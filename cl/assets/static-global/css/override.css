@@ -816,6 +816,12 @@ body.embed .plottable .axis text{
 body.embed .plottable .label-area text {
     font-size: 11px;
 }
+
+.caseHoverText {
+    color: rgb(51, 51, 51);
+    font-size: 14px;
+}
+
 .plottable .light-label .text-line {
     fill: #000;
 }

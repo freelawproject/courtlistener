@@ -857,7 +857,7 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 			}
 			if (datum !== null) {
 				caseHoverText
-					.text((datum.case_name_short) ? datum.case_name_short : datum.case_name)
+					.text((datum.case_name) ? datum.case_name : datum.case_name_short)
 					.style('visibility', 'visible');
 				caseHoverGroup
 					.attr('transform', 'translate(' + position.x + ',' + position.y + ')')
