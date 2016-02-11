@@ -396,8 +396,9 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 	}));
 
 	xScaleCatAbrev.domain([
-		'From ' + xDate(parseDate(workingJSON[0].date_filed)),
-		'To ' + xDate(parseDate(workingJSON[workingJSON.length - 1].date_filed))
+		xDate(parseDate(workingJSON[0].date_filed)) +
+		' to ' +
+		xDate(parseDate(workingJSON[workingJSON.length - 1].date_filed))
 	]);
 
 	// the rangeBand is the percent of the width of the chart that a single data point takes up
@@ -827,9 +828,9 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 		caseHoverText = cases
 			.foreground()
 			.append('text')
-			.attr('transform', 'translate(' + cases.width() / 2 + ',' + cases.height() / 2 + ')')
+			.attr('transform', 'translate(5,' + (cases.height() - 5) + ')')
 			.style('visibility', 'hidden')
-			.attr('text-anchor', 'middle')
+			.attr('text-anchor', 'left')
 			.attr('class', 'caseHoverText')
 			.text(defaultCaseHoverText);
 
