@@ -39,6 +39,7 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 		label = '',
 		//scales
 		xScaleCat = {}, // the scaling function for x in category mode
+		xScaleCatAbrev = {},
 		xCatPadding = 1, // padding in category mode to be added to right hand side
 		xScaleTime = {}, // the scaling function for x in timeline mode
 		yScale = {}, // the scaling function for y
@@ -77,12 +78,13 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 		connections = {}, // reference to the connection lines used to attach interactions
 		// x axis
 		xAxisCat = {}, // the x axis category
+		xAxisCatAbrev = {},
 		xAxisTime = {}, // the x axis timeline
 		// xLabel = {}, // label for the x axis
 		// chart interactions
 		caseHover = {}, // interaction behavior
-		// defaultCaseHoverText = '',
-		// caseHoverText = {}, // reference to the text in the object shown when hovering
+		defaultCaseHoverText = '',
+		caseHoverText = {}, // reference to the text in the object shown when hovering
 		caseHoverGroup = {}, // reference to the hover show object
 		caseClick = {}, // interaction behavior
 		caseDrag = {}, // used in edit mode
@@ -385,12 +387,18 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 	}
 
 	xScaleCat = new Plottable.Scales.Category(); // set switch for time or category time
+	xScaleCatAbrev = new Plottable.Scales.Category();
 	xScaleCat.outerPadding(0.9);
 	// ensure correct order by loading dates in
 	// preloading these allows us to draw connections before drawing nodes
 	xScaleCat.domain(workingJSON.map(function (d) {
 		return parseDate(d.date_filed);
 	}));
+
+	xScaleCatAbrev.domain([
+		'From ' + xDate(parseDate(workingJSON[0].date_filed)),
+		'To ' + xDate(parseDate(workingJSON[workingJSON.length - 1].date_filed))
+	]);
 
 	// the rangeBand is the percent of the width of the chart that a single data point takes up
 	// the floor of 5 div this div 100 yeilds a number from 0 to x that can be used to add padding
@@ -467,20 +475,21 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 		], ddc));
 	}
 
-	xAxisCat = new Plottable.Axes.Category(xScaleCat, 'bottom');
-
-	xAxisCat.formatter(function (d) {
+	function axisformat(d) {
 		var result = xDate(d);
 
 		if (d > new Date('9998-01-01')) {
 			result = '';
 		}
 		return result;
-	});
+	}
+
+	xAxisCat = new Plottable.Axes.Category(xScaleCat, 'bottom');
+	xAxisCatAbrev = new Plottable.Axes.Category(xScaleCatAbrev, 'bottom');
 	xAxisTime = new Plottable.Axes.Time(xScaleTime, 'bottom');
-	xAxisTime.formatter(function (d) {
-		return xDate(d);
-	});
+	xAxisCat.formatter(axisformat);
+	// xAxisCatAbrev.formatter(axisformat);
+	xAxisTime.formatter(axisformat);
 
 	setLabelAngle();
 
@@ -759,12 +768,27 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 		});
 	}
 
+	function pickAxis() {
+		var choice = null;
+
+		if (xAxisMode === 'cat') {
+			if (workingJSON.length < 35) {
+				choice = xAxisCat;
+			} else {
+				choice = xAxisCatAbrev;
+			}
+		} else {
+			choice = xAxisTime;
+		}
+		return choice;
+	}
+
 	// if we are not in gallery mode
 	if (galleryId === '') {
 		table = [
 			[null, null, legend, null],
 			[yLabel, yAxis, plot, null],
-			[null, null, (xAxisMode === 'cat') ? xAxisCat : xAxisTime, null]//,
+			[null, null, pickAxis(), null]//,
 			// [null, null, xLabel, null]
 		];
 	} else if (chartType === 'dos') { // gallery dos mode
@@ -800,11 +824,14 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 				'cx': 0,
 				'cy': 0
 			});
-		// caseHoverText = caseHoverGroup
-		// 	.append('text')
-		// 	.attr('text-anchor', 'middle')
-		// 	.attr('transform', 'translate(0,0)')
-		// 	.text(defaultCaseHoverText);
+		caseHoverText = cases
+			.foreground()
+			.append('text')
+			.attr('transform', 'translate(' + cases.width() / 2 + ',' + cases.height() / 2 + ')')
+			.style('visibility', 'hidden')
+			.attr('text-anchor', 'middle')
+			.attr('class', 'caseHoverText')
+			.text(defaultCaseHoverText);
 
 		caseHover.onPointerMove(function (p) {
 			var datum = null,
@@ -828,19 +855,25 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 				}
 			}
 			if (datum !== null) {
-				// caseHoverText.text(datum.case_name_short);
+				caseHoverText
+					.text((datum.case_name_short) ? datum.case_name_short : datum.case_name)
+					.style('visibility', 'visible');
 				caseHoverGroup
 					.attr('transform', 'translate(' + position.x + ',' + position.y + ')')
 					.style('visibility', 'visible')
 					.select('circle')
 					.attr('r', sizeScale.scale(scalePlot(datum.citation_count, datum.count - 1)) / 2);
 			} else {
-				// caseHoverText.text(defaultCaseHoverText);
+				caseHoverText
+					.style('visibility', 'hidden')
+					.text(defaultCaseHoverText);
 				caseHoverGroup.style('visibility', 'hidden');
 			}
 		});
 		caseHover.onPointerExit(function () {
-			// caseHoverText.text(defaultCaseHoverText);
+			caseHoverText
+					.style('visibility', 'hidden')
+					.text(defaultCaseHoverText);
 			caseHoverGroup.style('visibility', 'hidden');
 		});
 
