@@ -25,6 +25,7 @@ def sitemap_maker(request):
         # Simple pages
         make_url_dict('about', priority=0.6),
         make_url_dict('faq', priority=0.6),
+        make_url_dict('citation_redirector', priority=0.6, changefreq='never'),
         make_url_dict('coverage', priority=0.4),
         make_url_dict('feeds_info', priority=0.4, changefreq='never'),
         make_url_dict('contribute', priority=0.6, changefreq='never'),
