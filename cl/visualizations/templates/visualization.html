@@ -73,7 +73,7 @@
                         <div class="row">
                             <div class="col-xs-1 col-sm-2 col-md-3"></div>
                             <div class="col-xs-10 col-sm-8 col-md-6 well">
-                                <h2 class="text-center">This Network is Private</h2>
+                                <h2 class="text-center">This Visualization is Private</h2>
                                 {% if user.is_authenticated %}
                                     <p>You don't appear to be the owner of this
                                         network and it has not been
@@ -83,13 +83,12 @@
                                     </p>
                                 {% else %}
                                     <p>You are not signed in and this a
-                                        private network. If you're the
-                                        creator of this network and wish
+                                        private visualization. If you're the
+                                        creator of this visualization and wish
                                         to edit it, please <a
                                                 href="{% url "sign-in" %}?next={{ request.path }}">sign
                                             in</a> and you will be able to
-                                        access it. If you are not the creator of
-                                        this network, and you know the
+                                        access it. If you are not the creator and you know the
                                         creator, ask them to share it.
                                     </p>
                                 {% endif %}
