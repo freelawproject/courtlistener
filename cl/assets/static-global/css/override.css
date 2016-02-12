@@ -843,9 +843,6 @@ body.embed .caseHoverText {
     overflow-y: auto;
     max-height: 450px;
 }
-.gallery-chart {
-    width: 400px;
-}
 #viz-page .tooltip-inner {
     text-align: left;
 }
