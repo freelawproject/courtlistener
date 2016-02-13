@@ -303,6 +303,7 @@ div.hopscotch-bubble .hopscotch-bubble-close {
 mark {
     /* Needs extra declarations for old browsers */
     background-color: #ffffbf;
+    padding: 0;
 }
 
 .no-gutter {
