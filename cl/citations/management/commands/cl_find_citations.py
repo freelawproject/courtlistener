@@ -153,11 +153,11 @@ class Command(BaseCommand):
             call_command(
                 'cl_update_index',
                 '--type', 'opinions',
+                '--solr-url', settings.SOLR_OPINION_URL,
                 '--noinput',
                 '--update',
                 '--everything',
                 '--do-commit',
-                solr_url=settings.SOLR_OPINION_URL,
             )
         elif self.index == 'false':
             sys.stdout.write("Solr index not updated after running citation "
