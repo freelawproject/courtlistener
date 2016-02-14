@@ -1,3 +1,4 @@
+import re
 from urllib import urlencode
 from urlparse import parse_qs
 from django.utils.timezone import now
@@ -223,6 +224,28 @@ def make_fq(cd, field, key):
     return fq
 
 
+def make_fq_proximity_query(cd, field, key):
+    """Make an fq proximity query, attempting to normalize and user input.
+
+    This neuters the citation query box, but at the same time ensures that a
+    query for 22 US 44 doesn't return an item with parallel citations 22 US 88
+    and 44 F.2d 92. I.e., this ensures that queries don't span citations. This
+    works because internally Solr uses proximity to create multiValue fields.
+
+    See: http://stackoverflow.com/a/33858649/64911 and
+         https://github.com/freelawproject/courtlistener/issues/381
+    """
+    # Remove all valid Solr tokens, replacing with a space.
+    q = re.sub('[\^\?\*:\(\)!\"~\-\[\]]', ' ', cd[key])
+
+    # Remove all valid Solr words
+    tokens = []
+    for token in q.split():
+        if token not in ['AND', 'OR', 'NOT', 'TO']:
+            tokens.append(token)
+    return '%s:("%s"~5)' % (field, ' '.join(tokens))
+
+
 def make_date_query(query_field, before, after):
     """Given the cleaned data from a form, return a valid Solr fq string"""
     if any([before, after]):
@@ -378,7 +401,7 @@ def build_main_query(cd, highlight='all', order_by=''):
 
     if cd['type'] == 'o':
         if cd['citation']:
-            main_fq.append(make_fq(cd, 'citation', 'citation'))
+            main_fq.append(make_fq_proximity_query(cd, 'citation', 'citation'))
         if cd['neutral_cite']:
             main_fq.append(make_fq(cd, 'neutralCite', 'neutral_cite'))
         main_fq.append(make_date_query('dateFiled', cd['filed_before'],
@@ -440,7 +463,7 @@ def place_facet_queries(cd, conn=sunburnt.SolrInterface(settings.SOLR_OPINION_UR
 
     # Citations
     if cd['citation']:
-        fq.append(make_fq(cd, 'citation', 'citation'))
+        fq.append(make_fq_proximity_query(cd, 'citation', 'citation'))
     if cd['docket_number']:
         fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
     if cd['neutral_cite']:
