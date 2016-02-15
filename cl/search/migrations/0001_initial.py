@@ -48,25 +48,10 @@ class Migration(migrations.Migration):
                 ('case_name', models.TextField(help_text=b'The standard name of the case', blank=True)),
                 ('case_name_full', models.TextField(help_text=b'The full name of the case', blank=True)),
                 ('slug', models.SlugField(help_text=b'URL that the document should map to (the slug)', null=True, db_index=False)),
-                # docket number is made a mandatory argument.
-                ('docket_number', models.CharField(help_text=b'The docket numbers of a case, can be consolidated and quite long', max_length=5000, null=False, blank=False, db_index=True)),
+                ('docket_number', models.CharField(help_text=b'The docket numbers of a case, can be consolidated and quite long', max_length=5000, null=True, blank=True, db_index=True)),
                 ('date_blocked', models.DateField(help_text=b'The date that this opinion was blocked from indexing by search engines', null=True, db_index=True, blank=True)),
                 ('blocked', models.BooleanField(default=False, help_text=b'Whether a document should be blocked from indexing by search engines', db_index=True)),
                 ('court', models.ForeignKey(help_text=b'The court where the docket was filed', to='search.Court')),
-
-                # The below fields are added after Merging with RECAP. To include RECAP documents. @!$#
-                ('pacer_case_id', models.PositiveIntegerField(help_text=b'The cased ID which PACER provides.', null=True, blank=True, db_index=True)),
-                ('case_cause', models.CharField(help_text=b'The type of cause for the case (Not sure)', max_length=200, null=True, blank=True)),
-                ('assigned_to', models.ForeignKey(help_text=b'The judge the case was assigned to.', null=True, to='judges.Judge' )),
-                ('date_filed', models.DateField(help_text=b'The date the case was filed.', blank=True, null=True)),
-                ('date_terminated', models.DateField(help_text=b'The date the case was terminated.', blank=True, null=True)),
-                ('date_last_filing', models.DateField(help_text=b'The date the case was last updated in the docket.', blank=True, null=True)),
-                ('nature_of_suit', models.CharField(help_text=b'The type of case.  (Not sure)', max_length=100, null=True, blank=True)),
-                ('jury_demand', models.CharField(help_text=b'The compensation demand (Not sure)', max_length=500, null=True, blank=True)),
-                ('jurisdiction_type', models.CharField(help_text=b'Stands for jurisdiction in RECAP XML docket. Some examples are : "Diversity", "U.S. Government Defendant"', max_length=100, null=True, blank=True)),
-                ('xml_filepath_local', models.FilePathField(help_text=b'RECAPs Docket XML page file path in the local storage area.', max_length=500, null=True, blank=True)),
-                ('xml_filepath_ia', models.FilePathField(help_text=b'The Docket XML page file path in The Internet Archive', max_length=500, null=True, blank=True)),
-                ('source', models.SmallIntegerField(help_text=b'contains the source of the Docket.', null=False, blank=False, choices=[(0, b'Default'), (1, b'Recap')], default=0))
             ],
         ),
         migrations.CreateModel(
@@ -140,45 +125,6 @@ class Migration(migrations.Migration):
             options={
                 'verbose_name_plural': 'Opinions cited',
             },
-        ),
-
-        migrations.CreateModel(
-            name='DocketEntry',
-            fields=[
-                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('docket', models.ForeignKey(to='search.Docket', null=False, blank=False, help_text=b'Foreign key as a relation to the corresponding Docket object. Specifies which docket the docket entry belongs to.')),
-                ('filed_date', models.DateField(help_text=b'The Created date of the Docket Entry.', blank=False, null=False)),
-                ('entered_date', models.DateField(help_text=b'The date the Docket entry was entered in RECAP. Found in RECAP.', blank=True, null=True)),
-                # Here we have made the entry_number a mandatory field because all docket entries in RECAP
-                # will and must have an Entry number.
-                # Recap uses this number to identify documents and attachments. Therefore To maintain the identity of docket
-                # entries and documents, it is important to have an entry number to every docket entry.
-                ('entry_number', models.PositiveIntegerField(help_text=b'# on the PACER docket page.', null=False, blank=False)),
-                ('text', models.TextField(help_text=b'The text content of the docket entry that appears in the PACER docket page.This field is the long_desc in RECAP.', blank=False, null=False, db_index=True))
-
-            ],
-        ),
-
-        migrations.CreateModel(
-            name='Document',
-            fields=[
-                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('document_type', models.IntegerField(help_text=b'The type of file. Should be an enumeration.(Whether it is a Document or Attachment).', null=False, blank=False, db_index=True,  choices=[(1, b'PACER Document'), (2, b'Attachment')])),
-                ('docket_entry', models.ForeignKey(to='search.DocketEntry', null=False, blank=False, help_text=b'Foreign Key to the DocketEntry object to which it belongs. Multiple documents can belong to a DocketEntry. (Attachments and Documents together)')),
-                ('document_number', models.PositiveIntegerField(help_text=b'If the file is a document, the number is the document_number in RECAP docket.', blank=False, null=False)),
-                ('attachment_number', models.PositiveIntegerField( help_text=b'If the file is an attachment, the number is the attachment number in RECAP docket.', blank=True)),
-                # Character length same as in RECAP
-                ('pacer_doc_id', models.CharField(help_text=b'The ID of the document in PACER. This information is provided by RECAP.', max_length=32,  null=True, blank=True)),
-                ('date_upload', models.DateField(help_text=b'upload_date in RECAP. The date the file was uploaded to RECAP. This information is provided by RECAP.', blank=True, null=True)),
-                ('is_available', models.SmallIntegerField(help_text=b'Boolean (0 or 1) value to say if the document is available in RECAP.', blank=True, null=True, default=0)),
-                ('free_import', models.SmallIntegerField(help_text=b'Found in RECAP. Says if the document is free.', blank=True, null=True, default=0)),
-                # Character length same as in RECAP
-                ('sha1', models.CharField(max_length=40, blank=True, null=True, help_text=b'The ID used for a document in RECAP')),
-                ('filepath_local', models.FilePathField(help_text=b'The path of the file in the local storage area.', max_length=500, null=False, blank=False)),
-                ('filepath_ia', models.FilePathField(help_text=b'The URL of the file in IA', max_length=500, null=False, blank=False)),
-                ('date_created', models.DateTimeField(help_text=b'The date the file was imported to Local Storage.', blank=True, null=True)),
-                ('date_modified', models.DateTimeField(help_text=b'The date the Document object was last updated in CourtListener', blank=True, null=True))
-            ]
         ),
         migrations.AddField(
             model_name='opinion',
