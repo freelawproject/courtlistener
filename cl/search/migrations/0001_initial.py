@@ -48,7 +48,7 @@ class Migration(migrations.Migration):
                 ('case_name', models.TextField(help_text=b'The standard name of the case', blank=True)),
                 ('case_name_full', models.TextField(help_text=b'The full name of the case', blank=True)),
                 ('slug', models.SlugField(help_text=b'URL that the document should map to (the slug)', null=True, db_index=False)),
-                ('docket_number', models.CharField(help_text=b'The docket numbers of a case, can be consolidated and quite long', max_length=5000, null=True, blank=True, db_index=True)),
+                ('docket_number', models.CharField(help_text=b'The docket numbers of a case, can be consolidated and quite long', max_length=5000, null=True, blank=True)),
                 ('date_blocked', models.DateField(help_text=b'The date that this opinion was blocked from indexing by search engines', null=True, db_index=True, blank=True)),
                 ('blocked', models.BooleanField(default=False, help_text=b'Whether a document should be blocked from indexing by search engines', db_index=True)),
                 ('court', models.ForeignKey(help_text=b'The court where the docket was filed', to='search.Court')),
