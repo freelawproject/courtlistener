@@ -80,9 +80,9 @@
                     {% endfor %}
                 </ul>
                 <h4>
-                    <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})">
-                        Full List of Cited Opinions
-                        <i class="fa fa-arrow-circle-o-right gray"></i>
+                    <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+                       class="btn btn-default">
+                        View All Cited Opinions
                     </a>
                 </h4>
             </div>
@@ -103,9 +103,9 @@
                     {% endfor %}
                 </ul>
                 <h4>
-                    <a href="{% url "view_authorities" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}">
-                        Full Table of Authorities
-                        <i class="fa fa-arrow-circle-o-right gray"></i>
+                    <a href="{% url "view_authorities" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
+                       class="btn btn-default">
+                        View All Authorities
                     </a>
                 </h4>
             </div>
@@ -126,10 +126,13 @@
                         {% endfor %}
                     </ul>
                     <h4>
-                        <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}">
-                            Full List of Visualizations
-                            <i class="fa fa-arrow-circle-o-right gray"></i>
+                        <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
+                           class="btn btn-default">
+                            View Full List
                         </a>
+                        <a href="{% url "new_visualization" %}&start_id="
+                           class="btn btn-success">
+                            <i class="fa fa-plus"></i>&nbsp;New Network</a>
                     </h4>
                 </div>
             {% endif %}
