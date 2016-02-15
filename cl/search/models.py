@@ -337,7 +337,9 @@ class Document(models.Model):
 
     attachment_number = models.PositiveIntegerField(
         help_text="If the file is an attachment, the number is the attachment number in RECAP docket.",
-        blank=True
+        blank=True,
+        null=False,
+        default = 0
     )
 
     pacer_doc_id = models.CharField(
@@ -347,7 +349,7 @@ class Document(models.Model):
         blank=True
     )
 
-    date_upload = models.DateField(
+    date_upload = models.DateTimeField(
         help_text="upload_date in RECAP. The date the file was uploaded to RECAP. This information is provided by RECAP.",
         blank=True,
         null=True
