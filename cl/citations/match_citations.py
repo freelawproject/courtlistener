@@ -119,8 +119,8 @@ def match_citation(citation, citing_doc):
     # Non-precedential documents shouldn't be cited
     main_params['fq'].append('status:Precedential')
 
-    # Take 1: Use citation
-    citation_param = 'citation:"%s"' % citation.base_citation()
+    # Take 1: Use a proximity query to search the citation field.
+    citation_param = 'citation:("%s"~5)' % citation.base_citation()
     main_params['fq'].append(citation_param)
     main_params['caller'] = 'citation.match_citations.match_citation'
     results = conn.raw_query(**main_params).execute()
