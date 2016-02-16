@@ -104,7 +104,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docket',
             name='docket_number',
-            field=models.CharField(help_text=b'The docket numbers of a case, can be consolidated and quite long', max_length=5000, db_index=True, null=True, blank=True),
+            field=models.CharField(help_text=b'The docket numbers of a case, can be consolidated and quite long', max_length=5000, db_index=True, null=False, blank=False),
         ),
         migrations.AddField(
             model_name='docketentry',
