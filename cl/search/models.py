@@ -284,8 +284,12 @@ class DocketEntry(models.Model):
         blank=False
         # Here we have made the entry_number a mandatory field because all docket entries in RECAP
         # will and must have an Entry number.
-        # Recap uses this number to identify documents and attachments. Therefore To maintain the identity of docket
-        # entries and documents, it is important to have an entry number to every docket entry.
+        # RECAP currently does not handle minute entries (Docket entries withoout an entry_number, Discussed in :
+        # https://github.com/freelawproject/recap/issues/54)
+        # It is also not efficiently possible to handle the order of docket entries without entry_number.
+        # Therefore it has to be handled in the RECAP before anything canbe done here.
+        # Recap uses the entry_number to identify documents and attachments. Therefore, to maintain the identity of docket
+        # entries and documents, it is important to have an entry_number to every docket entry.
     )
 
     text = models.TextField(
