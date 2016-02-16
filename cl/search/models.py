@@ -338,8 +338,7 @@ class Document(models.Model):
     attachment_number = models.PositiveIntegerField(
         help_text="If the file is an attachment, the number is the attachment number in RECAP docket.",
         blank=True,
-        null=False,
-        default = 0
+        null=True
     )
 
     pacer_doc_id = models.CharField(
@@ -404,6 +403,13 @@ class Document(models.Model):
 
     def __unicode__(self):
         return "Docket_%s , document_number_%s , attachment_number_%s" % (self.docket_entry.docket.docket_number, self.document_number, self.attachment_number)
+    
+    def save(self, *args, **kwargs):
+        if self.document_type ==  self.ATTACHMENT:
+            if self.attachment_number == None:
+                raise ValidationError('attachment_number cannot be null for an attachment.')
+        
+        super(Document, self).save(*args, **kwargs)
 
 
 class Court(models.Model):
@@ -488,7 +494,7 @@ class Court(models.Model):
 
     class Meta:
         ordering = ["position"]
-
+    
 
 class OpinionCluster(models.Model):
     """A class representing a cluster of court opinions."""

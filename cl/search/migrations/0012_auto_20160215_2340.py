@@ -28,9 +28,9 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('document_type', models.IntegerField(help_text=b'The type of file. Should be an enumeration.(Whether it is a Document or Attachment).', db_index=True, choices=[(1, b'PACER Document'), (2, b'Attachment')])),
                 ('document_number', models.PositiveIntegerField(help_text=b'If the file is a document, the number is the document_number in RECAP docket.')),
-                ('attachment_number', models.PositiveIntegerField(help_text=b'If the file is an attachment, the number is the attachment number in RECAP docket.', blank=True)),
+                ('attachment_number', models.PositiveIntegerField(help_text=b'If the file is an attachment, the number is the attachment number in RECAP docket.', null=True, blank=True)),
                 ('pacer_doc_id', models.CharField(help_text=b'The ID of the document in PACER. This information is provided by RECAP.', max_length=32, null=True, blank=True)),
-                ('date_upload', models.DateField(help_text=b'upload_date in RECAP. The date the file was uploaded to RECAP. This information is provided by RECAP.', null=True, blank=True)),
+                ('date_upload', models.DateTimeField(help_text=b'upload_date in RECAP. The date the file was uploaded to RECAP. This information is provided by RECAP.', null=True, blank=True)),
                 ('is_available', models.SmallIntegerField(default=0, help_text=b'Boolean (0 or 1) value to say if the document is available in RECAP.', null=True, blank=True)),
                 ('free_import', models.SmallIntegerField(default=0, help_text=b'Found in RECAP. Says if the document is free.', null=True, blank=True)),
                 ('sha1', models.CharField(help_text=b'The ID used for a document in RECAP', max_length=40, null=True, blank=True)),
@@ -104,7 +104,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docket',
             name='docket_number',
-            field=models.CharField(help_text=b'The docket numbers of a case, can be consolidated and quite long', max_length=5000, null=False, blank=False, db_index=True),
+            field=models.CharField(help_text=b'The docket numbers of a case, can be consolidated and quite long', max_length=5000, db_index=True, null=True, blank=True),
         ),
         migrations.AddField(
             model_name='docketentry',
