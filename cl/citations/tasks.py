@@ -1,6 +1,5 @@
 import re
 from django.core import urlresolvers
-from django.db import IntegrityError
 from cl.citations import find_citations, match_citations
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.search.models import Opinion, OpinionsCited
@@ -61,10 +60,6 @@ def update_document(opinion, index=True):
     # List used so we can do one simple update to the citing opinion.
     opinions_cited = set()
     for citation in citations:
-        # Resource.org docs contain their own citation in the html text, which
-        # we don't want to include
-        if citation.base_citation() in opinion.cluster.citation_string:
-            continue
         matches, is_citation_match = match_citations.match_citation(
             citation,
             citing_doc=opinion

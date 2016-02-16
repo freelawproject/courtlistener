@@ -86,6 +86,7 @@ def match_citation(citation, citing_doc):
     # documents
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     main_params = {'fq': []}
+    main_params['fq'].append('-id:%s' % citing_doc.pk)  # Eliminate self-cites.
     # Set up filter parameters
     start_year = 1750
     end_year = date.today().year
