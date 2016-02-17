@@ -170,8 +170,8 @@ class Position(models.Model):
     SELECTION_METHODS = (
         ('e_part', 'Partisan Election'),
         ('e_non_part', 'Non-Partisan Election'),
-        ('a_pres', 'Appointment (Governor)'),
-        ('a_gov', 'Appointment (President)'),
+        ('a_pres', 'Appointment (President)'),
+        ('a_gov', 'Appointment (Governor)'),
         ('a_legis', 'Appointment (Legislature)'),
     )
     TERMINATION_REASONS = (
