@@ -76,8 +76,8 @@ def make_state_judge(item):
         date_retirement = date_retirement,
         votes_yes = votes_yes,
         votes_no = votes_no,
-        how_selected = get_select(item['howselected']),
-        termination_reason = get_end(item['howended'])
+        how_selected = get_select(courtid,item['startyear']),
+        termination_reason = item['howended']
     )
     
     position.save()

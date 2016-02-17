@@ -32,37 +32,20 @@ def get_school(schoolname):
     school = School.objects.filter(name='schoolname')
     return school
 
+
 select_dict = {'P': 'e_part',
                'NP': 'e_non_part',
-               'A': 'a_gov',
-               'L': 'a_legis'
+               'G': 'a_gov',
+               'L': 'a_legis',
+               'M': 'a_gov'
               }
 
-end_dict
-    SELECTION_METHODS = (
-        ('', 'Partisan Election'),
-        ('e_non_part', 'Non-Partisan Election'),
-        ('a_pres', 'Appointment (Governor)'),
-        ('a_gov', 'Appointment (President)'),
-        ('a_legis', 'Appointment (Legislature)'),
-    )
-    TERMINATION_REASONS = (
-        ('ded', 'Death'),
-        ('retire_vol', 'Voluntary Retirement'),
-        ('retire_mand', 'Mandatory Retirement'),
-        ('resign', 'Resigned'),
-        ('other_pos', 'Appointed to Other Judgeship'),
-        ('lost', 'Lost Election'),
-        ('abolished', 'Court Abolished'),
-        ('bad_judge', 'Impeached and Convicted'),
-        ('recess_not_confirmed', 'Recess Appointment Not Confirmed'),
-    )
+import pandas as pd
+select_data = pd.read_csv('/home/elliott/research/datasets/judges/clean/court/stateyeardata.csv')
 
-def get_select(how_selected):
+def get_select(state,year):
     return None
-
-def get_end(how_ended):
-    return None    
+ 
     
     
     
