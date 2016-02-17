@@ -2,6 +2,12 @@ from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
 
 
+def make_recap_path(instance, filename):
+    """Make a path to a good location on the local system for RECAP files."""
+    raise NotImplementedError("Need to do research based on the files that are "
+                              "returned to establish a sane practice here.")
+
+
 def make_upload_path(instance, filename):
     """Return a string like pdf/2010/08/13/foo_v._var.pdf
 

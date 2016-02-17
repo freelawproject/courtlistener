@@ -9,7 +9,7 @@ from django.utils.text import slugify
 
 from cl import settings
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.model_helpers import make_upload_path
+from cl.lib.model_helpers import make_upload_path, make_recap_path
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
 
@@ -66,8 +66,8 @@ SOURCES = (
 
 
 class Docket(models.Model):
-    """A class to sit above OpinionClusters and Audio files and link them
-    together.
+    """A class to sit above OpinionClusters, Audio files, and Docket Entries,
+    and link them together.
     """
     DEFAULT = 0
     RECAP = 1
@@ -155,6 +155,7 @@ class Docket(models.Model):
                   "quite long",
         max_length=5000,  # was 50, 100, 300, 1000
         blank=True,
+        null=True,
         db_index=True,
     )
     date_blocked = models.DateField(
@@ -199,7 +200,7 @@ class Docket(models.Model):
     )
     filepath_local = models.FileField(
         help_text="Path to RECAP’s Docket XML page.",
-        upload_to=make_upload_path,
+        upload_to=make_recap_path,
         storage=IncrementingFileSystemStorage(),
         max_length=1000,
         null=True,
@@ -242,13 +243,12 @@ class DocketEntry(models.Model):
                   "object. Specifies which docket the docket entry belongs to.",
     )
     date_created = models.DateTimeField(
-        help_text="The time when this item was created",
+        help_text="The time when this item was created.",
         auto_now_add=True,
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value in "
-                  "year 1750 indicates the value is unknown",
+        help_text="The last moment when the item was modified.",
         auto_now=True,
         db_index=True,
     )
@@ -285,6 +285,22 @@ class RECAPDocument(models.Model):
                   "Multiple documents can belong to a DocketEntry. "
                   "(Attachments and Documents together)",
     )
+    date_created = models.DateTimeField(
+        help_text="The date the file was imported to Local Storage.",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="Timestamp of last update.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_upload = models.DateTimeField(
+            help_text="upload_date in RECAP. The date the file was uploaded to "
+                      "RECAP. This information is provided by RECAP.",
+            blank=True,
+            null=True,
+    )
     document_type = models.IntegerField(
         help_text="Whether this is a regular document or an attachment.",
         db_index=True,
@@ -294,7 +310,7 @@ class RECAPDocument(models.Model):
         help_text="If the file is a document, the number is the "
                   "document_number in RECAP docket.",
     )
-    attachment_number = models.PositiveIntegerField(
+    attachment_number = models.SmallIntegerField(
         help_text="If the file is an attachment, the number is the attachment "
                   "number in RECAP docket.",
         blank=True,
@@ -306,13 +322,7 @@ class RECAPDocument(models.Model):
         max_length=32,  # Same as in RECAP
         blank=True,
     )
-    date_upload = models.DateTimeField(
-        help_text="upload_date in RECAP. The date the file was uploaded to "
-                  "RECAP. This information is provided by RECAP.",
-        blank=True,
-        null=True,
-    )
-    is_available = models.BooleanField(
+    is_available = models.NullBooleanField(
         help_text="True if the item is available in RECAP",
         blank=True,
         null=True,
@@ -323,23 +333,15 @@ class RECAPDocument(models.Model):
         max_length=40,  # As in RECAP
         blank=True,
     )
-    filepath_local = models.FilePathField(
+    filepath_local = models.FileField(
         help_text="The path of the file in the local storage area.",
-        max_length=500,
+        upload_to=make_recap_path,
+        storage=IncrementingFileSystemStorage(),
+        max_length=1000,
     )
-    filepath_ia = models.FilePathField(
+    filepath_ia = models.CharField(
         help_text="The URL of the file in IA",
-        max_length=500,
-    )
-    date_created = models.DateTimeField(
-        help_text="The date the file was imported to Local Storage.",
-        blank=True,
-        null=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The date the Document object was last updated in CourtListener",
-        blank=True,
-        null=True,
+        max_length=1000,
     )
 
     def __unicode__(self):
@@ -350,7 +352,7 @@ class RECAPDocument(models.Model):
             if self.attachment_number == None:
                 raise ValidationError('attachment_number cannot be null for an attachment.')
 
-        super(Document, self).save(*args, **kwargs)
+        super(RECAPDocument, self).save(*args, **kwargs)
 
 
 class Court(models.Model):
