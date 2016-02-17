@@ -3,7 +3,12 @@ from django.utils.text import get_valid_filename
 
 
 def make_upload_path(instance, filename):
-    """Return a string like pdf/2010/08/13/foo_v._var.pdf"""
+    """Return a string like pdf/2010/08/13/foo_v._var.pdf
+
+    This function requires that when you save an item you provide an attribute
+    called file_with_date on the object. That date will be used to place the
+    item in the correct location on disk.
+    """
     try:
         # Cannot do proper type checking here because of circular import
         # problems when importing Audio, Document, etc.
