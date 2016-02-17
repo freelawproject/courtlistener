@@ -182,9 +182,13 @@ def make_federal_judge(item):
 if __name__ == '__main__':
 
     import pandas as pd
-    
-    df = pd.read_excel('/home/elliott/research/datasets/judges/supreme court-judgebios-2016-01-19.xlsx')
-    
+
+    # make state judges    
+    df = pd.read_excel('/home/elliott/research/datasets/judges/  supreme court-judgebios-2016-01-19.xlsx')    
     for i, row in df.iterrows():    
         make_state_judge(dict(row))
     
+    # make federal judges
+    df = df = pd.read_excel('/home/elliott/research/datasets/judges/fjc-data.xlsx')
+    for i, row in df.iterrows():    
+        make_state_judge(dict(row))

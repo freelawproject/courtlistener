@@ -9,7 +9,7 @@ from cl.corpus_importer.import_columbia.populate_opinions import get_court_objec
 from cl.search.models import School
 
 def process_date(year,month,day):
-    # return date object and accompanying granularity
+    """ return date object and accompanying granularity """
     if year is None:
         pdate = None
         granularity = None
@@ -32,11 +32,15 @@ def get_school(schoolname):
     school = School.objects.filter(name='schoolname')
     return school
 
-select_dict = {
+select_dict = {'P': 'e_part',
+               'NP': 'e_non_part',
+               'A': 'a_gov',
+               'L': 'a_legis'
               }
 
+end_dict
     SELECTION_METHODS = (
-        ('e_part', 'Partisan Election'),
+        ('', 'Partisan Election'),
         ('e_non_part', 'Non-Partisan Election'),
         ('a_pres', 'Appointment (Governor)'),
         ('a_gov', 'Appointment (President)'),
