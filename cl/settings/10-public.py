@@ -188,6 +188,7 @@ SERVER_EMAIL = 'CourtListener <noreply@courtlistener.com>'
 DEFAULT_FROM_EMAIL = 'CourtListener <noreply@courtlistener.com>'
 SCRAPER_ADMINS = (
     ('Juriscraper List', 'juriscraper@lists.freelawproject.org'),
+    ('Slack Juriscraper Channel', 'j9f4b5n5x7k8x2r1@flp-talk.slack.com'),
 )
 
 ###############
