@@ -55,8 +55,7 @@ def update_document(opinion, index=True):
         )
 
     citations = get_document_citations(opinion)
-    # List for tracking number of citation vs. name matches
-    matched_citations = []
+
     # List used so we can do one simple update to the citing opinion.
     opinions_cited = set()
     for citation in citations:
@@ -67,7 +66,6 @@ def update_document(opinion, index=True):
 
         # TODO: Figure out what to do if there's more than one
         if len(matches) == 1:
-            matched_citations.append(is_citation_match)
             match_id = matches[0]['id']
             try:
                 matched_opinion = Opinion.objects.get(pk=match_id)
@@ -120,12 +118,6 @@ def update_document(opinion, index=True):
     # Update Solr if requested. In some cases we do it at the end for
     # performance reasons.
     opinion.save(index=index)
-    if DEBUG >= 1:
-        citation_matches = sum(matched_citations)
-        name_matches = len(matched_citations) - citation_matches
-        print "  %d citations" % len(citations)
-        print "  %d exact matches" % citation_matches
-        print "  %d name matches" % name_matches
 
 
 @task
