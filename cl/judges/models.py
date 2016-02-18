@@ -739,6 +739,9 @@ class PoliticalAffiliation(models.Model):
         ('i', 'Independent'),
         ('g', 'Green'),
         ('l', 'Libertarian'),
+        ('f', 'Federalist'),
+        ('w', 'Whig'),
+        ('j', 'Jeffersonian Republican')
     )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
