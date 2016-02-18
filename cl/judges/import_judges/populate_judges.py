@@ -5,7 +5,7 @@ from datetime import date
 
 from cl.judges.models import Judge, Position, Education, Career, Title, Race, PoliticalAffiliation, Source, ABARating
 
-from judge_utils import get_court, get_school, process_date, get_select, get_races
+from judge_utils import get_court, get_school, process_date, get_select, get_races, get_party
     
 def make_state_judge(item):
     """Takes the state judge data <item> and associates it with a Judge object.
@@ -319,20 +319,15 @@ def make_federal_judge(item):
 #        
 #        job.save()
     
-    if item['Party Affiliation of President'] in ['Republican', 'Democratic']:
-    party = item['Party Affiliation of President'][:1].lower()
-    if party not in [']
+    party = get_party(item['Party Affiliation of President'])    
     
-    if item['politics'].lower() == 'd':
-        party = 'd'
-    elif item['politics'].lower() == 'r':
-        party = 'r'
     if party is not None:
         politics = PoliticalAffiliation(
             date_created=now(),
             date_modified=now(),
             judge = judge,
-            political_party = party            
+            political_party = party,
+            source = 'a'
             )    
         politics.save()
     
@@ -356,7 +351,7 @@ def make_federal_judge(item):
             notes = notestr
             )
             source.save()                
-
+            
 
 if __name__ == '__main__':
 

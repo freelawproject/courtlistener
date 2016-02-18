@@ -45,7 +45,7 @@ racedict =  {'White': 'w',
              'Pacific Islander': 'p',            
              'Pacific Isl.': 'p',        
              'Hispanic': 'h',
-             'Latino': 'h',            
+             'Latino': 'h'}            
 
 def get_races(str_race):
     if '/' in str_race:
