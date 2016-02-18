@@ -130,11 +130,12 @@ class Command(BaseCommand):
                 t2 = time.time()
                 timings.append(t2 - t1)
                 average_per_s = 1000 / (sum(timings) / float(len(timings)))
-            sys.stdout.write("\rProcessing items in Celery queue: {:.0%} ({}/{}, {:.1f}/s)".format(
+            sys.stdout.write("\rProcessing items in Celery queue: {:.0%} ({}/{}, {:.1f}/s, Last id: {})".format(
                 processed_count * 1.0 / count,
                 processed_count,
                 count,
-                average_per_s
+                average_per_s,
+                doc.pk,
             ))
             sys.stdout.flush()
             last_document = (count == processed_count)
