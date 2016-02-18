@@ -32,6 +32,32 @@ def get_school(schoolname):
     school = School.objects.filter(name='schoolname')
     return school
 
+racedict =  {'White': 'w',
+             'Black': 'b',
+             'African American': 'b',
+             'African Am.': 'b',
+             'American Indian': 'i',
+             'Alaska Native': 'i',
+             'Asian': 'a',            
+             'Asian American': 'a',
+             'Asian Am.': 'a',
+             'Native Hawaiian':'p',
+             'Pacific Islander': 'p',            
+             'Pacific Isl.': 'p',        
+             'Hispanic': 'h',
+             'Latino': 'h',            
+
+def get_races(str_race):
+    if '/' in str_race:
+        rawraces = [x.strip() for x in str_race.split('/')]
+    else:
+        rawraces = [str_race]
+    races = []
+    for rawrace in rawraces: 
+        races.append(racedict[rawrace])
+    return races
+        
+    
 
 select_dict = {'P': 'e_part',
                'NP': 'e_non_part',
