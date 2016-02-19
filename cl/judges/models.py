@@ -30,7 +30,7 @@ DATE_GRANULARITIES = (
 )
 
 
-class Judge(models.Model):
+class Person(models.Model):
     race = models.ManyToManyField(
         'Race',
         blank=True,
@@ -51,7 +51,7 @@ class Judge(models.Model):
         db_index=True,
     )
     fjc_id = models.IntegerField(
-        help_text="The ID of the judge as assigned by the Federal Judicial "
+        help_text="The ID of a judge as assigned by the Federal Judicial "
                   "Center.",
         null=True,
         blank=True,
@@ -120,7 +120,7 @@ class Judge(models.Model):
                                      self.name_suffix)
 
     def get_absolute_url(self):
-        return reverse('view_judge', args=[self.pk, self.slug])
+        return reverse('view_person', args=[self.pk, self.slug])
 
     def save(self, *args, **kwargs):
         self.slug = slugify(
@@ -129,12 +129,12 @@ class Judge(models.Model):
                   158),
         )
         self.full_clean()
-        super(Judge, self).save(*args, **kwargs)
+        super(Person, self).save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         for field in ['dob', 'dod']:
             validate_partial_date(self, field)
-        super(Judge, self).clean_fields(*args, **kwargs)
+        super(Person, self).clean_fields(*args, **kwargs)
 
     @property
     def name_full(self):
@@ -152,8 +152,89 @@ class Judge(models.Model):
 
 
 class Position(models.Model):
-    """A role held by a judge, and the details about it."""
+    """A role held by a person, and the details about it."""
+    POSITION_TYPES = (
+        ('Judge', (
+            ('Acting', (
+                ('act-jud',      'Acting Judge'),
+                ('act-pres-jud', 'Acting Presiding Judge'),
+            )),
+            ('Associate', (
+                ('ass-jud',      'Associate Judge'),
+                ('ass-c-jud',    'Associate Chief Judge'),
+                ('ass-pres-jud', 'Associate Presiding Judge'),
+                ('jud',          'Judge'),
+                ('jus',          'Justice'),
+            )),
+            ('Chief', (
+                ('c-jud',     'Chief Judge'),
+                ('c-jus',     'Chief Justice'),
+                ('pres-jud',  'Presiding Judge'),
+                ('pres-jus',  'Presiding Justice'),
+                ('pres-mag',  'Presiding Magistrate'),
+            )),
+            ('Commissioner', (
+                ('com',     'Commissioner'),
+                ('com-dep', 'Deputy Commissioner'),
+            )),
+            ('Pro Tem', (
+                ('jud-pt', 'Judge Pro Tem'),
+                ('jus-pt', 'Justice Pro Tem'),
+                ('mag-pt', 'Magistrate Pro Tem'),
+            )),
+            ('Referee', (
+                ('ref-jud-tr',      'Judge Trial Referee'),
+                ('ref-off',         'Official Referee'),
+                ('ref-state-trial', 'State Trial Referee'),
+            )),
+            ('Retired', (
+                ('ret-act-jus',    'Active Retired Justice'),
+                ('ret-ass-jud',    'Retired Associate Judge'),
+                ('ret-c-jud',      'Retired Chief Judge'),
+                ('ret-jus',        'Retired Justice'),
+                ('ret-senior-jud', 'Senior Judge'),
+            )),
+            ('Special', (
+                ('spec-chair',  'Special Chairman'),
+                ('spec-jud',    'Special Judge'),
+                ('spec-m',      'Special Master'),
+                ('spec-scjcbc', 'Special Superior Court Judge for Complex Business '
+                                'Cases'),
+            )),
+            ('Other', (
+                ('chair',     'Chairman'),
+                ('chan',      'Chancellor'),
+                ('mag',       'Magistrate'),
+                ('presi-jud', 'President'),
+                ('res-jud',   'Reserve Judge'),
+                ('trial-jud', 'Trial Judge'),
+                ('vice-chan', 'Vice Chancellor'),
+                ('vice-cj',   'Vice Chief Judge'),
+            )),                        
+        )),
+        # Sometimes attorney generals write opinions too
+        ('Attorney General', (
+            ('att-gen',          'Attorney General'),
+            ('att-gen-ass',      'Assistant Attorney General'),
+            ('att-gen-ass-spec', 'Special Assistant Attorney General'),
+            ('sen-counsel',      'Senior Counsel'),
+            ('dep-sol-gen',      'Deputy Solicitor General'),
+        )),
+        ('Appointing Authority', (
+            ('pres',          'President'),
+            ('gov',           'Governor'),
+        )),
+        ('Clerkships', (
+            ('clerk',      'Clerk'),
+            ('staff-atty', 'Staff Attorney'),
+        )),
 
+        ('prof',    'Professor'),
+        ('prac',    'Practitioner'),        
+        ('pros',    'Prosecutor'),
+        ('pub_def', 'Public Defender'),
+        ('legis',   'Legislator'),
+    )
     NOMINATION_PROCESSES = (
         ('fed_senate', 'U.S. Senate'),
         ('state_senate', 'State Senate'),
@@ -185,27 +266,52 @@ class Position(models.Model):
         ('bad_judge', 'Impeached and Convicted'),
         ('recess_not_confirmed', 'Recess Appointment Not Confirmed'),
     )
-    judge = models.ForeignKey(
-        Judge,
+    person = models.ForeignKey(
+        Person,
+        related_name='positions',
+        blank=True,
+        null=True,
+    )
+    court = models.ForeignKey(
+        Court,        
         related_name='positions',
         blank=True,
         null=True,
     )
     appointer = models.ForeignKey(
-        'Politician',
+        help_text="If this is an appointed position, "
+                  "the person responsible for the appointing.",
+        Person,
+        blank=True,
+        null=True,
+    )
+    supervisor = models.ForeignKey(
+        help_text="If this is a clerkship, the supervising judge.",
+        Person,
+        blank=True,
+        null=True,
+    )
+    school = models.ForeignKey(
+        help_text="If academic job, the school where they work.",
+        School,
+        blank=True,
+        null=True,
+    )
+    job_title = models.CharField(
+        help_text="If title isnt in list, type here.",
+        max_length=100,
+        blank=True,
+    )
+    organization_name = models.CharField(
+        help_text="If org isnt court or school, type here.",
+        max_length=120,
         blank=True,
         null=True,
     )
     predecessor = models.ForeignKey(
-        Judge,
+        Person,
         blank=True,
         null=True,
-    )
-    court = models.ForeignKey(
-        Court,
-        # + indicates that we don't really see the need for this reverse
-        # relationship.
-        related_name='+',
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -273,7 +379,7 @@ class Position(models.Model):
         db_index=True,
     )
     date_start = models.DateField(
-        help_text="The date a judge starts active duty.",
+        help_text="The date the position starts active duty.",
         db_index=True,
     )
     date_granularity_start = models.CharField(
@@ -327,7 +433,7 @@ class Position(models.Model):
     )
 
     def __unicode__(self):
-        return u'%s: %s at %s' % (self.pk, self.judge.name_full, self.court_id)
+        return u'%s: %s at %s' % (self.pk, self.person.name_full, self.court_id)
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -344,48 +450,6 @@ class Position(models.Model):
             validate_partial_date(self, field)
 
         super(Position, self).clean_fields(*args, **kwargs)
-
-
-class Politician(models.Model):
-    POLITICAL_OFFICES = (
-        ('p', 'President'),
-        ('g', 'Governor'),
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True
-    )
-    name_first = models.CharField(
-        max_length=50,
-    )
-    name_middle = models.CharField(
-        max_length=50,
-        blank=True,
-    )
-    name_last = models.CharField(
-        max_length=50,
-        db_index=True,
-    )
-    name_suffix = models.CharField(
-        choices=SUFFIXES,
-        max_length=5,
-        blank=True,
-    )
-    office = models.CharField(
-        choices=POLITICAL_OFFICES,
-        max_length=5,
-    )
-
-    def __unicode__(self):
-        return u'%s: %s %s %s %s %s' % (self.pk, self.get_office_display(),
-                                        self.name_first, self.name_middle,
-                                        self.name_last, self.name_suffix)
 
 
 class RetentionEvent(models.Model):
@@ -436,44 +500,6 @@ class RetentionEvent(models.Model):
         blank=True,
     )
 
-
-class Education(models.Model):
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
-    judge = models.ForeignKey(
-        Judge,
-        related_name='educations',
-        blank=True,
-        null=True,
-    )
-    school = models.ForeignKey(
-        'judges.School',
-        related_name='educations',
-    )
-    degree = models.CharField(
-        max_length=100,
-        blank=True,
-    )
-    degree_year = models.PositiveSmallIntegerField(
-        help_text="The year the degree was awarded.",
-        null=True,
-        blank=True,
-    )
-
-    def __unicode__(self):
-        return u'%s: Degree in %s from %s in the year %s' % (
-            self.pk, self.degree, self.school.name, self.degree_year
-        )
-
-
 class School(models.Model):
     is_alias_of = models.ForeignKey(
         'self',
@@ -523,22 +549,7 @@ class School(models.Model):
             self.pk, self.name, self.ein, self.unit_id, self.ope_id
         )
 
-
-class Career(models.Model):
-    JOB_TYPES = (
-        ('prac',    'Practitioner'),
-        ('prof',    'Professor'),
-        ('pros',    'Prosecutor'),
-        ('pub_def', 'Public Defender'),
-        ('pol',     'Politician'),
-        ('j', 'Judge'),
-    )
-    judge = models.ForeignKey(
-        Judge,
-        related_name='careers',
-        blank=True,
-        null=True,
-    )
+class Education(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
         auto_now_add=True,
@@ -549,164 +560,30 @@ class Career(models.Model):
         auto_now=True,
         db_index=True,
     )
-    job_type = models.CharField(
-        choices=JOB_TYPES,
-        max_length=10,
+    person = models.ForeignKey(
+        Person,
+        related_name='educations',
+        blank=True,
+        null=True,
     )
-    job_title = models.CharField(
+    school = models.ForeignKey(
+        School,
+        related_name='educations',
+    )
+    degree = models.CharField(
         max_length=100,
         blank=True,
     )
-    organization_name = models.CharField(
-        max_length=120,
-    )
-    date_start = models.DateField(
-        blank=True,
-        null=True,
-        db_index=True,
-    )
-    date_granularity_start = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
-    )
-    date_end = models.DateField(
-        help_text="The date a judge stopped holding a specific job. If the "
-                  "actual date is unknown, this is a date prior to when they "
-                  "became a judge.",
-        blank=True,
-        null=True,
-        db_index=True,
-    )
-    date_granularity_end = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
-    )
-
-    def clean_fields(self, *args, **kwargs):
-        for field in ['start', 'end']:
-            validate_partial_date(self, field)
-        super(Career, self).clean_fields(*args, **kwargs)
-
-    class Meta:
-        ordering = ['date_start']
-
-
-class Title(models.Model):
-    JUDGE_TITLES = (
-        ('Acting', (
-            ('act-jud',      'Acting Judge'),
-            ('act-pres-jud', 'Acting Presiding Judge'),
-        )),
-        ('Associate', (
-            ('ass-jud',      'Associate Judge'),
-            ('ass-c-jud',    'Associate Chief Judge'),
-            ('ass-pres-jud', 'Associate Presiding Judge'),
-            ('jud',          'Judge'),
-            ('jus',          'Justice'),
-        )),
-        ('Chief', (
-            ('c-jud',     'Chief Judge'),
-            ('c-jus',     'Chief Justice'),
-            ('pres-jud',  'Presiding Judge'),
-            ('pres-jus',  'Presiding Justice'),
-            ('pres-mag',  'Presiding Magistrate'),
-        )),
-        ('Commissioner', (
-            ('com',     'Commissioner'),
-            ('com-dep', 'Deputy Commissioner'),
-        )),
-        ('Pro Tem', (
-            ('jud-pt', 'Judge Pro Tem'),
-            ('jus-pt', 'Justice Pro Tem'),
-            ('mag-pt', 'Magistrate Pro Tem'),
-        )),
-        ('Referee', (
-            ('ref-jud-tr',      'Judge Trial Referee'),
-            ('ref-off',         'Official Referee'),
-            ('ref-state-trial', 'State Trial Referee'),
-        )),
-        ('Retired', (
-            ('ret-act-jus',    'Active Retired Justice'),
-            ('ret-ass-jud',    'Retired Associate Judge'),
-            ('ret-c-jud',      'Retired Chief Judge'),
-            ('ret-jus',        'Retired Justice'),
-            ('ret-senior-jud', 'Senior Judge'),
-        )),
-        ('Special', (
-            ('spec-chair',  'Special Chairman'),
-            ('spec-jud',    'Special Judge'),
-            ('spec-m',      'Special Master'),
-            ('spec-scjcbc', 'Special Superior Court Judge for Complex Business '
-                            'Cases'),
-        )),
-        ('Other', (
-            ('chair',     'Chairman'),
-            ('chan',      'Chancellor'),
-            ('mag',       'Magistrate'),
-            ('presi',     'President'),
-            ('res-jud',   'Reserve Judge'),
-            ('trial-jud', 'Trial Judge'),
-            ('vice-chan', 'Vice Chancellor'),
-            ('vice-cj',   'Vice Chief Judge'),
-        )),
-
-        # Sometimes attorney generals write opinions too
-        ('Attorney General', (
-            ('att-gen',          'Attorney General'),
-            ('att-gen-ass',      'Assistant Attorney General'),
-            ('att-gen-ass-spec', 'Special Assistant Attorney General'),
-            ('sen-counsel',      'Senior Counsel'),
-            ('dep-sol-gen',      'Deputy Solicitor General'),
-        )),
-    )
-    judge = models.ForeignKey(
-        Judge,
-        related_name='titles',
-        blank=True,
-        null=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
-    title_name = models.CharField(
-        help_text="Title of the judge (Associate, Chief, Magistrate, etc.)",
-        max_length=30,
-        choices=JUDGE_TITLES,
-    )
-    date_start = models.DateField(
-        help_text="The year that a judge began holding the title.",
-        db_index=True,
-    )
-    date_granularity_start = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
-    )
-    date_end = models.DateField(
-        help_text="The year that a judge ceased holding the title.",
+    degree_year = models.PositiveSmallIntegerField(
+        help_text="The year the degree was awarded.",
         null=True,
         blank=True,
     )
-    date_granularity_end = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
-    )
 
-    def clean_fields(self, *args, **kwargs):
-        for field in ['start', 'end']:
-            validate_partial_date(self, field)
-        super(Title, self).clean_fields(*args, **kwargs)
-
+    def __unicode__(self):
+        return u'%s: Degree in %s from %s in the year %s' % (
+            self.pk, self.degree, self.school.name, self.degree_year
+        )
 
 class Race(models.Model):
     RACES = (
@@ -753,14 +630,8 @@ class PoliticalAffiliation(models.Model):
         auto_now=True,
         db_index=True,
     )
-    judge = models.ForeignKey(
-        Judge,
-        related_name='political_affiliations',
-        blank=True,
-        null=True,
-    )
-    politician = models.ForeignKey(
-        Politician,
+    person = models.ForeignKey(
+        Person,
         related_name='political_affiliations',
         blank=True,
         null=True,
@@ -800,8 +671,8 @@ class PoliticalAffiliation(models.Model):
 
 
 class Source(models.Model):
-    judge = models.ForeignKey(
-        Judge,
+    person = models.ForeignKey(
+        Person,
         related_name='sources',
         blank=True,
         null=True,
@@ -836,8 +707,8 @@ class ABARating(models.Model):
         ('nq', 'Not Qualified'),
         ('nqa', 'Not Qualified By Reason of Age'),
     )
-    judge = models.ForeignKey(
-        Judge,
+    person = models.ForeignKey(
+        Person,
         related_name='aba_ratings',
         blank=True,
         null=True,
