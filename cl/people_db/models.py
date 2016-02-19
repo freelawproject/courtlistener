@@ -120,7 +120,7 @@ class Person(models.Model):
                                      self.name_suffix)
 
     def get_absolute_url(self):
-        return reverse('view_person', args=[self.pk, self.slug])
+        return reverse('view_judge', args=[self.pk, self.slug])
 
     def save(self, *args, **kwargs):
         self.slug = slugify(
