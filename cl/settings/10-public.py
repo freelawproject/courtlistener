@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     'cl.donate',
     'cl.favorites',
     'cl.judges',
+    'cl.people_db',
     'cl.lib',
     'cl.opinion_page',
     'cl.scrapers',
