@@ -266,6 +266,12 @@ class Position(models.Model):
         ('bad_judge', 'Impeached and Convicted'),
         ('recess_not_confirmed', 'Recess Appointment Not Confirmed'),
     )
+    position_type = models.CharField(
+        choices=POSITION_TYPES,
+        max_length=20,
+        blank=True,
+        null=True,
+    )
     person = models.ForeignKey(
         Person,
         related_name='positions',
