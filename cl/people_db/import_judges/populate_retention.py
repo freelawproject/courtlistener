@@ -3,7 +3,7 @@
 from django.utils.timezone import now
 from datetime import date
 
-from cl.judges.models import RetentionEvent
+from cl.people_db.models import RetentionEvent
 
 def process_date(year,month,day):
     """

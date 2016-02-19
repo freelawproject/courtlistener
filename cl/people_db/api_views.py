@@ -12,7 +12,7 @@ from cl.people_db.filters import (
     EducationFilter, SchoolFilter, 
     PoliticalAffiliationFilter, ABARatingFilter, SourceFilter,
 )
-from cl.judges.models import Person, Position, RetentionEvent, \
+from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating
 
 

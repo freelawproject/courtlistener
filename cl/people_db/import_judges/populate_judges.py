@@ -3,7 +3,7 @@
 from django.utils.timezone import now
 from datetime import date
 
-from cl.judges.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
+from cl.people_db.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
 
 from judge_utils import get_court, get_school, process_date, get_select, get_races, get_party, get_appointer
     
