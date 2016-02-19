@@ -1,8 +1,8 @@
 from django.contrib import admin
 
 from cl.judges.models import (
-    Education, School, Person, Position, RetentionEvent, 
-    Race, PoliticalAffiliation, Source, ABARating
+    Education, School, Judge, Position, Politician, RetentionEvent, Career,
+    Title, Race, PoliticalAffiliation, Source, ABARating
 )
 
 
@@ -38,6 +38,17 @@ class EducationInline(admin.TabularInline):
     model = Education
     extra = 1
     raw_id_fields = ('school',)
+
+
+class CareerInline(admin.StackedInline):
+    model = Career
+    extra = 1
+
+
+class TitleInline(admin.TabularInline):
+    model = Title
+    extra = 1
+
 
 class PoliticalAffiliationJudgeInline(admin.TabularInline):
     """Affiliations can be tied to judges or politicians.
@@ -86,12 +97,14 @@ class ABARatingInline(admin.TabularInline):
     extra = 1
 
 
-class PersonAdmin(admin.ModelAdmin):
+class JudgeAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['name_first', 'name_middle', 'name_last',
                                     'name_suffix']}
     inlines = (
         PositionInline,
         EducationInline,
+        CareerInline,
+        TitleInline,
         PoliticalAffiliationJudgeInline,
         SourceInline,
         ABARatingInline,
@@ -111,12 +124,15 @@ class PersonAdmin(admin.ModelAdmin):
     )
 
 
-admin.site.register(Person, PersonAdmin)
+admin.site.register(Judge, JudgeAdmin)
 admin.site.register(Education, EducationAdmin)
 admin.site.register(School)
 admin.site.register(Position, PositionAdmin)
+admin.site.register(Politician, PoliticianAdmin)
 admin.site.register(PoliticalAffiliation)
 admin.site.register(RetentionEvent)
+admin.site.register(Career)
+admin.site.register(Title)
 admin.site.register(Race)
 admin.site.register(Source)
 admin.site.register(ABARating)
