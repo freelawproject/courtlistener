@@ -56,7 +56,16 @@ def get_races(str_race):
     for rawrace in rawraces: 
         races.append(racedict[rawrace])
     return races
+
+abadict =  dict([(v,k) for (k,v) in [('ewq', 'Exceptionally Well Qualified'),
+        ('wq', 'Well Qualified'),
+        ('q', 'Qualified'),
+        ('nq', 'Not Qualified'),
+        ('nqa', 'Not Qualified By Reason of Age')]])
         
+def get_aba(abastr):
+    aba = abadict[abastr]
+    return aba
     
 
 select_dict = {'P': 'e_part',
