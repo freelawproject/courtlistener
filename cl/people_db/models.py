@@ -328,12 +328,13 @@ class Position(models.Model):
     )
     court = models.ForeignKey(
         Court,        
-        related_name='positions',
+        related_name='court_positions',
         blank=True,
         null=True,
     )
     appointer = models.ForeignKey(
         Person,
+        related_name='appointed_positions',
         help_text="If this is an appointed position, "
                   "the person responsible for the appointing.",        
         blank=True,
@@ -341,7 +342,13 @@ class Position(models.Model):
     )
     supervisor = models.ForeignKey(
         Person,
+        related_name='supervised_positions',
         help_text="If this is a clerkship, the supervising judge.",       
+        blank=True,
+        null=True,
+    )
+    predecessor = models.ForeignKey(
+        Person,
         blank=True,
         null=True,
     )
@@ -359,11 +366,6 @@ class Position(models.Model):
     organization_name = models.CharField(
         help_text="If org isnt court or school, type here.",
         max_length=120,
-        blank=True,
-        null=True,
-    )
-    predecessor = models.ForeignKey(
-        Person,
         blank=True,
         null=True,
     )

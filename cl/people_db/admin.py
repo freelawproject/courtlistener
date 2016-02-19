@@ -23,7 +23,7 @@ class PositionAdmin(admin.ModelAdmin):
 class PositionInline(admin.StackedInline):
     model = Position
     extra = 1
-    fk_name = 'judge'
+    fk_name = 'person'
     raw_id_fields = ('court',)
 
 
@@ -39,41 +39,9 @@ class EducationInline(admin.TabularInline):
     extra = 1
     raw_id_fields = ('school',)
 
-class PoliticalAffiliationJudgeInline(admin.TabularInline):
-    """Affiliations can be tied to judges or politicians.
-
-    This class is to be inlined with judges.
-    """
+class PoliticalAffiliationInline(admin.TabularInline):
     model = PoliticalAffiliation
     extra = 1
-    exclude = (
-        'politician',
-    )
-
-
-class PoliticalAffiliationPoliticianInline(admin.TabularInline):
-    """Affiliations can be tied to judges or politicians.
-
-    This class is to be inlined with politicians.
-    """
-    model = PoliticalAffiliation
-    extra = 1
-    exclude = (
-        'judge',
-    )
-
-
-class PoliticianAdmin(admin.ModelAdmin):
-    inlines = (
-        PoliticalAffiliationPoliticianInline,
-    )
-    list_filter = (
-        'office',
-    )
-    search_fields = (
-        'name_last',
-        'name_first',
-    )
 
 
 class SourceInline(admin.TabularInline):
@@ -92,7 +60,7 @@ class PersonAdmin(admin.ModelAdmin):
     inlines = (
         PositionInline,
         EducationInline,
-        PoliticalAffiliationJudgeInline,
+        PoliticalAffiliationInline,
         SourceInline,
         ABARatingInline,
     )
