@@ -150,6 +150,54 @@ class Person(models.Model):
             ('has_beta_api_access', 'Can access features during beta period.'),
         )
 
+class School(models.Model):
+    is_alias_of = models.ForeignKey(
+        'self',
+        blank=True,
+        null=True,
+    )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
+    )
+    name = models.CharField(
+        max_length=120,  # Dept. Ed. bulk data had a max of 91.
+        db_index=True,
+    )
+    unit_id = models.IntegerField(
+        help_text="This is the ID assigned by the Department of Education, as "
+                  "found in the data on their API.",
+        unique=True,
+        db_index=True,
+        null=True  # b/c aliases have null values.
+    )
+    ein = models.IntegerField(
+        help_text="The EIN assigned by the IRS",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    ope_id = models.IntegerField(
+        help_text="This is the ID assigned by the Department of Education's "
+                  "Office of Postsecondary Education (OPE) for schools that "
+                  "have a Program Participation Agreement making them eligible "
+                  "for aid from the Federal Student Financial Assistance "
+                  "Program",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+
+    def __unicode__(self):
+        return u'%s: %s (ein: %s, unit_id: %s, ope_id: %s)' % (
+            self.pk, self.name, self.ein, self.unit_id, self.ope_id
+        )
 
 class Position(models.Model):
     """A role held by a person, and the details about it."""
@@ -285,21 +333,21 @@ class Position(models.Model):
         null=True,
     )
     appointer = models.ForeignKey(
-        help_text="If this is an appointed position, "
-                  "the person responsible for the appointing.",
         Person,
+        help_text="If this is an appointed position, "
+                  "the person responsible for the appointing.",        
         blank=True,
         null=True,
     )
     supervisor = models.ForeignKey(
-        help_text="If this is a clerkship, the supervising judge.",
         Person,
+        help_text="If this is a clerkship, the supervising judge.",       
         blank=True,
         null=True,
     )
     school = models.ForeignKey(
-        help_text="If academic job, the school where they work.",
         School,
+        help_text="If academic job, the school where they work.",        
         blank=True,
         null=True,
     )
@@ -505,55 +553,6 @@ class RetentionEvent(models.Model):
         null=True,
         blank=True,
     )
-
-class School(models.Model):
-    is_alias_of = models.ForeignKey(
-        'self',
-        blank=True,
-        null=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified",
-        auto_now=True,
-        db_index=True,
-    )
-    name = models.CharField(
-        max_length=120,  # Dept. Ed. bulk data had a max of 91.
-        db_index=True,
-    )
-    unit_id = models.IntegerField(
-        help_text="This is the ID assigned by the Department of Education, as "
-                  "found in the data on their API.",
-        unique=True,
-        db_index=True,
-        null=True  # b/c aliases have null values.
-    )
-    ein = models.IntegerField(
-        help_text="The EIN assigned by the IRS",
-        null=True,
-        blank=True,
-        db_index=True,
-    )
-    ope_id = models.IntegerField(
-        help_text="This is the ID assigned by the Department of Education's "
-                  "Office of Postsecondary Education (OPE) for schools that "
-                  "have a Program Participation Agreement making them eligible "
-                  "for aid from the Federal Student Financial Assistance "
-                  "Program",
-        null=True,
-        blank=True,
-        db_index=True,
-    )
-
-    def __unicode__(self):
-        return u'%s: %s (ein: %s, unit_id: %s, ope_id: %s)' % (
-            self.pk, self.name, self.ein, self.unit_id, self.ope_id
-        )
 
 class Education(models.Model):
     date_created = models.DateTimeField(
