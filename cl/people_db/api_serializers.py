@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from cl.api.utils import DynamicFieldsModelSerializer
-from cl.judges.models import Person, Position, RetentionEvent, \
+from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating
 
 

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from cl.judges.models import (
+from cl.people_db.models import (
     Education, School, Person, Position, RetentionEvent, 
     Race, PoliticalAffiliation, Source, ABARating
 )
