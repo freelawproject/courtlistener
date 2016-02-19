@@ -1,4 +1,4 @@
-from cl.judges.models import Person
+from cl.people_db.models import Person
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.search.models import Docket, SOURCES
