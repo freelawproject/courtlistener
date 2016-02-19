@@ -3,7 +3,7 @@
 from django.utils.timezone import now
 from datetime import date
 
-from cl.judges.models import Judge, Position, Education, Career, Title, Race, PoliticalAffiliation, Source, ABARating
+from cl.judges.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
 
 from judge_utils import get_court, get_school, process_date, get_select, get_races, get_party
     
@@ -20,7 +20,7 @@ def make_state_judge(item):
                                                   item['deathday'])  
     
     # instantiate Judge object    
-    judge = Judge(
+    person = Person(
         date_created=now(),
         date_modified=now(),
 
@@ -36,7 +36,7 @@ def make_state_judge(item):
         date_granularity_dod = date_granularity_dod                         
     )
     
-    judge.save()
+    person.save()
         
     appointer = None #get_appointer(state,date_appointed)
     predecessor = None # get_predecessor
@@ -59,10 +59,10 @@ def make_state_judge(item):
     votes_yes = None
     votes_no = None
     
-    position = Position(
+    judgeship = Position(
         date_created=now(),
         date_modified=now(),
-        judge = judge,
+        person = person,
         appointer = appointer,
         predecessor = predecessor,
         court_id = courtid,
@@ -80,12 +80,12 @@ def make_state_judge(item):
         termination_reason = item['howended']
     )
     
-    position.save()
+    judgeship.save()
 
     college = Education(
         date_created=now(),
         date_modified=now(),
-        judge = judge,
+        person = person,
         school = get_school(item['college']),
         degree = 'BA',
         )    
@@ -94,7 +94,7 @@ def make_state_judge(item):
     lawschool = Education(
         date_created=now(),
         date_modified=now(),
-        judge = judge,
+        person = person,
         school = get_school(item['lawschool']),
         degree = 'JD',
         )
@@ -105,15 +105,15 @@ def make_state_judge(item):
                    'postjudge', 'postprivate', 'postpolitician', 'postprof']:
         if not item[jobvar]:
             continue
-        job_type = None                     
+        title = None                     
         if 'judge' in jobvar:
-            job_type = 'j'
+            title = 'judge'
         elif 'private' in jobvar:
-            job_type = 'prac'
+            title = 'prac'
         elif 'politician' in jobvar:
-            job_type = 'pol'
+            title = 'pol'
         elif 'prof' in jobvar:
-            job_type = 'prof'            
+            title = 'prof'            
             
         job_start = None
         job_end = None          
@@ -124,10 +124,10 @@ def make_state_judge(item):
             job_start = date_termination.year + 1
             job_end = date_termination.year + 1    
             
-        job = Career(
+        job = Position(
             date_created=now(),
             date_modified=now(),
-            judge = judge,
+            person = person,
             job_type = job_type,
             date_start = date(job_start,1,1),
             date_granularity_start = 'Year',

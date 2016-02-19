@@ -6,7 +6,7 @@ Created on Wed Feb 17 12:31:34 2016
 """
 from datetime import date
 from cl.corpus_importer.import_columbia.populate_opinions import get_court_object
-from cl.search.models import School
+from cl.judges.models import School
 
 def process_date(year,month,day):
     """ return date object and accompanying granularity """
