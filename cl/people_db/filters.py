@@ -2,8 +2,8 @@ import rest_framework_filters as filters
 
 from cl.api.utils import DATETIME_LOOKUPS, \
     DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, ALL_TEXT_LOOKUPS, INTEGER_LOOKUPS
-from cl.judges.models import Judge, Position, Politician, RetentionEvent, \
-    Education, School, Career, Title, PoliticalAffiliation, Source, ABARating, \
+from cl.people_db.models import Person, Position, RetentionEvent, \
+    Education, School, PoliticalAffiliation, Source, ABARating, \
     Race
 from cl.search.filters import CourtFilter
 
@@ -46,40 +46,9 @@ class PoliticalAffiliationFilter(filters.FilterSet):
             'politician': ['exact'],
         }
 
-
-class TitleFilter(filters.FilterSet):
-    class Meta:
-        model = Title
-        fields = {
-            'id': ['exact'],
-            'date_created': DATETIME_LOOKUPS,
-            'date_modified': DATETIME_LOOKUPS,
-            'date_start': DATE_LOOKUPS,
-            'date_end': DATE_LOOKUPS,
-            'title_name': ['exact'],
-            'judge': ['exact'],
-        }
-
-
-class CareerFilter(filters.FilterSet):
-    class Meta:
-        model = Career
-        fields = {
-            'id': ['exact'],
-            'date_created': DATETIME_LOOKUPS,
-            'date_modified': DATETIME_LOOKUPS,
-            'date_start': DATE_LOOKUPS,
-            'date_end': DATE_LOOKUPS,
-            'job_type': ['exact'],
-            'job_title': ALL_TEXT_LOOKUPS,
-            'organization_name': ALL_TEXT_LOOKUPS,
-            'judge': ['exact'],
-        }
-
-
 class SchoolFilter(filters.FilterSet):
     educations = filters.RelatedFilter(
-        'cl.judges.filters.EducationFilter',
+        'cl.people_db.filters.EducationFilter',
         name='educations',
     )
 
@@ -99,7 +68,7 @@ class SchoolFilter(filters.FilterSet):
 
 class EducationFilter(filters.FilterSet):
     school = filters.RelatedFilter(SchoolFilter, name='school')
-    judge = filters.RelatedFilter('cl.judges.filters.JudgeFilter', name='judge')
+    person = filters.RelatedFilter('cl.people_db.filters.PersonFilter', name='person')
 
     class Meta:
         model = Education
@@ -109,24 +78,7 @@ class EducationFilter(filters.FilterSet):
             'date_modified': DATETIME_LOOKUPS,
             'degree_year': ['exact'],
             'degree': BASIC_TEXT_LOOKUPS,
-            'judge': ['exact'],
-        }
-
-
-class PoliticianFilter(filters.FilterSet):
-    political_affiliations = filters.RelatedFilter(
-            PoliticalAffiliationFilter, name='political_affiliations')
-
-    class Meta:
-        model = Politician
-        fields = {
-            'id': ['exact'],
-            'date_modified': DATETIME_LOOKUPS,
-            'date_created': DATETIME_LOOKUPS,
-            'name_first': BASIC_TEXT_LOOKUPS,
-            'name_middle': BASIC_TEXT_LOOKUPS,
-            'name_last': BASIC_TEXT_LOOKUPS,
-            'office': ['exact'],
+            'person': ['exact'],
         }
 
 
@@ -151,13 +103,13 @@ class PositionFilter(filters.FilterSet):
     court = filters.RelatedFilter(CourtFilter, name='court')
     retention_events = filters.RelatedFilter(
             RetentionEventFilter, name='retention_events')
-    appointer = filters.RelatedFilter(PoliticianFilter, name='appointer')
+    appointer = filters.RelatedFilter('cl.people_db.filters.PersonFilter', name='appointer')
 
     class Meta:
         model = Position
         fields = {
             'id': ['exact'],
-            'judge': ['exact'],
+            'person': ['exact'],
             'predecessor': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
@@ -181,11 +133,9 @@ class PositionFilter(filters.FilterSet):
         }
 
 
-class JudgeFilter(filters.FilterSet):
+class PersonFilter(filters.FilterSet):
     # filter_overrides = default_filter_overrides
-    educations = filters.RelatedFilter(EducationFilter, name='educations')
-    careers = filters.RelatedFilter(CareerFilter, name='careers')
-    titles = filters.RelatedFilter(TitleFilter, name='titles')
+    educations = filters.RelatedFilter(EducationFilter, name='educations')    
     political_affiliations = filters.RelatedFilter(
             PoliticalAffiliationFilter, name='political_affiliations')
     sources = filters.RelatedFilter(SourceFilter, name='sources')
@@ -215,7 +165,7 @@ class JudgeFilter(filters.FilterSet):
     )
 
     class Meta:
-        model = Judge
+        model = Person
         fields = {
             'id': ['exact'],
             'date_created': DATETIME_LOOKUPS,
