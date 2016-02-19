@@ -1,4 +1,4 @@
-from cl.judges.models import Judge
+from cl.judges.models import Person
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.search.models import Docket, SOURCES
@@ -40,7 +40,7 @@ class Audio(models.Model):
         blank=True
     )
     panel = models.ManyToManyField(
-        Judge,
+        Person,
         help_text="The judges that heard the oral arguments",
         related_name="oral_argument_panel_members",
         blank=True,
