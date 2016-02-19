@@ -331,26 +331,9 @@ def make_federal_judge(item):
             )    
         politics.save()
     
-    if item['links'] is not None:
-        links = item['links']
-        if ';' in links:
-            urls = [x.strip() for x in links.split(';')]
-        else:
-            urls = [links]
-        notestr = ''
-        for v in ['notes1','notes2','notes3']:
-            if item[v] is not None:
-                notestr = notestr + ' ; ' + item[v].strip()
-        if notestr == '':
-            notestr = None
-        for url in urls:
-            source = Source(
-            date_created=now(),
-            date_modified=now(),
-            judge = judge,
-            notes = notestr
-            )
-            source.save()                
+    rating = item['ABA Rating']
+    if rating is not None:
+        aba = ABARating
             
 
 if __name__ == '__main__':
