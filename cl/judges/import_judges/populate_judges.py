@@ -5,7 +5,7 @@ from datetime import date
 
 from cl.judges.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
 
-from judge_utils import get_court, get_school, process_date, get_select, get_races, get_party
+from judge_utils import get_court, get_school, process_date, get_select, get_races, get_party, get_appointer
     
 def make_state_judge(item):
     """Takes the state judge data <item> and associates it with a Judge object.
@@ -66,6 +66,7 @@ def make_state_judge(item):
         appointer = appointer,
         predecessor = predecessor,
         court_id = courtid,
+        position_type = 'judge',
         date_nominated = date_nominated,
         date_elected = date_elected,
         date_confirmation = date_confirmation,
@@ -105,15 +106,15 @@ def make_state_judge(item):
                    'postjudge', 'postprivate', 'postpolitician', 'postprof']:
         if not item[jobvar]:
             continue
-        title = None                     
+        position_type = None                     
         if 'judge' in jobvar:
-            title = 'judge'
+            position_type = 'judge'
         elif 'private' in jobvar:
-            title = 'prac'
+            position_type = 'prac'
         elif 'politician' in jobvar:
-            title = 'pol'
+            position_type = 'pol'
         elif 'prof' in jobvar:
-            title = 'prof'            
+            position_type = 'prof'            
             
         job_start = None
         job_end = None          
@@ -128,13 +129,12 @@ def make_state_judge(item):
             date_created=now(),
             date_modified=now(),
             person = person,
-            job_type = job_type,
+            position_type = position_type,
             date_start = date(job_start,1,1),
             date_granularity_start = 'Year',
             date_end = date(job_end,1,1),
             date_granularity_end = 'Year'
-        )
-        
+        )        
         job.save()
     
     if item['politics'] is not None:
@@ -147,7 +147,7 @@ def make_state_judge(item):
             politics = PoliticalAffiliation(
                 date_created=now(),
                 date_modified=now(),
-                judge = judge,
+                person = person,
                 political_party = party            
                 )    
             politics.save()
@@ -168,7 +168,7 @@ def make_state_judge(item):
             source = Source(
             date_created=now(),
             date_modified=now(),
-            judge = judge,
+            person = person,
             notes = notestr
             )
             source.save()                
@@ -196,7 +196,7 @@ def make_federal_judge(item):
     races = [Race(race=r) for r in listraces]
     
     # instantiate Judge object    
-    judge = Judge(
+    person = Person(
         date_created=now(),
         date_modified=now(),
 
@@ -218,7 +218,7 @@ def make_federal_judge(item):
         dod_state = dod_state
     )
     
-    judge.save()
+    person.save()
         
     appointer = get_appointer(item['President name'])
     predecessor = None # get_predecessor
