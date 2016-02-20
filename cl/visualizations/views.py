@@ -26,7 +26,6 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
 
 
-@permission_required('visualizations.has_beta_access')
 def render_visualization_page(request, pk, embed):
     viz = get_object_or_404(SCOTUSMap, pk=pk)
 
@@ -68,7 +67,6 @@ def render_visualization_page(request, pk, embed):
     )
 
 
-@permission_required('visualizations.has_beta_access')
 @xframe_options_exempt
 def view_embedded_visualization(request, pk):
     """Return the embedded network page.
@@ -78,7 +76,6 @@ def view_embedded_visualization(request, pk):
     return render_visualization_page(request, pk, embed=True)
 
 
-@permission_required('visualizations.has_beta_access')
 @never_cache
 def view_visualization(request, pk, slug):
     """Return the network page.
@@ -86,7 +83,6 @@ def view_visualization(request, pk, slug):
     return render_visualization_page(request, pk, embed=False)
 
 
-@permission_required('visualizations.has_beta_access')
 @login_required
 @never_cache
 def new_visualization(request):
@@ -186,7 +182,6 @@ def new_visualization(request):
     )
 
 
-@permission_required('visualizations.has_beta_access')
 @login_required
 def edit_visualization(request, pk):
     # This could apparently also be done with formsets? But they seem awful.
@@ -216,7 +211,6 @@ def edit_visualization(request, pk):
 
 
 @ensure_csrf_cookie
-@permission_required('visualizations.has_beta_access')
 @login_required
 def delete_visualization(request):
     if request.is_ajax():
@@ -232,7 +226,6 @@ def delete_visualization(request):
 
 
 @ensure_csrf_cookie
-@permission_required('visualizations.has_beta_access')
 @login_required
 def restore_visualization(request):
     if request.is_ajax():
@@ -249,7 +242,6 @@ def restore_visualization(request):
 
 
 @ensure_csrf_cookie
-@permission_required('visualizations.has_beta_access')
 @login_required
 def share_visualization(request):
     if request.is_ajax():
@@ -265,7 +257,6 @@ def share_visualization(request):
 
 
 @ensure_csrf_cookie
-@permission_required('visualizations.has_beta_access')
 @login_required
 def privatize_visualization(request):
     if request.is_ajax():
@@ -280,7 +271,6 @@ def privatize_visualization(request):
         )
 
 
-@permission_required('visualizations.has_beta_access')
 def mapper_homepage(request):
     if not is_bot(request):
         tally_stat('visualization.scotus_homepage_loaded')
@@ -309,7 +299,6 @@ def mapper_homepage(request):
     )
 
 
-@permission_required('visualizations.has_beta_access')
 @never_cache
 def gallery(request):
     visualizations = SCOTUSMap.objects.filter(

@@ -10,7 +10,6 @@
                 <a href="{% url "profile_alerts" %}"><i class="fa fa-bell-o gray"></i>&nbsp;Alerts</a>
             </li>
 
-            {% if perms.visualizations.has_beta_access %}
             <li class="{% block nav-visualizations %}inactive{% endblock %} dropdown"
                 role="presentation">
                 <a aria-expanded="false" href="#" id="vizDropDown"
@@ -34,7 +33,6 @@
                     </li>
                 </ul>
             </li>
-            {% endif %}
 
             <li class="{% block nav-favorites %}inactive{% endblock %}"
                 role="presentation">

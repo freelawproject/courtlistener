@@ -135,7 +135,6 @@
                         {% if user.is_authenticated %}
                             <ul class="nav navbar-nav">
                                 <li><a href="{% url "about" %}" tabindex="300">About</a></li>
-                                {% if perms.visualizations.has_beta_access %}
                                 <li class="dropdown">
                                     <a href="#"
                                        class="dropdown-toggle"
@@ -158,7 +157,6 @@
                                         </li>
                                     </ul>
                                 </li>
-                                {% endif %}
                                 <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
                                 <li><a href="{% url "coverage" %}" tabindex="302">Coverage</a></li>
                                 <li class="dropdown">
@@ -169,12 +167,10 @@
                                     <ul class="dropdown-menu" role="menu">
                                         <li><a href="{% url "profile_alerts" %}"
                                                tabindex="304">Alerts</a></li>
-                                        {% if perms.visualizations.has_beta_access %}
                                         <li>
                                             <a href="{% url "view_visualizations" %}"
                                                tabindex="306">Visualizations</a>
                                         </li>
-                                        {% endif %}
                                         <li><a href="{% url "profile_favorites" %}"
                                                tabindex="305">Favorites</a></li>
                                         <li><a href="/profile/donations/"

@@ -357,11 +357,6 @@ class SCOTUSMap(models.Model):
         super(SCOTUSMap, self).save(*args, **kwargs)
         self.__original_deleted = self.deleted
 
-    class Meta:
-        permissions = (
-            ('has_beta_access', 'Can access features during beta period.'),
-        )
-
 
 class Referer(models.Model):
     """Holds the referer domains where embedded maps are placed"""
