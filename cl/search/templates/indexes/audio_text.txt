@@ -1,0 +1,24 @@
+{# Audio file #}
+{% if item.case_name_full %}
+    {{ item.case_name_full }}
+{% elif item.case_name %}
+    {{ item.case_name }}
+{% else %}
+    {{ item.case_name_short }}
+{% endif %}
+
+{# Docket #}
+{# Need dates so queries for the date are sure to be returned (see #271) #}
+{{ item.docket.date_argued|date:"j F Y" }}
+{{ item.docket.date_reargued|date:"j F Y" }}
+{{ item.docket.date_reargument_denied|date:"j F Y" }}
+{{ item.docket.docket_number }}
+
+{# Court #}
+{{ item.docket.court.full_name }}
+{{ item.docket.court.citation_string }}
+{{ item.docket.court.pk }}
+
+{# Remainder of Audio File #}
+{{ item.sha1 }}
+{{ item.judges }}

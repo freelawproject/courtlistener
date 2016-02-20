@@ -1,14 +1,10 @@
 import os
 import sys
+from django.core.wsgi import get_wsgi_application
 
-# See https://modwsgi.readthedocs.org/en/latest/application-issues/index.html#non-blocking-module-imports
-import _strptime
-
-os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
+os.environ['DJANGO_SETTINGS_MODULE'] = 'cl.settings'
 os.environ["CELERY_LOADER"] = "django"
 
 execfile('/etc/courtlistener')
-sys.path.append(INSTALL_ROOT)
-sys.path.append('%s/alert' % INSTALL_ROOT)
-import django.core.handlers.wsgi
-application = django.core.handlers.wsgi.WSGIHandler()
+sys.path.append('%s/cl' % INSTALL_ROOT)
+application = get_wsgi_application()

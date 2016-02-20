@@ -20,26 +20,26 @@ def fixer(simulate=False, verbose=False):
 
     for doc in docs:
         # Special cases
-        if 'Klein' in doc.citation.case_name:
+        if 'Klein' in doc.case_name:
             continue
-        elif 'in re' in doc.citation.case_name.lower():
+        elif 'in re' in doc.case_name.lower():
             continue
-        elif doc.citation.case_name == "(White) v. Gray":
-            doc.citation.case_name = "White v. Gray"
+        elif doc.case_name == "(White) v. Gray":
+            doc.case_name = "White v. Gray"
             if not simulate:
                 doc.save()
 
 
         # Otherwise, we nuke the leading parens.
-        old_case_name = doc.citation.case_name
-        new_case_name = titlecase(harmonize(clean_string(re.sub('\(.*?\)', '', doc.citation.case_name, 1))))
+        old_case_name = doc.case_name
+        new_case_name = titlecase(harmonize(clean_string(re.sub('\(.*?\)', '', doc.case_name, 1))))
 
         if verbose:
             print "Fixing document %s: %s" % (doc.pk, doc)
             print "        New for %s: %s\n" % (doc.pk, new_case_name)
 
         if not simulate:
-            doc.citation.case_name = new_case_name
+            doc.case_name = new_case_name
             doc.citation.save()
 
 

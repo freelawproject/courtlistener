@@ -1,0 +1,61 @@
+/* the humans responsible & colophon */
+/* humanstxt.org */
+
+
+/* TEAM */
+    Concept and Guidance: Brian Carver
+    Site: http://sharealike.org
+    Twitter: @brianwc
+    Location: Berkeley, CA
+
+    Lead Developer: Mike Lissner
+    Site: http://michaeljaylissner.com
+    Twitter: @mlissner
+    Location: Berkeley, CA
+
+    Citator development: Karen Rustad and Rowyn McDonald
+    Coverage graphs: Rowyn McDonald, Jason Aller
+    PageRank development: Krist Jin
+    Visualization tools: Jason Aller, Colin Starger, University of Baltimore
+
+    Graphic Design: Ryan Moon
+
+    Data Donations from:
+     - Resource.org, and the estimable Carl Malamud
+     - The Lawbox team, Nicholas Zeltzer and Paul Kerschen
+     - Anonymous donors
+
+    Additional support at:
+     - https://www.courtlistener.com/about/
+
+
+/* SITE */
+  Standards: HTML5, CSS3
+  Components:
+        Text Extraction: Antiword, libwpd-tools, pdf2text
+        Audio: avconv, eyeD3
+        Code: Celery, Django, jQuery, D3, plottable.js, lxml, Git, requests,
+              sunburnt, Tesseract
+        Display: Bootstrap, Font Awesome
+        Infrastructure: Apache2, Linux, Postgres, Solr, Redis
+        More: requirements.txt
+  Source: https://github.com/freelawproject/courtlistener/
+
+
+
+                       ````
+                .:+oo++//++osso+/. -+++////+++.
+             -+ys/-`         ./yy+  `./mmmm/``
+           -sys:               `oo     ymmy
+          +yyo`                 `+`    ymmy
+         +yyy`                         ymms
+        -yyy+                          ymms
+        +yyy:                          ymms
+        +sss:                          ymms
+        /sss+                          ydds
+        `ssss.                         sdds
+         -syyo`                  ``    sdds
+          .oyys-                `s/    ydds            `+`
+            :shhs:`           `/ys`    yddh`          .hs
+              .:oyys+:-....-/oyys.  `./ddddy/:--.---:odd.
+                  `.-::///::-.`    -///////////////////-

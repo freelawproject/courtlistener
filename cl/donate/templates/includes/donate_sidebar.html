@@ -1,0 +1,39 @@
+{% load humanize %}
+
+<div class="sidebar-section hidden-xs">
+    {% if user.profile.total_donated_last_year < MIN_DONATION.no_ads %}
+        {# This title must say "Sponsored Links" or Google will disable our ads. #}
+        <h3><span>Sponsored Links</span></h3>
+        <script async
+                src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+        <div>
+            <ins class="adsbygoogle"
+                 style="display:block"
+                 data-ad-client="ca-pub-3709844646726399"
+                 data-ad-slot="7019181460"
+                 data-ad-format="auto"></ins>
+            <script>
+                (adsbygoogle = window.adsbygoogle || []).push({});
+            </script>
+        </div>
+        <p class="v-offset-above-1">
+            CourtListener is a project of <a
+                href="https://free.law" target="_blank">Free
+            Law Project</a>, a federally-recognized 501(c)(3) non-profit. We
+            rely heavily on donations for our financial security. To turn off
+            ads, we ask for a $10 donation each year.
+        </p>
+        <p>
+            <a href="{% url "donate" %}?referrer={{ referrer }}"
+               class="btn btn-danger btn-lg">Donate Now</a>
+        </p>
+
+    {% else %}
+        <h3><span>Thank You</span></h3>
+        <p>In the last year you donated
+            <strong>${{ user.profile.total_donated_last_year|intcomma }}</strong>. This
+            support allows us to begin new initiatives and support users like
+            you.
+        </p>
+    {% endif %}
+</div>

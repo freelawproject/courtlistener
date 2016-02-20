@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Advanced Search Techniques – CourtListener.com{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="col-sm-9">
+        <h2>Advanced Query Techniques</h2>
+
+        <p>CourtListener supports highly advanced Boolean queries. These allow you to build a complex search
+            that can be run across our entire corpus.</p>
+
+        <p>At present, the following Boolean connectors are supported:</p>
+
+        <dl>
+            <dt>Intersections AND</dt>
+            <dd><p>This connector is used by default, and so is not usually needed. However, if you wish, you can
+                explicitly create an AND comparison between words (e.g. <code>immigration AND borders</code>)</p></dd>
+
+            <dt>Unions OR</dt>
+            <dd><p>Creates an OR comparison between words (e.g. <code>immigration OR asylum</code>)</p></dd>
+
+            <dt>Negation/exclusion -, !, NOT</dt>
+            <dd><p>Requires that a word or phrase be excluded from the returned results (e.g. <code>immigration NOT
+                "border patrol"</code>). This operator must be written in uppercase.</p></dd>
+
+            <dt>Phrase queries " "</dt>
+            <dd><p>Creates a phrase search (e.g. <code>"border patrol"</code>). In the case that quotation marks are not
+                balanced (i.e. there is an odd number of them), they will be ignored.</p></dd>
+
+            <dt>Grouped terms ( )</dt>
+            <dd><p>Groups parts of a query (e.g. <code>(customs OR "border patrol") AND asylum</code>). Parentheses can
+                be nested as deeply as desired.</p></dd>
+
+            <dt>Fielded queries :</dt>
+            <dd><p>In addition to being able to place fielded searches in the side bar, advanced users can also place
+                fielded searches in their main query. For example, a search for <code>court_id:ca1
+                    status:precedential</code> would return only precedential cases in the First Circuit of Federal
+                Appeals. Parentheses can be used to create more complex queries. For example, <code>casename:(wade OR
+                    roe)</code> would find cases containing "wade" or "roe" in the name of the case.</p>
+
+                <p>The following fields can be used to place fielded searches: <strong>court_id, status, casename,
+                    judge, docketnumber, citation and casenumber</strong>. casenumber is a shortcut for searching within
+                    all citations and docket numbers simultaneously.</p>
+
+                <p>Valid entries for the status field are precedential (p), non-precedential (u), published (p),
+                    unpublished (u), relating-to (r), and in-chambers (i). The letter shown after the value is a valid
+                    shortcut for the field. Precedential and published are considered equivalents, as are unpublished
+                    and non-precedential.</p>
+
+                <p>Valid entries for the court field are ca1, ca2, ca3, ca4, ca5, ca6, ca7, ca8, ca9, ca10, ca11, cadc,
+                    cafc, scotus and so forth. If unknown, this value can be found in the URL for any case from the
+                    desired court or by looking at the <a href="{% url "court_index" %}">jurisdictions page</a>.</p>
+
+                <p>Two experimental fields are also available: <strong>citecount</strong> and
+                    <strong>suitnature</strong>. <code>citecount</code> searches allow you to search for opinions with a
+                    specific number of other opinions citing them, but for range queries you'll want to use the Citation
+                    Count boxes. <code>suitnature</code> can be used to query the nature of various suits, where that
+                    meta data is available. The data is not yet normalized, but intrepid users can experiment with this
+                    feature now.</p></dd>
+
+            <dt>Wildcards and Fuzzy Search *, ?, ~</dt>
+            <dd><p>Using an asterisk (<strong>*</strong>) allows wildcard searches. For example, <code>immigra*</code>
+                finds all words beginning with "immigra". This can also be used at the beginning or middle of words, at
+                both the beginning and the end of a word, or even all three. For example, you can find all words
+                containing two esses side-by-side with the following query: <code>*ss*</code>. You could also find words
+                with two esses separated by other letters with a query such as: <code>*s*s*</code>. This would find
+                cases containing words like "<strong>s</strong>u<strong>s</strong>an" or
+                "as<strong>s</strong>i<strong>s</strong>tant".</p>
+
+                <p>The question mark character (<strong>?</strong>) can be used similarly as a single letter wildcard.
+                    For example, this would find cases containing the word "immigrant" or "emmigration":
+                    <code>?mmigra*</code></p>
+
+                <p>Fuzzy search can be applied using the tilde character (<strong>~</strong>) after a word. This is an
+                    advanced parameter that allows searches for misspellings or different variations of a word's
+                    spelling. For example, searching for <code>immigrant~</code> would find words similar to
+                    "immigrant". Values can also be added after the tilde to indicate how similar different spellings
+                    must be. The default value, if none is given, is 0.5. Values can range between 0 and 1, with 1 being
+                    exact, and 0 being very sloppy. Fuzzy searches tend to broaden the result set, thus lowering
+                    precision, but also casting a wider net.</p>
+            </dd>
+
+            <dt>Proximity ~</dt>
+            <dd><p>Using a tilde character (<strong>~</strong>) after a phrase will ensure that the words in the phrase
+                are within a desired distance of each other. For example <code>"border fence"~50</code> would find the
+                words border and fence within 50 words of each other.</p></dd>
+
+            <dt>Range queries [ ]</dt>
+            <dd><p>Ranges can be queried by using brackets. For example, a search for <code>[1939 TO 1945]</code> would
+                find all cases that contained the numbers 1939 to 1945, inclusive. Range queries can also be fielded,
+                allowing searches like <code>citation:([22 TO 23] F2)</code>, which would find all cases from volumes 22
+                and 23 of the second series of the Federal Reporter. In range queries, the word 'TO' must be uppercase.
+            </p></dd>
+
+            <dt>Boosting ^</dt>
+            <dd><p>When sorting by relevancy, the carrot character (<strong>^</strong>) can be used to give certain
+                words more weight than others. For example, if you are interested in immigration cases that mention
+                asylum, a query like the following will boost cases containing "asylum" higher in the results than they
+                would be otherwise: <code>immigration asylum^5</code>. This is a way of telling the relevancy engine
+                which terms are important in your query. Boosting can also be used after phrases, and by default is set
+                to a value of 1.0.</p></dd>
+
+            <dt>Case fingerprints</dt>
+            <dd><p>Each case at CourtListener has a unique fingerprint that is generated using the <a
+                    href="http://en.wikipedia.org/wiki/SHA-1">SHA1 hashing algorithm</a>. These fingerprints are
+                displayed on the case pages, and can be used to locate a case in the future (e.g. a query for <code>17202b8ea46c3fc4434f803dd07e8ed4af041ab7</code>
+                will always bring up <a href="/scotus/uwF/isabella-gonzales-appt-v-william-williams">Gonzales v.
+                    Williams</a> as the first result).</dd>
+        </dl>
+
+        <p>These operators are all powered by the syntax of the Lucene search engine using the DisMax query parser. More
+            details about these operators use can be found on <a
+                    href="http://lucene.apache.org/java/3_4_0/queryparsersyntax.html">Lucene's help page</a>.</p>
+
+        <p>If you would like assistance crafting a query, <a href="{% url "contact" %}">let us know</a>. We can sometimes help.
+        </p>
+    </div>
+    <div class="col-sm-3">
+        {% include "includes/operators_quick_list.html" %}
+    </div>
+{% endblock %}

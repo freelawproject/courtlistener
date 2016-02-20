@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Email Confirmation Sent – CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="col-xs-3"></div>
+    <div class="col-xs-6">
+            <h2>Email Confirmation Sent</h2>
+            <p>We have sent a confirmation message to your email address. To log in, please verify your email address
+                within five days.</p>
+            <p>If you are unable to confirm your email address or have any questions, please
+                <a href="{% url "contact" %}">contact us for help</a>.</p>
+    </div>
+    <div class="col-xs-3"></div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block privacy %}{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block title %}Page not found (404) – CourtListener.com{% endblock %}
+
+
+{% block content %}
+    <div class="col-sm-3"></div>
+    <div class="col-sm-6">
+        <h2>Sorry, that page does not exist...</h2>
+
+        <p>You've got a few options:</p>
+        <ul>
+            <li>Return <a href="/">home</a>, where you can start fresh</li>
+            <li><a href="{% url "contact" %}">Let us know</a> it's missing, so we can fix
+                things
+            </li>
+            <li><a href="{% url "contribute" %}#bugs">File a bug</a>, if you think it's
+                something we should fix
+            </li>
+        </ul>
+        <p>Sorry about this. If you continue having problems, please do let us
+            know.</p>
+    </div>
+    <div class="col-sm-3"></div>
+{% endblock %}

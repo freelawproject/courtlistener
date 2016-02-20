@@ -1,0 +1,84 @@
+{% extends "profile/nav.html" %}
+
+{% block title %}Alerts – CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+
+{% block nav-alerts %}active{% endblock %}
+
+{% block content %}
+    <div class="col-xs-12">
+        {% if alerts %}
+            <div class="table-responsive">
+                <table class="table settings-table">
+                    <thead>
+                        <tr>
+                            <th>Query&nbsp;name</th>
+                            <th>Frequency</th>
+                            <th>Last&nbsp;hit</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alert in alerts %}
+                        <tr>
+                            <td>
+                                <p class="bottom">
+                                    {% if alert.type == 'o' %}
+                                        <i class="fa-file-text-o fa gray"
+                                           title="Opinion Alert"></i>
+                                    {% elif alert.type == 'oa' %}
+                                        <i class="fa-volume-up fa gray"
+                                           title="Oral Argument Alert"></i>
+                                    {% endif %}
+                                    <a href="/?{{ alert.query }}">{{ alert.name }}</a>
+                                </p>
+                            </td>
+                            <td>{{ alert.get_rate_display }}</td>
+                            <td>{{ alert.date_last_hit|date:"D, n/j/Y"|default:"Never" }}</td>
+                            <td class="right">
+                                {% if alert.type == 'o' %}
+                                    <a href="/feed/search/?{{ alert.query }}"
+                                       title="Atom feed for this alert"
+                                       class="btn btn-primary btn-xs">
+                                        <i class="fa fa-rss"></i>&nbsp;Subscribe
+                                    </a>
+                                {% elif alert.type == 'oa' %}
+                                    <a href="/podcast/search/?{{ alert.query }}"
+                                       title="Podcast for this alert"
+                                       class="btn btn-primary btn-xs">
+                                        <i class="fa fa-rss"></i>&nbsp;Subscribe
+                                    </a>
+                                {% endif %}
+                                {% if user.profile.total_donated_last_year < MIN_DONATION.rt_alerts and alert.rate == 'rt' %}
+                                    <p class="bottom inline"
+                                       title="Donate at least $10 each year for Real Time alerts">
+                                        <a class="btn btn-primary btn-xs disabled">
+                                            <i class="fa fa-pencil"></i>&nbsp;Edit</a>
+                                    </p>
+                                {% else %}
+                                    <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
+                                       class="btn btn-primary btn-xs">
+                                        <i class="fa fa-pencil"></i>&nbsp;Edit</a>
+                                {% endif %}
+                                <a href="/alert/delete/confirm/{{ alert.pk }}"
+                                   class="btn btn-danger btn-xs">
+                                    <i class="fa fa-trash-o"></i>&nbsp;Delete</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="row">
+                <div class="col-sm-12">
+                    <h3>You have not made any alerts.</h3>
+                    <form action="/" method="get">
+                        <button type="submit" class="btn btn-primary">Make New Alert</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

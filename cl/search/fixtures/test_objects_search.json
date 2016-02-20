@@ -1,0 +1,355 @@
+[
+  {
+    "fields": {
+      "date_blocked": null,
+      "date_reargument_denied": "2015-08-15",
+      "court": "test",
+      "date_reargued": "2015-08-16",
+      "case_name_full": "case name full docket 1",
+      "date_argued": "2015-08-16",
+      "date_modified": "2015-08-15T13:55:03.669Z",
+      "case_name": "case name docket 1",
+      "date_created": "2015-08-15T13:55:03.669Z",
+      "case_name_short": "case name short docket 1",
+      "docket_number": "docket number 1",
+      "slug": "case-name",
+      "blocked": false
+    },
+    "model": "search.docket",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_blocked": null,
+      "date_reargument_denied": "2015-08-15",
+      "court": "test",
+      "date_reargued": "2015-08-15",
+      "case_name_full": "case name full docket 2",
+      "date_argued": "2015-08-15",
+      "date_modified": "2015-08-15T13:55:03.669Z",
+      "case_name": "case name docket 2",
+      "date_created": "2015-08-15T13:55:03.669Z",
+      "case_name_short": "case name short docket 2",
+      "docket_number": "docket number 2",
+      "slug": "case-name",
+      "blocked": false
+    },
+    "model": "search.docket",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "date_blocked": null,
+      "date_reargument_denied": "2015-08-15",
+      "court": "ca1",
+      "date_reargued": "2015-08-14",
+      "case_name_full": "case name full docket 3",
+      "date_argued": "2015-08-14",
+      "date_modified": "2015-08-15T13:55:03.669Z",
+      "case_name": "case name docket 3",
+      "date_created": "2015-08-15T13:55:03.669Z",
+      "case_name_short": "case name short docket 3",
+      "docket_number": "docket number 3",
+      "slug": "case-name",
+      "blocked": false
+    },
+    "model": "search.docket",
+    "pk": 3
+  },
+
+
+  {
+    "fields": {
+      "date_blocked": null,
+      "case_name_full": "Paul Debbas v. Franklin",
+      "lexis_cite": "",
+      "neutral_cite": "",
+      "state_cite_regional": "",
+      "case_name_short": "Debbas",
+      "state_cite_two": "",
+      "blocked": false,
+      "state_cite_three": "",
+      "syllabus": "some rando syllabus",
+      "federal_cite_three": "",
+      "date_filed": "2015-08-15",
+      "procedural_history": "some rando history",
+      "citation_id": null,
+      "source": "C",
+      "state_cite_one": "33 state 1",
+      "panel": [1],
+      "per_curiam": false,
+      "federal_cite_one": "",
+      "judges": "",
+      "case_name": "Debbas v. Franklin",
+      "westlaw_cite": "44",
+      "attorneys": "a bunch of crooks!",
+      "slug": "case-name-cluster",
+      "posture": "",
+      "scotus_early_cite": "",
+      "federal_cite_two": "",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "precedential_status": "Errata",
+      "citation_count": 4,
+      "scdb_id": "",
+      "scdb_votes_minority": null,
+      "scdb_votes_majority": null,
+      "specialty_cite_one": "",
+      "nature_of_suit": "",
+      "non_participating_judges": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "docket": 1
+    },
+    "model": "search.opinioncluster",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_blocked": null,
+      "case_name_full": "Harvey Howard v. Antonin Honda",
+      "lexis_cite": "",
+      "neutral_cite": "22 AL 339",
+      "state_cite_regional": "",
+      "case_name_short": "Howard",
+      "state_cite_two": "",
+      "blocked": false,
+      "state_cite_three": "",
+      "syllabus": "some rando syllabus",
+      "federal_cite_three": "",
+      "date_filed": "1795-06-09",
+      "procedural_history": "some rando history",
+      "citation_id": null,
+      "source": "C",
+      "state_cite_one": "33 state 1",
+      "panel": [],
+      "per_curiam": false,
+      "federal_cite_one": "1 Yeates 1 (test 1795)",
+      "judges": "David",
+      "case_name": "Howard v. Honda",
+      "westlaw_cite": "",
+      "attorneys": "a bunch of crooks!",
+      "slug": "case-name-cluster",
+      "posture": "",
+      "scotus_early_cite": "",
+      "federal_cite_two": "56 F.2d 9",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "precedential_status": "Published",
+      "citation_count": 6,
+      "scdb_id": "",
+      "scdb_votes_minority": 3,
+      "scdb_votes_majority": 6,
+      "specialty_cite_one": "",
+      "nature_of_suit": "copyright",
+      "non_participating_judges": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "docket": 2
+    },
+    "model": "search.opinioncluster",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "date_blocked": null,
+      "case_name_full": "Reference to Lissner v. Saad",
+      "lexis_cite": "",
+      "neutral_cite": "",
+      "state_cite_regional": "",
+      "case_name_short": "case name short cluster 3",
+      "state_cite_two": "",
+      "blocked": false,
+      "state_cite_three": "",
+      "syllabus": "some rando syllabus",
+      "federal_cite_three": "",
+      "date_filed": "2015-08-15",
+      "procedural_history": "some rando history",
+      "citation_id": null,
+      "source": "C",
+      "state_cite_one": "33 state 1",
+      "panel": [],
+      "per_curiam": false,
+      "federal_cite_one": "22 fed 1",
+      "judges": "",
+      "case_name": "case name cluster 3",
+      "westlaw_cite": "",
+      "attorneys": "a bunch of crooks!",
+      "slug": "case-name-cluster",
+      "posture": "",
+      "scotus_early_cite": "",
+      "federal_cite_two": "",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "precedential_status": "Published",
+      "citation_count": 8,
+      "scdb_id": "",
+      "scdb_votes_minority": null,
+      "scdb_votes_majority": null,
+      "specialty_cite_one": "",
+      "nature_of_suit": "",
+      "non_participating_judges": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "docket": 3
+    },
+    "model": "search.opinioncluster",
+    "pk": 3
+  },
+
+
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": 1,
+      "plain_text": "my plain text secret word for queries",
+      "html": null,
+      "download_url": null,
+      "cluster": 1,
+      "html_with_citations": "",
+      "local_path": "test/search/opinion_doc.doc",
+      "html_columbia": null,
+      "joined_by": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": null,
+      "type": "020lead"
+    },
+    "model": "search.opinion",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": 1,
+      "plain_text": "my plain text secret word for queries",
+      "html": null,
+      "download_url": null,
+      "cluster": 2,
+      "html_with_citations": "",
+      "local_path": "test/search/opinion_pdf_image_based.pdf",
+      "html_columbia": null,
+      "joined_by": [1],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": null,
+      "type": "010combined"
+    },
+    "model": "search.opinion",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": 1,
+      "plain_text": "my plain text secret word for queries 1 Yeates 1",
+      "html": null,
+      "download_url": null,
+      "cluster": 3,
+      "html_with_citations": "",
+      "local_path": "test/search/opinion_pdf_text_based.pdf",
+      "html_columbia": null,
+      "joined_by": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": null,
+      "type": "010combined"
+    },
+    "model": "search.opinion",
+    "pk": 3
+  },
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": 1,
+      "plain_text": "my plain text secret word for queries",
+      "html": null,
+      "download_url": null,
+      "cluster": 1,
+      "html_with_citations": "",
+      "local_path": "test/search/opinion_html.html",
+      "html_columbia": null,
+      "joined_by": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": null,
+      "type": "010combined"
+    },
+    "model": "search.opinion",
+    "pk": 4
+  },
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": 1,
+      "plain_text": "my plain text secret word for queries",
+      "html": null,
+      "download_url": null,
+      "cluster": 1,
+      "html_with_citations": "",
+      "local_path": "test/search/opinion_wpd.wpd",
+      "html_columbia": null,
+      "joined_by": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": null,
+      "type": "010combined"
+    },
+    "model": "search.opinion",
+    "pk": 5
+  },
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": 1,
+      "plain_text": "my plain text secret word for queries",
+      "html": null,
+      "download_url": null,
+      "cluster": 1,
+      "html_with_citations": "",
+      "local_path": "/test/search/opinion_text.txt",
+      "html_columbia": null,
+      "joined_by": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": null,
+      "type": "010combined"
+    },
+    "model": "search.opinion",
+    "pk": 6
+  },
+
+
+  {
+    "fields": {
+      "cited_opinion": 2,
+      "citing_opinion": 1
+    },
+    "model": "search.opinionscited",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "cited_opinion": 3,
+      "citing_opinion": 1
+    },
+    "model": "search.opinionscited",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "cited_opinion": 3,
+      "citing_opinion": 2
+    },
+    "model": "search.opinionscited",
+    "pk": 3
+  },
+  {
+    "fields": {
+      "cited_opinion": 1,
+      "citing_opinion": 3
+    },
+    "model": "search.opinionscited",
+    "pk": 4
+  }
+]

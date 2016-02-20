@@ -20,7 +20,7 @@ def fixer(simulate=False, verbose=False):
         for doc in docs:
             if verbose:
                 print "Fixing document number %s: %s" % (doc.pk, doc)
-                old_case_name = doc.citation.case_name
+                old_case_name = doc.case_name
                 if left:
                     new_case_name = old_case_name.replace('P. v.', 'People v.')
                 else:
@@ -30,16 +30,16 @@ def fixer(simulate=False, verbose=False):
 
             if not simulate:
                 if left:
-                    doc.citation.case_name = doc.citation.case_name.replace('P. v.', 'People v.')
+                    doc.case_name = doc.case_name.replace('P. v.', 'People v.')
                 else:
-                    doc.citation.case_name = doc.citation.case_name.replace('v. P.', 'v. People')
+                    doc.case_name = doc.case_name.replace('v. P.', 'v. People')
                 doc.citation.save()
 
     def fix_michigan(docs, left, simulate, verbose):
         for doc in docs:
             if verbose:
                 print "Fixing document number %s: %s" % (doc.pk, doc)
-                old_case_name = doc.citation.case_name
+                old_case_name = doc.case_name
                 if left:
                     new_case_name = old_case_name.replace('People of Mi', 'People of Michigan')
                 print "    Replacing %s" % old_case_name
@@ -47,7 +47,7 @@ def fixer(simulate=False, verbose=False):
 
             if not simulate:
                 if left:
-                    doc.citation.case_name = doc.citation.case_name.replace('People of Mi', 'People of Michigan')
+                    doc.case_name = doc.case_name.replace('People of Mi', 'People of Michigan')
                 doc.citation.save()
 
     def fix_wva(docs, simulate, verbose):

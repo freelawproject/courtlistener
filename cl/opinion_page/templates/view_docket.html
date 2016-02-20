@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load text_filters %}
+{% load humanize %}
+{% load admin_urls %}
+
+{% block title %}Docket for {{ docket|best_case_name }} –
+    CourtListener.com{% endblock %}
+{% block og_title %}Docket for {{ docket|best_case_name }} -
+    CourtListener.com{% endblock %}
+{% block description %}Docket for {{ docket|best_case_name }}{% endblock %}
+{% block og_description %}Docket for {{ docket|best_case_name }}{% endblock %}
+
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+      {% if request.user.is_superuser %}
+        <div class="sidebar-section">
+          {% if private %}
+          <div class="btn btn-danger btn-xs">Blocked from Search Engines</div>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+{% endblock sidebar %}
+
+{% block content %}
+    <div class="col-xs-12">
+        {% if perms.search.change_docket %}
+            <p class="float-right">
+                <a href="{% url 'admin:search_docket_change' docket.id %}"
+                   class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;<i
+                   class="fa fa-pencil"></i>
+                </a>
+            </p>
+        {% endif %}
+        <h2>{{ docket|best_case_name|safe|v_wrapper }}</h2>
+
+        {% if docket.clusters.count %}
+        <div>
+            <h3>There {% if docket.clusters.count == 1 %}is{% else %}are{% endif %} {{ docket.clusters.count|apnumber|intcomma }} opinion{{ docket.clusters.count|pluralize }} associated with this docket.</h3>
+            <hr>
+            <ul>
+                {% for cluster in docket.clusters.all %}
+                    <li>
+                        <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                            {{ cluster.caption|safe|v_wrapper }}
+                        </a>
+                        {% if perms.search.change_document %}
+                            <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
+                               class="btn btn-primary btn-xs">Edit</a>
+                        {% endif %}
+                        <br/>
+                        {{ cluster.date_filed }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if docket.audio_files.count %}
+        <div>
+            <h3>There {% if docket.audio_files.count == 1 %}is{% else %}are{% endif %} {{ docket.audio_files.count|apnumber|intcomma }} audio file{{ docket.audio_files.count|pluralize }} on this docket.</h3>
+            <hr>
+            <ul>
+                {% for af in docket.audio_files.all %}
+                    <li>
+                        <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                            {{ af|best_case_name|safe|v_wrapper }}
+                        </a>
+                        {% if perms.audio.change_audio %}
+                            <a href="{% url 'admin:audio_audio_change' af.pk %}"
+                               class="btn btn-primary btn-xs">Edit</a>
+                        {% endif %}
+                        <br/>
+                        {{ af.docket.date_argued }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}

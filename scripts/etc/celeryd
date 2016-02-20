@@ -1,0 +1,16 @@
+CELERYD_NODES='w1'
+CELERY_BIN='/var/www/.virtualenvs/courtlistener/bin/celery'
+CELERY_APP='cl'
+CELERYD_CHDIR='/var/www/courtlistener'
+CELERYD_USER='www-data'
+CELERYD_GROUP='www-data'
+CELERY_CREATE_DIRS=1
+
+# Uncomment these if you're messing about in a dev env.
+# Normally I'd remove these lines, but Celery is so horrendous I find it wise to
+# keep them.
+# CELERY_BIN='/home/mlissner/.virtualenvs/courtlistener/bin/celery'
+# CELERYD_CHDIR='/home/mlissner/Programming/intellij/courtlistener'
+# CELERYD_CONCURRENCY=2
+#CELERYD_USER='mlissner'
+#CELERYD_GROUP='mlissner'

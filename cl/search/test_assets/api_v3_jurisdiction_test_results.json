@@ -1,0 +1,30 @@
+{
+    "meta": {
+        "donate": "Please donate today to support more projects from Free Law Project.",
+        "limit": 20,
+        "next": null,
+        "offset": 0,
+        "previous": null,
+        "request_uri": "/api/rest/v3/jurisdiction/?format=json",
+        "total_count": 1
+    },
+    "objects": [
+        {
+            "citation_string": "Test",
+            "date_modified": null,
+            "end_date": null,
+            "full_name": "Testing Supreme Court",
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
+            "id": "test",
+            "in_use": true,
+            "jurisdiction": "F",
+            "notes": "",
+            "position": 0.0,
+            "resource_uri": "/api/rest/v3/jurisdiction/test/",
+            "short_name": "Testing Supreme Court",
+            "start_date": "2013-06-13",
+            "url": "https://www.courtlistener.com/"
+        }
+    ]
+}

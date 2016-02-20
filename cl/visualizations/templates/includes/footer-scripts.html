@@ -1,0 +1,14 @@
+{% if DEBUG %}
+    <script src="{{ STATIC_URL }}js/d3.js"></script>
+    <script src="{{ STATIC_URL }}js/plottable.js"></script>
+    <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
+{% else %}
+    <script src="{{ STATIC_URL }}js/d3.min.js"></script>
+    <script src="{{ STATIC_URL }}js/plottable.min.js"></script>
+    <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+{% endif %}
+
+<script src="{{ STATIC_URL }}js/visualization_tools.js"></script>
+<script src="{{ STATIC_URL }}js/scotus_map.js"></script>
+
+{% include "includes/filters.svg" %}
