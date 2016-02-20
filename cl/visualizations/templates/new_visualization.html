@@ -3,222 +3,275 @@
 {% block title %}Create a New Citation Network – CourtListener.com{% endblock %}
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
+{% endblock %}
+
 {% block footer-scripts %}
     <script src="{{ STATIC_URL }}js/typeahead.jquery.js"></script>
     <script src="{{ STATIC_URL }}js/scotus_map_new.js"></script>
 
     <script type="application/javascript">
         var last_year = "{{ SCDB_LATEST_CASE }}";
+        var opinions = {
+            {% for viz in demo_viz %}
+                "{{ viz.id }}": {{ viz.json|safe }}{% if not forloop.last %},
+                {% endif %}
+            {% endfor %}
+        };
     </script>
+    {% include "includes/footer-scripts.html" %}
 {% endblock %}
 
 {% block content %}
-    <div class="col-xs-2"></div>
-    <div class="col-xs-8 text-center">
-        <h2>Create a New Citation Network</h2>
-        <h4 class="v-offset-above-2">Select any two post-1945 Supreme Court cases and see what citation network connects them. Once created, your network will be saved to your user profile and can be edited and shared.
-        </h4>
+    <div class="col-xs-12">
+        <div class="row">
+            <div class="col-sm-1 col-md-2 hidden-xs "></div>
+            <div class="col-xs-12 col-sm-10 col-md-8 text-center">
+                <h2>Create a New Citation Network</h2>
+                <h4 class="v-offset-above-2">Select any two post-1945 Supreme Court cases and see what citation network connects them. Once created, your network will be saved to your user profile and can be edited and shared.
+                </h4>
+            </div>
+            <div class="col-sm-1 col-md-2 hidden-xs "></div>
+        </div>
+
+        <div class="row v-offset-above-3">
+            <div class="col-xs-12 col-md-3 col-md-push-9">
+                <div class="sidebar-section">
+                    <h3><span>How to Use This Tool</span></h3>
+                    <p>To create a network of cases, you must select the
+                        leftmost and rightmost cases that interest you. For
+                        example, if you are studying fourth amendment issues,
+                        you might select an early case and a recent case,
+                        producing a network of all the important cases in
+                        between.
+                    </p>
+                    <div id="chart-{{ demo_viz.0.id }}"
+                         data-height="160"
+                         class="v-offset-below-1"></div>
+                    <p>Based on the first case you select, you can decide if you
+                        want to select the next case based on those that cite
+                        your first one, those that your first one cites, or by
+                        searching the complete collection.
+                    </p>
+                    <p>More information is on the homepage, on the Free Law
+                        Project blog, or on the LibGuide page. You can see lots
+                        of examples in the Gallery of shared visualizations.
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-xs-12 col-md-9 col-md-pull-3">
+                <form role="form"
+                      action=""
+                      method="post"
+                      id="visualization-form">
+                    {% csrf_token %}
+                    <div class="row">
+                    <div class="col-xs-12" id="starting-cluster">
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                <p class="bottom">There were errors with your
+                                    submission.</p>
+                            </div>
+                        {% endif %}
+                        <h3>First Case</h3>
+
+                        <p class="gray">Enter all or part of a case name to anchor the
+                            beginning or end of your network. Cases will be
+                            automatically suggested with the most relevant cases listed
+                            first. For example, try typing "Miranda", "Citizens United", or
+                            "Obergefell".
+                        </p>
+                        {% if form.cluster_start.errors %}
+                            <p class="help-block">
+                                {% for error in form.cluster_start.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </p>
+                        {% endif %}
+                        <div class="row">
+                            <div class="col-xs-12">
+                                <div class="form-group">
+                                    <input class="form-control typeahead"
+                                           type="text"
+                                           id="starting-cluster-typeahead">
+                                    {{ form.cluster_start }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+
+                    <div class="row">
+                    <div class="col-xs-12" id="ending-cluster">
+                        <h3>Second Case</h3>
+
+                        <ul class="nav nav-tabs nav-justified">
+                            <li role="presentation" class="active">
+                                <a href="#search"
+                                   aria-controls="search"
+                                   role="tab"
+                                   data-toggle="tab">Search</a></li>
+                            <li role="presentation">
+                                <a href="#authorities"
+                                   aria-controls="authorities"
+                                   role="tab"
+                                   data-toggle="tab"
+                                   id="authorities-tab">Cases Cited By Your First Case
+                                    <span class="authority-count"></span>
+                                </a>
+                            </li>
+                            <li role="presentation">
+                                <a href="#citing"
+                                   aria-controls="citing"
+                                   role="tab"
+                                   data-toggle="tab">Cases Citing Your First Case
+                                    <span class="citing-count"></span>
+                                </a>
+                            </li>
+                        </ul>
+
+
+                        <div class="tab-content v-offset-above-2">
+                            <div role="tabpanel"
+                                 class="tab-pane active"
+                                 id="search">
+                                <p class="gray">Enter all or part of a case name
+                                    to connect to <span class="first-selection">your
+                                        first case</span>. This search works exactly like the <i>First Case</i> search above. Once selected, we will make a network between these cases.
+                                </p>
+                                {% if form.cluster_end.errors %}
+                                    <p class="help-block">
+                                        {% for error in form.cluster_end.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </p>
+                                {% endif %}
+                                <div class="form-group">
+                                    <input class="form-control typeahead ending-typeahead"
+                                           type="text"
+                                           id="ending-cluster-typeahead-search">
+                                </div>
+                            </div>
+                            <div role="tabpanel"
+                                 class="tab-pane"
+                                 id="authorities">
+                                <p class="gray">Search the <span
+                                        class="authority-count"></span> Supreme Court cases that
+                                     <span
+                                        class="first-selection">your first case</span> cites. Make one of these <i>cites</i> cases your second anchor.
+                                    Once selected, we will make a network between these
+                                    cases.
+                                </p>
+                                {% if form.cluster_end.errors %}
+                                    <p class="help-block">
+                                        {% for error in form.cluster_end.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </p>
+                                {% endif %}
+                                <div class="form-group">
+                                    <input class="form-control typeahead ending-typeahead"
+                                           type="text"
+                                           id="ending-cluster-typeahead-authorities"
+                                           disabled="disabled">
+                                </div>
+                            </div>
+                            <div role="tabpanel"
+                                 class="tab-pane"
+                                 id="citing">
+                                <p class="gray">Search the Supreme Court cases that came after <span
+                                        class="first-selection">your first case</span> and cited back to it. Make one of these <i>cited by</i> cases your second anchor.
+                                    Once selected, we will make a network between these
+                                    cases.
+                                </p>
+                                {% if form.cluster_end.errors %}
+                                    <p class="help-block">
+                                        {% for error in form.cluster_end.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </p>
+                                {% endif %}
+                                <div class="form-group">
+                                    <input class="form-control typeahead ending-typeahead"
+                                           type="text"
+                                           id="ending-cluster-typeahead-citing"
+                                           disabled="disabled">
+                                </div>
+                            </div>
+                        </div>
+                        {{ form.cluster_end }}
+                    </div>
+                    </div>
+
+                    <div class="row">
+                    <div class="col-xs-12">
+                        <div class="text-center v-offset-above-2" id="center-buttons">
+                            <a class="btn btn-default btn-lg" id="more">More Options</a>
+                            <button type="submit"
+                                    class="btn btn-primary btn-lg"
+                                    name="make-viz"
+                                    id="make-viz-button">Make this Network
+                            </button>
+                        </div>
+
+                        <div class="hidden row" id="extra-options">
+                            <div class="col-xs-12" id="titles">
+                                <h3>Title</h3>
+                                <p class="gray">Give your network a title. If left
+                                    blank, this
+                                    will be automatically generated using the cases you
+                                    selected.
+                                </p>
+                                {% if form.title.errors %}
+                                    <p class="help-block">
+                                        {% for error in form.title.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </p>
+                                {% endif %}
+                                <div class="form-group">
+                                    {{ form.title }}
+                                </div>
+                            </div>
+
+                            <div class="col-xs-12" id="notes">
+                                <h3>Description</h3>
+
+                                <p class="gray">Provide any additional comments you have
+                                    about this network, explaining the story it tells
+                                    or why you created it. <a
+                                            href="{% url "markdown_help" %}"
+                                            target="_blank">Markdown syntax</a> allowed,
+                                    but no raw HTML. Examples: **bold**, *italics*.
+                                </p>
+                                {% if form.notes.errors %}
+                                    <p class="help-block">
+                                        {% for error in form.notes.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </p>
+                                {% endif %}
+                                <div class="form-group">
+                                    {{ form.notes }}
+                                </div>
+                            </div>
+                            <div class="col-xs-12 pull-right v-offset-above-2">
+                                <button type="submit"
+                                        class="btn btn-primary btn-lg pull-right"
+                                        name="make-viz"
+                                        id="make-viz-button">Make this Network
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </form>
+            </div>
+
+        </div>
     </div>
-    <div class="col-xs-2"></div>
-
-    <form role="form"
-          action=""
-          method="post"
-          id="visualization-form">
-        {% csrf_token %}
-        <div class="col-xs-12" id="starting-cluster">
-            {% if form.errors %}
-                <div class="alert alert-danger">
-                    <p class="bottom">There were errors with your
-                        submission.</p>
-                </div>
-            {% endif %}
-            <h3>First Case</h3>
-
-            <p class="gray">Enter all or part of a case name to anchor the
-                beginning or end of your network. Cases will be
-                automatically suggested with the most relevant cases listed
-                first. For example, try typing "Miranda", "Citizens United", or
-                "Obergefell".
-            </p>
-            {% if form.cluster_start.errors %}
-                <p class="help-block">
-                    {% for error in form.cluster_start.errors %}
-                        {{ error|escape }}
-                    {% endfor %}
-                </p>
-            {% endif %}
-            <div class="row">
-                <div class="col-xs-12">
-                    <div class="form-group">
-                        <input class="form-control typeahead"
-                               type="text"
-                               id="starting-cluster-typeahead">
-                        {{ form.cluster_start }}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xs-12" id="ending-cluster">
-            <h3>Second Case</h3>
-
-            <p class="gray">There are three ways for you to chose the second case anchoring your network. Use the "SEARCH", "CASES CITED BY" or "CASES CITING" tab.
-            </p>
-
-            <ul class="nav nav-tabs nav-justified">
-                <li role="presentation" class="active">
-                    <a href="#search"
-                       aria-controls="search"
-                       role="tab"
-                       data-toggle="tab">Search</a></li>
-                <li role="presentation">
-                    <a href="#authorities"
-                       aria-controls="authorities"
-                       role="tab"
-                       data-toggle="tab"
-                       id="authorities-tab">Cases Cited By Your First Case
-                        <span class="authority-count"></span>
-                    </a>
-                </li>
-                <li role="presentation">
-                    <a href="#citing"
-                       aria-controls="citing"
-                       role="tab"
-                       data-toggle="tab">Cases Citing Your First Case
-                        <span class="citing-count"></span>
-                    </a>
-                </li>
-            </ul>
-
-
-            <div class="tab-content v-offset-above-2">
-                <div role="tabpanel"
-                     class="tab-pane active"
-                     id="search">
-                    <p class="gray">Enter all or part of a case name
-                        to connect to <span class="first-selection">your
-                            first case</span>. This search works exactly like the <i>First Case</i> search above.
-                    </p>
-                    {% if form.cluster_end.errors %}
-                        <p class="help-block">
-                            {% for error in form.cluster_end.errors %}
-                                {{ error|escape }}
-                            {% endfor %}
-                        </p>
-                    {% endif %}
-                    <div class="form-group">
-                        <input class="form-control typeahead ending-typeahead"
-                               type="text"
-                               id="ending-cluster-typeahead-search">
-                    </div>
-                </div>
-                <div role="tabpanel"
-                     class="tab-pane"
-                     id="authorities">
-                    <p class="gray">Search the <span
-                            class="authority-count"></span> Supreme Court cases that
-                         <span
-                            class="first-selection">your first case</span> cites. Make one of these <i>cites</i> cases your second anchor.
-                    </p>
-                    {% if form.cluster_end.errors %}
-                        <p class="help-block">
-                            {% for error in form.cluster_end.errors %}
-                                {{ error|escape }}
-                            {% endfor %}
-                        </p>
-                    {% endif %}
-                    <div class="form-group">
-                        <input class="form-control typeahead ending-typeahead"
-                               type="text"
-                               id="ending-cluster-typeahead-authorities"
-                               disabled="disabled">
-                    </div>
-                </div>
-                <div role="tabpanel"
-                     class="tab-pane"
-                     id="citing">
-                    <p class="gray">Search the Supreme Court cases that came after <span
-                            class="first-selection">your first case</span> and cited back to it. Make one of these <i>cited by</i> cases your second anchor.
-                    </p>
-                    {% if form.cluster_end.errors %}
-                        <p class="help-block">
-                            {% for error in form.cluster_end.errors %}
-                                {{ error|escape }}
-                            {% endfor %}
-                        </p>
-                    {% endif %}
-                    <div class="form-group">
-                        <input class="form-control typeahead ending-typeahead"
-                               type="text"
-                               id="ending-cluster-typeahead-citing"
-                               disabled="disabled">
-                    </div>
-                </div>
-            </div>
-            {{ form.cluster_end }}
-        </div>
-
-        <div class="col-xs-12">
-            <div class="text-center v-offset-above-2" id="center-buttons">
-                <a class="btn btn-default btn-lg" id="more">More Options</a>
-                <button type="submit"
-                        class="btn btn-primary btn-lg"
-                        name="make-viz"
-                        id="make-viz-button">Make this Network
-                </button>
-            </div>
-
-            <div class="hidden row" id="extra-options">
-                <div class="col-xs-12" id="titles">
-                    <h3>Title</h3>
-                    <p class="gray">Give your network a title. If left
-                        blank, this
-                        will be automatically generated using the cases you
-                        selected.
-                    </p>
-                    {% if form.title.errors %}
-                        <p class="help-block">
-                            {% for error in form.title.errors %}
-                                {{ error|escape }}
-                            {% endfor %}
-                        </p>
-                    {% endif %}
-                    <div class="form-group">
-                        {{ form.title }}
-                    </div>
-                </div>
-
-                <div class="col-xs-12" id="notes">
-                    <h3>Description</h3>
-
-                    <p class="gray">Provide any additional comments you have
-                        about this network, explaining the story it tells
-                        or why you created it. <a
-                                href="{% url "markdown_help" %}"
-                                target="_blank">Markdown syntax</a> allowed,
-                        but no raw HTML. Examples: **bold**, *italics*.
-                    </p>
-                    {% if form.notes.errors %}
-                        <p class="help-block">
-                            {% for error in form.notes.errors %}
-                                {{ error|escape }}
-                            {% endfor %}
-                        </p>
-                    {% endif %}
-                    <div class="form-group">
-                        {{ form.notes }}
-                    </div>
-                </div>
-                <div class="col-xs-12 pull-right v-offset-above-2">
-                    <button type="submit"
-                            class="btn btn-primary btn-lg pull-right"
-                            name="make-viz"
-                            id="make-viz-button">Make this Network
-                    </button>
-                </div>
-            </div>
-        </div>
-    </form>
 
 {% endblock %}

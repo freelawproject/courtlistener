@@ -90,8 +90,29 @@ def view_visualization(request, pk, slug):
 @login_required
 @never_cache
 def new_visualization(request):
+    demo_viz = SCOTUSMap.objects.filter(
+        published=True,
+        deleted=False,
+    ).annotate(
+        Count('clusters'),
+    ).filter(
+        # Ensures that we only show good stuff on homepage
+        clusters__count__gt=10,
+        clusters__count__lt=35,
+    ).order_by(
+        '-date_published',
+        '-date_modified',
+        '-date_created',
+    )[:1]
+
+    context = {
+        'SCDB_LATEST_CASE': settings.SCDB_LATEST_CASE.isoformat(),
+        'demo_viz': demo_viz,
+        'private': True,
+    }
     if request.method == 'POST':
         form = VizForm(request.POST)
+        context['form'] = form
         if form.is_valid():
             # Process the data in form.cleaned_data
             cd = form.cleaned_data
@@ -129,7 +150,7 @@ def new_visualization(request):
                     messages.add_message(request, msg['level'], msg['message'])
                     return render_to_response(
                         'new_visualization.html',
-                        {'form': form, 'private': True},
+                        context,
                         RequestContext(request),
                     )
 
@@ -157,14 +178,10 @@ def new_visualization(request):
                 kwargs={'pk': viz.pk, 'slug': viz.slug}
             ))
     else:
-        form = VizForm()
+        context['form'] = VizForm()
     return render_to_response(
         'new_visualization.html',
-        {
-            'form': form,
-            'SCDB_LATEST_CASE': settings.SCDB_LATEST_CASE.isoformat(),
-            'private': True
-        },
+        context,
         RequestContext(request),
     )
 
