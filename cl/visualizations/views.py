@@ -97,8 +97,8 @@ def new_visualization(request):
         Count('clusters'),
     ).filter(
         # Ensures that we only show good stuff on homepage
-        clusters__count__gt=10,
-        clusters__count__lt=35,
+        clusters__count__gt=5,
+        clusters__count__lt=15,
     ).order_by(
         '-date_published',
         '-date_modified',
