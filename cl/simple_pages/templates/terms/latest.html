@@ -5,7 +5,19 @@
 
 {% block content %}
     <div class="col-xs-12">
-        <h2>Terms</h2>
+        <h2>Terms and Policies</h2>
+    </div>
+
+    <div class="col-sm-3">
+        <h4 class="bottom"><a href="#terms">Terms of Service</a></h4>
+        <h4 class="bottom"><a href="#privacy">Privacy Policy</a></h4>
+        <h4 class="bottom"><a href="#removal">Removal Policy</a></h4>
+        <h4 class="bottom"><a href="#copyright">Copyright Policy</a></h4>
+        <h4 class="bottom"><a href="#versions">Previous Versions</a></h4>
+    </div>
+
+    <div class="col-xs-9">
+        <h3 id="terms">Terms of Service</h3>
 
         <H4>1. We are not your lawyers.</H4>
 
@@ -75,7 +87,7 @@
         End of terms.
         <p><em>Last modified: May 2, 2010</em></p>
         <hr>
-        <h2 id="privacy">Privacy</h2>
+        <h3 id="privacy">Privacy</h3>
 
         <p>CourtListener does not sell information collected about your visits
             to this site and will only share such information in the ways
@@ -130,7 +142,7 @@
 
         <p><em>Last modified: May 7, 2012</em></p>
         <hr>
-        <h2 id="removal">Removal policy</h2>
+        <h3 id="removal">Removal Policy</h3>
 
         <p>CourtListener believes that there is a compelling public interest in
             making the law broadly available to all, and that is why we have
@@ -179,7 +191,7 @@
             interest in your case.</p>
 
         <hr>
-        <h2 id="copyright">Copyright policy</h2>
+        <h3 id="copyright">Copyright Policy</h3>
 
         <p>CourtListener.com follows the notice and takedown procedures in the
             Digital Millennium Copyright Act (DMCA), <a
@@ -202,7 +214,7 @@
             content is a fair use, because fair uses are not infringing. See
             <a href="https://www.law.cornell.edu/uscode/text/17/107">17 U.S.C.
             Section 107</a> and <a
-              href="https://www.courtlistener.com/opinion/2937139/stephanie-lenz-v-universal-music-corp/">
+              href="{% url "view_case" "2937139" "stephanie-lenz-v-universal-music-corp" %}">
             <em>Lenz v. Universal Music Corp.</em>, No. 13-16106 (9th Cir. Sep.
             14, 2015)</a>. If you are not sure if the content you want to
             report infringes your copyright, you should first contact a
@@ -243,9 +255,9 @@
 
         <p><em>Added: February 22, 2016</em></p>
         <hr>
-        <h2>Previous versions</h2>
+        <h3 id="versions">Previous Versions</h3>
 
-        <p class="bottom">Previous versions of these policies can be found in
+        <p>Previous versions of these policies can be found in
             the following locations:</p>
         <ul>
             <li><a href="{% url 'old_terms' '7' %}">Between December 14, 2015 and February 22, 2016</a></li>
@@ -260,5 +272,6 @@
                 2011</a></li>
             <li><a href="{% url 'old_terms' '1' %}">Prior to February 17, 2011</a></li>
         </ul>
+        <p>Thank you for using CourtListener.com.</p>
     </div>
 {% endblock %}
