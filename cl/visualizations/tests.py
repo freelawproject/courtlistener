@@ -39,18 +39,26 @@ class TestVizModels(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user('Joe', 'joe@cl.com', 'password')
+        self.start = OpinionCluster.objects.get(
+            case_name='Town of Greece v. Galloway'
+        )
+        self.end = OpinionCluster.objects.get(
+            case_name='Marsh v. Chambers'
+        )
 
     def test_SCOTUSMap_builds_nx_digraph(self):
+
+
         viz = SCOTUSMap(
             user=self.user,
-            cluster_start='Town of Greece v. Galloway',
-            cluster_end='Marsh v. Chambers',
+            cluster_start=self.start,
+            cluster_end=self.end,
             title='Test SCOTUSMap',
             notes='Test Notes'
         )
 
         build_kwargs = {
-            'parent_authority': 'Marsh v. Chambers',
+            'parent_authority': self.end,
             'visited_nodes': {},
             'good_nodes': {},
             'max_hops': 3,
