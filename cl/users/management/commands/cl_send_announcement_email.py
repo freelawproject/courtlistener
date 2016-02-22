@@ -84,13 +84,21 @@ class Command(BaseCommand):
         self.verbosity = int(options.get('verbosity', 1))
         self.options = options
 
-        recipients = []
+        recipients = set()
 
         if options.get('subscribers'):
             for up in UserProfile.objects.filter(wants_newsletter=True):
-                recipients.append(up.user.email)
+                recipients.add(up.user.email)
         if options.get('recipients'):
-            recipients.extend(options['recipients'])
+            recipients.update(options['recipients'])
+        if 'courtlistener' not in self.options['sender']:
+            press_on = raw_input(
+                "'CourtListener' isn't in your sender email address. In the "
+                "past this has resulted in a lot of emails being marked as "
+                "spam. Continue [y/n]? "
+            )
+            if press_on.lower() != 'y':
+                exit(1)
         if not options['subject']:
             sys.stderr.write('No subject provided. Aborting.\n')
             exit(1)
@@ -102,7 +110,6 @@ class Command(BaseCommand):
                 sys.stdout.write("**********************************\n")
                 sys.stdout.write("* SIMULATE MODE - NO EMAILS SENT *\n")
                 sys.stdout.write("**********************************\n")
-            recipients = list(set(recipients))  # Dups gotta go.
             self.send_emails(recipients)
         else:
             sys.stderr.write("No recipients defined. Aborting.\n")
