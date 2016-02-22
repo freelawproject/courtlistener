@@ -47,8 +47,7 @@ class TestVizModels(TestCase):
         )
 
     def test_SCOTUSMap_builds_nx_digraph(self):
-
-
+        """ Tests build_nx_digraph method to see how it works """
         viz = SCOTUSMap(
             user=self.user,
             cluster_start=self.start,
@@ -79,7 +78,15 @@ class TestViews(TestCase):
 
     view = 'new_visualization'
 
+    fixtures = ['scotus_map_data.json']
+
     def setUp(self):
+        self.start = OpinionCluster.objects.get(
+            case_name='Town of Greece v. Galloway'
+        )
+        self.end = OpinionCluster.objects.get(
+            case_name='Marsh v. Chambers'
+        )
         self.user = User.objects.create_user('beta', 'beta@cl.com', 'password')
         permission = Permission.objects.get(
             codename='has_beta_access'
@@ -106,10 +113,10 @@ class TestViews(TestCase):
     def test_new_visualization_view_creates_map_on_post(self):
         """ Test a valid POST creates a new ScotusMap object """
         data = {
-            'cluster_start':'blah',
-            'cluster_end':'blah',
-            'title':'Test Map Title',
-            'notes':'Just some notes'
+            'cluster_start': self.start.pk,
+            'cluster_end': self.end.pk,
+            'title': 'Test Map Title',
+            'notes': 'Just some notes'
         }
         response = self.client.post(reverse(self.view), data=data)
         # self.assertRedirects(response, reverse('view_visualization'))
