@@ -1,12 +1,12 @@
 """
 Unit tests for Visualizations
 """
-from django.test import TestCase
+from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User, Permission
 from django.core.urlresolvers import reverse
 from cl.visualizations.forms import VizForm
 from cl.visualizations.models import SCOTUSMap, JSONVersion
-from cl.visualizations import utils
+from cl.visualizations import utils, views
 from cl.users.models import UserProfile
 from cl.search.models import OpinionCluster
 
@@ -194,3 +194,113 @@ class TestViews(TestCase):
             old_view_count + 1,
             SCOTUSMap.objects.get(pk=1).view_count
         )
+
+
+class TestVizAjaxCrud(TestCase):
+    """
+    Test the CRUD operations for Visuzalizations that the javascript client
+    code relies on currently.
+    """
+
+    fixtures = ['scotus_map_data.json', 'visualizations.json']
+
+    def setUp(self):
+        self.live_viz = SCOTUSMap.objects.get(pk=1)
+        self.private_viz = SCOTUSMap.objects.get(pk=2)
+        self.deleted_viz = SCOTUSMap.objects.get(pk=3)
+        self.factory = RequestFactory()
+
+    def _build_post(self, url, username=None, data=None):
+        """ Helper method to build authenticated AJAX POST
+        Args:
+            url: url pattern to request
+            username: username for User to attach
+            **data: dictionary of POST data
+
+        Returns: HttpRequest configured as an AJAX POST
+        """
+        if not data:
+            data = {}
+        post = self.factory.post(url, data=data)
+        if username:
+            post.user = User.objects.get(username=username)
+        post.META['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest'
+        return post
+
+    def post_ajax_view(self, view, pk, username='admin'):
+        """
+        Generates a simple POST for the given view with the given
+        private key as the POST data.
+
+        Args:
+            view: reference to Django View
+            pk: private key of target SCOTUSMap
+            username: username of User to POST as
+
+        Returns: new reference to updated SCOTUSMap
+
+        """
+        post = self._build_post(
+            reverse(view),
+            username=username,
+            data={'pk': pk}
+        )
+        response = view(post)
+        self.assertEqual(response.status_code, 200)
+        return SCOTUSMap.objects.get(pk=pk)
+
+    def test_deletion_via_ajax_view(self):
+        """
+        Test deletion of visualization via view only sets deleted flag and
+        doesn't actualy delete the object yet
+        """
+        self.assertFalse(self.live_viz.deleted)
+        self.assertIsNone(self.live_viz.date_deleted)
+
+        viz = self.post_ajax_view(views.delete_visualization, self.live_viz.pk)
+
+        self.assertTrue(viz.deleted)
+        self.assertIsNotNone(viz.date_deleted)
+
+    def test_restore_via_ajax_view(self):
+        """
+        Tests restoration of deleted visualization from teh trash via a
+        ajax POST
+        """
+        self.assertTrue(self.deleted_viz.deleted)
+        self.assertIsNotNone(self.deleted_viz.date_deleted)
+
+        viz = self.post_ajax_view(
+            views.restore_visualization, self.deleted_viz.pk
+        )
+
+        self.assertFalse(viz.deleted)
+        self.assertIsNone(viz.date_deleted)
+
+    def test_privatizing_via_ajax_view(self):
+        """
+        Tests setting a public visualization to private via an AJAX POST
+        """
+        self.assertTrue(self.live_viz.published)
+        self.assertIsNotNone(self.live_viz.date_published)
+
+        viz = self.post_ajax_view(
+            views.privatize_visualization, self.live_viz.pk
+        )
+
+        self.assertFalse(viz.published)
+        self.assertIsNone(viz.date_published)
+
+    def test_sharing_via_ajax_view(self):
+        """
+        Tests sharing a public visualization via an AJAX POST
+        """
+        self.assertTrue(self.private_viz.published)
+        self.assertIsNotNone(self.private_viz.date_published)
+
+        viz = self.post_ajax_view(
+            views.share_visualization, self.private_viz.pk
+        )
+
+        self.assertFalse(viz.published)
+        self.assertIsNone(viz.date_published)
