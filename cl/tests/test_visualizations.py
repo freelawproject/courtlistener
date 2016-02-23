@@ -103,7 +103,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
         description.send_keys('Test description.\n#FreeKe$ha')
 
         # She clicks Make this Network when she's done
-        self.browser.find_element_by_id('')
+        self.browser.find_element_by_id('make-viz-button').click()
 
         # And she's brought to the new Visualization she just created!
-        self.assertIn('Network Graph of Marsh', self.browser.title)
+        self.assertIn('Network Graph of Selenium', self.browser.title)
