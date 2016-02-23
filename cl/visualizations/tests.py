@@ -112,14 +112,16 @@ class TestViews(TestCase):
 
     def test_new_visualization_view_creates_map_on_post(self):
         """ Test a valid POST creates a new ScotusMap object """
+        self.client.login(username='beta', password='password')
         data = {
-            'cluster_start': self.start.pk,
-            'cluster_end': self.end.pk,
+            'cluster_start': 2674862,
+            'cluster_end': 111014,
             'title': 'Test Map Title',
             'notes': 'Just some notes'
         }
         response = self.client.post(reverse(self.view), data=data)
-        # self.assertRedirects(response, reverse('view_visualization'))
+
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(1, SCOTUSMap.objects.count())
         scotus_map = SCOTUSMap.objects.get(title='Test Map Title')
         self.assertIsNotNone(scotus_map)
