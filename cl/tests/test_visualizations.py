@@ -2,7 +2,7 @@
 """
 Functional tests for the Visualization feature of CourtListener
 """
-from django.contrib.auth.models import User, Permission
+from django.contrib.auth.models import User
 from cl.users.models import UserProfile
 from cl.tests.base import BaseSeleniumTest
 
@@ -15,16 +15,12 @@ class VisualizationCrudTests(BaseSeleniumTest):
     fixtures = ['scotus_map_data.json', 'visualizations.json']
 
     def setUp(self):
-        self.beta_user = User.objects.create_user(
-            'beta', 'beta@cl.com', 'password'
+        self.user = User.objects.create_user(
+            'user', 'user@cl.com', 'password'
         )
-        permission = Permission.objects.get(
-            codename='has_beta_access'
-        )
-        self.beta_user.user_permissions.add(permission)
-        self.beta_user.save()
-        self.beta_user = UserProfile.objects.create(
-            user=self.beta_user,
+        self.user.save()
+        self.user = UserProfile.objects.create(
+            user=self.user,
             email_confirmed=True
         )
         super(VisualizationCrudTests, self).setUp()
@@ -33,7 +29,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
         """ Test if a user can create a new Visualization """
         # Beth Beta-User logs into CL
         self.browser.get(self.server_url)
-        self.attempt_sign_in('beta', 'password')
+        self.attempt_sign_in('user', 'password')
 
         # She selects "New Visualization" from the new Visualization menu
         menu = self.browser.find_element_by_link_text('Visualizations ')
