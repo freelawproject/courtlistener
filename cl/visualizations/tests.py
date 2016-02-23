@@ -190,7 +190,7 @@ class TestViews(TestCase):
 
 class TestVizAjaxCrud(TestCase):
     """
-    Test the CRUD operations for Visuzalizations that the javascript client
+    Test the CRUD operations for Visualizations that the javascript client
     code relies on currently.
     """
 
@@ -211,7 +211,7 @@ class TestVizAjaxCrud(TestCase):
 
         Returns: HttpRequest configured as an AJAX POST
         """
-        if not data:
+        if data is None:
             data = {}
         post = self.factory.post(url, data=data)
         if username:
@@ -244,7 +244,7 @@ class TestVizAjaxCrud(TestCase):
     def test_deletion_via_ajax_view(self):
         """
         Test deletion of visualization via view only sets deleted flag and
-        doesn't actualy delete the object yet
+        doesn't actually delete the object yet
         """
         self.assertFalse(self.live_viz.deleted)
         self.assertIsNone(self.live_viz.date_deleted)
