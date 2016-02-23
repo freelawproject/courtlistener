@@ -121,11 +121,6 @@ class TestViews(TestCase):
             email_confirmed=True
         )
 
-    def test_new_visualization_view_redirects_non_beta_users(self):
-        """ Non-beta users should get sent away """
-        response = self.client.get(reverse(self.view))
-        self.assertEqual(response.status_code, 302)
-
     def test_new_visualization_view_provides_form(self):
         """ Test a GET to the Visualization view provides a VizForm """
         self.client.login(username='user', password='password')
