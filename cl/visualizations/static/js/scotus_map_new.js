@@ -176,7 +176,7 @@ $(document).ready(function () {
 
     // Extra options JS
     $('#more').click(function (e) {
-        $('#center-buttons').addClass('hidden');
+        $('#more').addClass('hidden');
         $('#extra-options').removeClass('hidden');
     });
 });
