@@ -16,7 +16,26 @@ class TestVizUtils(TestCase):
 
     fixtures = ['scotus_map_data.json']
 
-    def test_reverse_endpoints_if_needed(self):
+    def test_reverse_endpoints_does_not_reverse_good_inputs(self):
+        """
+        Test the utility function does not change the order of endpoints that
+        are already in correct order
+        """
+        start = OpinionCluster.objects.get(
+            case_name='Marsh v. Chambers'
+        )
+        end = OpinionCluster.objects.get(
+            case_name='Town of Greece v. Galloway'
+        )
+        new_start, new_end = utils.reverse_endpoints_if_needed(start, end)
+        self.assertEqual(new_start, start)
+        self.assertEqual(new_end, end)
+
+    def test_reverse_endpoints_reverses_backwards_inputs(self):
+        """
+        Test the utility function for properly ordering visualization
+        endpoints.
+        """
         real_end = OpinionCluster.objects.get(
             case_name='Town of Greece v. Galloway'
         )
@@ -67,18 +86,12 @@ class TestVizModels(TestCase):
         self.assertTrue(g.edges() > 0)
 
 
-class TestVizForm(TestCase):
-    """ Tests for VizForm form """
-
-    pass
-
-
 class TestViews(TestCase):
     """ Tests for Visualization views """
 
     view = 'new_visualization'
 
-    fixtures = ['scotus_map_data.json']
+    fixtures = ['scotus_map_data.json', 'visualizations.json']
 
     def setUp(self):
         self.start = OpinionCluster.objects.get(
@@ -125,3 +138,11 @@ class TestViews(TestCase):
         self.assertEqual(1, SCOTUSMap.objects.count())
         scotus_map = SCOTUSMap.objects.get(title='Test Map Title')
         self.assertIsNotNone(scotus_map)
+
+    def test_published_visualizations_show_in_gallery(self):
+        """ Test that a user can see published visualizations from others """
+        self.client.login(username='beta', password='password')
+        response = self.client.get(reverse('viz_gallery'))
+        html = response.content.decode('utf-8')
+        self.assertIn('Shared by Admin', html)
+        self.assertIn('FREE KESHA', html)
