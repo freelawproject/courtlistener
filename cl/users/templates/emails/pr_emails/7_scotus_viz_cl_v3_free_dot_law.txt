@@ -1,0 +1,64 @@
+Free Law Project Newsletter - 22 February 2016
+==============================================
+
+In today's email, we're announcing a number of big items. As ever, we at Free Law Project have been very busy since our last news letter and we have a lot to share.
+
+
+SCOTUS Visualizations
+---------------------
+A new tool we're launching today lets you visualize Supreme Court citation networks so that you can analyze the way cases are cited and identify lines of Supreme Court doctrine. The tool is super simple to use and we hope people will find it useful as they're teaching or learning about the Supreme Court.
+
+You can read more about this and see some example visualizations at: https://free.law/2016/02/22/our-newest-launch-a-scotus-data-viz-tool/
+
+
+Citation Searching
+------------------
+A new feature on CourtListener is what we're calling "Citation Searching". This feature lets you slice and dice the cases citing an opinion you're interested in. Among other things, this allows you to filter to only the cases from the Supreme Court, or only those from the last ten years. You can even tie this in with our alert system so that you get an email whenever an opinion you're interested in is freshly cited.
+
+You can read more about this on the blog, where we walk through a full example using Planned Parenthood and Roe v. Wade: https://free.law/2016/01/30/citation-searching-on-courtlistener/
+
+We think this is one of the most powerful features we've ever launched and we're really excited to see how it's used.
+
+
+New Citation Finder
+-------------------
+Ever have a citation like 558 U.S. 310 and wish there was an easy way to look up the opinion for it? Well, you can always search for a citation in CourtListener, but we thought we'd make it easier, so we launched a new citation lookup tool that you can find at:
+
+https://www.courtlistener.com/c/
+
+It's dead simple to use and will quickly get you where you need to go, but it has a few tricks up its sleeve that you can read about on our blog: https://free.law/2015/11/30/our-new-citation-finder/
+
+
+Launching Free.law
+------------------
+Another announcement we're sharing is that we've launched a new homepage for Free Law Project at https://free.law/. Dot-law is a brand new suffix and after thinking long and hard about what we wanted our domain to be, we selected free.law as our new identity. We have found that having a short domain name lends credibility and weight to all our work, so we're quite happy to have this one. As a part of getting the new URL, we also launched a brand new homepage that's faster, more secure and more reliable.
+
+For more information and to see our new homepage go to: https://free.law/2016/01/30/launching-freelaw-website/
+
+
+New Version of CourtListener
+----------------------------
+A big project we've been working on at CourtListener has been to overhaul our database and search engine. It took the better part of a year, but we're really happy to share that it's done. This work has almost no impact on the site itself, but it lays a foundation for the next five to ten years of CourtListener improvements and features.
+
+You can read more about the overhaul, why it was necessary, and what we get from it on our blog: https://free.law/2016/01/30/many-improvements-released-in-new-courtlistener-version/
+
+
+What's Next?
+------------
+The next six months are exciting for Free Law Project. We're wrapping up a number of big projects and we're starting a bunch of new ones. In the next six months we plan to:
+
+ - Create a better search tool for PACER and RECAP
+ - Create a new website to analyze judges running for office
+ - Create a new database of judges and other elected officials
+ - Add millions of new opinions to our database
+
+These are lofty goals and we hope you'll support them with your time as a volunteer or with your donations, if you can.
+
+Thanks for subscribing to the newsletter!
+
+
+Mike Lissner
+Executive Director, FLP
+
+-----------
+If you wish to unsubscribe from these newsletters, just reply and we'll take you right off.

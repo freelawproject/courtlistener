@@ -82,7 +82,7 @@
                 <h4>
                     <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
                        class="btn btn-default">
-                        View All Cited Opinions
+                        View All Citing Opinions
                     </a>
                 </h4>
             </div>
@@ -112,30 +112,28 @@
         {% endif %}
 
         {# Visualizations #}
-        {% if perms.visualizations.has_beta_access %}
-            {% if cluster.top_visualizations %}
-                <div id="visualizations" class="sidebar-section">
-                    <h3><span>Visualizations</span></h3>
-                    <ul>
-                        {% for viz in cluster.top_visualizations|slice:":5" %}
-                            <li>
-                                <a href="{{ viz.get_absolute_url }}">
-                                    {{ viz.title|truncatewords:10 }}
-                                </a>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                    <h4>
-                        <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
-                           class="btn btn-default">
-                            View Full List
-                        </a>
-                        <a href="{% url "new_visualization" %}&start_id="
-                           class="btn btn-success">
-                            <i class="fa fa-plus"></i>&nbsp;New Network</a>
-                    </h4>
-                </div>
-            {% endif %}
+        {% if cluster.top_visualizations %}
+            <div id="visualizations" class="sidebar-section">
+                <h3><span>Visualizations</span></h3>
+                <ul>
+                    {% for viz in cluster.top_visualizations|slice:":5" %}
+                        <li>
+                            <a href="{{ viz.get_absolute_url }}">
+                                {{ viz.title|truncatewords:10 }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <h4>
+                    <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
+                       class="btn btn-default">
+                        View Full List
+                    </a>
+                    <a href="{% url "new_visualization" %}&start_id="
+                       class="btn btn-success">
+                        <i class="fa fa-plus"></i>&nbsp;New Network</a>
+                </h4>
+            </div>
         {% endif %}
 
         {# Download original? #}

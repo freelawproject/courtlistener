@@ -34,22 +34,31 @@ class Citation(object):
     """
     def __init__(self, reporter, page, volume, canonical_reporter=None,
                  lookup_index=None, extra=None, defendant=None, plaintiff=None,
-                 court=None, year=None, match_url=None, match_id=None):
-        # Note: It will be tempting to resolve reporter variations in the
-        #       __init__ function, but, alas, you cannot, because often
-        #       reporter variations refer to one of several reporters (e.g.
-        #       P.R. could be a variant of either 'Pen. & W.', 'P.R.R.', 'P.').
+                 court=None, year=None, match_url=None, match_id=None,
+                 reporter_found=None):
 
+        # Core data.
         self.reporter = reporter
-        self.canonical_reporter = canonical_reporter
-        self.lookup_index = lookup_index
         self.volume = volume
         self.page = page
+
+        # These values are set during disambiguation.
+        self.canonical_reporter = canonical_reporter
+        self.lookup_index = lookup_index
+
+        # Supplementary data, if possible.
         self.extra = extra
         self.defendant = defendant
         self.plaintiff = plaintiff
         self.court = court
         self.year = year
+
+        # The reporter found in the text is often different from the reporter
+        # once it's normalized. We need to keep that value so we can linkify it
+        # with a regex.
+        self.reporter_found = reporter_found
+
+        # Attributes of the matching item, for URL generation.
         self.match_url = match_url
         self.match_id = match_id
 
@@ -57,7 +66,11 @@ class Citation(object):
         return u"%d %s %d" % (self.volume, self.reporter, self.page)
 
     def as_regex(self):
-        return r"%d(\s+)%s(\s+)%d" % (self.volume, self.reporter, self.page)
+        return r"%d(\s+)%s(\s+)%d" % (
+            self.volume,
+            re.escape(self.reporter_found),
+            self.page
+        )
 
     # TODO: Update css for no-link citations
     def as_html(self):
@@ -275,7 +288,7 @@ def extract_base_citation(words, reporter_index):
         # No page, therefore not a valid citation
         return None
 
-    return Citation(reporter, page, volume)
+    return Citation(reporter, page, volume, reporter_found=reporter)
 
 
 def is_date_in_reporter(editions, year):

@@ -188,6 +188,7 @@ SERVER_EMAIL = 'CourtListener <noreply@courtlistener.com>'
 DEFAULT_FROM_EMAIL = 'CourtListener <noreply@courtlistener.com>'
 SCRAPER_ADMINS = (
     ('Juriscraper List', 'juriscraper@lists.freelawproject.org'),
+    ('Slack Juriscraper Channel', 'j9f4b5n5x7k8x2r1@flp-talk.slack.com'),
 )
 
 ###############
@@ -239,7 +240,7 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
-        'user': '1000/hour',
+        'user': '5000/hour',
     },
     'OVERRIDE_THROTTLE_RATES': {
         'scout': '10000/hour',

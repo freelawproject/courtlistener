@@ -3,7 +3,7 @@ from reporters_db import REPORTERS
 from cl.citations.find_citations import get_citations, is_date_in_reporter
 from cl.citations import find_citations
 from cl.citations.reporter_tokenizer import tokenize
-from cl.citations.tasks import update_document
+from cl.citations.tasks import update_document, create_cited_html
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 
@@ -11,6 +11,7 @@ from datetime import date
 from django.core.management import call_command
 from django.test import TestCase
 from lxml import etree
+
 
 def remove_citations_from_imported_fixtures():
     """Delete all the connections between items that are in the fixtures by
@@ -210,6 +211,33 @@ class CiteTest(TestCase):
                         [cite.__dict__ for cite in pair[1]]
                     )
             )
+
+    def test_make_html(self):
+        """Can we make basic HTML conversions properly?"""
+        good_html = ('<pre class="inline">asdf </pre><span class="citation '
+                     'no-link"><span class="volume">22</span> <span '
+                     'class="reporter">U.S.</span> <span class="page">33</span>'
+                     '</span><pre class="inline"> asdf</pre>')
+
+        # Simple example
+        s = 'asdf 22 U.S. 33 asdf'
+        opinion = Opinion(plain_text=s)
+        citations = get_citations(s)
+        new_html = create_cited_html(opinion, citations)
+        self.assertEqual(
+            good_html,
+            new_html,
+        )
+
+        # Using a variant format for U.S. (Issue #409)
+        s = 'asdf 22 U. S. 33 asdf'
+        opinion = Opinion(plain_text=s)
+        citations = get_citations(s)
+        new_html = create_cited_html(opinion, citations)
+        self.assertEqual(
+            good_html,
+            new_html,
+        )
 
 
 class MatchingTest(IndexedSolrTestCase):

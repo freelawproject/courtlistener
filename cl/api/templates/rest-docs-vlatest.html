@@ -312,7 +312,7 @@
 
 
         <h3 id="limitations-throttles">Limitations &amp; Throttles</h3>
-        <p>At present, this API is throttled to 1,000 queries per hour. Anonymous users (those that are not logged in), are allowed 100 queries per day for testing purposes.
+        <p>At present, this API is throttled to 5,000 queries per hour. Anonymous users (those that are not logged in), are allowed 100 queries per day for testing purposes.
         </p>
         <p>These numbers are counted by using the <code>X-Forwarded-For</code> and <code>Remote-Addr</code> HTTP headers, which can create problems for users that are behind a gateway that uses <a href="http://en.wikipedia.org/wiki/Network_address_translation">Network Address Translation (NAT)</a>. For more information about how this works, <a href="http://www.django-rest-framework.org/api-guide/throttling/#how-clients-are-identified">read the documentation on the Django REST Framework website</a>, but in general, the simplest solution is usually to log in. Note that using the browsable HTML API counts towards these thresholds since it's technically just another mediatype of the API.
         </p>
