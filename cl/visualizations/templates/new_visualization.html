@@ -210,66 +210,59 @@
                     </div>
 
                     <div class="row">
-                    <div class="col-xs-12">
-                        <div class="text-center v-offset-above-2" id="center-buttons">
-                            <a class="btn btn-default btn-lg" id="more">More Options</a>
-                            <button type="submit"
-                                    class="btn btn-primary btn-lg"
-                                    name="make-viz"
-                                    id="make-viz-button">Make this Network
-                            </button>
-                        </div>
+                        <div class="col-xs-12">
 
-                        <div class="hidden row" id="extra-options">
-                            <div class="col-xs-12" id="titles">
-                                <h3>Title</h3>
-                                <p class="gray">Give your network a title. If left
-                                    blank, this
-                                    will be automatically generated using the cases you
-                                    selected.
-                                </p>
-                                {% if form.title.errors %}
-                                    <p class="help-block">
-                                        {% for error in form.title.errors %}
-                                            {{ error|escape }}
-                                        {% endfor %}
+                            <div class="hidden row" id="extra-options">
+                                <div class="col-xs-12" id="titles">
+                                    <h3>Title</h3>
+                                    <p class="gray">Give your network a title. If left
+                                        blank, this
+                                        will be automatically generated using the cases you
+                                        selected.
                                     </p>
-                                {% endif %}
-                                <div class="form-group">
-                                    {{ form.title }}
+                                    {% if form.title.errors %}
+                                        <p class="help-block">
+                                            {% for error in form.title.errors %}
+                                                {{ error|escape }}
+                                            {% endfor %}
+                                        </p>
+                                    {% endif %}
+                                    <div class="form-group">
+                                        {{ form.title }}
+                                    </div>
+                                </div>
+
+                                <div class="col-xs-12" id="notes">
+                                    <h3>Description</h3>
+
+                                    <p class="gray">Provide any additional comments you have
+                                        about this network, explaining the story it tells
+                                        or why you created it. <a
+                                                href="{% url "markdown_help" %}"
+                                                target="_blank">Markdown syntax</a> allowed,
+                                        but no raw HTML. Examples: **bold**, *italics*.
+                                    </p>
+                                    {% if form.notes.errors %}
+                                        <p class="help-block">
+                                            {% for error in form.notes.errors %}
+                                                {{ error|escape }}
+                                            {% endfor %}
+                                        </p>
+                                    {% endif %}
+                                    <div class="form-group">
+                                        {{ form.notes }}
+                                    </div>
                                 </div>
                             </div>
-
-                            <div class="col-xs-12" id="notes">
-                                <h3>Description</h3>
-
-                                <p class="gray">Provide any additional comments you have
-                                    about this network, explaining the story it tells
-                                    or why you created it. <a
-                                            href="{% url "markdown_help" %}"
-                                            target="_blank">Markdown syntax</a> allowed,
-                                    but no raw HTML. Examples: **bold**, *italics*.
-                                </p>
-                                {% if form.notes.errors %}
-                                    <p class="help-block">
-                                        {% for error in form.notes.errors %}
-                                            {{ error|escape }}
-                                        {% endfor %}
-                                    </p>
-                                {% endif %}
-                                <div class="form-group">
-                                    {{ form.notes }}
-                                </div>
-                            </div>
-                            <div class="col-xs-12 pull-right v-offset-above-2">
+                            <div class="text-center v-offset-above-2" id="center-buttons">
+                                <a class="btn btn-default btn-lg" id="more">More Options</a>
                                 <button type="submit"
-                                        class="btn btn-primary btn-lg pull-right"
+                                        class="btn btn-primary btn-lg"
                                         name="make-viz"
                                         id="make-viz-button">Make this Network
                                 </button>
                             </div>
                         </div>
-                    </div>
                     </div>
                 </form>
             </div>
