@@ -114,11 +114,7 @@ class TestViews(TestCase):
         self.end = OpinionCluster.objects.get(
             case_name='Marsh v. Chambers'
         )
-        self.user = User.objects.create_user('beta', 'beta@cl.com', 'password')
-        permission = Permission.objects.get(
-            codename='has_beta_access'
-        )
-        self.user.user_permissions.add(permission)
+        self.user = User.objects.create_user('user', 'user@cl.com', 'password')
         self.user.save()
         self.user_profile = UserProfile.objects.create(
             user=self.user,
@@ -132,7 +128,7 @@ class TestViews(TestCase):
 
     def test_new_visualization_view_provides_form(self):
         """ Test a GET to the Visualization view provides a VizForm """
-        self.client.login(username='beta', password='password')
+        self.client.login(username='user', password='password')
         response = self.client.get(reverse(self.view))
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.context['form'], VizForm)
@@ -141,7 +137,7 @@ class TestViews(TestCase):
         """ Test a valid POST creates a new ScotusMap object """
         SCOTUSMap.objects.all().delete()
 
-        self.client.login(username='beta', password='password')
+        self.client.login(username='user', password='password')
         data = {
             'cluster_start': 2674862,
             'cluster_end': 111014,
@@ -157,7 +153,7 @@ class TestViews(TestCase):
 
     def test_published_visualizations_show_in_gallery(self):
         """ Test that a user can see published visualizations from others """
-        self.client.login(username='beta', password='password')
+        self.client.login(username='user', password='password')
         response = self.client.get(reverse('viz_gallery'))
         html = response.content.decode('utf-8')
         self.assertIn('Shared by Admin', html)
@@ -176,7 +172,7 @@ class TestViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'My Private Visualization', response.content)
 
-        self.client.login(username='beta', password='password')
+        self.client.login(username='user', password='password')
         response = self.client.get(url)
         self.assertNotEqual(response.status_code, 200)
         self.assertNotIn(b'My Private Visualization', response.context)
@@ -186,7 +182,7 @@ class TestViews(TestCase):
         viz = SCOTUSMap.objects.get(pk=1)
         old_view_count = viz.view_count
 
-        self.client.login(username='beta', password='password')
+        self.client.login(username='user', password='password')
         response = self.client.get(viz.get_absolute_url())
 
         self.assertEqual(response.status_code, 200)
@@ -289,18 +285,17 @@ class TestVizAjaxCrud(TestCase):
         )
 
         self.assertFalse(viz.published)
-        self.assertIsNone(viz.date_published)
 
     def test_sharing_via_ajax_view(self):
         """
         Tests sharing a public visualization via an AJAX POST
         """
-        self.assertTrue(self.private_viz.published)
-        self.assertIsNotNone(self.private_viz.date_published)
+        self.assertFalse(self.private_viz.published)
+        self.assertIsNone(self.private_viz.date_published)
 
         viz = self.post_ajax_view(
             views.share_visualization, self.private_viz.pk
         )
 
-        self.assertFalse(viz.published)
-        self.assertIsNone(viz.date_published)
+        self.assertTrue(viz.published)
+        self.assertIsNotNone(viz.date_published)
