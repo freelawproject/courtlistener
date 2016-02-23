@@ -5,8 +5,8 @@ from django.test import TestCase
 from django.contrib.auth.models import User, Permission
 from django.core.urlresolvers import reverse
 from cl.visualizations.forms import VizForm
-from cl.visualizations.models import SCOTUSMap
-from cl.visualizations import views, utils
+from cl.visualizations.models import SCOTUSMap, JSONVersion
+from cl.visualizations import utils
 from cl.users.models import UserProfile
 from cl.search.models import OpinionCluster
 
@@ -54,7 +54,7 @@ class TestVizModels(TestCase):
     """ Tests for Visualization models """
 
     # This fixture is pretty bloated. TODO: Slim down fixture file later.
-    fixtures = ['scotus_map_data.json']
+    fixtures = ['scotus_map_data.json', 'visualizations.json']
 
     def setUp(self):
         self.user = User.objects.create_user('Joe', 'joe@cl.com', 'password')
@@ -84,6 +84,20 @@ class TestVizModels(TestCase):
 
         g = viz.build_nx_digraph(**build_kwargs)
         self.assertTrue(g.edges() > 0)
+
+    def test_SCOTUSMap_deletes_cascade(self):
+        """
+        Make sure we delete JSONVersion instances when deleted SCOTUSMaps
+        """
+        viz = SCOTUSMap.objects.get(pk=1)
+        json_version = JSONVersion.objects.get(map=viz.pk)
+        self.assertIsNotNone(json_version)
+        json_pk = json_version.pk
+
+        viz.delete()
+
+        with self.assertRaises(JSONVersion.DoesNotExist):
+            JSONVersion.objects.get(pk=json_pk)
 
 
 class TestViews(TestCase):
@@ -125,6 +139,8 @@ class TestViews(TestCase):
 
     def test_new_visualization_view_creates_map_on_post(self):
         """ Test a valid POST creates a new ScotusMap object """
+        SCOTUSMap.objects.all().delete()
+
         self.client.login(username='beta', password='password')
         data = {
             'cluster_start': 2674862,
@@ -146,3 +162,35 @@ class TestViews(TestCase):
         html = response.content.decode('utf-8')
         self.assertIn('Shared by Admin', html)
         self.assertIn('FREE KESHA', html)
+
+    def test_cannot_view_anothers_private_visualization(self):
+        """ Test unpublished visualizations cannot be seen by others """
+        viz = SCOTUSMap.objects.get(pk=2)
+        self.assertFalse(viz.published, 'Test SCOTUSMap should be unpublished')
+        url = reverse(
+            'view_visualization', kwargs={'pk': viz.pk, 'slug': viz.slug}
+        )
+
+        self.client.login(username='admin', password='password')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'My Private Visualization', response.content)
+
+        self.client.login(username='beta', password='password')
+        response = self.client.get(url)
+        self.assertNotEqual(response.status_code, 200)
+        self.assertNotIn(b'My Private Visualization', response.context)
+
+    def test_view_counts_increment_by_one(self):
+        """ Test the view count for a Visualization increments on page view """
+        viz = SCOTUSMap.objects.get(pk=1)
+        old_view_count = viz.view_count
+
+        self.client.login(username='beta', password='password')
+        response = self.client.get(viz.get_absolute_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            old_view_count + 1,
+            SCOTUSMap.objects.get(pk=1).view_count
+        )
