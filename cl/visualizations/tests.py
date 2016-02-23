@@ -143,8 +143,9 @@ class TestViews(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(1, SCOTUSMap.objects.count())
-        scotus_map = SCOTUSMap.objects.get(title='Test Map Title')
-        self.assertIsNotNone(scotus_map)
+
+        # Should not raise DoesNotExist exception.
+        _ = SCOTUSMap.objects.get(title='Test Map Title')
 
     def test_published_visualizations_show_in_gallery(self):
         """ Test that a user can see published visualizations from others """
