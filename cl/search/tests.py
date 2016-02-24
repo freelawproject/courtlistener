@@ -15,8 +15,7 @@ from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase
 from cl.search.feeds import JurisdictionFeed
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
-from cl.search.management.commands.cl_calculate_pagerank_networkx import \
-    Command
+from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.tests.base import BaseSeleniumTest
 
 

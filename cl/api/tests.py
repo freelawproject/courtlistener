@@ -85,8 +85,7 @@ class BasicAPIPageTest(TestCase):
         self.client = Client()
 
         # Need pagerank file for test_pagerank_file()
-        from cl.search.management.commands.cl_calculate_pagerank_networkx \
-            import Command
+        from cl.search.management.commands.cl_calculate_pagerank import Command
         command = Command()
         command.do_pagerank(chown=False)
 
