@@ -245,6 +245,8 @@ REST_FRAMEWORK = {
     'OVERRIDE_THROTTLE_RATES': {
         'scout': '10000/hour',
         'scout_test': '10000/hour',
+        'waldo': '10000/hour',
+        'peidelman': '10000/hour',
     },
 
     # Auth
