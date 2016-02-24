@@ -9,7 +9,7 @@ import cl.lib.storage
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('judges', '0001_initial'),
+        ('people_db', '0001_initial'),
     ]
 
     operations = [
