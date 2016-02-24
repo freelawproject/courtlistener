@@ -255,13 +255,13 @@ class OpinionCluster(models.Model):
         related_name="clusters",
     )
     panel = models.ManyToManyField(
-        'people_db.Person',
+        'judges.Judge',
         help_text="The judges that heard the oral arguments",
         related_name="opinion_clusters_participating_judges",
         blank=True,
     )
     non_participating_judges = models.ManyToManyField(
-        'people_db.Person',
+        'judges.Judge',
         help_text="The judges that heard the case, but did not participate in "
                   "the opinion",
         related_name="opinion_clusters_non_participating_judges",
@@ -617,14 +617,14 @@ class Opinion(models.Model):
         blank=True,
     )
     author = models.ForeignKey(
-        'people_db.Person',
+        'judges.Judge',
         help_text="The primary author of this opinion",
         related_name='opinions_written',
         blank=True,
         null=True,
     )
     joined_by = models.ManyToManyField(
-        'people_db.Person',
+        'judges.Judge',
         related_name='opinions_joined',
         help_text="Other judges that joined the primary author in this opinion",
         blank=True,

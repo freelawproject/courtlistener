@@ -8,7 +8,7 @@ import localflavor.us.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('search', '0012_auto_20160219_1431'),
+        ('search', '0011_auto_20151222_1240'),
     ]
 
     operations = [
@@ -103,10 +103,8 @@ class Migration(migrations.Migration):
                 ('votes_no', models.PositiveSmallIntegerField(null=True, blank=True)),
                 ('how_selected', models.CharField(max_length=20, choices=[(b'e_part', b'Partisan Election'), (b'e_non_part', b'Non-Partisan Election'), (b'a_pres', b'Appointment (President)'), (b'a_gov', b'Appointment (Governor)'), (b'a_legis', b'Appointment (Legislature)')])),
                 ('termination_reason', models.CharField(blank=True, max_length=25, choices=[(b'ded', b'Death'), (b'retire_vol', b'Voluntary Retirement'), (b'retire_mand', b'Mandatory Retirement'), (b'resign', b'Resigned'), (b'other_pos', b'Appointed to Other Judgeship'), (b'lost', b'Lost Election'), (b'abolished', b'Court Abolished'), (b'bad_judge', b'Impeached and Convicted'), (b'recess_not_confirmed', b'Recess Appointment Not Confirmed')])),
-                ('appointer', models.ForeignKey(related_name='appointed_positions', blank=True, to='people_db.Person', help_text=b'If this is an appointed position, the person responsible for the appointing.', null=True)),
                 ('court', models.ForeignKey(related_name='court_positions', blank=True, to='search.Court', null=True)),
                 ('person', models.ForeignKey(related_name='positions', blank=True, to='people_db.Person', null=True)),
-                ('predecessor', models.ForeignKey(blank=True, to='people_db.Person', null=True)),
             ],
         ),
         migrations.CreateModel(
@@ -159,11 +157,6 @@ class Migration(migrations.Migration):
             model_name='position',
             name='school',
             field=models.ForeignKey(blank=True, to='people_db.School', help_text=b'If academic job, the school where they work.', null=True),
-        ),
-        migrations.AddField(
-            model_name='position',
-            name='supervisor',
-            field=models.ForeignKey(related_name='supervised_positions', blank=True, to='people_db.Person', help_text=b'If this is a clerkship, the supervising judge.', null=True),
         ),
         migrations.AddField(
             model_name='person',

@@ -332,26 +332,26 @@ class Position(models.Model):
         blank=True,
         null=True,
     )
-    appointer = models.ForeignKey(
-        Person,
-        related_name='appointed_positions',
-        help_text="If this is an appointed position, "
-                  "the person responsible for the appointing.",        
-        blank=True,
-        null=True,
-    )
-    supervisor = models.ForeignKey(
-        Person,
-        related_name='supervised_positions',
-        help_text="If this is a clerkship, the supervising judge.",       
-        blank=True,
-        null=True,
-    )
-    predecessor = models.ForeignKey(
-        Person,
-        blank=True,
-        null=True,
-    )
+#    appointer = models.ForeignKey(
+#        Person,
+#        related_name='appointed_positions',
+#        help_text="If this is an appointed position, "
+#                  "the person responsible for the appointing.",        
+#        blank=True,
+#        null=True,
+#    )
+#    supervisor = models.ForeignKey(
+#        Person,
+#        related_name='supervised_positions',
+#        help_text="If this is a clerkship, the supervising judge.",       
+#        blank=True,
+#        null=True,
+#    )
+#    predecessor = models.ForeignKey(
+#        Person,
+#        blank=True,
+#        null=True,
+#    )
     school = models.ForeignKey(
         School,
         help_text="If academic job, the school where they work.",        
