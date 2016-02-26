@@ -34,7 +34,7 @@ def get_court(courtname):
     return courtid
 
 def get_school(schoolname):
-    school = School.objects.filter(name='schoolname')
+    school = School.objects.filter(name=schoolname)
     if len(school) == 0:
         return None
     else:
