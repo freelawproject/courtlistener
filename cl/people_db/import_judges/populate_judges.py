@@ -6,19 +6,7 @@ from datetime import date
 from cl.people_db.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
 
 from cl.people_db.import_judges.judge_utils import get_court, get_school, process_date, get_select, get_races
-from cl.people_db.import_judges.judge_utils import get_party, get_appointer
-
-def get_suffix(suffstr):
-    suffdict = {'Jr': 'jr',
-                'Sr': 'sr',
-                'I': '1',
-                'II': '2',
-                'III': '3',
-                'IV': '4'}
-    if pd.isnull(suffstr):
-        return None
-    else:
-        return suffdict[suffstr]
+from cl.people_db.import_judges.judge_utils import get_party, get_appointer, get_suffix
     
 def make_state_judge(item, testing=False):
     """Takes the state judge data <item> and associates it with a Judge object.
@@ -80,7 +68,7 @@ def make_state_judge(item, testing=False):
         appointer = appointer,
         predecessor = predecessor,
         court_id = courtid,
-        position_type = 'judge',
+        position_type = 'jud',
         date_nominated = date_nominated,
         date_elected = date_elected,
         date_confirmation = date_confirmation,
@@ -98,28 +86,34 @@ def make_state_judge(item, testing=False):
     if not testing:
         judgeship.save()
 
-    college = Education(
-        date_created=now(),
-        date_modified=now(),
-        person = person,
-        school = get_school(item['college']),
-        degree = 'BA',
-        )    
-    college.save()
+    school = get_school(item['college'])
+    if school is not None:
+        college = Education(
+            date_created=now(),
+            date_modified=now(),
+            person = person,       
+            school = school,
+            degree = 'BA',
+            )   
+        if not testing:    
+            college.save()
     
-    lawschool = Education(
-        date_created=now(),
-        date_modified=now(),
-        person = person,
-        school = get_school(item['lawschool']),
-        degree = 'JD',
-        )
-    lawschool.save()
+    lschool = get_school(item['lawschool'])    
+    if lschool is not None:
+        lawschool = Education(
+            date_created=now(),
+            date_modified=now(),
+            person = person,
+            school = lschool,
+            degree = 'JD',
+            )
+        if not testing:    
+            lawschool.save()
         
     # iterate through job variables and add to career if applicable
     for jobvar in ['prevjudge','prevprivate','prevpolitician','prevprof',
                    'postjudge', 'postprivate', 'postpolitician', 'postprof']:
-        if not item[jobvar]:
+        if pd.isnull(item[jobvar]) or item[jobvar] == 0:
             continue
         position_type = None                     
         if 'judge' in jobvar:
@@ -146,11 +140,12 @@ def make_state_judge(item, testing=False):
             person = person,
             position_type = position_type,
             date_start = date(job_start,1,1),
-            date_granularity_start = 'Year',
-            date_end = date(job_end,1,1),
-            date_granularity_end = 'Year'
-        )        
-        job.save()
+            date_granularity_start = '%Y',
+            date_termination = date(job_end,1,1),
+            date_granularity_termination = '%Y'
+        )       
+        if not testing:   
+            job.save()
     
     if not pd.isnull(item['politics']):
         party = None
@@ -164,8 +159,9 @@ def make_state_judge(item, testing=False):
                 date_modified=now(),
                 person = person,
                 political_party = party            
-                )    
-            politics.save()
+                )  
+            if not testing: 
+                politics.save()
     
     if not pd.isnull(item['links']):
         links = item['links']
@@ -186,7 +182,8 @@ def make_state_judge(item, testing=False):
             person = person,
             notes = notestr
             )
-            source.save()                
+            if not testing: 
+                source.save()                
 
 def make_federal_judge(item):
     """Takes the federal judge data <item> and associates it with a Judge object.

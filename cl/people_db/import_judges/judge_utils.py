@@ -15,7 +15,7 @@ GRANULARITY_DAY = '%Y-%m-%d'
 
 def process_date(year,month,day):
     """ return date object and accompanying granularity """
-    if pd.isnull(year) or year == 'n/a':
+    if pd.isnull(year) or year in ['n/a', 'N/A', 'present']:
         pdate = None
         granularity = None
     elif pd.isnull(month):
@@ -35,14 +35,28 @@ def get_court(courtname):
 
 def get_school(schoolname):
     school = School.objects.filter(name='schoolname')
-    return school
+    if len(school) == 0:
+        return None
+    else:
+        return school[0]
 
 def get_party(partystr):
     return 'N'   
 
 def get_appointer(appointstr):
     return appointstr
-    
+
+def get_suffix(suffstr):
+    suffdict = {'Jr': 'jr',
+                'Sr': 'sr',
+                'I': '1',
+                'II': '2',
+                'III': '3',
+                'IV': '4'}
+    if pd.isnull(suffstr):
+        return None
+    else:
+        return suffdict[suffstr]    
     
 racedict =  {'White': 'w',
              'Black': 'b',
@@ -80,17 +94,16 @@ def get_aba(abastr):
     return aba
     
 
-select_dict = {'P': 'e_part',
+select_data = pd.read_csv('/home/elliott/research/datasets/judges/clean/court/stateyeardata.csv')
+
+def get_select(state,year):
+    select_dict = {'P': 'e_part',
                'NP': 'e_non_part',
                'G': 'a_gov',
                'L': 'a_legis',
                'M': 'a_gov'
               }
-
-#select_data = pd.read_csv('/home/elliott/research/datasets/judges/clean/court/stateyeardata.csv')
-
-def get_select(state,year):
-    return None
+    return 'P'
  
     
  
