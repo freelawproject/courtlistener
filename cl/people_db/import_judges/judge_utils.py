@@ -94,7 +94,7 @@ def get_aba(abastr):
     return aba
     
 
-select_data = pd.read_csv('/home/elliott/research/datasets/judges/clean/court/stateyeardata.csv')
+select_data = pd.read_excel('/vagrant/flp/columbia_data/judges/stateyeardata.xlsx',0)
 
 def get_select(state,year):
     select_dict = {'P': 'e_part',

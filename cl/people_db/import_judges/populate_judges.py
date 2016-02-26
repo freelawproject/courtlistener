@@ -131,6 +131,8 @@ def make_state_judge(item, testing=False):
             job_start = date_start.year - 1
             job_end = date_start.year - 1
         if 'post' in jobvar:
+            if date_termination is None:
+                continue
             job_start = date_termination.year + 1
             job_end = date_termination.year + 1    
             
@@ -279,7 +281,7 @@ def make_federal_judge(item):
     college = Education(
         date_created=now(),
         date_modified=now(),
-        judge = judge,
+        person = person,
         school = get_school(item['college']),
         degree = 'BA',
         )    
@@ -288,7 +290,7 @@ def make_federal_judge(item):
     lawschool = Education(
         date_created=now(),
         date_modified=now(),
-        judge = judge,
+        person = person,
         school = get_school(item['lawschool']),
         degree = 'JD',
         )
