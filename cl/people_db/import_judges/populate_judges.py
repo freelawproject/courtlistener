@@ -3,8 +3,8 @@
 from django.utils.timezone import now
 from datetime import date
 
+from cl.corpus_importer.import_columbia.parse_opinions import get_court_object
 from cl.people_db.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
-
 from cl.people_db.import_judges.judge_utils import get_court, get_school, process_date, get_select, get_races
 from cl.people_db.import_judges.judge_utils import get_party, get_appointer, get_suffix
     
@@ -37,12 +37,8 @@ def make_state_judge(item, testing=False):
     if not testing:
         person.save()
         
-    appointer = None #get_appointer(state,date_appointed)
-    predecessor = None # get_predecessor
-    courtid = get_court(item['court'])
-    date_nominated = None
-    date_elected = None
-    
+    courtid = get_court_object(item['court'])
+  
     # assign start date
     date_start, date_granularity_start = process_date(item['startyear'], 
                                                       item['startmonth'], 
@@ -53,27 +49,16 @@ def make_state_judge(item, testing=False):
     date_retirement, _ = process_date(item['senioryear'], 
                                       item['seniormonth'], 
                                       item['seniorday'])  
-
-    date_confirmation = None
-    votes_yes = None
-    votes_no = None
     
     judgeship = Position(
         person = person,
-        appointer = appointer,
-        predecessor = predecessor,
         court_id = courtid,
         position_type = 'jud',
-        date_nominated = date_nominated,
-        date_elected = date_elected,
-        date_confirmation = date_confirmation,
         date_start = date_start,
         date_granularity_start = date_granularity_start,
         date_termination = date_termination,
         date_granularity_termination = date_granularity_termination,
         date_retirement = date_retirement,
-        votes_yes = votes_yes,
-        votes_no = votes_no,
         how_selected = get_select(courtid,item['startyear']),
         termination_reason = item['howended']
     )

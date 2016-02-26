@@ -5,13 +5,8 @@ Created on Wed Feb 17 12:31:34 2016
 @author: elliott
 """
 from datetime import date
-from cl.corpus_importer.import_columbia.parse_opinions import get_court_object
-from cl.people_db.models import School
+from cl.people_db.models import School, GRANULARITY_YEAR, GRANULARITY_MONTH, GRANULARITY_DAY
 import pandas as pd
-
-GRANULARITY_YEAR = '%Y'
-GRANULARITY_MONTH = '%Y-%m'
-GRANULARITY_DAY = '%Y-%m-%d'
 
 def process_date(year,month,day):
     """ return date object and accompanying granularity """
@@ -29,12 +24,21 @@ def process_date(year,month,day):
         granularity = GRANULARITY_DAY
     return pdate, granularity
     
-def get_court(courtname):    
-    courtid = get_court_object(courtname)
-    return courtid
-
 def get_school(schoolname):
+    #first try for       
+    school = School.objects.filter(name__icontains=schoolname)  
+    if len(school) == 1:
+        return school[0]
+    if len(school) == 0:
+        print(schoolname,'-- no matches.')
+        return None
     school = School.objects.filter(name=schoolname)
+    if len(school) > 0:
+        
+        return None
+    if len(school) == 1:
+        return school[0]
+    
     if len(school) == 0:
         return None
     else:

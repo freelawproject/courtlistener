@@ -77,7 +77,7 @@ INSTALLED_APPS = [
     'cl.custom_filters',
     'cl.donate',
     'cl.favorites',
-    #'cl.judges',
+    'cl.judges', # currently needed for migrations
     'cl.people_db',
     'cl.lib',
     'cl.opinion_page',
