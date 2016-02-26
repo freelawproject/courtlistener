@@ -5,9 +5,22 @@ from datetime import date
 
 from cl.people_db.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
 
-from judge_utils import get_court, get_school, process_date, get_select, get_races, get_party, get_appointer
+from cl.people_db.import_judges.judge_utils import get_court, get_school, process_date, get_select, get_races
+from cl.people_db.import_judges.judge_utils import get_party, get_appointer
+
+def get_suffix(suffstr):
+    suffdict = {'Jr': 'jr',
+                'Sr': 'sr',
+                'I': '1',
+                'II': '2',
+                'III': '3',
+                'IV': '4'}
+    if pd.isnull(suffstr):
+        return None
+    else:
+        return suffdict[suffstr]
     
-def make_state_judge(item):
+def make_state_judge(item, testing=False):
     """Takes the state judge data <item> and associates it with a Judge object.
     Returns a Judge object.
     """
@@ -27,8 +40,8 @@ def make_state_judge(item):
         name_first = item['firstname'],
         name_middle = item['midname'],
         name_last = item['lastname'],
-        name_suffix = item['suffname'],
-        gender = item['gender'].lower(),
+        name_suffix = get_suffix(item['suffname']),
+        gender = item['gender'],
         
         date_dob = date_dob,
         date_granularity_dob = date_granularity_dob,
@@ -36,7 +49,8 @@ def make_state_judge(item):
         date_granularity_dod = date_granularity_dod                         
     )
     
-    person.save()
+    if not testing:
+        person.save()
         
     appointer = None #get_appointer(state,date_appointed)
     predecessor = None # get_predecessor
@@ -81,7 +95,8 @@ def make_state_judge(item):
         termination_reason = item['howended']
     )
     
-    judgeship.save()
+    if not testing:
+        judgeship.save()
 
     college = Education(
         date_created=now(),
@@ -137,7 +152,7 @@ def make_state_judge(item):
         )        
         job.save()
     
-    if item['politics'] is not None:
+    if not pd.isnull(item['politics']):
         party = None
         if item['politics'].lower() == 'd':
             party = 'd'
@@ -152,7 +167,7 @@ def make_state_judge(item):
                 )    
             politics.save()
     
-    if item['links'] is not None:
+    if not pd.isnull(item['links']):
         links = item['links']
         if ';' in links:
             urls = [x.strip() for x in links.split(';')]
@@ -160,7 +175,7 @@ def make_state_judge(item):
             urls = [links]
         notestr = ''
         for v in ['notes1','notes2','notes3']:
-            if item[v] is not None:
+            if not pd.isnull(item[v]):
                 notestr = notestr + ' ; ' + item[v].strip()
         if notestr == '':
             notestr = None
@@ -244,7 +259,7 @@ def make_federal_judge(item):
     position = Position(
         date_created=now(),
         date_modified=now(),
-        judge = judge,
+        person = person,
         appointer = appointer,
         predecessor = predecessor,
         court_id = courtid,
@@ -341,11 +356,11 @@ if __name__ == '__main__':
     import pandas as pd
 
     # make state judges    
-    df = pd.read_excel('/home/elliott/research/datasets/judges/  supreme court-judgebios-2016-01-19.xlsx')    
+    df = pd.read_excel('/vagrant/flp/columbia_data/judges/supreme-court-judgebios-2016-02-17.xlsx', 0)    
     for i, row in df.iterrows():    
-        make_state_judge(dict(row))
+        make_state_judge(dict(row), testing=True)
     
     # make federal judges
-    df = df = pd.read_excel('/home/elliott/research/datasets/judges/fjc-data.xlsx')
+    df = df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx')
     for i, row in df.iterrows():    
-        make_state_judge(dict(row))
+        make_federal_judge(dict(row))

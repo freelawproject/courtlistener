@@ -5,23 +5,28 @@ Created on Wed Feb 17 12:31:34 2016
 @author: elliott
 """
 from datetime import date
-from cl.corpus_importer.import_columbia.populate_opinions import get_court_object
+from cl.corpus_importer.import_columbia.parse_opinions import get_court_object
 from cl.people_db.models import School
+import pandas as pd
+
+GRANULARITY_YEAR = '%Y'
+GRANULARITY_MONTH = '%Y-%m'
+GRANULARITY_DAY = '%Y-%m-%d'
 
 def process_date(year,month,day):
     """ return date object and accompanying granularity """
-    if year is None:
+    if pd.isnull(year) or year == 'n/a':
         pdate = None
         granularity = None
-    elif month is None:
-        pdate = date(year,1,1)
-        granularity = 'Year'
-    elif day is None:
-        pdate = date(year,month,1)
-        granularity = 'Month'
+    elif pd.isnull(month):
+        pdate = date(int(year),1,1)
+        granularity = GRANULARITY_YEAR
+    elif pd.isnull(day):
+        pdate = date(int(year),int(month),1)
+        granularity = GRANULARITY_MONTH
     else:
-        pdate = date(year,month,day)
-        granularity = 'Day'
+        pdate = date(int(year),int(month),int(day))
+        granularity = GRANULARITY_DAY
     return pdate, granularity
     
 def get_court(courtname):    
@@ -32,6 +37,13 @@ def get_school(schoolname):
     school = School.objects.filter(name='schoolname')
     return school
 
+def get_party(partystr):
+    return 'N'   
+
+def get_appointer(appointstr):
+    return appointstr
+    
+    
 racedict =  {'White': 'w',
              'Black': 'b',
              'African American': 'b',
@@ -75,12 +87,10 @@ select_dict = {'P': 'e_part',
                'M': 'a_gov'
               }
 
-import pandas as pd
-select_data = pd.read_csv('/home/elliott/research/datasets/judges/clean/court/stateyeardata.csv')
+#select_data = pd.read_csv('/home/elliott/research/datasets/judges/clean/court/stateyeardata.csv')
 
 def get_select(state,year):
     return None
  
     
-    
-    
+ 
