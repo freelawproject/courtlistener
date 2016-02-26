@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from django.utils.timezone import now
+from dateutil.relativedelta import relativedelta
 
 from cl.search.models import Docket, Opinion, OpinionCluster, Court
-from cl.judges.models import Judge
+from cl.judges.models import Person, Position
 from cl.citations.find_citations import  get_citations
 from cl.lib.import_lib import map_citations_to_models
 
@@ -21,18 +21,35 @@ OPINION_TYPE_MAPPING = {
 }
 
 
-def find_judge(name, court_id, case_date):
-    """Identifies a judge by name and metadata."""
-    pass
-    # TODO: actually find a judge once the database has been populated with them
-    # judges = Judge.objects.filter(name_last=name)
-    # court = Court.objects.get(pk=court_id)
+def find_person(name, court_id, case_date):
+    """Uniquely identifies a judge by both name and metadata or raises and exception."""
+    candidates = Person.objects.filter(name_last__iexact=name)
+    unique_person = None
+    court = Court.objects.get(pk=court_id)
+    for person in candidates:
+        # give a 1-year margin of error for start and end dates
+        positions = Position.objects.filter(
+            person=person
+            ,position_type='judge'
+            ,court=court
+            ,date_start__leq=case_date + relativedelta(years=1)
+            ,date_termination__geq=case_date.year - relativedelta(years=1)
+        )
+        if positions:
+            if unique_person:
+                raise Exception("Found multiple judges with last name '%s' and matching positions." % name)
+            unique_person = person
+    if not unique_person:
+        raise Exception("Failed to find a judge with last name '%s` and matching position." % name)
+    return unique_person
+
 
 
 def make_and_save(item):
-    """Takes the case data <item> and associates it with objects. Saves these objects."""
+    """Associates case data from `parse_opinions` with objects. Saves these objects."""
     if not item:
         return []
+
     # find relevent dates
     argued_date = reargued_date = reargue_denied_date = opinion_date = None
     for type in item['dates']:
@@ -54,57 +71,53 @@ def make_and_save(item):
             else:                
                 opinion_date = date_info[1]
 
-    # saves docket object
     docket = Docket(
-        date_created=now(),
-        date_modified=now(),
-        date_argued=argued_date,
-        date_reargued=reargued_date,
-        date_reargument_denied=reargue_denied_date,
-        court_id=item.get('court_id'),
-        case_name_short=item.get('case_name_short'),
-        case_name=item.get('case_name'),
-        case_name_full=item.get('case_name_full'),
-        docket_number=item.get('docket')
+        date_argued=argued_date
+        ,date_reargued=reargued_date
+        ,date_reargument_denied=reargue_denied_date
+        ,court_id=item['court_id']
+        ,case_name_short=item['case_name_short']
+        ,case_name=item['case_name']
+        ,case_name_full=item['case_name_full']
+        ,docket_number=item['docket']
     )
     docket.save()
 
-    # grab citations in, e.g. the {'federal_cite_one': '1 U.S. 1', ...} form
-    # will be passed as kwargs
+    panel = [find_person(n, item['court_id'], argued_date or opinion_date) for n in item['panel']]
+    # get citations in the form of, e.g. {'federal_cite_one': '1 U.S. 1', ...}
     all_citations = map_citations_to_models([get_citations(c)[0] for c in item['citations']])
 
-    # saves opinion cluster object
     cluster = OpinionCluster(
-        docket=docket,
-        precedential_status=('Unpublished' if item['unpublished'] else 'Published'),
-        date_created=now(),
-        date_modified=now(),
-        date_filed=opinion_date, 
-        # panel=item.get('panel', []),
-        case_name_short=item.get('case_name_short'),
-        case_name=item.get('case_name'),
-        case_name_full=item.get('case_name_full'),
-        source='Z',
-        attorneys=item.get('attorneys'),
-        posture=item.get('posture'),
-        **all_citations
+        docket=docket
+        ,precedential_status=('Unpublished' if item['unpublished'] else 'Published')
+        ,date_filed=opinion_date
+        ,panel=panel
+        ,case_name_short=item['case_name_short']
+        ,case_name=item['case_name']
+        ,case_name_full=item['case_name_full']
+        ,source='Z'
+        ,attorneys=item['attorneys']
+        ,posture=item['posture']
+        ,**all_citations
     )
     cluster.save()
 
-    # save opinion objects
     for opinion_info in item['opinions']:
-        # author = find_judge(
-        #     opinion_info['byline'],
-        #     item.get('court_id'),
-        #     opinion_date or reargued_date
-        # )
+        if not opinion_info['author']:
+            author = None
+        else:
+            author = find_person(opinion_info['byline'], item['court_id'], opinion_date or argued_date)
+        joined_by = [find_person(n, item['court_id'], opinion_date or argued_date) for n in opinion_info['joining']]
         opinion = Opinion(
-            cluster=cluster,
-            # author=author,
-            # joined_by=
-            date_created=now(),
-            date_modified=now(),
-            type=OPINION_TYPE_MAPPING[opinion_info['type']],
-            html_columbia=opinion_info['opinion']
+            cluster=cluster
+            ,author=author
+            ,joined_by=joined_by
+            ,type=OPINION_TYPE_MAPPING[opinion_info['type']]
+            ,html_columbia=opinion_info['opinion']
         )
         opinion.save()
+
+if __name__ == '__main__':
+    import parse_opinions
+    parsed = parse_opinions.parse_file('cl/corpus_importer/import_columbia/test_opinions/0b59c80d9043a003.xml')
+    make_and_save(parsed)

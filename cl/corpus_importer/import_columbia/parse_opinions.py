@@ -130,9 +130,22 @@ def parse_file(file_path, court_fallback=''):
     # get opinions
     info['opinions'] = []
     for opinion in raw_info.get('opinions', []):
+        full_opinion = {
+            'opinion': opinion['opinion']
+            ,'type': opinion['type']
+            ,'author': None
+            ,'joining': []
+        }
         if opinion['byline']:
-            opinion['byline'] = parse_judge(opinion['byline'])
-        info['opinions'].append(opinion)
+            # sometimes there's a 'joined by' that we need to split on
+            if 'joined by' in opinion['byline']:
+                author, joining = opinion['byline'].split('joined by', 1)
+            else:
+                author = opinion['byline']
+                joining = None
+            full_opinion['author'] = parse_judge(author)
+            full_opinion['joining'] = parse_panel_judges(joining) if joining else []
+        info['opinions'].append(full_opinion)
     return info
 
 
@@ -351,7 +364,5 @@ def get_court_object(raw_court, fallback=''):
 
 
 if __name__ == '__main__':
-    # parsed = parse_file("../data/alaska/court_opinions/documents/9a059daf5ebc0582.xml")
-    # pass
-    for p in parse_many("../data/", limit=100, court_fallback_regex=r"data/([a-z_]+?/[a-z_]+?)/", log='log.log'):
-        pass
+    parsed = parse_file("test_opinions/0b59c80d9043a003.xml")
+    pass
