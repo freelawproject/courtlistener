@@ -1,9 +1,10 @@
-#! usr/bin/python
+#!/usr/bin/env python
 
 import MySQLdb as database
 from downloader_constants import *
 import time
 import csv
+import re
 
 
 def main():
@@ -20,14 +21,15 @@ def main():
         # Initializing counters
         filecount += 1
         csv_row_count = csv_lines_count_offset+1
+
         # Constructing the csv filename
-        csv_filename = "{1}{2}.csv"%(CSV_FILENAME_PREFIX, re.sub('\.', '',"%f"%time.time()))
-        
+        csv_filename = "%s%s.csv"%(CSV_FILEPATH, re.sub('\.', '',"%f" % time.time()))
         sql_args = (MAX_NUMBER_OF_XML_PER_TASK, csv_lines_count_offset)
+
         if recap_db_cursor.execute(sql, sql_args):
             docket_xml_filenames_tuple_tuple = recap_db_cursor.fetchall()
             
-            # Legnth of the XML file will be used to determine if there are still dockets left in the DB.
+            # Length of the XML file will be used to determine if there are dockets still left in the DB.
             xml_tuple_length = len(docket_xml_filenames_tuple_tuple)
             csv_lines_count_offset += xml_tuple_length
             
@@ -40,7 +42,7 @@ def main():
                     csv_row_count += 1
                 
             # Appending to the reference file.
-            with open(REFERENCE_FILENAME, 'a') as file_reference:
+            with open(REFERENCE_FILEPATH, 'a') as file_reference:
                 csvwriter = csv.writer(file_reference, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 csvwriter.writerow([str(filecount), csv_filename])
                 
