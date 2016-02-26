@@ -10,7 +10,8 @@ from cl.people_db.import_judges.judge_utils import get_party, get_appointer, get
     
 def make_state_judge(item, testing=False):
     """Takes the state judge data <item> and associates it with a Judge object.
-    Returns a Judge object.
+    
+    Saves the judge to the DB.
     """
 
     date_dob, date_granularity_dob = process_date(item['birthyear'], 
@@ -20,11 +21,7 @@ def make_state_judge(item, testing=False):
                                                   item['deathmonth'], 
                                                   item['deathday'])  
     
-    # instantiate Judge object    
     person = Person(
-        date_created=now(),
-        date_modified=now(),
-
         name_first = item['firstname'],
         name_middle = item['midname'],
         name_last = item['lastname'],
@@ -62,8 +59,6 @@ def make_state_judge(item, testing=False):
     votes_no = None
     
     judgeship = Position(
-        date_created=now(),
-        date_modified=now(),
         person = person,
         appointer = appointer,
         predecessor = predecessor,
@@ -89,20 +84,16 @@ def make_state_judge(item, testing=False):
     school = get_school(item['college'])
     if school is not None:
         college = Education(
-            date_created=now(),
-            date_modified=now(),
             person = person,       
             school = school,
             degree = 'BA',
-            )   
+        )   
         if not testing:    
             college.save()
     
     lschool = get_school(item['lawschool'])    
     if lschool is not None:
         lawschool = Education(
-            date_created=now(),
-            date_modified=now(),
             person = person,
             school = lschool,
             degree = 'JD',
@@ -137,11 +128,9 @@ def make_state_judge(item, testing=False):
             job_end = date_termination.year + 1    
             
         job = Position(
-            date_created=now(),
-            date_modified=now(),
             person = person,
             position_type = position_type,
-            date_start = date(job_start,1,1),
+            date_start = date(job_start, 1, 1),
             date_granularity_start = '%Y',
             date_termination = date(job_end,1,1),
             date_granularity_termination = '%Y'
@@ -150,20 +139,12 @@ def make_state_judge(item, testing=False):
             job.save()
     
     if not pd.isnull(item['politics']):
-        party = None
-        if item['politics'].lower() == 'd':
-            party = 'd'
-        elif item['politics'].lower() == 'r':
-            party = 'r'
-        if party is not None:
-            politics = PoliticalAffiliation(
-                date_created=now(),
-                date_modified=now(),
-                person = person,
-                political_party = party            
-                )  
-            if not testing: 
-                politics.save()
+        politics = PoliticalAffiliation(
+            person = person,
+            political_party = item['politics']
+        )  
+        if not testing: 
+            politics.save()
     
     if not pd.isnull(item['links']):
         links = item['links']
@@ -179,10 +160,8 @@ def make_state_judge(item, testing=False):
             notestr = None
         for url in urls:
             source = Source(
-            date_created=now(),
-            date_modified=now(),
-            person = person,
-            notes = notestr
+                person = person,
+                notes = notestr
             )
             if not testing: 
                 source.save()                
@@ -211,9 +190,6 @@ def make_federal_judge(item):
     
     # instantiate Judge object    
     person = Person(
-        date_created=now(),
-        date_modified=now(),
-
         name_first = item['Judge First Name'],
         name_middle = item['Judge Middle Name'],
         name_last = item['Judge Last Name'],
@@ -256,8 +232,6 @@ def make_federal_judge(item):
     votes_no = None
     
     position = Position(
-        date_created=now(),
-        date_modified=now(),
         person = person,
         appointer = appointer,
         predecessor = predecessor,
@@ -279,8 +253,6 @@ def make_federal_judge(item):
     position.save()
 
     college = Education(
-        date_created=now(),
-        date_modified=now(),
         person = person,
         school = get_school(item['college']),
         degree = 'BA',
@@ -288,8 +260,6 @@ def make_federal_judge(item):
     college.save()
     
     lawschool = Education(
-        date_created=now(),
-        date_modified=now(),
         person = person,
         school = get_school(item['lawschool']),
         degree = 'JD',
@@ -321,8 +291,6 @@ def make_federal_judge(item):
 #            job_end = date_termination.year + 1    
 #            
 #        job = Career(
-#            date_created=now(),
-#            date_modified=now(),
 #            judge = judge,
 #            job_type = job_type,
 #            date_start = date(job_start,1,1),
@@ -337,8 +305,6 @@ def make_federal_judge(item):
     
     if party is not None:
         politics = PoliticalAffiliation(
-            date_created=now(),
-            date_modified=now(),
             judge = judge,
             political_party = party,
             source = 'a'
@@ -360,6 +326,6 @@ if __name__ == '__main__':
         make_state_judge(dict(row), testing=True)
     
     # make federal judges
-    df = df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx')
+    df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx')
     for i, row in df.iterrows():    
         make_federal_judge(dict(row))
