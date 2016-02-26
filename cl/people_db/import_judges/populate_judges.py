@@ -21,13 +21,16 @@ def make_state_judge(item, testing=False):
                                                   item['deathmonth'], 
                                                   item['deathday'])  
     
+    check = Person.objects.filter(name_first=item['firstname'], name_last=item['lastname'], date_dob=date_dob)
+    if len(check) > 0:
+        print('Warning: ' + item['firstname'] + ' ' + item['firstname'] + ' ' + str(date_dob) + ' exists.')        
+    
     person = Person(
         name_first = item['firstname'],
         name_middle = item['midname'],
         name_last = item['lastname'],
         name_suffix = get_suffix(item['suffname']),
-        gender = item['gender'],
-        
+        gender = item['gender'],        
         date_dob = date_dob,
         date_granularity_dob = date_granularity_dob,
         date_dod = date_dod,
@@ -46,9 +49,10 @@ def make_state_judge(item, testing=False):
     date_termination, date_granularity_termination = process_date(item['endyear'], 
                                                                   item['endmonth'], 
                                                                   item['endday'])    
-    date_retirement, _ = process_date(item['senioryear'], 
-                                      item['seniormonth'], 
-                                      item['seniorday'])  
+    # this data is too unreliable.                                                              
+    #date_retirement, _ = process_date(item['senioryear'], 
+    #                                  item['seniormonth'], 
+    #                                  item['seniorday'])  
     
     judgeship = Position(
         person = person,
@@ -57,8 +61,7 @@ def make_state_judge(item, testing=False):
         date_start = date_start,
         date_granularity_start = date_granularity_start,
         date_termination = date_termination,
-        date_granularity_termination = date_granularity_termination,
-        date_retirement = date_retirement,
+        date_granularity_termination = date_granularity_termination,        
         how_selected = get_select(courtid,item['startyear']),
         termination_reason = item['howended']
     )
