@@ -23,6 +23,7 @@ OPINION_TYPE_MAPPING = {
 
 def find_person(name, court_id, case_date):
     """Uniquely identifies a judge by both name and metadata or raises and exception."""
+    # EA: I think you can directly filter on name and position.
     candidates = Person.objects.filter(name_last__iexact=name)
     unique_person = None
     court = Court.objects.get(pk=court_id)
@@ -32,15 +33,16 @@ def find_person(name, court_id, case_date):
             person=person
             ,position_type='judge'
             ,court=court
-            ,date_start__leq=case_date + relativedelta(years=1)
-            ,date_termination__geq=case_date.year - relativedelta(years=1)
+            ,date_start__leq = case_date.year - relativedelta(years=1)
+            ,date_termination__geq = case_date.year + relativedelta(years=1)
         )
         if positions:
             if unique_person:
                 raise Exception("Found multiple judges with last name '%s' and matching positions." % name)
             unique_person = person
     if not unique_person:
-        raise Exception("Failed to find a judge with last name '%s` and matching position." % name)
+        #raise Exception("Failed to find a judge with last name '%s` and matching position." % name)
+        print("Failed to find a judge with last name '%s` and matching position." % name)        
     return unique_person
 
 
@@ -65,6 +67,7 @@ def make_and_save(item):
                 reargued_date = date_info[1]
             elif date_info[0] in REARG_DENIED_TAGS:
                 reargue_denied_date = date_info[1]
+            # EA: basestring is python 2 only, could we do this in a way that is 2/3 compatible
             elif isinstance(date_info[0], basestring) and 'cert' in date_info[0]:
                 # we don't have an item for cert acceptance/denial
                 pass
@@ -84,6 +87,7 @@ def make_and_save(item):
     docket.save()
 
     panel = [find_person(n, item['court_id'], argued_date or opinion_date) for n in item['panel']]
+    panel = [x for x in panel if x is not None]
     # get citations in the form of, e.g. {'federal_cite_one': '1 U.S. 1', ...}
     all_citations = map_citations_to_models([get_citations(c)[0] for c in item['citations']])
 
@@ -103,7 +107,7 @@ def make_and_save(item):
     cluster.save()
 
     for opinion_info in item['opinions']:
-        if not opinion_info['author']:
+        if opinion_info['byline'] is None:
             author = None
         else:
             author = find_person(opinion_info['byline'], item['court_id'], opinion_date or argued_date)
@@ -118,6 +122,6 @@ def make_and_save(item):
         opinion.save()
 
 if __name__ == '__main__':
-    import parse_opinions
-    parsed = parse_opinions.parse_file('cl/corpus_importer/import_columbia/test_opinions/0b59c80d9043a003.xml')
+    from cl.corpus_importer.import_columbia.parse_opinions import parse_file
+    parsed = parse_file('cl/corpus_importer/import_columbia/test_opinions/0b59c80d9043a003.xml')
     make_and_save(parsed)

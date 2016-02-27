@@ -27,13 +27,6 @@ def process_date(year,month,day):
 def get_school(schoolname):
     
     schools = School.objects.filter(name__iexact=schoolname)
-    if len(schools) > 1:
-        print('Duplicate schools found:',schoolname,schools)
-        school = schools[0]
-        if school.is_alias_of is not None:
-            return school.is_alias_of
-        else:
-            return school
     if len(schools) == 1:
         school = schools[0]
         if school.is_alias_of is not None:
@@ -44,20 +37,35 @@ def get_school(schoolname):
     print('No exact matches: ' + schoolname + '. Running "contains".')
     
     schools = School.objects.filter(name__icontains=schoolname)  
-    if len(schools) > 1:
-        print('Duplicate schools found:',schoolname,schools)
-        school = schools[0]
-        if school.is_alias_of is not None:
-            return school.is_alias_of
-        else:
-            return school
     if len(schools) == 1:
         school = schools[0]
         if school.is_alias_of is not None:
             return school.is_alias_of
         else:
             return school
-    print('No fuzzy matches: ' + schoolname )
+    if len(schools) > 1:
+        print('Multiple school matches:',schoolname,schools)
+        return None
+
+    #print('No fuzzy matches: ' + schoolname )
+
+    filterwords = ['college','university','of','law', 'school', 'u']
+
+    normname = schoolname.lower()
+    for f in filterwords:
+        normname = normname.replace(f,'').strip()
+    
+    schools = School.objects.filter(name__icontains=normname)  
+    if len(schools) == 1:
+        school = schools[0]
+        if school.is_alias_of is not None:
+            return school.is_alias_of
+        else:
+            return school
+    if len(schools) > 1:
+        print('Multiple school matches:',normname,schools)
+        return None
+
     return None
 
 
