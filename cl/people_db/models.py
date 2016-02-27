@@ -170,25 +170,8 @@ class School(models.Model):
         max_length=120,  # Dept. Ed. bulk data had a max of 91.
         db_index=True,
     )
-    unit_id = models.IntegerField(
-        help_text="This is the ID assigned by the Department of Education, as "
-                  "found in the data on their API.",
-        unique=True,
-        db_index=True,
-        null=True  # b/c aliases have null values.
-    )
     ein = models.IntegerField(
         help_text="The EIN assigned by the IRS",
-        null=True,
-        blank=True,
-        db_index=True,
-    )
-    ope_id = models.IntegerField(
-        help_text="This is the ID assigned by the Department of Education's "
-                  "Office of Postsecondary Education (OPE) for schools that "
-                  "have a Program Participation Agreement making them eligible "
-                  "for aid from the Federal Student Financial Assistance "
-                  "Program",
         null=True,
         blank=True,
         db_index=True,
@@ -196,7 +179,7 @@ class School(models.Model):
 
     def __unicode__(self):
         return u'%s: %s (ein: %s, unit_id: %s, ope_id: %s)' % (
-            self.pk, self.name, self.ein, self.unit_id, self.ope_id
+            self.pk, self.name, self.ein
         )
 
 class Position(models.Model):
