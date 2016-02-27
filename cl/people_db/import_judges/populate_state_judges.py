@@ -64,15 +64,16 @@ def make_state_judge(item, testing=False):
     if not testing:
         judgeship.save()
 
-    school = get_school(item['college'])
-    if school is not None:
-        college = Education(
-            person = person,       
-            school = school,
-            degree = 'BA',
-        )   
-        if not testing:    
-            college.save()
+    if not pd.isnull(item['college']):
+        school = get_school(item['college'])
+        if school is not None:
+            college = Education(
+                person = person,       
+                school = school,
+                degree = 'BA',
+            )   
+            if not testing:    
+                college.save()
     
     lschool = get_school(item['lawschool'])    
     if lschool is not None:

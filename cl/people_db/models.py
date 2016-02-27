@@ -178,9 +178,14 @@ class School(models.Model):
     )
 
     def __unicode__(self):
-        return u'%s: %s (ein: %s, unit_id: %s, ope_id: %s)' % (
-            self.pk, self.name, self.ein
-        )
+        if self.is_alias_of:            
+            return u'%s: %s (alias: %s)' % (
+                self.pk, self.name, self.is_alias_of
+            )
+        else:            
+            return u'%s: %s' % (
+                self.pk, self.name
+            )
 
 class Position(models.Model):
     """A role held by a person, and the details about it."""
