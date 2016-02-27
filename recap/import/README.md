@@ -17,6 +17,7 @@ For the first part, i.e generating csv reference files. Run...
 After the process completes. You will find CSV files in the 'recap_db_references/' folder.
 
 To set up download tasks in celery. Run...
+
     python recap_docket_downloader_task_creator.py
 
 To make sure every docket has been downloaded. You may run it again.
