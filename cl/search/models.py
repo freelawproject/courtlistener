@@ -505,9 +505,9 @@ class OpinionCluster(models.Model):
         """
         return [
             'neutral_cite', 'federal_cite_one', 'federal_cite_two',
-            'federal_cite_three', 'specialty_cite_one', 'state_cite_regional',
-            'state_cite_one', 'state_cite_two', 'state_cite_three',
-            'westlaw_cite', 'lexis_cite'
+            'federal_cite_three', 'scotus_early_cite', 'specialty_cite_one',
+            'state_cite_regional', 'state_cite_one', 'state_cite_two',
+            'state_cite_three', 'westlaw_cite', 'lexis_cite'
         ]
 
     @property
