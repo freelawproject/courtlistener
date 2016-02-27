@@ -180,7 +180,7 @@ class School(models.Model):
     def __unicode__(self):
         if self.is_alias_of:            
             return u'%s: %s (alias: %s)' % (
-                self.pk, self.name, self.is_alias_of
+                self.pk, self.name, self.is_alias_of.name
             )
         else:            
             return u'%s: %s' % (

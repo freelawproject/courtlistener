@@ -65,25 +65,37 @@ def make_state_judge(item, testing=False):
         judgeship.save()
 
     if not pd.isnull(item['college']):
-        school = get_school(item['college'])
-        if school is not None:
-            college = Education(
-                person = person,       
-                school = school,
-                degree = 'BA',
-            )   
-            if not testing:    
-                college.save()
+        if ';' in item['college']:
+            colls = [x.strip() for x in item['college'].split(';')]
+        else:
+            colls = [item['college'].strip()]
+        for coll in colls:
+            school = get_school(coll)
+            if school is not None:
+                college = Education(
+                    person = person,       
+                    school = school,
+                    degree = 'BA',
+                )   
+                if not testing:    
+                    college.save()
     
-    lschool = get_school(item['lawschool'])    
-    if lschool is not None:
-        lawschool = Education(
-            person = person,
-            school = lschool,
-            degree = 'JD',
-            )
-        if not testing:    
-            lawschool.save()
+    if not pd.isnull(item['lawschool']):
+        if ';' in item['lawschool']:
+            lschools = [x.strip() for x in item['lawschool'].split(';')]
+        else:
+            lschools = [item['lawschool'].strip()]
+        
+        for L in lschools:
+            lschool = get_school(L)    
+            if lschool is not None:
+                lawschool = Education(
+                    person = person,
+                    school = lschool,
+                    degree = 'JD',
+                    )
+                if not testing:    
+                    lawschool.save()
         
     # iterate through job variables and add to career if applicable
     for jobvar in ['prevjudge','prevprivate','prevpolitician','prevprof',
@@ -136,23 +148,17 @@ def make_state_judge(item, testing=False):
             urls = [x.strip() for x in links.split(';')]
         else:
             urls = [links]
-        notestr = ''
-        for v in ['notes1','notes2','notes3']:
-            if not pd.isnull(item[v]):
-                notestr = notestr + ' ; ' + item[v].strip()
-        if notestr == '':
-            notestr = None
         for url in urls:
             source = Source(
                 person = person,
-                notes = notestr
+                notes = item['notes']
             )
             if not testing: 
                 source.save()                 
 
 if __name__ == '__main__':
     import pandas as pd
-    df = pd.read_excel('/vagrant/flp/columbia_data/judges/supreme-court-judgebios-2016-02-17.xlsx', 0)    
+    df = pd.read_excel('/vagrant/flp/columbia_data/judges/supreme-court-judgebios-2016-02-27.xlsx', 0)    
     for i, row in df.iterrows():    
         make_state_judge(dict(row), testing=True)
     df = pd.read_excel('/vagrant/flp/columbia_data/judges/iac-judgebios-2016-01-19.xlsx', 0)   

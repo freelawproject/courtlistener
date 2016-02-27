@@ -23,9 +23,16 @@ def process_date(year,month,day):
         pdate = date(int(year),int(month),int(day))
         granularity = GRANULARITY_DAY
     return pdate, granularity
+
+from collections import Counter
+C = Counter() # for fixing school names.
     
 def get_school(schoolname):
+    "Takes the name of a school from judges data and tries to match to a unique School object."        
     
+    if schoolname.isspace():
+        return None
+        
     schools = School.objects.filter(name__iexact=schoolname)
     if len(schools) == 1:
         school = schools[0]
@@ -34,38 +41,50 @@ def get_school(schoolname):
         else:
             return school
             
-    print('No exact matches: ' + schoolname + '. Running "contains".')
+    #print('No exact matches: ' + schoolname + '. Running "contains".')
     
     schools = School.objects.filter(name__icontains=schoolname)  
+    if len(schools) > 1:
+        schools = [x for x in schools if not x.is_alias_of]
     if len(schools) == 1:
         school = schools[0]
         if school.is_alias_of is not None:
+            #print(schoolname,'matched to',school.is_alias_of)
             return school.is_alias_of
         else:
+            #print(schoolname,'matched to',school)
             return school
     if len(schools) > 1:
-        print('Multiple school matches:',schoolname,schools)
+        #print('Multiple matches:',schoolname,[x.name for x in schools])
+        C[schoolname+ ',' + ','.join([x.name for x in schools])] += 1
         return None
 
     #print('No fuzzy matches: ' + schoolname )
 
-    filterwords = ['college','university','of','law', 'school', 'u']
+    filterwords = ['college','university','of','law', 'school', 'u', 'the']
 
-    normname = schoolname.lower()
-    for f in filterwords:
-        normname = normname.replace(f,'').strip()
+    normname = ''
+    normwords = schoolname.lower().split()
+    for f in normwords:
+        if f not in filterwords:
+            normname = normname + ' ' + f
+    normname = normname.strip()
     
     schools = School.objects.filter(name__icontains=normname)  
     if len(schools) == 1:
         school = schools[0]
         if school.is_alias_of is not None:
+            #print(schoolname,'matched to',school.is_alias_of)
             return school.is_alias_of
         else:
+            #print(schoolname,'matched to',school)
             return school
     if len(schools) > 1:
-        print('Multiple school matches:',normname,schools)
+        #print('Multiple normalized matches:',schoolname,[x.name for x in schools])
+        C[schoolname+ ',' + ','.join([x.name for x in schools])] += 1
         return None
-
+    #print('No matches:',schoolname,normname)    
+    C[schoolname+',no-matches'] += 1
     return None
 
 
