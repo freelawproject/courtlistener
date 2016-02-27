@@ -8,7 +8,7 @@ import localflavor.us.models
 class Migration(migrations.Migration):
 
     dependencies = [
-     #   ('search', '0011_auto_20151222_1240'),
+        ('search', '0001_initial'),
     ]
 
     operations = [

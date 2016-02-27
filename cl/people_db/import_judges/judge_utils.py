@@ -25,24 +25,41 @@ def process_date(year,month,day):
     return pdate, granularity
     
 def get_school(schoolname):
-    #first try for       
-    school = School.objects.filter(name__icontains=schoolname)  
-    if len(school) == 1:
-        return school[0]
-    if len(school) == 0:
-        print(schoolname,'-- no matches.')
-        return None
-    school = School.objects.filter(name=schoolname)
-    if len(school) > 0:
-        
-        return None
-    if len(school) == 1:
-        return school[0]
     
-    if len(school) == 0:
-        return None
-    else:
-        return school[0]
+    schools = School.objects.filter(name__iexact=schoolname)
+    if len(schools) > 1:
+        print('Duplicate schools found:',schoolname,schools)
+        school = schools[0]
+        if school.is_alias_of is not None:
+            return school.is_alias_of
+        else:
+            return school
+    if len(schools) == 1:
+        school = schools[0]
+        if school.is_alias_of is not None:
+            return school.is_alias_of
+        else:
+            return school
+            
+    print('No exact matches: ' + schoolname + '. Running "contains".')
+    
+    schools = School.objects.filter(name__icontains=schoolname)  
+    if len(schools) > 1:
+        print('Duplicate schools found:',schoolname,schools)
+        school = schools[0]
+        if school.is_alias_of is not None:
+            return school.is_alias_of
+        else:
+            return school
+    if len(schools) == 1:
+        school = schools[0]
+        if school.is_alias_of is not None:
+            return school.is_alias_of
+        else:
+            return school
+    print('No fuzzy matches: ' + schoolname )
+    return None
+
 
 def get_party(partystr):
     return 'N'   
@@ -61,8 +78,9 @@ def get_suffix(suffstr):
         return None
     else:
         return suffdict[suffstr]    
-    
-racedict =  {'White': 'w',
+              
+def get_races(str_race):
+    racedict =  {'White': 'w',
              'Black': 'b',
              'African American': 'b',
              'African Am.': 'b',
@@ -75,9 +93,7 @@ racedict =  {'White': 'w',
              'Pacific Islander': 'p',            
              'Pacific Isl.': 'p',        
              'Hispanic': 'h',
-             'Latino': 'h'}            
-
-def get_races(str_race):
+             'Latino': 'h'}  
     if '/' in str_race:
         rawraces = [x.strip() for x in str_race.split('/')]
     else:
@@ -86,14 +102,15 @@ def get_races(str_race):
     for rawrace in rawraces: 
         races.append(racedict[rawrace])
     return races
-
-abadict =  dict([(v,k) for (k,v) in [('ewq', 'Exceptionally Well Qualified'),
+        
+def get_aba(abastr):
+    abadict =  dict([(v,k) for (k,v) in [('ewq', 'Exceptionally Well Qualified'),
         ('wq', 'Well Qualified'),
         ('q', 'Qualified'),
         ('nq', 'Not Qualified'),
         ('nqa', 'Not Qualified By Reason of Age')]])
-        
-def get_aba(abastr):
+    if pd.isnull(abastr):
+        return None
     aba = abadict[abastr]
     return aba
     
