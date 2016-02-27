@@ -79,11 +79,8 @@ def match_citation(citation, citing_doc):
 
     Returns:
       - a Solr Result object with the results, or an empty list if no hits
-      - a Boolean indicating whether results were found by searching the
-        citation itself.
     """
-    # TODO: Create shared solr connection to use across multiple citations/
-    # documents
+    # TODO: Create shared solr connection for all queries
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     main_params = {'fq': []}
     main_params['fq'].append('-id:%s' % citing_doc.pk)  # Eliminate self-cites.
@@ -125,15 +122,11 @@ def match_citation(citation, citing_doc):
     main_params['caller'] = 'citation.match_citations.match_citation'
     results = conn.raw_query(**main_params).execute()
     if len(results) == 1:
-        return results, True
+        return results
     if len(results) > 1:
         if citation.defendant:  # Refine using defendant, if there is one
             results = case_name_query(conn, main_params, citation, citing_doc)
-        return results, True
+        return results
 
-    # Take 2: Use case name
-    if not citation.defendant:
-        return [], False
-    # Remove citation parameter
-    main_params['fq'].remove(citation_param)
-    return case_name_query(conn, main_params, citation, citing_doc), False
+    # Give up.
+    return []

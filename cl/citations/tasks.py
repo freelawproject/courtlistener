@@ -59,7 +59,7 @@ def update_document(opinion, index=True):
     # List used so we can do one simple update to the citing opinion.
     opinions_cited = set()
     for citation in citations:
-        matches, is_citation_match = match_citations.match_citation(
+        matches = match_citations.match_citation(
             citation,
             citing_doc=opinion
         )
