@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import sys
 import csv
-from downloader_constants import *
+from recap_constants import *
 import recap_docket_downloader
 
 

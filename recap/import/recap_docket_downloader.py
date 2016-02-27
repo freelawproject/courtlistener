@@ -6,11 +6,11 @@ import urllib2
 import csv
 import sys
 import os
-from downloader_constants import *
+from recap_constants import *
 
 from celery import Celery
 from celery.registry import tasks
-app = Celery('recap_docket_downloader', broker='redis://localhost')
+app = Celery('recap_docket_downloader', broker=CELERY_MESSAGE_BROKER)
 
 
 def get_args():
@@ -91,7 +91,6 @@ def downloader (self, recap_download_csv_file_name):
                     result_writer.writerow([saved_file_counter, docket_filename])
 
         # Renaming the file for status COMPLETE
-
         os.rename(result_csv_filename, completed_csv_filename)
 
     return

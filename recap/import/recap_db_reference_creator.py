@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import MySQLdb as database
-from downloader_constants import *
+from recap_constants import *
 import time
 import csv
 import re
