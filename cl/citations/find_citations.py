@@ -12,7 +12,7 @@ from cl.search.models import Court
 
 FORWARD_SEEK = 20
 
-BACKWARD_SEEK = 70  # Average case name length in the db is 67
+BACKWARD_SEEK = 28  # Median case name length in the db is 28 (2016-02-26)
 
 STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
                "remanded", "see", "granted", "dismissed"]
