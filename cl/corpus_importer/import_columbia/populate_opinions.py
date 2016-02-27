@@ -3,7 +3,7 @@
 from dateutil.relativedelta import relativedelta
 
 from cl.search.models import Docket, Opinion, OpinionCluster, Court
-from cl.judges.models import Person, Position
+from cl.people_db.models import Person, Position
 from cl.citations.find_citations import  get_citations
 from cl.lib.import_lib import map_citations_to_models
 
