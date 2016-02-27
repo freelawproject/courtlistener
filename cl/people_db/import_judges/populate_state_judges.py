@@ -5,8 +5,7 @@ from datetime import date
 
 from cl.corpus_importer.import_columbia.parse_opinions import get_court_object
 from cl.people_db.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
-from cl.people_db.import_judges.judge_utils import get_school, process_date, get_select, get_races
-                                                   get_party, get_appointer, get_suffix
+from cl.people_db.import_judges.judge_utils import get_school, process_date, get_select, get_races, get_party, get_appointer, get_suffix
     
 def make_state_judge(item, testing=False):
     """Takes the state judge data <item> and associates it with a Judge object.
