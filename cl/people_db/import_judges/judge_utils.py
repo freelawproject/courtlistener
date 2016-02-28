@@ -70,6 +70,10 @@ def get_school(schoolname):
             normname = normname + ' ' + f
     normname = normname.strip()
     
+    if normname.isspace():
+        print('Fully normed:',schoolname)
+        return None
+    
     schools = School.objects.filter(name__icontains=normname)  
     if len(schools) == 1:
         school = schools[0]

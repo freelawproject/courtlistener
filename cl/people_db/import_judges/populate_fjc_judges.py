@@ -5,39 +5,40 @@ from datetime import date
 
 from cl.corpus_importer.import_columbia.parse_opinions import get_court_object
 from cl.people_db.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
-from cl.people_db.import_judges.judge_utils import get_school, process_date, get_select, get_races,
+from cl.people_db.import_judges.judge_utils import get_school, process_date, get_select, get_races, \
                                                     get_party, get_appointer, get_suffix, get_aba
     
-def make_federal_judge(item):
+def make_federal_judge(item, testing=False):
     """Takes the federal judge data <item> and associates it with a Judge object.
     Returns a Judge object.
     """        
 
     date_dob, date_granularity_dob = process_date(item['Birth year'], 
-                                                  item['Birth monthy'], 
+                                                  item['Birth month'], 
                                                   item['Birth day']) 
     
     dob_city = item['Place of Birth (City)']
     dob_state = item['Place of Birth (State)']
     
+    check = Person.objects.filter(name_first=item['firstname'], name_last=item['lastname'], date_dob=date_dob)
+    if len(check) > 0:
+        print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.')        
+
+
     date_dod, date_granularity_dod = process_date(item['Death year'], 
                                                   item['Death month'], 
-                                                  item['Death day'])  
+                                                  item['Death day'])                                                    
 
     dod_city = item['Place of Death (City)']
     dod_state = item['Place of Death (State)']
-    
-    listraces = get_races(item['Race or Ethnicity'])
-    races = [Race(race=r) for r in listraces]
-    
+        
     # instantiate Judge object    
     person = Person(
-        name_first = item['Judge First Name'],
+        name_first = item['firstname'],
         name_middle = item['Judge Middle Name'],
-        name_last = item['Judge Last Name'],
+        name_last = item['lastname'],
         name_suffix = get_suffix(item['Suffix']),
-        gender = item['Gender'].lower(),
-        race = races,
+        gender = item['Gender'],        
         fjc_id = item['Judge Identification Number'],
         
         date_dob = date_dob,
@@ -45,12 +46,24 @@ def make_federal_judge(item):
         dob_city = dob_city,
         dob_state = dob_state,
         date_dod = date_dod,
-        date_granularity_dod = date_granularity_dod   ,                      
+        date_granularity_dod = date_granularity_dod,                      
         dod_city = dod_city,
         dod_state = dod_state
     )
     
-    person.save()
+    if not testing:
+        person.save()
+        
+    listraces = get_races(item['Race or Ethnicity'])
+    races = [Race(race=r) for r in listraces]
+    for r in races:
+        race = Race(                
+                race = r
+        )
+        if not testing:
+            person.race.add(race)
+
+
         
     appointer = get_appointer(item['President name'])
     predecessor = None # get_predecessor
@@ -128,6 +141,6 @@ def make_federal_judge(item):
 
 if __name__ == '__main__':
     import pandas as pd
-    df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx')
-    for i, row in df.iterrows():    
+    fed_df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx',0)
+    for i, row in fed_df.iterrows():    
         make_federal_judge(dict(row))
