@@ -1,6 +1,8 @@
 #!/usr/bin/env python
-import os, sys
 import csv
+import os
+import sys
+
 # Adding the path to ENV for importing constants.
 sys.path.append(os.path.abspath('..'))
 from recap_constants import *
