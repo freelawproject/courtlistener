@@ -7,6 +7,7 @@ Created on Wed Feb 17 12:31:34 2016
 from datetime import date
 from cl.people_db.models import School, GRANULARITY_YEAR, GRANULARITY_MONTH, GRANULARITY_DAY
 import pandas as pd
+import re
 
 def process_date(year,month,day):
     """ return date object and accompanying granularity """
@@ -91,17 +92,45 @@ def get_school(schoolname):
     C[schoolname+',no-matches'] += 1
     return None
 
-#def get_degree(degstr):
-#    degdict = {'ba': ['ba','ab','bs','bae','barch','bba',],
-#               'aa': ['aa','as', 'aas'],
-#               'ma': ['ma','ms', 'am'],
-#               'llm': ['llm'],
-#               'llb': ['llb','bsl'],
-#               'phd': ['aa','as', 'aas'],               
-#              }
+def get_degree_level(degstr):
+    if degstr is None:
+        return None
+    degdict = {'ba': ['ba','ab','bs','bae','barch','bba','bbs','bcs',
+                      'bsee','phb','blitt'],
+               'aa': ['aa','as', 'aas'],
+               'ma': ['ma','ms', 'msc','am', 'mst','mfa','mph','msw','mia','mpa','msed'
+                       'mbe','mssp','mcit','mes','mse','mcp','mpa',
+                       'mpp','mdiv', 'mls'],               
+               'llb': ['llb','bsl','bl'],
+               'jd': ['jd'], 
+               'llm': ['llm','ml'],
+               'jsd': ['jsd','sjd'],
+               'phd': ['phd','edd','ded','dma','dphil'],               
+               'md': ['md','dmd'],
+               'mba': ['mba'],
+              }
+    deg = re.sub(r"[^a-z]+", '', degstr.lower())
+    for k in degdict:
+        if deg in degdict[k]:
+            return k    
+    
+    if k.startswith('b'):
+        return 'ba'
+    if k.startswith('m'):
+        return 'ma'
+    print(degstr+' not in degdict.')    
+    return None
                
 def get_party(partystr):
-    return 'N'   
+    partydict =  dict([(v,k) for (k,v) in [('d', 'Democrat'),
+        ('r', 'Republican'),
+        ('i', 'Independent'),
+        ('g', 'Green'),
+        ('l', 'Libertarian'),
+        ('f', 'Federalist'),
+        ('w', 'Whig'),
+        ('j', 'Jeffersonian Republican')]])
+    return partydict[partystr]   
 
 def get_appointer(appointstr):
     return appointstr

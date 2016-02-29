@@ -546,13 +546,16 @@ class RetentionEvent(models.Model):
 
 class Education(models.Model):
     DEGREE_LEVELS = (
-        ('ba', "Bachelor's (B.A./B.S.)"),
-        ('ma', "Master's (M.A./M.S./etc.)")
+        ('ba', "Bachelor's (e.g. B.A.)"),
+        ('ma', "Master's (e.g. M.A.)"),
         ('jd', 'Juris Doctor (J.D.)'),
         ('llm', 'Master of Laws (LL.M)'),
-        ('llb', 'Bachelor of Laws (LL.B)'),
+        ('llb', 'Bachelor of Laws (e.g. LL.B)'),
+        ('jsd', 'Doctor of Law (J.S.D)'), 
         ('phd', 'Doctor of Philosophy (PhD)'),
-        ('aa', 'Associate (A.A./A.S)'),
+        ('aa', 'Associate (e.g. A.A.)'),
+        ('md', 'Medical Degree (M.D.)'),
+        ('mba', 'Master of Business Administration (M.B.A.)')
     )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -577,6 +580,7 @@ class Education(models.Model):
     degree_level = models.CharField(
         choices=DEGREE_LEVELS,
         max_length=2,
+        blank=True,
     )
     degree = models.CharField(
         max_length=100,
@@ -592,6 +596,7 @@ class Education(models.Model):
         return u'%s: Degree in %s from %s in the year %s' % (
             self.pk, self.degree, self.school.name, self.degree_year
         )
+
 
 class Race(models.Model):
     RACES = (

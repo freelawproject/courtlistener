@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from django.utils.timezone import now
-from datetime import date
 
+from datetime import date
 from cl.corpus_importer.import_columbia.parse_opinions import get_court_object
 from cl.people_db.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
-from cl.people_db.import_judges.judge_utils import get_school, process_date, get_select, get_races, \
-                                                    get_party, get_appointer, get_suffix, get_aba
+from cl.people_db.import_judges.judge_utils import get_school, process_date, get_races, \
+                                                    get_party, get_suffix, get_aba, get_degree_level
     
 def make_federal_judge(item, testing=False):
     """Takes the federal judge data <item> and associates it with a Judge object.
@@ -63,26 +62,28 @@ def make_federal_judge(item, testing=False):
         if not testing:
             person.race.add(race)
     
-    # add education items    
+    # add position items (up to 6 of them)   
     for posnum in range(1,7):
         if posnum > 1:
-            pos_str = '(%s)'%posnum
+            pos_str = ' (%s)'%posnum
         else:
             pos_str = ''
      
+        if pd.isnull(item['Court Name'+pos_str]):
+            continue
         courtid = get_court_object(item['Court Name'+pos_str])                        
         
         date_nominated = item['Nomination Date Senate Executive Journal']
         date_recess_appointment = item['Recess Appointment date']
-        date_referred_to_judicial_committee = item['referral date (referral to Judicial Committee)']
+        date_referred_to_judicial_committee = item['Referral date (referral to Judicial Committee)']
         date_judicial_committee_action = item['Committee action date']
         date_hearing = item['Hearings']
         date_confirmation = item['Senate Vote Date (Confirmation Date)']
         
         # assign start date
         date_start = item['Commission Date'+pos_str]
-        date_termination = item['Date of Termination'+pos_str]
-        date_retirement, _ = item['Retirement from Active Service'+pos_str]
+        date_termination = item['Date of Termination'+pos_str]        
+        date_retirement = item['Retirement from Active Service'+pos_str]
     
         date_confirmation = None
         votes_yes = None
@@ -91,6 +92,7 @@ def make_federal_judge(item, testing=False):
         position = Position(
             person = person,
             court_id = courtid,
+            position_type = 'jud',
             
             date_nominated = date_nominated,      
             date_recess_appointment = date_recess_appointment,
@@ -113,15 +115,17 @@ def make_federal_judge(item, testing=False):
         if not testing:
             position.save()
 
-        # set party        
-        party = get_party(item['Party Affiliation of President'+pos_str])        
-        if party is not None:
+        # set party                
+        p = item['Party Affiliation of President'+pos_str]
+        if p is not None and p not in ['Assignment','Reassignment']:
+            party = get_party(item['Party Affiliation of President'+pos_str])        
             politics = PoliticalAffiliation(
                 person = person,
                 political_party = party,
                 source = 'a'
                 )    
-            politics.save()       
+            if not testing:    
+                politics.save()       
         
         rating = get_aba(item['ABA Rating'+pos_str])
         if rating is not None:
@@ -129,9 +133,10 @@ def make_federal_judge(item, testing=False):
                 person = person,
                 rating = rating
             )
-            aba.save()
+            if not testing:
+                aba.save()
 
-    # add education items    
+    # add education items (up to 5 of them)
     for schoolnum in range(1,6):
         if schoolnum  > 1:
             school_str = ' (%s)'%schoolnum
@@ -141,7 +146,8 @@ def make_federal_judge(item, testing=False):
         schoolname = item['Name of School'+school_str]
         if pd.isnull(schoolname):
             continue
-        degtype = item['Degree'+school_str]
+        degtype = item['Degree'+school_str]        
+        deg_level = get_degree_level(degtype)
         degyear = item['Degree year'+school_str]
         school = get_school(schoolname)
         if school is not None:
@@ -149,13 +155,12 @@ def make_federal_judge(item, testing=False):
                         person = person,       
                         school = school,
                         degree = degtype,
+                        degree_level = deg_level,
                         degree_year = degyear
                     )   
             if not testing:
                 degree.save()
-        
-
-        
+     
     
     
 
@@ -164,4 +169,4 @@ if __name__ == '__main__':
     fed_df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx',0)
     fed_df = fed_df.where((pd.notnull(fed_df)), None)
     for i, row in fed_df.iterrows():    
-        make_federal_judge(dict(row))
+        make_federal_judge(dict(row),testing=True)

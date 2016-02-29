@@ -75,7 +75,7 @@ def make_state_judge(item, testing=False):
                 college = Education(
                     person = person,       
                     school = school,
-                    degree = 'BA',
+                    degree_level = 'ba',
                 )   
                 if not testing:    
                     college.save()
@@ -92,7 +92,7 @@ def make_state_judge(item, testing=False):
                 lawschool = Education(
                     person = person,
                     school = lschool,
-                    degree = 'JD',
+                    degree_level = 'jd',
                     )
                 if not testing:    
                     lawschool.save()
