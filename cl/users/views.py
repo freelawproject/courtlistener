@@ -85,7 +85,7 @@ def view_visualizations(request):
     ).annotate(
         Count('clusters'),
     ).order_by(
-        '-date_modified',
+        '-date_created',
     )
     paginator = Paginator(visualizations, 20, orphans=2)
     page = request.GET.get('page', 1)
@@ -116,7 +116,7 @@ def view_deleted_visualizations(request):
     ).annotate(
         Count('clusters'),
     ).order_by(
-        '-date_modified',
+        '-date_created',
     )
     paginator = Paginator(visualizations, 20, orphans=2)
     page = request.GET.get('page', 1)
