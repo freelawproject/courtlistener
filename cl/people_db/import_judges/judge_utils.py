@@ -91,7 +91,15 @@ def get_school(schoolname):
     C[schoolname+',no-matches'] += 1
     return None
 
-
+#def get_degree(degstr):
+#    degdict = {'ba': ['ba','ab','bs','bae','barch','bba',],
+#               'aa': ['aa','as', 'aas'],
+#               'ma': ['ma','ms', 'am'],
+#               'llm': ['llm'],
+#               'llb': ['llb','bsl'],
+#               'phd': ['aa','as', 'aas'],               
+#              }
+               
 def get_party(partystr):
     return 'N'   
 
@@ -122,7 +130,8 @@ def get_races(str_race):
              'Asian Am.': 'a',
              'Native Hawaiian':'p',
              'Pacific Islander': 'p',            
-             'Pacific Isl.': 'p',        
+             'Pacific Isl.': 'p',  
+             'Pac. Isl.': 'p',
              'Hispanic': 'h',
              'Latino': 'h'}  
     if '/' in str_race:

@@ -545,6 +545,15 @@ class RetentionEvent(models.Model):
     )
 
 class Education(models.Model):
+    DEGREE_LEVELS = (
+        ('ba', "Bachelor's (B.A./B.S.)"),
+        ('ma', "Master's (M.A./M.S./etc.)")
+        ('jd', 'Juris Doctor (J.D.)'),
+        ('llm', 'Master of Laws (LL.M)'),
+        ('llb', 'Bachelor of Laws (LL.B)'),
+        ('phd', 'Doctor of Philosophy (PhD)'),
+        ('aa', 'Associate (A.A./A.S)'),
+    )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
         auto_now_add=True,
@@ -564,6 +573,10 @@ class Education(models.Model):
     school = models.ForeignKey(
         School,
         related_name='educations',
+    )
+    degree_level = models.CharField(
+        choices=DEGREE_LEVELS,
+        max_length=2,
     )
     degree = models.CharField(
         max_length=100,

@@ -62,85 +62,106 @@ def make_federal_judge(item, testing=False):
         )
         if not testing:
             person.race.add(race)
+    
+    # add education items    
+    for posnum in range(1,7):
+        if posnum > 1:
+            pos_str = '(%s)'%posnum
+        else:
+            pos_str = ''
+     
+        courtid = get_court_object(item['Court Name'+pos_str])                        
+        
+        date_nominated = item['Nomination Date Senate Executive Journal']
+        date_recess_appointment = item['Recess Appointment date']
+        date_referred_to_judicial_committee = item['referral date (referral to Judicial Committee)']
+        date_judicial_committee_action = item['Committee action date']
+        date_hearing = item['Hearings']
+        date_confirmation = item['Senate Vote Date (Confirmation Date)']
+        
+        # assign start date
+        date_start = item['Commission Date'+pos_str]
+        date_termination = item['Date of Termination'+pos_str]
+        date_retirement, _ = item['Retirement from Active Service'+pos_str]
+    
+        date_confirmation = None
+        votes_yes = None
+        votes_no = None
+        
+        position = Position(
+            person = person,
+            court_id = courtid,
+            
+            date_nominated = date_nominated,      
+            date_recess_appointment = date_recess_appointment,
+            date_referred_to_judicial_committee=date_referred_to_judicial_committee,
+            date_judicial_committee_action=date_judicial_committee_action,
+            date_hearing=date_hearing,
+            date_confirmation = date_confirmation,
+            date_start = date_start,
+            date_granularity_start = '%Y-%m-%d',
+            date_termination = date_termination,
+            date_granularity_termination = '%Y-%m-%d',
+            date_retirement = date_retirement,
+            
+            votes_yes = votes_yes,
+            votes_no = votes_no,
+            how_selected = 'a_pres',
+            termination_reason = item['Termination specific reason'+pos_str]
+        )
+        
+        if not testing:
+            position.save()
 
+        # set party        
+        party = get_party(item['Party Affiliation of President'+pos_str])        
+        if party is not None:
+            politics = PoliticalAffiliation(
+                person = person,
+                political_party = party,
+                source = 'a'
+                )    
+            politics.save()       
+        
+        rating = get_aba(item['ABA Rating'+pos_str])
+        if rating is not None:
+            aba = ABARating(
+                person = person,
+                rating = rating
+            )
+            aba.save()
+
+    # add education items    
+    for schoolnum in range(1,6):
+        if schoolnum  > 1:
+            school_str = ' (%s)'%schoolnum
+        else:
+            school_str = ''
+        
+        schoolname = item['Name of School'+school_str]
+        if pd.isnull(schoolname):
+            continue
+        degtype = item['Degree'+school_str]
+        degyear = item['Degree year'+school_str]
+        school = get_school(schoolname)
+        if school is not None:
+            degree = Education(
+                        person = person,       
+                        school = school,
+                        degree = degtype,
+                        degree_year = degyear
+                    )   
+            if not testing:
+                degree.save()
+        
 
         
-    appointer = get_appointer(item['President name'])
-    predecessor = None # get_predecessor
-    courtid = get_court(item['Court Name'])
-    date_nominated = None
-    date_elected = None
     
-    # assign start date
-    date_start, date_granularity_start = process_date(item['startyear'], 
-                                                      item['startmonth'], 
-                                                      item['startday'])
-    date_termination, date_granularity_termination = process_date(item['endyear'], 
-                                                                  item['endmonth'], 
-                                                                  item['endday'])    
-    date_retirement, _ = process_date(item['senioryear'], 
-                                      item['seniormonth'], 
-                                      item['seniorday'])  
-
-    date_confirmation = None
-    votes_yes = None
-    votes_no = None
     
-    position = Position(
-        person = person,
-        appointer = appointer,
-        predecessor = predecessor,
-        court_id = courtid,
-        date_nominated = date_nominated,
-        date_elected = date_elected,
-        date_confirmation = date_confirmation,
-        date_start = date_start,
-        date_granularity_start = date_granularity_start,
-        date_termination = date_termination,
-        date_granularity_termination = date_granularity_termination,
-        date_retirement = date_retirement,
-        votes_yes = votes_yes,
-        votes_no = votes_no,
-        how_selected = get_select(courtid,item['startyear']),
-        termination_reason = item['howended']
-    )
-    
-    position.save()
-
-    college = Education(
-        person = person,
-        school = get_school(item['college']),
-        degree = 'BA',
-        )    
-    college.save()
-    
-    lawschool = Education(
-        person = person,
-        school = get_school(item['lawschool']),
-        degree = 'JD',
-        )
-    lawschool.save()
-        
-    party = get_party(item['Party Affiliation of President'])    
-    
-    if party is not None:
-        politics = PoliticalAffiliation(
-            person = person,
-            political_party = party,
-            source = 'a'
-            )    
-        politics.save()
-    
-    rating = get_aba(item['ABA Rating'])
-    if rating is not None:
-        aba = ABARating(
-            person = person,
-            rating = rating
-        )
-        aba.save()
 
 if __name__ == '__main__':
     import pandas as pd
     fed_df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx',0)
+    fed_df = fed_df.where((pd.notnull(fed_df)), None)
     for i, row in fed_df.iterrows():    
         make_federal_judge(dict(row))
