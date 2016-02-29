@@ -4,8 +4,9 @@ import argparse
 import re
 import urllib2
 import csv
-import sys
-import os
+import os, sys
+# Adding the path to ENV for importing constants.
+sys.path.append(os.path.abspath('..'))
 from recap_constants import *
 
 from celery import Celery
@@ -26,13 +27,16 @@ def get_args():
 def downloader (self, recap_download_csv_file_name):
 
     if recap_download_csv_file_name:
+        STATUS_INPROGRESS = STAGE_DOWNLOAD + FILE_IN_PROGRESS
+        STATUS_COMPLETE = STAGE_DOWNLOAD + FILE_COMPLETE
+
         file_timestamp_part = re.search(r'(?P<timestamp>\d+)\.csv$', recap_download_csv_file_name).group('timestamp')
         last_downloaded_file_line = None
 
         # Checking if there is already a file with 'complete' status.
         # If there is, then all the docket downloads for the input CSV file are complete.
         # Therefore we stop
-        completed_csv_filename = "%s%s_%s.csv"%(CSV_FILEPATH, file_timestamp_part, FILE_COMPLETE)
+        completed_csv_filename = "%s%s%s.csv"%(DOWNLOAD_CSV_FILEPATH, file_timestamp_part, STATUS_COMPLETE)
         try:
             completed_csv_file  = open(completed_csv_filename, 'r')
         except IOError:
@@ -41,7 +45,7 @@ def downloader (self, recap_download_csv_file_name):
             print " File %s is found with COMPLETE status. Stopping the task."%completed_csv_filename
             sys.exit(1)
 
-        result_csv_filename = "%s%s_%s.csv"%(CSV_FILEPATH, file_timestamp_part, FILE_IN_PROGRESS)
+        result_csv_filename = "%s%s%s.csv"%(DOWNLOAD_CSV_FILEPATH, file_timestamp_part, STATUS_INPROGRESS)
         try:
             # Try opening the Results CSV file.
             result_csv_file  = open(result_csv_filename, 'r')
@@ -67,7 +71,6 @@ def downloader (self, recap_download_csv_file_name):
                     if docket_name_list == last_downloaded_file_line:
                         break
 
-            saved_file_counter = 0
             for row in csv_reader:
                 counter, docket_filename = row
 
@@ -84,11 +87,10 @@ def downloader (self, recap_download_csv_file_name):
                 docket_xml_filepath = "%s%s"%(XML_DOWNLOAD_FOLDER_PATH, docket_filename)
                 with open(docket_xml_filepath, 'w') as docket_file:
                     docket_file.write(xml_content)
-                saved_file_counter  += 1
 
                 with open(result_csv_filename, 'a') as result_csv_file:
                     result_writer = csv.writer(result_csv_file, delimiter=',', quotechar='"')
-                    result_writer.writerow([saved_file_counter, docket_filename])
+                    result_writer.writerow([counter, docket_filename])
 
         # Renaming the file for status COMPLETE
         os.rename(result_csv_filename, completed_csv_filename)

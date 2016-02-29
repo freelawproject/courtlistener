@@ -1,7 +1,7 @@
 Courtlistener is going towards making dockets in RECAP searchable. .
 
 This project is divided into three stages
- *-    import
+ *-    download
  *-    parse
  *-    index
 As described in the design.(ProcessFlowDesign.png)

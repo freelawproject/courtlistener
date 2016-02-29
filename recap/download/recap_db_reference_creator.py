@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 import MySQLdb as database
+import os, sys
+# Adding the path to ENV for importing constants.
+sys.path.append(os.path.abspath('..'))
 from recap_constants import *
 import time
 import csv
@@ -23,8 +26,8 @@ def main():
         csv_row_count = csv_lines_count_offset+1
 
         # Constructing the csv filename
-        csv_filename = "%s%s.csv"%(CSV_FILEPATH, re.sub('\.', '',"%f" % time.time()))
-        sql_args = (MAX_NUMBER_OF_XML_PER_TASK, csv_lines_count_offset)
+        csv_filename = "%s%s.csv"%(DOWNLOAD_CSV_FILEPATH, re.sub('\.', '',"%f" % time.time()))
+        sql_args = (DOWNLOAD_MAX_XML_PER_TASK, csv_lines_count_offset)
 
         if recap_db_cursor.execute(sql, sql_args):
             docket_xml_filenames_tuple_tuple = recap_db_cursor.fetchall()
@@ -42,7 +45,7 @@ def main():
                     csv_row_count += 1
                 
             # Appending to the reference file.
-            with open(REFERENCE_FILEPATH, 'a') as file_reference:
+            with open(DOWNLOAD_REFERENCE_FILEPATH, 'a') as file_reference:
                 csvwriter = csv.writer(file_reference, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 csvwriter.writerow([str(filecount), csv_filename])
                 

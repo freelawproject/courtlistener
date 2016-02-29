@@ -1,5 +1,5 @@
 
-The import stage is divided to two parts.
+The download stage is divided to two parts.
     - Generate CSV files with docket names to be used as a reference to download.
     - Create celery tasks to download on parallel jobs.
 
