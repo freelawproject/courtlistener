@@ -13,7 +13,7 @@ import dateutil.parser as dparser
 import logging
 
 from regexes_columbia import state_pairs, special_regexes
-from parse_judges import parse_judge, parse_panel_judges
+from parse_judges import find_judges
 
 # tags for which content will be condensed into plain text
 SIMPLE_TAGS = [
@@ -118,15 +118,15 @@ def parse_file(file_path, court_fallback=''):
     info['attorneys'] = ''.join(raw_info.get('attorneys', [])) or None
     info['posture'] = ''.join(raw_info.get('posture', [])) or None
     info['court_id'] = get_court_object(''.join(raw_info.get('court', [])), court_fallback) or None
-    info['panel'] = parse_panel_judges(''.join(raw_info.get('panel', []))) or []
+    info['panel'] = find_judges(''.join(raw_info.get('panel', []))) or []
     # get dates
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates)
     # get case names
-    info['case_name_full'] = ''.join(raw_info.get('caption', [])) or None
-    info['case_name'] = ''.join(raw_info.get('reporter_caption', [])) or None
+    info['case_name_full'] = condense_whitespace(caps2title(''.join(raw_info.get('caption', [])))) or None
+    info['case_name'] = condense_whitespace(caps2title(''.join(raw_info.get('reporter_caption', [])))) or None
     shortener = CaseNameTweaker()
-    info['case_name_short'] = shortener.make_case_name_short(info['case_name'])
+    info['case_name_short'] = condense_whitespace(caps2title(shortener.make_case_name_short(info['case_name'])))
     # get opinions
     info['opinions'] = []
     for opinion in raw_info.get('opinions', []):
@@ -137,14 +137,11 @@ def parse_file(file_path, court_fallback=''):
             ,'joining': []
         }
         if opinion['byline']:
-            # sometimes there's a 'joined by' that we need to split on
-            if 'joined by' in opinion['byline']:
-                author, joining = opinion['byline'].split('joined by', 1)
-            else:
-                author = opinion['byline']
-                joining = None
-            full_opinion['author'] = parse_judge(author)
-            full_opinion['joining'] = parse_panel_judges(joining) if joining else []
+            judges = find_judges(opinion['byline'])
+            if judges:
+                full_opinion['author'] = judges[0]
+            if len(judges) > 1:
+                full_opinion['joining'] = judges[1:]
         info['opinions'].append(full_opinion)
     return info
 
@@ -342,6 +339,16 @@ class CaseNameTweaker(object):
         return u''
 
 
+def caps2title(line):
+    """Replaces all ALL CAPS words with Title Case."""
+    return ''.join([s.title() if s.isupper() else s for s in re.split('([^a-zA-Z])', line)])
+
+
+def condense_whitespace(line):
+    """Condenses multiple whitespaces into a single one."""
+    return ' '.join(line.split())
+
+
 def get_court_object(raw_court, fallback=''):
     """Get the court object from a string.
 
@@ -364,5 +371,7 @@ def get_court_object(raw_court, fallback=''):
 
 
 if __name__ == '__main__':
-    parsed = parse_file("test_opinions/0b59c80d9043a003.xml")
-    pass
+    for i in parse_many(r'C:\Users\Jeff\Dropbox\court-listener\data', limit=100, status_interval=1000):
+        pass
+    # parsed = parse_file("test_opinions/0b59c80d9043a003.xml")
+    # pass

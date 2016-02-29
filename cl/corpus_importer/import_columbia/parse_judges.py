@@ -1,63 +1,59 @@
 # -*- coding: utf-8 -*-
-"""
-Methods to extract judges from lists in text files
-"""
 
 import re
-import string
 
 
-abblist=["J.","c.","Justice","justice","c.j.", "C.", "c.", "j.", "CJ", 
-	 "C", "J", "JJ++", "ARJ++", "Chief", "PRIOR", "cj", "c", "J",
-	 "chief", "OF", "Chief Justice", "DISSENT", "Chief-Justice", 
-	 "chief justice", "JJ", "JJ.", "++", "FN*","JJ++", "FURTHER", 
-	 "C.J.", "PAGE", "DID", "NOT", "SIT", "CONFERENCES", "NO", "SUBMITTED", 
-	 "PARTICIPATE", "PARTICIPATION", "ISSUANCE", "CONSULTATION","HIS", "RESUL", 
-	 "FURTH", "EVEN", "THOUGH", "ARGUMENT", "AS", "QUALIFIED", "PRESENT", 
-	 "MAJORITY", "SPECIALLY", "IN","THE", "CONCURRENCE", "ARGUMENT", "INITIAL", 
-	 "CONCURRING", "FINAL", "MAY", "DISSENTING", "OPINION", "DECISION", "CONFERENCE", 
-	 "THIS", "ADOPTED", "BUT", "RETIRED", "BEFORE", "CERTIFIED", "SAT", "ORAL", 
-	 "RESIGNED", "CASE", "MEMBER", "TIME", "TO", "PREPARATION", "JOINED", "RETIRED", 
-	 "ACTIVE", "JUSTICE", "ON", "ORDER", "WHILE", "HE", "ORDER", "CHIEF", "AT", 
-	 "PARTICIPATED", "WAS", "ADOPTED", "FELLOWS", "A", "PARTICIPATED", "ALTHOUGH", 
-	 "AVAILABLE", "JUSTICE", "AUTHORIZED",  "CONTINUE", "CAPACITY","DIED", "PARTICIPATE"]    
+# list of words that aren't judge names
+NOT_JUDGE = [
+    'justice', 'arj', 'chief', 'prior', 'dissent', 'further', 'page', 'did', 'not', 'sit', 'conferences'
+    ,'submitted', 'participate', 'participation', 'issuance', 'consultation', 'his', 'resul', 'furth', 'even'
+    ,'though', 'argument', 'qualified', 'present', 'majority', 'specially', 'the', 'concurrence', 'initial'
+    ,'concurring', 'final', 'may', 'dissenting', 'opinion', 'decision', 'conference', 'this', 'adopted', 'but'
+    ,'retired', 'before', 'certified', 'sat', 'oral', 'resigned', 'case', 'member', 'time', 'preparation'
+    ,'joined', 'active', 'while', 'order', 'participated', 'was', 'fellows', 'although', 'available'
+    ,'authorized', 'continue', 'capacity', 'died', 'panel', 'sitting', 'judge', 'and', 'judges', 'senior', 'justices'
+    ,'superior', 'court', 'pro', 'tem', 'participating', 'appeals', 'appellate', 'per', 'curiam', 'presiding'
+    ,'supernumerary', 'circuit', 'appellate', 'part', 'division', 'vice', 'result', 'judgment', 'special', 'italic'
+    ,'bold', 'denials', 'transfer', 'center', 'with', 'indiana', 'commissioner', 'dissents', 'acting', 'footnote'
+    ,'reference', 'concurred'
+]
 
-starting_word=["PANEL", "BEFORE", "SITTING:", "SITTING", "PANEL:"]
+# judge names can only be this size or larger
+NAME_CUTOFF = 3
 
 
-def parse_judge(line):
-    words = line.split()
-    for word in words:
-        if word not in abblist:
-            word=re.sub(",", "",word)
-            return word
-         
-
-def parse_panel_judges(line):
-    if not line:
-        return []
-    judges = []
-    #for line in lines:
-     #don't consider emtpy lines
-    line=line.replace(",", "")
-    line=line.replace(".", "")
-    line=line.upper()
-    #if not line.split():
-    #   continue
-    #only consider lines which start with Before
-    if (line.split()[0]!=None) & (line.split()[0] not in starting_word):
-        judges=judges+[line.split()[0]]
+def find_judges(text):
+    """Returns a list of last names of judges in `text`."""
+    text = text.lower() or ''
+    # just use the first nonempty line (there's sometimes a useless second line)
+    line = text
+    if '\n' in text:
+        line = ''
+        for l in text.split('\n'):
+            if l:
+                line = l
+            break
+    # normalize text and get candidate judge names
+    line = ''.join([c if c.isalpha() else ' ' for c in line.lower()])
+    names = []
+    for word in line.split():
+        if len(word) < NAME_CUTOFF or word in NOT_JUDGE:
+            continue
+        names.append(word)
+    # try to identify full judge names, and only retain their last names
+    if len(names) < 2:
+        last_names = names
     else:
-        line = line.strip(line.split()[0])
-        line = ''.join(ch for ch in line if ch not in set(string.punctuation)).strip()
-        line = line.replace("AND","")
-        #Replaces "and" with whitespace in the string
-        line = line.split()
-        for i in range(0, len(line)):
-            try:
-                val = int(line[i])
-            except ValueError:
-                val=0
-                if (line[i] not in abblist) & (line[i] not in judges) :
-                    judges=judges+[line[i]]
-    return (judges)
+        last_names = [names[0]]
+        for i in range(len(names))[1:]:
+            first_last = '%s %s' % (names[i - 1], names[i])
+            first_m_last = '%s [a-z]\.? %s' % (names[i - 1], names[i])
+            if re.search('%s|%s' % (first_last, first_m_last), text):
+                last_names[-1] = names[i]
+                continue
+            last_names.append(names[i])
+    return last_names
+
+
+if __name__ == '__main__':
+    find_judges('before: tom bryner, chief justice, tim v. matthews, eastaugh, fabe, and carpeneti, justices.')
