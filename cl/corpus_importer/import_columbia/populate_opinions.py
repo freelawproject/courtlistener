@@ -41,7 +41,6 @@ def find_person(name, court_id, case_date):
                 raise Exception("Found multiple judges with last name '%s' and matching positions." % name)
             unique_person = person
     if not unique_person:
-        #raise Exception("Failed to find a judge with last name '%s` and matching position." % name)
         print("Failed to find a judge with last name '%s` and matching position." % name)        
     return unique_person
 
@@ -67,8 +66,7 @@ def make_and_save(item):
                 reargued_date = date_info[1]
             elif date_info[0] in REARG_DENIED_TAGS:
                 reargue_denied_date = date_info[1]
-            # EA: basestring is python 2 only, could we do this in a way that is 2/3 compatible
-            elif isinstance(date_info[0], basestring) and 'cert' in date_info[0]:
+            elif (isinstance(date_info[0], str) or isinstance(date_info[0], unicode)) and 'cert' in date_info[0]:
                 # we don't have an item for cert acceptance/denial
                 pass
             else:                
