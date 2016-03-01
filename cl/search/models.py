@@ -215,6 +215,7 @@ class Docket(models.Model):
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
         choices=SOURCE_CHOICES,
+        default=DEFAULT
     )
 
     def __unicode__(self):
