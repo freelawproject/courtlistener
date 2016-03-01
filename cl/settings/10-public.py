@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     'cl.judges',
     'cl.lib',
     'cl.opinion_page',
+    'cl.recap',
     'cl.scrapers',
     'cl.search',
     'cl.simple_pages',
