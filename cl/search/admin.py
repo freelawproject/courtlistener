@@ -123,6 +123,9 @@ class OpinionsCitedAdmin(admin.ModelAdmin):
         'citing_opinion',
         'cited_opinion',
     )
+    search_fields = (
+        '=citing_opinion__id',
+    )
 
     def save_model(self, request, obj, form, change):
         obj.save()
