@@ -35,6 +35,7 @@ lxml==3.4.4
 markdown2==2.3.0
 networkx==1.10
 nose
+pandas
 psycopg2==2.6.1
 pyinotify==0.9.6
 pylint==1.4.3
