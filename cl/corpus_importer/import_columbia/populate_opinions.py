@@ -48,9 +48,6 @@ def find_person(name, court_id, case_date):
 
 def make_and_save(item):
     """Associates case data from `parse_opinions` with objects. Saves these objects."""
-    if not item:
-        return []
-
     # find relevent dates
     argued_date = reargued_date = reargue_denied_date = opinion_date = None
     for type in item['dates']:
@@ -110,6 +107,7 @@ def make_and_save(item):
         else:
             author = find_person(opinion_info['byline'], item['court_id'], opinion_date or argued_date)
         joined_by = [find_person(n, item['court_id'], opinion_date or argued_date) for n in opinion_info['joining']]
+        joined_by = [x for x in joined_by if x is not None]
         opinion = Opinion(
             cluster=cluster
             ,author=author
