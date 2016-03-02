@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 
+import re, os, sys
+import argparse
 from django.core.exceptions import ObjectDoesNotExist
 from bs4 import BeautifulSoup
 from datetime import datetime
 # Adding the path to ENV for importing constants.
 sys.path.append(os.path.abspath('..'))
+sys.path.append(os.path.abspath('../../'))
 from recap_constants import *
 from cl.search.models import *
 from cl.judges.models import Judge
@@ -16,17 +19,22 @@ class DocumentType:
 class FormatType:
     STRING = 0
     INTEGER = 1
-    DATETIME = 2
-    COURT_OBJ = 3
-    JUDGE_OBJ = 4
+    DATE = 2
+    DATETIME = 3
+    COURT_OBJ = 4
+    JUDGE_OBJ = 5
+    BOOLEAN = 6
 
+class DocketSource:
+    DEFAULT = 0
+    RECAP = 1
 
 def get_args():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument('--docket_xml', type=str, help='The XML docket file in RECAP/IA to parse\n')
     args = arg_parser.parse_args()
 
-    if not args.docket_csv:
+    if not args.docket_xml:
         arg_parser.print_help()
     return args
 
@@ -47,10 +55,15 @@ def get_reformated_value_from_xml(xml_tag, format_type):
             # Returning None in case the Court object is nor found for the RECAP court name
             pass
 
-    elif format_type == FormatType.DATETIME:
+    elif format_type == FormatType.DATE:
         date_str = xml_tag.string if xml_tag else None
         if date_str:
             return_obj = datetime.strptime(date_str, "%Y-%m-%d")
+
+    elif format_type == FormatType.DATETIME:
+        date_str = xml_tag.string if xml_tag else None
+        if date_str:
+            return_obj = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
 
     elif format_type == FormatType.INTEGER:
         item_str = xml_tag.string if xml_tag else None
@@ -64,45 +77,81 @@ def get_reformated_value_from_xml(xml_tag, format_type):
     elif format_type == FormatType.STRING:
         return_obj = xml_tag.string if xml_tag else None
 
+    elif format_type == FormatType.BOOLEAN:
+        number_val = xml_tag.string if xml_tag else None
+        if number_val:
+            try:
+                return_obj = bool(int(number_val))
+            except ValueError:
+                # Returning None if error found while trying to converting to INT throws error
+                pass
+
     elif format_type == FormatType.JUDGE_OBJ:
         pass
-        # Judge yet to be done because of the
+        # Judge yet to be done because of the Fname, Lname issue.
+        # Judge in CL has Fname, Lname but Recap documents contain the Fullname.
 
     return return_obj
 
 def parser(recap_docket_xml_filepath):
 
-    docket_xml_content = None
+    # Getting the docket file name
+    # For example: 'gov.uscourts.ilcd.61910'
+    docket_url_name = re.search('(?P<docket>gov\.uscourts\.(.*))\.docket', recap_docket_xml_filepath).group('docket')
+
     with open(recap_docket_xml_filepath, 'r') as docket_fp:
         docket_xml_content = docket_fp.read()
 
     if docket_xml_content:
+
         soup = BeautifulSoup(docket_xml_content)
         soup_case = soup.case_details
 
         court_obj = get_reformated_value_from_xml(soup_case.court, FormatType.COURT_OBJ)
         docket_number = get_reformated_value_from_xml(soup_case.docket_num, FormatType.STRING)
         pacer_case_num = get_reformated_value_from_xml(soup_case.pacer_case_num, FormatType.INTEGER)
-        date_terminated = get_reformated_value_from_xml(soup_case.date_case_terminated. FormatType.DATETIME)
+        date_terminated = get_reformated_value_from_xml(soup_case.date_case_terminated, FormatType.DATE)
+        date_last_filing = get_reformated_value_from_xml(soup_case.date_last_filing, FormatType.DATE)
         case_name = get_reformated_value_from_xml(soup_case.case_name, FormatType.STRING)
-        date_filed = get_reformated_value_from_xml(soup_case.date_filed, FormatType.DATETIME)
+        date_filed = get_reformated_value_from_xml(soup_case.date_filed, FormatType.DATE)
         case_cause = get_reformated_value_from_xml(soup_case.case_cause, FormatType.STRING)
         nature_of_suit = get_reformated_value_from_xml(soup_case.nature_of_suit, FormatType.STRING)
         jury_demand = get_reformated_value_from_xml(soup_case.jury_demand, FormatType.STRING)
         jurisdiction = get_reformated_value_from_xml(soup_case.jurisdiction, FormatType.STRING)
-        # 'assigned_to' has to be implemented - PENDING
-
+        assigned_to = None        # 'assigned_to' has to be implemented - PENDING
 
         try:
-            docket_obj = Docket.objects.get(court=court_obj, docket_number=docket_number)
+            docket_obj = Docket.objects.get(court=court_obj, pacer_case_id=pacer_case_num)
         except ObjectDoesNotExist:
             try:
-                docket_obj = Docket.objects.get(court=court_obj, pacer_case_id=pacer_case_num)
+                docket_obj = Docket.objects.get(court=court_obj, docket_number=docket_number)
             except ObjectDoesNotExist:
-                docket_obj = Docket.objects.create(court=court_obj, pacer_case_id=pacer_case_num)
+                docket_obj = Docket.objects.create(court=court_obj, pacer_case_id=pacer_case_num,
+                                                   docket_number=docket_number)
+                # Adding the source as RECAP.
+                docket_obj.source = DocketSource.RECAP
+            else:
+                # adding the pacer_case_num id the docket is found without the pacer_case_num (Existing CL dockets)
+                docket_obj.pacer_case_id = pacer_case_num
+
+        # Updating the Docket contents.
+        docket_obj.date_filed = date_filed
+        docket_obj.date_terminated = date_terminated
+        docket_obj.date_last_filing = date_last_filing
+        docket_obj.assigned_to = assigned_to
+        docket_obj.case_name = case_name
+        docket_obj.cause = case_cause
+        docket_obj.nature_of_suit = nature_of_suit
+        docket_obj.jury_demand = jury_demand
+        docket_obj.jurisdiction_type = jurisdiction
+
+        # Path of the docket file local as well as in the Internet Archive
+        docket_obj.filepath_local = os.path.abspath(recap_docket_xml_filepath)
+        # Constructing the Internet Archive Docket File path
+        docket_obj.filepath_ia = IA_XML_DOCKET_PATH_FORMAT_STRING % (docket_url_name, docket_url_name)
 
         for document_tag in soup.document_list.find_all('document'):
-            document_number = int(document_tag['doc_num'])
+            document_num = int(document_tag['doc_num'])
             attachment_num = int(document_tag['attachment_num'])
 
             if attachment_num == 0:
@@ -110,12 +159,61 @@ def parser(recap_docket_xml_filepath):
             else:
                 document_type = DocumentType.ATTACHMENT
 
+            try:
+                docket_entry_obj = DocketEntry.objects.get(docket=docket_obj, entry_number = document_num)
+            except ObjectDoesNotExist:
+                if document_type == DocumentType.PACER_DOCUMENT:
+                    docket_entry_obj = DocketEntry(docket=docket_obj, entry_number = document_num)
+                else:
+                    raise Exception("ERROR : DocketEntry object does not exist. "
+                                    "Attachment found without its associated document")
+
             if document_type == DocumentType.PACER_DOCUMENT:
-                 try:
-                     DocketEntry.objects.get(docket=)
+                # Parsing DocketEntry contents in case the document type is PACER_DOCUMENT
+                date_filed = get_reformated_value_from_xml(document_tag.date_filed, FormatType.DATE)
+                docket_entry_text = get_reformated_value_from_xml(document_tag.long_desc, FormatType.STRING)
+                # Updating the DocketEntry object
+                docket_entry_obj.date_filed = date_filed
+                docket_entry_obj.description = docket_entry_text
+                docket_entry_obj.save()
 
+            # Obtaining the document contents.
+            pacer_document_id = get_reformated_value_from_xml(document_tag.pacer_doc_id, FormatType.STRING)
+            # pacer doc id is made as unique
+            if not pacer_document_id:
+                # RECAP does not have a document associated with this docket entry.
+                # Therefore continuing the loop
+                continue
+            try:
+                document_obj = RECAPDocument.objects.get(pacer_doc_id=pacer_document_id)
+            except ObjectDoesNotExist:
+                document_obj = RECAPDocument(pacer_doc_id=pacer_document_id, docket_entry=docket_entry_obj)
 
+            uploaded_date = get_reformated_value_from_xml(document_tag.upload_date, FormatType.DATETIME)
+            is_available = get_reformated_value_from_xml(document_tag.available, FormatType.BOOLEAN)
+            sha1 = get_reformated_value_from_xml(document_tag.sha1, FormatType.STRING)
+            filepath_ia = IA_PDF_DOCUMENT_PATH_FORMAT_STRING.format(docket_url_name, document_num, attachment_num)
 
+            # Updating the document object values.
+            document_obj.date_upload = uploaded_date
+            document_obj.document_type = document_type
+            document_obj.document_number = document_num
+            document_obj.is_available = is_available
+            document_obj.sha1 = sha1
+            document_obj.filepath_ia = filepath_ia
+            if document_type == DocumentType.ATTACHMENT:
+                document_obj.attachment_number = attachment_num
+            document_obj.save()
 
     else:
         raise Exception("Could not read the XML contents")
+
+    return
+
+
+if __name__ == '__main__':
+    import django
+    django.setup()
+
+    args = get_args()
+    parser(args.docket_xml)

@@ -218,6 +218,9 @@ class Docket(models.Model):
         default=DEFAULT
     )
 
+    class Meta:
+        unique_together = (('court', 'docket_number'), ('court', 'pacer_case_id'))
+
     def __unicode__(self):
         if self.case_name:
             return smart_unicode('%s: %s' % (self.pk, self.case_name))
@@ -265,8 +268,12 @@ class DocketEntry(models.Model):
         db_index=True,
     )
 
+    class Meta:
+        unique_together = ('docket', 'entry_number')
+
+
     def __unicode__(self):
-        return "<DocketEntry ---> %s >" % (self.text[:50])
+        return "<DocketEntry ---> %s >" % (self.description[:50])
 
 
 class RECAPDocument(models.Model):
@@ -321,7 +328,7 @@ class RECAPDocument(models.Model):
         help_text="The ID of the document in PACER. This information is "
                   "provided by RECAP.",
         max_length=32,  # Same as in RECAP
-        blank=True,
+        unique = True
     )
     is_available = models.NullBooleanField(
         help_text="True if the item is available in RECAP",
@@ -344,6 +351,9 @@ class RECAPDocument(models.Model):
         help_text="The URL of the file in IA",
         max_length=1000,
     )
+
+    class Meta:
+        unique_together = ('docket_entry', 'document_number', 'attachment_number')
 
     def __unicode__(self):
         return "Docket_%s , document_number_%s , attachment_number_%s" % (self.docket_entry.docket.docket_number, self.document_number, self.attachment_number)
