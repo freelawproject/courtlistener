@@ -24,33 +24,24 @@ OPINION_TYPE_MAPPING = {
 def find_person(name, court_id, case_date):
     """Uniquely identifies a judge by both name and metadata or raises and exception."""
     # EA: I think you can directly filter on name and position.
-    candidates = Person.objects.filter(name_last__iexact=name)
-    unique_person = None
-    court = Court.objects.get(pk=court_id)
-    for person in candidates:
-        # give a 1-year margin of error for start and end dates
-        positions = Position.objects.filter(
-            person=person
-            ,position_type='judge'
-            ,court=court
-            ,date_start__leq = case_date.year - relativedelta(years=1)
-            ,date_termination__geq = case_date.year + relativedelta(years=1)
-        )
-        if positions:
-            if unique_person:
-                raise Exception("Found multiple judges with last name '%s' and matching positions." % name)
-            unique_person = person
-    if not unique_person:
-        print("Failed to find a judge with last name '%s` and matching position." % name)        
-    return unique_person
-
+    candidates = Person.objects.filter(
+        name_last__iexact=name,
+        positions__position_type='judge',
+        positions__court_id=court_id,
+        positions__date_start__leq = case_date.year + relativedelta(years=1),
+        positions__date_termination__geq = case_date.year - relativedelta(years=1),
+    )
+    if len(candidates) == 1:
+        return candidates[0]
+    elif len(candidates) > 1:
+        raise Exception("Found multiple judges with last name '%s' and matching positions." % name)
+    else:
+        print("Failed to find a judge with last name '%s` and matching position." % name) 
+        return None
 
 
 def make_and_save(item):
     """Associates case data from `parse_opinions` with objects. Saves these objects."""
-    if not item:
-        return []
-
     # find relevent dates
     argued_date = reargued_date = reargue_denied_date = opinion_date = None
     for type in item['dates']:
@@ -110,6 +101,7 @@ def make_and_save(item):
         else:
             author = find_person(opinion_info['byline'], item['court_id'], opinion_date or argued_date)
         joined_by = [find_person(n, item['court_id'], opinion_date or argued_date) for n in opinion_info['joining']]
+        joined_by = [x for x in joined_by if x is not None]
         opinion = Opinion(
             cluster=cluster
             ,author=author
