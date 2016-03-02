@@ -80,6 +80,18 @@ class Docket(models.Model):
         auto_now=True,
         db_index=True,
     )
+    date_cert_granted = models.DateField(
+        help_text="date cert was granted for this case, if applicable",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    date_cert_denied = models.DateField(
+        help_text="the date cert was denied for this case, if applicable",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
     date_argued = models.DateField(
         help_text="the date the case was argued",
         blank=True,
