@@ -96,17 +96,17 @@ def get_degree_level(degstr):
     if degstr is None:
         return None
     degdict = {'ba': ['ba','ab','bs','bae','barch','bba','bbs','bcs',
-                      'bsee','phb','blitt'],
+                      'bsee','phb','blitt','littb'],
                'aa': ['aa','as', 'aas'],
                'ma': ['ma','ms', 'msc','am', 'mst','mfa','mph','msw','mia','mpa','msed'
                        'mbe','mssp','mcit','mes','mse','mcp','mpa',
                        'mpp','mdiv', 'mls'],               
                'llb': ['llb','bsl','bl'],
                'jd': ['jd'], 
-               'llm': ['llm','ml'],
+               'llm': ['llm','ml', 'mjs', 'mj'],
                'jsd': ['jsd','sjd'],
-               'phd': ['phd','edd','ded','dma','dphil'],               
-               'md': ['md','dmd'],
+               'phd': ['phd','edd','ded','dma','dphil'],     
+               'md': ['md','dmd','rn'],
                'mba': ['mba'],
               }
     deg = re.sub(r"[^a-z]+", '', degstr.lower())
