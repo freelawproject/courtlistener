@@ -4,16 +4,19 @@
 
 import xml.etree.cElementTree as ET
 import re
-import traceback
 from random import shuffle
 import os
 import fnmatch
-import geonamescache
 import dateutil.parser as dparser
-import logging
+
+from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
 
 from regexes_columbia import state_pairs, special_regexes
 from parse_judges import find_judges
+
+
+# initialized once since it takes resources
+CASE_NAME_TWEAKER = CaseNameTweaker()
 
 # tags for which content will be condensed into plain text
 SIMPLE_TAGS = [
@@ -30,20 +33,14 @@ STRIP_REGEX = [r'</?citation.*>', r'</?page_number.*>']
 OPINION_TYPES = ['opinion', 'dissent', 'concurrence']
 
 
-def output(m=''):
-    print m
-    logging.info(m)
-
-
 def parse_many(dir_path,
                limit=None,
                random_order=True,
                status_interval=10,
-               court_fallback_regex=r"data/([a-z_]+?/[a-z_]+?)/",
-               log=None):
+               court_fallback_regex=r"data/([a-z_]+?/[a-z_]+?)/"):
     """Runs the parse method on all the xml files in the given directory tree up to the given limit.
     Yields dictionaries returned by the parse method.
-    Prints parsing tracebacks instead of raising exceptions.
+    Prints updates.
 
     :param dir_path: The directory to parse the files of.
     :param limit: A limit on how many files to parse. If None, will parse all.
@@ -51,16 +48,12 @@ def parse_many(dir_path,
     :param status_interval: How often a status update will be given.
     :param court_fallback_regex: Regex that matches a file's path (always has '/' delimiters) for a string to be used
         as a fallback in getting the court object. The regexes associated to its value in special_regexes will be used.
-    :param log: Either None or the file to log output to. Will be overwritten.
     """
     # get an initial number of files that we're going to be dealing with
-    if log:
-        print "Logging to '%s'." % log
-        logging.basicConfig(filename=log, filemode='w', level=logging.DEBUG, format='%(message)s')
     if limit:
         total = limit
     else:
-        output("Getting an initial count of the files to be parsed ...")
+        print "Getting an initial count of the files to be parsed ..."
         total = 0
         for _, _, file_names in os.walk(dir_path):
             total += len(fnmatch.filter(file_names, '*.xml'))
@@ -78,25 +71,11 @@ def parse_many(dir_path,
                 matches = re.compile(court_fallback_regex).findall(path)
                 if matches:
                     court_fallback = matches[0]
-            # try to parse the file and print any exceptions with full tracebacks
-            try:
-                yield parse_file(path, court_fallback=court_fallback)
-            except Exception as e:
-                # print simple exception summaries for known problems
-                if 'mismatched tag' in str(e):
-                    output("Mismatched tag exception encountered in file '%s':%s" % (path, str(e).split(':', 1)[1]))
-                else:
-                    # otherwise, print generic traceback
-                    output()
-                    output("Exception encountered in file '%s':" % path)
-                    logging.exception('')
-                    print traceback.format_exc()
-                    output()
-                yield {}
+            yield parse_file(path, court_fallback=court_fallback)
             # status update
             count += 1
             if count % status_interval == 0:
-                output("Parsed %s out of %s." % (count, total))
+                print "Parsed %s out of %s." % (count, total)
             if count == limit:
                 return
 
@@ -123,10 +102,9 @@ def parse_file(file_path, court_fallback=''):
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates)
     # get case names
-    info['case_name_full'] = condense_whitespace(caps2title(''.join(raw_info.get('caption', [])))) or None
-    info['case_name'] = condense_whitespace(caps2title(''.join(raw_info.get('reporter_caption', [])))) or None
-    shortener = CaseNameTweaker()
-    info['case_name_short'] = condense_whitespace(caps2title(shortener.make_case_name_short(info['case_name'])))
+    info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
+    info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
+    info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or None
     # get opinions
     info['opinions'] = []
     for opinion in raw_info.get('opinions', []):
@@ -250,103 +228,9 @@ def parse_dates(raw_dates):
     return dates
 
 
-class CaseNameTweaker(object):
-    def __init__(self):
-        acros = [u'a.g.p.', u'c.d.c.', u'c.i.a.', u'd.o.c.', u'e.e.o.c.',
-                 u'e.p.a.', u'f.b.i.', u'f.c.c.', u'f.d.i.c.', u'f.s.b.',
-                 u'f.t.c.', u'i.c.c.', u'i.n.s.', u'i.r.s.', u'n.a.a.c.p.',
-                 u'n.l.r.b.', u'p.l.c.', u's.e.c.', u's.p.a.', u's.r.l.',
-                 u'u.s.', u'u.s.a.', u'u.s.e.e.o.c.', u'u.s.e.p.a.']
-        acros_sans_dots = [acro.replace(u'.', u'') for acro in acros]
-        # corp_acros = ['L.L.C.', 'L.L.L.P.', 'L.L.P.', 'L.P.', 'P.A.', 'P.C.',
-        #              'P.L.L.C.', ]
-        # corp_acros_sans_dots = [acro.replace('.', '') for acro in corp_acros]
-        common_names = [u'state', u'people', u'smith', u'johnson']
-        ags = [u'Akerman', u'Ashcroft', u'Barr', u'Bates', u'Bell', u'Berrien',
-               u'Biddle', u'Black', u'Bonaparte', u'Bork', u'Bradford',
-               u'Breckinridge', u'Brewster', u'Brownell', u'Butler',
-               u'Civiletti', u'Clark', u'Clement', u'Clifford', u'Crittenden',
-               u'Cummings', u'Cushing', u'Daugherty', u'Devens', u'Evarts',
-               u'Filip', u'Garland', u'Gerson', u'Gilpin', u'Gonzales',
-               u'Gregory', u'Griggs', u'Grundy', u'Harmon', u'Hoar', u'Holder',
-               u'Jackson', u'Johnson', u'Katzenbach', u'Keisler', u'Kennedy',
-               u'Kleindienst', u'Knox', u'Lee', u'Legaré', u'Levi', u'Lincoln',
-               u'Lynch', u'MacVeagh', u'Mason', u'McGranery', u'McGrath',
-               u'McKenna', u'McReynolds', u'Meese', u'Miller', u'Mitchell',
-               u'Moody', u'Mukasey', u'Murphy', u'Nelson', u'Olney', u'Palmer',
-               u'Pierrepont', u'Pinkney', u'Randolph', u'Reno', u'Richardson',
-               u'Rodney', u'Rogers', u'Rush', u'Sargent', u'Saxbe', u'Smith',
-               u'Speed', u'Stanbery', u'Stanton', u'Stone', u'Taft', u'Taney',
-               u'Thornburgh', u'Toucey', u'Wickersham', u'Williams', u'Wirt']
-        # self.corp_acros = corp_acros + corp_acros_sans_dots
-        self.corp_identifiers = [u'Co.', u'Corp.', u'Inc.', u'Ltd.']
-        bad_words = acros + acros_sans_dots + common_names + ags + \
-            self.make_geographies_list()
-        self.bad_words = [s.lower() for s in bad_words]
-        super(CaseNameTweaker, self).__init__()
-
-    @staticmethod
-    def make_geographies_list():
-        """Make a flat list of cities, counties and states that we can exclude
-        from short names.
-        """
-        geonames = geonamescache.GeonamesCache()
-        # Make a list of cities with big populations.
-        cities = [v[u'name'] for v in
-                  geonames.get_cities().values() if (
-                      v[u'countrycode'] == u'US' and
-                      v[u'population'] > 150000
-                  )]
-        counties = [v[u'name'] for v in geonames.get_us_counties()]
-        states = [v[u'name'] for v in geonames.get_us_states().values()]
-        return cities + counties + states
-
-    def make_case_name_short(self, s):
-        """Creates short case names where obvious ones can easily be made."""
-        if not s:
-            return None
-        parts = [part.strip().split() for part in s.split(u' v. ')]
-        if len(parts) == 1:
-            # No v.
-            if s.lower().startswith(u'in re'):
-                # Starts with 'in re'
-                # In re Lissner --> In re Lissner
-                return s
-            if s.lower().startswith(u'matter of'):
-                # Starts with 'matter of' --> [['matter', 'of', 'lissner']]
-                return u'In re %s' % parts[0][2]
-        elif len(parts) == 2:
-            # X v. Y --> [['X'], ['Y']]
-            # X Y Z v. A B --> [['X', 'Y', 'Z'], ['A', 'B']]
-            if len(parts[0]) == 1:
-                if parts[0][0].lower() not in self.bad_words:
-                    # Simple case: Langley v. Google
-                    return parts[0][0]
-                elif len(parts[1]) == 1:
-                    # Plaintiff was a bad_word. Try the defendant.
-                    # Dallas v. Lissner
-                    if parts[1][0].lower() not in self.bad_words:
-                        return parts[1][0]
-            elif len(parts[0]) > 1:
-                # Plaintiff part is longer than a single word, focus on the
-                # defendant.
-                if len(parts[1]) == 1:
-                    # If the defendant is a single word.
-                    if parts[1][0].lower() not in self.bad_words:
-                        # That's not a bad word.
-                        return parts[1][0]
-        # More than 1 instance of v. or otherwise no matches --> Give up.
-        return u''
-
-
-def caps2title(line):
-    """Replaces all ALL CAPS words with Title Case."""
-    return ''.join([s.title() if s.isupper() else s for s in re.split('([^a-zA-Z])', line)])
-
-
-def condense_whitespace(line):
-    """Condenses multiple whitespaces into a single one."""
-    return ' '.join(line.split())
+def format_case_name(n):
+    """Applies standard harmonization methods after normalizing with lowercase."""
+    return titlecase(harmonize(clean_string(n.lower())))
 
 
 def get_court_object(raw_court, fallback=''):
