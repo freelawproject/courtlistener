@@ -101,6 +101,9 @@ def parse_file(file_path, court_fallback=''):
     # get dates
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates)
+    print dates
+    print info['dates']
+    print '-' * 30
     # get case names
     info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
     info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
@@ -191,7 +194,7 @@ def get_xml_string(e):
 
 def parse_dates(raw_dates):
     """Parses the dates from a list of string.
-    Returns a list of lists of datetime objects or tuples of (string,datetime) if there is a string before the date
+    Returns a list of lists of (string, datetime) tuples if there is a string before the date (or None).
 
     :param raw_dates: A list of (probably) date-containing strings
     """
@@ -211,7 +214,7 @@ def parse_dates(raw_dates):
                     continue
             # try to grab a date from the string using an intelligent library
             try:
-                date = dparser.parse(raw_part, fuzzy = True).date()
+                date = dparser.parse(raw_part, fuzzy=True).date()
             except:
                 continue
             # split on either the month or the first number (e.g. for a 1/1/2016 date) to get the text before it
@@ -221,16 +224,16 @@ def parse_dates(raw_dates):
                 text = months.split(raw_part.lower())[0].strip()
             # if we ended up getting some text, add it, else ignore it
             if text:
-                inner_dates.append((text,date))
+                inner_dates.append((clean_string(text), date))
             else:
-                inner_dates.append((date,))
+                inner_dates.append((None, date))
         dates.append(inner_dates)
     return dates
 
 
 def format_case_name(n):
     """Applies standard harmonization methods after normalizing with lowercase."""
-    return titlecase(harmonize(clean_string(n.lower())))
+    return titlecase(harmonize(n.lower()))
 
 
 def get_court_object(raw_court, fallback=''):
@@ -255,7 +258,7 @@ def get_court_object(raw_court, fallback=''):
 
 
 if __name__ == '__main__':
-    for i in parse_many(r'C:\Users\Jeff\Dropbox\court-listener\data', limit=100, status_interval=1000):
+    for i in parse_many(r'C:\Users\Jeff\Dropbox\court-listener\data\colorado', limit=500, status_interval=1000):
         pass
     # parsed = parse_file("test_opinions/0b59c80d9043a003.xml")
     # pass
