@@ -1,7 +1,5 @@
 import re
-from django.core import urlresolvers
 from cl.citations import find_citations, match_citations
-from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.search.models import Opinion, OpinionsCited
 from celery import task
 
@@ -43,17 +41,6 @@ def create_cited_html(opinion, citations):
 def update_document(opinion, index=True):
     """Get the citations for an item and save it and add it to the index if
     requested."""
-    DEBUG = 0
-
-    if DEBUG >= 1:
-        print "%s at %s" % (
-            best_case_name(opinion.cluster),
-            urlresolvers.reverse(
-                'admin:search_opinioncluster_change',
-                args=(opinion.cluster.pk,),
-            )
-        )
-
     citations = get_document_citations(opinion)
 
     # List used so we can do one simple update to the citing opinion.
@@ -84,19 +71,15 @@ def update_document(opinion, index=True):
                 citation.match_url = matched_opinion.cluster.get_absolute_url()
                 citation.match_id = matched_opinion.pk
             except Opinion.DoesNotExist:
-                if DEBUG >= 2:
-                    print "No Opinions returned for id %s" % match_id
+                # No Opinions returned. Press on.
                 continue
             except Opinion.MultipleObjectsReturned:
-                if DEBUG >= 2:
-                    print "Multiple Opinions returned for id %s" % match_id
+                # Multiple Opinions returned. Press on.
                 continue
         else:
+            # No match found for citation
             #create_stub([citation])
-            if DEBUG >= 2:
-                # TODO: Don't print 1 line per citation.  Save them in a list
-                # and print in a single line at the end.
-                print "No match found for citation %s" % citation.base_citation()
+            pass
 
     # Only update things if we found citations
     if citations:
@@ -111,9 +94,6 @@ def update_document(opinion, index=True):
                           cited_opinion_id=pk) for
             pk in opinions_cited
         ])
-
-        if DEBUG >= 3:
-            print opinion.html_with_citations
 
     # Update Solr if requested. In some cases we do it at the end for
     # performance reasons.
