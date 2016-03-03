@@ -213,11 +213,13 @@ def add_post_citation(citation, words, reporter_index):
         Full citation: 123 F.2d 345, 347-348 (4th Cir. 1990)
         Post-citation info: year=1990, court="4th Cir.", extra (page range)="347-348"
     """
-    end_position = reporter_index + 2
-    # Start looking 2 tokens after the reporter (1 after page)
+    # Start looking 2 tokens after the reporter (1 after page), and go to
+    # either the end of the words list or to FORWARD_SEEK tokens from where you
+    # started.
     for start in xrange(reporter_index + 2,
                         min((reporter_index + FORWARD_SEEK), len(words))):
         if words[start].startswith('('):
+            # Get the year by looking for a token that ends in a paren.
             for end in xrange(start, start + FORWARD_SEEK):
                 try:
                     has_ending_paren = (words[end].find(')') > -1)
@@ -231,15 +233,13 @@ def add_post_citation(citation, words, reporter_index):
                     else:
                         citation.year = get_year(words[end])
                     citation.court = get_court_by_paren(u' '.join(words[start:end + 1]), citation)
-                    end_position = end
                     break
+
             if start > reporter_index + 2:
                 # Then there's content between page and (), starting with a
                 # comma, which we skip
                 citation.extra = u' '.join(words[reporter_index + 2:start])
             break
-
-    return end_position
 
 
 def add_defendant(citation, words, reporter_index):
