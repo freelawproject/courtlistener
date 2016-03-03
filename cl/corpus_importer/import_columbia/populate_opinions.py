@@ -24,8 +24,8 @@ OPINION_TYPE_MAPPING = {
 
 
 def find_person(name, court_id, case_date):
-    """Uniquely identifies a judge by both name and metadata or raises and exception."""
-    # EA: I think you can directly filter on name and position.
+    """Uniquely identifies a judge by both name and metadata. Prints a warning if couldn't find and raises an
+    exception if not unique."""
     candidates = Person.objects.filter(
         name_last__iexact=name,
         positions__position_type='judge',
@@ -38,7 +38,7 @@ def find_person(name, court_id, case_date):
     elif len(candidates) > 1:
         raise Exception("Found multiple judges with last name '%s' and matching positions." % name)
     else:
-        print("Failed to find a judge with last name '%s` and matching position." % name) 
+        print "Failed to find a judge with last name '%s' and matching position." % name
         return None
 
 
@@ -117,6 +117,7 @@ def make_and_save(item):
             ,html_columbia=opinion_info['opinion']
         )
         opinion.save()
+
 
 if __name__ == '__main__':
     from cl.corpus_importer.import_columbia.parse_opinions import parse_file

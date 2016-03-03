@@ -4,9 +4,7 @@
 
 import xml.etree.cElementTree as ET
 import re
-from random import shuffle
 import os
-import fnmatch
 import dateutil.parser as dparser
 
 from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
@@ -29,55 +27,8 @@ SIMPLE_TAGS = [
 STRIP_REGEX = [r'</?citation.*>', r'</?page_number.*>']
 
 # types of opinions that will be parsed
-# each must have both a '_byline' and '_text' node
+# each may have a '_byline' and '_text' node
 OPINION_TYPES = ['opinion', 'dissent', 'concurrence']
-
-
-def parse_many(dir_path,
-               limit=None,
-               random_order=True,
-               status_interval=10,
-               court_fallback_regex=r"data/([a-z_]+?/[a-z_]+?)/"):
-    """Runs the parse method on all the xml files in the given directory tree up to the given limit.
-    Yields dictionaries returned by the parse method.
-    Prints updates.
-
-    :param dir_path: The directory to parse the files of.
-    :param limit: A limit on how many files to parse. If None, will parse all.
-    :param random_order: If true, will parse the files in a random order.
-    :param status_interval: How often a status update will be given.
-    :param court_fallback_regex: Regex that matches a file's path (always has '/' delimiters) for a string to be used
-        as a fallback in getting the court object. The regexes associated to its value in special_regexes will be used.
-    """
-    # get an initial number of files that we're going to be dealing with
-    if limit:
-        total = limit
-    else:
-        print "Getting an initial count of the files to be parsed ..."
-        total = 0
-        for _, _, file_names in os.walk(dir_path):
-            total += len(fnmatch.filter(file_names, '*.xml'))
-    # go through the files, yielding parsed files and printing status updates as we go
-    count = 0
-    for root, dir_names, file_names in os.walk(dir_path):
-        if random_order:
-            shuffle(dir_names)
-            shuffle(file_names)
-        for file_name in fnmatch.filter(file_names, '*.xml'):
-            path = os.path.join(root, file_name).replace('\\', '/')
-            # grab the fallback text from the path if it's there
-            court_fallback = ''
-            if court_fallback_regex:
-                matches = re.compile(court_fallback_regex).findall(path)
-                if matches:
-                    court_fallback = matches[0]
-            yield parse_file(path, court_fallback=court_fallback)
-            # status update
-            count += 1
-            if count % status_interval == 0:
-                print "Parsed %s out of %s." % (count, total)
-            if count == limit:
-                return
 
 
 def parse_file(file_path, court_fallback=''):
@@ -101,9 +52,6 @@ def parse_file(file_path, court_fallback=''):
     # get dates
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates)
-    print dates
-    print info['dates']
-    print '-' * 30
     # get case names
     info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
     info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
@@ -258,7 +206,5 @@ def get_court_object(raw_court, fallback=''):
 
 
 if __name__ == '__main__':
-    for i in parse_many(r'C:\Users\Jeff\Dropbox\court-listener\data\colorado', limit=500, status_interval=1000):
-        pass
-    # parsed = parse_file("test_opinions/0b59c80d9043a003.xml")
-    # pass
+    parsed = parse_file("test_opinions/0b59c80d9043a003.xml")
+    pass
