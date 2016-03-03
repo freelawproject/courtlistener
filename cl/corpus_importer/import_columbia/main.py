@@ -14,7 +14,7 @@ if not NO_CL:
     from populate_opinions import make_and_save
 
 
-def do_many(dir_path, limit=None, random_order=True, status_interval=100, log=None):
+def do_many(dir_path, limit=None, random_order=True, status_interval=100):
     """Runs through a directory of the form /data/[state]/[sub]/.../[folders]/[.xml documents]. Parses each .xml
     document, instantiates the associated model object, and saves the object.
     Prints/logs status updates and tracebacks instead of raising exceptions.
@@ -68,4 +68,4 @@ def do_many(dir_path, limit=None, random_order=True, status_interval=100, log=No
 
 
 if __name__ == '__main__':
-    do_many(r'C:\Users\Jeff\Dropbox\court-listener\data', limit=10000, log='main.log')
+    do_many(r'C:\Users\Jeff\Dropbox\court-listener\data', limit=10000)

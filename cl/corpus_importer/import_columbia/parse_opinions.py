@@ -9,7 +9,7 @@ import dateutil.parser as dparser
 
 from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
 
-from regexes_columbia import state_pairs, special_regexes
+from regexes_columbia import STATE_PAIRS, SPECIAL_REGEXES
 from parse_judges import find_judges
 
 
@@ -185,10 +185,10 @@ def format_case_name(n):
 
 
 def get_court_object(raw_court, fallback=''):
-    """Get the court object from a string.
+    """Get the court object from a string. Searches through `STATE_PAIRS`.
 
     :param raw_court: A raw court string, parsed from an XML file.
-    :param fallback: If fail to find one, will apply the regexes associated to this key in special_regexes.
+    :param fallback: If fail to find one, will apply the regexes associated to this key in `SPECIAL_REGEXES`.
     """
     if '.' in raw_court:
         j = raw_court.find('.')
@@ -196,11 +196,11 @@ def get_court_object(raw_court, fallback=''):
     if ',' in raw_court:
         j = raw_court.find(',')
         raw_court = raw_court[:j]
-    for regex, value in state_pairs:
+    for regex, value in STATE_PAIRS:
         if re.search(regex, raw_court):
             return value
-    if fallback in special_regexes:
-        for regex, value in special_regexes:
+    if fallback in SPECIAL_REGEXES:
+        for regex, value in SPECIAL_REGEXES:
             if re.search(regex, raw_court):
                 return value
 
