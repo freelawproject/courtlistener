@@ -152,6 +152,7 @@ class TestViews(TestCase):
         self.client.login(username='user', password='password')
         response = self.client.get(reverse('viz_gallery'))
         html = response.content.decode('utf-8')
+        html = ' '.join(html.split())
         self.assertIn('Shared by Admin', html)
         self.assertIn('FREE KESHA', html)
 
