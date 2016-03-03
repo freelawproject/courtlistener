@@ -35,7 +35,7 @@ class Citation(object):
     def __init__(self, reporter, page, volume, canonical_reporter=None,
                  lookup_index=None, extra=None, defendant=None, plaintiff=None,
                  court=None, year=None, match_url=None, match_id=None,
-                 reporter_found=None):
+                 reporter_found=None, reporter_index=None):
 
         # Core data.
         self.reporter = reporter
@@ -54,9 +54,13 @@ class Citation(object):
         self.year = year
 
         # The reporter found in the text is often different from the reporter
-        # once it's normalized. We need to keep that value so we can linkify it
-        # with a regex.
+        # once it's normalized. We need to keep the original value so we can
+        # linkify it with a regex.
         self.reporter_found = reporter_found
+
+        # The location of the reporter is useful for tasks like finding parallel
+        # citations, and finding supplementary info like defendants and years.
+        self.reporter_index = reporter_index
 
         # Attributes of the matching item, for URL generation.
         self.match_url = match_url
@@ -202,7 +206,7 @@ def get_year(token):
     return year
 
 
-def add_post_citation(citation, words, reporter_index):
+def add_post_citation(citation, words):
     """Add to a citation object any additional information found after the base
     citation, including court, year, and possibly page range.
 
@@ -216,8 +220,9 @@ def add_post_citation(citation, words, reporter_index):
     # Start looking 2 tokens after the reporter (1 after page), and go to
     # either the end of the words list or to FORWARD_SEEK tokens from where you
     # started.
-    for start in xrange(reporter_index + 2,
-                        min((reporter_index + FORWARD_SEEK), len(words))):
+    for start in xrange(
+            citation.reporter_index + 2,
+            min((citation.reporter_index + FORWARD_SEEK), len(words))):
         if words[start].startswith('('):
             # Get the year by looking for a token that ends in a paren.
             for end in xrange(start, start + FORWARD_SEEK):
@@ -235,21 +240,23 @@ def add_post_citation(citation, words, reporter_index):
                     citation.court = get_court_by_paren(u' '.join(words[start:end + 1]), citation)
                     break
 
-            if start > reporter_index + 2:
+            if start > citation.reporter_index + 2:
                 # Then there's content between page and (), starting with a
                 # comma, which we skip
-                citation.extra = u' '.join(words[reporter_index + 2:start])
+                citation.extra = u' '.join(
+                        words[citation.reporter_index + 2:start])
             break
 
 
-def add_defendant(citation, words, reporter_index):
+def add_defendant(citation, words):
     """Scan backwards from 2 tokens before reporter until you find v., in re,
     etc. If no known stop-token is found, no defendant name is stored.  In the
     future, this could be improved.
     """
     start_index = None
-    for index in xrange(reporter_index - 1,
-                        max(reporter_index - BACKWARD_SEEK, 0), -1):
+    for index in xrange(
+            citation.reporter_index - 1,
+            max(citation.reporter_index - BACKWARD_SEEK, 0), -1):
         word = words[index]
         if word == ',':
             # Skip it
@@ -263,7 +270,8 @@ def add_defendant(citation, words, reporter_index):
             # String citation
             break
     if start_index:
-        citation.defendant = u' '.join(words[start_index:reporter_index - 1])
+        citation.defendant = u' '.join(
+                words[start_index:citation.reporter_index - 1])
 
 
 def extract_base_citation(words, reporter_index):
@@ -288,7 +296,8 @@ def extract_base_citation(words, reporter_index):
         # No page, therefore not a valid citation
         return None
 
-    return Citation(reporter, page, volume, reporter_found=reporter)
+    return Citation(reporter, page, volume, reporter_found=reporter,
+                    reporter_index=reporter_index)
 
 
 def is_date_in_reporter(editions, year):
@@ -437,9 +446,9 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
                 # Not a valid citation; continue looking
                 continue
             if do_post_citation:
-                add_post_citation(citation, words, i)
+                add_post_citation(citation, words)
             if do_defendant:
-                add_defendant(citation, words, i)
+                add_defendant(citation, words)
             citations.append(citation)
 
     # Disambiguate or drop all the reporters
