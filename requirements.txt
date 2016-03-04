@@ -51,3 +51,4 @@ six==1.9.0
 sqlparse==0.1.15
 stripe==1.22.3
 wsgiref==0.1.2
+beautifulsoup4==4.4.1

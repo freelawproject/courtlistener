@@ -130,11 +130,13 @@ class Docket(models.Model):
         'judges.Judge',
         help_text="The judge the case was assigned to.",
         null=True,
+        related_name='assigning'
     )
     referred_to = models.ForeignKey(
         'judges.Judge',
         help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
         null=True,
+        related_name='referring'
     )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
@@ -186,22 +188,26 @@ class Docket(models.Model):
         help_text="The cause for the case.",
         max_length=200,
         blank=True,
+        null=True,
     )
     nature_of_suit = models.CharField(
         help_text="The nature of suit code from PACER.",
         max_length=100,
         blank=True,
+        null=True,
     )
     jury_demand = models.CharField(
         help_text="The compensation demand.",
         max_length=500,
         blank=True,
+        null=True,
     )
     jurisdiction_type = models.CharField(
         help_text="Stands for jurisdiction in RECAP XML docket. For example, "
                   "'Diversity', 'U.S. Government Defendant'.",
         max_length=100,
         blank=True,
+        null=True,
     )
     filepath_local = models.FileField(
         help_text="Path to RECAP’s Docket XML page.",
@@ -220,7 +226,6 @@ class Docket(models.Model):
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
         choices=SOURCE_CHOICES,
-        default=DEFAULT
     )
 
     class Meta:
