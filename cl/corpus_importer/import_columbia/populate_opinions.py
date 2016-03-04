@@ -85,7 +85,15 @@ def make_and_save(item):
     panel = [find_person(n, item['court_id'], date_argued or date_filed) for n in item['panel']]
     panel = [x for x in panel if x is not None]
     # get citations in the form of, e.g. {'federal_cite_one': '1 U.S. 1', ...}
-    all_citations = map_citations_to_models([get_citations(c)[0] for c in item['citations']])
+    found_citations = []
+    for c in item['citations']:
+        found = get_citations(c)
+        if not found:
+            raise Exception("Failed to get a citation from the string '%s'." % c)
+        elif len(found) > 1:
+            raise Exception("Got multiple citations from string '%s' when there should have been one." % c)
+        found_citations.append(found[0])
+    citations_map = map_citations_to_models(found_citations)
 
     cluster = OpinionCluster(
         docket=docket
@@ -98,7 +106,7 @@ def make_and_save(item):
         ,source='Z'
         ,attorneys=item['attorneys']
         ,posture=item['posture']
-        ,**all_citations
+        ,**citations_map
     )
     cluster.save()
 
