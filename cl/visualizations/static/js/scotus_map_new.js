@@ -161,14 +161,14 @@ $(document).ready(function () {
                     .text("(" + cache[suggestion.id].citing_count + ")");
                 $('input[disabled="disabled"]').prop('disabled', false);
             });
-            $('#id_cluster_start').val(suggestion.id);
+            $('#id_cluster_start').val(suggestion.cluster_id);
             $('.first-selection')
                 .text(suggestion.caseNameShort || suggestion.caseName);
         });
     $('.ending-typeahead').bind(
         'typeahead:select',
         function (ev, suggestion) {
-            $('#id_cluster_end').val(suggestion.id);
+            $('#id_cluster_end').val(suggestion.cluster_id);
         });
     $('a[data-toggle="tab"]').on('show.bs.tab', function (e) {
         $('.ending-typeahead').typeahead('val', "");
