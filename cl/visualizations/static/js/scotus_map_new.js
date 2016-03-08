@@ -6,7 +6,7 @@ $(document).ready(function () {
             method: 'GET',
             url: "/api/rest/v3/search/",
             data: {
-                q: "id:" + id,
+                q: "cluster_id:" + id,
                 format: 'json'
             },
             success: function (data) {
