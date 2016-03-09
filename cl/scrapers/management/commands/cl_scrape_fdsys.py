@@ -109,8 +109,6 @@ class Command(BaseCommand):
 
     def scrape_mods_file(self, fdsys, index, full_crawl=True):
         download_error = False
-        # Get the court object early for logging
-        # opinions.united_states.federal.ca9_u --> ca9
         mods_data = fdsys[index]
         court_str = mods_data.court_id
         court = Court.objects.get(pk=court_str)
@@ -118,77 +116,61 @@ class Command(BaseCommand):
         dup_checker = DupChecker(court, full_crawl=full_crawl)
         abort = dup_checker.abort_by_url_hash(mods_data.url, mods_data.hash)
         if not abort:
-            # todo this isn't done
-            for i, item in enumerate(mods_data):
-                msg, r = get_binary_content(
-                    item['download_urls'],
-                    mods_data.cookies,
-                    mods_data._get_adapter_instance(),
-                    method=mods_data.method
-                )
-                if msg:
-                    logging.warn(msg)
-                    ErrorLog(log_level='WARNING',
-                             court=court,
-                             message=msg).save()
-                    continue
+            msg, r = get_binary_content(
+                mods_data.download_url,
+                mods_data.cookies,
+                mods_data._get_adapter_instance(),
+                method=mods_data.method
+            )
+            if msg:
+                logging.warn(msg)
+                ErrorLog(log_level='WARNING',
+                         court=court,
+                         message=msg).save()
+            else:
+                sha1_hash = hashlib.sha1(r.content).hexdigest()
 
-                content = mods_data.cleanup_content(r.content)
+                lookup_params = {
+                    'lookup_value': sha1_hash,
+                    'lookup_by': 'sha1'
+                }
 
-                current_date = item['case_dates']
-                try:
-                    next_date = mods_data[i + 1]['case_dates']
-                except IndexError:
-                    next_date = None
-
-                sha1_hash = hashlib.sha1(content).hexdigest()
-                if court_str == 'nev' and \
-                                item['precedential_statuses'] == 'Unpublished':
-                    # Nevada's non-precedential cases have different SHA1
-                    # sums every time.
-                    lookup_params = {'lookup_value': item['download_urls'],
-                                     'lookup_by': 'download_url'}
-                else:
-                    lookup_params = {'lookup_value': sha1_hash,
-                                     'lookup_by': 'sha1'}
-
-                onwards = dup_checker.press_on(Opinion, current_date, next_date,
-                                               **lookup_params)
+                onwards = dup_checker.press_on(Opinion, None, None, **lookup_params)
                 if onwards:
                     # Not a duplicate, carry on
                     logging.info('Adding new document found at: %s' %
-                                item['download_urls'].encode('utf-8'))
+                                mods_data.download_url.encode('utf-8'))
                     dup_checker.reset()
 
                     docket, opinion, cluster, error = self.make_objects(
-                        item, court, sha1_hash, content
+                        mods_data, court, sha1_hash, r.content
                     )
 
                     if error:
                         download_error = True
-                        continue
+                    else:
 
-                    self.save_everything(
-                        items={
-                            'docket': docket,
-                            'opinion': opinion,
-                            'cluster': cluster
-                        },
-                        index=False
-                    )
-                    extract_doc_content.delay(
-                        opinion.pk,
-                        callback=subtask(extract_by_ocr),
-                        citation_countdown=random.randint(0, 3600)
-                    )
+                        self.save_everything(
+                            items={
+                                'docket': docket,
+                                'opinion': opinion,
+                                'cluster': cluster
+                            },
+                            index=False
+                        )
+                        extract_doc_content.delay(
+                            opinion.pk,
+                            callback=subtask(extract_by_ocr),
+                            citation_countdown=random.randint(0, 3600)
+                        )
 
-                    logging.info("Successfully added doc {pk}: {name}".format(
-                        pk=opinion.pk,
-                        name=item['case_names'].encode('utf-8'),
-                    ))
+                        logging.info("Successfully added doc {pk}: {name}".format(
+                            pk=opinion.pk,
+                            name=mods_data.case_name.encode('utf-8'),
+                        ))
 
-            # Update the hash if everything finishes properly.
-            logging.info("%s: Successfully crawled opinions." % mods_data.court_id)
+                    # Update the hash if everything finishes properly.
+                    logging.info("%s: Successfully crawled opinions." % mods_data.court_id)
             if not download_error:
                 # Only update the hash if no errors occurred.
                 dup_checker.update_site_hash(mods_data.hash)
@@ -197,7 +179,13 @@ class Command(BaseCommand):
         """Takes the meta data from the scraper and associates it with objects.
 
         Returns the created objects.
+        :param content: str with html page
+        :param sha1_hash: str with sha1_hash
+        :param court: Court:
+        :param item: juriscraper.fdsys.FDSysSite.FDSysModsContent
         """
+        # todo this isn't done
+
         blocked = item['blocked_statuses']
         if blocked is not None:
             date_blocked = date.today()
@@ -266,4 +254,3 @@ class Command(BaseCommand):
             item_type='o',
             item_pk=opinion.pk,
         )
-
