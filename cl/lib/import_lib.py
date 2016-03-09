@@ -36,8 +36,9 @@ def map_citations_to_models(citations):
 
     cite_mapping = {}
     for citation in citations:
-        cite_type = REPORTERS[citation.canonical_reporter][
-            citation.lookup_index]['cite_type']
+        cite_type = (REPORTERS[citation.canonical_reporter]
+                     [citation.lookup_index]
+                     ['cite_type'])
         if cite_type in ['federal', 'state', 'specialty']:
             cite_mapping = add_mapping(cite_mapping, cite_type,
                                        citation.base_citation())
