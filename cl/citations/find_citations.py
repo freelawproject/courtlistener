@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # encoding: utf-8
-
+import functools
 import re
 import sys
+
+import operator
 from juriscraper.lib.html_utils import get_visible_text
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 from django.utils.timezone import now
@@ -113,6 +115,24 @@ class Citation(object):
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        """Used to test equality in dicts.
+
+        Overridden here to simplify away some of the attributes that can differ
+        for the same citation.
+        """
+        equality_attributes = [
+            'reporter', 'volume', 'page', 'canonical_reporter', 'lookup_index',
+            'court', 'year',
+        ]
+        return functools.reduce(
+            operator.xor,
+            [hash(getattr(self, attr, None)) for attr in equality_attributes]
+        )
 
 
 # Adapted from nltk Penn Treebank tokenizer
@@ -281,21 +301,21 @@ def extract_base_citation(words, reporter_index):
     after for volume and page number.  If found, construct and return a
     Citation object.
     """
-    reporter = words[reporter_index]
-    if words[reporter_index - 1].isdigit():
-        volume = int(words[reporter_index - 1])
+    volume = strip_punct(words[reporter_index - 1])
+    if volume.isdigit():
+        volume = int(volume)
     else:
         # No volume, therefore not a valid citation
         return None
-    page_str = words[reporter_index + 1]
-    # Strip off ending comma, which occurs when there is a page range next
-    page_str = page_str.strip(',')
-    if page_str.isdigit():
-        page = int(page_str)
+
+    page = strip_punct(words[reporter_index + 1])
+    if page.isdigit():
+        page = int(page)
     else:
         # No page, therefore not a valid citation
         return None
 
+    reporter = words[reporter_index]
     return Citation(reporter, page, volume, reporter_found=reporter,
                     reporter_index=reporter_index)
 
