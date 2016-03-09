@@ -140,70 +140,90 @@ class Command(BaseCommand):
         cite_type = (REPORTERS[citation.canonical_reporter]
                      [citation.lookup_index]
                      ['cite_type'])
+        self.stdout.write("    Citation type is: %s\n" % cite_type)
+        cite_attr = None
         if cite_type in ['federal', 'state', 'specialty']:
-            # Try adding it up to three times.
             for number in ['one', 'two', 'three']:
                 cite_attr = '%s_cite_%s' % (cite_type, number)
                 if not getattr(cluster, cite_attr):
-                    setattr(cluster, cite_attr, citation.base_citation())
-        elif cite_type == 'state_regional':
-            if not getattr(cluster, 'state_cite_regional'):
-                setattr(cluster, 'state_cite_regional', citation.base_citation())
-        elif cite_type == 'scotus_early':
-            if not getattr(cluster, 'scotus_early_cite'):
-                setattr(cluster, 'scotus_early_cite', citation.base_citation())
-        elif cite_type == 'specialty_lexis':
-            if not getattr(cluster, 'lexis_cite'):
-                setattr(cluster, 'lexis_cite', citation.base_citation())
-        elif cite_type == 'specialty_west':
-            if not getattr(cluster, 'westlaw_cite'):
-                setattr(cluster, 'westlaw_cite', citation.base_citation())
-        elif cite_type == 'neutral':
-            if not getattr(cluster, 'neutral_cite'):
-                setattr(cluster, 'neutral_cite', citation.base_citation())
+                    break
+        else:
+            if cite_type == 'state_regional':
+                cite_attr = 'state_cite_regional'
+            elif cite_type == 'scotus_early':
+                cite_attr = 'scotus_early_cite'
+            elif cite_type == 'specialty_lexis':
+                cite_attr = 'lexis_cite'
+            elif cite_type == 'specialty_west':
+                cite_attr = 'westlaw_cite'
+            elif cite_type == 'neutral':
+                cite_attr = 'neutral_cite'
+
+        has_empty_field = not getattr(cluster, cite_attr)
+        if cite_attr is not None and has_empty_field:
+            setattr(cluster, cite_attr, citation.base_citation())
+            self.stdout.write("    Set %s attribute of cluster.\n" % cite_attr)
+        else:
+            self.stdout.write("    Unable to find empty space for citation.\n")
 
     def handle_edge(self, node, neighbor, data, options):
         """Add an edge to the database if it's significant."""
+        self.stdout.write("Processing edge from %s to %s with weight %s:\n" % (
+            node.base_citation(), neighbor.base_citation(), data['weight'],
+        ))
+
         if data['weight'] > EDGE_RELEVANCE_THRESHOLD:
             # Look up both citations.
             node_results = self.match_on_citation(node)
             neighbor_results = self.match_on_citation(neighbor)
+            cluster = None
 
             # If neither returns a result, do nothing.
             if not node_results and not neighbor_results:
+                self.stdout.write("  Got no results for either citation. Pass.\n")
                 return
 
             # If both citations load results, do nothing. In this case, the
             # results could be the same or they could be different. Either way,
             # we don't want to deal with them.
-            if node_results and neighbor_results:
+            elif node_results and neighbor_results:
+                self.stdout.write("  Got results for both citations. Pass.\n")
                 return
 
             # If one citation loads something and the other doesn't, we're in
             # business.
-            if len(node_results) == 1 or len(neighbor_results) == 1:
-                if node_results:
-                    # Update using the citation from neighbor
-                    cluster = OpinionCluster.objects.get(
-                        pk=node_results[0].cluster_id
-                    )
-                    self.add_citation_to_cluster(
-                        neighbor,
-                        cluster,
-                    )
+            elif len(node_results) == 1 and len(neighbor_results) == 0:
+                self.stdout.write(
+                    "  Got 1 result for %s and 0 for %s. Attempting to update "
+                    "cluster.\n" % (node.base_citation(),
+                                    neighbor.base_citation())
+                )
+                cluster = OpinionCluster.objects.get(
+                    pk=node_results[0].cluster_id
+                )
+                self.add_citation_to_cluster(
+                    citation=neighbor,
+                    cluster=cluster,
+                )
 
-                elif neighbor_results:
-                    # Update using the citation from node
-                    cluster = OpinionCluster.objects.get(
-                        pk=neighbor_results[0].cluster_id
-                    )
-                    self.add_citation_to_cluster(
-                        node,
-                        cluster,
-                    )
+            elif len(neighbor_results) == 1 and len(node_results) == 0:
+                self.stdout.write(
+                    "  Got 1 result for %s and 0 for %s. Attempting to update "
+                    "cluster.\n" % (neighbor.base_citation(),
+                                    node.base_citation())
+                )
+                cluster = OpinionCluster.objects.get(
+                    pk=neighbor_results[0].cluster_id
+                )
+                self.add_citation_to_cluster(
+                    citation=node,
+                    cluster=cluster,
+                )
 
-            if options['update_database']:
+            if options['update_database'] and cluster is not None:
                 cluster.save()
+        else:
+            self.stdout.write("  Weight too low. Pass.\n")
 
     def add_groups_to_network(self, citation_groups):
         """Add the citation groups from an opinion to the global network
@@ -274,18 +294,9 @@ class Command(BaseCommand):
             self.add_groups_to_network(citation_groups)
             completed += 1
             sys.stdout.write("\r  Completed %s of %s." % (completed, count))
-        sys.stdout.write("\n")
-        pprint.pprint([node.base_citation() for node in self.g.nodes()])
-        print
-        for node, neighbor, data in self.g.edges(data=True):
-            print "Weight: %s" % data
-            print u"  %s\t%s" % (node.base_citation(), str(node).decode('utf-8'))
-            print u"  %s\t%s" % (neighbor.base_citation(), str(neighbor).decode('utf-8'))
-
-        sys.stdout.write("Entering phase two: Saving the best edges to the "
+        sys.stdout.write("\nEntering phase two: Saving the best edges to the "
                          "database.\n")
         for node, neighbor, data in self.g.edges(data=True):
             self.handle_edge(node, neighbor, data, options)
-
 
         self.do_solr(options)
