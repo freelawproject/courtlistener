@@ -1,10 +1,11 @@
 # coding=utf-8
-import pprint
 import sys
 
 import networkx as nx
 from django.conf import settings
 from django.core.management import BaseCommand, call_command, CommandError
+from django.db.models import Q
+from django.template.defaultfilters import filesizeformat
 from reporters_db import REPORTERS
 
 from cl.citations.match_citations import get_years_from_reporter, \
@@ -21,7 +22,7 @@ PARALLEL_DISTANCE = 5
 
 # Parallel citations need to be identified this many times before they should be
 # added to the database.
-EDGE_RELEVANCE_THRESHOLD = 5
+EDGE_RELEVANCE_THRESHOLD = 10
 
 
 def identify_parallel_citations(citations):
@@ -117,7 +118,7 @@ class Command(BaseCommand):
         }
 
         if citation.year:
-            start_year, end_year = citation.year
+            start_year = end_year = citation.year
         else:
             start_year, end_year = get_years_from_reporter(citation)
         main_params['fq'].append(
@@ -166,13 +167,47 @@ class Command(BaseCommand):
         else:
             self.stdout.write("    Unable to find empty space for citation.\n")
 
+    def _update_citation_object(self, left, right, results):
+        self.stdout.write(
+            "  Got 1 result for %s and 0 for %s. Attempting to update "
+            "cluster.\n" % (left.base_citation(),
+                            right.base_citation())
+        )
+
+        # Make sure that we don't get an item that already has the
+        # citation. This is just a safety check.
+        q = Q()
+        lookup_fields = OpinionCluster().citation_fields
+        for lookup_field in lookup_fields:
+            q |= Q(**{lookup_field: right.base_citation()})
+
+        clusters = OpinionCluster.objects.filter(
+            pk=results[0]['cluster_id']
+        ).exclude(q)
+        if clusters:
+            cluster = clusters[0]
+            self.add_citation_to_cluster(
+                citation=right,
+                cluster=cluster,
+            )
+        else:
+            self.stdout.write(
+                "    Unable to find cluster with ID %s and without "
+                "citation %s" % (
+                    results[0]['cluster_id'],
+                    right.base_citation(),
+                ))
+            cluster = None
+
+        return cluster
+
     def handle_edge(self, node, neighbor, data, options):
         """Add an edge to the database if it's significant."""
         self.stdout.write("Processing edge from %s to %s with weight %s:\n" % (
             node.base_citation(), neighbor.base_citation(), data['weight'],
         ))
 
-        if data['weight'] > EDGE_RELEVANCE_THRESHOLD:
+        if data['weight'] >= EDGE_RELEVANCE_THRESHOLD:
             # Look up both citations.
             node_results = self.match_on_citation(node)
             neighbor_results = self.match_on_citation(neighbor)
@@ -193,31 +228,16 @@ class Command(BaseCommand):
             # If one citation loads something and the other doesn't, we're in
             # business.
             elif len(node_results) == 1 and len(neighbor_results) == 0:
-                self.stdout.write(
-                    "  Got 1 result for %s and 0 for %s. Attempting to update "
-                    "cluster.\n" % (node.base_citation(),
-                                    neighbor.base_citation())
+                cluster = self._update_citation_object(
+                    left=node,
+                    right=neighbor,
+                    results=node_results,
                 )
-                cluster = OpinionCluster.objects.get(
-                    pk=node_results[0].cluster_id
-                )
-                self.add_citation_to_cluster(
-                    citation=neighbor,
-                    cluster=cluster,
-                )
-
             elif len(neighbor_results) == 1 and len(node_results) == 0:
-                self.stdout.write(
-                    "  Got 1 result for %s and 0 for %s. Attempting to update "
-                    "cluster.\n" % (neighbor.base_citation(),
-                                    node.base_citation())
-                )
-                cluster = OpinionCluster.objects.get(
-                    pk=neighbor_results[0].cluster_id
-                )
-                self.add_citation_to_cluster(
-                    citation=node,
-                    cluster=cluster,
+                cluster = self._update_citation_object(
+                    left=neighbor,
+                    right=node,
+                    results=neighbor_results,
                 )
 
             if options['update_database'] and cluster is not None:
@@ -232,8 +252,6 @@ class Command(BaseCommand):
         for group in citation_groups:
             edge_list = make_edge_list(group)
             for edge in edge_list:
-                # Strip extraneous attributes so that nx equality works.
-                edge = [c.strip_attributes() for c in edge]
                 if self.g.has_edge(*edge):
                     # Increment the weight of the edge.
                     self.g[edge[0]][edge[1]]['weight'] += 1
@@ -278,6 +296,11 @@ class Command(BaseCommand):
         if no_option:
             raise CommandError("Please specify if you want all items or a "
                                "specific item.")
+        if not options['update_database']:
+            self.stdout.write(
+                "--update_database is not set. No changes will be made to the "
+                "database."
+            )
 
         sys.stdout.write("Entering phase one: Building a network object of all "
                          "citations.\n")
@@ -293,7 +316,11 @@ class Command(BaseCommand):
             citation_groups = identify_parallel_citations(citations)
             self.add_groups_to_network(citation_groups)
             completed += 1
-            sys.stdout.write("\r  Completed %s of %s." % (completed, count))
+            sys.stdout.write("\r  Completed %s of %s. Network is %s." % (
+                completed,
+                count,
+                filesizeformat(sys.getsizeof(self.g)),
+            ))
         sys.stdout.write("\nEntering phase two: Saving the best edges to the "
                          "database.\n")
         for node, neighbor, data in self.g.edges(data=True):

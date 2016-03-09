@@ -4,7 +4,7 @@ from reporters_db import REPORTERS
 from cl.citations.find_citations import get_citations, is_date_in_reporter, \
     Citation
 from cl.citations.management.commands.cl_add_parallel_citations import \
-    identify_parallel_citations, make_edge_list, monkey_patch_citations
+    identify_parallel_citations, make_edge_list
 from cl.citations.reporter_tokenizer import tokenize
 from cl.citations.tasks import update_document, create_cited_html
 from cl.lib.test_helpers import IndexedSolrTestCase
@@ -430,21 +430,14 @@ class ParallelCitationTest(SimpleTestCase):
                 a,
             )
 
-    def test_monkey_patching(self):
-        """Can we make the regular equality operator do near duping?"""
+    def test_hash(self):
+        """Do two citation objects hash to the same?"""
         citations = [
             Citation(reporter=2, volume="U.S.", page="2", reporter_index=1),
             Citation(reporter=2, volume="U.S.", page="2", reporter_index=2),
         ]
-        # Before monkey patching, they differ
-        self.assertNotEqual(
-            citations[0],
-            citations[1],
+        self.assertEqual(
+            hash(citations[0]),
+            hash(citations[1]),
         )
 
-        # After patching, they're the same!
-        monkey_patch_citations()
-        self.assertEqual(
-            citations[0],
-            citations[1],
-        )
