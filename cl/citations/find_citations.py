@@ -137,7 +137,7 @@ class Citation(object):
 
     def fuzzy_eq(self, other):
         """Used to override the __eq__ function."""
-        return self.nearly_hash() == other.nearly_hash()
+        return self.fuzzy_hash() == other.fuzzy_hash()
 
 
 # Adapted from nltk Penn Treebank tokenizer
