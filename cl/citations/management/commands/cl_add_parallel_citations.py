@@ -76,8 +76,8 @@ class Command(BaseCommand):
         )
 
     def monkey_patch_citation(self):
-        Citation.__eq__ = Citation.nearly_eq
-        Citation.__hash = Citation.nearly_hash
+        Citation.__eq__ = Citation.fuzzy_eq
+        Citation.__hash__ = Citation.fuzzy_hash
 
     def match_on_citation(self, citation):
         """Attempt to identify the item referred to by the citation."""

@@ -123,7 +123,7 @@ class Citation(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def nearly_hash(self):
+    def fuzzy_hash(self):
         """Used to test equality in dicts.
 
         Overridden here to simplify away some of the attributes that can differ
@@ -135,7 +135,7 @@ class Citation(object):
                  self.equality_attributes]
         )
 
-    def nearly_eq(self, other):
+    def fuzzy_eq(self, other):
         """Used to override the __eq__ function."""
         return self.nearly_hash() == other.nearly_hash()
 
