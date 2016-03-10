@@ -7,7 +7,7 @@ from celery import task
 # This is the distance two reporter abbreviations can be from each other if they
 # are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
 # would have a distance of 4.
-PARALLEL_DISTANCE = 5
+PARALLEL_DISTANCE = 4
 
 @task
 def identify_parallel_citations(citations):
@@ -39,6 +39,7 @@ def identify_parallel_citations(citations):
     return parallel_citations
 
 
+@task
 def get_document_citations(opinion):
     """Identify and return citations from the html or plain text of the
     opinion.

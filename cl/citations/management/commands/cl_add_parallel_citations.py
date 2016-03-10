@@ -2,7 +2,7 @@
 import sys
 
 import networkx as nx
-from celery.task import TaskSet
+from celery import group
 from django.conf import settings
 from django.core.management import BaseCommand, call_command, CommandError
 from django.db.models import Q
@@ -18,7 +18,7 @@ from cl.search.models import Opinion, OpinionCluster
 
 # Parallel citations need to be identified this many times before they should be
 # added to the database.
-EDGE_RELEVANCE_THRESHOLD = 10
+EDGE_RELEVANCE_THRESHOLD = 20
 
 
 def make_edge_list(group):
@@ -210,7 +210,8 @@ class Command(BaseCommand):
             if options['update_database'] and cluster is not None:
                 cluster.save()
         else:
-            self.stdout.write("  Weight too low. Pass.\n")
+            self.stdout.write("  Weight of %s too low. Pass.\n" %
+                              data['weight'])
 
     def add_groups_to_network(self, citation_groups):
         """Add the citation groups from an opinion to the global network
@@ -280,12 +281,14 @@ class Command(BaseCommand):
         completed = 0
         subtasks = []
         for o in opinions:
-            subtasks.append(identify_parallel_citations.subtask(
-                (get_document_citations(o),)
-            ))
+            subtasks.append(
+                # This will call the second function with the results from the
+                # first.
+                get_document_citations.s(o) | identify_parallel_citations.s()
+            )
             last_item = (count == completed + 1)
-            if (completed % 5000 == 0) or last_item:
-                job = TaskSet(tasks=subtasks)
+            if (completed % 50 == 0) or last_item:
+                job = group(subtasks)
                 result = job.apply_async().join()
                 [self.add_groups_to_network(citation_groups) for
                  citation_groups in result]
