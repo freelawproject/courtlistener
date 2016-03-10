@@ -8,6 +8,7 @@ from django.core.management import BaseCommand, call_command, CommandError
 from django.db.models import Q
 from reporters_db import REPORTERS
 
+from cl.citations.find_citations import Citation
 from cl.citations.match_citations import get_years_from_reporter, \
     build_date_range
 from cl.citations.tasks import get_document_citations, \
@@ -73,6 +74,10 @@ class Command(BaseCommand):
             nargs='*',
             help='ids of citing opinions',
         )
+
+    def monkey_patch_citation(self):
+        Citation.__eq__ = Citation.nearly_eq
+        Citation.__hash = Citation.nearly_hash
 
     def match_on_citation(self, citation):
         """Attempt to identify the item referred to by the citation."""
@@ -270,6 +275,9 @@ class Command(BaseCommand):
                 "database."
             )
 
+        # Update Citation object to consider similar objects equal.
+        self.monkey_patch_citation()
+
         sys.stdout.write("Entering phase one: Building a network object of all "
                          "citations.\n")
         q = Opinion.objects.all()
@@ -306,7 +314,6 @@ class Command(BaseCommand):
                 edge_count,
             ))
             sys.stdout.flush()
-
 
         sys.stdout.write("\n\nEntering phase two: Saving the best edges to the "
                          "database.\n")

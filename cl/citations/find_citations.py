@@ -68,6 +68,10 @@ class Citation(object):
         self.match_url = match_url
         self.match_id = match_id
 
+        self.equality_attributes = [
+            'reporter', 'volume', 'page', 'canonical_reporter', 'lookup_index',
+        ]
+
     def base_citation(self):
         return u"%d %s %d" % (self.volume, self.reporter, self.page)
 
@@ -119,20 +123,21 @@ class Citation(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def __hash__(self):
+    def nearly_hash(self):
         """Used to test equality in dicts.
 
         Overridden here to simplify away some of the attributes that can differ
         for the same citation.
         """
-        equality_attributes = [
-            'reporter', 'volume', 'page', 'canonical_reporter', 'lookup_index',
-            'court', 'year',
-        ]
         return functools.reduce(
-            operator.xor,
-            [hash(getattr(self, attr, None)) for attr in equality_attributes]
+                operator.xor,
+                [hash(getattr(self, attr, None)) for attr in
+                 self.equality_attributes]
         )
+
+    def nearly_eq(self, other):
+        """Used to override the __eq__ function."""
+        return self.nearly_hash() == other.nearly_hash()
 
 
 # Adapted from nltk Penn Treebank tokenizer
