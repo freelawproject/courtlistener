@@ -278,7 +278,7 @@ class Command(BaseCommand):
         count = q.count()
         opinions = queryset_generator(q, chunksize=10000)
 
-        completed = 0
+        node_count = edge_count = completed = 0
         subtasks = []
         for o in opinions:
             subtasks.append(
@@ -295,11 +295,18 @@ class Command(BaseCommand):
                 subtasks = []
 
             completed += 1
-            sys.stdout.write("\r  Completed %s of %s." % (
+            if completed % 250 == 0 or last_item:
+                # Only do this once in a while.
+                node_count = len(self.g.nodes())
+                edge_count = len(self.g.edges())
+            sys.stdout.write("\r  Completed %s of %s. (%s nodes, %s edges)" % (
                 completed,
                 count,
+                node_count,
+                edge_count,
             ))
             sys.stdout.flush()
+
 
         sys.stdout.write("\n\nEntering phase two: Saving the best edges to the "
                          "database.\n")
