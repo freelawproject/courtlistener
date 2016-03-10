@@ -1,7 +1,42 @@
 import re
+
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited
 from celery import task
+
+# This is the distance two reporter abbreviations can be from each other if they
+# are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
+# would have a distance of 4.
+PARALLEL_DISTANCE = 5
+
+@task
+def identify_parallel_citations(citations):
+    """Work through a list of citations and identify ones that are physically
+    near each other in the document.
+
+    Return a list of tuples. Each tuple represents a series of parallel
+    citations. These will usually be length two, but not necessarily.
+    """
+    if len(citations) == 0:
+        return citations
+    citation_indexes = [c.reporter_index for c in citations]
+    parallel_citation = [citations[0]]
+    parallel_citations = []
+    for i, reporter_index in enumerate(citation_indexes[:-1]):
+        if reporter_index + PARALLEL_DISTANCE > citation_indexes[i + 1]:
+            # The present item is within a reasonable distance from the next
+            # item. It's a parallel citation.
+            parallel_citation.append(citations[i + 1])
+        else:
+            # Not close enough. Append what we've got and start a new list.
+            if len(parallel_citation) > 1:
+                parallel_citations.append(parallel_citation)
+            parallel_citation = [citations[i + 1]]
+
+    # In case the last item had a citation.
+    if len(parallel_citation) > 1:
+        parallel_citations.append(parallel_citation)
+    return parallel_citations
 
 
 def get_document_citations(opinion):

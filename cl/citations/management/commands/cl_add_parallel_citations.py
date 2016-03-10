@@ -2,56 +2,23 @@
 import sys
 
 import networkx as nx
+from celery.task import TaskSet
 from django.conf import settings
 from django.core.management import BaseCommand, call_command, CommandError
 from django.db.models import Q
-from django.template.defaultfilters import filesizeformat
 from reporters_db import REPORTERS
 
 from cl.citations.match_citations import get_years_from_reporter, \
     build_date_range
-from cl.citations.tasks import get_document_citations
+from cl.citations.tasks import get_document_citations, \
+    identify_parallel_citations
 from cl.lib.db_tools import queryset_generator
 from cl.lib.sunburnt import sunburnt
 from cl.search.models import Opinion, OpinionCluster
 
-# This is the distance two reporter abbreviations can be from each other if they
-# are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
-# would have a distance of 4.
-PARALLEL_DISTANCE = 5
-
 # Parallel citations need to be identified this many times before they should be
 # added to the database.
 EDGE_RELEVANCE_THRESHOLD = 10
-
-
-def identify_parallel_citations(citations):
-    """Work through a list of citations and identify ones that are physically
-    near each other in the document.
-
-    Return a list of tuples. Each tuple represents a series of parallel
-    citations. These will usually be length two, but not necessarily.
-    """
-    if len(citations) == 0:
-        return citations
-    citation_indexes = [c.reporter_index for c in citations]
-    parallel_citation = [citations[0]]
-    parallel_citations = []
-    for i, reporter_index in enumerate(citation_indexes[:-1]):
-        if reporter_index + PARALLEL_DISTANCE > citation_indexes[i + 1]:
-            # The present item is within a reasonable distance from the next
-            # item. It's a parallel citation.
-            parallel_citation.append(citations[i + 1])
-        else:
-            # Not close enough. Append what we've got and start a new list.
-            if len(parallel_citation) > 1:
-                parallel_citations.append(parallel_citation)
-            parallel_citation = [citations[i + 1]]
-
-    # In case the last item had a citation.
-    if len(parallel_citation) > 1:
-        parallel_citations.append(parallel_citation)
-    return parallel_citations
 
 
 def make_edge_list(group):
@@ -308,20 +275,30 @@ class Command(BaseCommand):
         if options.get('doc_id'):
             q = q.filter(pk__in=options['doc_id'])
         count = q.count()
-        completed = 0
         opinions = queryset_generator(q, chunksize=10000)
 
+        completed = 0
+        subtasks = []
         for o in opinions:
-            citations = get_document_citations(o)
-            citation_groups = identify_parallel_citations(citations)
-            self.add_groups_to_network(citation_groups)
+            subtasks.append(identify_parallel_citations.subtask(
+                (get_document_citations(o),)
+            ))
+            last_item = (count == completed + 1)
+            if (completed % 5000 == 0) or last_item:
+                job = TaskSet(tasks=subtasks)
+                result = job.apply_async().join()
+                [self.add_groups_to_network(citation_groups) for
+                 citation_groups in result]
+                subtasks = []
+
             completed += 1
-            sys.stdout.write("\r  Completed %s of %s. Network is %s." % (
+            sys.stdout.write("\r  Completed %s of %s." % (
                 completed,
                 count,
-                filesizeformat(sys.getsizeof(self.g)),
             ))
-        sys.stdout.write("\nEntering phase two: Saving the best edges to the "
+            sys.stdout.flush()
+
+        sys.stdout.write("\n\nEntering phase two: Saving the best edges to the "
                          "database.\n")
         for node, neighbor, data in self.g.edges(data=True):
             self.handle_edge(node, neighbor, data, options)
