@@ -1,11 +1,11 @@
 # coding=utf-8
+import logging
 import sys
 
 import networkx as nx
 from celery import group
 from django.conf import settings
 from django.core.management import BaseCommand, call_command, CommandError
-from django.db.models import Q
 from reporters_db import REPORTERS
 
 from cl.citations.find_citations import Citation
@@ -16,6 +16,8 @@ from cl.citations.tasks import get_document_citations, \
 from cl.lib.db_tools import queryset_generator
 from cl.lib.sunburnt import sunburnt
 from cl.search.models import Opinion, OpinionCluster
+
+logger = logging.getLogger(__name__)
 
 # Parallel citations need to be identified this many times before they should be
 # added to the database.
@@ -113,7 +115,7 @@ class Command(BaseCommand):
         cite_type = (REPORTERS[citation.canonical_reporter]
                      [citation.lookup_index]
                      ['cite_type'])
-        self.stdout.write("    Citation type is: %s\n" % cite_type)
+        logger.info("    Citation type is: %s\n" % cite_type)
         cite_attr = None
         if cite_type in ['federal', 'state', 'specialty']:
             for number in ['one', 'two', 'three']:
@@ -135,14 +137,14 @@ class Command(BaseCommand):
         has_empty_field = not getattr(cluster, cite_attr)
         if cite_attr is not None and has_empty_field:
             setattr(cluster, cite_attr, citation.base_citation())
-            self.stdout.write("    Set %s attribute of cluster.\n" % cite_attr)
+            logger.info("    Set %s attribute of cluster.\n" % cite_attr)
         else:
-            self.stdout.write("    Unable to find empty space for citation.\n")
+            logger.info("    Unable to find empty space for citation.\n")
 
     def _update_cluster_with_citation(self, cluster, citation):
         """Update the cluster with the citation object."""
-        self.stdout.write("  Updating cluster %s with value %s" %
-                          (cluster.pk, citation.base_citation()()))
+        logger.info("  Updating cluster %s with value %s" %
+                    (cluster.pk, citation.base_citation()()))
 
         # Make sure we don't get an item that has the citation already.
         # Just a safety check.
@@ -192,7 +194,7 @@ class Command(BaseCommand):
                 sub_graph.remove_node(node)
 
         if len(sub_graph.nodes()) == 0:
-            self.stdout.write("  No strong edges found. Pass.\n")
+            logger.info("  No strong edges found. Pass.\n")
             return
 
         # Look up all remaining nodes in Solr, and make a (node, results) pair.
@@ -201,11 +203,11 @@ class Command(BaseCommand):
             result_sets.append((node, self.match_on_citation(node)))
 
         if sum(len(results) for node, results in result_sets) == 0:
-            self.stdout.write("  Got no results for any citation. Pass.\n")
+            logger.info("  Got no results for any citation. Pass.\n")
             return
 
         if all(len(results) > 0 for node, results in result_sets):
-            self.stdout.write("  Got results for all citations. Pass.\n")
+            logger.info("  Got results for all citations. Pass.\n")
             return
 
         # Remove any node-results pairs with more than than one result.
@@ -218,13 +220,13 @@ class Command(BaseCommand):
         # the same ID?
         if len(set([results[0]['cluster_id'] for node, results in
                     result_sets if len(results) > 0])) > 1:
-            self.stdout.write("  Got multiple IDs for the citations. Pass.\n")
+            logger.info("  Got multiple IDs for the citations. Pass.\n")
             return
 
         # Are the number of unique reporters equal to the number of results?
         if len(set([node.reporter for node, results in
                     result_sets])) != len(result_sets):
-            self.stdout.write("  Got duplicated reporter in citations. Pass.\n")
+            logger.info("  Got duplicated reporter in citations. Pass.\n")
             return
 
         # Get the cluster. By now we know all results have either 0 or 1 item.
@@ -301,7 +303,7 @@ class Command(BaseCommand):
             raise CommandError("Please specify if you want all items or a "
                                "specific item.")
         if not options['update_database']:
-            self.stdout.write(
+            logger.info(
                 "--update_database is not set. No changes will be made to the "
                 "database."
             )
