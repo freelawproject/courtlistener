@@ -80,6 +80,18 @@ class Docket(models.Model):
         auto_now=True,
         db_index=True,
     )
+    date_cert_granted = models.DateField(
+        help_text="date cert was granted for this case, if applicable",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    date_cert_denied = models.DateField(
+        help_text="the date cert was denied for this case, if applicable",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
     date_argued = models.DateField(
         help_text="the date the case was argued",
         blank=True,
@@ -255,13 +267,13 @@ class OpinionCluster(models.Model):
         related_name="clusters",
     )
     panel = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judges that heard the oral arguments",
         related_name="opinion_clusters_participating_judges",
         blank=True,
     )
     non_participating_judges = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judges that heard the case, but did not participate in "
                   "the opinion",
         related_name="opinion_clusters_non_participating_judges",
@@ -617,14 +629,14 @@ class Opinion(models.Model):
         blank=True,
     )
     author = models.ForeignKey(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The primary author of this opinion",
         related_name='opinions_written',
         blank=True,
         null=True,
     )
     joined_by = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         related_name='opinions_joined',
         help_text="Other judges that joined the primary author in this opinion",
         blank=True,

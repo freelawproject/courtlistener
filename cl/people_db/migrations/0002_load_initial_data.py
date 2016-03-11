@@ -10,22 +10,22 @@ def load_fixture(apps, schema_editor):
     # Every time tests are run, the migrations are applied, importing this data.
     # Because the standard school data has more than 6,000 items, it takes too
     # long to import, and instead we import a miniature version.
-    if 'test' in sys.argv:
+    #if 'test' in sys.argv:
         # Testing mode.
-        fixture = 'school_data_truncated'
-    else:
-        fixture = 'school_data'
-    #call_command('loaddata', fixture, app_label='judges')
+    #    fixture = 'school_data_truncated'
+    #else:
+    #    fixture = 'schools_data'
+    call_command('loaddata', 'schools_data', app_label='people_db')
 
 
 def unload_fixture(apps, schema_editor):
     """Delete everything"""
-    SchoolModel = apps.get_model("judges", "School")
+    SchoolModel = apps.get_model("people_db", "School")
     SchoolModel.objects.all().delete()
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('judges', '0002_auto_20150818_0954'),
+        ('people_db', '0001_initial'),
     ]
 
     operations = [

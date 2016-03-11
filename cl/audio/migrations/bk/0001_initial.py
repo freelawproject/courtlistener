@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('search', '0001_initial'),
-        ('people_db', '0001_initial'),
+        ('judges', '0002_auto_20150818_0954'),
     ]
 
     operations = [
