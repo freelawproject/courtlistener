@@ -179,6 +179,10 @@ class Command(BaseCommand):
             node.base_citation(), neighbor.base_citation(), data['weight'],
         ))
 
+        if node.reporter == neighbor.reporter:
+            self.stdout.write("  Same reporter in both citations. Pass.")
+            return
+
         if data['weight'] >= EDGE_RELEVANCE_THRESHOLD:
             # Look up both citations.
             node_results = self.match_on_citation(node)
@@ -225,6 +229,12 @@ class Command(BaseCommand):
         for group in citation_groups:
             edge_list = make_edge_list(group)
             for edge in edge_list:
+                if any(e for e in edge if e.reporter_found in ['Id.', 'Cr.']):
+                    # Alas, Idaho can be abbreviated as Id. This creates lots of
+                    # problems, so if made a match on "Id." we simple move on.
+                    # Ditto for Cr. (short for Cranch)
+                    return
+
                 if self.g.has_edge(*edge):
                     # Increment the weight of the edge.
                     self.g[edge[0]][edge[1]]['weight'] += 1
@@ -278,8 +288,8 @@ class Command(BaseCommand):
         # Update Citation object to consider similar objects equal.
         self.monkey_patch_citation()
 
-        sys.stdout.write("Entering phase one: Building a network object of all "
-                         "citations.\n")
+        sys.stdout.write("## Entering phase one: Building a network object of "
+                         "all citations.\n")
         q = Opinion.objects.all()
         if options.get('doc_id'):
             q = q.filter(pk__in=options['doc_id'])
@@ -315,8 +325,8 @@ class Command(BaseCommand):
             ))
             sys.stdout.flush()
 
-        sys.stdout.write("\n\nEntering phase two: Saving the best edges to the "
-                         "database.\n")
+        sys.stdout.write("\n\n## Entering phase two: Saving the best edges to "
+                         "the database.\n\n")
         for node, neighbor, data in self.g.edges(data=True):
             self.handle_edge(node, neighbor, data, options)
 
