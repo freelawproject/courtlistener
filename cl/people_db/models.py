@@ -150,6 +150,7 @@ class Person(models.Model):
             ('has_beta_api_access', 'Can access features during beta period.'),
         )
 
+
 class School(models.Model):
     is_alias_of = models.ForeignKey(
         'self',
@@ -178,14 +179,15 @@ class School(models.Model):
     )
 
     def __unicode__(self):
-        if self.is_alias_of:            
+        if self.is_alias_of:
             return u'%s: %s (alias: %s)' % (
                 self.pk, self.name, self.is_alias_of.name
             )
-        else:            
+        else:
             return u'%s: %s' % (
                 self.pk, self.name
             )
+
 
 class Position(models.Model):
     """A role held by a person, and the details about it."""
@@ -234,7 +236,8 @@ class Position(models.Model):
                 ('spec-chair',  'Special Chairman'),
                 ('spec-jud',    'Special Judge'),
                 ('spec-m',      'Special Master'),
-                ('spec-scjcbc', 'Special Superior Court Judge for Complex Business '
+                ('spec-scjcbc', 'Special Superior Court Judge for Complex '
+                                'Business '
                                 'Cases'),
             )),
             ('Other', (
@@ -246,7 +249,7 @@ class Position(models.Model):
                 ('trial-jud', 'Trial Judge'),
                 ('vice-chan', 'Vice Chancellor'),
                 ('vice-cj',   'Vice Chief Judge'),
-            )),                        
+            )),
         )),
         # Sometimes attorney generals write opinions too
         ('Attorney General', (
@@ -266,7 +269,7 @@ class Position(models.Model):
         )),
 
         ('prof',    'Professor'),
-        ('prac',    'Practitioner'),        
+        ('prac',    'Practitioner'),
         ('pros',    'Prosecutor'),
         ('pub_def', 'Public Defender'),
         ('legis',   'Legislator'),
@@ -315,7 +318,7 @@ class Position(models.Model):
         null=True,
     )
     court = models.ForeignKey(
-        Court,        
+        Court,
         related_name='court_positions',
         blank=True,
         null=True,
@@ -324,14 +327,14 @@ class Position(models.Model):
         Person,
         related_name='appointed_positions',
         help_text="If this is an appointed position, "
-                  "the person responsible for the appointing.",        
+                  "the person responsible for the appointing.",
         blank=True,
         null=True,
     )
     supervisor = models.ForeignKey(
         Person,
         related_name='supervised_positions',
-        help_text="If this is a clerkship, the supervising judge.",       
+        help_text="If this is a clerkship, the supervising judge.",
         blank=True,
         null=True,
     )
@@ -342,7 +345,7 @@ class Position(models.Model):
     )
     school = models.ForeignKey(
         School,
-        help_text="If academic job, the school where they work.",        
+        help_text="If academic job, the school where they work.",
         blank=True,
         null=True,
     )
@@ -544,6 +547,7 @@ class RetentionEvent(models.Model):
         blank=True,
     )
 
+
 class Education(models.Model):
     DEGREE_LEVELS = (
         ('ba', "Bachelor's (e.g. B.A.)"),
@@ -551,7 +555,7 @@ class Education(models.Model):
         ('jd', 'Juris Doctor (J.D.)'),
         ('llm', 'Master of Laws (LL.M)'),
         ('llb', 'Bachelor of Laws (e.g. LL.B)'),
-        ('jsd', 'Doctor of Law (J.S.D)'), 
+        ('jsd', 'Doctor of Law (J.S.D)'),
         ('phd', 'Doctor of Philosophy (PhD)'),
         ('aa', 'Associate (e.g. A.A.)'),
         ('md', 'Medical Degree (M.D.)'),
