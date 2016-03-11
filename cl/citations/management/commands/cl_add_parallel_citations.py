@@ -139,88 +139,106 @@ class Command(BaseCommand):
         else:
             self.stdout.write("    Unable to find empty space for citation.\n")
 
-    def _update_citation_object(self, left, right, results):
-        self.stdout.write(
-            "  Got 1 result for %s and 0 for %s. Attempting to update "
-            "cluster.\n" % (left.base_citation(),
-                            right.base_citation())
-        )
+    def _update_cluster_with_citation(self, cluster, citation):
+        """Update the cluster with the citation object."""
+        self.stdout.write("  Updating cluster %s with value %s" %
+                          (cluster.pk, citation.base_citation()()))
 
-        # Make sure that we don't get an item that already has the
-        # citation. This is just a safety check.
-        q = Q()
+        # Make sure we don't get an item that has the citation already.
+        # Just a safety check.
         lookup_fields = OpinionCluster().citation_fields
-        for lookup_field in lookup_fields:
-            q |= Q(**{lookup_field: right.base_citation()})
+        problem = False
+        for field in lookup_fields:
+            if getattr(cluster, field) == citation.base_citation():
+                problem = True
+                break
 
-        clusters = OpinionCluster.objects.filter(
-            pk=results[0]['cluster_id']
-        ).exclude(q)
-        if clusters:
-            cluster = clusters[0]
+        if not problem:
             self.add_citation_to_cluster(
-                citation=right,
+                citation=citation,
                 cluster=cluster,
             )
-        else:
-            self.stdout.write(
-                "    Unable to find cluster with ID %s and without "
-                "citation %s" % (
-                    results[0]['cluster_id'],
-                    right.base_citation(),
-                ))
-            cluster = None
 
-        return cluster
 
-    def handle_edge(self, node, neighbor, data, options):
-        """Add an edge to the database if it's significant."""
-        self.stdout.write("Processing edge from %s to %s with weight %s:\n" % (
-            node.base_citation(), neighbor.base_citation(), data['weight'],
-        ))
+    def handle_subgraph(self, sub_graph, options):
+        """Add edges to the database if significant.
 
-        if node.reporter == neighbor.reporter:
-            self.stdout.write("  Same reporter in both citations. Pass.")
+        An earlier version of the code simply looked at each edge, but this
+        looks at sub_graphs within the main graph. This is different (and
+        better) because the main graph might have multiple nodes like so:
+
+            A <-- (22 US 33): This node is in the DB already
+            |
+            B <-- (2013 LEXIS 223948): This node is not yet in the DB
+            |
+            C <-- (2013 WL 3808347): This node is not yet in the DB
+            |
+            D <-- This node can be disregarded because it has low edge weight.
+
+        If we handled this edge by edge, we might process B --> C before doing
+        A --> B. If we did that, we'd get zero results for B and C, and we'd
+        add nothing. That'd be bad, since there's a strong edge between A, B,
+        and C.
+
+        Instead, we process this as a graph, looking at all the nodes at once.
+        """
+        # Remove nodes that are only connected weakly.
+        for node in sub_graph.nodes():
+            has_good_edge = False
+            for a, b, data in sub_graph.edges([node], data=True):
+                if data['weight'] > EDGE_RELEVANCE_THRESHOLD:
+                    has_good_edge = True
+                    break
+            if not has_good_edge:
+                sub_graph.remove_node(node)
+
+        # Look up all remaining nodes in Solr, and make a (node, results) pair.
+        result_sets = []
+        for node in sub_graph.nodes():
+            result_sets.append((node, self.match_on_citation(node)))
+
+        if sum(len(results) for node, results in result_sets) == 0:
+            self.stdout.write("  Got no results for any citation. Pass.\n")
             return
 
-        if data['weight'] >= EDGE_RELEVANCE_THRESHOLD:
-            # Look up both citations.
-            node_results = self.match_on_citation(node)
-            neighbor_results = self.match_on_citation(neighbor)
-            cluster = None
+        if all(len(results) > 0 for node, results in result_sets):
+            self.stdout.write("  Got results for all citations. Pass.\n")
+            return
 
-            # If neither returns a result, do nothing.
-            if not node_results and not neighbor_results:
-                self.stdout.write("  Got no results for either citation. Pass.\n")
-                return
+        # Remove any node-results pairs with more than than one result.
+        result_sets = filter(
+            lambda (n, r): len(r) > 1,
+            result_sets,
+        )
 
-            # If both citations load results, do nothing. In this case, the
-            # results could be the same or they could be different. Either way,
-            # we don't want to deal with them.
-            elif node_results and neighbor_results:
-                self.stdout.write("  Got results for both citations. Pass.\n")
-                return
+        # For result_sets with more than 0 results, do all the citations have
+        # the same ID?
+        if len(set([results[0]['cluster_id'] for node, results in
+                    result_sets if len(results) > 0])) > 1:
+            self.stdout.write("  Got multiple IDs for the citations. Pass.\n")
+            return
 
-            # If one citation loads something and the other doesn't, we're in
-            # business.
-            elif len(node_results) == 1 and len(neighbor_results) == 0:
-                cluster = self._update_citation_object(
-                    left=node,
-                    right=neighbor,
-                    results=node_results,
-                )
-            elif len(neighbor_results) == 1 and len(node_results) == 0:
-                cluster = self._update_citation_object(
-                    left=neighbor,
-                    right=node,
-                    results=neighbor_results,
-                )
+        # Are the number of unique reporters equal to the number of results?
+        if len(set([node.reporter for node, results in
+                    result_sets])) != len(result_sets):
+            self.stdout.write("  Got duplicated reporter in citations. Pass.\n")
+            return
 
-            if options['update_database'] and cluster is not None:
-                cluster.save()
-        else:
-            self.stdout.write("  Weight of %s too low. Pass.\n" %
-                              data['weight'])
+        # Get the cluster. By now we know all results have either 0 or 1 item.
+        oc = None
+        for node, results in result_sets:
+            if len(results) > 0:
+                oc = OpinionCluster.objects.get(pk=results[0]['cluster_id'])
+                break
+
+        if oc is not None:
+            # Update the cluster with all the nodes that had no results.
+            for node, results in result_sets:
+                if len(results) == 0:
+                    # add the citation to the cluster.
+                    self._update_cluster_with_citation(oc, node)
+            if options['update_database']:
+                oc.save()
 
     def add_groups_to_network(self, citation_groups):
         """Add the citation groups from an opinion to the global network
@@ -327,7 +345,7 @@ class Command(BaseCommand):
 
         sys.stdout.write("\n\n## Entering phase two: Saving the best edges to "
                          "the database.\n\n")
-        for node, neighbor, data in self.g.edges(data=True):
-            self.handle_edge(node, neighbor, data, options)
+        for sub_graph in nx.connected_component_subgraphs(self.g):
+            self.handle_subgraph(sub_graph, options)
 
         self.do_solr(options)
