@@ -1,7 +1,8 @@
 # coding=utf-8
 import logging
-
 import networkx as nx
+import sys
+
 from celery import group
 from django.conf import settings
 from django.core.management import BaseCommand, call_command, CommandError
@@ -349,13 +350,13 @@ class Command(BaseCommand):
                 # Only do this once in a while.
                 node_count = len(self.g.nodes())
                 edge_count = len(self.g.edges())
-            self.stdout.write("\r  Completed %s of %s. (%s nodes, %s edges)" % (
+            sys.stdout.write("\r  Completed %s of %s. (%s nodes, %s edges)" % (
                 completed,
                 count,
                 node_count,
                 edge_count,
             ))
-            self.stdout.flush()
+            sys.stdout.flush()
 
         logger.info("\n\n## Entering phase two: Saving the best edges to "
                     "the database.\n\n")
