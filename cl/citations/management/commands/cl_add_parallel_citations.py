@@ -349,7 +349,7 @@ class Command(BaseCommand):
                 # Only do this once in a while.
                 node_count = len(self.g.nodes())
                 edge_count = len(self.g.edges())
-            logger.info("\r  Completed %s of %s. (%s nodes, %s edges)" % (
+            self.stdout.write("\r  Completed %s of %s. (%s nodes, %s edges)" % (
                 completed,
                 count,
                 node_count,
