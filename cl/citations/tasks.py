@@ -21,7 +21,7 @@ def identify_parallel_citations(citations):
         return citations
     citation_indexes = [c.reporter_index for c in citations]
     parallel_citation = [citations[0]]
-    parallel_citations = []
+    parallel_citations = set()
     for i, reporter_index in enumerate(citation_indexes[:-1]):
         if reporter_index + PARALLEL_DISTANCE > citation_indexes[i + 1]:
             # The present item is within a reasonable distance from the next
@@ -30,12 +30,18 @@ def identify_parallel_citations(citations):
         else:
             # Not close enough. Append what we've got and start a new list.
             if len(parallel_citation) > 1:
-                parallel_citations.append(parallel_citation)
+                if tuple(parallel_citation[::-1]) not in parallel_citations:
+                    # If the reversed tuple isn't in the set already, add it.
+                    # This makes sure a document with many references to the
+                    # same case only gets counted once.
+                    parallel_citations.add(tuple(parallel_citation))
             parallel_citation = [citations[i + 1]]
 
     # In case the last item had a citation.
     if len(parallel_citation) > 1:
-        parallel_citations.append(parallel_citation)
+        if tuple(parallel_citation[::-1]) not in parallel_citations:
+            # Ensure the reversed tuple isn't in the set already (see above).
+            parallel_citations.add(tuple(parallel_citation))
     return parallel_citations
 
 
