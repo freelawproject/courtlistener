@@ -1,6 +1,5 @@
 # coding=utf-8
 import logging
-import sys
 
 import networkx as nx
 from celery import group
@@ -50,6 +49,7 @@ class Command(BaseCommand):
         super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
         self.g = nx.Graph()
         self.conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        self.update_count = 0
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -137,9 +137,18 @@ class Command(BaseCommand):
         has_empty_field = not getattr(cluster, cite_attr)
         if cite_attr is not None and has_empty_field:
             setattr(cluster, cite_attr, citation.base_citation())
-            logger.info("    Set %s attribute of cluster.\n" % cite_attr)
+            logger.info("    Set %s attribute of cluster %s to %s.\n" % (
+                cite_attr,
+                cluster.pk,
+                citation.base_citation(),
+            ))
+            self.update_count += 1
         else:
-            logger.info("    Unable to find empty space for citation.\n")
+            logger.info("    Unable to find empty space in cluster %s for "
+                        "citation %s.\n" % (
+                cluster.pk,
+                citation.base_citation()
+            ))
 
     def _update_cluster_with_citation(self, cluster, citation):
         """Update the cluster with the citation object."""
@@ -278,8 +287,8 @@ class Command(BaseCommand):
                 '--do-commit',
             )
         else:
-            sys.stdout.write("\nSolr index not updated. You may want to do so "
-                             "manually.\n")
+            logger.info("\nSolr index not updated. You may want to do so "
+                        "manually.\n")
 
     def handle(self, *args, **options):
         """Identify parallel citations and save them as requested.
@@ -311,8 +320,8 @@ class Command(BaseCommand):
         # Update Citation object to consider similar objects equal.
         self.monkey_patch_citation()
 
-        sys.stdout.write("## Entering phase one: Building a network object of "
-                         "all citations.\n")
+        logger.info("## Entering phase one: Building a network object of "
+                    "all citations.\n")
         q = Opinion.objects.all()
         if options.get('doc_id'):
             q = q.filter(pk__in=options['doc_id'])
@@ -340,17 +349,19 @@ class Command(BaseCommand):
                 # Only do this once in a while.
                 node_count = len(self.g.nodes())
                 edge_count = len(self.g.edges())
-            sys.stdout.write("\r  Completed %s of %s. (%s nodes, %s edges)" % (
+            logger.info("\r  Completed %s of %s. (%s nodes, %s edges)" % (
                 completed,
                 count,
                 node_count,
                 edge_count,
             ))
-            sys.stdout.flush()
+            self.stdout.flush()
 
-        sys.stdout.write("\n\n## Entering phase two: Saving the best edges to "
-                         "the database.\n\n")
+        logger.info("\n\n## Entering phase two: Saving the best edges to "
+                    "the database.\n\n")
         for sub_graph in nx.connected_component_subgraphs(self.g):
             self.handle_subgraph(sub_graph, options)
+
+        logger.info("\n\n## Done. Added %s new citations." % self.update_count)
 
         self.do_solr(options)
