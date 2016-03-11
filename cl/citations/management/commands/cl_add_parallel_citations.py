@@ -159,7 +159,6 @@ class Command(BaseCommand):
                 cluster=cluster,
             )
 
-
     def handle_subgraph(self, sub_graph, options):
         """Add edges to the database if significant.
 
@@ -191,6 +190,10 @@ class Command(BaseCommand):
                     break
             if not has_good_edge:
                 sub_graph.remove_node(node)
+
+        if len(sub_graph.nodes()) == 0:
+            self.stdout.write("  No strong edges found. Pass.\n")
+            return
 
         # Look up all remaining nodes in Solr, and make a (node, results) pair.
         result_sets = []
