@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 # encoding: utf-8
-import functools
 import re
 import sys
 
-import operator
 from juriscraper.lib.html_utils import get_visible_text
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 from django.utils.timezone import now
@@ -129,11 +127,10 @@ class Citation(object):
         Overridden here to simplify away some of the attributes that can differ
         for the same citation.
         """
-        return functools.reduce(
-                operator.xor,
-                [hash(getattr(self, attr, None)) for attr in
-                 self.equality_attributes]
-        )
+        s = ''
+        for attr in self.equality_attributes:
+            s += str(getattr(self, attr, None))
+        return hash(s)
 
     def fuzzy_eq(self, other):
         """Used to override the __eq__ function."""
