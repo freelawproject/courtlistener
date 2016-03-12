@@ -22,11 +22,10 @@ from cl.lib.string_utils import trunc
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.tasks import extract_doc_content, extract_by_ocr
-from cl.search.models import Docket
+from cl.search.models import Docket, RECAPDocument, DocketEntry
 from cl.search.models import Court
 from cl.search.models import Opinion
 from cl.search.models import OpinionCluster
-
 
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
@@ -135,47 +134,47 @@ class Command(BaseCommand):
                     'lookup_by': 'sha1'
                 }
 
-                onwards = dup_checker.press_on(Opinion, None, None, **lookup_params)
+                onwards = dup_checker.press_on(Docket, None, None, **lookup_params)
                 if onwards:
                     # Not a duplicate, carry on
                     logging.info('Adding new document found at: %s' %
-                                mods_data.download_url.encode('utf-8'))
+                                 mods_data.download_url.encode('utf-8'))
                     dup_checker.reset()
 
-                    docket, opinion, cluster, error = self.make_objects(
-                        mods_data, court, sha1_hash, r.content
+                    docket, error = self.make_objects(
+                        mods_data, court, sha1_hash, r.content, dup_checker
                     )
 
                     if error:
                         download_error = True
                     else:
+                        # todo need to discuss this, the old code is working only with Opinion model
+                        # extract_doc_content.delay(
+                        #     docket.pk,
+                        #     callback=subtask(extract_by_ocr),
+                        #     citation_countdown=random.randint(0, 3600)
+                        # )
+                        #
+                        # for docket_entry in docket.docketentry_set.objects.all():
+                        #     for recap_docket in docket_entry.recapdocument_set.objects.all():
+                        #         extract_doc_content.delay(
+                        #             recap_docket.pk,
+                        #             callback=subtask(extract_by_ocr),
+                        #             citation_countdown=random.randint(0, 3600)
+                        #         )
+                        #
+                        # logging.info("Successfully added doc {pk}: {name}".format(
+                        #     pk=docket.pk,
+                        #     name=mods_data.case_name.encode('utf-8'),
+                        # ))
 
-                        self.save_everything(
-                            items={
-                                'docket': docket,
-                                'opinion': opinion,
-                                'cluster': cluster
-                            },
-                            index=False
-                        )
-                        extract_doc_content.delay(
-                            opinion.pk,
-                            callback=subtask(extract_by_ocr),
-                            citation_countdown=random.randint(0, 3600)
-                        )
-
-                        logging.info("Successfully added doc {pk}: {name}".format(
-                            pk=opinion.pk,
-                            name=mods_data.case_name.encode('utf-8'),
-                        ))
-
-                    # Update the hash if everything finishes properly.
-                    logging.info("%s: Successfully crawled opinions." % mods_data.court_id)
+                        # Update the hash if everything finishes properly.
+                        logging.info("%s: Successfully crawled opinions." % mods_data.court_id)
             if not download_error:
                 # Only update the hash if no errors occurred.
                 dup_checker.update_site_hash(mods_data.hash)
 
-    def make_objects(self, item, court, sha1_hash, content):
+    def make_objects(self, item, court, sha1_hash, content, dup_checker):
         """Takes the meta data from the scraper and associates it with objects.
 
         Returns the created objects.
@@ -184,52 +183,30 @@ class Command(BaseCommand):
         :param court: Court:
         :param item: juriscraper.fdsys.FDSysSite.FDSysModsContent
         """
-        # todo this isn't done
+        # removed blocked_statuses
+        blocked = False
+        date_blocked = None
+        error = False
 
-        blocked = item['blocked_statuses']
-        if blocked is not None:
-            date_blocked = date.today()
-        else:
-            date_blocked = None
+        case_name_short = self.cnt.make_case_name_short(item.case_name)
 
-        case_name_short = (item.get('case_name_shorts') or
-                           self.cnt.make_case_name_short(item['case_names']))
         docket = Docket(
-            docket_number=item.get('docket_numbers', ''),
-            case_name=item['case_names'],
+            docket_number=item.docket_number,
+            case_name=item.case_names,
             case_name_short=case_name_short,
+            # pacer_case_id=item.fdsys_id,  USCOURTS-ned-8_07-cr-00156 not a positive integer
             court=court,
             blocked=blocked,
             date_blocked=date_blocked,
+            filepath_ia=item.ur
         )
 
-        cluster = OpinionCluster(
-            judges=item.get('judges', ''),
-            date_filed=item['case_dates'],
-            case_name=item['case_names'],
-            case_name_short=case_name_short,
-            source='C',
-            precedential_status=item['precedential_statuses'],
-            nature_of_suit=item.get('nature_of_suit', ''),
-            blocked=blocked,
-            date_blocked=date_blocked,
-            federal_cite_one=item.get('west_citations', ''),
-            state_citejuriscraper_one=item.get('west_state_citations', ''),
-            neutral_cite=item.get('neutral_citations', ''),
-        )
-        opinion = Opinion(
-            type='010combined',
-            sha1=sha1_hash,
-            download_url=item['download_urls'],
-        )
-
-        error = False
         try:
             cf = ContentFile(content)
             extension = get_extension(content)
-            file_name = trunc(item['case_names'].lower(), 75) + extension
-            opinion.file_with_date = cluster.date_filed
-            opinion.local_path.save(file_name, cf, save=False)
+            file_name = trunc(item.case_names.lower(), 75) + extension
+            docket.filepath_local.save(file_name, cf, save=True)
+            docket.save()
         except:
             msg = ('Unable to save binary to disk. Deleted '
                    'item: %s.\n %s' %
@@ -237,20 +214,62 @@ class Command(BaseCommand):
             logging.critical(msg.encode('utf-8'))
             ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
             error = True
+            return docket, error
 
-        return docket, opinion, cluster, error
+        for document in item.documents:
+            docket_entry = DocketEntry(
+                docket=docket,
+                date_filed=document['date_filed'],
+                description=document['description']
+            )
+            docket_entry.save()
 
-    @staticmethod
-    def save_everything(items, index=False):
-        """Saves all the sub items and associates them as appropriate.
-        """
-        docket, cluster, opinion = items['docket'], items['cluster'], items['opinion']
-        docket.save()
-        cluster.docket = docket
-        cluster.save(index=False)  # Index only when the opinion is associated.
-        opinion.cluster = cluster
-        opinion.save(index=index)
-        RealTimeQueue.objects.create(
-            item_type='o',
-            item_pk=opinion.pk,
-        )
+            recap_document = RECAPDocument(
+                docket_entry=docket_entry,
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                filepath_ia=document['download_url']
+            )
+
+            try:
+
+                msg, r = get_binary_content(
+                    document['download_url'],
+                    {},
+                    item._get_adapter_instance(),
+                    method=item.method
+                )
+
+                if msg:
+                    logging.warn(msg)
+                    ErrorLog(log_level='WARNING',
+                             court=court,
+                             message=msg).save()
+                else:
+                    sha1_hash = hashlib.sha1(r.content).hexdigest()
+
+                    lookup_params = {
+                        'lookup_value': sha1_hash,
+                        'lookup_by': 'sha1'
+                    }
+
+                    onwards = dup_checker.press_on(Docket, None, None, **lookup_params)
+                    if onwards:
+                        # Not a duplicate, carry on
+                        logging.info('Adding new document found at: %s' %
+                                     document['download_url'].encode('utf-8'))
+                        dup_checker.reset()
+                        cf = ContentFile(r.content)
+                        extension = get_extension(r.content)
+                        file_name = trunc(item.case_name.lower(), 75) + extension
+                        recap_document.filepath_local.save(file_name, cf, save=True)
+                        recap_document.save()
+            except:
+                msg = ('Unable to save binary to disk. Deleted '
+                       'item: %s.\n %s' %
+                       (item.case_name, traceback.format_exc()))
+                logging.critical(msg.encode('utf-8'))
+                ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
+                error = True
+                return docket, error
+
+        return docket, error
