@@ -115,9 +115,10 @@ class Person(models.Model):
     )
 
     def __unicode__(self):
-        return u'%s: %s %s %s %s' % (self.pk, self.name_first,
-                                     self.name_middle, self.name_last,
-                                     self.name_suffix)
+        return u'%s: %s' % (self.pk, ' '.join([self.name_first,
+                                               self.name_middle,
+                                               self.name_last,
+                                               self.name_suffix]))
 
     def get_absolute_url(self):
         return reverse('view_judge', args=[self.pk, self.slug])
@@ -149,6 +150,7 @@ class Person(models.Model):
         permissions = (
             ('has_beta_api_access', 'Can access features during beta period.'),
         )
+        verbose_name_plural = "people"
 
 
 class School(models.Model):
@@ -193,63 +195,59 @@ class Position(models.Model):
     """A role held by a person, and the details about it."""
     POSITION_TYPES = (
         ('Judge', (
-            ('Acting', (
-                ('act-jud',      'Acting Judge'),
-                ('act-pres-jud', 'Acting Presiding Judge'),
-            )),
-            ('Associate', (
-                ('ass-jud',      'Associate Judge'),
-                ('ass-c-jud',    'Associate Chief Judge'),
-                ('ass-pres-jud', 'Associate Presiding Judge'),
-                ('jud',          'Judge'),
-                ('jus',          'Justice'),
-            )),
-            ('Chief', (
-                ('c-jud',     'Chief Judge'),
-                ('c-jus',     'Chief Justice'),
-                ('pres-jud',  'Presiding Judge'),
-                ('pres-jus',  'Presiding Justice'),
-                ('pres-mag',  'Presiding Magistrate'),
-            )),
-            ('Commissioner', (
-                ('com',     'Commissioner'),
-                ('com-dep', 'Deputy Commissioner'),
-            )),
-            ('Pro Tem', (
-                ('jud-pt', 'Judge Pro Tem'),
-                ('jus-pt', 'Justice Pro Tem'),
-                ('mag-pt', 'Magistrate Pro Tem'),
-            )),
-            ('Referee', (
-                ('ref-jud-tr',      'Judge Trial Referee'),
-                ('ref-off',         'Official Referee'),
-                ('ref-state-trial', 'State Trial Referee'),
-            )),
-            ('Retired', (
-                ('ret-act-jus',    'Active Retired Justice'),
-                ('ret-ass-jud',    'Retired Associate Judge'),
-                ('ret-c-jud',      'Retired Chief Judge'),
-                ('ret-jus',        'Retired Justice'),
-                ('ret-senior-jud', 'Senior Judge'),
-            )),
-            ('Special', (
-                ('spec-chair',  'Special Chairman'),
-                ('spec-jud',    'Special Judge'),
-                ('spec-m',      'Special Master'),
-                ('spec-scjcbc', 'Special Superior Court Judge for Complex '
-                                'Business '
-                                'Cases'),
-            )),
-            ('Other', (
-                ('chair',     'Chairman'),
-                ('chan',      'Chancellor'),
-                ('mag',       'Magistrate'),
-                ('presi-jud', 'President'),
-                ('res-jud',   'Reserve Judge'),
-                ('trial-jud', 'Trial Judge'),
-                ('vice-chan', 'Vice Chancellor'),
-                ('vice-cj',   'Vice Chief Judge'),
-            )),
+            # Acting
+            ('act-jud',      'Acting Judge'),
+            ('act-pres-jud', 'Acting Presiding Judge'),
+
+            # Associate
+            ('ass-jud',      'Associate Judge'),
+            ('ass-c-jud',    'Associate Chief Judge'),
+            ('ass-pres-jud', 'Associate Presiding Judge'),
+            ('jud',          'Judge'),
+            ('jus',          'Justice'),
+
+            # Chief
+            ('c-jud',     'Chief Judge'),
+            ('c-jus',     'Chief Justice'),
+            ('pres-jud',  'Presiding Judge'),
+            ('pres-jus',  'Presiding Justice'),
+            ('pres-mag',  'Presiding Magistrate'),
+            # Commissioner
+            ('com',     'Commissioner'),
+            ('com-dep', 'Deputy Commissioner'),
+
+            # Pro Tem
+            ('jud-pt', 'Judge Pro Tem'),
+            ('jus-pt', 'Justice Pro Tem'),
+            ('mag-pt', 'Magistrate Pro Tem'),
+
+            # Referee
+            ('ref-jud-tr',      'Judge Trial Referee'),
+            ('ref-off',         'Official Referee'),
+            ('ref-state-trial', 'State Trial Referee'),
+
+            # Retired
+            ('ret-act-jus',    'Active Retired Justice'),
+            ('ret-ass-jud',    'Retired Associate Judge'),
+            ('ret-c-jud',      'Retired Chief Judge'),
+            ('ret-jus',        'Retired Justice'),
+            ('ret-senior-jud', 'Senior Judge'),
+
+            # Special
+            ('spec-chair',  'Special Chairman'),
+            ('spec-jud',    'Special Judge'),
+            ('spec-m',      'Special Master'),
+            ('spec-scjcbc', 'Special Superior Court Judge for Complex Business '
+                            'Cases'),
+            # Other
+            ('chair',     'Chairman'),
+            ('chan',      'Chancellor'),
+            ('mag',       'Magistrate'),
+            ('presi-jud', 'President'),
+            ('res-jud',   'Reserve Judge'),
+            ('trial-jud', 'Trial Judge'),
+            ('vice-chan', 'Vice Chancellor'),
+            ('vice-cj',   'Vice Chief Judge'),
         )),
         # Sometimes attorney generals write opinions too
         ('Attorney General', (
@@ -350,7 +348,7 @@ class Position(models.Model):
         null=True,
     )
     job_title = models.CharField(
-        help_text="If title isnt in list, type here.",
+        help_text="If title isn't in list, type here.",
         max_length=100,
         blank=True,
     )
@@ -472,6 +470,7 @@ class Position(models.Model):
     how_selected = models.CharField(
         choices=SELECTION_METHODS,
         max_length=20,
+        blank=True,
     )
     termination_reason = models.CharField(
         choices=TERMINATION_REASONS,
