@@ -305,7 +305,7 @@
         </p>
         <p>For example, if you wish to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
         </p>
-        <pre class="scrollable">curl {% get_full_host %}{% url "judge-list" version="v3" %}?fields=educations,date_modified</pre>
+        <pre class="scrollable">curl {% get_full_host %}{% url "person-list" version="v3" %}?fields=educations,date_modified</pre>
         <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/freelawproject/courtlistener/issues/407" target="_blank">we welcome contributions in this area</a>.
         </p>
 
