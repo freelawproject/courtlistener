@@ -86,7 +86,7 @@ class Citation(object):
         # against accidentally updating things like docket number 22 Cr. 1 as
         # 22 Cranch 1, which is totally wrong.
         template = u'<span class="volume">%(volume)d</span>\\1' \
-                   u'<span class="reporter">%(reporter_found)s</span>\\2' \
+                   u'<span class="reporter">%(reporter)s</span>\\2' \
                    u'<span class="page">%(page)d</span>'
         inner_html = template % self.__dict__
         span_class = "citation"

@@ -186,11 +186,11 @@ class CiteTest(TestCase):
                        reporter_index=1, reporter_found='Wash.')]),
             # 6. Cr. --> A variant of Cranch, which is ambiguous, except with
             #    paired with this variation.
-            ('1 Cr. 1',
+            ('1 Cra. 1',
              [Citation(volume=1, reporter='Cranch', page=1,
                        canonical_reporter=u'Cranch', lookup_index=0,
                        court='scotus', reporter_index=1,
-                       reporter_found='Cr.')]),
+                       reporter_found='Cra.')]),
             # 7. Cranch. --> Not a variant, but could refer to either Cranch's
             #    Supreme Court cases or his DC ones. In this case, we cannot
             #    disambiguate. Years are not known, and we have no further
@@ -281,9 +281,7 @@ class MatchingTest(IndexedSolrTestCase):
         )
 
 
-class CitationFeedTest(TestCase):
-    fixtures = ['test_court.json', 'judge_judy.json',
-                'test_objects_search.json']
+class CitationFeedTest(IndexedSolrTestCase):
 
     def _tree_has_content(self, content, expected_count):
         xml_tree = etree.fromstring(content)
@@ -315,7 +313,10 @@ class CitationFeedTest(TestCase):
                         u'CO., \u2014'
         OpinionCluster.objects.filter(pk=1).update(case_name=new_case_name)
 
-        r = self.client.get('/feed/search/?q=cites:1')
+        r = self.client.get(
+            reverse('search_feed', args=['search']),
+            {'q': 'cites:1'},
+        )
         self.assertEqual(r.status_code, 200)
 
         expected_count = 1
@@ -405,7 +406,7 @@ class ParallelCitationTest(SimpleTestCase):
             if not citation_groups:
                 # Add an empty list to make testing easier.
                 citation_groups = [[]]
-            computed_num_parallel_citation = len(citation_groups[0])
+            computed_num_parallel_citation = len(list(citation_groups)[0])
             self.assertEqual(
                 computed_num_parallel_citation,
                 expected_num_parallel_citations,
@@ -432,6 +433,7 @@ class ParallelCitationTest(SimpleTestCase):
 
     def test_hash(self):
         """Do two citation objects hash to the same?"""
+        Citation.__hash__ = Citation.fuzzy_hash
         citations = [
             Citation(reporter=2, volume="U.S.", page="2", reporter_index=1),
             Citation(reporter=2, volume="U.S.", page="2", reporter_index=2),
@@ -440,4 +442,5 @@ class ParallelCitationTest(SimpleTestCase):
             hash(citations[0]),
             hash(citations[1]),
         )
+        Citation.fuzzy_hash = Citation.__hash__
 
