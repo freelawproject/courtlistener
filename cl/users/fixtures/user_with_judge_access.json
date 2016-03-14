@@ -11,7 +11,7 @@
       "is_staff": false,
       "last_login": "2006-12-17T16:46:30Z",
       "groups": [],
-      "user_permissions": [152],
+      "user_permissions": [],
       "password": "sha1$6efc0$f93efe9fd7542f25a7be94871ea45aa95de57161",
       "email": "pandora@courtlistener.com",
       "date_joined": "2006-12-17T16:46:30Z"
@@ -37,14 +37,5 @@
       "email_confirmed": true,
       "zip_code": null
     }
-  },
-  {
-    "fields": {
-      "codename": "has_beta_api_access",
-      "name": "Can access features during beta period.",
-      "content_type": 24
-    },
-    "model": "auth.permission",
-    "pk": 152
   }
 ]
