@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from cl.people_db.models import (
-    Education, School, Person, Position, RetentionEvent, 
+    Education, School, Person, Position, RetentionEvent,
     Race, PoliticalAffiliation, Source, ABARating
 )
 
@@ -18,19 +18,41 @@ class PositionAdmin(admin.ModelAdmin):
     inlines = (
         RetentionEventInline,
     )
+    raw_id_fields = (
+        'court',
+        'school',
+        'appointer',
+        'supervisor',
+        'predecessor',
+    )
 
 
 class PositionInline(admin.StackedInline):
     model = Position
     extra = 1
     fk_name = 'person'
-    raw_id_fields = ('court',)
+    raw_id_fields = (
+        'court',
+        'school',
+        'appointer',
+        'supervisor',
+        'predecessor',
+    )
+
+
+class SchoolAdmin(admin.ModelAdmin):
+    search_fields = (
+        'id',
+        'ein',
+        'name',
+    )
 
 
 class EducationAdmin(admin.ModelAdmin):
     search_fields = (
         'school__name',
         'school__ein',
+        'school__pk',
     )
 
 
@@ -38,6 +60,7 @@ class EducationInline(admin.TabularInline):
     model = Education
     extra = 1
     raw_id_fields = ('school',)
+
 
 class PoliticalAffiliationInline(admin.TabularInline):
     model = PoliticalAffiliation
@@ -81,7 +104,7 @@ class PersonAdmin(admin.ModelAdmin):
 
 admin.site.register(Person, PersonAdmin)
 admin.site.register(Education, EducationAdmin)
-admin.site.register(School)
+admin.site.register(School, SchoolAdmin)
 admin.site.register(Position, PositionAdmin)
 admin.site.register(PoliticalAffiliation)
 admin.site.register(RetentionEvent)
