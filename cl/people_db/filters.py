@@ -1,7 +1,7 @@
 import rest_framework_filters as filters
 
 from cl.api.utils import DATETIME_LOOKUPS, \
-    DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, ALL_TEXT_LOOKUPS, INTEGER_LOOKUPS
+    DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, INTEGER_LOOKUPS, ALL_TEXT_LOOKUPS
 from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, \
     Race
@@ -14,7 +14,7 @@ class SourceFilter(filters.FilterSet):
         fields = {
             'id': ['exact'],
             'date_modified': DATETIME_LOOKUPS,
-            'judge': ['exact'],
+            'person': ['exact'],
         }
 
 
@@ -27,7 +27,7 @@ class ABARatingFilter(filters.FilterSet):
             'date_modified': DATETIME_LOOKUPS,
             'date_rated': DATE_LOOKUPS,
             'rating': ['exact'],
-            'judge': ['exact'],
+            'person': ['exact'],
         }
 
 
@@ -42,9 +42,9 @@ class PoliticalAffiliationFilter(filters.FilterSet):
             'date_end': DATE_LOOKUPS,
             'political_party': ['exact'],
             'source': ['exact'],
-            'judge': ['exact'],
-            'politician': ['exact'],
+            'person': ['exact'],
         }
+
 
 class SchoolFilter(filters.FilterSet):
     educations = filters.RelatedFilter(
@@ -59,10 +59,7 @@ class SchoolFilter(filters.FilterSet):
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'name': BASIC_TEXT_LOOKUPS,
-            'is_alias_of': ['exact'],
-            'unit_id': ['exact'],
             'ein': ['exact'],
-            'ope_id': ['exact'],
         }
 
 
@@ -78,6 +75,7 @@ class EducationFilter(filters.FilterSet):
             'date_modified': DATETIME_LOOKUPS,
             'degree_year': ['exact'],
             'degree': BASIC_TEXT_LOOKUPS,
+            'degree_level': ['exact'],
             'person': ['exact'],
         }
 
@@ -109,8 +107,10 @@ class PositionFilter(filters.FilterSet):
         model = Position
         fields = {
             'id': ['exact'],
+            'position_type': ['exact'],
             'person': ['exact'],
             'predecessor': ['exact'],
+            'job_title': ALL_TEXT_LOOKUPS,
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_nominated': DATE_LOOKUPS,
@@ -130,12 +130,13 @@ class PositionFilter(filters.FilterSet):
             'votes_no': INTEGER_LOOKUPS,
             'how_selected': ['exact'],
             'termination_reason': ['exact'],
+
         }
 
 
 class PersonFilter(filters.FilterSet):
     # filter_overrides = default_filter_overrides
-    educations = filters.RelatedFilter(EducationFilter, name='educations')    
+    educations = filters.RelatedFilter(EducationFilter, name='educations')
     political_affiliations = filters.RelatedFilter(
             PoliticalAffiliationFilter, name='political_affiliations')
     sources = filters.RelatedFilter(SourceFilter, name='sources')
