@@ -305,14 +305,14 @@
         </p>
         <p>For example, if you wish to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
         </p>
-        <pre class="scrollable">curl {% get_full_host %}{% url "judge-list" version="v3" %}?fields=educations,date_modified</pre>
+        <pre class="scrollable">curl {% get_full_host %}{% url "person-list" version="v3" %}?fields=educations,date_modified</pre>
         <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/freelawproject/courtlistener/issues/407" target="_blank">we welcome contributions in this area</a>.
         </p>
 
 
 
         <h3 id="limitations-throttles">Limitations &amp; Throttles</h3>
-        <p>At present, this API is throttled to 1,000 queries per hour. Anonymous users (those that are not logged in), are allowed 100 queries per day for testing purposes.
+        <p>At present, this API is throttled to 5,000 queries per hour. Anonymous users (those that are not logged in), are allowed 100 queries per day for testing purposes.
         </p>
         <p>These numbers are counted by using the <code>X-Forwarded-For</code> and <code>Remote-Addr</code> HTTP headers, which can create problems for users that are behind a gateway that uses <a href="http://en.wikipedia.org/wiki/Network_address_translation">Network Address Translation (NAT)</a>. For more information about how this works, <a href="http://www.django-rest-framework.org/api-guide/throttling/#how-clients-are-identified">read the documentation on the Django REST Framework website</a>, but in general, the simplest solution is usually to log in. Note that using the browsable HTML API counts towards these thresholds since it's technically just another mediatype of the API.
         </p>

@@ -7,11 +7,11 @@ from cl.lib.mojibake import fix_mojibake
 from cl.scrapers.models import ErrorLog
 from cl.search.models import Opinion
 from celery import task
-from celery.task.sets import subtask
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
 from django.utils.timezone import now
+from eyed3 import id3
 from lxml.html.clean import Cleaner
 from lxml.etree import XMLSyntaxError
 from seal_rookery import seals_data, seals_root
@@ -287,26 +287,15 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     """
     court = audio_obj.docket.court
 
-    # Nuke the old id3 tags.
-    eyed3_command = [
-        'eyeD3',
-        '--remove-all',
-        '--quiet',
-        mp3_path,
-    ]
-    try:
-        _ = subprocess.check_output(
-            eyed3_command,
-            stderr=subprocess.STDOUT
-        )
-    except subprocess.CalledProcessError, e:
-        print 'eyeD3 failed command: %s\nerror code: %s\noutput: %s\n' % \
-              (eyed3_command, e.returncode, e.output)
-        print traceback.format_exc()
-        raise
-
-    # Load the file, then create a fresh tag.
+    # Load the file, delete the old tags and create a new one.
     audio_file = eyed3.load(mp3_path)
+
+    # Undocumented API from eyed3.plugins.classic.ClassicPlugin#handleRemoves
+    id3.Tag.remove(
+        audio_file.tag.file_info.name,
+        id3.ID3_ANY_VERSION,
+        preserve_file_time=False,
+    )
     audio_file.initTag()
     audio_file.tag.title = best_case_name(audio_obj)
     audio_file.tag.album = u'{court}, {year}'.format(

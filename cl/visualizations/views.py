@@ -26,7 +26,6 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
 
 
-@permission_required('visualizations.has_beta_access')
 def render_visualization_page(request, pk, embed):
     viz = get_object_or_404(SCOTUSMap, pk=pk)
 
@@ -68,7 +67,6 @@ def render_visualization_page(request, pk, embed):
     )
 
 
-@permission_required('visualizations.has_beta_access')
 @xframe_options_exempt
 def view_embedded_visualization(request, pk):
     """Return the embedded network page.
@@ -78,7 +76,6 @@ def view_embedded_visualization(request, pk):
     return render_visualization_page(request, pk, embed=True)
 
 
-@permission_required('visualizations.has_beta_access')
 @never_cache
 def view_visualization(request, pk, slug):
     """Return the network page.
@@ -86,12 +83,32 @@ def view_visualization(request, pk, slug):
     return render_visualization_page(request, pk, embed=False)
 
 
-@permission_required('visualizations.has_beta_access')
 @login_required
 @never_cache
 def new_visualization(request):
+    demo_viz = SCOTUSMap.objects.filter(
+        published=True,
+        deleted=False,
+    ).annotate(
+        Count('clusters'),
+    ).filter(
+        # Ensures that we only show good stuff on homepage
+        clusters__count__gt=5,
+        clusters__count__lt=15,
+    ).order_by(
+        '-date_published',
+        '-date_modified',
+        '-date_created',
+    )[:1]
+
+    context = {
+        'SCDB_LATEST_CASE': settings.SCDB_LATEST_CASE.isoformat(),
+        'demo_viz': demo_viz,
+        'private': True,
+    }
     if request.method == 'POST':
         form = VizForm(request.POST)
+        context['form'] = form
         if form.is_valid():
             # Process the data in form.cleaned_data
             cd = form.cleaned_data
@@ -129,7 +146,7 @@ def new_visualization(request):
                     messages.add_message(request, msg['level'], msg['message'])
                     return render_to_response(
                         'new_visualization.html',
-                        {'form': form, 'private': True},
+                        context,
                         RequestContext(request),
                     )
 
@@ -157,19 +174,14 @@ def new_visualization(request):
                 kwargs={'pk': viz.pk, 'slug': viz.slug}
             ))
     else:
-        form = VizForm()
+        context['form'] = VizForm()
     return render_to_response(
         'new_visualization.html',
-        {
-            'form': form,
-            'SCDB_LATEST_CASE': settings.SCDB_LATEST_CASE.isoformat(),
-            'private': True
-        },
+        context,
         RequestContext(request),
     )
 
 
-@permission_required('visualizations.has_beta_access')
 @login_required
 def edit_visualization(request, pk):
     # This could apparently also be done with formsets? But they seem awful.
@@ -199,7 +211,6 @@ def edit_visualization(request, pk):
 
 
 @ensure_csrf_cookie
-@permission_required('visualizations.has_beta_access')
 @login_required
 def delete_visualization(request):
     if request.is_ajax():
@@ -215,7 +226,6 @@ def delete_visualization(request):
 
 
 @ensure_csrf_cookie
-@permission_required('visualizations.has_beta_access')
 @login_required
 def restore_visualization(request):
     if request.is_ajax():
@@ -232,7 +242,6 @@ def restore_visualization(request):
 
 
 @ensure_csrf_cookie
-@permission_required('visualizations.has_beta_access')
 @login_required
 def share_visualization(request):
     if request.is_ajax():
@@ -248,7 +257,6 @@ def share_visualization(request):
 
 
 @ensure_csrf_cookie
-@permission_required('visualizations.has_beta_access')
 @login_required
 def privatize_visualization(request):
     if request.is_ajax():
@@ -263,7 +271,6 @@ def privatize_visualization(request):
         )
 
 
-@permission_required('visualizations.has_beta_access')
 def mapper_homepage(request):
     if not is_bot(request):
         tally_stat('visualization.scotus_homepage_loaded')
@@ -292,7 +299,6 @@ def mapper_homepage(request):
     )
 
 
-@permission_required('visualizations.has_beta_access')
 @never_cache
 def gallery(request):
     visualizations = SCOTUSMap.objects.filter(

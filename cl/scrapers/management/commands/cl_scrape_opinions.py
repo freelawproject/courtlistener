@@ -34,6 +34,10 @@ die_now = False
 class Command(BaseCommand):
     help = 'Runs the Juriscraper toolkit against one or many jurisdictions.'
 
+    def __init__(self, stdout=None, stderr=None, no_color=False):
+        super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
+        self.cnt = CaseNameTweaker()
+
     def add_arguments(self, parser):
         parser.add_argument(
             '--daemon',
@@ -248,7 +252,6 @@ class Command(BaseCommand):
             raise CommandError('Unable to import module or package. Aborting.')
 
         logger.info("Starting up the scraper.")
-        self.cnt = CaseNameTweaker()
         num_courts = len(module_strings)
         wait = (options['rate'] * 60) / num_courts
         i = 0

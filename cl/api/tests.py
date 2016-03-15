@@ -79,14 +79,14 @@ class BulkDataTest(TestCase):
 
 class BasicAPIPageTest(TestCase):
     """Test the basic views"""
-    fixtures = ['judge_judy.json', 'test_objects_search.json']
+    fixtures = ['court_data.json', 'judge_judy.json',
+                'test_objects_search.json']
 
     def setUp(self):
         self.client = Client()
 
         # Need pagerank file for test_pagerank_file()
-        from cl.search.management.commands.cl_calculate_pagerank_networkx \
-            import Command
+        from cl.search.management.commands.cl_calculate_pagerank import Command
         command = Command()
         command.do_pagerank(chown=False)
 
@@ -137,6 +137,7 @@ class BasicAPIPageTest(TestCase):
 
 class ApiViewTest(TestCase):
     """Tests views in API module via direct calls and not HTTP"""
+    fixtures = ['court_data.json']
 
     def test_coverage_data_view_provides_court_data(self):
         response = coverage_data(HttpRequest(), 'v2', 'ca9')
@@ -148,6 +149,7 @@ class ApiViewTest(TestCase):
 
 def assertCount(cls, path, q, expected_count):
     cls.client.login(username='pandora', password='password')
+    print "Path and q are: %s, %s" % (path, q)
     r = cls.client.get(path, q)
     cls.assertEqual(len(r.data['results']), expected_count,
                     msg="r.data was: %s" % r.data)
@@ -155,11 +157,12 @@ def assertCount(cls, path, q, expected_count):
 
 class DRFJudgeApiFilterTests(TestCase):
     """Do the filters work properly?"""
-    fixtures = ['judge_judy.json', 'user_with_judge_access.json']
+    fixtures = ['judge_judy.json', 'user_with_judge_access.json',
+                'court_data.json']
 
     def test_judge_filtering_by_first_name(self):
         """Can we filter by first name?"""
-        path = reverse('judge-list', kwargs={'version': 'v3'})
+        path = reverse('person-list', kwargs={'version': 'v3'})
 
         # Filtering with good values brings back 1 result.
         q = {'name_first__istartswith': 'judith'}
@@ -171,7 +174,7 @@ class DRFJudgeApiFilterTests(TestCase):
 
     def test_judge_filtering_by_date(self):
         """Do the various date filters work properly?"""
-        path = reverse('judge-list', kwargs={'version': 'v3'})
+        path = reverse('person-list', kwargs={'version': 'v3'})
 
         # Exact match for her birthday
         correct_date = date(1942, 10, 21)
@@ -193,15 +196,15 @@ class DRFJudgeApiFilterTests(TestCase):
         Each of these assertions adds another parameter making our final test
         a pretty complex combination.
         """
-        path = reverse('judge-list', kwargs={'version': 'v3'})
+        path = reverse('person-list', kwargs={'version': 'v3'})
         q = dict()
 
         # No results for a bad query
-        q['educations__degree'] = 'XXX'
+        q['educations__degree_level'] = 'XXX'
         assertCount(self, path, q, 0)
 
         # One result for a good query
-        q['educations__degree'] = 'JD'
+        q['educations__degree_level'] = 'jd'
         assertCount(self, path, q, 1)
 
         # Again, no results
@@ -217,22 +220,22 @@ class DRFJudgeApiFilterTests(TestCase):
         assertCount(self, path, q, 1)
 
         # Moving on to careers. Bad value, then good.
-        q['careers__job_title__icontains'] = 'XXX'
+        q['positions__job_title__icontains'] = 'XXX'
         assertCount(self, path, q, 0)
-        q['careers__job_title__icontains'] = 'lawyer'
+        q['positions__job_title__icontains'] = 'lawyer'
         assertCount(self, path, q, 1)
 
         # Moving on to titles...bad value, then good.
-        q['titles__title_name'] = 'XXX'
+        q['positions__position_type'] = 'XXX'
         assertCount(self, path, q, 0)
-        q['titles__title_name'] = 'c-jud'
+        q['positions__position_type'] = 'c-jud'
         assertCount(self, path, q, 1)
 
         # Political affiliation filtering...bad, then good.
         q['political_affiliations__political_party'] = 'XXX'
         assertCount(self, path, q, 0)
         q['political_affiliations__political_party'] = 'd'
-        assertCount(self, path, q, 1)
+        assertCount(self, path, q, 2)
 
         # Sources
         about_now = '2015-12-17T00:00:00Z'
@@ -240,13 +243,13 @@ class DRFJudgeApiFilterTests(TestCase):
         assertCount(self, path, q, 0)
         q.pop('sources__date_modified__gt')  # Next key doesn't overwrite.
         q['sources__date_modified__lt'] = about_now
-        assertCount(self, path, q, 1)
+        assertCount(self, path, q, 2)
 
         # ABA Ratings
         q['aba_ratings__rating'] = 'q'
         assertCount(self, path, q, 0)
         q['aba_ratings__rating'] = 'nq'
-        assertCount(self, path, q, 1)
+        assertCount(self, path, q, 2)
 
     def test_education_filtering(self):
         """Can we filter education objects?"""
@@ -254,9 +257,9 @@ class DRFJudgeApiFilterTests(TestCase):
         q = dict()
 
         # Filter by degree
-        q['degree'] = 'XXX'
+        q['degree_level'] = 'XXX'
         assertCount(self, path, q, 0)
-        q['degree'] = 'JD'
+        q['degree_level'] = 'jd'
         assertCount(self, path, q, 1)
 
         # Filter by degree's related field, School
@@ -267,20 +270,20 @@ class DRFJudgeApiFilterTests(TestCase):
 
     def test_title_filtering(self):
         """Can Judge Titles be filtered?"""
-        path = reverse('title-list', kwargs={'version': 'v3'})
+        path = reverse('position-list', kwargs={'version': 'v3'})
         q = dict()
 
         # Filter by title_name
-        q['title_name'] = 'XXX'
+        q['position_type'] = 'XXX'
         assertCount(self, path, q, 0)
-        q['title_name'] = 'c-jud'
+        q['position_type'] = 'c-jud'
         assertCount(self, path, q, 1)
 
     def test_reverse_filtering(self):
         """Can we filter Source objects by judge name?"""
         # I want any source notes about judge judy.
         path = reverse('source-list', kwargs={'version': 'v3'})
-        q = {'judge': 1}
+        q = {'person': 2}
         assertCount(self, path, q, 1)
 
     def test_position_filters(self):
@@ -288,12 +291,12 @@ class DRFJudgeApiFilterTests(TestCase):
         path = reverse('position-list', kwargs={'version': 'v3'})
         q = dict()
 
-        # I want positions to do with judge #1 (Judy)
-        q['judge'] = 1
-        assertCount(self, path, q, 1)
+        # I want positions to do with judge #2 (Judy)
+        q['person'] = 2
+        assertCount(self, path, q, 2)
 
         # Retention events
-        q['rentention_events__retention_type'] = 'reapp_gov'
+        q['retention_events__retention_type'] = 'reapp_gov'
         assertCount(self, path, q, 1)
 
         # Appointer was Bill, a Democrat
@@ -306,31 +309,31 @@ class DRFJudgeApiFilterTests(TestCase):
 
     def test_racial_filters(self):
         """Can we filter by race?"""
-        path = reverse('judge-list', kwargs={'version': 'v3'})
+        path = reverse('person-list', kwargs={'version': 'v3'})
         q = {'race': 'w'}
-        assertCount(self, path, q, 1)
+        assertCount(self, path, q, 2)
 
         # Do an OR. This returns judges that are either black or white (not
         # that it matters, MJ)
         q['race'] = ['w', 'b']
-        assertCount(self, path, q, 1)
+        assertCount(self, path, q, 3)
 
     def test_circular_relationships(self):
         """Do filters configured using strings instead of classes work?"""
         path = reverse('education-list', kwargs={'version': 'v3'})
         q = dict()
 
-        # Traverse judges, careers
-        q['judge__careers__job_title__icontains'] = 'xxx'
+        # Traverse person, position
+        q['person__positions__job_title__icontains'] = 'xxx'
         assertCount(self, path, q, 0)
-        q['judge__careers__job_title__icontains'] = 'lawyer'
-        assertCount(self, path, q, 1)
+        q['person__positions__job_title__icontains'] = 'lawyer'
+        assertCount(self, path, q, 2)
 
         # Just traverse to the judge table
-        q['judge__name_first'] = "Judy"  # Nope.
+        q['person__name_first'] = "Judy"  # Nope.
         assertCount(self, path, q, 0)
-        q['judge__name_first'] = "Judith"  # Yep.
-        assertCount(self, path, q, 1)
+        q['person__name_first'] = "Judith"  # Yep.
+        assertCount(self, path, q, 2)
 
     def test_exclusion_filters(self):
         """Can we exclude using !'s?"""
@@ -340,8 +343,8 @@ class DRFJudgeApiFilterTests(TestCase):
         # I want positions to do with any judge other than judge #1
         # Note the exclamation mark. In a URL this would look like
         # "?judge!=1". Fun stuff.
-        q['judge!'] = 1
-        assertCount(self, path, q, 0)   # Alas, there are none.
+        q['person!'] = 2
+        assertCount(self, path, q, 1)   # Bill
 
 
 class DRFSearchAndAudioAppsApiFilterTest(TestCase):
@@ -355,11 +358,11 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
         q = dict()
 
         # Related filters
-        q['panel__id'] = 1
+        q['panel__id'] = 2
         assertCount(self, path, q, 1)
         q['non_participating_judges!'] = 1  # Exclusion filter.
         assertCount(self, path, q, 1)
-        q['sub_opinions__author'] = 1
+        q['sub_opinions__author'] = 2
         assertCount(self, path, q, 4)
 
         # Boolean filter
@@ -385,9 +388,9 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
         assertCount(self, path, q, 6)
 
         # Related filters
-        q['cluster__panel'] = 2
-        assertCount(self, path, q, 0)
         q['cluster__panel'] = 1
+        assertCount(self, path, q, 0)
+        q['cluster__panel'] = 2
         assertCount(self, path, q, 4)
 
         q = dict()
@@ -396,6 +399,7 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
         q['author__name_first__istartswith'] = "jud"
         assertCount(self, path, q, 6)
 
+        q = dict()
         q['joined_by__name_first__istartswith'] = "Nope"
         assertCount(self, path, q, 0)
         q['joined_by__name_first__istartswith'] = "jud"
@@ -480,13 +484,13 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
 
 class DRFFieldSelectionTest(TestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json',
-                'user_with_judge_access.json']
+                'user_with_judge_access.json', 'court_data.json']
 
     def test_only_some_fields_returned(self):
         """Can we return only some of the fields?"""
 
         # First check the Judge endpoint, one of our more complicated ones.
-        path = reverse('judge-list', kwargs={'version': 'v3'})
+        path = reverse('person-list', kwargs={'version': 'v3'})
         fields_to_return = ['educations', 'date_modified', 'slug']
         q = {'fields': ','.join(fields_to_return)}
         self.client.login(username='pandora', password='password')

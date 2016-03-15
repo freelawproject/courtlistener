@@ -1,5 +1,3 @@
-[![Slack Status](https://join-flp-talk.herokuapp.com/badge.svg)](https://join-flp-talk.herokuapp.com/)
-
 The majority of the code is in the "alert" directory.
 
 See INSTALL.md for first steps of installation.

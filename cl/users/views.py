@@ -76,7 +76,6 @@ def view_donations(request):
                               RequestContext(request))
 
 
-@permission_required('visualizations.has_beta_access')
 @login_required
 @never_cache
 def view_visualizations(request):
@@ -86,7 +85,7 @@ def view_visualizations(request):
     ).annotate(
         Count('clusters'),
     ).order_by(
-        '-date_modified',
+        '-date_created',
     )
     paginator = Paginator(visualizations, 20, orphans=2)
     page = request.GET.get('page', 1)
@@ -106,7 +105,6 @@ def view_visualizations(request):
     )
 
 
-@permission_required('visualizations.has_beta_access')
 @login_required
 @never_cache
 def view_deleted_visualizations(request):
@@ -118,7 +116,7 @@ def view_deleted_visualizations(request):
     ).annotate(
         Count('clusters'),
     ).order_by(
-        '-date_modified',
+        '-date_created',
     )
     paginator = Paginator(visualizations, 20, orphans=2)
     page = request.GET.get('page', 1)
