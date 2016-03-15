@@ -746,7 +746,20 @@ class OpinionsCited(models.Model):
         Opinion,
         related_name='citing_opinions',
     )
-
+    depth = models.IntegerField(
+        help_text='The number of times the cited opinion was cited '
+                  'in the citing opinion',
+        default=1,
+        db_index=True,
+    )
+    quoted = models.BooleanField(
+        help_text='Equals true if previous case was quoted directly',
+        default=False,
+        db_index=True,
+    )
+    #treatment: positive, negative, etc.
+    #  
+    
     def __unicode__(self):
         return u'%s ⤜--cites⟶  %s' % (self.citing_opinion.id,
                                         self.cited_opinion.id)
@@ -754,3 +767,4 @@ class OpinionsCited(models.Model):
     class Meta:
         verbose_name_plural = 'Opinions cited'
         unique_together = ("citing_opinion", "cited_opinion")
+
