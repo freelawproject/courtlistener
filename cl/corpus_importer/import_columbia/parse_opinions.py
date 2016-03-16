@@ -9,7 +9,8 @@ import dateutil.parser as dparser
 
 from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
 
-from regexes_columbia import STATE_PAIRS, SPECIAL_REGEXES
+from cl.corpus_importer.court_regexes import STATE_PAIRS
+from regexes_columbia import SPECIAL_REGEXES
 from parse_judges import find_judges
 
 

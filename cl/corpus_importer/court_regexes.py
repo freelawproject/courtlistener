@@ -463,6 +463,51 @@ state_pairs = (
     (re.compile('Court of Appeals? of (of )?Wisconsin', re.I), 'wisctapp'),
         (re.compile('Wisconsin Court of Appeals', re.I), 'wisctapp'),
     (re.compile('Supreme Court (of )?Wyoming', re.I), 'wyo'),
+
+    # new codes by elliott
+    (re.compile('Massachusetts Superior Court', re.I), 'masssuperct'),
+    (re.compile('High Court of Errors and Appeals of Delaware', re.I), 'del'),
+    (re.compile('Court of Errors and Appeals of Delaware', re.I), 'del'),
+    (re.compile('Court of Common Pleas of Delaware', re.I), 'delcompl'),
+    (re.compile('Hawaii Court of Appeals?', re.I), 'hawapp'),
+    (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),
+    (re.compile('Commonwealth of Massachusetts Department of Industrial Accidents', re.I), ''),
+    (re.compile('Minnesota Court of Appeals?', re.I), 'minnctapp'),
+    (re.compile('Minnesota Court of Appeals?', re.I), 'minnctapp'),
+    (re.compile('Appellate Division of the Supreme Court of New York', re.I), 'nyappdiv'),
+    (re.compile('Supreme Court of the State of New York', re.I), 'nysupremect'),
+    
+    # Note that these next three might just become 'nylowercourts'
+    (re.compile('Criminal Court of the City of New York', re.I), 'nycrimct'),
+    (re.compile('Civil Court of the City of New York', re.I), 'nycivct'),
+    (re.compile('Appellate Term of the Supreme Court of New York', re.I), 'nyappterm'),
+
+    (re.compile('Superior Court of North Carolina', re.I), 'ncsuperct'),
+    (re.compile('North Carolina Industrial Commission', re.I), 'ncworkcompcom'),
+    (re.compile('Court of Appeals of Ohio', re.I), 'ohioctapp'),
+    (re.compile('Court of Claims of Ohio', re.I), 'ohioctcl'),
+    (re.compile('Oregon Tax Court', re.I), 'ortc'),
+    (re.compile('State of Rhode Island, Superior Court', re.I), 'risuperct'),
+
+    # attorneys general
+    (re.compile('Attorney General of Arkansas', re.I), 'arkattygenop'),
+    (re.compile('Attorney General of California', re.I), 'calattygenop'),
+    (re.compile('Attorney General of Colorado', re.I), 'coloattygenop'),
+    (re.compile('Attorney General of Florida', re.I), 'flaattygenop'),
+    (re.compile('Attorney General of Kansas', re.I), 'kanattygenop'),
+    (re.compile('Attorney General of Louisiana', re.I), 'laattygenop'),
+    (re.compile('Attorney General of Maryland', re.I), 'mdattygenop'),
+    (re.compile('Attorney General of Missouri', re.I), 'moattygenop'),
+    (re.compile('Attorney General of Nebraska', re.I), 'nebattygenop'),
+    (re.compile('Attorney General of New York', re.I), 'nyattygenop'),
+    (re.compile('Attorney General of Oklahoma', re.I), 'oklaattygenop'),
+    (re.compile('Attorney General of Texas', re.I), 'texattygenop'),
+    (re.compile('Attorney General of Washington', re.I), 'washattygenop'),
+    (re.compile('Attorney General of Wisconsin', re.I), 'wisattygenop'),
+
+    # other items
+    (re.compile('Industrial Claim Appeals Office', re.I), 'coloworkcompcom'),
+    (re.compile('Connecticut Compensation Review Board', re.I), 'connworkcompcom'),
 )
 
 

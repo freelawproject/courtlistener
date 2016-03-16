@@ -13,7 +13,7 @@ def process_date(year,month,day):
     """ return date object and accompanying granularity """
     if pd.isnull(year) or year in ['n/a', 'N/A', 'present']:
         pdate = None
-        granularity = None
+        granularity = ''
     elif pd.isnull(month):
         pdate = date(int(year),1,1)
         granularity = GRANULARITY_YEAR
@@ -28,7 +28,7 @@ def process_date(year,month,day):
 from collections import Counter
 C = Counter() # for fixing school names.
     
-def get_school(schoolname):
+def get_school(schoolname, testing=False):
     "Takes the name of a school from judges data and tries to match to a unique School object."        
     
     if schoolname.isspace():
@@ -143,7 +143,7 @@ def get_suffix(suffstr):
                 'III': '3',
                 'IV': '4'}
     if pd.isnull(suffstr):
-        return None
+        return ''
     else:
         return suffdict[suffstr]    
               
