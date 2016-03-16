@@ -184,7 +184,7 @@ class Command(BaseCommand):
                 except IndexError:
                     next_date = None
 
-                sha1_hash = hashlib.sha1(content).hexdigest()
+                sha1_hash = hashlib.sha1(content.encode('utf-8')).hexdigest()
                 if court_str == 'nev' and \
                                 item['precedential_statuses'] == 'Unpublished':
                     # Nevada's non-precedential cases have different SHA1

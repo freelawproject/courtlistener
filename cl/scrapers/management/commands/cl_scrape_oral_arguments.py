@@ -115,7 +115,7 @@ class Command(cl_scrape_opinions.Command):
                 except IndexError:
                     next_date = None
 
-                sha1_hash = hashlib.sha1(content).hexdigest()
+                sha1_hash = hashlib.sha1(content.encode('utf-8')).hexdigest()
                 onwards = dup_checker.press_on(
                     Audio,
                     current_date,
