@@ -28,13 +28,14 @@ FILE_COMPLETE = "_complete"
 STATUS_TASK_ADDED  = 'TASK ADDED'
 
 # Creating an independent file path
-DOWNLOAD_CSV_FILEPATH = "%s/recap/"%settings.MEDIA_ROOT
+DOWNLOAD_CSV_FILEPATH = "%srecap/"%settings.MEDIA_ROOT
 
 DOWNLOAD_REFERENCE_FILEPATH = DOWNLOAD_CSV_FILEPATH + "recap_csv_file_reference.csv"
 DOWNLOAD_REFERENCE_RESULT_FILEPATH = DOWNLOAD_CSV_FILEPATH + "recap_csv_file_reference_results.csv"
 DOWNLOAD_MAX_XML_PER_TASK = 100000
 
 PARSED_FILES_TRACKER_FILEPATH = DOWNLOAD_CSV_FILEPATH + "parsed_files_tracker.csv"
+UNSAVED_JUDGES_FILEPATH = DOWNLOAD_CSV_FILEPATH + "unsaved_recap_judges.csv"
 
 IA_URL_PREFIX = "https://archive.org/download/"
 IA_XML_DOCKET_PATH_FORMAT_STRING = IA_URL_PREFIX + "%s/%s.docket.xml"

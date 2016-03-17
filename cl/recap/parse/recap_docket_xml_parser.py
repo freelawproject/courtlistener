@@ -2,6 +2,7 @@
 
 import re, os, sys
 import pytz
+import csv
 import argparse
 from django.core.exceptions import ObjectDoesNotExist
 from bs4 import BeautifulSoup
@@ -15,7 +16,10 @@ sys.path.append(os.path.abspath('..'))
 sys.path.append(os.path.abspath('../../../'))
 from recap_constants import *
 from cl.search.models import *
-from cl.judges.models import Judge, Position
+from cl.people_db.models import Position
+
+# Stopwords that appear in the judge names
+JUDGE_STOPWORDS_LIST = ['magistrate', 'judge', 'hon\.', 'honorable', 'chief', 'senior', 'district']
 
 class DocumentType:
     PACER_DOCUMENT = 1
@@ -98,15 +102,21 @@ def get_reformated_value_from_xml(xml_tag, format_type):
         judge_full_name = xml_tag.string if xml_tag else None
         if judge_full_name:
             # Removing the Noise in the name and making a
-            judge_full_name_reformed = re.sub('(M|m)agistrate|(J|j)udge', '', judge_full_name)
+            judge_full_name_reformed = re.sub("|".join(map((lambda x : re.sub('^.', "(%s|%s)"%(x[0].upper(), x[0].lower()), x)),JUDGE_STOPWORDS_LIST)), '', judge_full_name).strip()
+
             if judge_full_name_reformed:
                 judge_name_list = judge_full_name_reformed.split()
                 return_obj = judge_name_list
 
     return return_obj
 
+
 def get_judge_obj(judge_names_list, court_obj, filing_date):
-    judge_lname = judge_names_list[:-1]
+
+    # Converting all to the lowercase
+    lowered_judge_names_list = list(map((lambda x : x.lower()), judge_names_list))
+    # Assuming the last string value in the list is that last name.
+    judge_lname = lowered_judge_names_list[:-1]
 
     # Identifying the Judge using combination of last name court and date_start.
     # Last name is used to avoid chances of having nicknames in the First Name
@@ -114,11 +124,14 @@ def get_judge_obj(judge_names_list, court_obj, filing_date):
 
     # Filing date is not a mandatory argument. Therefore checking if there is a filing date
     if filing_date:
-        judge_pos_qs = Position.objects.filter(judge__name_last=judge_lname,
-                                                court=court_obj,
-                                                date_start__lte=filing_date)
+        judge_pos_qs = Position.objects.filter(person__name_last=judge_lname,
+                                               position_type = "Judge",
+                                               court=court_obj,
+                                               date_start__lte=filing_date)
     else:
-        judge_pos_qs = Position.objects.filter(judge__name_last=judge_lname, court=court_obj)
+        judge_pos_qs = Position.objects.filter(person__name_last=judge_lname,
+                                               position_type = "Judge",
+                                               court=court_obj)
 
     judge_obj = None
     if judge_pos_qs:
@@ -143,6 +156,8 @@ def parser(recap_docket_xml_filepath):
     # Getting the docket file name
     # For example: 'gov.uscourts.ilcd.61910'
     docket_url_name = re.search('(?P<docket>gov\.uscourts\.(.*))\.docket', recap_docket_xml_filepath).group('docket')
+    # A dictionary to keep a record of unsaved judges
+    unsaved_judge_dict = {}
 
     with open(recap_docket_xml_filepath, 'r') as docket_fp:
         docket_xml_content = docket_fp.read()
@@ -173,6 +188,8 @@ def parser(recap_docket_xml_filepath):
                 judge_obj = get_judge_obj(judge_names_list, court_obj, date_filed)
                 if judge_obj:
                     assigned_to = judge_obj
+                else:
+                    unsaved_judge_dict[(' '.join(judge_names_list), court_obj)] = True
 
             # Getting the Judge Object for referred_to
             referred_to = None
@@ -181,6 +198,8 @@ def parser(recap_docket_xml_filepath):
                 judge_obj = get_judge_obj(judge_names_list, court_obj, date_filed)
                 if judge_obj:
                     referred_to = judge_obj
+                else:
+                    unsaved_judge_dict[(' '.join(judge_names_list), court_obj)] = True
 
             try:
                 docket_obj = Docket.objects.get(court=court_obj, pacer_case_id=pacer_case_num)
@@ -276,7 +295,7 @@ def parser(recap_docket_xml_filepath):
     else:
         raise Exception("Could not read the XML contents")
 
-    return
+    return unsaved_judge_dict
 
 
 if __name__ == '__main__':
