@@ -190,8 +190,8 @@ df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx',0)
 for x in textfields:
     df[x] = df[x].replace(np.nan,'',regex=True)
 
-for i, row in df.iterrows():    
-    make_federal_judge(dict(row),testing=False)
+#for i, row in df.iterrows():    
+#    make_federal_judge(dict(row),testing=False)
 
 
 
