@@ -31,6 +31,17 @@ DATE_GRANULARITIES = (
 
 
 class Person(models.Model):
+    RELIGIONS = (
+    ('ca', 'Catholic'),
+    ('pr', 'Protestant'),
+    ('je', 'Jewish'),
+    ('mu', 'Muslim'),
+    ('at', 'Atheist'),
+    ('ag', 'Agnostic'),
+    ('mo', 'Mormon'),
+    ('bu', 'Buddhist'),
+    ('hi', 'Hindu')
+    )
     race = models.ManyToManyField(
         'Race',
         blank=True,
@@ -112,6 +123,12 @@ class Person(models.Model):
     gender = models.CharField(
         choices=GENDERS,
         max_length=2,
+        blank = True
+    )
+    religion = models.CharField(
+        choices=RELIGIONS,
+        max_length=2,
+        blank=True
     )
 
     def __unicode__(self):

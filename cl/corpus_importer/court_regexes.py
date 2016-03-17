@@ -179,6 +179,47 @@ fd_pairs = (
     (re.compile('N(\.|(orthern)) Mariana', re.I), 'nmid'),
     (re.compile('Puerto Rico', re.I), 'prd'),
     (re.compile('Virgin Islands', re.I), 'vid'),
+
+     (re.compile('U. S. Court of Customs Appeals', re.I), ''),
+     (re.compile(u'Commerce Court', re.I), ''),
+     (re.compile(u'Court of Claims', re.I), ''),
+     (re.compile(u'Supreme Court of the United States', re.I), ''),
+     (re.compile(u'U. S. Circuit Court for the Districts of California', re.I), ''),
+     (re.compile(u'U. S. Circuit Court for the Fifth Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Court for the First Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Court for the Fourth Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Court for the Second Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Court for the Sixth Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Court for the Third Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Courts for the Eighth Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Courts for the Fifth Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Courts for the First Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Courts for the Fourth Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Courts for the Ninth Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Courts for the Second Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Courts for the Seventh Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Courts for the Sixth Circuit', re.I), ''),
+     (re.compile(u'U. S. Circuit Courts for the Third Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the District of Columbia Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Eighth Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Eleventh Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Federal Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Fifth Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the First Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Fourth Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Ninth Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Second Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Seventh Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Sixth Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Tenth Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Appeals for the Third Circuit', re.I), ''),
+     (re.compile(u'U. S. Court of Customs and Patent Appeals', re.I), ''),
+     (re.compile(u'U. S. Court of International Trade', re.I), ''),
+     (re.compile(u'U. S. Customs Court', re.I), ''),
+     (re.compile(u'U. S. District Court for the District of Columbia', re.I), ''),
+     (re.compile(u'U. S. District Court for the Eastern District of New Jersey', re.I), ''),
+     (re.compile(u'U. S. District Court for the Western District of New Jersey', re.I), ''),     
+
 )
 
 fb_pairs = (
@@ -463,6 +504,51 @@ state_pairs = (
     (re.compile('Court of Appeals? of (of )?Wisconsin', re.I), 'wisctapp'),
         (re.compile('Wisconsin Court of Appeals', re.I), 'wisctapp'),
     (re.compile('Supreme Court (of )?Wyoming', re.I), 'wyo'),
+
+    # new codes by elliott
+    (re.compile('Massachusetts Superior Court', re.I), 'masssuperct'),
+    (re.compile('High Court of Errors and Appeals of Delaware', re.I), 'del'),
+    (re.compile('Court of Errors and Appeals of Delaware', re.I), 'del'),
+    (re.compile('Court of Common Pleas of Delaware', re.I), 'delcompl'),
+    (re.compile('Hawaii Court of Appeals?', re.I), 'hawapp'),
+    (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),
+    (re.compile('Commonwealth of Massachusetts Department of Industrial Accidents', re.I), ''),
+    (re.compile('Minnesota Court of Appeals?', re.I), 'minnctapp'),
+    (re.compile('Minnesota Court of Appeals?', re.I), 'minnctapp'),
+    (re.compile('Appellate Division of the Supreme Court of New York', re.I), 'nyappdiv'),
+    (re.compile('Supreme Court of the State of New York', re.I), 'nysupremect'),
+    
+    # Note that these next three might just become 'nylowercourts'
+    (re.compile('Criminal Court of the City of New York', re.I), 'nycrimct'),
+    (re.compile('Civil Court of the City of New York', re.I), 'nycivct'),
+    (re.compile('Appellate Term of the Supreme Court of New York', re.I), 'nyappterm'),
+
+    (re.compile('Superior Court of North Carolina', re.I), 'ncsuperct'),
+    (re.compile('North Carolina Industrial Commission', re.I), 'ncworkcompcom'),
+    (re.compile('Court of Appeals of Ohio', re.I), 'ohioctapp'),
+    (re.compile('Court of Claims of Ohio', re.I), 'ohioctcl'),
+    (re.compile('Oregon Tax Court', re.I), 'ortc'),
+    (re.compile('State of Rhode Island, Superior Court', re.I), 'risuperct'),
+
+    # attorneys general
+    (re.compile('Attorney General of Arkansas', re.I), 'arkattygenop'),
+    (re.compile('Attorney General of California', re.I), 'calattygenop'),
+    (re.compile('Attorney General of Colorado', re.I), 'coloattygenop'),
+    (re.compile('Attorney General of Florida', re.I), 'flaattygenop'),
+    (re.compile('Attorney General of Kansas', re.I), 'kanattygenop'),
+    (re.compile('Attorney General of Louisiana', re.I), 'laattygenop'),
+    (re.compile('Attorney General of Maryland', re.I), 'mdattygenop'),
+    (re.compile('Attorney General of Missouri', re.I), 'moattygenop'),
+    (re.compile('Attorney General of Nebraska', re.I), 'nebattygenop'),
+    (re.compile('Attorney General of New York', re.I), 'nyattygenop'),
+    (re.compile('Attorney General of Oklahoma', re.I), 'oklaattygenop'),
+    (re.compile('Attorney General of Texas', re.I), 'texattygenop'),
+    (re.compile('Attorney General of Washington', re.I), 'washattygenop'),
+    (re.compile('Attorney General of Wisconsin', re.I), 'wisattygenop'),
+
+    # other items
+    (re.compile('Industrial Claim Appeals Office', re.I), 'coloworkcompcom'),
+    (re.compile('Connecticut Compensation Review Board', re.I), 'connworkcompcom'),
 )
 
 
@@ -486,8 +572,9 @@ try:
                            'judge_stats.pkl'), 'rb') as fix_file:
         judge_stats = pickle.load(fix_file)
 except (IOError, EOFError):
-    print "Unable to load judge_stats.pkl"
-    sys.exit(1)
+    pass
+#    print "Unable to load judge_stats.pkl"
+#    sys.exit(1)
 
 
 def disambiguate_by_judge(judge, threshold=0.85):
