@@ -9,6 +9,7 @@ from datetime import date
 from celery.task.sets import subtask
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
+from django.utils.encoding import force_bytes
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -184,9 +185,11 @@ class Command(BaseCommand):
                 except IndexError:
                     next_date = None
 
-                sha1_hash = hashlib.sha1(content).hexdigest()
-                if court_str == 'nev' and \
-                                item['precedential_statuses'] == 'Unpublished':
+                # request.content is sometimes a str, sometimes unicode, so
+                # force it all to be bytes, pleasing hashlib.
+                sha1_hash = hashlib.sha1(force_bytes(content)).hexdigest()
+                if (court_str == 'nev' and
+                        item['precedential_statuses'] == 'Unpublished'):
                     # Nevada's non-precedential cases have different SHA1
                     # sums every time.
                     lookup_params = {'lookup_value': item['download_urls'],
