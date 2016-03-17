@@ -158,7 +158,7 @@ def make_state_judge(item, testing=False):
         for url in urls:
             source = Source(
                 person = person,
-                notes = item['notes']
+                notes = item['notes'],
                 url = url
             )
             if not testing: 
