@@ -123,6 +123,7 @@ class Person(models.Model):
     gender = models.CharField(
         choices=GENDERS,
         max_length=2,
+        blank = True
     )
     religion = models.CharField(
         choices=RELIGIONS,

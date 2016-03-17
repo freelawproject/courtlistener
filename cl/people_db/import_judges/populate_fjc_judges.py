@@ -1,11 +1,24 @@
 # -*- coding: utf-8 -*-
 
+import re
 
-from datetime import date
-from cl.corpus_importer.import_columbia.parse_opinions import get_court_object
+from cl.corpus_importer.court_regexes import fd_pairs
 from cl.people_db.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
 from cl.people_db.import_judges.judge_utils import get_school, process_date, get_races, \
                                                     get_party, get_suffix, get_aba, get_degree_level
+
+def get_court_object(raw_court):
+    if '.' in raw_court:
+        j = raw_court.find('.')
+        raw_court = raw_court[:j]
+    if ',' in raw_court:
+        j = raw_court.find(',')
+        raw_court = raw_court[:j]
+    for regex, value in fd_pairs:
+        if re.search(regex, raw_court):
+            return value
+    return None
+
     
 def make_federal_judge(item, testing=False):
     """Takes the federal judge data <item> and associates it with a Judge object.
@@ -19,9 +32,10 @@ def make_federal_judge(item, testing=False):
     dob_city = item['Place of Birth (City)']
     dob_state = item['Place of Birth (State)']
     
-    check = Person.objects.filter(name_first=item['firstname'], name_last=item['lastname'], date_dob=date_dob)
+    check = Person.objects.filter(fjc_id=item['Judge Identification Number'])
     if len(check) > 0:
-        print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.')        
+        print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.')  
+        
 
 
     date_dod, date_granularity_dod = process_date(item['Death year'], 
@@ -34,10 +48,10 @@ def make_federal_judge(item, testing=False):
     # instantiate Judge object    
     person = Person(
         name_first = item['firstname'],
-        name_middle = item['Judge Middle Name'],
+        name_middle = item['midname'],
         name_last = item['lastname'],
-        name_suffix = get_suffix(item['Suffix']),
-        gender = item['Gender'],        
+        name_suffix = get_suffix(item['suffname']),
+        gender = item['gender'],        
         fjc_id = item['Judge Identification Number'],
         
         date_dob = date_dob,
@@ -53,14 +67,12 @@ def make_federal_judge(item, testing=False):
     if not testing:
         person.save()
         
-    listraces = get_races(item['Race or Ethnicity'])
-    races = [Race(race=r) for r in listraces]
-    for r in races:
-        race = Race(                
-                race = r
-        )
-        if not testing:
-            person.race.add(race)
+#    listraces = get_races(item['race'])
+#    races = [Race(race=r) for r in listraces]
+#    for r in races:
+#        if not testing:
+#            r.save()
+#            person.race.add(r)
     
     # add position items (up to 6 of them)   
     for posnum in range(1,7):
@@ -72,6 +84,8 @@ def make_federal_judge(item, testing=False):
         if pd.isnull(item['Court Name'+pos_str]):
             continue
         courtid = get_court_object(item['Court Name'+pos_str])                        
+        if courtid is None:
+            raise
         
         date_nominated = item['Nomination Date Senate Executive Journal']
         date_recess_appointment = item['Recess Appointment date']
@@ -161,12 +175,35 @@ def make_federal_judge(item, testing=False):
             if not testing:
                 degree.save()
      
-    
+
+  
     
 
-if __name__ == '__main__':
-    import pandas as pd
-    fed_df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx',0)
-    fed_df = fed_df.where((pd.notnull(fed_df)), None)
-    for i, row in fed_df.iterrows():    
-        make_federal_judge(dict(row),testing=True)
+#if __name__ == '__main__':
+import pandas as pd
+import numpy as np
+textfields = ['firstname','midname','lastname','gender',
+              'Place of Birth (City)','Place of Birth (State)',
+              'Place of Death (City)','Place of Death (State)']
+
+df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx',0)
+for x in textfields:
+    df[x] = df[x].replace(np.nan,'',regex=True)
+
+for i, row in df.iterrows():    
+    make_federal_judge(dict(row),testing=False)
+
+
+
+# test courts
+missing_courts = []  
+
+for i, row in df.iterrows():   
+    for posnum in range(1,7):
+        if posnum > 1:
+            pos_str = ' (%s)'%posnum
+        else:
+            pos_str = ''
+        courtid = get_court_object(row['Court Name'+pos_str])                        
+        if courtid is None:
+            print(row['Court Name'+pos_str])

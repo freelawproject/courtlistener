@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from django.utils.timezone import now
 from datetime import date
 
 from cl.corpus_importer.import_columbia.parse_opinions import get_court_object
@@ -20,24 +19,29 @@ def make_state_judge(item, testing=False):
                                                   item['deathmonth'], 
                                                   item['deathday'])  
     
+    if item['firstname'] == '':
+        return
+    
     check = Person.objects.filter(name_first=item['firstname'], name_last=item['lastname'], date_dob=date_dob)
     if len(check) > 0:
-        print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.')        
+        print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.') 
+        person = check[0]          
+    else:
         
-    person = Person(
-        name_first = item['firstname'],
-        name_middle = item['midname'],
-        name_last = item['lastname'],
-        name_suffix = get_suffix(item['suffname']),
-        gender = item['gender'],        
-        date_dob = date_dob,
-        date_granularity_dob = date_granularity_dob,
-        date_dod = date_dod,
-        date_granularity_dod = date_granularity_dod                         
-    )
-    
-    if not testing:
-        person.save()
+        person = Person(
+            name_first = item['firstname'],
+            name_middle = item['midname'],
+            name_last = item['lastname'],
+            name_suffix = get_suffix(item['suffname']),
+            gender = item['gender'],        
+            date_dob = date_dob,
+            date_granularity_dob = date_granularity_dob,
+            date_dod = date_dod,
+            date_granularity_dod = date_granularity_dod                         
+        )
+        
+        if not testing:
+            person.save()
         
     courtid = get_court_object(item['court'] + ' of ' + item['state'])
     
@@ -107,11 +111,11 @@ def make_state_judge(item, testing=False):
             continue
         position_type = None                     
         if 'judge' in jobvar:
-            position_type = 'judge'
+            position_type = 'jud'
         elif 'private' in jobvar:
             position_type = 'prac'
         elif 'politician' in jobvar:
-            position_type = 'pol'
+            position_type = 'legis'
         elif 'prof' in jobvar:
             position_type = 'prof'            
             
@@ -159,16 +163,17 @@ def make_state_judge(item, testing=False):
             if not testing: 
                 source.save()                 
 
-if __name__ == '__main__':
-    import pandas as pd
-    import numpy as np
-    textfields = ['firstname','midname','lastname','gender',
-               'howended']
-    df = pd.read_excel('/vagrant/flp/columbia_data/judges/supreme-court-judgebios-2016-02-27.xlsx', 0)    
-    for x in textfields:
-        df[x] = df[x].replace(np.nan,'',regex=True)
-        make_state_judge(dict(row), testing=True)
-    
-    df = pd.read_excel('/vagrant/flp/columbia_data/judges/iac-judgebios-2016-01-19.xlsx', 0)   
-    for i, row in df.iterrows():    
-        make_state_judge(dict(row), testing=True)
+#if __name__ == '__main__':
+import pandas as pd
+import numpy as np
+textfields = ['firstname','midname','lastname','gender',
+           'howended']
+df = pd.read_excel('/vagrant/flp/columbia_data/judges/supreme-court-judgebios-2016-02-27.xlsx', 0)    
+for x in textfields:
+    df[x] = df[x].replace(np.nan,'',regex=True)
+for i, row in df.iterrows():   
+    make_state_judge(dict(row), testing=False)
+
+#df = pd.read_excel('/vagrant/flp/columbia_data/judges/iac-judgebios-2016-01-19.xlsx', 0)   
+#for i, row in df.iterrows():    
+#    make_state_judge(dict(row), testing=True)
