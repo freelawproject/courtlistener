@@ -164,9 +164,6 @@ class Person(models.Model):
         ])
 
     class Meta:
-        permissions = (
-            ('has_beta_api_access', 'Can access features during beta period.'),
-        )
         verbose_name_plural = "people"
 
 
@@ -630,6 +627,7 @@ class Race(models.Model):
     race = models.CharField(
         choices=RACES,
         max_length=5,
+        unique=True,
     )
 
     def __unicode__(self):

@@ -398,6 +398,14 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
+        # Disable SuspiciousOperation.DisallowedHost exception ("Invalid
+        # HTTP_HOST" header messages.) This appears to be caused by clients that
+        # don't support SNI, and which are browsing to other domains on the
+        # server. The most relevant bad client is the googlebot.
+        'django.security.DisallowedHost': {
+            'handlers': ['null'],
+            'propagate': False,
+        },
         # This is the one that's used practically everywhere in the code.
         'cl': {
             'handlers': ['log_file'],
