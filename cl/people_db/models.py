@@ -147,9 +147,6 @@ class Person(models.Model):
         ])
 
     class Meta:
-        permissions = (
-            ('has_beta_api_access', 'Can access features during beta period.'),
-        )
         verbose_name_plural = "people"
 
 
