@@ -5,7 +5,8 @@ import re
 from cl.corpus_importer.court_regexes import fd_pairs
 from cl.people_db.models import Person, Position, Education, Race, PoliticalAffiliation, Source, ABARating
 from cl.people_db.import_judges.judge_utils import get_school, process_date, get_races, \
-                                                    get_party, get_suffix, get_aba, get_degree_level
+                                                    get_party, get_suffix, get_aba, get_degree_level, \
+                                                    process_date_string
 
 def get_court_object(raw_court):
     for regex, value in fd_pairs:
@@ -29,7 +30,7 @@ def make_federal_judge(item, testing=False):
     check = Person.objects.filter(fjc_id=item['Judge Identification Number'])
     if len(check) > 0:
         print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.')  
-        
+        return
 
 
     date_dod, date_granularity_dod = process_date(item['Death year'], 
@@ -81,21 +82,40 @@ def make_federal_judge(item, testing=False):
         if courtid is None:
             raise
         
-        date_nominated = item['Nomination Date Senate Executive Journal']
-        date_recess_appointment = item['Recess Appointment date']
-        date_referred_to_judicial_committee = item['Referral date (referral to Judicial Committee)']
-        date_judicial_committee_action = item['Committee action date']
-        date_hearing = item['Hearings']
-        date_confirmation = item['Senate Vote Date (Confirmation Date)']
+        date_nominated = process_date_string(item['Nomination Date Senate Executive Journal'])
+        date_recess_appointment = process_date_string(item['Recess Appointment date'])
+        date_referred_to_judicial_committee = process_date_string(item['Referral date (referral to Judicial Committee)'])
+        date_judicial_committee_action = process_date_string(item['Committee action date'])
+        date_hearing = process_date_string(item['Hearings'])
+        date_confirmation = process_date_string(item['Senate Vote Date (Confirmation Date)'])
         
         # assign start date
-        date_start = item['Commission Date'+pos_str]
-        date_termination = item['Date of Termination'+pos_str]        
-        date_retirement = item['Retirement from Active Service'+pos_str]
+        date_start = process_date_string(item['Commission Date'+pos_str])
+        date_termination = process_date_string(item['Date of Termination'+pos_str])        
+        date_retirement = process_date_string(item['Retirement from Active Service'+pos_str])
+        
+        if date_termination is None:
+            date_granularity_termination = ''
+        else:
+            date_granularity_termination = '%Y-%m-%d'
     
-        date_confirmation = None
         votes_yes = None
         votes_no = None
+        
+        termdict = {'Abolition of Court':'abolished',
+                    'Death':'ded',
+                    'Reassignment':'other_pos',
+                    'Appointment to Another Judicial Position': 'other_pos',
+                    'Impeachment & Conviction':'bad_judge',
+                    'Recess Appopintment-Not Confirmed':'recess_not_confirmed',
+                    'Resignation':'resign',
+                    'Retirement':'retire_vol'
+                    }
+        term_reason = item['Termination specific reason'+pos_str]
+        if pd.isnull(term_reason):
+            term_reason = ''
+        else:
+            term_reason = termdict[term_reason]
         
         position = Position(
             person = person,
@@ -111,13 +131,13 @@ def make_federal_judge(item, testing=False):
             date_start = date_start,
             date_granularity_start = '%Y-%m-%d',
             date_termination = date_termination,
-            date_granularity_termination = '%Y-%m-%d',
+            date_granularity_termination = date_granularity_termination,
             date_retirement = date_retirement,
             
             votes_yes = votes_yes,
             votes_no = votes_no,
             how_selected = 'a_pres',
-            termination_reason = item['Termination specific reason'+pos_str]
+            termination_reason = term_reason
         )
         
         if not testing:
@@ -184,22 +204,6 @@ df = pd.read_excel('/vagrant/flp/columbia_data/judges/fjc-data.xlsx',0)
 for x in textfields:
     df[x] = df[x].replace(np.nan,'',regex=True)
 
-#for i, row in df.iterrows():    
-#    make_federal_judge(dict(row),testing=False)
+for i, row in df.iterrows():    
+    make_federal_judge(dict(row),testing=False)
 
-
-
-# test courts
-missing_courts = set()  
-
-for i, row in df.iterrows():   
-    for posnum in range(1,7):
-        if posnum > 1:
-            pos_str = ' (%s)'%posnum
-        else:
-            pos_str = ''
-        if pd.isnull(row['Court Name'+pos_str]):
-            continue
-        courtid = get_court_object(row['Court Name'+pos_str])                        
-        if courtid is None:
-            missing_courts.add(row['Court Name'+pos_str])

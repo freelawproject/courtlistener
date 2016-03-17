@@ -521,20 +521,14 @@ state_pairs = (
     (re.compile('Court of Errors and Appeals of Delaware', re.I), 'del'),
     (re.compile('Court of Common Pleas of Delaware', re.I), 'delcompl'),
     (re.compile('Hawaii Court of Appeals?', re.I), 'hawapp'),
-    (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),
-    (re.compile('Commonwealth of Massachusetts Department of Industrial Accidents', re.I), ''),
-    (re.compile('Minnesota Court of Appeals?', re.I), 'minnctapp'),
+    (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),    
     (re.compile('Minnesota Court of Appeals?', re.I), 'minnctapp'),
     (re.compile('Appellate Division of the Supreme Court of New York', re.I), 'nyappdiv'),
     (re.compile('Supreme Court of the State of New York', re.I), 'nysupremect'),
-    
-    # Note that these next three might just become 'nylowercourts'
     (re.compile('Criminal Court of the City of New York', re.I), 'nycrimct'),
     (re.compile('Civil Court of the City of New York', re.I), 'nycivct'),
     (re.compile('Appellate Term of the Supreme Court of New York', re.I), 'nyappterm'),
-
-    (re.compile('Superior Court of North Carolina', re.I), 'ncsuperct'),
-    (re.compile('North Carolina Industrial Commission', re.I), 'ncworkcompcom'),
+    (re.compile('Superior Court of North Carolina', re.I), 'ncsuperct'),    
     (re.compile('Court of Appeals of Ohio', re.I), 'ohioctapp'),
     (re.compile('Court of Claims of Ohio', re.I), 'ohioctcl'),
     (re.compile('Oregon Tax Court', re.I), 'ortc'),
@@ -556,9 +550,11 @@ state_pairs = (
     (re.compile('Attorney General of Washington', re.I), 'washattygenop'),
     (re.compile('Attorney General of Wisconsin', re.I), 'wisattygenop'),
 
-    # other items
+    # worker's compensation commissions
     (re.compile('Industrial Claim Appeals Office', re.I), 'coloworkcompcom'),
     (re.compile('Connecticut Compensation Review Board', re.I), 'connworkcompcom'),
+    (re.compile('Commonwealth of Massachusetts Department of Industrial Accidents', re.I), 'maworkcompcom'),
+    (re.compile('North Carolina Industrial Commission', re.I), 'ncworkcompcom'),
 )
 
 

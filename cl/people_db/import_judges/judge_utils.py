@@ -4,7 +4,7 @@ Created on Wed Feb 17 12:31:34 2016
 
 @author: elliott
 """
-from datetime import date
+from datetime import date, datetime
 from cl.people_db.models import School, GRANULARITY_YEAR, GRANULARITY_MONTH, GRANULARITY_DAY
 import pandas as pd
 import re
@@ -24,6 +24,15 @@ def process_date(year,month,day):
         pdate = date(int(year),int(month),int(day))
         granularity = GRANULARITY_DAY
     return pdate, granularity
+
+def process_date_string(date_input):
+    
+    if pd.isnull(date_input):
+        return None
+    
+    date_object = datetime.strptime(date_input, '%m/%d/%Y')
+    
+    return date_object
 
 from collections import Counter
 C = Counter() # for fixing school names.
@@ -93,7 +102,7 @@ def get_school(schoolname, testing=False):
     return None
 
 def get_degree_level(degstr):
-    if degstr is None:
+    if pd.isnull(degstr):
         return None
     degdict = {'ba': ['ba','ab','bs','bae','barch','bba','bbs','bcs',
                       'bsee','phb','blitt','littb'],

@@ -6686,5 +6686,347 @@
             "has_oral_argument_scraper": false,
             "start_date": null
         }
+    },
+    {
+        "pk": "caca",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "F",            
+            "citation_string": "",
+            "short_name": "California Circuit",
+            "in_use": false,
+            "url": "http://www.fjc.gov/history/home.nsf/page/landmark_07.html",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "Circuit Court for California",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": "1804-10-01",
+            "end_date": "1812-04-30"
+        }
+    },
+    {
+        "pk": "orld",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "Orleans District Court",
+            "in_use": false,
+            "url": "https://en.wikipedia.org/wiki/United_States_District_Court_for_the_District_of_Orleans",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, Orleans",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": "1804-10-01",
+            "end_date": "1812-04-08"
+        }
+    },
+    {
+        "pk": "ald",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Alabama",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Alabama",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "fld",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Florida",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Florida",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "gad",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Georgia",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Georgia",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "iad",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Iowa",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Iowa",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "kyd",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Kentucky",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Kentucky",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "lad",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Louisiana",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Louisiana",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "michd",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Michigan",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Michigan",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "missd",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Mississippi",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Mississippi",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "mod",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Missouri",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Missouri",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "nyd",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. New York",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. New York",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "ncd",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. North Carolina",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. North Carolina",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "texd",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Texas",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Texas",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "vad",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Virginia",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Virginia",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "washd",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Washington",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Washington",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "wvad",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. West Virginia",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. West Virginia",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
+    },
+    {
+        "pk": "wisd",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",            
+            "citation_string": "",
+            "short_name": "D. Wisconsin",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "date_modified": "2016-03-17T01:01:01Z",
+            "full_name": "District Court, D. Wisconsin",
+            "position": null,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
+            "start_date": null,
+            "end_date": null
+        }
     }
 ]

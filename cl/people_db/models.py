@@ -599,7 +599,7 @@ class Education(models.Model):
     )
     degree_level = models.CharField(
         choices=DEGREE_LEVELS,
-        max_length=2,
+        max_length=3,
         blank=True,
     )
     degree = models.CharField(
