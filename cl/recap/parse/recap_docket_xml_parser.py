@@ -19,7 +19,18 @@ from cl.search.models import *
 from cl.people_db.models import Position
 
 # Stopwords that appear in the judge names
-JUDGE_STOPWORDS_LIST = ['magistrate', 'judge', 'hon\.', 'honorable', 'chief', 'senior', 'district']
+JUDGE_STOPWORDS_LIST = ['magistrate', 'hon\.', 'honorable', 'justice', 'arj', 'chief', 'prior', 'dissent', 'further'
+    ,'page', 'did', 'not', 'sit', 'conferences','submitted'
+    ,'participate', 'participation', 'issuance', 'consultation', 'his', 'resul', 'furth', 'even', 'district'
+    ,'though', 'argument', 'qualified', 'present', 'majority', 'specially', 'the', 'concurrence', 'initial'
+    ,'concurring', 'final', 'may', 'dissenting', 'opinion', 'decision', 'conference', 'this', 'adopted', 'but'
+    ,'retired', 'before', 'certified', 'sat', 'oral', 'resigned', 'case', 'member', 'time', 'preparation'
+    ,'joined', 'active', 'while', 'order', 'participated', 'was', 'fellows', 'although', 'available'
+    ,'authorized', 'continue', 'capacity', 'died', 'panel', 'sitting', 'judge', 'and', 'judges', 'senior', 'justices'
+    ,'superior', 'court', 'pro', 'tem', 'participating', 'appeals', 'appellate', 'per', 'curiam', 'presiding'
+    ,'supernumerary', 'circuit', 'appellate', 'part', 'division', 'vice', 'result', 'judgment', 'special', 'italic'
+    ,'bold', 'denials', 'transfer', 'center', 'with', 'indiana', 'commissioner', 'dissents', 'acting', 'footnote'
+    ,'reference', 'concurred']
 
 class DocumentType:
     PACER_DOCUMENT = 1
