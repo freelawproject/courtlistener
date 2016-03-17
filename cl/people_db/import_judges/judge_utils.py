@@ -102,8 +102,8 @@ def get_school(schoolname, testing=False):
     return None
 
 def get_degree_level(degstr):
-    if pd.isnull(degstr):
-        return None
+    if pd.isnull(degstr) or degstr == '':
+        return ''
     degdict = {'ba': ['ba','ab','bs','bae','barch','bba','bbs','bcs',
                       'bsee','phb','blitt','littb'],
                'aa': ['aa','as', 'aas'],
@@ -123,12 +123,12 @@ def get_degree_level(degstr):
         if deg in degdict[k]:
             return k    
     
-    if k.startswith('b'):
+    if deg.startswith('b'):
         return 'ba'
-    if k.startswith('m'):
+    if deg.startswith('m'):
         return 'ma'
     print(degstr+' not in degdict.')    
-    return None
+    return ''
                
 def get_party(partystr):
     partydict =  dict([(v,k) for (k,v) in [('d', 'Democrat'),

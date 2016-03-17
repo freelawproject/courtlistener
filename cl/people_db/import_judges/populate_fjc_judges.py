@@ -26,6 +26,9 @@ def make_federal_judge(item, testing=False):
     
     dob_city = item['Place of Birth (City)']
     dob_state = item['Place of Birth (State)']
+    # if foreign-born, leave blank for now.
+    if len(dob_state) > 2:
+        dob_state = ''
     
     check = Person.objects.filter(fjc_id=item['Judge Identification Number'])
     if len(check) > 0:
@@ -39,6 +42,9 @@ def make_federal_judge(item, testing=False):
 
     dod_city = item['Place of Death (City)']
     dod_state = item['Place of Death (State)']
+    # if foreign-dead, leave blank for now.
+    if len(dod_state) > 2:
+        dod_state = ''
         
     # instantiate Judge object    
     person = Person(
@@ -63,10 +69,9 @@ def make_federal_judge(item, testing=False):
         person.save()
         
 #    listraces = get_races(item['race'])
-#    races = [Race(race=r) for r in listraces]
+#    races = [Race.objects.get(race=r) for r in listraces]
 #    for r in races:
-#        if not testing:
-#            r.save()
+#        if not testing:            
 #            person.race.add(r)
     
     # add position items (up to 6 of them)   
@@ -91,6 +96,11 @@ def make_federal_judge(item, testing=False):
         
         # assign start date
         date_start = process_date_string(item['Commission Date'+pos_str])
+        if pd.isnull(date_start) and not pd.isnull(date_recess_appointment):
+            date_start = date_recess_appointment
+        if pd.isnull(date_start):
+            # if still no start date, skip
+            continue
         date_termination = process_date_string(item['Date of Termination'+pos_str])        
         date_retirement = process_date_string(item['Retirement from Active Service'+pos_str])
         
@@ -107,7 +117,7 @@ def make_federal_judge(item, testing=False):
                     'Reassignment':'other_pos',
                     'Appointment to Another Judicial Position': 'other_pos',
                     'Impeachment & Conviction':'bad_judge',
-                    'Recess Appopintment-Not Confirmed':'recess_not_confirmed',
+                    'Recess Appointment-Not Confirmed':'recess_not_confirmed',
                     'Resignation':'resign',
                     'Retirement':'retire_vol'
                     }
@@ -145,7 +155,7 @@ def make_federal_judge(item, testing=False):
 
         # set party                
         p = item['Party Affiliation of President'+pos_str]
-        if p is not None and p not in ['Assignment','Reassignment']:
+        if not pd.isnull(p) and p not in ['Assignment','Reassignment']:
             party = get_party(item['Party Affiliation of President'+pos_str])        
             politics = PoliticalAffiliation(
                 person = person,
@@ -174,22 +184,47 @@ def make_federal_judge(item, testing=False):
         schoolname = item['Name of School'+school_str]
         if pd.isnull(schoolname):
             continue
-        degtype = item['Degree'+school_str]        
-        deg_level = get_degree_level(degtype)
-        degyear = item['Degree year'+school_str]
-        school = get_school(schoolname)
-        if school is not None:
-            degree = Education(
-                        person = person,       
-                        school = school,
-                        degree = degtype,
-                        degree_level = deg_level,
-                        degree_year = degyear
-                    )   
-            if not testing:
-                degree.save()
+        
+        if pd.isnull(item['Degree'+school_str]):
+            degs = ['']
+        else:
+            degs = [x.strip() for x in item['Degree'+school_str].split(';')]
+        for degtype in degs:            
+            deg_level = get_degree_level(degtype)
+            degyear = item['Degree year'+school_str]
+            try: 
+                int(degyear)
+            except:
+                degyear = None
+            school = get_school(schoolname)
+            if school is not None:
+                degree = Education(
+                            person = person,       
+                            school = school,
+                            degree = degtype,
+                            degree_level = deg_level,
+                            degree_year = degyear
+                        )   
+                if not testing:
+                    degree.save()
      
+    if not pd.isnull(item['Employment text field']):        
+        notes = item['Employment text field']        
+        source = Source(
+            person = person,
+            notes = notes
+        )
+        if not testing: 
+            source.save()  
 
+    if not pd.isnull(item['Bankruptcy and Magistrate service']):        
+        notes = item['Bankruptcy and Magistrate service']        
+        source = Source(
+            person = person,
+            notes = notes
+        )
+        if not testing: 
+            source.save() 
   
     
 

@@ -159,6 +159,7 @@ def make_state_judge(item, testing=False):
             source = Source(
                 person = person,
                 notes = item['notes']
+                url = url
             )
             if not testing: 
                 source.save()                 
