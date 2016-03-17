@@ -8,12 +8,6 @@ from cl.people_db.import_judges.judge_utils import get_school, process_date, get
                                                     get_party, get_suffix, get_aba, get_degree_level
 
 def get_court_object(raw_court):
-    if '.' in raw_court:
-        j = raw_court.find('.')
-        raw_court = raw_court[:j]
-    if ',' in raw_court:
-        j = raw_court.find(',')
-        raw_court = raw_court[:j]
     for regex, value in fd_pairs:
         if re.search(regex, raw_court):
             return value
