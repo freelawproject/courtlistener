@@ -196,7 +196,7 @@ for i, row in df.iterrows():
 
 
 # test courts
-missing_courts = []  
+missing_courts = set()  
 
 for i, row in df.iterrows():   
     for posnum in range(1,7):
@@ -204,6 +204,8 @@ for i, row in df.iterrows():
             pos_str = ' (%s)'%posnum
         else:
             pos_str = ''
+        if pd.isnull(row['Court Name'+pos_str]):
+            continue
         courtid = get_court_object(row['Court Name'+pos_str])                        
         if courtid is None:
-            print(row['Court Name'+pos_str])
+            missing_courts.add(row['Court Name'+pos_str])
