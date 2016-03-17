@@ -68,11 +68,11 @@ def make_federal_judge(item, testing=False):
     if not testing:
         person.save()
         
-#    listraces = get_races(item['race'])
-#    races = [Race.objects.get(race=r) for r in listraces]
-#    for r in races:
-#        if not testing:            
-#            person.race.add(r)
+    listraces = get_races(item['race'])
+    races = [Race.objects.get(race=r) for r in listraces]
+    for r in races:
+        if not testing:            
+            person.race.add(r)
     
     # add position items (up to 6 of them)   
     for posnum in range(1,7):
