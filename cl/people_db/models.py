@@ -627,6 +627,7 @@ class Race(models.Model):
     race = models.CharField(
         choices=RACES,
         max_length=5,
+        unique=True,
     )
 
     def __unicode__(self):

@@ -102,12 +102,18 @@ class PersonAdmin(admin.ModelAdmin):
     )
 
 
+class RaceAdmin(admin.ModelAdmin):
+    list_display = (
+        'get_race_display',
+    )
+
+
 admin.site.register(Person, PersonAdmin)
 admin.site.register(Education, EducationAdmin)
 admin.site.register(School, SchoolAdmin)
 admin.site.register(Position, PositionAdmin)
 admin.site.register(PoliticalAffiliation)
 admin.site.register(RetentionEvent)
-admin.site.register(Race)
+admin.site.register(Race, RaceAdmin)
 admin.site.register(Source)
 admin.site.register(ABARating)
