@@ -81,10 +81,10 @@ def find_person(name_last, court_id, name_first=None, case_date=None,
     
     # check based on dates
     candidates = Person.objects.filter(
-        name_last__iexact=name_last,        
-        positions__court_id=court_id,
-        positions__date_start__lt=case_date + relativedelta(years=1),
-        Q(positions__date_termination__gt=case_date - relativedelta(years=1)) | Q( positions__date_termination=None)
+        Q(name_last__iexact=name_last),        
+        Q(positions__court_id=court_id),
+        Q(positions__date_start__lt=case_date + relativedelta(years=1)),
+        Q(positions__date_termination__gt=case_date - relativedelta(years=1)) | Q(positions__date_termination=None)
     )
     if len(candidates) == 1:
         return candidates[0]
@@ -99,10 +99,10 @@ def find_person(name_last, court_id, name_first=None, case_date=None,
     
     if name_first is not None:
         candidates = Person.objects.filter(
-            name_last__iexact=name_last,        
-            name_first__iexact=name_first,
-            positions__court_id=court_id,
-            positions__date_start__lt=case_date + relativedelta(years=1),
+            Q(name_last__iexact=name_last),        
+            Q(name_first__iexact=name_first),
+            Q(positions__court_id=court_id),
+            Q(positions__date_start__lt=case_date + relativedelta(years=1)),
             Q(positions__date_termination__gt=case_date - relativedelta(years=1)) | Q( positions__date_termination=None)
         )
         if len(candidates) == 1:
