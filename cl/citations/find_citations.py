@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # encoding: utf-8
-
 import re
 import sys
+
 from juriscraper.lib.html_utils import get_visible_text
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 from django.utils.timezone import now
@@ -12,7 +12,7 @@ from cl.search.models import Court
 
 FORWARD_SEEK = 20
 
-BACKWARD_SEEK = 70  # Average case name length in the db is 67
+BACKWARD_SEEK = 28  # Median case name length in the db is 28 (2016-02-26)
 
 STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
                "remanded", "see", "granted", "dismissed"]
@@ -34,33 +34,57 @@ class Citation(object):
     """
     def __init__(self, reporter, page, volume, canonical_reporter=None,
                  lookup_index=None, extra=None, defendant=None, plaintiff=None,
-                 court=None, year=None, match_url=None, match_id=None):
-        # Note: It will be tempting to resolve reporter variations in the
-        #       __init__ function, but, alas, you cannot, because often
-        #       reporter variations refer to one of several reporters (e.g.
-        #       P.R. could be a variant of either 'Pen. & W.', 'P.R.R.', 'P.').
+                 court=None, year=None, match_url=None, match_id=None,
+                 reporter_found=None, reporter_index=None):
 
+        # Core data.
         self.reporter = reporter
-        self.canonical_reporter = canonical_reporter
-        self.lookup_index = lookup_index
         self.volume = volume
         self.page = page
+
+        # These values are set during disambiguation.
+        self.canonical_reporter = canonical_reporter
+        self.lookup_index = lookup_index
+
+        # Supplementary data, if possible.
         self.extra = extra
         self.defendant = defendant
         self.plaintiff = plaintiff
         self.court = court
         self.year = year
+
+        # The reporter found in the text is often different from the reporter
+        # once it's normalized. We need to keep the original value so we can
+        # linkify it with a regex.
+        self.reporter_found = reporter_found
+
+        # The location of the reporter is useful for tasks like finding parallel
+        # citations, and finding supplementary info like defendants and years.
+        self.reporter_index = reporter_index
+
+        # Attributes of the matching item, for URL generation.
         self.match_url = match_url
         self.match_id = match_id
+
+        self.equality_attributes = [
+            'reporter', 'volume', 'page', 'canonical_reporter', 'lookup_index',
+        ]
 
     def base_citation(self):
         return u"%d %s %d" % (self.volume, self.reporter, self.page)
 
     def as_regex(self):
-        return r"%d(\s+)%s(\s+)%d" % (self.volume, self.reporter, self.page)
+        return r"%d(\s+)%s(\s+)%d" % (
+            self.volume,
+            re.escape(self.reporter_found),
+            self.page
+        )
 
     # TODO: Update css for no-link citations
     def as_html(self):
+        # Uses reporter_found so that we don't update the text. This guards us
+        # against accidentally updating things like docket number 22 Cr. 1 as
+        # 22 Cranch 1, which is totally wrong.
         template = u'<span class="volume">%(volume)d</span>\\1' \
                    u'<span class="reporter">%(reporter)s</span>\\2' \
                    u'<span class="page">%(page)d</span>'
@@ -96,6 +120,24 @@ class Citation(object):
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def fuzzy_hash(self):
+        """Used to test equality in dicts.
+
+        Overridden here to simplify away some of the attributes that can differ
+        for the same citation.
+        """
+        s = ''
+        for attr in self.equality_attributes:
+            s += str(getattr(self, attr, None))
+        return hash(s)
+
+    def fuzzy_eq(self, other):
+        """Used to override the __eq__ function."""
+        return self.fuzzy_hash() == other.fuzzy_hash()
 
 
 # Adapted from nltk Penn Treebank tokenizer
@@ -189,7 +231,7 @@ def get_year(token):
     return year
 
 
-def add_post_citation(citation, words, reporter_index):
+def add_post_citation(citation, words):
     """Add to a citation object any additional information found after the base
     citation, including court, year, and possibly page range.
 
@@ -200,11 +242,14 @@ def add_post_citation(citation, words, reporter_index):
         Full citation: 123 F.2d 345, 347-348 (4th Cir. 1990)
         Post-citation info: year=1990, court="4th Cir.", extra (page range)="347-348"
     """
-    end_position = reporter_index + 2
-    # Start looking 2 tokens after the reporter (1 after page)
-    for start in xrange(reporter_index + 2,
-                        min((reporter_index + FORWARD_SEEK), len(words))):
+    # Start looking 2 tokens after the reporter (1 after page), and go to
+    # either the end of the words list or to FORWARD_SEEK tokens from where you
+    # started.
+    for start in xrange(
+            citation.reporter_index + 2,
+            min((citation.reporter_index + FORWARD_SEEK), len(words))):
         if words[start].startswith('('):
+            # Get the year by looking for a token that ends in a paren.
             for end in xrange(start, start + FORWARD_SEEK):
                 try:
                     has_ending_paren = (words[end].find(')') > -1)
@@ -218,25 +263,25 @@ def add_post_citation(citation, words, reporter_index):
                     else:
                         citation.year = get_year(words[end])
                     citation.court = get_court_by_paren(u' '.join(words[start:end + 1]), citation)
-                    end_position = end
                     break
-            if start > reporter_index + 2:
+
+            if start > citation.reporter_index + 2:
                 # Then there's content between page and (), starting with a
                 # comma, which we skip
-                citation.extra = u' '.join(words[reporter_index + 2:start])
+                citation.extra = u' '.join(
+                        words[citation.reporter_index + 2:start])
             break
 
-    return end_position
 
-
-def add_defendant(citation, words, reporter_index):
+def add_defendant(citation, words):
     """Scan backwards from 2 tokens before reporter until you find v., in re,
     etc. If no known stop-token is found, no defendant name is stored.  In the
     future, this could be improved.
     """
     start_index = None
-    for index in xrange(reporter_index - 1,
-                        max(reporter_index - BACKWARD_SEEK, 0), -1):
+    for index in xrange(
+            citation.reporter_index - 1,
+            max(citation.reporter_index - BACKWARD_SEEK, 0), -1):
         word = words[index]
         if word == ',':
             # Skip it
@@ -250,7 +295,8 @@ def add_defendant(citation, words, reporter_index):
             # String citation
             break
     if start_index:
-        citation.defendant = u' '.join(words[start_index:reporter_index - 1])
+        citation.defendant = u' '.join(
+                words[start_index:citation.reporter_index - 1])
 
 
 def extract_base_citation(words, reporter_index):
@@ -260,22 +306,23 @@ def extract_base_citation(words, reporter_index):
     after for volume and page number.  If found, construct and return a
     Citation object.
     """
-    reporter = words[reporter_index]
-    if words[reporter_index - 1].isdigit():
-        volume = int(words[reporter_index - 1])
+    volume = strip_punct(words[reporter_index - 1])
+    if volume.isdigit():
+        volume = int(volume)
     else:
         # No volume, therefore not a valid citation
         return None
-    page_str = words[reporter_index + 1]
-    # Strip off ending comma, which occurs when there is a page range next
-    page_str = page_str.strip(',')
-    if page_str.isdigit():
-        page = int(page_str)
+
+    page = strip_punct(words[reporter_index + 1])
+    if page.isdigit():
+        page = int(page)
     else:
         # No page, therefore not a valid citation
         return None
 
-    return Citation(reporter, page, volume)
+    reporter = words[reporter_index]
+    return Citation(reporter, page, volume, reporter_found=reporter,
+                    reporter_index=reporter_index)
 
 
 def is_date_in_reporter(editions, year):
@@ -424,9 +471,9 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
                 # Not a valid citation; continue looking
                 continue
             if do_post_citation:
-                add_post_citation(citation, words, i)
+                add_post_citation(citation, words)
             if do_defendant:
-                add_defendant(citation, words, i)
+                add_defendant(citation, words)
             citations.append(citation)
 
     # Disambiguate or drop all the reporters

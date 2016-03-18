@@ -1,6 +1,6 @@
 from cl.api import views
 from cl.audio import api_views as audio_views
-from cl.judges import api_views as judge_views
+from cl.people_db import api_views as judge_views
 from cl.search import api_views as search_views
 
 from django.conf.urls import url, include
@@ -17,14 +17,11 @@ router.register(r'opinions-cited', search_views.OpinionsCitedViewSet)
 router.register(r'search', search_views.SearchViewSet, base_name='search')
 
 # Judges
-router.register(r'judges', judge_views.JudgesViewSet)
+router.register(r'people', judge_views.PersonViewSet)
 router.register(r'positions', judge_views.PositionViewSet)
-router.register(r'politicians', judge_views.PoliticianViewSet)
 router.register(r'retention-events', judge_views.RetentionEventViewSet)
 router.register(r'educations', judge_views.EducationViewSet)
 router.register(r'schools', judge_views.SchoolViewSet)
-router.register(r'careers', judge_views.CareerViewSet)
-router.register(r'titles', judge_views.TitleViewSet)
 router.register(r'political-affiliations',
                 judge_views.PoliticalAffiliationViewSet)
 router.register(r'sources', judge_views.SourceViewSet)

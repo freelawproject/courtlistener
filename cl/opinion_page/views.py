@@ -112,7 +112,6 @@ def view_authorities(request, pk, slug):
     )
 
 
-@permission_required('visualizations.has_beta_access')
 def cluster_visualizations(request, pk, slug):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     return render_to_response(

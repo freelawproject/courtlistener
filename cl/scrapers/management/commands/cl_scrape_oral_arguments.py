@@ -2,6 +2,8 @@ import hashlib
 import random
 import traceback
 
+from django.utils.encoding import force_bytes
+
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
 from cl.lib.string_utils import trunc
@@ -115,7 +117,9 @@ class Command(cl_scrape_opinions.Command):
                 except IndexError:
                     next_date = None
 
-                sha1_hash = hashlib.sha1(content).hexdigest()
+                # request.content is sometimes a str, sometimes unicode, so
+                # force it all to be bytes, pleasing hashlib.
+                sha1_hash = hashlib.sha1(force_bytes(content)).hexdigest()
                 onwards = dup_checker.press_on(
                     Audio,
                     current_date,

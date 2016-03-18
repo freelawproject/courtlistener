@@ -1,5 +1,6 @@
 from django.contrib import admin
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
+
 from cl.alerts.admin import AlertInline
 from cl.favorites.admin import FavoriteInline
 from cl.users.models import UserProfile, BarMembership
@@ -41,3 +42,4 @@ class UserAdmin(admin.ModelAdmin):
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 admin.site.register(BarMembership)
+admin.site.register(Permission)

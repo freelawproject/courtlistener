@@ -1,0 +1,2234 @@
+[
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.519Z",
+    "case_name": "Marsh v. Chambers",
+    "date_created": "2016-02-16T19:49:54.519Z",
+    "case_name_short": "Marsh",
+    "docket_number": null,
+    "slug": "marsh-v-chambers",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 111014
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.540Z",
+    "case_name": "Lynch v. Donnelly",
+    "date_created": "2016-02-16T19:49:54.540Z",
+    "case_name_short": "Lynch",
+    "docket_number": null,
+    "slug": "lynch-v-donnelly",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 111113
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.557Z",
+    "case_name": "WALLACE, GOVERNOR OF ALABAMA, et al. v. JAFFREE et al.",
+    "date_created": "2016-02-16T19:49:54.557Z",
+    "case_name_short": "Wallace",
+    "docket_number": null,
+    "slug": "wallace-governor-of-alabama-et-al-v-jaffree-et-al",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 111464
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.605Z",
+    "case_name": "SCHOOL DISTRICT OF THE CITY OF GRAND RAPIDS et al. v. BALL et al.",
+    "date_created": "2016-02-16T19:49:54.605Z",
+    "case_name_short": "Ball",
+    "docket_number": null,
+    "slug": "school-district-of-the-city-of-grand-rapids-et-al-v-ball-et-al",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 111505
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.623Z",
+    "case_name": "EDWARDS, GOVERNOR OF LOUISIANA, et al. v. AGUILLARD et al.",
+    "date_created": "2016-02-16T19:49:54.623Z",
+    "case_name_short": "Aguillard",
+    "docket_number": null,
+    "slug": "edwards-governor-of-louisiana-et-al-v-aguillard-et-al",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 111924
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.570Z",
+    "case_name": "Allegheny County v. Greater Pittsburgh ACLU",
+    "date_created": "2016-02-16T19:49:54.570Z",
+    "case_name_short": "Allegheny County",
+    "docket_number": null,
+    "slug": "allegheny-county-v-greater-pittsburgh-aclu",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 112331
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.529Z",
+    "case_name": "Harmelin v. Michigan",
+    "date_created": "2016-02-16T19:49:54.529Z",
+    "case_name_short": "Harmelin",
+    "docket_number": null,
+    "slug": "harmelin-v-michigan",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 112646
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.578Z",
+    "case_name": "Lee v. Weisman",
+    "date_created": "2016-02-16T19:49:54.578Z",
+    "case_name_short": "Lee",
+    "docket_number": null,
+    "slug": "lee-v-weisman",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 112779
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.586Z",
+    "case_name": "LAMB'S CHAPEL AND JOHN STEIGERWALD v. CENTER MORICHES UNION FREE SCHOOL DISTRICT et al.",
+    "date_created": "2016-02-16T19:49:54.586Z",
+    "case_name_short": "Lamb's Chapel",
+    "docket_number": null,
+    "slug": "lambs-chapel-and-john-steigerwald-v-center-moriches-union-free-school",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 112874
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.595Z",
+    "case_name": "RONALD W. ROSENBERGER, et al. v. RECTOR AND VISITORS OF THE UNIVERSITY OF VIRGINIA et al.",
+    "date_created": "2016-02-16T19:49:54.595Z",
+    "case_name_short": "Rosenberger",
+    "docket_number": null,
+    "slug": "ronald-w-rosenberger-et-al-v-rector-and-visitors-of-the-university-of",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 117967
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.548Z",
+    "case_name": "Santa Fe Independent School Dist. v. Doe",
+    "date_created": "2016-02-16T19:49:54.548Z",
+    "case_name_short": "Doe",
+    "docket_number": null,
+    "slug": "santa-fe-independent-school-dist-v-doe",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 118377
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.613Z",
+    "case_name": "SUSAN TAVE ZELMAN, SUPERINTENDENT OF PUBLIC INSTRUCTION OF OHIO, et al. v. DORIS SIMMONS-HARRIS et al.",
+    "date_created": "2016-02-16T19:49:54.613Z",
+    "case_name_short": "Zelman",
+    "docket_number": null,
+    "slug": "susan-tave-zelman-superintendent-of-public-instruction-of-ohio-et-al-v",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 121168
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.652Z",
+    "case_name": "Elk Grove Unified School Dist. v. Newdow",
+    "date_created": "2016-02-16T19:49:54.652Z",
+    "case_name_short": "Newdow",
+    "docket_number": null,
+    "slug": "elk-grove-unified-school-dist-v-newdow",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 136984
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.640Z",
+    "case_name": "JON B. CUTTER, et al. v. REGINALD WILKINSON, DIRECTOR, OHIO DEPARTMENT OF REHABILITATION AND CORRECTION, et al.",
+    "date_created": "2016-02-16T19:49:54.640Z",
+    "case_name_short": "Cutter",
+    "docket_number": null,
+    "slug": "jon-b-cutter-et-al-v-reginald-wilkinson-director-ohio-department-of",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 142900
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.661Z",
+    "case_name": "Van Orden v. Perry",
+    "date_created": "2016-02-16T19:49:54.661Z",
+    "case_name_short": "Van Orden",
+    "docket_number": null,
+    "slug": "van-orden-v-perry",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 799990
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.631Z",
+    "case_name": "McCreary County v. American Civil Liberties Union of Ky.",
+    "date_created": "2016-02-16T19:49:54.631Z",
+    "case_name_short": "McCreary",
+    "docket_number": null,
+    "slug": "mccreary-county-v-american-civil-liberties-union-of-ky",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 799993
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "date_reargument_denied": null,
+    "court": "scotus",
+    "date_reargued": null,
+    "case_name_full": "",
+    "date_argued": null,
+    "date_modified": "2016-02-16T19:49:54.505Z",
+    "case_name": "Town of Greece v. Galloway",
+    "date_created": "2016-02-16T19:49:54.504Z",
+    "case_name_short": "Town/Greece",
+    "docket_number": null,
+    "slug": "town-of-greece-v-galloway",
+    "blocked": false
+  },
+  "model": "search.docket",
+  "pk": 2674862
+},
+{
+  "fields": {
+    "jurisdiction": "F",
+    "end_date": null,
+    "short_name": "Supreme Court",
+    "citation_string": "SCOTUS",
+    "in_use": true,
+    "url": "http://supremecourt.gov/",
+    "notes": "",
+    "date_modified": "2013-08-14T16:46:30Z",
+    "has_oral_argument_scraper": false,
+    "full_name": "Supreme Court of the United States",
+    "position": 1.0,
+    "has_opinion_scraper": true,
+    "start_date": "1789-09-24"
+  },
+  "model": "search.court",
+  "pk": "scotus"
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 6,
+    "case_name_short": "Marsh",
+    "scdb_id": "111014",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "1983-07-05",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 1,
+    "judges": "",
+    "case_name": "Marsh v. Chambers",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 3,
+    "slug": "marsh-v-chambers",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.522Z",
+    "precedential_status": "Published",
+    "citation_count": 14,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.522Z",
+    "docket": 111014
+  },
+  "model": "search.opinioncluster",
+  "pk": 111014
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 5,
+    "case_name_short": "Lynch",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "1984-03-05",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 1,
+    "judges": "",
+    "case_name": "Lynch v. Donnelly",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 4,
+    "slug": "lynch-v-donnelly",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.542Z",
+    "precedential_status": "Published",
+    "citation_count": 13,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.542Z",
+    "docket": 111113
+  },
+  "model": "search.opinioncluster",
+  "pk": 111113
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 6,
+    "case_name_short": "Wallace",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "1985-06-04",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 2,
+    "judges": "",
+    "case_name": "WALLACE, GOVERNOR OF ALABAMA, et al. v. JAFFREE et al.",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 3,
+    "slug": "wallace-governor-of-alabama-et-al-v-jaffree-et-al",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.562Z",
+    "precedential_status": "Published",
+    "citation_count": 12,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.562Z",
+    "docket": 111464
+  },
+  "model": "search.opinioncluster",
+  "pk": 111464
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 5,
+    "case_name_short": "Ball",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "1985-07-01",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 2,
+    "judges": "",
+    "case_name": "SCHOOL DISTRICT OF THE CITY OF GRAND RAPIDS et al. v. BALL et al.",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 4,
+    "slug": "school-district-of-the-city-of-grand-rapids-et-al-v-ball-et-al",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.608Z",
+    "precedential_status": "Published",
+    "citation_count": 7,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.608Z",
+    "docket": 111505
+  },
+  "model": "search.opinioncluster",
+  "pk": 111505
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 7,
+    "case_name_short": "Aguillard",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "1987-06-19",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 2,
+    "judges": "",
+    "case_name": "EDWARDS, GOVERNOR OF LOUISIANA, et al. v. AGUILLARD et al.",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 2,
+    "slug": "edwards-governor-of-louisiana-et-al-v-aguillard-et-al",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.626Z",
+    "precedential_status": "Published",
+    "citation_count": 5,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.626Z",
+    "docket": 111924
+  },
+  "model": "search.opinioncluster",
+  "pk": 111924
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 5,
+    "case_name_short": "Allegheny County",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "1989-07-03",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 2,
+    "judges": "",
+    "case_name": "Allegheny County v. Greater Pittsburgh ACLU",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 4,
+    "slug": "allegheny-county-v-greater-pittsburgh-aclu",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.573Z",
+    "precedential_status": "Published",
+    "citation_count": 7,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.573Z",
+    "docket": 112331
+  },
+  "model": "search.opinioncluster",
+  "pk": 112331
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 5,
+    "case_name_short": "Harmelin",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "1991-06-27",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 1,
+    "judges": "",
+    "case_name": "Harmelin v. Michigan",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 4,
+    "slug": "harmelin-v-michigan",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.532Z",
+    "precedential_status": "Published",
+    "citation_count": 2,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.532Z",
+    "docket": 112646
+  },
+  "model": "search.opinioncluster",
+  "pk": 112646
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 5,
+    "case_name_short": "Lee",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "1992-06-24",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 2,
+    "judges": "",
+    "case_name": "Lee v. Weisman",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 4,
+    "slug": "lee-v-weisman",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.581Z",
+    "precedential_status": "Published",
+    "citation_count": 9,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.581Z",
+    "docket": 112779
+  },
+  "model": "search.opinioncluster",
+  "pk": 112779
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 9,
+    "case_name_short": "Lamb's Chapel",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "1993-06-07",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 2,
+    "judges": "",
+    "case_name": "LAMB'S CHAPEL AND JOHN STEIGERWALD v. CENTER MORICHES UNION FREE SCHOOL DISTRICT et al.",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 0,
+    "slug": "lambs-chapel-and-john-steigerwald-v-center-moriches-union-free-school",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.589Z",
+    "precedential_status": "Published",
+    "citation_count": 4,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.589Z",
+    "docket": 112874
+  },
+  "model": "search.opinioncluster",
+  "pk": 112874
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 5,
+    "case_name_short": "Rosenberger",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "1995-06-29",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 1,
+    "judges": "",
+    "case_name": "RONALD W. ROSENBERGER, et al. v. RECTOR AND VISITORS OF THE UNIVERSITY OF VIRGINIA et al.",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 4,
+    "slug": "ronald-w-rosenberger-et-al-v-rector-and-visitors-of-the-university-of",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.598Z",
+    "precedential_status": "Published",
+    "citation_count": 6,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.598Z",
+    "docket": 117967
+  },
+  "model": "search.opinioncluster",
+  "pk": 117967
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 6,
+    "case_name_short": "Doe",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "2000-06-19",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 2,
+    "judges": "",
+    "case_name": "Santa Fe Independent School Dist. v. Doe",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 3,
+    "slug": "santa-fe-independent-school-dist-v-doe",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.550Z",
+    "precedential_status": "Published",
+    "citation_count": 4,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.550Z",
+    "docket": 118377
+  },
+  "model": "search.opinioncluster",
+  "pk": 118377
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 5,
+    "case_name_short": "Zelman",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "2002-06-27",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 1,
+    "judges": "",
+    "case_name": "SUSAN TAVE ZELMAN, SUPERINTENDENT OF PUBLIC INSTRUCTION OF OHIO, et al. v. DORIS SIMMONS-HARRIS et al.",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 4,
+    "slug": "susan-tave-zelman-superintendent-of-public-instruction-of-ohio-et-al-v",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.617Z",
+    "precedential_status": "Published",
+    "citation_count": 5,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.617Z",
+    "docket": 121168
+  },
+  "model": "search.opinioncluster",
+  "pk": 121168
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 8,
+    "case_name_short": "Newdow",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "2004-06-14",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 1,
+    "judges": "",
+    "case_name": "Elk Grove Unified School Dist. v. Newdow",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 0,
+    "slug": "elk-grove-unified-school-dist-v-newdow",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.655Z",
+    "precedential_status": "Published",
+    "citation_count": 3,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.655Z",
+    "docket": 136984
+  },
+  "model": "search.opinioncluster",
+  "pk": 136984
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 9,
+    "case_name_short": "Cutter",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "2005-05-31",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 2,
+    "judges": "",
+    "case_name": "JON B. CUTTER, et al. v. REGINALD WILKINSON, DIRECTOR, OHIO DEPARTMENT OF REHABILITATION AND CORRECTION, et al.",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 0,
+    "slug": "jon-b-cutter-et-al-v-reginald-wilkinson-director-ohio-department-of",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.645Z",
+    "precedential_status": "Published",
+    "citation_count": 3,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.645Z",
+    "docket": 142900
+  },
+  "model": "search.opinioncluster",
+  "pk": 142900
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 5,
+    "case_name_short": "Van Orden",
+    "scdb_id": "1234",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "2005-06-27",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 1,
+    "judges": "",
+    "case_name": "Van Orden v. Perry",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 4,
+    "slug": "van-orden-v-perry",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.664Z",
+    "precedential_status": "Published",
+    "citation_count": 1,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.664Z",
+    "docket": 799990
+  },
+  "model": "search.opinioncluster",
+  "pk": 799990
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": 5,
+    "case_name_short": "McCreary",
+    "scdb_id": "123",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "2005-06-27",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": 2,
+    "judges": "",
+    "case_name": "McCreary County v. American Civil Liberties Union of Ky.",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": 4,
+    "slug": "mccreary-county-v-american-civil-liberties-union-of-ky",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.634Z",
+    "precedential_status": "Published",
+    "citation_count": 1,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.634Z",
+    "docket": 799993
+  },
+  "model": "search.opinioncluster",
+  "pk": 799993
+},
+{
+  "fields": {
+    "date_blocked": null,
+    "case_name_full": "",
+    "lexis_cite": "",
+    "neutral_cite": "",
+    "state_cite_regional": "",
+    "scdb_votes_majority": -1,
+    "case_name_short": "Town/Greece",
+    "scdb_id": "2674862",
+    "state_cite_two": "",
+    "blocked": false,
+    "state_cite_three": "",
+    "syllabus": "",
+    "federal_cite_three": "",
+    "date_filed": "2014-05-05",
+    "procedural_history": "",
+    "citation_id": null,
+    "source": "M",
+    "state_cite_one": "",
+    "panel": [],
+    "per_curiam": false,
+    "federal_cite_one": "",
+    "scdb_decision_direction": -1,
+    "judges": "",
+    "case_name": "Town of Greece v. Galloway",
+    "westlaw_cite": "",
+    "attorneys": "",
+    "scdb_votes_minority": -1,
+    "slug": "town-of-greece-v-galloway",
+    "posture": "",
+    "scotus_early_cite": "",
+    "federal_cite_two": "",
+    "date_modified": "2016-02-16T19:49:54.509Z",
+    "precedential_status": "Published",
+    "citation_count": 0,
+    "specialty_cite_one": "",
+    "nature_of_suit": "",
+    "non_participating_judges": [],
+    "date_created": "2016-02-16T19:49:54.509Z",
+    "docket": 2674862
+  },
+  "model": "search.opinioncluster",
+  "pk": 2674862
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.525Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 111014,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.525Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 111014
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.545Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 111113,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.545Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 111113
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.565Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 111464,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.565Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 111464
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.610Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 111505,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.610Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 111505
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.629Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 111924,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.629Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 111924
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.575Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 112331,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.575Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 112331
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.537Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 112646,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.537Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 112646
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.583Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 112779,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.583Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 112779
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.592Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 112874,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.592Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 112874
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.602Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 117967,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.602Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 117967
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.553Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 118377,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.553Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 118377
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.621Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 121168,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.621Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 121168
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.658Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 136984,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.658Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 136984
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.647Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 142900,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.647Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 142900
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.666Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 799990,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.666Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 799990
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.636Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 799993,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.636Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 799993
+},
+{
+  "fields": {
+    "sha1": "asdf",
+    "date_modified": "2016-02-16T19:49:54.513Z",
+    "extracted_by_ocr": false,
+    "author": null,
+    "plain_text": "",
+    "html": null,
+    "download_url": null,
+    "cluster": 2674862,
+    "html_with_citations": "",
+    "local_path": "",
+    "html_columbia": null,
+    "joined_by": [],
+    "date_created": "2016-02-16T19:49:54.513Z",
+    "html_lawbox": null,
+    "type": "010combined"
+  },
+  "model": "search.opinion",
+  "pk": 2674862
+},
+{
+  "fields": {
+    "cited_opinion": 112331,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 1
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 2
+},
+{
+  "fields": {
+    "cited_opinion": 112646,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 3
+},
+{
+  "fields": {
+    "cited_opinion": 118377,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 4
+},
+{
+  "fields": {
+    "cited_opinion": 112779,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 5
+},
+{
+  "fields": {
+    "cited_opinion": 121168,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 6
+},
+{
+  "fields": {
+    "cited_opinion": 142900,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 7
+},
+{
+  "fields": {
+    "cited_opinion": 799990,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 8
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 9
+},
+{
+  "fields": {
+    "cited_opinion": 136984,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 10
+},
+{
+  "fields": {
+    "cited_opinion": 799993,
+    "citing_opinion": 2674862
+  },
+  "model": "search.opinionscited",
+  "pk": 11
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 112646
+  },
+  "model": "search.opinionscited",
+  "pk": 12
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 111113
+  },
+  "model": "search.opinionscited",
+  "pk": 13
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 118377
+  },
+  "model": "search.opinionscited",
+  "pk": 14
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 118377
+  },
+  "model": "search.opinionscited",
+  "pk": 15
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 118377
+  },
+  "model": "search.opinionscited",
+  "pk": 16
+},
+{
+  "fields": {
+    "cited_opinion": 112874,
+    "citing_opinion": 118377
+  },
+  "model": "search.opinionscited",
+  "pk": 17
+},
+{
+  "fields": {
+    "cited_opinion": 112779,
+    "citing_opinion": 118377
+  },
+  "model": "search.opinionscited",
+  "pk": 18
+},
+{
+  "fields": {
+    "cited_opinion": 117967,
+    "citing_opinion": 118377
+  },
+  "model": "search.opinionscited",
+  "pk": 19
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 111464
+  },
+  "model": "search.opinionscited",
+  "pk": 20
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 111464
+  },
+  "model": "search.opinionscited",
+  "pk": 21
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 112331
+  },
+  "model": "search.opinionscited",
+  "pk": 22
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 112331
+  },
+  "model": "search.opinionscited",
+  "pk": 23
+},
+{
+  "fields": {
+    "cited_opinion": 111924,
+    "citing_opinion": 112331
+  },
+  "model": "search.opinionscited",
+  "pk": 24
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 112331
+  },
+  "model": "search.opinionscited",
+  "pk": 25
+},
+{
+  "fields": {
+    "cited_opinion": 111505,
+    "citing_opinion": 112331
+  },
+  "model": "search.opinionscited",
+  "pk": 26
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 112779
+  },
+  "model": "search.opinionscited",
+  "pk": 27
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 112779
+  },
+  "model": "search.opinionscited",
+  "pk": 28
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 112779
+  },
+  "model": "search.opinionscited",
+  "pk": 29
+},
+{
+  "fields": {
+    "cited_opinion": 112331,
+    "citing_opinion": 112779
+  },
+  "model": "search.opinionscited",
+  "pk": 30
+},
+{
+  "fields": {
+    "cited_opinion": 111505,
+    "citing_opinion": 112779
+  },
+  "model": "search.opinionscited",
+  "pk": 31
+},
+{
+  "fields": {
+    "cited_opinion": 111924,
+    "citing_opinion": 112779
+  },
+  "model": "search.opinionscited",
+  "pk": 32
+},
+{
+  "fields": {
+    "cited_opinion": 112331,
+    "citing_opinion": 112874
+  },
+  "model": "search.opinionscited",
+  "pk": 33
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 112874
+  },
+  "model": "search.opinionscited",
+  "pk": 34
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 112874
+  },
+  "model": "search.opinionscited",
+  "pk": 35
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 112874
+  },
+  "model": "search.opinionscited",
+  "pk": 36
+},
+{
+  "fields": {
+    "cited_opinion": 112779,
+    "citing_opinion": 112874
+  },
+  "model": "search.opinionscited",
+  "pk": 37
+},
+{
+  "fields": {
+    "cited_opinion": 111505,
+    "citing_opinion": 112874
+  },
+  "model": "search.opinionscited",
+  "pk": 38
+},
+{
+  "fields": {
+    "cited_opinion": 112331,
+    "citing_opinion": 117967
+  },
+  "model": "search.opinionscited",
+  "pk": 39
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 117967
+  },
+  "model": "search.opinionscited",
+  "pk": 40
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 117967
+  },
+  "model": "search.opinionscited",
+  "pk": 41
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 117967
+  },
+  "model": "search.opinionscited",
+  "pk": 42
+},
+{
+  "fields": {
+    "cited_opinion": 112874,
+    "citing_opinion": 117967
+  },
+  "model": "search.opinionscited",
+  "pk": 43
+},
+{
+  "fields": {
+    "cited_opinion": 112779,
+    "citing_opinion": 117967
+  },
+  "model": "search.opinionscited",
+  "pk": 44
+},
+{
+  "fields": {
+    "cited_opinion": 111505,
+    "citing_opinion": 117967
+  },
+  "model": "search.opinionscited",
+  "pk": 45
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 111505
+  },
+  "model": "search.opinionscited",
+  "pk": 46
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 111505
+  },
+  "model": "search.opinionscited",
+  "pk": 47
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 111505
+  },
+  "model": "search.opinionscited",
+  "pk": 48
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 121168
+  },
+  "model": "search.opinionscited",
+  "pk": 49
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 121168
+  },
+  "model": "search.opinionscited",
+  "pk": 50
+},
+{
+  "fields": {
+    "cited_opinion": 112779,
+    "citing_opinion": 121168
+  },
+  "model": "search.opinionscited",
+  "pk": 51
+},
+{
+  "fields": {
+    "cited_opinion": 117967,
+    "citing_opinion": 121168
+  },
+  "model": "search.opinionscited",
+  "pk": 52
+},
+{
+  "fields": {
+    "cited_opinion": 111505,
+    "citing_opinion": 121168
+  },
+  "model": "search.opinionscited",
+  "pk": 53
+},
+{
+  "fields": {
+    "cited_opinion": 111924,
+    "citing_opinion": 121168
+  },
+  "model": "search.opinionscited",
+  "pk": 54
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 111924
+  },
+  "model": "search.opinionscited",
+  "pk": 55
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 111924
+  },
+  "model": "search.opinionscited",
+  "pk": 56
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 111924
+  },
+  "model": "search.opinionscited",
+  "pk": 57
+},
+{
+  "fields": {
+    "cited_opinion": 111505,
+    "citing_opinion": 111924
+  },
+  "model": "search.opinionscited",
+  "pk": 58
+},
+{
+  "fields": {
+    "cited_opinion": 112331,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 59
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 60
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 61
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 62
+},
+{
+  "fields": {
+    "cited_opinion": 112874,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 63
+},
+{
+  "fields": {
+    "cited_opinion": 112779,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 64
+},
+{
+  "fields": {
+    "cited_opinion": 117967,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 65
+},
+{
+  "fields": {
+    "cited_opinion": 121168,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 66
+},
+{
+  "fields": {
+    "cited_opinion": 111924,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 67
+},
+{
+  "fields": {
+    "cited_opinion": 118377,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 68
+},
+{
+  "fields": {
+    "cited_opinion": 142900,
+    "citing_opinion": 799993
+  },
+  "model": "search.opinionscited",
+  "pk": 69
+},
+{
+  "fields": {
+    "cited_opinion": 121168,
+    "citing_opinion": 142900
+  },
+  "model": "search.opinionscited",
+  "pk": 70
+},
+{
+  "fields": {
+    "cited_opinion": 136984,
+    "citing_opinion": 142900
+  },
+  "model": "search.opinionscited",
+  "pk": 71
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 142900
+  },
+  "model": "search.opinionscited",
+  "pk": 72
+},
+{
+  "fields": {
+    "cited_opinion": 112779,
+    "citing_opinion": 142900
+  },
+  "model": "search.opinionscited",
+  "pk": 73
+},
+{
+  "fields": {
+    "cited_opinion": 117967,
+    "citing_opinion": 142900
+  },
+  "model": "search.opinionscited",
+  "pk": 74
+},
+{
+  "fields": {
+    "cited_opinion": 112331,
+    "citing_opinion": 136984
+  },
+  "model": "search.opinionscited",
+  "pk": 75
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 136984
+  },
+  "model": "search.opinionscited",
+  "pk": 76
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 136984
+  },
+  "model": "search.opinionscited",
+  "pk": 77
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 136984
+  },
+  "model": "search.opinionscited",
+  "pk": 78
+},
+{
+  "fields": {
+    "cited_opinion": 112874,
+    "citing_opinion": 136984
+  },
+  "model": "search.opinionscited",
+  "pk": 79
+},
+{
+  "fields": {
+    "cited_opinion": 112779,
+    "citing_opinion": 136984
+  },
+  "model": "search.opinionscited",
+  "pk": 80
+},
+{
+  "fields": {
+    "cited_opinion": 117967,
+    "citing_opinion": 136984
+  },
+  "model": "search.opinionscited",
+  "pk": 81
+},
+{
+  "fields": {
+    "cited_opinion": 121168,
+    "citing_opinion": 136984
+  },
+  "model": "search.opinionscited",
+  "pk": 82
+},
+{
+  "fields": {
+    "cited_opinion": 118377,
+    "citing_opinion": 136984
+  },
+  "model": "search.opinionscited",
+  "pk": 83
+},
+{
+  "fields": {
+    "cited_opinion": 112331,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 84
+},
+{
+  "fields": {
+    "cited_opinion": 112646,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 85
+},
+{
+  "fields": {
+    "cited_opinion": 111014,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 86
+},
+{
+  "fields": {
+    "cited_opinion": 111464,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 87
+},
+{
+  "fields": {
+    "cited_opinion": 111113,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 88
+},
+{
+  "fields": {
+    "cited_opinion": 112779,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 89
+},
+{
+  "fields": {
+    "cited_opinion": 117967,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 90
+},
+{
+  "fields": {
+    "cited_opinion": 121168,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 91
+},
+{
+  "fields": {
+    "cited_opinion": 111505,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 92
+},
+{
+  "fields": {
+    "cited_opinion": 111924,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 93
+},
+{
+  "fields": {
+    "cited_opinion": 118377,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 94
+},
+{
+  "fields": {
+    "cited_opinion": 136984,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 95
+},
+{
+  "fields": {
+    "cited_opinion": 142900,
+    "citing_opinion": 799990
+  },
+  "model": "search.opinionscited",
+  "pk": 96
+}
+]

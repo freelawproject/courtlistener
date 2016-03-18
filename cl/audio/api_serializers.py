@@ -8,7 +8,7 @@ class AudioSerializer(serializers.HyperlinkedModelSerializer):
                                          read_only=True)
     panel = serializers.HyperlinkedRelatedField(
         many=True,
-        view_name='judge-detail',
+        view_name='person-detail',
         read_only=True,
     )
     # This seems unnecessary and it serializes the same data either way. But

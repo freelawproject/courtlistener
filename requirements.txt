@@ -39,7 +39,8 @@ psycopg2==2.6.1
 pyinotify==0.9.6
 pylint==1.4.3
 pyparsing==2.0.3
-python-dateutil==2.4.2
+python-dateutil==2.5.0
+python-igraph
 python-mimeparse==0.1.4
 pytz==2015.7
 redis==2.10.5

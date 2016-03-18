@@ -185,7 +185,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         # TODO: Refactor. Same code used in
         #       test_basic_homepage_search_and_signin_and_signout
         profile_dropdown = self.browser. \
-            find_element_by_css_selector('a.dropdown-toggle')
+            find_elements_by_css_selector('a.dropdown-toggle')[1]
         self.assertEqual(profile_dropdown.text.strip(), u'Profile')
 
         dropdown_menu = self.browser. \
@@ -235,7 +235,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.attempt_sign_in('pandora', 'password')
 
         profile_dropdown = self.browser. \
-            find_element_by_css_selector('a.dropdown-toggle')
+            find_elements_by_css_selector('a.dropdown-toggle')[1]
         self.assertEqual(profile_dropdown.text.strip(), u'Profile')
 
         dropdown_menu = self.browser. \

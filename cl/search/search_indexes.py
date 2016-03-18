@@ -7,7 +7,6 @@ from django.core.urlresolvers import NoReverseMatch
 from django.template import loader
 
 
-
 class InvalidDocumentError(Exception):
     """The document could not be formed"""
     def __init__(self, message):

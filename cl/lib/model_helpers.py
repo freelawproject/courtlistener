@@ -3,7 +3,12 @@ from django.utils.text import get_valid_filename
 
 
 def make_upload_path(instance, filename):
-    """Return a string like pdf/2010/08/13/foo_v._var.pdf"""
+    """Return a string like pdf/2010/08/13/foo_v._var.pdf
+
+    This function requires that when you save an item you provide an attribute
+    called file_with_date on the object. That date will be used to place the
+    item in the correct location on disk.
+    """
     try:
         # Cannot do proper type checking here because of circular import
         # problems when importing Audio, Document, etc.
@@ -29,7 +34,7 @@ def validate_partial_date(instance, field):
        be completed if the other is not).
      - If a partial date, the day/month is/are set to 01.
     """
-    from cl.judges.models import GRANULARITY_MONTH, GRANULARITY_YEAR
+    from cl.people_db.models import GRANULARITY_MONTH, GRANULARITY_YEAR
     d = getattr(instance, 'date_%s' % field)
     granularity = getattr(instance, 'date_granularity_%s' % field)
 

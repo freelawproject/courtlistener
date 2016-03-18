@@ -55,7 +55,6 @@
         <div class="navbar-right">
             <ul class="nav navbar-nav">
                 <li><a href="{% url "about" %}" tabindex="300">About</a></li>
-                {% if perms.visualizations.has_beta_access %}
                 <li class="dropdown">
                     <a href="#"
                        class="dropdown-toggle"
@@ -78,9 +77,7 @@
                         <li>
                     </ul>
                 </li>
-                {% endif %}
                 <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
-                <li><a href="{% url "coverage" %}" tabindex="302">Coverage</a></li>
                 <li class="dropdown">
                     <a href="#"
                        class="dropdown-toggle"
@@ -89,11 +86,9 @@
                     <ul class="dropdown-menu" role="menu">
                         <li><a href="{% url "profile_alerts" %}"
                                tabindex="304">Alerts</a></li>
-                        {% if perms.visualizations.has_beta_access %}
                         <li><a href="{% url "view_visualizations" %}"
                                tabindex="306">Visualizations</a>
                         </li>
-                        {% endif %}
                         <li><a href="{% url "profile_favorites" %}"
                                tabindex="305">Favorites</a></li>
                         <li><a href="/profile/donations/"
@@ -109,9 +104,30 @@
     {% else %}
         <ul class="nav navbar-nav">
             <li><a href="{% url "about" %}">About</a></li>
+            <li class="dropdown">
+                <a href="#"
+                   class="dropdown-toggle"
+                   tabindex="301"
+                   data-toggle="dropdown">Visualizations&nbsp;<span
+                        class="caret"></span>
+                </a>
+                <ul class="dropdown-menu" role="menu">
+                    <li>
+                        <a href="{% url "viz_gallery" %}"
+                           tabindex="301">Gallery</a>
+                    </li>
+                    <li>
+                        <a href="{% url "mapper_homepage" %}"
+                           tabindex="301">SCOTUS Networks</a>
+                    </li>
+                    <li>
+                        <a href="{% url "new_visualization" %}"
+                           tabindex="301">New Network</a></li>
+                    <li>
+                </ul>
+            </li>
             <li><a href="{% url "faq" %}">FAQ</a></li>
             <li><a href="" class="tour-link">Tour</a></li>
-            <li><a href="{% url "coverage" %}">Coverage</a></li>
         {% if request.path != "/sign-out/" %}
             <li>
                 <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}{% if results %}page={{ results.number }}{% endif %}">
@@ -318,34 +334,32 @@
     </div>
 
     <div class="row lg-v-offset-below-3">
-        {% if perms.visualizations.has_beta_access %}
-            <div class="col-sm-6">
-                <div class="row">
-                    <div class="col-xs-12">
-                        <h3>Supreme Court Network Visualizations&nbsp;<i class="gray fa fa-line-chart"></i>
-                        </h3>
-                        <p>Supreme Court Network Visualizations allow you to see
-                            and analyze lines of precedent in Supreme Court
-                            cases.
-                        </p>
-                            {% for viz in visualizations %}
-                                <div id="chart-{{ viz.id }}"></div>
-                            {% endfor %}
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-xs-12 v-offset-above-2">
-                        <a href="{% url "viz_gallery" %}"
-                           class="btn btn-lg btn-default">See Gallery</a>
-
-                        <p class="float-right">
-                            <a href="{% url "mapper_homepage" %}"
-                               class="btn btn-lg btn-primary">Learn More About SCOTUS Networks</a>
-                        </p>
-                    </div>
+        <div class="col-sm-6">
+            <div class="row">
+                <div class="col-xs-12">
+                    <h3>Supreme Court Network Visualizations&nbsp;<i class="gray fa fa-line-chart"></i>
+                    </h3>
+                    <p>Supreme Court Network Visualizations allow you to see
+                        and analyze lines of precedent in Supreme Court
+                        cases.
+                    </p>
+                        {% for viz in visualizations %}
+                            <div id="chart-{{ viz.id }}"></div>
+                        {% endfor %}
                 </div>
             </div>
-        {% endif %}
+            <div class="row">
+                <div class="col-xs-12 v-offset-above-2">
+                    <a href="{% url "viz_gallery" %}"
+                       class="btn btn-lg btn-default">See Gallery</a>
+
+                    <p class="float-right">
+                        <a href="{% url "mapper_homepage" %}"
+                           class="btn btn-lg btn-primary">Learn More About SCOTUS Networks</a>
+                    </p>
+                </div>
+            </div>
+        </div>
 
         {% cache 21600 homepage-stats %}
             <div class="col-sm-6">
@@ -414,13 +428,6 @@
                     </div>
                 </div>
 
-                {% comment %}
-                This section needs to be added after the beta period ends, when
-                we remove the has_beta_access flag. The alternative is to have
-                move complex caching, and that's no fun. I've left the
-                has_beta_access flag below so we don't miss this while removing
-                that code.
-                {% if perms.visualizations.has_beta_access %}
                 {% if viz_in_last_ten > 0 %}
                     <div class="row">
                         <div class="col-xs-3 text-center">
@@ -432,8 +439,6 @@
                         </div>
                     </div>
                 {% endif %}
-                {% endif %}
-                {% endcomment %}
 
 
                 <div class="row">

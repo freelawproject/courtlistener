@@ -1,0 +1,32 @@
+[
+  {
+    "fields": {
+      "date_created": "2010-06-08T00:00:00Z",
+      "date_modified": "2010-06-08T00:00:00Z",
+      "ein": 466000364,
+      "name": "Northern State University"
+    },
+    "model": "people_db.School",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_created": "2010-06-08T00:00:00Z",
+      "date_modified": "2010-06-08T00:00:00Z",
+      "is_alias_of": 1,
+      "name": "NSU"
+    },
+    "model": "people_db.School",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "date_created": "2010-06-08T00:00:00Z",
+      "date_modified": "2010-06-08T00:00:00Z",
+      "ein": 460280847,
+      "name": "Presentation College"
+    },
+    "model": "people_db.School",
+    "pk": 3
+  }
+]

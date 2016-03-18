@@ -1,8 +1,8 @@
 from django.contrib import admin
 
-from cl.judges.models import (
-    Education, School, Judge, Position, Politician, RetentionEvent, Career,
-    Title, Race, PoliticalAffiliation, Source, ABARating
+from cl.people_db.models import (
+    Education, School, Person, Position, RetentionEvent,
+    Race, PoliticalAffiliation, Source, ABARating
 )
 
 
@@ -18,19 +18,41 @@ class PositionAdmin(admin.ModelAdmin):
     inlines = (
         RetentionEventInline,
     )
+    raw_id_fields = (
+        'court',
+        'school',
+        'appointer',
+        'supervisor',
+        'predecessor',
+    )
 
 
 class PositionInline(admin.StackedInline):
     model = Position
     extra = 1
-    fk_name = 'judge'
-    raw_id_fields = ('court',)
+    fk_name = 'person'
+    raw_id_fields = (
+        'court',
+        'school',
+        'appointer',
+        'supervisor',
+        'predecessor',
+    )
+
+
+class SchoolAdmin(admin.ModelAdmin):
+    search_fields = (
+        'id',
+        'ein',
+        'name',
+    )
 
 
 class EducationAdmin(admin.ModelAdmin):
     search_fields = (
         'school__name',
         'school__ein',
+        'school__pk',
     )
 
 
@@ -40,51 +62,9 @@ class EducationInline(admin.TabularInline):
     raw_id_fields = ('school',)
 
 
-class CareerInline(admin.StackedInline):
-    model = Career
-    extra = 1
-
-
-class TitleInline(admin.TabularInline):
-    model = Title
-    extra = 1
-
-
-class PoliticalAffiliationJudgeInline(admin.TabularInline):
-    """Affiliations can be tied to judges or politicians.
-
-    This class is to be inlined with judges.
-    """
+class PoliticalAffiliationInline(admin.TabularInline):
     model = PoliticalAffiliation
     extra = 1
-    exclude = (
-        'politician',
-    )
-
-
-class PoliticalAffiliationPoliticianInline(admin.TabularInline):
-    """Affiliations can be tied to judges or politicians.
-
-    This class is to be inlined with politicians.
-    """
-    model = PoliticalAffiliation
-    extra = 1
-    exclude = (
-        'judge',
-    )
-
-
-class PoliticianAdmin(admin.ModelAdmin):
-    inlines = (
-        PoliticalAffiliationPoliticianInline,
-    )
-    list_filter = (
-        'office',
-    )
-    search_fields = (
-        'name_last',
-        'name_first',
-    )
 
 
 class SourceInline(admin.TabularInline):
@@ -97,15 +77,13 @@ class ABARatingInline(admin.TabularInline):
     extra = 1
 
 
-class JudgeAdmin(admin.ModelAdmin):
+class PersonAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['name_first', 'name_middle', 'name_last',
                                     'name_suffix']}
     inlines = (
         PositionInline,
         EducationInline,
-        CareerInline,
-        TitleInline,
-        PoliticalAffiliationJudgeInline,
+        PoliticalAffiliationInline,
         SourceInline,
         ABARatingInline,
     )
@@ -124,15 +102,12 @@ class JudgeAdmin(admin.ModelAdmin):
     )
 
 
-admin.site.register(Judge, JudgeAdmin)
+admin.site.register(Person, PersonAdmin)
 admin.site.register(Education, EducationAdmin)
-admin.site.register(School)
+admin.site.register(School, SchoolAdmin)
 admin.site.register(Position, PositionAdmin)
-admin.site.register(Politician, PoliticianAdmin)
 admin.site.register(PoliticalAffiliation)
 admin.site.register(RetentionEvent)
-admin.site.register(Career)
-admin.site.register(Title)
 admin.site.register(Race)
 admin.site.register(Source)
 admin.site.register(ABARating)

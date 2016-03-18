@@ -80,6 +80,18 @@ class Docket(models.Model):
         auto_now=True,
         db_index=True,
     )
+    date_cert_granted = models.DateField(
+        help_text="date cert was granted for this case, if applicable",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    date_cert_denied = models.DateField(
+        help_text="the date cert was denied for this case, if applicable",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
     date_argued = models.DateField(
         help_text="the date the case was argued",
         blank=True,
@@ -255,13 +267,13 @@ class OpinionCluster(models.Model):
         related_name="clusters",
     )
     panel = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judges that heard the oral arguments",
         related_name="opinion_clusters_participating_judges",
         blank=True,
     )
     non_participating_judges = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judges that heard the case, but did not participate in "
                   "the opinion",
         related_name="opinion_clusters_non_participating_judges",
@@ -505,9 +517,9 @@ class OpinionCluster(models.Model):
         """
         return [
             'neutral_cite', 'federal_cite_one', 'federal_cite_two',
-            'federal_cite_three', 'specialty_cite_one', 'state_cite_regional',
-            'state_cite_one', 'state_cite_two', 'state_cite_three',
-            'westlaw_cite', 'lexis_cite'
+            'federal_cite_three', 'scotus_early_cite', 'specialty_cite_one',
+            'state_cite_regional', 'state_cite_one', 'state_cite_two',
+            'state_cite_three', 'westlaw_cite', 'lexis_cite'
         ]
 
     @property
@@ -617,14 +629,14 @@ class Opinion(models.Model):
         blank=True,
     )
     author = models.ForeignKey(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The primary author of this opinion",
         related_name='opinions_written',
         blank=True,
         null=True,
     )
     joined_by = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         related_name='opinions_joined',
         help_text="Other judges that joined the primary author in this opinion",
         blank=True,
@@ -734,7 +746,20 @@ class OpinionsCited(models.Model):
         Opinion,
         related_name='citing_opinions',
     )
-
+    depth = models.IntegerField(
+        help_text='The number of times the cited opinion was cited '
+                  'in the citing opinion',
+        default=1,
+        db_index=True,
+    )
+    quoted = models.BooleanField(
+        help_text='Equals true if previous case was quoted directly',
+        default=False,
+        db_index=True,
+    )
+    #treatment: positive, negative, etc.
+    #  
+    
     def __unicode__(self):
         return u'%s ⤜--cites⟶  %s' % (self.citing_opinion.id,
                                         self.cited_opinion.id)
@@ -742,3 +767,4 @@ class OpinionsCited(models.Model):
     class Meta:
         verbose_name_plural = 'Opinions cited'
         unique_together = ("citing_opinion", "cited_opinion")
+
