@@ -1,7 +1,2 @@
-# Set the default behavior, in case people don't have core.autocrlf set.
-* text=auto
-
-# force git to keep our init scripts *nix friendly
-celeryd text eol=lf
-solr text eol=lf
-scraper text eol=lf
+# Prevent Windows git clients for goofing up files that must run on Linux
+* text eol=lf
