@@ -54,6 +54,7 @@ def make_federal_judge(item, testing=False):
         name_suffix = get_suffix(item['suffname']),
         gender = item['gender'],        
         fjc_id = item['Judge Identification Number'],
+        cl_id = item['cl_id'],
         
         date_dob = date_dob,
         date_granularity_dob = date_granularity_dob,

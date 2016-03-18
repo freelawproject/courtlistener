@@ -29,6 +29,7 @@ def make_state_judge(item, testing=False):
     else:
         
         person = Person(
+            cl_id = item['cl_id'],
             name_first = item['firstname'],
             name_middle = item['midname'],
             name_last = item['lastname'],
