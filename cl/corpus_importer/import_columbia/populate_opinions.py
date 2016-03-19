@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from dateutil.relativedelta import relativedelta
-
 from cl.search.models import Docket, Opinion, OpinionCluster
 from cl.people_db.models import Person
 from cl.citations.find_citations import get_citations
-from cl.lib.import_lib import map_citations_to_models
+from cl.lib.import_lib import map_citations_to_models, find_person
 
 
 # used to identify dates
@@ -21,46 +19,6 @@ OPINION_TYPE_MAPPING = {
     ,'dissent': '040dissent'
     ,'concurrence': '030concurrence'
 }
-
-
-def find_person(name, court_id, case_date):
-    """Uniquely identifies a judge by both name and metadata. Prints a warning if couldn't find and raises an
-    exception if not unique."""
-    candidates = Person.objects.filter(
-        name_last__iexact=name,        
-        positions__court_id=court_id,
-    )    
-    if len(candidates) == 0:
-        print("Failed to find a judge with last name '%s' and matching position." % name)
-        return None
-    if len(candidates) == 1:
-        return candidates[0]
-        
-    candidates = Person.objects.filter(
-        name_last__iexact=name,        
-        positions__court_id=court_id,
-        positions__date_start__lt=case_date + relativedelta(years=1)
-    )
-    if len(candidates) == 1:
-        return candidates[0]
-    
-    candidates = list(Person.objects.filter(
-        name_last__iexact=name,        
-        positions__court_id=court_id,
-        positions__date_start__lt=case_date + relativedelta(years=1),
-        positions__date_termination__gt=case_date - relativedelta(years=1)
-    )) + list(Person.objects.filter(
-        name_last__iexact=name,        
-        positions__court_id=court_id,
-        positions__date_start__lt=case_date + relativedelta(years=1),
-        positions__date_termination=None
-    ))
-      
-    if len(candidates) == 1:
-        return candidates[0]
-        
-    raise Exception("Found multiple judges for name '%s' and court '%s' but could not resolve conflict." % name,court_id)
-
 
 def make_and_save(item):
     """Associates case data from `parse_opinions` with objects. Saves these objects."""
@@ -157,5 +115,14 @@ def make_and_save(item):
 
 #if __name__ == '__main__':
 from cl.corpus_importer.import_columbia.parse_opinions import parse_file
-parsed = parse_file('cl/corpus_importer/import_columbia/test_opinions/0b59c80d9043a003.xml')
-make_and_save(parsed)
+from glob import glob
+files = glob('/vagrant/flp/columbia_data/opinions/*/*/documents/*xml')
+
+
+
+for f in files:
+    parsed = parse_file(f)
+    try:
+        make_and_save(parsed)
+    except Exception, e:
+        print(f,e)

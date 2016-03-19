@@ -69,6 +69,13 @@ class Person(models.Model):
         unique=True,
         db_index=True,
     )
+    cl_id = models.CharField(
+        max_length=30,
+        help_text="A unique identifier for judge, also indicating source "
+                    "of data.",
+        unique=True,
+        db_index=True,
+        )
     slug = models.SlugField(
         max_length=158  # len(self.name_full)
     )
