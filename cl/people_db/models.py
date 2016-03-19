@@ -32,15 +32,15 @@ DATE_GRANULARITIES = (
 
 class Person(models.Model):
     RELIGIONS = (
-    ('ca', 'Catholic'),
-    ('pr', 'Protestant'),
-    ('je', 'Jewish'),
-    ('mu', 'Muslim'),
-    ('at', 'Atheist'),
-    ('ag', 'Agnostic'),
-    ('mo', 'Mormon'),
-    ('bu', 'Buddhist'),
-    ('hi', 'Hindu')
+        ('ca', 'Catholic'),
+        ('pr', 'Protestant'),
+        ('je', 'Jewish'),
+        ('mu', 'Muslim'),
+        ('at', 'Atheist'),
+        ('ag', 'Agnostic'),
+        ('mo', 'Mormon'),
+        ('bu', 'Buddhist'),
+        ('hi', 'Hindu')
     )
     race = models.ManyToManyField(
         'Race',
