@@ -177,6 +177,13 @@ class Docket(models.Model):
         blank=True,
         db_index=True,
     )
+    fdsys_case_id = models.CharField(
+        help_text="The cased ID provided by FDSYS.",
+        null=True,
+        blank=True,
+        max_length=100,
+        db_index=True,
+    )
     cause = models.CharField(
         help_text="The cause for the case.",
         max_length=200,
@@ -437,6 +444,41 @@ class Court(models.Model):
 
     class Meta:
         ordering = ["position"]
+
+
+class CaseParty(models.Model):
+    """A class representing a party in a case"""
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket that the case party is a part of",
+        related_name='parties'
+    )
+    name_first = models.CharField(
+        help_text="First name",
+        max_length=50,
+        blank=True
+    )
+    name_last = models.CharField(
+        help_text="Last name",
+        max_length=50,
+        blank=True
+    )
+    name_middle = models.CharField(
+        help_text="Middle name",
+        max_length=50,
+        blank=True
+    )
+    name_suffix = models.CharField(
+        help_text='Suffix name',
+        max_length=50,
+        blank=True
+    )
+    # todo this could be streamlined and added in a separate model, as there shouldn't more then a few types of roles
+    role = models.CharField(
+        help_text="Parties role in the case",
+        max_length=50,
+        blank=True
+    )
 
 
 class OpinionCluster(models.Model):
