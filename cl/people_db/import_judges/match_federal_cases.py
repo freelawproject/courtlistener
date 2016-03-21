@@ -36,6 +36,12 @@ for i, row in df.iterrows():
         candidates.append(find_person(judge, row.court_id, case_date=date_filed))    
     
     candidates = [c for c in candidates if c is not None]
+    
+    if len(candidates) == 1:
+        author = candidates[0]
+    if len(candidates) > 1:
+        panel = candidates
+    
     if len(candidates) == 1:
         matchcount += 1
     if len(candidates) > 1:
