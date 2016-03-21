@@ -170,7 +170,7 @@ import pandas as pd
 import numpy as np
 textfields = ['firstname','midname','lastname','gender',
            'howended']
-df = pd.read_excel('/vagrant/flp/columbia_data/judges/supreme-court-judgebios-2016-02-27.xlsx', 0)    
+df = pd.read_excel('/vagrant/flp/columbia_data/judges/supreme-court-judgebios-2016-03-20.xlsx', 0)    
 for x in textfields:
     df[x] = df[x].replace(np.nan,'',regex=True)
 for i, row in df.iterrows():   
