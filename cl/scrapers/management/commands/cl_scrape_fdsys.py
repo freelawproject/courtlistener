@@ -216,6 +216,11 @@ class Command(BaseCommand):
             error = True
             return docket, error
 
+        # adding the parties
+        for partie in item.parties:
+            partie
+
+        # adding the documents
         for document in item.documents:
             docket_entry = DocketEntry(
                 docket=docket,

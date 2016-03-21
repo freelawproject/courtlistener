@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='CaseParty',
+            name='CaseParties',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('name_first', models.CharField(help_text=b'First name', max_length=50, blank=True)),
@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
             field=models.CharField(help_text=b'The cased ID provided by FDSYS.', max_length=100, null=True, db_index=True, blank=True),
         ),
         migrations.AddField(
-            model_name='caseparty',
+            model_name='caseparties',
             name='docket',
             field=models.ForeignKey(related_name='parties', to='search.Docket', help_text=b'The docket that the case party is a part of'),
         ),

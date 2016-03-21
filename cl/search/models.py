@@ -446,7 +446,7 @@ class Court(models.Model):
         ordering = ["position"]
 
 
-class CaseParty(models.Model):
+class CaseParties(models.Model):
     """A class representing a party in a case"""
     docket = models.ForeignKey(
         Docket,
