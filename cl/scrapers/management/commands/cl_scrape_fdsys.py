@@ -22,7 +22,7 @@ from cl.lib.string_utils import trunc
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.tasks import extract_doc_content, extract_by_ocr
-from cl.search.models import Docket, RECAPDocument, DocketEntry
+from cl.search.models import Docket, RECAPDocument, DocketEntry, CaseParties
 from cl.search.models import Court
 from cl.search.models import Opinion
 from cl.search.models import OpinionCluster
@@ -217,8 +217,16 @@ class Command(BaseCommand):
             return docket, error
 
         # adding the parties
-        for partie in item.parties:
-            partie
+        for parties in item.parties:
+            case_parties = CaseParties(
+                docket=docket,
+                first_name=parties['name_first'],
+                last_name=parties['name_last'],
+                middle_name=parties['name_middle'],
+                suffix_name=parties['name_suffix'],
+                role=parties['role']
+            )
+            case_parties.save()
 
         # adding the documents
         for document in item.documents:

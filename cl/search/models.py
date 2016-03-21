@@ -453,22 +453,22 @@ class CaseParties(models.Model):
         help_text="The docket that the case party is a part of",
         related_name='parties'
     )
-    name_first = models.CharField(
+    first_name = models.CharField(
         help_text="First name",
         max_length=50,
         blank=True
     )
-    name_last = models.CharField(
+    last_name = models.CharField(
         help_text="Last name",
         max_length=50,
         blank=True
     )
-    name_middle = models.CharField(
+    middle_name = models.CharField(
         help_text="Middle name",
         max_length=50,
         blank=True
     )
-    name_suffix = models.CharField(
+    suffix_name = models.CharField(
         help_text='Suffix name',
         max_length=50,
         blank=True
