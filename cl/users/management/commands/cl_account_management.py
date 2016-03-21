@@ -69,9 +69,9 @@ class Command(BaseCommand):
                 print "User %s deleted" % user
             if not self.options['simulate']:
                 # Gather their foreign keys, delete those
-                up.alert.all().delete()
-                up.donation.all().delete()
-                up.favorite.all().delete()
+                up.alerts.all().delete()
+                up.donations.all().delete()
+                up.favorites.all().delete()
 
                 # delete the user then the profile.
                 up.user.delete()
