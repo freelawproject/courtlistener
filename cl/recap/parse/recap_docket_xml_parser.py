@@ -112,8 +112,13 @@ def get_reformated_value_from_xml(xml_tag, format_type):
     elif format_type == FormatType.JUDGE_OBJ:
         judge_full_name = xml_tag.string if xml_tag else None
         if judge_full_name:
-            # Removing the Noise in the name and making a
-            judge_full_name_reformed = re.sub("|".join(map((lambda x : re.sub('^.', "(%s|%s)"%(x[0].upper(), x[0].lower()), x)),JUDGE_STOPWORDS_LIST)), '', judge_full_name).strip()
+            # Removing the Noise in the name and making a regex.
+            # Diving the JUDGE_STOPWORDS_LIST into two because passing them together for re.sub() throws an assertion error.
+            half_judge_stopwords = len(JUDGE_STOPWORDS_LIST)/2
+            # The first half
+            judge_full_name_reformed = re.sub("|".join(map((lambda x : re.sub('^.', "(%s|%s)"%(x[0].upper(), x[0].lower()), x)),JUDGE_STOPWORDS_LIST[:half_judge_stopwords])), '', judge_full_name).strip()
+            # The second half
+            judge_full_name_reformed = re.sub("|".join(map((lambda x : re.sub('^.', "(%s|%s)"%(x[0].upper(), x[0].lower()), x)),JUDGE_STOPWORDS_LIST[half_judge_stopwords:])), '', judge_full_name_reformed).strip()
 
             if judge_full_name_reformed:
                 judge_name_list = judge_full_name_reformed.split()
