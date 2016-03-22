@@ -14,13 +14,14 @@ def load_fixture(apps, schema_editor):
         fixture = 'school_data_truncated'
     else:
         fixture = 'schools_data'
-    call_command('loaddata', 'schools_data', app_label='people_db')
+    call_command('loaddata', fixture, app_label='people_db')
 
 
 def unload_fixture(apps, schema_editor):
     """Delete everything"""
     SchoolModel = apps.get_model("people_db", "School")
     SchoolModel.objects.all().delete()
+
 
 class Migration(migrations.Migration):
     dependencies = [

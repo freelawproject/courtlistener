@@ -53,7 +53,6 @@ class TestVizUtils(TestCase):
 class TestVizModels(TestCase):
     """ Tests for Visualization models """
 
-    # This fixture is pretty bloated. TODO: Slim down fixture file later.
     fixtures = ['scotus_map_data.json', 'visualizations.json']
 
     def setUp(self):
