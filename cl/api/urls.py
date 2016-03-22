@@ -29,7 +29,6 @@ router.register(r'aba-ratings', judge_views.ABARatingViewSet)
 
 
 urlpatterns = [
-    # url(r'^api/rest/(?P<version>[v3]+)/', include(router.urls)),
     url(r'^api-auth/',
         include('rest_framework.urls', namespace='rest_framework')),
     url(r'^api/rest/(?P<version>[v3]+)/', include(router.urls)),
