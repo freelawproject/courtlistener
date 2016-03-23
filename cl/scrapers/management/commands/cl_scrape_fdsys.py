@@ -21,7 +21,7 @@ from cl.lib.scrape_helpers import (
 from cl.lib.string_utils import trunc
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.DupChecker import DupChecker
-from cl.scrapers.tasks import extract_doc_content, extract_by_ocr, extract_fdsys_doc_content
+from cl.scrapers.tasks import extract_doc_content, extract_by_ocr
 from cl.search.models import Docket, RECAPDocument, DocketEntry, CaseParties
 from cl.search.models import Court
 from cl.search.models import Opinion
