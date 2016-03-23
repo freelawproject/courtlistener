@@ -11,6 +11,17 @@ from cl.visualizations.models import Referer
 from cl.visualizations.utils import emails
 
 
+def blacklisted_url(url):
+    """Check if a URL is blacklisted."""
+    blacklist = [
+        'content_mobile.php',  # Mobile version of starger's site
+        'https://www.courtlistener.com'  # Self-embeds.
+    ]
+    if len([b for b in blacklist if b in url]) > 0:
+        return True
+    return False
+
+
 @task(bind=True, max_retries=8)
 def get_title(self, referer_id):
     """Get the HTML title for a page, trying again if failures occur.
@@ -31,6 +42,9 @@ def get_title(self, referer_id):
     countdown = 15 * 60 * (2 ** self.request.retries)
 
     referer = Referer.objects.get(pk=referer_id)
+    if blacklisted_url(referer.url):
+        return
+
     r = requests.get(
         referer.url,
         headers={'User-Agent': "CourtListener"},
