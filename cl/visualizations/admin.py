@@ -35,7 +35,7 @@ class RefererAdmin(admin.ModelAdmin):
         'date_modified',
     )
     search_fields = (
-        'pk',
+        'id',
         'url',
         'page_title',
     )
