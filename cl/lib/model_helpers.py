@@ -1,11 +1,21 @@
+from datetime import date
+
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
 
 
 def make_recap_path(instance, filename):
     """Make a path to a good location on the local system for RECAP files."""
-    raise NotImplementedError("Need to do research based on the files that are "
-                              "returned to establish a sane practice here.")
+    # raise NotImplementedError("Need to do research based on the files that are "
+    #                           "returned to establish a sane practice here.")
+    d = date.today()
+    return '%s/%s/%02d/%02d/%s' % (
+        filename.split('.')[-1],
+        d.year,
+        d.month,
+        d.day,
+        get_valid_filename(filename)
+    )
 
 
 def make_upload_path(instance, filename):

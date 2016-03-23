@@ -191,7 +191,8 @@ class Command(BaseCommand):
             court=court,
             blocked=blocked,
             date_blocked=date_blocked,
-            filepath_ia=item.download_url
+            filepath_ia=item.download_url,
+            source=Docket.RECAP
         )
 
         try:
@@ -226,14 +227,16 @@ class Command(BaseCommand):
             docket_entry = DocketEntry(
                 docket=docket,
                 date_filed=document['date_filed'],
-                description=document['description']
+                description=document['description'],
+                entry_number=999  # todo not sure if this is the best solution, but this is a scraper for fdsys not pacer
             )
             docket_entry.save()
 
             recap_document = RECAPDocument(
                 docket_entry=docket_entry,
                 document_type=RECAPDocument.PACER_DOCUMENT,
-                filepath_ia=document['download_url']
+                filepath_ia=document['download_url'],
+                document_number=999  # todo not sure if this is the best solution, but this is a scraper for fdsys not pacer
             )
 
             try:

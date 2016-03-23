@@ -232,7 +232,7 @@ class Docket(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        if self.source == 1 and not self.pacer_case_id:
+        if self.source == 1 and not self.fdsys_case_id:
             raise ValidationError("pacer_case_id cannot be Null or empty in "
                                   "RECAP documents.")
 
