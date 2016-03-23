@@ -31,6 +31,17 @@ DATE_GRANULARITIES = (
 
 
 class Person(models.Model):
+    RELIGIONS = (
+        ('ca', 'Catholic'),
+        ('pr', 'Protestant'),
+        ('je', 'Jewish'),
+        ('mu', 'Muslim'),
+        ('at', 'Atheist'),
+        ('ag', 'Agnostic'),
+        ('mo', 'Mormon'),
+        ('bu', 'Buddhist'),
+        ('hi', 'Hindu')
+    )
     race = models.ManyToManyField(
         'Race',
         blank=True,
@@ -57,6 +68,14 @@ class Person(models.Model):
         blank=True,
         unique=True,
         db_index=True,
+    )
+    cl_id = models.CharField(
+        max_length=30,
+        help_text="A unique identifier for judge, also indicating source of "
+                  "data.",
+        unique=True,
+        db_index=True,
+        null=True,
     )
     slug = models.SlugField(
         max_length=158  # len(self.name_full)
@@ -112,6 +131,12 @@ class Person(models.Model):
     gender = models.CharField(
         choices=GENDERS,
         max_length=2,
+        blank = True
+    )
+    religion = models.CharField(
+        choices=RELIGIONS,
+        max_length=2,
+        blank=True
     )
 
     def __unicode__(self):
@@ -579,7 +604,7 @@ class Education(models.Model):
     )
     degree_level = models.CharField(
         choices=DEGREE_LEVELS,
-        max_length=2,
+        max_length=3,
         blank=True,
     )
     degree = models.CharField(
@@ -610,6 +635,7 @@ class Race(models.Model):
     race = models.CharField(
         choices=RACES,
         max_length=5,
+        unique=True,
     )
 
     def __unicode__(self):

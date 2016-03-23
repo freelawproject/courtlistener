@@ -629,10 +629,12 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 						if (typeof links[name].d !== 'undefined') {
 							color = links[name].d;
 						}
-						connections.addDataset(new Plottable.Dataset([
-							{x: coords[cluster.id].date_filed, y: coords[cluster.id].count, c: color, o: opacity},
-							{x: coords[item].date_filed, y: coords[item].count, c: color, o: opacity}
-						]));
+						if (typeof coords[item] !== 'undefined') {
+							connections.addDataset(new Plottable.Dataset([
+								{x: coords[cluster.id].date_filed, y: coords[cluster.id].count, c: color, o: opacity},
+								{x: coords[item].date_filed, y: coords[item].count, c: color, o: opacity}
+							]));
+						}
 					}
 				}
 			}

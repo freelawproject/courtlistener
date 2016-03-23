@@ -11,6 +11,18 @@ from cl.visualizations.models import Referer
 from cl.visualizations.utils import emails
 
 
+def blacklisted_url(url):
+    """Check if a URL is blacklisted."""
+    blacklist = [
+        'content_mobile.php',  # Mobile version of starger's site
+        'https://www.courtlistener.com',  # Self-embeds.
+        'translate.google',  # Google translate
+    ]
+    if len([b for b in blacklist if b in url]) > 0:
+        return True
+    return False
+
+
 @task(bind=True, max_retries=8)
 def get_title(self, referer_id):
     """Get the HTML title for a page, trying again if failures occur.
@@ -31,6 +43,9 @@ def get_title(self, referer_id):
     countdown = 15 * 60 * (2 ** self.request.retries)
 
     referer = Referer.objects.get(pk=referer_id)
+    if blacklisted_url(referer.url):
+        return
+
     r = requests.get(
         referer.url,
         headers={'User-Agent': "CourtListener"},
@@ -43,9 +58,11 @@ def get_title(self, referer_id):
 
     html_tree = html.fromstring(r.text)
     try:
-        title = getattr(html_tree.xpath('//title')[0], 'text', '').strip()
-    except IndexError as exc:
-        raise self.retry(exc=exc, countdown=countdown)
+        title = getattr(html_tree.xpath('//title')[0], 'text', '')
+        if title is not None:
+            title = title.strip()
+    except IndexError:
+        title = ''
 
     if title:
         referer.page_title = trunc(
@@ -66,4 +83,7 @@ def get_title(self, referer_id):
             # Create an exception to catch.
             raise Exception("Couldn't get title from HTML")
         except Exception as exc:
+            if self.request.retries >= self.max_retries:
+                # We couldn't get the title. Let it go.
+                return
             raise self.retry(exc=exc, countdown=countdown)

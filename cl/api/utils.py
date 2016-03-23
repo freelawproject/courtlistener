@@ -52,6 +52,10 @@ class SimpleMetadataWithFilters(SimpleMetadata):
     def determine_metadata(self, request, view):
         metadata = super(SimpleMetadataWithFilters, self).determine_metadata(request, view)
         filters = OrderedDict()
+        if not hasattr(view, 'filter_class'):
+            # This is the API Root, which is not filtered.
+            return metadata
+
         for filter_name, filter_type in view.filter_class.base_filters.items():
             filter_parts = filter_name.split('__')
             filter_name = filter_parts[0]

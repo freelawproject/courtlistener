@@ -14,7 +14,7 @@ def load_fixture(apps, schema_editor):
         fixture = 'school_data_truncated'
     else:
         fixture = 'schools_data'
-    call_command('loaddata', 'schools_data', app_label='people_db')
+    call_command('loaddata', fixture, app_label='people_db')
 
 
 def unload_fixture(apps, schema_editor):
@@ -22,9 +22,10 @@ def unload_fixture(apps, schema_editor):
     SchoolModel = apps.get_model("people_db", "School")
     SchoolModel.objects.all().delete()
 
+
 class Migration(migrations.Migration):
     dependencies = [
-        ('people_db', '0001_initial'),
+        ('people_db', '0002_auto_20160318_1735'),
     ]
 
     operations = [
