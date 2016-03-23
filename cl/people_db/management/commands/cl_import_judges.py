@@ -10,7 +10,7 @@ from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge
 
 
 class Command(BaseCommand):
-    help = 'Import data from the SCDB Case Centered CSV.'
+    help = 'Import judge data from various files.'
 
     def valid_actions(self, s):
         if s.lower() not in self.VALID_ACTIONS:
