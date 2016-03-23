@@ -21,7 +21,7 @@ from cl.lib.scrape_helpers import (
 from cl.lib.string_utils import trunc
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.DupChecker import DupChecker
-from cl.scrapers.tasks import extract_doc_content, extract_by_ocr
+from cl.scrapers.tasks import extract_doc_content, extract_by_ocr, extract_fdsys_doc_content
 from cl.search.models import Docket, RECAPDocument, DocketEntry, CaseParties
 from cl.search.models import Court
 from cl.search.models import Opinion
@@ -148,25 +148,21 @@ class Command(BaseCommand):
                     if error:
                         download_error = True
                     else:
-                        # todo need to discuss this, the old code is working only with Opinion model
-                        # extract_doc_content.delay(
-                        #     docket.pk,
-                        #     callback=subtask(extract_by_ocr),
-                        #     citation_countdown=random.randint(0, 3600)
-                        # )
-                        #
+                        # todo need to discuss this,
+                        # the old code is working only with Opinion model
+                        # where should the extracted data be saved, opinion model has html and text fields ?
                         # for docket_entry in docket.docketentry_set.objects.all():
                         #     for recap_docket in docket_entry.recapdocument_set.objects.all():
-                        #         extract_doc_content.delay(
+                        #         extract_fdsys_doc_content.delay(
                         #             recap_docket.pk,
                         #             callback=subtask(extract_by_ocr),
                         #             citation_countdown=random.randint(0, 3600)
                         #         )
-                        #
-                        # logging.info("Successfully added doc {pk}: {name}".format(
-                        #     pk=docket.pk,
-                        #     name=mods_data.case_name.encode('utf-8'),
-                        # ))
+
+                        logging.info("Successfully added doc {pk}: {name}".format(
+                            pk=docket.pk,
+                            name=mods_data.case_name.encode('utf-8'),
+                        ))
 
                         # Update the hash if everything finishes properly.
                         logging.info("%s: Successfully crawled opinions." % mods_data.court_id)

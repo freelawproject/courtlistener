@@ -5,7 +5,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import anonymize, trunc
 from cl.lib.mojibake import fix_mojibake
 from cl.scrapers.models import ErrorLog
-from cl.search.models import Opinion
+from cl.search.models import Opinion, Docket, RECAPDocument
 from celery import task
 from celery.task.sets import subtask
 from django.conf import settings
@@ -208,6 +208,71 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
     )
 
     return opinion
+
+#
+# @task
+# def extract_fdsys_doc_content(recap_document_pk, callback=None, citation_countdown=0):
+#     """
+#     Given a document, we extract it, sniffing its extension, then store its
+#     contents in the database.  Finally, we asynchronously find citations in
+#     the document content and match them to other documents.
+#
+#     TODO: this implementation cannot be distributed due to using local paths.
+#     :param citation_countdown:
+#     :param callback:
+#     :param recap_document_pk:
+#     """
+#     document = RECAPDocument.objects.get(pk=recap_document_pk)
+#
+#     path = document.filepath_local.path
+#
+#     extension = path.split('.')[-1]
+#     if extension == 'doc':
+#         content, err = extract_from_doc(path, DEVNULL)
+#     elif extension == 'html':
+#         content, err = extract_from_html(path)
+#     elif extension == 'pdf':
+#         opinion, content, err = extract_from_pdf(document, path, DEVNULL, callback)
+#     elif extension == 'txt':
+#         content, err = extract_from_txt(path)
+#     elif extension == 'wpd':
+#         opinion, content, err = extract_from_wpd(document, path, DEVNULL)
+#     else:
+#         print ('*****Unable to extract content due to unknown extension: %s '
+#                'on opinion: %s****' % (extension, document))
+#         return 2
+#
+#     if extension in ['html', 'wpd']:
+#         document.html, blocked = anonymize(content)
+#     else:
+#         document.plain_text, blocked = anonymize(content)
+#
+#     if err:
+#         print ("****Error extracting text from %s: %s****" %
+#                (extension, document))
+#         return document
+#
+#     try:
+#         if citation_countdown == 0:
+#             # No waiting around. Save to the database now, but don't bother
+#             # with the index yet because citations are being done imminently.
+#             document.save(index=False)
+#         else:
+#             # Save to the index now, citations come later, commit comes
+#             # according to schedule
+#             document.save(index=True)
+#     except Exception, e:
+#         print "****Error saving text to the db for: %s****" % document
+#         print traceback.format_exc()
+#         return document
+#
+#     # Identify and link citations within the document content
+#     update_document_by_id.apply_async(
+#         (document.pk,),
+#         countdown=citation_countdown
+#     )
+#
+#     return document
 
 
 def convert_to_pngs(path, tmp_file_prefix):
