@@ -127,11 +127,9 @@ class Command(BaseCommand):
                          court=court,
                          message=msg).save()
             else:
-                sha1_hash = hashlib.sha1(r.content).hexdigest()
-
                 lookup_params = {
-                    'lookup_value': sha1_hash,
-                    'lookup_by': 'sha1'
+                    'lookup_value': mods_data.fdsys_id,
+                    'lookup_by': 'fdsys_case_id'
                 }
 
                 onwards = dup_checker.press_on(Docket, None, None, **lookup_params)
@@ -142,7 +140,7 @@ class Command(BaseCommand):
                     dup_checker.reset()
 
                     docket, error = self.make_objects(
-                        mods_data, court, sha1_hash, r.content, dup_checker
+                        mods_data, court, r.content, dup_checker
                     )
 
                     if error:
@@ -170,12 +168,11 @@ class Command(BaseCommand):
                 # Only update the hash if no errors occurred.
                 dup_checker.update_site_hash(mods_data.hash)
 
-    def make_objects(self, item, court, sha1_hash, content, dup_checker):
+    def make_objects(self, item, court, content, dup_checker):
         """Takes the meta data from the scraper and associates it with objects.
 
         Returns the created objects.
         :param content: str with html page
-        :param sha1_hash: str with sha1_hash
         :param court: Court:
         :param item: juriscraper.fdsys.FDSysSite.FDSysModsContent
         """
@@ -188,25 +185,25 @@ class Command(BaseCommand):
 
         docket = Docket(
             docket_number=item.docket_number,
-            case_name=item.case_names,
+            case_name=item.case_name,
             case_name_short=case_name_short,
-            # pacer_case_id=item.fdsys_id,  USCOURTS-ned-8_07-cr-00156 not a positive integer
+            fdsys_case_id=item.fdsys_id,
             court=court,
             blocked=blocked,
             date_blocked=date_blocked,
-            filepath_ia=item.ur
+            filepath_ia=item.download_url
         )
 
         try:
             cf = ContentFile(content)
             extension = get_extension(content)
-            file_name = trunc(item.case_names.lower(), 75) + extension
+            file_name = trunc(item.case_name.lower(), 75) + extension
             docket.filepath_local.save(file_name, cf, save=True)
             docket.save()
         except:
             msg = ('Unable to save binary to disk. Deleted '
                    'item: %s.\n %s' %
-                   (item['case_names'], traceback.format_exc()))
+                   (item.case_name, traceback.format_exc()))
             logging.critical(msg.encode('utf-8'))
             ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
             error = True
@@ -261,7 +258,7 @@ class Command(BaseCommand):
                         'lookup_by': 'sha1'
                     }
 
-                    onwards = dup_checker.press_on(Docket, None, None, **lookup_params)
+                    onwards = dup_checker.press_on(RECAPDocument, None, None, **lookup_params)
                     if onwards:
                         # Not a duplicate, carry on
                         logging.info('Adding new document found at: %s' %

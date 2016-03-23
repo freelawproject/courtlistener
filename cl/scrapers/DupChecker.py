@@ -98,6 +98,8 @@ class DupChecker(dict):
             exists = object_type.objects.filter(sha1=lookup_value).exists()
         elif lookup_by == 'download_url':
             exists = object_type.objects.filter(download_url=lookup_value).exists()
+        elif lookup_by == 'fdsys_case_id':
+            exists = object_type.objects.filter(fdsys_case_id=lookup_value).exists()
         else:
             raise NotImplementedError('Unknown lookup_by parameter.')
 
