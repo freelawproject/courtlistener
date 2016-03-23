@@ -34,6 +34,11 @@ class RefererAdmin(admin.ModelAdmin):
         'date_created',
         'date_modified',
     )
+    search_fields = (
+        'pk',
+        'url',
+        'title',
+    )
 
 
 class RefererInline(admin.StackedInline):
