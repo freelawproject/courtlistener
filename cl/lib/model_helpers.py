@@ -40,7 +40,7 @@ def validate_partial_date(instance, field):
        be completed if the other is not).
      - If a partial date, the day/month is/are set to 01.
     """
-    from cl.judges.models import GRANULARITY_MONTH, GRANULARITY_YEAR
+    from cl.people_db.models import GRANULARITY_MONTH, GRANULARITY_YEAR
     d = getattr(instance, 'date_%s' % field)
     granularity = getattr(instance, 'date_granularity_%s' % field)
 

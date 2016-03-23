@@ -1,5 +1,5 @@
+import igraph
 import logging
-import networkx as nx
 import os
 import pwd
 import shutil
@@ -16,17 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 def make_and_populate_nx_graph():
-    """Create a new nx DiGraph and populate it.
+    """Create a new igraph object and populate it.
 
     This pulls all of the inter-opinion citations into memory then passes all of
-    them to nx's `add_edges_from` method. The alternate way to do this process
-    is to iterate over the citations calling `add_edge` on each of them. In
-    testing with 12M citations, that's marginally slower, however, the advantage
-    is that you don't need to pull all of the citations into memory at once.
+    them to igraph as a directed graph.
     """
-    g = nx.DiGraph()
-    g.add_edges_from(
-        list(OpinionsCited.objects.values_list(
+    g = igraph.Graph(directed=True, edges=list(
+        OpinionsCited.objects.values_list(
             'citing_opinion',
             'cited_opinion',
         ))
@@ -34,7 +30,7 @@ def make_and_populate_nx_graph():
     return g
 
 
-def make_sorted_pr_file(pr_result, result_file_path):
+def make_sorted_pr_file(pr_results, result_file_path):
     """Convert the pagerank results list into something Solr can use.
 
     Solr uses a file of the form:
@@ -48,20 +44,19 @@ def make_sorted_pr_file(pr_result, result_file_path):
     using the os's `sort` executable for fastest sorting.
     """
     temp_extension = '.tmp'
-    result_file = open(result_file_path + temp_extension, 'w')
-
-    progress = 0
-    min_value = min(pr_result.values())
-    for pk in Opinion.objects.values_list('pk', flat=True):
-        progress += 1
-        try:
-            new_pr = pr_result[pk]
-        except KeyError:
-            # Not all nodes will be in the NX DiGraph, some will have no
-            # citations, and so will simply get the min-value.
-            new_pr = min_value
-        result_file.write('{}={}\n'.format(pk, new_pr))
-    result_file.close()
+    min_value = min(pr_results)
+    with open(result_file_path + temp_extension, 'w') as f:
+        # pr_results has a score for every value between 0 and our highest
+        # opinion id that has citations. Write a file that only contains values
+        # matching valid Opinions.
+        for pk in Opinion.objects.values_list('pk', flat=True):
+            try:
+                score = pr_results[pk]
+            except IndexError:
+                # Happens because some items don't have citations, thus aren't
+                # in network.
+                score = min_value
+            f.write('{}={}\n'.format(pk, score))
 
     # For improved Solr performance, sort the temp file, creating a new file
     # without the temp_extension value.
@@ -94,7 +89,7 @@ class Command(BaseCommand):
 
     def do_pagerank(self, chown=True):
         g = make_and_populate_nx_graph()
-        pr_results = nx.pagerank(g)
+        pr_results = g.pagerank()
         make_sorted_pr_file(pr_results, self.RESULT_FILE_PATH)
         reload_pagerank_external_file_cache()
         cp_pr_file_to_bulk_dir(self.RESULT_FILE_PATH, chown)

@@ -123,6 +123,15 @@ class OpinionsCitedAdmin(admin.ModelAdmin):
         'citing_opinion',
         'cited_opinion',
     )
+    search_fields = (
+        '=citing_opinion__id',
+    )
+
+    def save_model(self, request, obj, form, change):
+        obj.save()
+        from cl.search.tasks import add_or_update_opinions
+        add_or_update_opinions.delay([obj.citing_opinion_id],
+                                     force_commit=False)
 
 admin.site.register(Opinion, OpinionAdmin)
 admin.site.register(Court, CourtAdmin)

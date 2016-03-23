@@ -63,11 +63,11 @@ class OpinionFilter(filters.FilterSet):
         name='cluster',
     )
     author = filters.RelatedFilter(
-        'cl.judges.filters.JudgeFilter',
+        'cl.people_db.filters.PersonFilter',
         name='author',
     )
     joined_by = filters.RelatedFilter(
-        'cl.judges.filters.JudgeFilter',
+        'cl.people_db.filters.PersonFilter',
         name='joined_by',
     )
     type = filters.MultipleChoiceFilter(
@@ -88,11 +88,11 @@ class OpinionFilter(filters.FilterSet):
 class OpinionClusterFilter(filters.FilterSet):
     docket = filters.RelatedFilter(DocketFilter, name='docket')
     non_participating_judges = filters.RelatedFilter(
-        'cl.judges.filters.JudgeFilter',
+        'cl.people_db.filters.PersonFilter',
         name='non_participating_judges',
     )
     panel = filters.RelatedFilter(
-        'cl.judges.filters.JudgeFilter',
+        'cl.people_db.filters.PersonFilter',
         name='panel',
     )
     sub_opinions = filters.RelatedFilter(

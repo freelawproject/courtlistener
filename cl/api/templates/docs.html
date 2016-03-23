@@ -14,21 +14,33 @@
 
 {% block content %}
     <div class="col-xs-12">
-        <h2>APIs and Bulk Data</h2>
-        <p>We currently have two free APIs available to developers using our
-            platform. If you are interested in obtaining large quantities of
-            our data, we recommend using our <a href="{% url "bulk_data_index" %}">bulk
-                API</a>, which provides compressed JSON files of our entire
-            collection, by jurisdiction. If you wish to query our data
-            programatically, we recommend using our <a
-                    href="{% url "rest_docs" %}">REST APIs</a>.
-        </p>
+        <h2 class="text-center v-offset-below-3">CourtListener APIs and Bulk Legal Data</h2>
         <div class="row">
-            <div class="col-sm-6 text-center">
-                <h3><i class="fa fa-arrow-circle-o-right gray"></i> <a href="{% url "bulk_data_index" %}">Check out our Bulk Data API</a></h3>
+            <div class="col-md-1"></div>
+            <div class="col-xs-12 col-md-10">
+                <p>We currently have two free APIs available to developers using our
+                    platform. If you are interested in obtaining large quantities of
+                    our data, we recommend using our <a
+                            href="{% url "bulk_data_index" %}">bulk
+                        API</a>, which provides compressed JSON files of our entire
+                    collection, by jurisdiction. If you wish to query our data
+                    programatically, we recommend using our <a
+                            href="{% url "rest_docs" %}">REST APIs</a>.
+                </p>
+                <p>We also offer <a href="https://free.law/data-consulting/">custom data services</a> with hourly and project-based rates.</p>
             </div>
-            <div class="col-sm-6 text-center">
-                <h3><i class="fa fa-arrow-circle-o-right gray"></i> <a href="{% url "rest_docs" %}">Check out our REST APIs</a></h3>
+            <div class="col-md-1"></div>
+        </div>
+
+        <div class="row v-offset-below-3">
+            <div class="col-sm-4 text-center v-offset-above-3">
+                <a href="{% url "bulk_data_index" %}" class="btn btn-xl btn-primary">Check out the Bulk Data API</a>
+            </div>
+            <div class="col-sm-4 text-center v-offset-above-3">
+                <a href="{% url "rest_docs" %}" class="btn btn-xl btn-primary">Check out the REST APIs</a>
+            </div>
+            <div class="col-sm-4 text-center v-offset-above-3">
+                <a href="https://free.law/data-consulting/" class="btn btn-xl btn-success">Learn About Data Services</a>
             </div>
         </div>
         <div class="row">

@@ -15,7 +15,7 @@ def load_fixture(apps, schema_editor):
         fixture = 'school_data_truncated'
     else:
         fixture = 'school_data'
-    call_command('loaddata', fixture, app_label='judges')
+    #call_command('loaddata', fixture, app_label='judges')
 
 
 def unload_fixture(apps, schema_editor):

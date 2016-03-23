@@ -6,7 +6,7 @@ $(document).ready(function () {
             method: 'GET',
             url: "/api/rest/v3/search/",
             data: {
-                q: "id:" + id,
+                q: "cluster_id:" + id,
                 format: 'json'
             },
             success: function (data) {
@@ -62,13 +62,13 @@ $(document).ready(function () {
     var updateCache = function (suggestion, callback) {
         // Check if we have the ID in our cache. If so, do nothing. If not,
         // load up the cache.
-        if (suggestion.id in cache) {
+        if (suggestion.cluster_id in cache) {
             // All good; do nothing; pass
         } else {
             // Get the authority IDs as the
-            setAuthorityIDs(suggestion.id, function () {
-                setAuthorityCount(suggestion.id, function () {
-                    setCitingCount(suggestion.id, function () {
+            setAuthorityIDs(suggestion.cluster_id, function () {
+                setAuthorityCount(suggestion.cluster_id, function () {
+                    setCitingCount(suggestion.cluster_id, function () {
                         callback(suggestion);
                     });
                 });
@@ -156,19 +156,19 @@ $(document).ready(function () {
         function (ev, suggestion) {
             updateCache(suggestion, function (suggestion) {
                 $('.authority-count')
-                    .text("(" + cache[suggestion.id].authority_count + ")");
+                    .text("(" + cache[suggestion.cluster_id].authority_count + ")");
                 $('.citing-count')
-                    .text("(" + cache[suggestion.id].citing_count + ")");
+                    .text("(" + cache[suggestion.cluster_id].citing_count + ")");
                 $('input[disabled="disabled"]').prop('disabled', false);
             });
-            $('#id_cluster_start').val(suggestion.id);
+            $('#id_cluster_start').val(suggestion.cluster_id);
             $('.first-selection')
                 .text(suggestion.caseNameShort || suggestion.caseName);
         });
     $('.ending-typeahead').bind(
         'typeahead:select',
         function (ev, suggestion) {
-            $('#id_cluster_end').val(suggestion.id);
+            $('#id_cluster_end').val(suggestion.cluster_id);
         });
     $('a[data-toggle="tab"]').on('show.bs.tab', function (e) {
         $('.ending-typeahead').typeahead('val', "");
@@ -176,7 +176,7 @@ $(document).ready(function () {
 
     // Extra options JS
     $('#more').click(function (e) {
-        $('#center-buttons').addClass('hidden');
+        $('#more').addClass('hidden');
         $('#extra-options').removeClass('hidden');
     });
 });

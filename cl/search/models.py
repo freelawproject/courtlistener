@@ -87,6 +87,18 @@ class Docket(models.Model):
         auto_now=True,
         db_index=True,
     )
+    date_cert_granted = models.DateField(
+        help_text="date cert was granted for this case, if applicable",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    date_cert_denied = models.DateField(
+        help_text="the date cert was denied for this case, if applicable",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
     date_argued = models.DateField(
         help_text="the date the case was argued",
         blank=True,
@@ -130,6 +142,13 @@ class Docket(models.Model):
         'judges.Judge',
         help_text="The judge the case was assigned to.",
         null=True,
+        related_name='assigning'
+    )
+    referred_to = models.ForeignKey(
+        'judges.Judge',
+        help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
+        null=True,
+        related_name='referring'
     )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
@@ -181,22 +200,26 @@ class Docket(models.Model):
         help_text="The cause for the case.",
         max_length=200,
         blank=True,
+        null=True,
     )
     nature_of_suit = models.CharField(
         help_text="The nature of suit code from PACER.",
         max_length=100,
         blank=True,
+        null=True,
     )
     jury_demand = models.CharField(
         help_text="The compensation demand.",
         max_length=500,
         blank=True,
+        null=True,
     )
     jurisdiction_type = models.CharField(
         help_text="Stands for jurisdiction in RECAP XML docket. For example, "
                   "'Diversity', 'U.S. Government Defendant'.",
         max_length=100,
         blank=True,
+        null=True,
     )
     filepath_local = models.FileField(
         help_text="Path to RECAP’s Docket XML page.",
@@ -216,6 +239,9 @@ class Docket(models.Model):
         help_text="contains the source of the Docket.",
         choices=SOURCE_CHOICES,
     )
+
+    class Meta:
+        unique_together = (('court', 'docket_number'), ('court', 'pacer_case_id'))
 
     def __unicode__(self):
         if self.case_name:
@@ -264,8 +290,12 @@ class DocketEntry(models.Model):
         db_index=True,
     )
 
+    class Meta:
+        unique_together = ('docket', 'entry_number')
+
+
     def __unicode__(self):
-        return "<DocketEntry ---> %s >" % (self.text[:50])
+        return "<DocketEntry ---> %s >" % (self.description[:50])
 
 
 class RECAPDocument(models.Model):
@@ -320,7 +350,7 @@ class RECAPDocument(models.Model):
         help_text="The ID of the document in PACER. This information is "
                   "provided by RECAP.",
         max_length=32,  # Same as in RECAP
-        blank=True,
+        unique = True
     )
     is_available = models.NullBooleanField(
         help_text="True if the item is available in RECAP",
@@ -343,6 +373,9 @@ class RECAPDocument(models.Model):
         help_text="The URL of the file in IA",
         max_length=1000,
     )
+
+    class Meta:
+        unique_together = ('docket_entry', 'document_number', 'attachment_number')
 
     def __unicode__(self):
         return "Docket_%s , document_number_%s , attachment_number_%s" % (self.docket_entry.docket.docket_number, self.document_number, self.attachment_number)
@@ -452,13 +485,13 @@ class OpinionCluster(models.Model):
         related_name="clusters",
     )
     panel = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judges that heard the oral arguments",
         related_name="opinion_clusters_participating_judges",
         blank=True,
     )
     non_participating_judges = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judges that heard the case, but did not participate in "
                   "the opinion",
         related_name="opinion_clusters_non_participating_judges",
@@ -702,9 +735,9 @@ class OpinionCluster(models.Model):
         """
         return [
             'neutral_cite', 'federal_cite_one', 'federal_cite_two',
-            'federal_cite_three', 'specialty_cite_one', 'state_cite_regional',
-            'state_cite_one', 'state_cite_two', 'state_cite_three',
-            'westlaw_cite', 'lexis_cite'
+            'federal_cite_three', 'scotus_early_cite', 'specialty_cite_one',
+            'state_cite_regional', 'state_cite_one', 'state_cite_two',
+            'state_cite_three', 'westlaw_cite', 'lexis_cite'
         ]
 
     @property
@@ -814,14 +847,14 @@ class Opinion(models.Model):
         blank=True,
     )
     author = models.ForeignKey(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The primary author of this opinion",
         related_name='opinions_written',
         blank=True,
         null=True,
     )
     joined_by = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         related_name='opinions_joined',
         help_text="Other judges that joined the primary author in this opinion",
         blank=True,

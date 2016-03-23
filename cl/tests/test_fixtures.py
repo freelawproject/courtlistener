@@ -2,7 +2,7 @@
 Unit tests for validating Fixture loading works with model logic
 """
 from django.test import TestCase
-from cl.judges.models import Judge
+from cl.people_db.models import Person
 
 
 class FixtureTest(TestCase):
@@ -13,6 +13,6 @@ class FixtureTest(TestCase):
 
     def test_does_judge_judy_fixture_load(self):
         """Can we load Judge Judy from a fixture?"""
-        judge = Judge.objects.get(pk=1)
-        self.assertEqual(judge.name_first, 'Judith')
-        self.assertEqual(judge.name_last, 'Sheindlin')
+        judy = Person.objects.get(pk=2)
+        self.assertEqual(judy.name_first, 'Judith')
+        self.assertEqual(judy.name_last, 'Sheindlin')

@@ -9,6 +9,7 @@ from datetime import date
 from celery.task.sets import subtask
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
+from django.utils.encoding import force_bytes
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -33,6 +34,10 @@ die_now = False
 
 class Command(BaseCommand):
     help = 'Runs the Juriscraper toolkit against one or many jurisdictions.'
+
+    def __init__(self, stdout=None, stderr=None, no_color=False):
+        super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
+        self.cnt = CaseNameTweaker()
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -180,9 +185,11 @@ class Command(BaseCommand):
                 except IndexError:
                     next_date = None
 
-                sha1_hash = hashlib.sha1(content).hexdigest()
-                if court_str == 'nev' and \
-                                item['precedential_statuses'] == 'Unpublished':
+                # request.content is sometimes a str, sometimes unicode, so
+                # force it all to be bytes, pleasing hashlib.
+                sha1_hash = hashlib.sha1(force_bytes(content)).hexdigest()
+                if (court_str == 'nev' and
+                        item['precedential_statuses'] == 'Unpublished'):
                     # Nevada's non-precedential cases have different SHA1
                     # sums every time.
                     lookup_params = {'lookup_value': item['download_urls'],
@@ -248,7 +255,6 @@ class Command(BaseCommand):
             raise CommandError('Unable to import module or package. Aborting.')
 
         logger.info("Starting up the scraper.")
-        self.cnt = CaseNameTweaker()
         num_courts = len(module_strings)
         wait = (options['rate'] * 60) / num_courts
         i = 0
