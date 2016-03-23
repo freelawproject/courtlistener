@@ -44,8 +44,8 @@ def get_title(self, referer_id):
     html_tree = html.fromstring(r.text)
     try:
         title = getattr(html_tree.xpath('//title')[0], 'text', '').strip()
-    except IndexError as exc:
-        raise self.retry(exc=exc, countdown=countdown)
+    except IndexError:
+        title = ''
 
     if title:
         referer.page_title = trunc(
@@ -66,4 +66,7 @@ def get_title(self, referer_id):
             # Create an exception to catch.
             raise Exception("Couldn't get title from HTML")
         except Exception as exc:
+            if self.request.retries >= self.max_retries:
+                # We couldn't get the title. Let it go.
+                return
             raise self.retry(exc=exc, countdown=countdown)
