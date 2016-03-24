@@ -139,13 +139,13 @@ class Docket(models.Model):
         related_name='dockets',
     )
     assigned_to = models.ForeignKey(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judge the case was assigned to.",
         null=True,
         related_name='assigning'
     )
     referred_to = models.ForeignKey(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
         null=True,
         related_name='referring'

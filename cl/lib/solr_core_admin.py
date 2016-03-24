@@ -57,7 +57,13 @@ def create_default_cores():
                             'audio_schema.xml'),
         instance_dir='/usr/local/solr/example/solr/audio',
     )
-
+    create_solr_core(
+        core_name='recap',
+        data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_recap'),
+        schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+                            'recap_schema.xml'),
+        instance_dir='/usr/local/solr/example/solr/recap',
+    )
 
 def delete_solr_core(core_name, delete_index=True, delete_data_dir=False):
     """ Delete a solr core by name."""
