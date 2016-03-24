@@ -1,4 +1,3 @@
-# coding=utf-8
 import re
 
 from django.core.exceptions import ValidationError
@@ -139,13 +138,13 @@ class Docket(models.Model):
         related_name='dockets',
     )
     assigned_to = models.ForeignKey(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judge the case was assigned to.",
         null=True,
         related_name='assigning'
     )
     referred_to = models.ForeignKey(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
         null=True,
         related_name='referring'
@@ -222,7 +221,7 @@ class Docket(models.Model):
         null=True,
     )
     filepath_local = models.FileField(
-        help_text="Path to RECAP’s Docket XML page.",
+        help_text="Path to RECAP's Docket XML page.",
         upload_to=make_recap_path,
         storage=IncrementingFileSystemStorage(),
         max_length=1000,
