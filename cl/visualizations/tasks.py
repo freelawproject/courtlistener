@@ -1,5 +1,4 @@
 import requests
-from celery.task import task
 
 from django.core.mail import send_mail
 from django.core.urlresolvers import reverse
@@ -7,6 +6,7 @@ from juriscraper.lib.string_utils import trunc
 from lxml import html
 from requests.exceptions import HTTPError
 
+from cl.celery import app
 from cl.visualizations.models import Referer
 from cl.visualizations.utils import emails
 
@@ -23,7 +23,7 @@ def blacklisted_url(url):
     return False
 
 
-@task(bind=True, max_retries=8)
+@app.task(bind=True, max_retries=8)
 def get_title(self, referer_id):
     """Get the HTML title for a page, trying again if failures occur.
 
