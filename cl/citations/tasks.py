@@ -1,15 +1,15 @@
 import re
 
+from cl.celery import app
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited
-from celery import task
 
 # This is the distance two reporter abbreviations can be from each other if they
 # are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
 # would have a distance of 4.
 PARALLEL_DISTANCE = 4
 
-@task
+@app.task
 def identify_parallel_citations(citations):
     """Work through a list of citations and identify ones that are physically
     near each other in the document.
@@ -45,7 +45,7 @@ def identify_parallel_citations(citations):
     return parallel_citations
 
 
-@task
+@app.task
 def get_document_citations(opinion):
     """Identify and return citations from the html or plain text of the
     opinion.
@@ -79,7 +79,7 @@ def create_cited_html(opinion, citations):
     return new_html.encode('utf-8')
 
 
-@task
+@app.task
 def update_document(opinion, index=True):
     """Get the citations for an item and save it and add it to the index if
     requested."""
@@ -142,7 +142,7 @@ def update_document(opinion, index=True):
     opinion.save(index=index)
 
 
-@task
+@app.task
 def update_document_by_id(opinion_id):
     """This is not an OK way to do id-based tasks. Needs to be refactored."""
     op = Opinion.objects.get(pk=opinion_id)
