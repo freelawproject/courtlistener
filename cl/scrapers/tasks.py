@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 from cl.audio.models import Audio
+from cl.celery import app
 from cl.citations.tasks import update_document_by_id
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import anonymize, trunc
 from cl.lib.mojibake import fix_mojibake
 from cl.scrapers.models import ErrorLog
 from cl.search.models import Opinion
-from celery import task
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
@@ -142,7 +142,7 @@ def extract_from_wpd(opinion, path, DEVNULL):
     return opinion, content, err
 
 
-@task
+@app.task
 def extract_doc_content(pk, callback=None, citation_countdown=0):
     """
     Given a document, we extract it, sniffing its extension, then store its
@@ -230,7 +230,7 @@ def convert_to_txt(tmp_file_prefix):
     return tess_out
 
 
-@task
+@app.task
 def extract_by_ocr(path):
     """Extract the contents of a PDF using OCR
 
@@ -356,7 +356,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     audio_file.tag.save()
 
 
-@task
+@app.task
 def process_audio_file(pk):
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.

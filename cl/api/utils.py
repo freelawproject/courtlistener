@@ -101,7 +101,8 @@ class SimpleMetadataWithFilters(SimpleMetadata):
 
         metadata['filters'] = filters
 
-        metadata['ordering'] = view.ordering_fields
+        if hasattr(view, 'ordering_fields'):
+            metadata['ordering'] = view.ordering_fields
         return metadata
 
 

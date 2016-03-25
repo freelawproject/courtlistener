@@ -1,17 +1,17 @@
 import socket
 
 from cl.audio.models import Audio
+from cl.celery import app
 from cl.lib.sunburnt import SolrError
 from cl.lib import sunburnt
 from cl.search.models import Opinion, OpinionCluster
 from cl.search.search_indexes import InvalidDocumentError, SearchAudioFile
 from cl.search.search_indexes import SearchDocument
 
-from celery import task
 from django.conf import settings
 
 
-@task
+@app.task
 def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
     """Adds an item to a solr index.
 
@@ -46,7 +46,7 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
         add_or_update_items.retry(exc=exc, countdown=120)
 
 
-@task
+@app.task
 def add_or_update_opinions(item_pks, force_commit=True):
     si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
     try:
@@ -58,7 +58,7 @@ def add_or_update_opinions(item_pks, force_commit=True):
         add_or_update_opinions.retry(exc=exc, countdown=30)
 
 
-@task
+@app.task
 def add_or_update_audio_files(item_pks, force_commit=True):
     si = sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='w')
     try:
@@ -70,14 +70,14 @@ def add_or_update_audio_files(item_pks, force_commit=True):
         add_or_update_audio_files.retry(exc=exc, countdown=30)
 
 
-@task
+@app.task
 def delete_items(items, solr_url):
     si = sunburnt.SolrInterface(solr_url, mode='w')
     si.delete(list(items))
     si.commit()
 
 
-@task
+@app.task
 def add_or_update_cluster(pk, force_commit=True):
     si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
     try:

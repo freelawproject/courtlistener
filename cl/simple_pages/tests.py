@@ -3,6 +3,7 @@ import datetime
 import os
 
 from django.conf import settings
+from django.core import mail
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest
 from django.test import TestCase, RequestFactory
@@ -16,6 +17,13 @@ from cl.simple_pages.views import serve_static_file, show_maintenance_warning
 
 class ContactTest(TestCase):
     fixtures = ['authtest_data.json']
+    test_msg = {
+        'name': "pandora",
+        'subject': "asdf",
+        'message': '123456789012345678901',
+        'email': 'pandora@box.com',
+        'skip_me_if_alive': "",
+    }
 
     def test_multiple_requests_request(self):
         """ Is state persisted in the contact form?
@@ -25,14 +33,27 @@ class ContactTest(TestCase):
         behavior does not regress.
         """
         self.client.login(username='pandora', password='password')
-        self.client.get('/contact/')
+        self.client.get(reverse('contact'))
         self.client.logout()
 
         # Now, as an anonymous user, we get the page again. If the bug is
         # resolved, we should not see anything about the previously logged-in
         # user, pandora.
-        r = self.client.get('/contact/')
+        r = self.client.get(reverse('contact'))
         self.assertNotIn('pandora', r.content)
+
+    def test_contact_logged_in(self):
+        """Can we use the contact form to send a message when logged in?"""
+        self.client.login(username='pandora', password='password')
+        response = self.client.post(reverse('contact'), self.test_msg)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_contact_logged_out(self):
+        """Can we use the contact form to send a message when logged out?"""
+        response = self.client.post(reverse('contact'), self.test_msg)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
 
 
 class SimplePagesTest(TestCase):
