@@ -13,6 +13,7 @@
     "case_name_short": "Marsh",
     "docket_number": null,
     "slug": "marsh-v-chambers",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -32,6 +33,7 @@
     "case_name_short": "Lynch",
     "docket_number": null,
     "slug": "lynch-v-donnelly",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -51,6 +53,7 @@
     "case_name_short": "Wallace",
     "docket_number": null,
     "slug": "wallace-governor-of-alabama-et-al-v-jaffree-et-al",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -70,6 +73,7 @@
     "case_name_short": "Ball",
     "docket_number": null,
     "slug": "school-district-of-the-city-of-grand-rapids-et-al-v-ball-et-al",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -89,6 +93,7 @@
     "case_name_short": "Aguillard",
     "docket_number": null,
     "slug": "edwards-governor-of-louisiana-et-al-v-aguillard-et-al",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -108,6 +113,7 @@
     "case_name_short": "Allegheny County",
     "docket_number": null,
     "slug": "allegheny-county-v-greater-pittsburgh-aclu",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -127,6 +133,7 @@
     "case_name_short": "Harmelin",
     "docket_number": null,
     "slug": "harmelin-v-michigan",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -146,6 +153,7 @@
     "case_name_short": "Lee",
     "docket_number": null,
     "slug": "lee-v-weisman",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -165,6 +173,7 @@
     "case_name_short": "Lamb's Chapel",
     "docket_number": null,
     "slug": "lambs-chapel-and-john-steigerwald-v-center-moriches-union-free-school",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -184,6 +193,7 @@
     "case_name_short": "Rosenberger",
     "docket_number": null,
     "slug": "ronald-w-rosenberger-et-al-v-rector-and-visitors-of-the-university-of",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -203,6 +213,7 @@
     "case_name_short": "Doe",
     "docket_number": null,
     "slug": "santa-fe-independent-school-dist-v-doe",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -222,6 +233,7 @@
     "case_name_short": "Zelman",
     "docket_number": null,
     "slug": "susan-tave-zelman-superintendent-of-public-instruction-of-ohio-et-al-v",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -241,6 +253,7 @@
     "case_name_short": "Newdow",
     "docket_number": null,
     "slug": "elk-grove-unified-school-dist-v-newdow",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -260,6 +273,7 @@
     "case_name_short": "Cutter",
     "docket_number": null,
     "slug": "jon-b-cutter-et-al-v-reginald-wilkinson-director-ohio-department-of",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -279,6 +293,7 @@
     "case_name_short": "Van Orden",
     "docket_number": null,
     "slug": "van-orden-v-perry",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -298,6 +313,7 @@
     "case_name_short": "McCreary",
     "docket_number": null,
     "slug": "mccreary-county-v-american-civil-liberties-union-of-ky",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",
@@ -317,6 +333,7 @@
     "case_name_short": "Town/Greece",
     "docket_number": null,
     "slug": "town-of-greece-v-galloway",
+    "source": 0,
     "blocked": false
   },
   "model": "search.docket",

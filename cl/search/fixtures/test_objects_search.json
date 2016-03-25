@@ -13,7 +13,8 @@
       "case_name_short": "case name short docket 1",
       "docket_number": "docket number 1",
       "slug": "case-name",
-      "blocked": false
+      "blocked": false,
+      "source": 0
     },
     "model": "search.docket",
     "pk": 1
@@ -32,6 +33,7 @@
       "case_name_short": "case name short docket 2",
       "docket_number": "docket number 2",
       "slug": "case-name",
+      "source": 0,
       "blocked": false
     },
     "model": "search.docket",
@@ -51,6 +53,7 @@
       "case_name_short": "case name short docket 3",
       "docket_number": "docket number 3",
       "slug": "case-name",
+      "source": 0,
       "blocked": false
     },
     "model": "search.docket",
