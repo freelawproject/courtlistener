@@ -130,10 +130,7 @@ class ModelTest(TestCase):
         """Can we save opinions older than 1900?"""
         court = Court.objects.get(pk='test')
 
-        docket = Docket(
-            case_name=u"Blah",
-            court=court,
-        )
+        docket = Docket(case_name=u"Blah", court=court, source=Docket.DEFAULT)
         docket.save()
         oc = OpinionCluster(
             case_name=u"Blah",

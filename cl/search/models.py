@@ -71,9 +71,11 @@ class Docket(models.Model):
     """
     DEFAULT = 0
     RECAP = 1
+    SCRAPER = 2
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
+        (SCRAPER, "Scraper")
     )
 
     date_created = models.DateTimeField(
