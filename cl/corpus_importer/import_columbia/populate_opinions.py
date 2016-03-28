@@ -7,11 +7,16 @@ from cl.lib.import_lib import map_citations_to_models, find_person
 
 
 # used to identify dates
-ARGUED_TAGS = ['argued', 'submitted', 'submitted on briefs', 'on briefs']
-REARGUE_DENIED_TAGS = ['reargument denied', 'rehearing denied']
-REARGUE_TAGS = ['reargued']
+FILED_TAGS = ['filed']
+DECIDED_TAGS = ['decided']
+ARGUED_TAGS = ['argued', 'submitted', 'submitted on briefs', 'on briefs', 'heard']
+REARGUE_DENIED_TAGS = [
+    'reargument denied', 'rehearing denied', 'further rehearing denied', 'as modified on denial of rehearing'
+    ,'order denying rehearing', 'petition for rehearing filed', 'motion for rehearing filed'
+]
+REARGUE_TAGS = ['reargued', 'reheard']
 CERT_GRANTED_TAGS = ['certiorari granted']
-CERT_DENIED_TAGS = ['certiorari denied']
+CERT_DENIED_TAGS = ['certiorari denied', 'certiorari quashed']
 
 # used to map the parsed opinion types to their tags in the populated opinion objects
 OPINION_TYPE_MAPPING = {
@@ -33,7 +38,12 @@ def make_and_save(item):
                 date_filed = date_info[1]
                 continue
             # try to figure out what type of date it is based on its tag string
-            if date_info[0] in ARGUED_TAGS:
+            if date_info[0] in FILED_TAGS:
+                date_filed = date_info[1]
+            elif date_info[0] in DECIDED_TAGS:
+                if not date_filed:
+                    date_filed = date_info[1]
+            elif date_info[0] in ARGUED_TAGS:
                 date_argued = date_info[1]
             elif date_info[0] in REARGUE_TAGS:
                 date_reargued = date_info[1]
@@ -53,10 +63,10 @@ def make_and_save(item):
         ,date_cert_denied=date_cert_denied
         ,date_reargument_denied=date_reargument_denied
         ,court_id=item['court_id']
-        ,case_name_short=item['case_name_short']
-        ,case_name=item['case_name']
-        ,case_name_full=item['case_name_full']
-        ,docket_number=item['docket']
+        ,case_name_short=item['case_name_short'] or ''
+        ,case_name=item['case_name'] or ''
+        ,case_name_full=item['case_name_full'] or ''
+        ,docket_number=item['docket'] or ''
     )
     docket.save()
 
@@ -75,12 +85,12 @@ def make_and_save(item):
         docket=docket
         ,precedential_status=('Unpublished' if item['unpublished'] else 'Published')
         ,date_filed=date_filed
-        ,case_name_short=item['case_name_short']
-        ,case_name=item['case_name']
-        ,case_name_full=item['case_name_full']
+        ,case_name_short=item['case_name_short'] or ''
+        ,case_name=item['case_name'] or ''
+        ,case_name_full=item['case_name_full'] or ''
         ,source='Z'
-        ,attorneys=item['attorneys']
-        ,posture=item['posture']
+        ,attorneys=item['attorneys'] or ''
+        ,posture=item['posture'] or ''
         ,**citations_map
     )
     cluster.save()
@@ -110,19 +120,3 @@ def make_and_save(item):
         joined_by = [x for x in joined_by if x is not None]
         for joiner in joined_by:
             opinion.joined_by.add(joiner)
-
-
-
-#if __name__ == '__main__':
-from cl.corpus_importer.import_columbia.parse_opinions import parse_file
-from glob import glob
-files = glob('/vagrant/flp/columbia_data/opinions/*/*/documents/*xml')
-
-
-
-for f in files:
-    parsed = parse_file(f)
-    try:
-        make_and_save(parsed)
-    except Exception, e:
-        print(f,e)

@@ -57,22 +57,24 @@ def parse_file(file_path, court_fallback=''):
     info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
     info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
     info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or None
-    # get opinions
+    # condense opinions into at most 3 elements (corresponding to their types)
     info['opinions'] = []
-    for opinion in raw_info.get('opinions', []):
-        full_opinion = {
-            'opinion': opinion['opinion']
-            ,'type': opinion['type']
-            ,'author': None
-            ,'joining': []
-        }
-        if opinion['byline']:
-            judges = find_judges(opinion['byline'])
-            if judges:
-                full_opinion['author'] = judges[0]
-            if len(judges) > 1:
-                full_opinion['joining'] = judges[1:]
-        info['opinions'].append(full_opinion)
+    for current_type in OPINION_TYPES:
+        texts = []
+        judges = []
+        for opinion in raw_info.get('opinions', []):
+            if opinion['type'] != current_type:
+                continue
+            texts.append(opinion['opinion'])
+            if opinion['byline']:
+                judges.extend(find_judges(opinion['byline']))
+        if texts:
+            info['opinions'].append({
+                'opinion': '\n'.join(texts)
+                ,'type': current_type
+                ,'author': judges[0] if judges else None
+                ,'joining': judges[1:] if len(judges) > 0 else []
+            })
     return info
 
 
