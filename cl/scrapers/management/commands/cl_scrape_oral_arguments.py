@@ -39,6 +39,7 @@ class Command(cl_scrape_opinions.Command):
             blocked=blocked,
             date_blocked=date_blocked,
             date_argued=item['case_dates'],
+            source=Docket.SCRAPER,
         )
 
         audio_file = Audio(
@@ -127,6 +128,8 @@ class Command(cl_scrape_opinions.Command):
                     lookup_value=sha1_hash,
                     lookup_by='sha1'
                 )
+                if dup_checker.emulate_break:
+                    break
 
                 if onwards:
                     # Not a duplicate, carry on

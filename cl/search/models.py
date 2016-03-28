@@ -71,9 +71,11 @@ class Docket(models.Model):
     """
     DEFAULT = 0
     RECAP = 1
+    SCRAPER = 2
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
+        (SCRAPER, "Scraper")
     )
 
     date_created = models.DateTimeField(
@@ -222,7 +224,7 @@ class Docket(models.Model):
         null=True,
     )
     filepath_local = models.FileField(
-        help_text="Path to RECAP’s Docket XML page.",
+        help_text="Path to RECAP's Docket XML page.",
         upload_to=make_recap_path,
         storage=IncrementingFileSystemStorage(),
         max_length=1000,
@@ -964,6 +966,19 @@ class OpinionsCited(models.Model):
         Opinion,
         related_name='citing_opinions',
     )
+    # depth = models.IntegerField(
+    #     help_text='The number of times the cited opinion was cited '
+    #               'in the citing opinion',
+    #     default=1,
+    #     db_index=True,
+    # )
+    # quoted = models.BooleanField(
+    #     help_text='Equals true if previous case was quoted directly',
+    #     default=False,
+    #     db_index=True,
+    # )
+    #treatment: positive, negative, etc.
+    #
 
     def __unicode__(self):
         return u'%s ⤜--cites⟶  %s' % (self.citing_opinion.id,
@@ -972,3 +987,4 @@ class OpinionsCited(models.Model):
     class Meta:
         verbose_name_plural = 'Opinions cited'
         unique_together = ("citing_opinion", "cited_opinion")
+

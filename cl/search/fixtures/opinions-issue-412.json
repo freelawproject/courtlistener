@@ -13,6 +13,7 @@
       "case_name_short": "short name for Not Blocked Docket",
       "docket_number": "1337-np",
       "slug": "case-name",
+      "source": 0,
       "blocked": false
     },
     "model": "search.docket",
@@ -95,6 +96,7 @@
       "case_name_short": "short name for Blocked Docket",
       "docket_number": "blocked-docket-number",
       "slug": "case-name",
+      "source": 0,
       "blocked": true
     },
     "model": "search.docket",

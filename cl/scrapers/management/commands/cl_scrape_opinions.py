@@ -97,6 +97,7 @@ class Command(BaseCommand):
             court=court,
             blocked=blocked,
             date_blocked=date_blocked,
+            source=Docket.SCRAPER,
         )
 
         cluster = OpinionCluster(
@@ -200,6 +201,9 @@ class Command(BaseCommand):
 
                 onwards = dup_checker.press_on(Opinion, current_date, next_date,
                                                **lookup_params)
+                if dup_checker.emulate_break:
+                    break
+
                 if onwards:
                     # Not a duplicate, carry on
                     logger.info('Adding new document found at: %s' %
