@@ -9,7 +9,7 @@ from django.utils.text import slugify
 
 from cl import settings
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.model_helpers import make_upload_path
+from cl.lib.model_helpers import make_upload_path, make_recap_path
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
 
@@ -66,9 +66,18 @@ SOURCES = (
 
 
 class Docket(models.Model):
-    """A class to sit above OpinionClusters and Audio files and link them
-    together.
+    """A class to sit above OpinionClusters, Audio files, and Docket Entries,
+    and link them together.
     """
+    DEFAULT = 0
+    RECAP = 1
+    SCRAPER = 2
+    SOURCE_CHOICES = (
+        (DEFAULT, "Default"),
+        (RECAP, "RECAP"),
+        (SCRAPER, "Scraper")
+    )
+
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -110,11 +119,38 @@ class Docket(models.Model):
         null=True,
         db_index=True,
     )
+    date_filed = models.DateField(
+        help_text="The date the case was filed.",
+        blank=True,
+        null=True,
+    )
+    date_terminated = models.DateField(
+        help_text="The date the case was terminated.",
+        blank=True,
+        null=True,
+    )
+    date_last_filing = models.DateField(
+        help_text="The date the case was last updated in the docket. ",
+        blank=True,
+        null=True,
+    )
     court = models.ForeignKey(
         'Court',
         help_text="The court where the docket was filed",
         db_index=True,
         related_name='dockets',
+    )
+    assigned_to = models.ForeignKey(
+        'people_db.Person',
+        help_text="The judge the case was assigned to.",
+        null=True,
+        related_name='assigning'
+    )
+    referred_to = models.ForeignKey(
+        'people_db.Person',
+        help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
+        null=True,
+        related_name='referring'
     )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
@@ -140,7 +176,8 @@ class Docket(models.Model):
                   "quite long",
         max_length=5000,  # was 50, 100, 300, 1000
         blank=True,
-        null=True
+        null=True,
+        db_index=True,
     )
     date_blocked = models.DateField(
         help_text="The date that this opinion was blocked from indexing by "
@@ -153,8 +190,60 @@ class Docket(models.Model):
         help_text="Whether a document should be blocked from indexing by "
                   "search engines",
         db_index=True,
-        default=False
+        default=False,
     )
+    pacer_case_id = models.PositiveIntegerField(
+        help_text="The cased ID provided by PACER.",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    cause = models.CharField(
+        help_text="The cause for the case.",
+        max_length=200,
+        blank=True,
+        null=True,
+    )
+    nature_of_suit = models.CharField(
+        help_text="The nature of suit code from PACER.",
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+    jury_demand = models.CharField(
+        help_text="The compensation demand.",
+        max_length=500,
+        blank=True,
+        null=True,
+    )
+    jurisdiction_type = models.CharField(
+        help_text="Stands for jurisdiction in RECAP XML docket. For example, "
+                  "'Diversity', 'U.S. Government Defendant'.",
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+    filepath_local = models.FileField(
+        help_text="Path to RECAP's Docket XML page.",
+        upload_to=make_recap_path,
+        storage=IncrementingFileSystemStorage(),
+        max_length=1000,
+        null=True,
+        blank=True,
+    )
+    filepath_ia = models.CharField(
+        help_text="Path to the Docket XML page in The Internet Archive",
+        max_length=1000,
+        null=True,
+        blank=True,
+    )
+    source = models.SmallIntegerField(
+        help_text="contains the source of the Docket.",
+        choices=SOURCE_CHOICES,
+    )
+
+    class Meta:
+        unique_together = (('court', 'docket_number'), ('court', 'pacer_case_id'))
 
     def __unicode__(self):
         if self.case_name:
@@ -164,10 +253,141 @@ class Docket(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
+        if self.source == 1 and not self.pacer_case_id:
+            raise ValidationError("pacer_case_id cannot be Null or empty in "
+                                  "RECAP documents.")
+
         super(Docket, self).save(*args, **kwargs)
 
     def get_absolute_url(self):
         return reverse('view_docket', args=[self.pk, self.slug])
+
+
+class DocketEntry(models.Model):
+
+    docket = models.ForeignKey(
+        Docket,
+        help_text="Foreign key as a relation to the corresponding Docket "
+                  "object. Specifies which docket the docket entry belongs to.",
+    )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created.",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_filed = models.DateField(
+        help_text="The created date of the Docket Entry.",
+    )
+    entry_number = models.PositiveIntegerField(
+        help_text="# on the PACER docket page.",
+    )
+    description = models.TextField(
+        help_text="The text content of the docket entry that appears in the "
+                  "PACER docket page.",
+        db_index=True,
+    )
+
+    class Meta:
+        unique_together = ('docket', 'entry_number')
+
+
+    def __unicode__(self):
+        return "<DocketEntry ---> %s >" % (self.description[:50])
+
+
+class RECAPDocument(models.Model):
+    """
+        The model for Docket Documents and Attachments.
+    """
+
+    PACER_DOCUMENT = 1
+    ATTACHMENT = 2
+    DOCUMENT_TYPES = (
+        (PACER_DOCUMENT, "PACER Document"),
+        (ATTACHMENT, "Attachment"),
+    )
+    docket_entry = models.ForeignKey(
+        DocketEntry,
+        help_text="Foreign Key to the DocketEntry object to which it belongs. "
+                  "Multiple documents can belong to a DocketEntry. "
+                  "(Attachments and Documents together)",
+    )
+    date_created = models.DateTimeField(
+        help_text="The date the file was imported to Local Storage.",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="Timestamp of last update.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_upload = models.DateTimeField(
+            help_text="upload_date in RECAP. The date the file was uploaded to "
+                      "RECAP. This information is provided by RECAP.",
+            blank=True,
+            null=True,
+    )
+    document_type = models.IntegerField(
+        help_text="Whether this is a regular document or an attachment.",
+        db_index=True,
+        choices=DOCUMENT_TYPES,
+    )
+    document_number = models.PositiveIntegerField(
+        help_text="If the file is a document, the number is the "
+                  "document_number in RECAP docket.",
+    )
+    attachment_number = models.SmallIntegerField(
+        help_text="If the file is an attachment, the number is the attachment "
+                  "number in RECAP docket.",
+        blank=True,
+        null=True,
+    )
+    pacer_doc_id = models.CharField(
+        help_text="The ID of the document in PACER. This information is "
+                  "provided by RECAP.",
+        max_length=32,  # Same as in RECAP
+        unique = True
+    )
+    is_available = models.NullBooleanField(
+        help_text="True if the item is available in RECAP",
+        blank=True,
+        null=True,
+        default=False,
+    )
+    sha1 = models.CharField(
+        help_text="The ID used for a document in RECAP",
+        max_length=40,  # As in RECAP
+        blank=True,
+    )
+    filepath_local = models.FileField(
+        help_text="The path of the file in the local storage area.",
+        upload_to=make_recap_path,
+        storage=IncrementingFileSystemStorage(),
+        max_length=1000,
+    )
+    filepath_ia = models.CharField(
+        help_text="The URL of the file in IA",
+        max_length=1000,
+    )
+
+    class Meta:
+        unique_together = ('docket_entry', 'document_number', 'attachment_number')
+
+    def __unicode__(self):
+        return "Docket_%s , document_number_%s , attachment_number_%s" % (self.docket_entry.docket.docket_number, self.document_number, self.attachment_number)
+
+    def save(self, *args, **kwargs):
+        if self.document_type ==  self.ATTACHMENT:
+            if self.attachment_number == None:
+                raise ValidationError('attachment_number cannot be null for an attachment.')
+
+        super(RECAPDocument, self).save(*args, **kwargs)
 
 
 class Court(models.Model):
@@ -214,12 +434,12 @@ class Court(models.Model):
     short_name = models.CharField(
         help_text='a short name of the court',
         max_length=100,
-        blank=False
+        blank=False,
     )
     full_name = models.CharField(
         help_text='the full name of the court',
         max_length='200',
-        blank=False
+        blank=False,
     )
     url = models.URLField(
         help_text='the homepage for each court or the closest thing thereto',

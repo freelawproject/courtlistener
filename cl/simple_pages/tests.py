@@ -141,7 +141,7 @@ class StaticFilesTest(TestCase):
 
     def setUp(self):
         self.court = Court.objects.get(pk='test')
-        self.docket = Docket(case_name=u'Docket', court=self.court)
+        self.docket = Docket(case_name=u'Docket', court=self.court, source=Docket.DEFAULT)
         self.docket.save()
 
         self.audio = Audio(

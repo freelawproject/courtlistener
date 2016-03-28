@@ -97,6 +97,7 @@ class Command(BaseCommand):
             court=court,
             blocked=blocked,
             date_blocked=date_blocked,
+            source=Docket.SCRAPER,
         )
 
         cluster = OpinionCluster(
