@@ -171,5 +171,22 @@ def make_state_judge(item, testing=False):
                     notes=item['notes'],
                     url=url
             )
-            if not testing:
-                source.save()
+
+            if not testing: 
+                source.save()                 
+
+#if __name__ == '__main__':
+import pandas as pd
+import numpy as np
+textfields = ['firstname','midname','lastname','gender',
+           'howended']
+df = pd.read_excel('/vagrant/flp/columbia_data/judges/supreme-court-judgebios-2016-03-20.xlsx', 0)    
+for x in textfields:
+    df[x] = df[x].replace(np.nan,'',regex=True)
+for i, row in df.iterrows():   
+    make_state_judge(dict(row), testing=False)
+
+#df = pd.read_excel('/vagrant/flp/columbia_data/judges/iac-judgebios-2016-01-19.xlsx', 0)   
+#for i, row in df.iterrows():    
+#    make_state_judge(dict(row), testing=True)
+
