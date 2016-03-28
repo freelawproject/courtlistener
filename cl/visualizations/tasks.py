@@ -41,6 +41,7 @@ def get_title(self, referer_id):
     # Set the exponential back off in case we need it, starting at 15 minutes,
     # then 30, 60, 120...
     countdown = 15 * 60 * (2 ** self.request.retries)
+    retried_exceeded = (self.request.retries >= self.max_retries)
 
     referer = Referer.objects.get(pk=referer_id)
     if blacklisted_url(referer.url):
@@ -54,6 +55,9 @@ def get_title(self, referer_id):
     try:
         r.raise_for_status()
     except HTTPError as exc:
+        if retried_exceeded:
+            # We're not wanted here. Maybe we'll have better luck another time.
+            return
         raise self.retry(exc=exc, countdown=countdown)
 
     html_tree = html.fromstring(r.text)
@@ -83,7 +87,7 @@ def get_title(self, referer_id):
             # Create an exception to catch.
             raise Exception("Couldn't get title from HTML")
         except Exception as exc:
-            if self.request.retries >= self.max_retries:
+            if retried_exceeded:
                 # We couldn't get the title. Let it go.
                 return
             raise self.retry(exc=exc, countdown=countdown)
