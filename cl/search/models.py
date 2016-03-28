@@ -243,7 +243,7 @@ class Docket(models.Model):
     )
 
     class Meta:
-        unique_together = (('court', 'docket_number'), ('court', 'pacer_case_id'))
+        unique_together = ('court', 'pacer_case_id')
 
     def __unicode__(self):
         if self.case_name:
