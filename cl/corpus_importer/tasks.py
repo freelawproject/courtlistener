@@ -3,13 +3,13 @@ import os
 import requests
 import shutil
 
-from celery import task
+from cl.celery import app
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 
-@task
+@app.task
 def download_recap_item(url, filename):
     logger.info("  Getting item at: %s" % url)
     location = os.path.join(settings.MEDIA_ROOT, 'recap', filename)
