@@ -19,7 +19,7 @@ def load_csv():
 
     This CSV is generated with:
 
-        mysql recap_prod -p -u root < export.sql > out.csv
+        mysql recap_prod -p -u recap < export.sql > out.csv
 
     export.sql contains:
 
@@ -34,7 +34,11 @@ def load_csv():
 
     The resulting file is tab separated, and pandas will handle that just fine.
     """
-    return pd.read_csv(CSV_PATH, delimiter='\t')
+    return pd.read_csv(CSV_PATH, delimiter='\t', dtype={
+        'casenum': object,
+        'docnum': object,
+        'court': object,
+    })
 
 
 def make_download_tasks(data):
