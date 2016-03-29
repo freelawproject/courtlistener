@@ -71,8 +71,8 @@ def make_download_tasks(data, line_count, start_line):
         url = get_pdf_url(item['court'], item['casenum'], filename)
         subtasks.append(download_recap_item.subtask((url, filename)))
 
-        # Every fifty items send the subtasks to Celery.
-        if (len(subtasks) >= 50) or last_item:
+        # Every n items send the subtasks to Celery.
+        if (len(subtasks) >= 1000) or last_item:
             msg = ("Sent %s subtasks to celery. We have processed %s "
                    "rows so far." % (len(subtasks), completed + 1))
             logger.info(msg)
