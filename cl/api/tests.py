@@ -25,6 +25,7 @@ class BulkDataTest(TestCase):
         docket = Docket(
             case_name=u'foo',
             court=Court.objects.get(pk='test'),
+            source=Docket.DEFAULT
         )
         docket.save()
         # Must be more than a year old for all tests to be runnable.

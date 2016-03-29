@@ -39,6 +39,7 @@ class Command(cl_scrape_opinions.Command):
             blocked=blocked,
             date_blocked=date_blocked,
             date_argued=item['case_dates'],
+            source=Docket.SCRAPER,
         )
 
         audio_file = Audio(
