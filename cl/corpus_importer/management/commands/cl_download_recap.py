@@ -45,12 +45,17 @@ def load_csv():
     return data, line_count
 
 
-def make_download_tasks(data, line_count):
+def make_download_tasks(data, line_count, start_line):
     """For every item in the CSV, send it to Celery for processing"""
     previous_casenum = None
     subtasks = []
     completed = 0
     for index, item in data.iterrows():
+        if completed < start_line - 1:
+            # Skip ahead if start_lines is provided.
+            completed += 1
+            continue
+
         last_item = (line_count == completed + 1)
         if item['casenum'] != previous_casenum:
             # New case, get the docket before getting the pdf
@@ -69,7 +74,7 @@ def make_download_tasks(data, line_count):
         # Every fifty items send the subtasks to Celery.
         if (len(subtasks) >= 50) or last_item:
             msg = ("Sent %s subtasks to celery. We have processed %s "
-                   "rows so far." % (len(subtasks), completed))
+                   "rows so far." % (len(subtasks), completed + 1))
             logger.info(msg)
             print msg
             job = TaskSet(tasks=subtasks)
@@ -83,6 +88,14 @@ class Command(BaseCommand):
     help = ('Using a local CSV, download the XML data for RECAP content. '
             'Output is sent to the log.')
 
-    def handle(self, *args, **kwargs):
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--start_line',
+            type=int,
+            default=0,
+            help='The line in the file where you wish to start processing.'
+        )
+
+    def handle(self, *args, **options):
         data, line_count = load_csv()
-        make_download_tasks(data, line_count)
+        make_download_tasks(data, line_count, options['start_line'])
