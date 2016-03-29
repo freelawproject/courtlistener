@@ -142,15 +142,17 @@ class Docket(models.Model):
     )
     assigned_to = models.ForeignKey(
         'people_db.Person',
+        related_name='assigning',
         help_text="The judge the case was assigned to.",
         null=True,
-        related_name='assigning'
+        blank=True,
     )
     referred_to = models.ForeignKey(
         'people_db.Person',
+        related_name='referring',
         help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
         null=True,
-        related_name='referring'
+        blank=True,
     )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
