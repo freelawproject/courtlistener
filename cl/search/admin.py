@@ -25,6 +25,8 @@ class OpinionAdmin(admin.ModelAdmin):
     )
     raw_id_fields = (
         'cluster',
+        'author',
+        'joined_by',
     )
     search_fields = (
         'plain_text',
@@ -81,6 +83,8 @@ class OpinionClusterAdmin(admin.ModelAdmin):
     )
     raw_id_fields = (
         'docket',
+        'panel',
+        'non_participating_judges',
     )
     list_filter = (
         'source',
@@ -115,6 +119,10 @@ class DocketAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['case_name']}
     readonly_fields = (
         'date_modified',
+    )
+    raw_id_fields = (
+        'assigned_to',
+        'referred_to',
     )
 
 

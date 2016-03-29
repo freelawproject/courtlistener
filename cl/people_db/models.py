@@ -140,20 +140,13 @@ class Person(models.Model):
     )
 
     def __unicode__(self):
-        return u'%s: %s' % (self.pk, ' '.join([self.name_first,
-                                               self.name_middle,
-                                               self.name_last,
-                                               self.name_suffix]))
+        return u'%s: %s' % (self.pk, self.name_full)
 
     def get_absolute_url(self):
         return reverse('view_judge', args=[self.pk, self.slug])
 
     def save(self, *args, **kwargs):
-        self.slug = slugify(
-            trunc('%s %s %s %s' % (self.name_first, self.name_middle,
-                                   self.name_last, self.name_suffix),
-                  158),
-        )
+        self.slug = slugify(trunc(self.name_full, 158))
         self.full_clean()
         super(Person, self).save(*args, **kwargs)
 
@@ -168,8 +161,8 @@ class Person(models.Model):
             self.name_first,
             self.name_middle,
             self.name_last,
-            self.name_suffix,
-        ])
+            self.get_name_suffix_display(),
+        ]).strip()
 
     class Meta:
         verbose_name_plural = "people"

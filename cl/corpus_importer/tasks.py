@@ -3,14 +3,16 @@ import os
 import requests
 import shutil
 
-from celery import task
+from requests.packages.urllib3.exceptions import ReadTimeoutError
+
+from cl.celery import app
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 
-@task
-def download_recap_item(url, filename):
+@app.task(bind=True, max_retries=5)
+def download_recap_item(self, url, filename):
     logger.info("  Getting item at: %s" % url)
     location = os.path.join(settings.MEDIA_ROOT, 'recap', filename)
     try:
@@ -19,14 +21,22 @@ def download_recap_item(url, filename):
         r = requests.get(
             url,
             stream=True,
+            timeout=60,
             headers={'User-Agent': "Free Law Project"},
         )
         r.raise_for_status()
+    except requests.Timeout as e:
+        logger.warning("    Timed out attempting to get: %s\n" % url)
+        raise self.retry(exc=e, countdown=2)
     except requests.RequestException as e:
-        logger.warning("    Unable to get item! Exception was:\n%s" % e)
+        logger.warning("    Unable to get %s\nException was:\n%s" % (url, e))
     except IOError as e:
         logger.warning("    %s" % e)
     else:
         with open(location, 'wb') as f:
             r.raw.decode_content = True
-            shutil.copyfileobj(r.raw, f)
+            try:
+                shutil.copyfileobj(r.raw, f)
+            except ReadTimeoutError as exc:
+                os.remove(location)  # Cleanup
+                raise self.retry(exc=exc)
