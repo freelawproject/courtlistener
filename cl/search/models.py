@@ -78,6 +78,30 @@ class Docket(models.Model):
         (SCRAPER, "Scraper")
     )
 
+    source = models.SmallIntegerField(
+            help_text="contains the source of the Docket.",
+            choices=SOURCE_CHOICES,
+    )
+    court = models.ForeignKey(
+            'Court',
+            help_text="The court where the docket was filed",
+            db_index=True,
+            related_name='dockets',
+    )
+    assigned_to = models.ForeignKey(
+            'people_db.Person',
+            related_name='assigning',
+            help_text="The judge the case was assigned to.",
+            null=True,
+            blank=True,
+    )
+    referred_to = models.ForeignKey(
+            'people_db.Person',
+            related_name='referring',
+            help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
+            null=True,
+            blank=True,
+    )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -134,26 +158,6 @@ class Docket(models.Model):
         blank=True,
         null=True,
     )
-    court = models.ForeignKey(
-        'Court',
-        help_text="The court where the docket was filed",
-        db_index=True,
-        related_name='dockets',
-    )
-    assigned_to = models.ForeignKey(
-        'people_db.Person',
-        related_name='assigning',
-        help_text="The judge the case was assigned to.",
-        null=True,
-        blank=True,
-    )
-    referred_to = models.ForeignKey(
-        'people_db.Person',
-        related_name='referring',
-        help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
-        null=True,
-        blank=True,
-    )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
                   "'Marsh'",
@@ -180,19 +184,6 @@ class Docket(models.Model):
         blank=True,
         null=True,
         db_index=True,
-    )
-    date_blocked = models.DateField(
-        help_text="The date that this opinion was blocked from indexing by "
-                  "search engines",
-        blank=True,
-        null=True,
-        db_index=True,
-    )
-    blocked = models.BooleanField(
-        help_text="Whether a document should be blocked from indexing by "
-                  "search engines",
-        db_index=True,
-        default=False,
     )
     pacer_case_id = models.PositiveIntegerField(
         help_text="The cased ID provided by PACER.",
@@ -239,9 +230,18 @@ class Docket(models.Model):
         null=True,
         blank=True,
     )
-    source = models.SmallIntegerField(
-        help_text="contains the source of the Docket.",
-        choices=SOURCE_CHOICES,
+    date_blocked = models.DateField(
+            help_text="The date that this opinion was blocked from indexing by "
+                      "search engines",
+            blank=True,
+            null=True,
+            db_index=True,
+    )
+    blocked = models.BooleanField(
+            help_text="Whether a document should be blocked from indexing by "
+                      "search engines",
+            db_index=True,
+            default=False,
     )
 
     class Meta:
