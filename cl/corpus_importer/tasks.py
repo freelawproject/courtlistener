@@ -3,6 +3,8 @@ import os
 import requests
 import shutil
 
+from requests.packages.urllib3.exceptions import ReadTimeoutError
+
 from cl.celery import app
 from django.conf import settings
 
@@ -19,7 +21,7 @@ def download_recap_item(self, url, filename):
         r = requests.get(
             url,
             stream=True,
-            timeout=15,
+            timeout=60,
             headers={'User-Agent': "Free Law Project"},
         )
         r.raise_for_status()
@@ -33,4 +35,8 @@ def download_recap_item(self, url, filename):
     else:
         with open(location, 'wb') as f:
             r.raw.decode_content = True
-            shutil.copyfileobj(r.raw, f)
+            try:
+                shutil.copyfileobj(r.raw, f)
+            except ReadTimeoutError as exc:
+                os.remove(location)  # Cleanup
+                raise self.retry(exc=exc)
