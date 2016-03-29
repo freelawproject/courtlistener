@@ -15,6 +15,9 @@ def make_state_judge(item, testing=False):
 
     Saves the judge to the DB.
     """
+    
+    if pd.isnull(item['startyear']):
+        continue
 
     date_dob, date_granularity_dob = process_date(item['birthyear'],
                                                   item['birthmonth'],
@@ -61,10 +64,13 @@ def make_state_judge(item, testing=False):
     date_start, date_granularity_start = process_date(item['startyear'],
                                                       item['startmonth'],
                                                       item['startday'])
+
+    if not pd.isnull(item['endyear']) and item['endyear'] < 2016:
+        item['endyear'] = None
     date_termination, date_granularity_termination = process_date(
             item['endyear'],
             item['endmonth'],
-            item['endday'])
+            item['endday'])            
 
     judgeship = Position(
             person=person,
@@ -174,19 +180,4 @@ def make_state_judge(item, testing=False):
 
             if not testing: 
                 source.save()                 
-
-#if __name__ == '__main__':
-import pandas as pd
-import numpy as np
-textfields = ['firstname','midname','lastname','gender',
-           'howended']
-df = pd.read_excel('/vagrant/flp/columbia_data/judges/supreme-court-judgebios-2016-03-20.xlsx', 0)    
-for x in textfields:
-    df[x] = df[x].replace(np.nan,'',regex=True)
-for i, row in df.iterrows():   
-    make_state_judge(dict(row), testing=False)
-
-#df = pd.read_excel('/vagrant/flp/columbia_data/judges/iac-judgebios-2016-01-19.xlsx', 0)   
-#for i, row in df.iterrows():    
-#    make_state_judge(dict(row), testing=True)
 
