@@ -79,7 +79,7 @@ class ABARatingInline(admin.TabularInline):
 
 class PersonAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['name_first', 'name_middle', 'name_last',
-                                    'name_suffix']}
+                                    'get_name_suffix_display']}
     inlines = (
         PositionInline,
         EducationInline,
