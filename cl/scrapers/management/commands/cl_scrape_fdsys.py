@@ -60,24 +60,24 @@ class Command(BaseCommand):
         # safely
         signal.signal(signal.SIGTERM, signal_handler)
 
-        logging.info("Starting up the fdsys scraper.")
+        logging.warning("Starting up the fdsys scraper.")
         self.cnt = CaseNameTweaker()
         # num_courts = len(module_strings)
-        wait = (options['rate'] * 60)
+        # wait = (options['rate'] * 60)
+        wait = 2
 
         i = 0
         fdsys = FDSysSite().parse()
         mods_num = len(fdsys)
-
+        logging.warning('Found {} documents'.format(mods_num))
         while i < mods_num:
             if die_now:
-                logging.info("The fdsys scraper has stopped.")
+                logging.warning("The fdsys scraper has stopped.")
                 sys.exit(1)
 
             # noinspection PyBroadException
 
             try:
-                # todo
                 self.scrape_mods_file(fdsys, i)
 
             except Exception, e:
@@ -97,19 +97,22 @@ class Command(BaseCommand):
                 last_mods_in_list = (i == (mods_num - 1))
                 if last_mods_in_list and options['daemon']:
                     # Start over...
-                    logging.info('All done. Looping back to'
+                    logging.warning('All done. Looping back to'
                                  'the beginning because daemon mode is enabled.')
                     i = 0
                 else:
                     i += 1
 
-        logging.info("The fdsys scraper has stopped.")
+        logging.warning("The fdsys scraper has stopped.")
         sys.exit(0)
 
     def scrape_mods_file(self, fdsys, index, full_crawl=True):
+        logging.warning([fdsys, index])
         download_error = False
         mods_data = fdsys[index]
         court_str = mods_data.court_id
+
+        logging.warning([fdsys, index, mods_data, court_str])
         court = Court.objects.get(pk=court_str)
 
         dup_checker = DupChecker(court, full_crawl=full_crawl)
@@ -135,7 +138,7 @@ class Command(BaseCommand):
                 onwards = dup_checker.press_on(Docket, None, None, **lookup_params)
                 if onwards:
                     # Not a duplicate, carry on
-                    logging.info('Adding new document found at: %s' %
+                    logging.warning('Adding new document found at: %s' %
                                  mods_data.download_url.encode('utf-8'))
                     dup_checker.reset()
 
@@ -146,24 +149,13 @@ class Command(BaseCommand):
                     if error:
                         download_error = True
                     else:
-                        # todo need to discuss this,
-                        # the old code is working only with Opinion model
-                        # where should the extracted data be saved, opinion model has html and text fields ?
-                        # for docket_entry in docket.docketentry_set.objects.all():
-                        #     for recap_docket in docket_entry.recapdocument_set.objects.all():
-                        #         extract_fdsys_doc_content.delay(
-                        #             recap_docket.pk,
-                        #             callback=subtask(extract_by_ocr),
-                        #             citation_countdown=random.randint(0, 3600)
-                        #         )
-
-                        logging.info("Successfully added doc {pk}: {name}".format(
+                        logging.warning("Successfully added doc {pk}: {name}".format(
                             pk=docket.pk,
                             name=mods_data.case_name.encode('utf-8'),
                         ))
 
                         # Update the hash if everything finishes properly.
-                        logging.info("%s: Successfully crawled opinions." % mods_data.court_id)
+                        logging.warning("%s: Successfully crawled opinions." % mods_data.court_id)
             if not download_error:
                 # Only update the hash if no errors occurred.
                 dup_checker.update_site_hash(mods_data.hash)
@@ -196,22 +188,25 @@ class Command(BaseCommand):
         )
 
         try:
+            logging.warning('Saving the content for docket: {}'.format(docket.docket_number))
             cf = ContentFile(content)
             extension = get_extension(content)
             file_name = trunc(item.case_name.lower(), 75) + extension
             docket.filepath_local.save(file_name, cf, save=True)
             docket.save()
+            logging.warning('===============SAVED++++++++++++++')
         except:
             msg = ('Unable to save binary to disk. Deleted '
                    'item: %s.\n %s' %
                    (item.case_name, traceback.format_exc()))
-            logging.critical(msg.encode('utf-8'))
+            logging.warning(msg.encode('utf-8'))
             ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
             error = True
             return docket, error
 
         # adding the parties
         for parties in item.parties:
+
             case_parties = CaseParties(
                 docket=docket,
                 first_name=parties['name_first'],
@@ -220,6 +215,7 @@ class Command(BaseCommand):
                 suffix_name=parties['name_suffix'],
                 role=parties['role']
             )
+            logging.warning('Saving Parties {}'.format(case_parties.first_name))
             case_parties.save()
 
         # adding the documents
@@ -230,6 +226,7 @@ class Command(BaseCommand):
                 description=document['description'],
                 entry_number=999  # todo not sure if this is the best solution, but this is a scraper for fdsys not pacer
             )
+            logging.warning('Saving docket entry {}'.format(docket_entry.date_filed))
             docket_entry.save()
 
             recap_document = RECAPDocument(
@@ -240,6 +237,7 @@ class Command(BaseCommand):
             )
 
             try:
+                logging.warning('Getting the binary data of a recap document {}'.format(recap_document.filepath_ia))
 
                 msg, r = get_binary_content(
                     document['download_url'],
@@ -264,19 +262,21 @@ class Command(BaseCommand):
                     onwards = dup_checker.press_on(RECAPDocument, None, None, **lookup_params)
                     if onwards:
                         # Not a duplicate, carry on
-                        logging.info('Adding new document found at: %s' %
+                        logging.warning('Adding new document found at: %s' %
                                      document['download_url'].encode('utf-8'))
                         dup_checker.reset()
                         cf = ContentFile(r.content)
                         extension = get_extension(r.content)
                         file_name = trunc(item.case_name.lower(), 75) + extension
                         recap_document.filepath_local.save(file_name, cf, save=True)
+                        logging.warning('Saving recap document {}'.format(recap_document.filepath_local))
+
                         recap_document.save()
             except:
                 msg = ('Unable to save binary to disk. Deleted '
                        'item: %s.\n %s' %
                        (item.case_name, traceback.format_exc()))
-                logging.critical(msg.encode('utf-8'))
+                logging.warning(msg.encode('utf-8'))
                 ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
                 error = True
                 return docket, error

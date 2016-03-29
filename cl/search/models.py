@@ -455,28 +455,28 @@ class CaseParties(models.Model):
     )
     first_name = models.CharField(
         help_text="First name",
-        max_length=50,
+        max_length=500,
         blank=True
     )
     last_name = models.CharField(
         help_text="Last name",
-        max_length=50,
+        max_length=500,
         blank=True
     )
     middle_name = models.CharField(
         help_text="Middle name",
-        max_length=50,
+        max_length=500,
         blank=True
     )
     suffix_name = models.CharField(
         help_text='Suffix name',
-        max_length=50,
+        max_length=500,
         blank=True
     )
     # todo this could be streamlined and added in a separate model, as there shouldn't more then a few types of roles
     role = models.CharField(
         help_text="Parties role in the case",
-        max_length=50,
+        max_length=500,
         blank=True
     )
 

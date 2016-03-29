@@ -15,11 +15,11 @@ class Migration(migrations.Migration):
             name='CaseParties',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('first_name', models.CharField(help_text=b'First name', max_length=50, blank=True)),
-                ('last_name', models.CharField(help_text=b'Last name', max_length=50, blank=True)),
-                ('middle_name', models.CharField(help_text=b'Middle name', max_length=50, blank=True)),
-                ('suffix_name', models.CharField(help_text=b'Suffix name', max_length=50, blank=True)),
-                ('role', models.CharField(help_text=b'Parties role in the case', max_length=50, blank=True)),
+                ('first_name', models.CharField(help_text=b'First name', max_length=500, blank=True)),
+                ('last_name', models.CharField(help_text=b'Last name', max_length=500, blank=True)),
+                ('middle_name', models.CharField(help_text=b'Middle name', max_length=500, blank=True)),
+                ('suffix_name', models.CharField(help_text=b'Suffix name', max_length=500, blank=True)),
+                ('role', models.CharField(help_text=b'Parties role in the case', max_length=500, blank=True)),
             ],
         ),
         migrations.AddField(
