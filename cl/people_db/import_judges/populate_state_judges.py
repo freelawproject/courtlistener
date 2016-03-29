@@ -32,10 +32,7 @@ def make_state_judge(item, testing=False):
     check = Person.objects.filter(name_first=item['firstname'],
                                   name_last=item['lastname'], date_dob=date_dob)
     if len(check) > 0:
-        print(
-            'Warning: ' + item['firstname'] + ' ' + item[
-                'lastname'] + ' ' + str(
-                    date_dob) + ' exists.')
+        print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.')
         person = check[0]
     else:
 
