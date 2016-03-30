@@ -69,7 +69,7 @@ emails = {
                 "account was: \n\n"
                 " - %s\n\n"
                 "Can't keep 'em all, I suppose.\n\n",
-        'from': 'CourtListener <noreply@courtlistener.com>',
+        'from': settings.DEFAULT_FROM_EMAIL,
         'to': [a[1] for a in settings.ADMINS]
     },
     'email_changed_successfully': {
@@ -84,7 +84,7 @@ emails = {
                 "------------------\n"
                 "For questions or comments, please see our contact page, "
                 "https://www.courtlistener.com/contact/.",
-        'from': 'CourtListener <noreply@courtlistener.com>',
+        'from': settings.DEFAULT_FROM_EMAIL,
     },
     'confirm_your_new_account': {
         'subject': 'Confirm your account on CourtListener.com',
@@ -98,7 +98,7 @@ emails = {
                 "-------------------\n"
                 "For questions or comments, please see our contact page, "
                 "https://www.courtlistener.com/contact/.",
-        'from': 'CourtListener <noreply@courtlistener.com>',
+        'from': settings.DEFAULT_FROM_EMAIL,
     },
     'confirm_existing_account': {
         'subject': 'Confirm your account on CourtListener.com',
@@ -115,7 +115,7 @@ emails = {
                 "For questions or comments, please visit our contact page, "
                 "https://www.courtlistener.com/contact/\n"
                 "We're always happy to hear from you.",
-        'from': 'CourtListener <noreply@courtlistener.com>',
+        'from': settings.DEFAULT_FROM_EMAIL,
     },
     'email_not_confirmed': {
         'subject': 'Please confirm your account on %s',
@@ -133,7 +133,7 @@ emails = {
                 "------------------\n"
                 "For questions or comments, please see our contact page, "
                 "https://www.courtlistener.com/contact/.",
-        'from': 'CourtListener <noreply@courtlistener.com>',
+        'from': settings.DEFAULT_FROM_EMAIL,
     },
     'new_account_created': {
         'subject': 'New user confirmed on CourtListener: %s',
@@ -143,7 +143,7 @@ emails = {
                 "  Their email address is: %s\n\n"
                 "Sincerely,\n\n"
                 "The CourtListener Bots",
-        'from': 'CourtListener <noreply@courtlistener.com>',
+        'from': settings.DEFAULT_FROM_EMAIL,
         'to': [a[1] for a in settings.ADMINS],
     },
 }

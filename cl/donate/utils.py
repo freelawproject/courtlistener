@@ -20,7 +20,7 @@ emails = {
                  'Michael Lissner and Brian Carver\n'
                  'Founders of Free Law Project\n'
                  'https://free.law/contact/'),
-        'from': 'Free Law Project <donate@free.law>',
+        'from': settings.DEFAULT_FROM_EMAIL,
     }
 }
 
