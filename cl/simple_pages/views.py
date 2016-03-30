@@ -165,31 +165,31 @@ def contact(
             cd = form.cleaned_data
             default_from = settings.DEFAULT_FROM_EMAIL
             EmailMessage(
-                subject='[CourtListener] Contact form message',
-                body='Subject: {subject}\n'
-                     'From: {name} ({email})\n'
-                     'Browser: {browser}\n'
-                     'Message: \n\n{message}'.format(
-                        browser=request.META.get('HTTP_USER_AGENT', "Unknown"),
+                subject=u'[CourtListener] Contact form message',
+                body=u'Subject: {subject}\n'
+                     u'From: {name} ({email})\n'
+                     u'Browser: {browser}\n'
+                     u'Message: \n\n{message}'.format(
+                        browser=request.META.get(u'HTTP_USER_AGENT', u"Unknown"),
                         **cd
                      ),
                 to=[m[1] for m in settings.MANAGERS],
-                reply_to=[cd.get('email', default_from) or default_from],
+                reply_to=[cd.get(u'email', default_from) or default_from],
             ).send()
-            return HttpResponseRedirect(reverse('contact_thanks'))
+            return HttpResponseRedirect(reverse(u'contact_thanks'))
     else:
         # the form is loading for the first time
         try:
-            initial['email'] = request.user.email
-            initial['name'] = request.user.get_full_name()
+            initial[u'email'] = request.user.email
+            initial[u'name'] = request.user.get_full_name()
             form = ContactForm(initial=initial)
         except AttributeError:
             # for anonymous users, who lack full_names, and emails
             form = ContactForm(initial=initial)
 
     template_data.update(
-        {'form': form,
-         'private': False}
+        {u'form': form,
+         u'private': False}
     )
     return render_to_response(
         template_path,
@@ -200,8 +200,8 @@ def contact(
 
 def contact_thanks(request):
     return render_to_response(
-        'contact_thanks.html',
-        {'private': True},
+        u'contact_thanks.html',
+        {u'private': True},
         RequestContext(request)
     )
 

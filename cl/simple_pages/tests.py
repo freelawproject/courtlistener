@@ -55,6 +55,19 @@ class ContactTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)
 
+    def test_contact_unicode(self):
+        """Can unicode be used when contacting us?"""
+        msg = self.test_msg.copy()
+        msg['message'] = (
+            'Possible ideas and thoughts are vast in number. A distinct word '
+            'for every distinct idea and thought would require a vast '
+            'vocabulary. The problem in language is to express many ideas and '
+            'thoughts with comparatively few words. — John Wesley Powell'
+        )
+        response = self.client.post(reverse('contact'), msg)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+
 
 class SimplePagesTest(TestCase):
 
