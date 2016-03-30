@@ -15,9 +15,9 @@ def make_state_judge(item, testing=False):
 
     Saves the judge to the DB.
     """
-    
+
     if pd.isnull(item['startyear']):
-        continue
+        return
 
     date_dob, date_granularity_dob = process_date(item['birthyear'],
                                                   item['birthmonth'],
@@ -67,7 +67,7 @@ def make_state_judge(item, testing=False):
     date_termination, date_granularity_termination = process_date(
             item['endyear'],
             item['endmonth'],
-            item['endday'])            
+            item['endday'])
 
     judgeship = Position(
             person=person,
@@ -175,6 +175,6 @@ def make_state_judge(item, testing=False):
                     url=url
             )
 
-            if not testing: 
-                source.save()                 
+            if not testing:
+                source.save()
 
