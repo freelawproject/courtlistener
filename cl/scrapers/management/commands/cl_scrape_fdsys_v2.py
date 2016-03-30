@@ -62,11 +62,9 @@ class Command(BaseCommand):
 
         logging.warning("Starting up the fdsys scraper.")
         self.cnt = CaseNameTweaker()
-        # num_courts = len(module_strings)
-        # wait = (options['rate'] * 60)
         wait = 2
-
         i = 0
+
         fdsys = FDSysSite().parse()
         mods_num = len(fdsys)
         logging.warning('Found {} documents'.format(mods_num))
@@ -98,7 +96,7 @@ class Command(BaseCommand):
                 if last_mods_in_list and options['daemon']:
                     # Start over...
                     logging.warning('All done. Looping back to'
-                                 'the beginning because daemon mode is enabled.')
+                                    'the beginning because daemon mode is enabled.')
                     i = 0
                 else:
                     i += 1
@@ -115,52 +113,39 @@ class Command(BaseCommand):
         logging.warning([fdsys, index, mods_data, court_str])
         court = Court.objects.get(pk=court_str)
 
-        dup_checker = DupChecker(court, full_crawl=full_crawl)
-        abort = dup_checker.abort_by_url_hash(mods_data.url, mods_data.hash)
-        if not abort:
-            msg, r = get_binary_content(
-                mods_data.download_url,
-                mods_data.cookies,
-                mods_data._get_adapter_instance(),
-                method=mods_data.method
+        msg, r = get_binary_content(
+            mods_data.download_url,
+            mods_data.cookies,
+            mods_data._get_adapter_instance(),
+            method=mods_data.method
+        )
+        if msg:
+            logging.warn(msg)
+            ErrorLog(log_level='WARNING',
+                     court=court,
+                     message=msg).save()
+        else:
+
+            # Not a duplicate, carry on
+            logging.warning('Adding new document found at: %s' %
+                            mods_data.download_url.encode('utf-8'))
+
+            docket, error = self.make_objects(
+                mods_data, court, r.content
             )
-            if msg:
-                logging.warn(msg)
-                ErrorLog(log_level='WARNING',
-                         court=court,
-                         message=msg).save()
+
+            if error:
+                download_error = True
             else:
-                lookup_params = {
-                    'lookup_value': mods_data.fdsys_id,
-                    'lookup_by': 'fdsys_case_id'
-                }
+                logging.warning("Successfully added doc {pk}: {name}".format(
+                    pk=docket.pk,
+                    name=mods_data.case_name.encode('utf-8'),
+                ))
 
-                onwards = dup_checker.press_on(Docket, None, None, **lookup_params)
-                if onwards:
-                    # Not a duplicate, carry on
-                    logging.warning('Adding new document found at: %s' %
-                                 mods_data.download_url.encode('utf-8'))
-                    dup_checker.reset()
+                # Update the hash if everything finishes properly.
+                logging.warning("%s: Successfully crawled opinions." % mods_data.court_id)
 
-                    docket, error = self.make_objects(
-                        mods_data, court, r.content, dup_checker
-                    )
-
-                    if error:
-                        download_error = True
-                    else:
-                        logging.warning("Successfully added doc {pk}: {name}".format(
-                            pk=docket.pk,
-                            name=mods_data.case_name.encode('utf-8'),
-                        ))
-
-                        # Update the hash if everything finishes properly.
-                        logging.warning("%s: Successfully crawled opinions." % mods_data.court_id)
-            if not download_error:
-                # Only update the hash if no errors occurred.
-                dup_checker.update_site_hash(mods_data.hash)
-
-    def make_objects(self, item, court, content, dup_checker):
+    def make_objects(self, item, court, content):
         """Takes the meta data from the scraper and associates it with objects.
 
         Returns the created objects.
@@ -225,7 +210,8 @@ class Command(BaseCommand):
                 docket=docket,
                 date_filed=document['date_filed'],
                 description=document['description'],
-                entry_number=999  # todo not sure if this is the best solution, but this is a scraper for fdsys not pacer
+                entry_number=999
+                # todo not sure if this is the best solution, but this is a scraper for fdsys not pacer
             )
             logging.warning('Saving docket entry {}'.format(docket_entry.date_filed))
             if _:
@@ -235,7 +221,8 @@ class Command(BaseCommand):
                 docket_entry=docket_entry,
                 document_type=RECAPDocument.PACER_DOCUMENT,
                 filepath_ia=document['download_url'],
-                document_number=999  # todo not sure if this is the best solution, but this is a scraper for fdsys not pacer
+                document_number=999
+                # todo not sure if this is the best solution, but this is a scraper for fdsys not pacer
             )
 
             try:
@@ -254,27 +241,17 @@ class Command(BaseCommand):
                              court=court,
                              message=msg).save()
                 else:
-                    sha1_hash = hashlib.sha1(r.content).hexdigest()
-
-                    lookup_params = {
-                        'lookup_value': sha1_hash,
-                        'lookup_by': 'sha1'
-                    }
-
-                    onwards = dup_checker.press_on(RECAPDocument, None, None, **lookup_params)
-                    logging.warning('Going to download this RECAPDocument {}'.format(onwards))
-                    if onwards:
+                    logging.warning('Going to download this RECAPDocument {}'.format(recap_document))
                         # Not a duplicate, carry on
-                        logging.warning('Adding new document found at: %s' %
-                                     document['download_url'].encode('utf-8'))
-                        dup_checker.reset()
-                        cf = ContentFile(r.content)
-                        extension = get_extension(r.content)
-                        file_name = trunc(item.case_name.lower(), 75) + extension
-                        recap_document.filepath_local.save(file_name, cf, save=True)
-                        logging.warning('Saving recap document {}'.format(recap_document.filepath_local))
+                    logging.warning('Adding new document found at: %s' %
+                                    document['download_url'].encode('utf-8'))
+                    cf = ContentFile(r.content)
+                    extension = get_extension(r.content)
+                    file_name = trunc(item.case_name.lower(), 75) + extension
+                    recap_document.filepath_local.save(file_name, cf, save=True)
+                    logging.warning('Saving recap document {}'.format(recap_document.filepath_local))
 
-                        recap_document.save()
+                    recap_document.save()
             except:
                 msg = ('Unable to save binary to disk. Deleted '
                        'item: %s.\n %s' %
