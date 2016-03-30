@@ -4,6 +4,7 @@ import stripe
 from datetime import datetime, timedelta
 from django.conf import settings
 from django.core import mail
+from django.core.urlresolvers import reverse
 from django.test import Client, TestCase
 from django.utils.timezone import now
 
@@ -65,7 +66,7 @@ class DonationFormSubmissionTest(TestCase):
             'amount_other': '1',
         })
         r = self.client.post(
-            '/donate/',
+            reverse('donate'),
             self.params,
             follow=True,
         )
@@ -77,7 +78,7 @@ class DonationFormSubmissionTest(TestCase):
             'amount': '10',
         })
         r = self.client.post(
-            '/donate/',
+            reverse('donate'),
             self.params,
             follow=True,
         )
@@ -103,7 +104,7 @@ class StripeTest(TestCase):
 
         # Place a donation as an anonymous (not logged in) person using the
         # token we just got
-        r = self.client.post('/donate/', data={
+        r = self.client.post(reverse('donate'), data={
             'amount': amount,
             'amount_other': amount_other,
             'payment_provider': 'cc',
@@ -142,7 +143,7 @@ class StripeTest(TestCase):
                 % token.card.fingerprint
         )
 
-        r = self.client.post('/donate/callbacks/stripe/',
+        r = self.client.post(reverse('stripe_callback'),
                              data=json.dumps(event),
                              content_type='application/json')
 
