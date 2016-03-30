@@ -26,7 +26,7 @@ def get_full_host(context, username=None, password=None):
         protocol = 'http'
         domain_and_port = 'courtlistener.com'
     else:
-        protocol = 'https' if r.is_secure() else 'http',
+        protocol = 'https' if r.is_secure() else 'http'
         domain_and_port = r.get_host()
 
     return mark_safe("{protocol}://{username}{password}{domain_and_port}".format(
