@@ -20,7 +20,7 @@ class UrlHash(models.Model):
     )
 
     def __unicode__(self):
-        return u"{pk}".format(self.pk)
+        return u"{pk}".format(pk=self.pk)
 
     class Meta:
         verbose_name_plural = "URL Hashes"

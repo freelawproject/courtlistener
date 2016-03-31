@@ -1,0 +1,44 @@
+[
+  {
+    "fields": {
+      "race": "w"
+    },
+    "model": "people_db.race",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "race": "b"
+    },
+    "model": "people_db.race",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "race": "i"
+    },
+    "model": "people_db.race",
+    "pk": 3
+  },
+  {
+    "fields": {
+      "race": "a"
+    },
+    "model": "people_db.race",
+    "pk": 4
+  },
+  {
+    "fields": {
+      "race": "p"
+    },
+    "model": "people_db.race",
+    "pk": 5
+  },
+  {
+    "fields": {
+      "race": "h"
+    },
+    "model": "people_db.race",
+    "pk": 6
+  }
+]

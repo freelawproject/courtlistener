@@ -13,6 +13,7 @@
       "case_name_short": "short name for Voutila v. Bonvini",
       "docket_number": "1337-np",
       "slug": "case-name",
+      "source": 0,
       "blocked": false
     },
     "model": "search.docket",
@@ -95,6 +96,7 @@
       "case_name_short": "short name for Voutila v. Bonvini, part 2",
       "docket_number": "1337-stuff",
       "slug": "case-name",
+      "source": 0,
       "blocked": false
     },
     "model": "search.docket",
@@ -240,6 +242,7 @@
       "case_name_short": "short name for Bippity Boppity vs. Bonvini",
       "docket_number": "1337-stuff 13",
       "slug": "case-name",
+      "source": 0,
       "blocked": false
     },
     "model": "search.docket",

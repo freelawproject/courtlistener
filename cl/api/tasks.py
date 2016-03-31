@@ -4,19 +4,20 @@ import shutil
 import tarfile
 from os.path import join
 
-from celery.task import task
+
 from django.conf import settings
 from django.test import RequestFactory
 from rest_framework.renderers import JSONRenderer
 from rest_framework.versioning import URLPathVersioning
 
 from cl.api.utils import BulkJsonHistory
+from cl.celery import app
 from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
 from cl.lib.utils import deepgetattr, mkdir_p
 
 
-@task
+@app.task
 @print_timing
 def make_bulk_data_and_swap_it_in(courts, kwargs):
     """We can't wrap the handle() function, but we can wrap this one."""

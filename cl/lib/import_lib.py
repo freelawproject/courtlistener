@@ -36,8 +36,9 @@ def map_citations_to_models(citations):
 
     cite_mapping = {}
     for citation in citations:
-        cite_type = REPORTERS[citation.canonical_reporter][
-            citation.lookup_index]['cite_type']
+        cite_type = (REPORTERS[citation.canonical_reporter]
+                     [citation.lookup_index]
+                     ['cite_type'])
         if cite_type in ['federal', 'state', 'specialty']:
             cite_mapping = add_mapping(cite_mapping, cite_type,
                                        citation.base_citation())
@@ -54,5 +55,61 @@ def map_citations_to_models(citations):
 
     return cite_mapping
 
+from django.db.models import Q
+from dateutil.relativedelta import relativedelta
+from cl.people_db.models import Person
 
+def find_person(name_last, court_id, name_first=None, case_date=None, 
+                require_dates=False, raise_mult=False, raise_zero=False):
+    """Uniquely identifies a judge by both name and metadata. Prints a warning if couldn't find and raises an
+    exception if not unique."""
+    
+    # don't check for dates
+    if not require_dates:
+        candidates = Person.objects.filter(
+            name_last__iexact=name_last,        
+            positions__court_id=court_id,
+        )    
+        if len(candidates) == 0:
+            print("No judge: Last name '%s', position '%s'." % (name_last,court_id))
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+    
+    if case_date is None:
+        raise Exception("No case date provided.")
+    
+    # check based on dates
+    candidates = Person.objects.filter(
+        Q(name_last__iexact=name_last),        
+        Q(positions__court_id=court_id),
+        Q(positions__date_start__lt=case_date + relativedelta(years=1)),
+        Q(positions__date_termination__gt=case_date - relativedelta(years=1)) | Q(positions__date_termination=None)
+    )
+    if len(candidates) == 1:
+        return candidates[0]
+    
+    if len(candidates) == 0:
+        print("No judge: Last name '%s', position '%s'." % (name_last,court_id))
+        if raise_zero:
+            raise Exception("No judge: Last name '%s', position '%s'." % (name_last,court_id))
+        else:
+             print("No judge: Last name '%s', position '%s'." % (name_last,court_id))
+             return None
+    
+    if name_first is not None:
+        candidates = Person.objects.filter(
+            Q(name_last__iexact=name_last),        
+            Q(name_first__iexact=name_first),
+            Q(positions__court_id=court_id),
+            Q(positions__date_start__lt=case_date + relativedelta(years=1)),
+            Q(positions__date_termination__gt=case_date - relativedelta(years=1)) | Q( positions__date_termination=None)
+        )
+        if len(candidates) == 1:
+            return candidates[0]
+        print('First name %s not found in group %s' % (name_first, str([c.name_first for c in candidates])))
+
+        
+    if raise_mult:         
+        raise Exception("Multiple judges: Last name '%s', court '%s', options: %s." % (name_last,court_id, str([c.name_first for c in candidates])))
 

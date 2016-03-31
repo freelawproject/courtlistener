@@ -1,11 +1,51 @@
 import re
-from django.core import urlresolvers
+
+from cl.celery import app
 from cl.citations import find_citations, match_citations
-from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.search.models import Opinion, OpinionsCited
-from celery import task
+
+# This is the distance two reporter abbreviations can be from each other if they
+# are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
+# would have a distance of 4.
+PARALLEL_DISTANCE = 4
+
+@app.task
+def identify_parallel_citations(citations):
+    """Work through a list of citations and identify ones that are physically
+    near each other in the document.
+
+    Return a list of tuples. Each tuple represents a series of parallel
+    citations. These will usually be length two, but not necessarily.
+    """
+    if len(citations) == 0:
+        return citations
+    citation_indexes = [c.reporter_index for c in citations]
+    parallel_citation = [citations[0]]
+    parallel_citations = set()
+    for i, reporter_index in enumerate(citation_indexes[:-1]):
+        if reporter_index + PARALLEL_DISTANCE > citation_indexes[i + 1]:
+            # The present item is within a reasonable distance from the next
+            # item. It's a parallel citation.
+            parallel_citation.append(citations[i + 1])
+        else:
+            # Not close enough. Append what we've got and start a new list.
+            if len(parallel_citation) > 1:
+                if tuple(parallel_citation[::-1]) not in parallel_citations:
+                    # If the reversed tuple isn't in the set already, add it.
+                    # This makes sure a document with many references to the
+                    # same case only gets counted once.
+                    parallel_citations.add(tuple(parallel_citation))
+            parallel_citation = [citations[i + 1]]
+
+    # In case the last item had a citation.
+    if len(parallel_citation) > 1:
+        if tuple(parallel_citation[::-1]) not in parallel_citations:
+            # Ensure the reversed tuple isn't in the set already (see above).
+            parallel_citations.add(tuple(parallel_citation))
+    return parallel_citations
 
 
+@app.task
 def get_document_citations(opinion):
     """Identify and return citations from the html or plain text of the
     opinion.
@@ -39,35 +79,22 @@ def create_cited_html(opinion, citations):
     return new_html.encode('utf-8')
 
 
-@task
+@app.task
 def update_document(opinion, index=True):
     """Get the citations for an item and save it and add it to the index if
     requested."""
-    DEBUG = 0
-
-    if DEBUG >= 1:
-        print "%s at %s" % (
-            best_case_name(opinion.cluster),
-            urlresolvers.reverse(
-                'admin:search_opinioncluster_change',
-                args=(opinion.cluster.pk,),
-            )
-        )
-
     citations = get_document_citations(opinion)
-    # List for tracking number of citation vs. name matches
-    matched_citations = []
+
     # List used so we can do one simple update to the citing opinion.
     opinions_cited = set()
     for citation in citations:
-        matches, is_citation_match = match_citations.match_citation(
+        matches = match_citations.match_citation(
             citation,
             citing_doc=opinion
         )
 
         # TODO: Figure out what to do if there's more than one
         if len(matches) == 1:
-            matched_citations.append(is_citation_match)
             match_id = matches[0]['id']
             try:
                 matched_opinion = Opinion.objects.get(pk=match_id)
@@ -86,19 +113,15 @@ def update_document(opinion, index=True):
                 citation.match_url = matched_opinion.cluster.get_absolute_url()
                 citation.match_id = matched_opinion.pk
             except Opinion.DoesNotExist:
-                if DEBUG >= 2:
-                    print "No Opinions returned for id %s" % match_id
+                # No Opinions returned. Press on.
                 continue
             except Opinion.MultipleObjectsReturned:
-                if DEBUG >= 2:
-                    print "Multiple Opinions returned for id %s" % match_id
+                # Multiple Opinions returned. Press on.
                 continue
         else:
+            # No match found for citation
             #create_stub([citation])
-            if DEBUG >= 2:
-                # TODO: Don't print 1 line per citation.  Save them in a list
-                # and print in a single line at the end.
-                print "No match found for citation %s" % citation.base_citation()
+            pass
 
     # Only update things if we found citations
     if citations:
@@ -114,21 +137,12 @@ def update_document(opinion, index=True):
             pk in opinions_cited
         ])
 
-        if DEBUG >= 3:
-            print opinion.html_with_citations
-
     # Update Solr if requested. In some cases we do it at the end for
     # performance reasons.
     opinion.save(index=index)
-    if DEBUG >= 1:
-        citation_matches = sum(matched_citations)
-        name_matches = len(matched_citations) - citation_matches
-        print "  %d citations" % len(citations)
-        print "  %d exact matches" % citation_matches
-        print "  %d name matches" % name_matches
 
 
-@task
+@app.task
 def update_document_by_id(opinion_id):
     """This is not an OK way to do id-based tasks. Needs to be refactored."""
     op = Opinion.objects.get(pk=opinion_id)

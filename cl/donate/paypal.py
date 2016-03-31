@@ -1,7 +1,10 @@
 import logging
 import simplejson as json  # This is needed to handle Decimal objects.
 import requests
+from django.core.urlresolvers import reverse
+
 from cl.donate.models import Donation
+from cl.donate.utils import send_thank_you_email
 from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
@@ -74,7 +77,6 @@ def process_paypal_callback(request):
         # completed (2), it'll get processed (4).
         d.status = 4
         d.save()
-        from cl.donate.views import send_thank_you_email
         send_thank_you_email(d)
     else:
         logger.critical("Unable to execute PayPal transaction. Status code %s "
@@ -82,7 +84,7 @@ def process_paypal_callback(request):
         d.status = 1
         d.save()
     # Finally, show them the thank you page
-    return HttpResponseRedirect('/donate/paypal/complete/')
+    return HttpResponseRedirect(reverse('paypal_complete'))
 
 
 def process_paypal_payment(cd_donation_form):

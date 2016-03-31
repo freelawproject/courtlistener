@@ -76,7 +76,7 @@ emails = {
                 "If nobody approves it, it'll never show up on the site.\n\n"
                 "Godspeed, fair admin.\n"
                 "The CourtListener bots",
-        'from': 'CourtListener <noreply@courtlistener.com>',
+        'from': settings.DEFAULT_FROM_EMAIL,
         'to': [a[1] for a in settings.ADMINS],
     }
 }

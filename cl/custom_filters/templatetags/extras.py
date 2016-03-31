@@ -21,10 +21,17 @@ def get_full_host(context, username=None, password=None):
         assert all([username, password]), ("If a username is provided, a "
                                            "password must also be provided and "
                                            "vice versa.")
-    r = context['request']
+    r = context.get('request')
+    if r is None:
+        protocol = 'http'
+        domain_and_port = 'courtlistener.com'
+    else:
+        protocol = 'https' if r.is_secure() else 'http'
+        domain_and_port = r.get_host()
+
     return mark_safe("{protocol}://{username}{password}{domain_and_port}".format(
-        protocol='https' if r.is_secure() else 'http',
+        protocol=protocol,
         username='' if username is None else username,
         password='' if password is None else ':' + password + '@',
-        domain_and_port=r.get_host()
+        domain_and_port=domain_and_port,
     ))

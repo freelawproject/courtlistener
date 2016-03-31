@@ -2,7 +2,8 @@ import json
 import os
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage
+from django.core.urlresolvers import reverse
 from django.db.models import Count
 from django.http import HttpResponseRedirect, Http404
 from django.http import HttpResponse
@@ -162,37 +163,33 @@ def contact(
         form = ContactForm(request.POST)
         if form.is_valid():
             cd = form.cleaned_data
-
-            # pull the email addresses out of the MANAGERS tuple
-            i = 0
-            email_addresses = []
-            while i < len(settings.MANAGERS):
-                email_addresses.append(settings.MANAGERS[i][1])
-                i += 1
-
-            # send the email to the MANAGERS
-            send_mail(
-                'CourtListener message from "%s": %s' % (cd['name'],
-                                                         cd['subject']),
-                cd['message'],
-                cd.get('email', 'noreply@example.com'),
-                email_addresses, )
-            # we must redirect after success to avoid problems with people
-            # using the refresh button.
-            return HttpResponseRedirect('/contact/thanks/')
+            default_from = settings.DEFAULT_FROM_EMAIL
+            EmailMessage(
+                subject=u'[CourtListener] Contact form message',
+                body=u'Subject: {subject}\n'
+                     u'From: {name} ({email})\n'
+                     u'Browser: {browser}\n'
+                     u'Message: \n\n{message}'.format(
+                        browser=request.META.get(u'HTTP_USER_AGENT', u"Unknown"),
+                        **cd
+                     ),
+                to=[m[1] for m in settings.MANAGERS],
+                reply_to=[cd.get(u'email', default_from) or default_from],
+            ).send()
+            return HttpResponseRedirect(reverse(u'contact_thanks'))
     else:
         # the form is loading for the first time
         try:
-            initial['email'] = request.user.email
-            initial['name'] = request.user.get_full_name()
+            initial[u'email'] = request.user.email
+            initial[u'name'] = request.user.get_full_name()
             form = ContactForm(initial=initial)
         except AttributeError:
             # for anonymous users, who lack full_names, and emails
             form = ContactForm(initial=initial)
 
     template_data.update(
-        {'form': form,
-         'private': False}
+        {u'form': form,
+         u'private': False}
     )
     return render_to_response(
         template_path,
@@ -203,8 +200,8 @@ def contact(
 
 def contact_thanks(request):
     return render_to_response(
-        'contact_thanks.html',
-        {'private': True},
+        u'contact_thanks.html',
+        {u'private': True},
         RequestContext(request)
     )
 

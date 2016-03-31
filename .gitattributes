@@ -1,0 +1,2 @@
+# Prevent Windows git clients for goofing up files that must run on Linux
+* text eol=lf

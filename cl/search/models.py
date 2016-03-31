@@ -71,11 +71,37 @@ class Docket(models.Model):
     """
     DEFAULT = 0
     RECAP = 1
+    SCRAPER = 2
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
+        (SCRAPER, "Scraper")
     )
 
+    source = models.SmallIntegerField(
+            help_text="contains the source of the Docket.",
+            choices=SOURCE_CHOICES,
+    )
+    court = models.ForeignKey(
+            'Court',
+            help_text="The court where the docket was filed",
+            db_index=True,
+            related_name='dockets',
+    )
+    assigned_to = models.ForeignKey(
+            'people_db.Person',
+            related_name='assigning',
+            help_text="The judge the case was assigned to.",
+            null=True,
+            blank=True,
+    )
+    referred_to = models.ForeignKey(
+            'people_db.Person',
+            related_name='referring',
+            help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
+            null=True,
+            blank=True,
+    )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -85,6 +111,18 @@ class Docket(models.Model):
         help_text="The last moment when the item was modified. A value in "
                   "year 1750 indicates the value is unknown",
         auto_now=True,
+        db_index=True,
+    )
+    date_cert_granted = models.DateField(
+        help_text="date cert was granted for this case, if applicable",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    date_cert_denied = models.DateField(
+        help_text="the date cert was denied for this case, if applicable",
+        blank=True,
+        null=True,
         db_index=True,
     )
     date_argued = models.DateField(
@@ -120,17 +158,6 @@ class Docket(models.Model):
         blank=True,
         null=True,
     )
-    court = models.ForeignKey(
-        'Court',
-        help_text="The court where the docket was filed",
-        db_index=True,
-        related_name='dockets',
-    )
-    assigned_to = models.ForeignKey(
-        'judges.Judge',
-        help_text="The judge the case was assigned to.",
-        null=True,
-    )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
                   "'Marsh'",
@@ -158,19 +185,6 @@ class Docket(models.Model):
         null=True,
         db_index=True,
     )
-    date_blocked = models.DateField(
-        help_text="The date that this opinion was blocked from indexing by "
-                  "search engines",
-        blank=True,
-        null=True,
-        db_index=True,
-    )
-    blocked = models.BooleanField(
-        help_text="Whether a document should be blocked from indexing by "
-                  "search engines",
-        db_index=True,
-        default=False,
-    )
     pacer_case_id = models.PositiveIntegerField(
         help_text="The cased ID provided by PACER.",
         null=True,
@@ -188,25 +202,29 @@ class Docket(models.Model):
         help_text="The cause for the case.",
         max_length=200,
         blank=True,
+        null=True,
     )
     nature_of_suit = models.CharField(
         help_text="The nature of suit code from PACER.",
         max_length=100,
         blank=True,
+        null=True,
     )
     jury_demand = models.CharField(
         help_text="The compensation demand.",
         max_length=500,
         blank=True,
+        null=True,
     )
     jurisdiction_type = models.CharField(
         help_text="Stands for jurisdiction in RECAP XML docket. For example, "
                   "'Diversity', 'U.S. Government Defendant'.",
         max_length=100,
         blank=True,
+        null=True,
     )
     filepath_local = models.FileField(
-        help_text="Path to RECAP’s Docket XML page.",
+        help_text="Path to RECAP's Docket XML page.",
         upload_to=make_recap_path,
         storage=IncrementingFileSystemStorage(),
         max_length=1000,
@@ -219,10 +237,22 @@ class Docket(models.Model):
         null=True,
         blank=True,
     )
-    source = models.SmallIntegerField(
-        help_text="contains the source of the Docket.",
-        choices=SOURCE_CHOICES,
+    date_blocked = models.DateField(
+            help_text="The date that this opinion was blocked from indexing by "
+                      "search engines",
+            blank=True,
+            null=True,
+            db_index=True,
     )
+    blocked = models.BooleanField(
+            help_text="Whether a document should be blocked from indexing by "
+                      "search engines",
+            db_index=True,
+            default=False,
+    )
+
+    class Meta:
+        unique_together = ('court', 'pacer_case_id')
 
     def __unicode__(self):
         if self.case_name:
@@ -271,8 +301,12 @@ class DocketEntry(models.Model):
         db_index=True,
     )
 
+    class Meta:
+        unique_together = ('docket', 'entry_number')
+
+
     def __unicode__(self):
-        return "<DocketEntry ---> %s >" % (self.text[:50])
+        return "<DocketEntry ---> %s >" % (self.description[:50])
 
 
 class RECAPDocument(models.Model):
@@ -327,7 +361,7 @@ class RECAPDocument(models.Model):
         help_text="The ID of the document in PACER. This information is "
                   "provided by RECAP.",
         max_length=32,  # Same as in RECAP
-        blank=True,
+        unique = True
     )
     is_available = models.NullBooleanField(
         help_text="True if the item is available in RECAP",
@@ -350,6 +384,9 @@ class RECAPDocument(models.Model):
         help_text="The URL of the file in IA",
         max_length=1000,
     )
+
+    class Meta:
+        unique_together = ('docket_entry', 'document_number', 'attachment_number')
 
     def __unicode__(self):
         return "Docket_%s , document_number_%s , attachment_number_%s" % (self.docket_entry.docket.docket_number, self.document_number, self.attachment_number)
@@ -494,13 +531,13 @@ class OpinionCluster(models.Model):
         related_name="clusters",
     )
     panel = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judges that heard the oral arguments",
         related_name="opinion_clusters_participating_judges",
         blank=True,
     )
     non_participating_judges = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The judges that heard the case, but did not participate in "
                   "the opinion",
         related_name="opinion_clusters_non_participating_judges",
@@ -744,9 +781,9 @@ class OpinionCluster(models.Model):
         """
         return [
             'neutral_cite', 'federal_cite_one', 'federal_cite_two',
-            'federal_cite_three', 'specialty_cite_one', 'state_cite_regional',
-            'state_cite_one', 'state_cite_two', 'state_cite_three',
-            'westlaw_cite', 'lexis_cite'
+            'federal_cite_three', 'scotus_early_cite', 'specialty_cite_one',
+            'state_cite_regional', 'state_cite_one', 'state_cite_two',
+            'state_cite_three', 'westlaw_cite', 'lexis_cite'
         ]
 
     @property
@@ -856,14 +893,14 @@ class Opinion(models.Model):
         blank=True,
     )
     author = models.ForeignKey(
-        'judges.Judge',
+        'people_db.Person',
         help_text="The primary author of this opinion",
         related_name='opinions_written',
         blank=True,
         null=True,
     )
     joined_by = models.ManyToManyField(
-        'judges.Judge',
+        'people_db.Person',
         related_name='opinions_joined',
         help_text="Other judges that joined the primary author in this opinion",
         blank=True,
@@ -973,6 +1010,19 @@ class OpinionsCited(models.Model):
         Opinion,
         related_name='citing_opinions',
     )
+    # depth = models.IntegerField(
+    #     help_text='The number of times the cited opinion was cited '
+    #               'in the citing opinion',
+    #     default=1,
+    #     db_index=True,
+    # )
+    # quoted = models.BooleanField(
+    #     help_text='Equals true if previous case was quoted directly',
+    #     default=False,
+    #     db_index=True,
+    # )
+    #treatment: positive, negative, etc.
+    #
 
     def __unicode__(self):
         return u'%s ⤜--cites⟶  %s' % (self.citing_opinion.id,
@@ -981,3 +1031,4 @@ class OpinionsCited(models.Model):
     class Meta:
         verbose_name_plural = 'Opinions cited'
         unique_together = ("citing_opinion", "cited_opinion")
+

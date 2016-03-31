@@ -51,12 +51,12 @@ class OpinionSerializer(DynamicFieldsModelSerializer,
     )
     author = serializers.HyperlinkedRelatedField(
         many=False,
-        view_name='judge-detail',
+        view_name='person-detail',
         read_only=True,
     )
     joined_by = serializers.HyperlinkedRelatedField(
             many=True,
-            view_name='judge-detail',
+            view_name='person-detail',
             read_only=True,
     )
 
@@ -90,12 +90,12 @@ class OpinionClusterSerializer(DynamicFieldsModelSerializer,
                                          read_only=True)
     panel = serializers.HyperlinkedRelatedField(
         many=True,
-        view_name='judge-detail',
+        view_name='person-detail',
         read_only=True,
     )
     non_participating_judges = serializers.HyperlinkedRelatedField(
         many=True,
-        view_name='judge-detail',
+        view_name='person-detail',
         read_only=True,
     )
     docket = serializers.HyperlinkedRelatedField(

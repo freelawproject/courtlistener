@@ -1,12 +1,17 @@
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.timezone import utc
 import logging
 import json
 import stripe
-from cl.donate.models import Donation
+
 from datetime import datetime
 from django.conf import settings
+from django.core.urlresolvers import reverse
 from django.http import HttpResponseNotAllowed, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.timezone import utc
+
+from cl.donate.models import Donation
+from cl.donate.utils import send_thank_you_email
+
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +43,6 @@ def process_stripe_callback(request):
                 d.clearing_date = datetime.utcfromtimestamp(
                     charge['created']).replace(tzinfo=utc)
                 d.status = 4
-                from cl.donate.views import send_thank_you_email
                 send_thank_you_email(d)
             elif event['type'].endswith('failed'):
                 if not d:
@@ -89,7 +93,7 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
             'message': None,
             'status': 0,  # Awaiting payment
             'payment_id': charge.id,
-            'redirect': '/donate/stripe/complete/',
+            'redirect': reverse('stripe_complete'),
         }
     except stripe.error.CardError, e:
         logger.warn("Stripe was unable to process the payment: %s" % e)
