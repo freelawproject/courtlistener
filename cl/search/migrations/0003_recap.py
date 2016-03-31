@@ -116,8 +116,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterUniqueTogether(
             name='docket',
-            unique_together={('court', 'pacer_case_id'),
-                             ('court', 'docket_number')},
+            unique_together={('court', 'pacer_case_id')},
         ),
         migrations.AddField(
             model_name='docketentry',
