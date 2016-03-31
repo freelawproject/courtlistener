@@ -245,6 +245,7 @@ class Command(BaseCommand):
                 docket_entry=docket_entry,
                 document_type=RECAPDocument.FDSYS_DOCUMENT,
                 filepath_ia=document['download_url'],
+                fdsys_document_number=document['entry_number']
             )
 
             try:

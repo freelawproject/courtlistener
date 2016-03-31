@@ -370,6 +370,7 @@ class RECAPDocument(models.Model):
     document_number = models.PositiveIntegerField(
         help_text="If the file is a document, the number is the "
                   "document_number in RECAP docket.",
+        blank=True,
         null=True
     )
     attachment_number = models.SmallIntegerField(
@@ -378,6 +379,7 @@ class RECAPDocument(models.Model):
         blank=True,
         null=True,
     )
+    # todo this generates an error for fdsys
     pacer_doc_id = models.CharField(
         help_text="The ID of the document in PACER. This information is "
                   "provided by RECAP.",
@@ -411,9 +413,14 @@ class RECAPDocument(models.Model):
         max_length=1000,
         null=True
     )
+    fdsys_document_number = models.PositiveIntegerField(
+        help_text="document_number in FDSYS docket.",
+        blank=True,
+        null=True
+    )
 
     class Meta:
-        unique_together = ('docket_entry', 'document_number', 'attachment_number')
+        unique_together = ('docket_entry', 'document_number', 'attachment_number', 'fdsys_document_number')
 
     def __unicode__(self):
         return "Docket_%s , document_number_%s , attachment_number_%s" % (
