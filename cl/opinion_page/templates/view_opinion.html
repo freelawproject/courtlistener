@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{% block title %}{{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}{{ title }} – CourtListener.com{% endblock %}
+{% block description %}Opinion for {{ title }}{% endblock %}
+{% block og_description %}Opinion for {{ title }}{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block head %}
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{cluster|best_case_name|truncatewords:10}}" href="/feed/search/?q=cites:({{ cluster.sub_opinions.all|OR_join }})">
+{% endblock %}
+
+{% block footer-scripts %}
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/save-favorites.js"></script>
+{% endblock %}
+
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+        <div class="sidebar-section">
+            <h4>
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="/?{{ request.META.QUERY_STRING }}">Back to {% if get_string %}Search Results{% else %}Home Page{% endif %}</a>
+            </h4>
+        </div>
+
+        {# show the admin tools if applicable #}
+        {% if perms.search.change_docket or perms.search.change_opinioncluster or perms.search.change_citation %}
+            <div class="sidebar-section">
+                <h3><span>Admin</span></h3>
+                <p>
+                    {% if perms.search.change_docket %}
+                        <a href="{% url 'admin:search_docket_change' cluster.docket.pk %}"
+                           class="btn btn-primary btn-xs">Docket</a>
+                    {% endif %}
+                    {% if perms.search.change_opinioncluster %}
+                        <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
+                           class="btn btn-primary btn-xs">Cluster</a>
+                    {% endif %}
+                    {% if perms.search.change_opinion %}
+                        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                            <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
+                               class="btn btn-primary btn-xs">{{ sub_opinion.type }} opinion</a>
+                        {% endfor %}
+                    {% endif %}
+                    {% if request.user.is_superuser %}
+                      {% if private %}
+                      <div class="btn btn-danger btn-xs">Blocked from Search Engines</div>
+                      {% endif %}
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+
+        {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
+        <div class="{% if not favorite_form.instance.cluster_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
+            <div>
+                <h3 class="inline"><span>Your Notes</span></h3>
+                <p class="inline" data-toggle="modal" data-target="#modal-save-favorite">
+                    (<a href="#favorite-editor">edit</a>)
+                     <i class="fa fa-pencil gray pointer"></i>
+                </p>
+                <p id="sidebar-notes-text">
+                    {{ favorite_form.instance.notes|default:"(none)" }}
+                </p>
+            </div>
+        </div>
+
+        {# Show cases that cite this case #}
+        {% if citing_clusters.result.numFound > 0 %}
+            <div id="cited-by" class="sidebar-section">
+                <h3><span>Cited By ({{ citing_clusters.result.numFound }})</span></h3>
+                <p class="bottom">This case has been cited by these opinions:</p>
+                <ul>
+                    {% for citing_cluster in citing_clusters %}
+                        <li>
+                            <a href="{{ citing_cluster.absolute_url }}?{{ request.META.QUERY_STRING }}">{{ citing_cluster.caseName|safe|truncatewords:12|v_wrapper }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <h4>
+                    <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+                       class="btn btn-default">
+                        View All Citing Opinions
+                    </a>
+                </h4>
+            </div>
+        {% endif %}
+
+        {# Show cases this case cites #}
+        {% if top_authorities %}
+            <div id="authorities" class="sidebar-section">
+                <h3><span>Authorities ({{ cluster.authority_count }})</span></h3>
+                <p class="bottom">This opinion cites:</p>
+                <ul>
+                    {% for authority in top_authorities %}
+                        <li>
+                            <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                {{ authority.caption|safe|truncatewords:10|v_wrapper }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <h4>
+                    <a href="{% url "view_authorities" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
+                       class="btn btn-default">
+                        View All Authorities
+                    </a>
+                </h4>
+            </div>
+        {% endif %}
+
+        {# Visualizations #}
+        {% if cluster.top_visualizations %}
+            <div id="visualizations" class="sidebar-section">
+                <h3><span>Visualizations</span></h3>
+                <ul>
+                    {% for viz in cluster.top_visualizations|slice:":5" %}
+                        <li>
+                            <a href="{{ viz.get_absolute_url }}">
+                                {{ viz.title|truncatewords:10 }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <h4>
+                    <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
+                       class="btn btn-default">
+                        View Full List
+                    </a>
+                    <a href="{% url "new_visualization" %}"
+                       class="btn btn-success">
+                        <i class="fa fa-plus"></i>&nbsp;New Network</a>
+                </h4>
+            </div>
+        {% endif %}
+
+        {# Download original? #}
+        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+            {% if sub_opinion.download_url or sub_opinion.local_path %}
+                <div class="sidebar-section">
+                    {% if sub_opinion.source != 'R' and sub_opinion.source != 'L' and sub_opinion.source != 'LR' %}
+                        <h3><span>Original {{sub_opinion.get_type_display}}</span></h3>
+                        <p>
+                            {% if sub_opinion.download_url and sub_opinion.source != 'R' %}
+                                <a href="{{sub_opinion.download_url}}" class="visitable">From the court</a>
+                            {% endif %}
+                            {% if sub_opinion.download_url and sub_opinion.source != 'R' and sub_opinion.local_path %}
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+                            {% endif %}
+                            {% if sub_opinion.local_path %}
+                                <a href="/{{sub_opinion.local_path}}" class="visitable">Our backup</a>
+                            {% endif %}
+                        </p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        {% include "includes/social_links.html" %}
+        {% include "includes/donate_sidebar.html" with referrer="ad-o" %}
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <article class="col-sm-9">
+        <i id="favorites-star"
+           class="{% if favorite_form.instance.cluster_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
+           data-toggle="modal"
+           data-target="#modal-save-favorite, #modal-logged-out"
+           title="Save this record as a favorite in your profile"></i>
+        <h2 class="inline">{{ cluster.caption|safe|v_wrapper }}</h2>
+        {% include "includes/favorites_modal.html" %}
+
+        <h3>{{ cluster.docket.court }}</h3>
+        <p class="bottom">
+            <span class="meta-data-header">Filed:</span>
+            <span class="meta-data-value">
+                {{cluster.date_filed|date:"F jS, Y"}}
+            </span>
+        </p>
+        <p class="bottom">
+            <span class="meta-data-header">Precedential Status:</span>
+            <span class="meta-data-value">
+                {{cluster.get_precedential_status_display|default:'Unknown'}}
+            </span>
+        </p>
+        <p class="bottom">
+            <span class="meta-data-header">Citations:</span>
+            <span class="meta-data-value">
+                {{ cluster.citation_string|default:"None known" }}
+            </span>
+        </p>
+        <p class="bottom">
+            <span class="meta-data-header">Docket Number:</span>
+            <span class="meta-data-value">
+                {{ cluster.docket.docket_number|default:"Unknown" }}
+            </span>
+        </p>
+        {% if cluster.docket.court_id == 'scotus' %}
+        <p class="bottom">
+            <span class="meta-data-header">Supreme Court Database ID:</span>
+            <span class="meta-data-value">
+                {% if cluster.scdb_id %}
+                    <a href="http://supremecourtdatabase.org/analysisCaseDetail.php?cid={{ cluster.scdb_id }}" target="_blank">
+                    {{ cluster.scdb_id }}
+                    </a><i class="gray fa fa-external-link"></i>
+                {% else %}
+                    Unknown
+                {% endif %}
+            </span>
+        </p>
+        {% endif %}
+        <p class="bottom">
+            <span class="meta-data-header">Judges:</span>
+            <span class="meta-data-value">
+                {{ cluster.judges|default:"Unknown" }}
+            </span>
+        </p>
+        <p class="bottom">
+            <span class="meta-data-header">Nature of suit:</span>
+            <span class="meta-data-value">
+                {{ cluster.nature_of_suit|default:"Unknown" }}
+            </span>
+        </p>
+        <br>
+
+        {# Only display tabs and make panels if more than one sub-opinion. #}
+        {% with opinion_count=cluster.sub_opinions.all.count %}
+            {% if opinion_count > 1 %}
+                <ul class="nav nav-tabs v-offset-below-3" role="tablist">
+                    {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                        <li role="presentation" {% if forloop.first %}class="active"{% endif %}>
+                            <a href="#{{ sub_opinion.type }}{{ forloop.counter }}"
+                               aria-controls="{{ sub_opinion.type }}{{ forloop.counter }}"
+                               role="tab"
+                               data-toggle="tab">{{ sub_opinion.get_type_display }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            <div class="tab-content">
+                {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                    <div {% if opinion_count > 1 %}
+                            role="tabpanel"
+                            class="tab-pane {% if forloop.first %}active{% endif %}"
+                        {% endif %}
+                            id="{{ sub_opinion.type }}{{ forloop.counter }}">
+
+                        {% if sub_opinion.extracted_by_ocr %}
+                            <div class="col-sm-12 alert-warning alert">
+                                <p class="bottom">The text of this document was
+                                    obtained by analyzing a scanned document
+                                    provided by the court. As a result it may have
+                                    typos, and you may prefer <a
+                                            href="{{ sub_opinion.download_url }}"
+                                            class="visitable">reading the
+                                        original</a>.
+                                </p>
+                            </div>
+                            <div class="clearfix"></div>
+                        {% endif %}
+                        {% if 'Z' in cluster.source %}
+                        <div id="columbia-text">
+                        {% elif 'L' in cluster.source %}
+                        <div id='lawbox-text'>
+                        {% elif 'R' in cluster.source %}
+                        <div id='resource-org-text'>
+                        {% else %}
+                        <div id='default-text'>
+                        {% endif %}
+                            <div id="opinion-content"> {# used by Zotero, Juris-M #}
+                                {% if sub_opinion.html_with_citations %}
+                                    {{ sub_opinion.html_with_citations|safe }}
+                                {% elif sub_opinion.html_columbia %}
+                                    {{ sub_opinion.html_columbia|safe }}
+                                {% elif sub_opinion.html_lawbox %}
+                                    {{ sub_opinion.html_lawbox|safe }}
+                                {% elif sub_opinion.html %}
+                                    {{sub_opinion.html|safe}}
+                                {% else %}
+                                    <pre>{{sub_opinion.plain_text}}</pre>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endwith %}
+    </article>
+{% endblock %}

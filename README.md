@@ -1,6 +1,6 @@
 The majority of the code is in the "alert" directory.
 
-See INSTALL.txt for first steps of installation.
+See INSTALL.md for first steps of installation.
 
 If you want to get involved send us an email with your contact info or take a look through the [issues list][issues] or our [help wanted board][trel].
 

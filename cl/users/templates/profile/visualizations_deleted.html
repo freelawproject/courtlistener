@@ -1,0 +1,73 @@
+{% extends "profile/nav.html" %}
+{% load humanize %}
+{% block title %}Visualizations – CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+
+{% block nav-visualizations %}active{% endblock %}
+
+{% block footer-scripts %}
+    <script src="{{ STATIC_URL }}js/visualization_tools.js"></script>
+    {% if DEBUG %}
+        <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
+    {% else %}
+        <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="col-xs-12">
+        {% if results.paginator.count > 0 %}
+            <div class="alert alert-warning" role="alert">
+                <p class="bottom"><i
+                        class="fa fa-exclamation-triangle"></i>&nbsp;Items in
+                    the trash are deleted after 30 days.</p>
+            </div>
+            <div class="table-responsive">
+                <table class="table settings-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Count</th>
+                            <th>Deleted</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for viz in results.object_list %}
+                        <tr>
+                            <td>{{ viz.pk }}</td>
+                            <td>
+                                <a href="{{ viz.get_absolute_url }}">{{ viz.title }}</a>
+                            </td>
+                            <td>{{ viz.clusters__count }} Cases</td>
+                            <td>{{ viz.date_deleted|date:"n/j/Y" }}</td>
+                            <td class="right">
+                                <a href="{% url "restore_visualization" %}"
+                                   class="btn btn-success btn-xs restore-button"
+                                   data-id="{{ viz.pk }}"
+                                   data-toggle="tooltip" data-placement="top"
+                                   title="Make Active">
+                                    <i class="fa fa-trash-o"></i>&nbsp;Restore</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="row">
+                <div class="col-sm-3"></div>
+                <div class="col-sm-6">
+                    <h3>You Don't Have Any Visualizations in the Trash</h3>
+
+                    <p>Visualizations in the trash are automatically deleted after 30 days.
+                    </p>
+                </div>
+                <div class="col-sm-3"></div>
+            </div>
+        {% endif %}
+        {% include "includes/pagination.html" %}
+    </div>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "profile/nav.html" %}
+{% load humanize %}
+{% block title %}Visualizations – CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+
+{% block nav-visualizations %}active{% endblock %}
+
+{% block footer-scripts %}
+    <script src="{{ STATIC_URL }}js/visualization_tools.js"></script>
+    {% if DEBUG %}
+        <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
+    {% else %}
+        <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="col-xs-12">
+        {% if results.paginator.count > 0 %}
+            <div class="table-responsive">
+                <table class="table settings-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Count</th>
+                            <th>Created</th>
+                            <th>Last Viewed</th>
+                            <th>View&nbsp;Count</th>
+                            <th>Shared</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for viz in results.object_list %}
+                        <tr>
+                            <td>{{ viz.pk }}</td>
+                            <td>
+                                <a href="{{ viz.get_absolute_url }}">{{ viz.title }}</a>
+                            </td>
+                            <td>{{ viz.clusters__count }} Cases</td>
+                            <td>{{ viz.date_created|date:"n/j/Y" }}</td>
+                            <td>{{ viz.date_modified|date:"n/j/Y" }}</td>
+                            <td>{{ viz.view_count|intcomma }}</td>
+                            <td><strong>{{ viz.published|yesno|capfirst }}</strong></td>
+                            <td class="right">
+                                <a href="{% url "edit_visualization" pk=viz.pk %}"
+                                   class="btn btn-primary btn-xs">
+                                    <i class="fa fa-pencil"></i>&nbsp;Edit</a>
+                                <a href="{% url "delete_visualization" %}"
+                                   class="btn btn-danger btn-xs trash-button"
+                                   data-id="{{ viz.pk }}"
+                                   data-toggle="tooltip" data-placement="top"
+                                   title="Move to trash">
+                                    <i class="fa fa-trash-o"></i>&nbsp;Trash</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="row">
+                <div class="col-sm-3"></div>
+                <div class="col-sm-6">
+                    <h3>You Don't Have Any Visualizations</h3>
+
+                    <p>Visualizations are a way to plot the citations between Supreme Court cases. With visualizations, you can make lots of inferences about cases, like how precedent evolved from one case to another or how a topic may have become more liberal or conservative over time.
+                    </p>
+                    <p><a href="{% url "new_visualization" %}" class="btn btn-primary btn-lg">Make a Visualization</a>
+                    </p>
+                </div>
+                <div class="col-sm-3"></div>
+            </div>
+        {% endif %}
+        {% include "includes/pagination.html" %}
+    </div>
+{% endblock %}

@@ -1,0 +1,25 @@
+[
+  {
+    "fields": {
+      "date_blocked": null,
+      "judges": "",
+      "sha1": "de8cff186eb263dc06bdc5340860eb6809f898d3",
+      "local_path_original_file": "mp3/2014/06/09/ander_v._leo.mp3",
+      "date_modified": "2015-07-28T00:36:13.094Z",
+      "case_name_full": "Ander v Leo (Full Name)",
+      "processing_complete": true,
+      "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.15-1442.15-1442_07_08_2015.mp3",
+      "case_name": "Ander v. Leo",
+      "source": "C",
+      "local_path_mp3": "mp3/2014/06/09/ander_v._leo.mp3",
+      "duration": 15,
+      "date_created": "2015-08-08T01:24:26.633Z",
+      "case_name_short": "Ander v Leo (Short Name)",
+      "panel": [],
+      "docket": 10,
+      "blocked": false
+    },
+    "model": "audio.audio",
+    "pk": 10
+  }
+]

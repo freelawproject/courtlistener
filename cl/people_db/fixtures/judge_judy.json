@@ -1,0 +1,311 @@
+[
+  {
+    "fields": {
+      "gender": "m",
+      "name_first": "Bill",
+      "name_last": "Clinton",
+      "date_modified": "2016-03-12T01:40:19.324Z",
+      "date_dod": null,
+      "date_dob": null,
+      "date_granularity_dob": "",
+      "name_suffix": "",
+      "date_granularity_dod": "",
+      "name_middle": "",
+      "race": [
+        1
+      ],
+      "dod_city": "",
+      "dod_state": "",
+      "dob_city": "",
+      "is_alias_of": null,
+      "date_created": "2016-03-12T01:40:19.324Z",
+      "fjc_id": null,
+      "dob_state": "",
+      "slug": "bill-clinton"
+    },
+    "model": "people_db.person",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "gender": "f",
+      "name_first": "Judith",
+      "name_last": "Sheindlin",
+      "date_modified": "2016-03-12T01:43:11.047Z",
+      "date_dod": null,
+      "date_dob": "1942-10-21",
+      "date_granularity_dob": "%Y-%m-%d",
+      "name_suffix": "",
+      "date_granularity_dod": "",
+      "name_middle": "Susan",
+      "race": [
+        1,
+        2
+      ],
+      "dod_city": "",
+      "dod_state": "",
+      "dob_city": "Brookyln",
+      "is_alias_of": null,
+      "date_created": "2016-03-12T01:41:56.580Z",
+      "fjc_id": null,
+      "dob_state": "NY",
+      "slug": "judith-susan-sheindlin"
+    },
+    "model": "people_db.person",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "supervisor": null,
+      "date_referred_to_judicial_committee": null,
+      "votes_no": null,
+      "date_granularity_start": "%Y-%m-%d",
+      "date_hearing": null,
+      "court": null,
+      "date_termination": null,
+      "votes_yes": null,
+      "date_start": "1993-01-20",
+      "organization_name": "",
+      "date_retirement": "2001-01-20",
+      "date_elected": null,
+      "job_title": "",
+      "predecessor": null,
+      "termination_reason": "retire_mand",
+      "appointer": null,
+      "judicial_committee_action": "",
+      "date_granularity_termination": "",
+      "date_confirmation": null,
+      "school": null,
+      "date_judicial_committee_action": null,
+      "date_modified": "2016-03-12T01:40:19.331Z",
+      "position_type": "pres",
+      "voice_vote": null,
+      "person": 1,
+      "how_selected": "e_part",
+      "date_created": "2016-03-12T01:40:19.331Z",
+      "date_nominated": null,
+      "nomination_process": "",
+      "date_recess_appointment": null
+    },
+    "model": "people_db.position",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "supervisor": null,
+      "date_referred_to_judicial_committee": null,
+      "votes_no": null,
+      "date_granularity_start": "%Y-%m-%d",
+      "date_hearing": null,
+      "court": "ca1",
+      "date_termination": null,
+      "votes_yes": null,
+      "date_start": "2015-12-14",
+      "organization_name": "",
+      "date_retirement": null,
+      "date_elected": null,
+      "job_title": "",
+      "predecessor": 2,
+      "termination_reason": "",
+      "appointer": 1,
+      "judicial_committee_action": "no_rep",
+      "date_granularity_termination": "",
+      "date_confirmation": null,
+      "school": null,
+      "date_judicial_committee_action": null,
+      "date_modified": "2016-03-12T01:43:11.055Z",
+      "position_type": "c-jud",
+      "voice_vote": null,
+      "person": 2,
+      "how_selected": "e_part",
+      "date_created": "2016-03-12T01:41:56.602Z",
+      "date_nominated": null,
+      "nomination_process": "fed_senate",
+      "date_recess_appointment": null
+    },
+    "model": "people_db.position",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "supervisor": null,
+      "date_referred_to_judicial_committee": null,
+      "votes_no": null,
+      "date_granularity_start": "%Y-%m-%d",
+      "date_hearing": null,
+      "court": null,
+      "date_termination": null,
+      "votes_yes": null,
+      "date_start": "2015-12-14",
+      "organization_name": "Pants, Inc.",
+      "date_retirement": null,
+      "date_elected": null,
+      "job_title": "Corporate Lawyer",
+      "predecessor": null,
+      "termination_reason": "",
+      "appointer": null,
+      "judicial_committee_action": "",
+      "date_granularity_termination": "",
+      "date_confirmation": null,
+      "school": null,
+      "date_judicial_committee_action": null,
+      "date_modified": "2016-03-12T01:41:56.605Z",
+      "position_type": "prac",
+      "voice_vote": null,
+      "person": 2,
+      "how_selected": "",
+      "date_created": "2016-03-12T01:41:56.605Z",
+      "date_nominated": null,
+      "nomination_process": "",
+      "date_recess_appointment": null
+    },
+    "model": "people_db.position",
+    "pk": 3
+  },
+  {
+    "fields": {
+      "date_retention": "2015-12-14",
+      "unopposed": true,
+      "date_modified": "2016-03-12T01:44:24.060Z",
+      "votes_yes": 44,
+      "retention_type": "reapp_gov",
+      "votes_no": 2,
+      "won": true,
+      "date_created": "2016-03-12T01:44:24.060Z",
+      "position": 2
+    },
+    "model": "people_db.retentionevent",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "is_alias_of": null,
+      "date_created": "2010-06-08T00:00:00Z",
+      "ein": 135645885,
+      "name": "New York Law School",
+      "date_modified": "2010-06-08T00:00:00Z"
+    },
+    "model": "people_db.school",
+    "pk": 3938
+  },
+  {
+    "fields": {
+      "is_alias_of": null,
+      "date_created": "2010-06-08T00:00:00Z",
+      "ein": 530196549,
+      "name": "American University",
+      "date_modified": "2010-06-08T00:00:00Z"
+    },
+    "model": "people_db.school",
+    "pk": 6041
+  },
+  {
+    "fields": {
+      "school": 3938,
+      "degree": "",
+      "date_modified": "2016-03-12T01:41:56.606Z",
+      "degree_level": "jd",
+      "person": 2,
+      "degree_year": 1965,
+      "date_created": "2016-03-12T01:41:56.606Z"
+    },
+    "model": "people_db.education",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "school": 6041,
+      "degree": "",
+      "date_modified": "2016-03-12T01:41:56.608Z",
+      "degree_level": "ba",
+      "person": 2,
+      "degree_year": null,
+      "date_created": "2016-03-12T01:41:56.608Z"
+    },
+    "model": "people_db.education",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "race": "w"
+    },
+    "model": "people_db.race",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "race": "b"
+    },
+    "model": "people_db.race",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "date_modified": "2016-03-12T01:40:19.336Z",
+      "political_party": "d",
+      "source": "b",
+      "date_end": null,
+      "date_start": "1993-01-01",
+      "person": 1,
+      "date_granularity_end": "",
+      "date_created": "2016-03-12T01:40:19.336Z",
+      "date_granularity_start": "%Y"
+    },
+    "model": "people_db.politicalaffiliation",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_modified": "2016-03-12T01:41:56.609Z",
+      "political_party": "d",
+      "source": "b",
+      "date_end": null,
+      "date_start": "2015-12-14",
+      "person": 2,
+      "date_granularity_end": "",
+      "date_created": "2016-03-12T01:41:56.609Z",
+      "date_granularity_start": "%Y-%m-%d"
+    },
+    "model": "people_db.politicalaffiliation",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "date_modified": "2016-03-12T01:41:56.610Z",
+      "political_party": "d",
+      "source": "b",
+      "date_end": null,
+      "date_start": "2015-12-14",
+      "person": 2,
+      "date_granularity_end": "",
+      "date_created": "2016-03-12T01:41:56.610Z",
+      "date_granularity_start": "%Y-%m-%d"
+    },
+    "model": "people_db.politicalaffiliation",
+    "pk": 3
+  },
+  {
+    "fields": {
+      "date_modified": "2015-12-16T01:41:56.612Z",
+      "url": "",
+      "notes": "This is a test.",
+      "date_accessed": "2015-12-15",
+      "person": 2,
+      "date_created": "2015-12-16T01:41:56.612Z"
+    },
+    "model": "people_db.source",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "rating": "nq",
+      "date_modified": "2016-03-12T01:41:56.613Z",
+      "person": 2,
+      "date_granularity_rated": "%Y-%m-%d",
+      "date_created": "2016-03-12T01:41:56.613Z",
+      "date_rated": "2015-12-14"
+    },
+    "model": "people_db.abarating",
+    "pk": 1
+  }
+]

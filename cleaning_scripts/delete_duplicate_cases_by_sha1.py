@@ -8,7 +8,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert.search.models import Document, Court
 from optparse import OptionParser
-from search.tasks import delete_item
+from search.tasks import delete_items
 
 # A list of bad cases, found with the following query
 # select
@@ -1978,7 +1978,7 @@ def fixer(simulate=False, verbose=False):
             id = int(id.strip())
             print "Deleting %s from index." % id
             if not simulate:
-                delete_item.delay(id, settings.SOLR_OPINION_URL)
+                delete_items.delay([id], settings.SOLR_OPINION_URL)
 
 
 def main():

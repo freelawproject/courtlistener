@@ -1,0 +1,409 @@
+{
+  "meta": {
+    "donate": "Please consider donating to support more projects from Free Law Project", 
+    "version": 1.0
+  }, 
+  "opinion_clusters": [
+    {
+      "absolute_url": "/opinion/2674862/town-of-greece-v-galloway/", 
+      "case_name": "Town of Greece v. Galloway", 
+      "case_name_short": "Town/Greece", 
+      "citation_count": 0, 
+      "date_filed": "2014-05-05T00:00:00", 
+      "decision_direction": "-1", 
+      "id": 2674862, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            112331, 
+            111014, 
+            112646, 
+            118377, 
+            112779, 
+            121168, 
+            142900, 
+            799990, 
+            111113, 
+            136984, 
+            799993
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "-1", 
+      "votes_minority": "-1"
+    }, 
+    {
+      "absolute_url": "/opinion/111014/marsh-v-chambers/", 
+      "case_name": "Marsh v. Chambers", 
+      "case_name_short": "Marsh", 
+      "citation_count": 14, 
+      "date_filed": "1983-07-05T00:00:00", 
+      "decision_direction": "1", 
+      "id": 111014, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "6", 
+      "votes_minority": "3"
+    }, 
+    {
+      "absolute_url": "/opinion/112646/harmelin-v-michigan/", 
+      "case_name": "Harmelin v. Michigan", 
+      "case_name_short": "Harmelin", 
+      "citation_count": 2, 
+      "date_filed": "1991-06-27T00:00:00", 
+      "decision_direction": "1", 
+      "id": 112646, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            111014
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "5", 
+      "votes_minority": "4"
+    }, 
+    {
+      "absolute_url": "/opinion/111113/lynch-v-donnelly/", 
+      "case_name": "Lynch v. Donnelly", 
+      "case_name_short": "Lynch", 
+      "citation_count": 13, 
+      "date_filed": "1984-03-05T00:00:00", 
+      "decision_direction": "1", 
+      "id": 111113, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            111014
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "5", 
+      "votes_minority": "4"
+    }, 
+    {
+      "absolute_url": "/opinion/118377/santa-fe-independent-school-dist-v-doe/", 
+      "case_name": "Santa Fe Independent School Dist. v. Doe", 
+      "case_name_short": "Doe", 
+      "citation_count": 4, 
+      "date_filed": "2000-06-19T00:00:00", 
+      "decision_direction": "2", 
+      "id": 118377, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            111014, 
+            111464, 
+            111113, 
+            112874, 
+            112779, 
+            117967
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "6", 
+      "votes_minority": "3"
+    }, 
+    {
+      "absolute_url": "/opinion/111464/wallace-v-jaffree/", 
+      "case_name": "WALLACE, GOVERNOR OF ALABAMA, et al. v. JAFFREE et al.", 
+      "case_name_short": "Wallace", 
+      "citation_count": 12, 
+      "date_filed": "1985-06-04T00:00:00", 
+      "decision_direction": "2", 
+      "id": 111464, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            111113, 
+            111014
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "6", 
+      "votes_minority": "3"
+    }, 
+    {
+      "absolute_url": "/opinion/112331/allegheny-county-v-greater-pittsburgh-aclu/", 
+      "case_name": "Allegheny County v. Greater Pittsburgh ACLU", 
+      "case_name_short": "Allegheny County", 
+      "citation_count": 7, 
+      "date_filed": "1989-07-03T00:00:00", 
+      "decision_direction": "2", 
+      "id": 112331, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            111464, 
+            111113, 
+            111924, 
+            111014, 
+            111505
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "5", 
+      "votes_minority": "4"
+    }, 
+    {
+      "absolute_url": "/opinion/112779/lee-v-weisman/", 
+      "case_name": "Lee v. Weisman", 
+      "case_name_short": "Lee", 
+      "citation_count": 9, 
+      "date_filed": "1992-06-24T00:00:00", 
+      "decision_direction": "2", 
+      "id": 112779, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            111014, 
+            111464, 
+            111113, 
+            112331, 
+            111505, 
+            111924
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "5", 
+      "votes_minority": "4"
+    }, 
+    {
+      "absolute_url": "/opinion/112874/lambs-chapel-v-center-moriches-union-free-school-d/", 
+      "case_name": "LAMB'S CHAPEL AND JOHN STEIGERWALD v. CENTER MORICHES UNION FREE SCHOOL DISTRICT et al.", 
+      "case_name_short": "Lamb's Chapel", 
+      "citation_count": 4, 
+      "date_filed": "1993-06-07T00:00:00", 
+      "decision_direction": "2", 
+      "id": 112874, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            112331, 
+            111014, 
+            111464, 
+            111113, 
+            112779, 
+            111505
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "9", 
+      "votes_minority": "0"
+    }, 
+    {
+      "absolute_url": "/opinion/117967/rosenberger-v-rector-and-visitors-of-univ-of-va/", 
+      "case_name": "RONALD W. ROSENBERGER, et al. v. RECTOR AND VISITORS OF THE UNIVERSITY OF VIRGINIA et al.", 
+      "case_name_short": "Rosenberger", 
+      "citation_count": 6, 
+      "date_filed": "1995-06-29T00:00:00", 
+      "decision_direction": "1", 
+      "id": 117967, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            112331, 
+            111014, 
+            111464, 
+            111113, 
+            112874, 
+            112779, 
+            111505
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "5", 
+      "votes_minority": "4"
+    }, 
+    {
+      "absolute_url": "/opinion/111505/school-dist-of-grand-rapids-v-ball/", 
+      "case_name": "SCHOOL DISTRICT OF THE CITY OF GRAND RAPIDS et al. v. BALL et al.", 
+      "case_name_short": "Ball", 
+      "citation_count": 7, 
+      "date_filed": "1985-07-01T00:00:00", 
+      "decision_direction": "2", 
+      "id": 111505, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            111464, 
+            111113, 
+            111014
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "5", 
+      "votes_minority": "4"
+    }, 
+    {
+      "absolute_url": "/opinion/121168/zelman-v-simmons-harris/", 
+      "case_name": "SUSAN TAVE ZELMAN, SUPERINTENDENT OF PUBLIC INSTRUCTION OF OHIO, et al. v. DORIS SIMMONS-HARRIS et al.", 
+      "case_name_short": "Zelman", 
+      "citation_count": 5, 
+      "date_filed": "2002-06-27T00:00:00", 
+      "decision_direction": "1", 
+      "id": 121168, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            111464, 
+            111113, 
+            112779, 
+            117967, 
+            111505, 
+            111924
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "5", 
+      "votes_minority": "4"
+    }, 
+    {
+      "absolute_url": "/opinion/111924/edwards-v-aguillard/", 
+      "case_name": "EDWARDS, GOVERNOR OF LOUISIANA, et al. v. AGUILLARD et al.", 
+      "case_name_short": "Aguillard", 
+      "citation_count": 5, 
+      "date_filed": "1987-06-19T00:00:00", 
+      "decision_direction": "2", 
+      "id": 111924, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            111464, 
+            111113, 
+            111014, 
+            111505
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "7", 
+      "votes_minority": "2"
+    }, 
+    {
+      "absolute_url": "/opinion/799993/mccreary-county-v-american-civil-liberties-union-o/", 
+      "case_name": "McCreary County v. American Civil Liberties Union of Ky.", 
+      "case_name_short": "McCreary", 
+      "citation_count": 1, 
+      "date_filed": "2005-06-27T00:00:00", 
+      "decision_direction": "2", 
+      "id": 799993, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            112331, 
+            111014, 
+            111464, 
+            111113, 
+            112874, 
+            112779, 
+            117967, 
+            121168, 
+            111924, 
+            118377, 
+            142900
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "5", 
+      "votes_minority": "4"
+    }, 
+    {
+      "absolute_url": "/opinion/142900/cutter-v-wilkinson/", 
+      "case_name": "JON B. CUTTER, et al. v. REGINALD WILKINSON, DIRECTOR, OHIO DEPARTMENT OF REHABILITATION AND CORRECTION, et al.", 
+      "case_name_short": "Cutter", 
+      "citation_count": 3, 
+      "date_filed": "2005-05-31T00:00:00", 
+      "decision_direction": "2", 
+      "id": 142900, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            121168, 
+            136984, 
+            111464, 
+            112779, 
+            117967
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "9", 
+      "votes_minority": "0"
+    }, 
+    {
+      "absolute_url": "/opinion/136984/elk-grove-unified-school-dist-v-newdow/", 
+      "case_name": "Elk Grove Unified School Dist. v. Newdow", 
+      "case_name_short": "Newdow", 
+      "citation_count": 3, 
+      "date_filed": "2004-06-14T00:00:00", 
+      "decision_direction": "1", 
+      "id": 136984, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            112331, 
+            111014, 
+            111464, 
+            111113, 
+            112874, 
+            112779, 
+            117967, 
+            121168, 
+            118377
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "8", 
+      "votes_minority": "0"
+    }, 
+    {
+      "absolute_url": "/opinion/799990/van-orden-v-perry/", 
+      "case_name": "Van Orden v. Perry", 
+      "case_name_short": "Van Orden", 
+      "citation_count": 1, 
+      "date_filed": "2005-06-27T00:00:00", 
+      "decision_direction": "1", 
+      "id": 799990, 
+      "sub_opinions": [
+        {
+          "opinions_cited": [
+            112331, 
+            112646, 
+            111014, 
+            111464, 
+            111113, 
+            112779, 
+            117967, 
+            121168, 
+            111505, 
+            111924, 
+            118377, 
+            136984, 
+            142900
+          ], 
+          "type": "combined"
+        }
+      ], 
+      "votes_majority": "5", 
+      "votes_minority": "4"
+    }
+  ]
+}

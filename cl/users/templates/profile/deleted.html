@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Goodbye – CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="col-sm-3">&nbsp;</div>
+    <div class="col-sm-6">
+        <h2>We Are Sorry to See You Go</h2>
+        <p>Thank you for your time with our site, and goodbye for now. While we
+        are concerned with every user that we lose, we do hope you have found
+        something else to suit your needs.</p>
+
+        <p>If you haven't had a chance to tell us about your experience, please
+        do so at your earliest convenience via our <a href="{% url "contact" %}">contact
+        form</a>. This will allow us to improve the system.</p>
+
+        <p>Goodbye one last time, and fare thee well,</p>
+        <p><em>~~The CourtListener Team~~</em></p>
+    </div>
+    <div class="col-sm-3">&nbsp;</div>
+{% endblock %}
+

@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% load text_filters %}
+{% load admin_urls %}
+
+{% block title %}Oral Argument for {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}Oral Argument for {{ title }} – CourtListener.com{% endblock %}
+{% block description %}Oral Argument for {{ title }}{% endblock %}
+{% block og_description %}Oral Argument for {{ title }}{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block head %}
+    <meta property="og:audio:url"
+          content="https://www.courtlistener.com/{{ af.local_path_mp3 }}">
+    <meta property="og:audio:secure_url" content="https://www.courtlistener.com/{{ af.local_path_mp3 }}">
+    <meta property="og:audio:type" content="audio/mp3">
+
+    <link type="text/css" href="{{ STATIC_URL }}skin/jplayer.blue.monday.css"
+          rel="stylesheet"/>
+{% endblock %}
+
+{% block footer-scripts %}
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/save-favorites.js"></script>
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/jquery.jplayer.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $("#jquery_jplayer_1").jPlayer({
+                ready: function (event) {
+                    $(this).jPlayer("setMedia", {
+                        title: "{{ af|best_case_name }}",
+                        mp3: "/{{ af.local_path_mp3 }}"
+                    });
+                },
+                swfPath: "{{ STATIC_URL }}swf/Jplayer.swf"
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+        <div class="sidebar-section">
+            <h4>
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="/?{{ request.META.QUERY_STRING }}">Back to
+                    {% if get_string %}Search Results{% else %}Home
+                        Page{% endif %}</a>
+            </h4>
+        </div>
+
+
+        {# show the admin tools if applicable #}
+        {% if perms.search.change_docket or perms.audio.change_audio %}
+            <div class="sidebar-section">
+                <h3><span>Admin</span></h3>
+                <p>
+                    {% if perms.search.change_docket %}
+                        <a href="{% url 'admin:search_docket_change' af.docket.pk %}"
+                           class="btn btn-primary btn-xs">Docket</a>
+                    {% endif %}
+                    {% if perms.audio.change_audio %}
+                        <a href="{% url 'admin:audio_audio_change' af.pk%}"
+                           class="btn btn-primary btn-xs">Audio File</a>
+                    {% endif %}
+                    {% if request.user.is_superuser %}
+                      {% if private %}
+                      <div class="btn btn-danger btn-xs">Blocked from Search Engines</div>
+                      {% endif %}
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+
+        {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
+        <div class="{% if not favorite_form.instance.audio_id %}hidden{% endif %} sidebar-section"
+             id="sidebar-notes">
+            <div>
+                <h3 class="inline"><span>Your Notes</span></h3>
+
+                <p class="inline" data-toggle="modal"
+                   data-target="#modal-save-favorite">
+                    (<a href="#favorite-editor">edit</a>)
+                    <i class="fa fa-pencil gray pointer"></i>
+                </p>
+
+                <p id="sidebar-notes-text">
+                    {{ favorite_form.instance.notes|default:"(none)" }}
+                </p>
+            </div>
+        </div>
+
+        {# Download original? #}
+        {% if af.download_url or af.local_path_mp3 %}
+            <div class="sidebar-section">
+                <h3><span>Download</span></h3>
+                <p>
+                    {% if af.download_url %}
+                        <a href="{{ af.download_url }}" class="visitable">Original</a>
+                    {% endif %}
+                    {% if af.download_url and af.local_path_mp3 %}
+                        &nbsp;&nbsp;|&nbsp;&nbsp;
+                    {% endif %}
+                    {% if af.local_path_mp3 %}
+                        <a href="/{{ af.local_path_mp3 }}" class="visitable">Our Version</a>
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+
+        {% include "includes/social_links.html" %}
+        {% include "includes/donate_sidebar.html" with referrer="ad-oa" %}
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <article class="col-sm-9">
+        <i id="favorites-star"
+           class="{% if favorite_form.instance.audio_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
+           data-toggle="modal"
+           data-target="#modal-save-favorite, #modal-logged-out"
+           title="{% if favorite_form.instance.audio_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
+
+        <h2 class="inline">{{ af|best_case_name|safe|v_wrapper }}</h2>
+        {% include "includes/favorites_modal.html" %}
+
+        <h3>{{ af.docket.court }}</h3>
+
+        <p class="bottom">
+            <span class="meta-data-header">Date Argued:</span>
+            <span class="meta-data-value">
+                {% if af.docket.date_argued %}
+                    {{ af.docket.date_argued|date:"F jS, Y" }}
+                {% else %}
+                    Unknown Date
+                {% endif %}
+            </span>
+        </p>
+
+        {% if af.processing_complete %}
+        <p class="bottom">
+            <span class="meta-data-header">Duration:</span>
+            <span class="meta-data-value">{{ af.duration|naturalduration }}</span>
+        </p>
+        {% endif %}
+
+        <p class="bottom">
+            {% if af.docket.docket_number %}
+                <span class="meta-data-header">Docket Number: </span>
+                <span class="meta-data-value">{{ af.docket.docket_number }}</span>
+            {% endif %}
+        </p>
+
+        <p class="bottom">
+            {% if af.judges %}
+                <span class="meta-data-header">Judges:</span>
+                <span class="meta-data-value">{{ af.judges }}</span>
+            {% endif %}
+        </p>
+
+        <p>
+            <span class="meta-data-header"
+                  title="SHA1 Hash of the binary or text">Fingerprint:</span>
+            <span class="meta-data-value">{{ af.sha1 }}</span>
+        </p>
+        <br>
+        {% if not af.processing_complete %}
+            <div class="col-xs-12 alert alert-warning">
+                <p class="bottom">This file has not yet completed processing on
+                    our server. Please try again in a few moments or if you
+                    prefer not to wait you may download the audio <a
+                            href="{{ af.download_url }}">directly from the
+                        court website</a>. Generally this process takes about
+                    thirty minutes.
+                </p>
+            </div>
+        {% else %}
+            <div id="jquery_jplayer_1" class="jp-jplayer"></div>
+            <div id="jp_container_1" class="jp-audio">
+                <div class="jp-type-single">
+                    <div class="jp-gui jp-interface">
+                        <ul class="jp-controls">
+                            <li><a href="javascript:;"
+                                   class="jp-play">play</a></li>
+                            <li><a href="javascript:;"
+                                   class="jp-pause">pause</a></li>
+                            <li><a href="javascript:;"
+                                   class="jp-stop">stop</a></li>
+                            <li><a href="javascript:;"
+                                   class="jp-mute"
+                                   title="mute">mute</a></li>
+                            <li><a href="javascript:;"
+                                   class="jp-unmute"
+                                   title="unmute">unmute</a></li>
+                            <li><a href="javascript:;"
+                                   class="jp-volume-max"
+                                   title="max volume">max volume</a>
+                            </li>
+                        </ul>
+                        <div class="jp-progress">
+                            <div class="jp-seek-bar">
+                                <div class="jp-play-bar"></div>
+                            </div>
+                        </div>
+                        <div class="jp-volume-bar">
+                            <div class="jp-volume-bar-value"></div>
+                        </div>
+                        <div class="jp-time-holder">
+                            <div class="jp-current-time"></div>
+                            <div class="jp-duration"></div>
+                            <ul class="jp-toggles">
+                                <li><a href="javascript:;"
+                                       class="jp-repeat"
+                                       title="repeat">repeat</a></li>
+                                <li><a href="javascript:;"
+                                       class="jp-repeat-off"
+                                       title="repeat off">repeat off</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="jp-details">
+                        <ul>
+                            <li><span class="jp-title"></span></li>
+                        </ul>
+                    </div>
+                    <div class="jp-no-solution">
+                        <span>Update Required</span>
+                        To play the media you will need to either update your
+                        browser to a recent version or update your <a
+                            href="http://get.adobe.com/flashplayer/"
+                            target="_blank">Flash plugin</a>.
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </article>
+{% endblock %}

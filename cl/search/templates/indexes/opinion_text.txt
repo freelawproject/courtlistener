@@ -1,0 +1,48 @@
+{# The body of the item (columbia > lawbox > html > plaintext) #}
+{% if item.html_columbia %}
+    {{ item.html_columbia|striptags }}
+{% elif item.html_lawbox %}
+    {{ item.html_lawbox|striptags }}
+{% elif item.html %}
+    {{ item.html|striptags }}
+{% else %}
+    {{ item.plain_text }}
+{% endif %}
+
+{# Docket #}
+{# Need dates so queries for the date are sure to be returned (see #271) #}
+{{ item.cluster.docket.date_argued|date:"j F Y" }}
+{{ item.cluster.docket.date_reargued|date:"j F Y" }}
+{{ item.cluster.docket.date_reargument_denied|date:"j F Y" }}
+{{ item.cluster.docket.docket_number }}
+
+{# Court #}
+{{ item.cluster.docket.court.full_name }}
+{{ item.cluster.docket.court.pk }}
+{{ item.cluster.docket.court.citation_string }}
+
+{# Cluster #}
+{% if item.cluster.case_name_full %}
+    {{ item.cluster.case_name_full }}
+{% elif item.cluster.case_name %}
+    {{ item.cluster.case_name }}
+{% else %}
+    {{ item.cluster.case_name_short }}
+{% endif %}
+{% for judge in item.cluster.panel.all %}
+    {{ judge.name_full }}
+{% endfor %}
+{{ item.cluster.judges }}
+{{ item.cluster.date_filed|date:"j F Y" }}
+{{ citation_string }}
+{{ item.cluster.procedural_history }}
+{{ item.cluster.attorneys }}
+{{ item.cluster.nature_of_suit }}
+{{ item.cluster.posture }}
+{{ item.cluster.syllabus }}
+{{ item.cluster.precedential_status }}
+
+{# Opinion #}
+{{ item.sha1 }}
+
+{# HTML fields would go here, but they must be first, since they're displayed when no query #}

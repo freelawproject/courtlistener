@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}APIs and Bulk Data – CourtListener.com{% endblock %}
+{% block description %}
+    Free legal APIs and Bulk Data from Free Law Project, a 501(c)(3)
+    nonprofit.
+{% endblock %}
+{% block og_description %}
+    Free legal APIs and Bulk Data from Free Law Project, a 501(c)(3)
+    nonprofit.
+{% endblock %}
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="col-xs-12">
+        <h2 class="text-center v-offset-below-3">CourtListener APIs and Bulk Legal Data</h2>
+        <div class="row">
+            <div class="col-md-1"></div>
+            <div class="col-xs-12 col-md-10">
+                <p>We currently have two free APIs available to developers using our
+                    platform. If you are interested in obtaining large quantities of
+                    our data, we recommend using our <a
+                            href="{% url "bulk_data_index" %}">bulk
+                        API</a>, which provides compressed JSON files of our entire
+                    collection, by jurisdiction. If you wish to query our data
+                    programatically, we recommend using our <a
+                            href="{% url "rest_docs" %}">REST APIs</a>.
+                </p>
+                <p>We also offer <a href="https://free.law/data-consulting/">custom data services</a> with hourly and project-based rates.</p>
+            </div>
+            <div class="col-md-1"></div>
+        </div>
+
+        <div class="row v-offset-below-3">
+            <div class="col-sm-4 text-center v-offset-above-3">
+                <a href="{% url "bulk_data_index" %}" class="btn btn-xl btn-primary">Check out the Bulk Data API</a>
+            </div>
+            <div class="col-sm-4 text-center v-offset-above-3">
+                <a href="{% url "rest_docs" %}" class="btn btn-xl btn-primary">Check out the REST APIs</a>
+            </div>
+            <div class="col-sm-4 text-center v-offset-above-3">
+                <a href="https://free.law/data-consulting/" class="btn btn-xl btn-success">Learn About Data Services</a>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6">
+                <h3 id="pride">We're Proud of our Data</h3>
+                <p>
+                    Over the past several years, we have made a significant investment in
+                    making our data the best on the open Web.
+                    Among the minor enhancements we make on a regular basis, we've made
+                    significant improvements to our data that you won't find in other
+                    sources:
+                </p>
+                <ol>
+                    <li>We've <a href="https://free.law/2011/05/25/updated-supreme-court-case-dates-and-the-first-release-of-early-scotus-data-in-machine-readable-form/">
+                        added exact dates from the library of congress</a> to our collection
+                        of older Supreme Court cases, enhancing thousands of cases beyond what's
+                        available anywhere else.
+                    </li>
+                    <li>When we imported the Resource.org data, we <a href="https://free.law/2011/08/25/second-series-of-federal-reporter-from-1950-to-1993-now-on-courtlistener/">
+                        manually corrected</a> more than ten thousand omissions or
+                        errors in the data, ensuring that it's complete and accurate.
+                    </li>
+                    <li>Our data has <a href="https://free.law/2012/05/11/building-a-citator-on-courtlistener/">
+                        the citation network</a>, showing which cases reference each
+                        other, saving you the effort of building and testing a citation
+                        finding and matching algorithm yourself. Currently, we're working with
+                        researchers at USC to complete an audit of the citation network, the
+                        results of which will be folded back into our corpus.
+                    </li>
+                    <li>We complete complicated cleanup routines on the data, eliminating and
+                        fixing errant abbreviations like 'et al', 'U.S.A.' and the like.
+                    </li>
+                    <li>The data on CourtListener is a combination of many partial sources such
+                        as court websites, <a href="https://public.resource.org/">Public.Resource.Org</a>,
+                        and a donation from <a href="http://lawboxapps.com">Lawbox LLC.</a>
+                        This means that we have the best parts of all of our sources.
+                    </li>
+                    <li>
+                        We help you identify opinions that should be private. Many people don't want their
+                        case on the Web and have contacted us or Resource.org. In our data
+                        we provide a field indicating which cases should be kept private. In
+                        addition, we provide research about how to keep these cases out of
+                        search engines (more detail at right).
+                    </li>
+                </ol>
+            </div>
+
+            <div class="col-sm-6">
+                <h3 id="privacy">Privacy Concerns</h3>
+                <p>As is explained in our <a href="/removal/">removal policy</a>, we
+                    have blocked public search engines from indexing many of the cases available
+                    in our data (though they remain in our search engine).
+                    As you work with this data, please be cognizant of the privacy and safety
+                    issues involved with public-facing legal documents. This impacts real people
+                    with privacy issues such as jailed informants, women avoiding stalkers,
+                    foreign citizens with rejected asylum requests, children who were named
+                    incidentally in a case about their parent's wrongdoings, etc.</p>
+
+                <p>If you intend to respect the privacy wishes of the parties involved,
+                    there is a field for each case, "<strong>blocked</strong>," which
+                    describes whether we have blocked search engines from indexing the
+                    case. The simple thing for you to do is to continue blocking
+                    such cases.</p>
+
+                <p>For our approach to blocking, please see our <a href="/removal/">removal
+                    policy</a>. For our technical approach, please see the blog entries below. If
+                    you believe Robots.txt prevents a URL from appearing in search results,
+                    please be sure to check these out (it likely does not work as you expect):
+                </p>
+                <ul>
+                    <li>
+                        <a href="https://free.law/2012/01/16/respecting-privacy-while-providing-hundreds-of-thousands-of-public-documents/">
+                            Respecting privacy while providing hundreds of thousands of public documents
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://free.law/2012/01/25/support-for-x-robots-tag-and-robots-html-meta-tag/">
+                            Support for x-robots-tag and robots HTML meta tag
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://free.law/2012/04/27/further-privacy-protections-at-courtlistener/">
+                            Further privacy protections at CourtListener
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-4">
+            <h3>Available Jurisdictions</h3>
+                <p>
+                    We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs.
+                    Details about the jurisdictions that are available can be found <a href="{% url "court_index" %}">here</a>.
+                </p>
+            </div>
+            <div class="col-sm-4">
+            <h3>Feedback and Updates</h3>
+                <p>To stay up to date about our APIs or to give us feedback, please join
+                    <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">our developer forum</a>
+                    and follow <a href="https://free.law">our blog</a>.
+                </p>
+            </div>
+            <div class="col-sm-4">
+                <h3 id="copyright">Copyright</h3>
+                <p>
+                    Our bulk data is free of known copyright restrictions.<br />
+                    <a rel="license" href="http://creativecommons.org/publicdomain/mark/1.0/">
+                        <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png" alt="Public Domain Mark" height="31" width="88"/>
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+{% endblock %}

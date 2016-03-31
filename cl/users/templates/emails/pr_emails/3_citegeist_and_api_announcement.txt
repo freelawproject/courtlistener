@@ -1,0 +1,36 @@
+Hi,
+
+We've had another couple busy weeks at Free Law Project and today's newsletter brings another two big updates.
+
+Introducing CiteGeist, our New Relevancy Engine
+-----------------------------------------------
+The first update that I'm happy to share is that we've created a new relevancy engine that makes the results of your queries more relevant. We're calling this system "CiteGeist", and you can use it now by switching the ordering dropdown on the search results page so it is set to "Relevancy". This feature was developed by a volunteer contributor, and we couldn't be happier to share it today.
+
+The power of CiteGeist is based on two major factors. The first factor that we utilize is the citations that each opinion makes to other opinions. Whenever an opinion cites another, we consider that a vote of importance in the cited opinion. Opinions that have been cited many times by other opinions that have been cited many times (and on and on) will now show up higher in your results because they are more important.
+
+The second major factor of the CiteGeist score that we're releasing today is a query analyzer that figures out if you are looking for a particular opinion. Beginning now, if you make queries containing words like "v." or "vs." or "In Re", we'll assume you're looking for a specific case by its name, and we'll try to make those cases more relevant. A second volunteer contributed the idea for this, and we took it and ran with it, launching it last Friday.
+
+For more information about these features, see our blog post on the topic:
+
+ - https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/
+
+
+A New API for Developers and Researchers
+----------------------------------------
+The second piece of news that we're sharing today is that we've created and launched a new API for our data. This API will help usher in the next generation of legal technologies by allowing other developers, bloggers and researchers to consume, analyze and share our data in ways that were not possible or easy before today.
+
+This is a feature we've wanted to build for years and years and on our blog we've listed a number of ways we expect this feature to be used.
+
+For more information on this feature, see our blog post we put out just today:
+
+ -https://free.law/2013/11/19/free-law-project-unveils-api-for-american-opinions/
+
+We hope that these new features will unleash a new surge in legal research and technology, and that you'll help support our project so that we can continue bringing these technologies and information to the fore.
+
+Best,
+
+Mike and Brian
+Creators of Free Law Project
+
+----------
+If you wish to unsubscribe to our announcements, simply reply to this email and we'll take you right off.

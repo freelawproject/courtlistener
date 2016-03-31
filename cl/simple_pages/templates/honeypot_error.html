@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block head %}
+    <meta name="robots" content="noindex, noodp, noarchive, noimageindex"/>
+{% endblock %}
+
+{% block privacy %}{% endblock %}
+
+{% block title %}Server Error 400 – CourtListener.com{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block content %}
+    <div class="col-xs-1 col-sm-2 col-md-3"></div>
+    <div class="col-xs-10 col-sm-8 col-md-6 well">
+        <h2>400 Bad Request</h2>
+        <p>Honey Pot Error: ({{fieldname}}). Request aborted.</p>
+        <p>We believe that you're a spam bot, but if you're a human reading
+            this we definitely made a mistake. The following may help:</p>
+        <ul>
+            <li>Try filling out the form on the previous page more carefully,
+                or disabling any browser extensions that interact with forms.
+            </li>
+            <li><a href="{% url "contact" %}">Let us</a> know that you're having trouble using this form.</li>
+        </ul>
+
+        <p>Sorry about this. If you continue having problems, please do <a href="{% url "contact" %}">let us know</a>.</p>
+    </div>
+    <div class="col-xs-1 col-sm-2 col-med-3"></div>
+{% endblock %}

@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% load markdown_deux_tags %}
+{% load text_filters %}
+{% load extras %}
+{% load humanize %}
+
+{% block title %}Network Graph of {{ viz.title }} – CourtListener.com{% endblock %}
+{% block og_title %}Network Graph of {{ viz.title }} – CourtListener.com{% endblock %}
+{% block description %}
+    Network graph of {{ viz.title }} at CourtListener.com
+{% endblock %}
+{% block og_description %}
+    Network graph of {{ viz.title }} at CourtListener.com
+{% endblock %}
+{% block og_image %}{% get_full_host %}{{ STATIC_URL }}png/og-viz-image-1000x450.png{% endblock %}
+{% block og_image_width %}1000{% endblock %}
+{% block og_image_height %}450{% endblock %}
+
+
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block head %}
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
+{% endblock %}
+
+{% block footer-scripts %}
+    <script type="text/javascript">
+        {# Gets the most recent version, by default ordering #}
+        var opinions = {{ viz.json|safe }},
+            embedUrl = '{% get_full_host %}{% url "view_embedded_visualization" viz.pk %}';
+
+    </script>
+    {% include "includes/footer-scripts.html" %}
+{% endblock %}
+
+{% block content %}
+    {% if viz.deleted %}
+        <div class="col-xs-1 col-sm-2 col-md-3"></div>
+        <div class="col-xs-10 col-sm-8 col-md-6 well">
+            <h2 class="text-center">Deleted by Owner</h2>
+            <p>This network was deleted by the owner. If this was done in
+                error, and you are the owner, you can restore it from your <a
+                        href="{% url "view_deleted_visualizations" %}">profile
+                    page</a>.
+            </p>
+        </div>
+        <div class="col-xs-1 col-sm-2 col-md-3"></div>
+    {% else %}
+        {# Not deleted; Make decisions on owner/anon and shared/private #}
+        <div class="col-xs-12" id="viz-page">
+            <div class="row v-offset-below-2" id="title-block">
+                <div class="col-xs-12">
+                    {% if viz.published or viz.user == user %}
+                        {% block vis-title %}
+                            <h2 id="title"
+                                class="text-center"><span class="alt">{{ viz.id }}.&nbsp;</span>{{ viz.title|v_wrapper }}
+                                <span class="alt private-label">
+                                    {% if not viz.published and viz.user == user%}
+                                        (Private)
+                                    {% endif %}
+                                </span>
+                            </h2>
+                        {% endblock %}
+
+                        {% block vis-subtitles %}
+                        <h4 class="gray text-center">Contains {{ viz.clusters.all.count }} cases starting at <a
+                                href="{{ viz.cluster_start.get_absolute_url }}">{{ viz.cluster_start|best_case_name|v_wrapper }}</a>,
+                            and going to <a
+                                    href="{{ viz.cluster_end.get_absolute_url }}">{{ viz.cluster_end|best_case_name|v_wrapper }}</a>.
+                        </h4>
+                        {% endblock %}
+                    {% else %}
+                        <div class="row">
+                            <div class="col-xs-1 col-sm-2 col-md-3"></div>
+                            <div class="col-xs-10 col-sm-8 col-md-6 well">
+                                <h2 class="text-center">This Visualization is Private</h2>
+                                {% if user.is_authenticated %}
+                                    <p>You don't appear to be the owner of this
+                                        network and it has not been
+                                        shared by its owner. If you know the
+                                        creator of this network, ask them
+                                        to share it.
+                                    </p>
+                                {% else %}
+                                    <p>You are not signed in and this a
+                                        private visualization. If you're the
+                                        creator of this visualization and wish
+                                        to edit it, please <a
+                                                href="{% url "sign-in" %}?next={{ request.path }}">sign
+                                            in</a> and you will be able to
+                                        access it. If you are not the creator and you know the
+                                        creator, ask them to share it.
+                                    </p>
+                                {% endif %}
+                            </div>
+                            <div class="col-xs-1 col-sm-2 col-md-3"></div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if viz.published or viz.user == user %}
+                <div class="row">
+                    <div class="col-xs-12">
+                        <div id="chart" data-height="{% block height %}600{% endblock %}"></div>
+                        {% block vis-caption %}{% endblock %}
+                        {% block vis-forms %}
+                            <form action=""
+                                  method="POST"
+                                  role="form"
+                                  class="v-offset-above-2 v-offset-below-3">
+                                <div class="row">
+                                    <div class="form-group col-md-4">
+                                        <label for="chartType">Chart Type&nbsp;<i
+                                                class="fa fa-question-circle gray"
+                                                data-toggle="tooltip"
+                                                data-placement="top"
+                                                data-html="true"
+                                                title="<em>Spread</em>: All of the cases are shown as an overview, with a random vertical axis.<br><em>Supreme Court Database</em>: The vertical axis is set using the decision direction and vote counts from the Supreme Court Database. <br><em>Clean</em> makes many of the citation lines lighter to highlight the most direct paths from the starting and ending cases."></i></label>
+                                        <select name="chartType"
+                                                id="chartTypeSelect"
+                                                class="form-control">
+                                            <option selected="true" value="dos">Spread</option>
+                                            <option value="genealogy">Supreme
+                                                Court Database, Spaeth (Clean)
+                                            </option>
+                                            <option value="spaeth">Supreme Court Database, Spaeth (Complete)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group col-md-4">
+                                        <label for="axisType">Timeline Spacing&nbsp;<i
+                                                class="fa fa-question-circle gray"
+                                                data-toggle="tooltip"
+                                                data-placement="top"
+                                                data-html="true"
+                                                title="<em>Chronological Spacing</em> sets the horizontal axis of the chart so that longer gaps between cases are shown.<br><em>Equal Spacing</em> sets the axis so that longer periods are condensed and shorter ones are expanded, providing more space during active periods."></i></label>
+                                        <select name="axisType"
+                                                id="axisTypeSelect"
+                                                class="form-control">
+                                            <option value="time"
+                                                    selected="true">Chronological</option>
+                                            <option value="cat">Equal Spacing</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group col-md-4">
+                                        <label for="degreesOfSeparation">Degrees of Separation&nbsp;<i
+                                                class="fa fa-question-circle gray"
+                                                data-toggle="tooltip"
+                                                data-placement="top"
+                                                data-html="true"
+                                                title="Set the maximum number of hops between the oldest and newest case. In the Clean <em>Supreme Court Database</em> this is always set to the maximum."></i></label>
+                                        <select name="degreesOfSeparation"
+                                                id="degreesOfSeparationSelect"
+                                                class="form-control">
+                                            <option value="1">1</option>
+                                            <option value="2">2</option>
+                                            <option selected="true" value="3">3</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </form>
+                        {% endblock %}
+                    </div>
+                </div>
+
+                {% block vis-lower-content %}
+                <div class="row v-offset-above-2">
+                    <div class="col-md-10">
+                        <!-- Nav tabs -->
+                        <ul class="nav nav-tabs v-offset-below-3" role="tablist">
+                            <li role="presentation"
+                                {% if viz.notes %}class="active"{% endif %}>
+                                <a href="#notes" aria-controls="notes"
+                                   role="tab"
+                                   data-toggle="tab">Description</a>
+                            </li>
+                            <li role="presentation"
+                                {% if not viz.notes %}class="active"{% endif %}>
+                                <a href="#case-table" aria-controls="case-table"
+                                   role="tab"
+                                   data-toggle="tab">Cases (<span id="case-count"></span>)</a>
+                            </li>
+                            <li role="presentation">
+                                <a href="#case-metadata" aria-controls="case-metadata"
+                                   role="tab"
+                                   data-toggle="tab">Analysis</a>
+                            </li>
+                            {% if viz.referers_displayed.all.count > 0 %}
+                            <li role="presentation">
+                                <a href="#referers" aria-controls="referers"
+                                   role="tab" data-toggle="tab">On the Web</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+
+                        <!-- Tab panes -->
+                        <div class="tab-content">
+                            <div role="tabpanel"
+                                 class="tab-pane markdown{% if viz.notes %} active{% endif %}"
+                                 id="notes">{{ viz.notes|default:"*(No description from the creator.)*"|markdown }}
+                            </div>
+                            <div role="tabpanel"
+                                 class="tab-pane{% if not viz.notes %} active{% endif %}"
+                                 id="case-table">
+
+                            </div>
+                            <div role="tabpanel"
+                                 class="tab-pane"
+                                 id="case-metadata">
+                                <div id="case-metadata-title">
+                                    <h2>Metadata for {{ viz.title|v_wrapper }}</h2>
+                                </div>
+                                <div id="degree-of-dissent">
+                                    <h3>Degree of Dissent&nbsp;<a
+                                            href="{% url "faq" %}#dod"
+                                            class="no-underline"><i
+                                            class="fa fa-question-circle gray"></i></a>
+                                    </h3>
+                                    <p><span id="dod-info"></span></p>
+                                    <div id="dod-chart"></div>
+                                </div>
+
+                                <div id="creator">
+                                    <h3>Creator</h3>
+                                    <p>{{ viz.user.get_full_name|default:viz.user }}</p>
+                                </div>
+
+                                {% if viz.published %}
+                                <div>
+                                    <h3>Shared</h3>
+                                    <p>{{ viz.date_published }}</p>
+                                </div>
+                                {% endif %}
+
+
+                            </div>
+                            {% if viz.referers_displayed.all.count > 0 %}
+                            <div role="tabpanel"
+                                 class="tab-pane"
+                                 id="referers">
+                                <ul>
+                                    {% for referer in viz.referers_displayed.all %}
+                                        <li>{{ referer.date_created|date:"n/j/Y" }}&nbsp;&ndash;&nbsp;<a href="{{ referer.url }}" rel="nofollow">{{ referer.page_title }}</a>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-2">
+                        <div class="row">
+                            <div class="sidebar-section col-xs-12">
+                                <p><a href="{% url "new_visualization" %}"
+                                      class="btn btn-success btn-lg btn-block">
+                                    <i class="fa fa-plus"></i>&nbsp;New <span class="visible-lg-inline">Network</span></a>
+                                </p>
+                                {% if not viz.published and viz.user == user%}
+                                <p><a href="{% url "share_visualization" %}"
+                                      class="btn btn-primary btn-lg btn-block share-button"
+                                      data-id="{{ viz.pk }}"
+                                      data-function="share">
+                                    <i class="fa fa-share-alt"></i>&nbsp;<span id="share">Share</span>
+                                    <span class="visible-lg-inline">Network</span></a>
+                                </p>
+                                {% endif %}
+                                {% if viz.user == user %}
+                                    <p><a href="{% url "edit_visualization" pk=viz.pk %}"
+                                          class="btn btn-primary btn-lg btn-block">
+                                        <i class="fa fa-pencil"></i>&nbsp;Edit
+                                        <span class="visible-lg-inline">Network</span></a>
+                                    </p>
+                                {% endif %}
+                                {% if perms.visualizations.change_scotusmap %}
+                                <p>
+                                    <a href="{% url 'admin:visualizations_scotusmap_change' viz.pk %}"
+                                       class="btn btn-primary btn-lg btn-block">
+                                        <i class="fa fa-lock"></i>&nbsp;Admin<span class="visible-lg-inline"> for Viz</span></a>
+                                </p>
+                                {% endif %}
+                            </div>
+
+                            <div class="sidebar-section col-sm-12">
+                                <h3><span>Embed</span></h3>
+                                <div class="form-group">
+                                    <input type="text"
+                                           value="&lt;iframe height=&quot;540&quot; width=&quot;560&quot; src=&quot;{% get_full_host %}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
+                                           onclick="this.select()"
+                                           class="form-control"
+                                           id="embed-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="sidebar-section col-xs-12">
+                                <h3><span>Collaboration</span></h3>
+                                <a href="http://law.ubalt.edu/faculty/scotus-mapping/index.cfm" target="_blank">
+                                    <img src="{{ STATIC_URL }}png/ubalt-logo.png"
+                                         class="img-responsive"
+                                         height="98" width="292">
+                                </a>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="sidebar-section col-md-12 hidden-sm hidden-xs">
+                                <h4 class="caps gray">{{ viz.view_count|intcomma }}
+                                    view{{ viz.view_count|pluralize }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endblock %}
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

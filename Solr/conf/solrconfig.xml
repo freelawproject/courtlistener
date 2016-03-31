@@ -433,7 +433,7 @@
          be based on the last SolrCore to be initialized.
 
       -->
-    <maxBooleanClauses>2024</maxBooleanClauses>
+    <maxBooleanClauses>2048</maxBooleanClauses>
 
 
     <!-- Solr Internal Query Caches
@@ -777,7 +777,7 @@
        <!-- Default boosting is set up in the query fields
             Note that these are overridden in search_utils.py-->
        <str name="qf">
-          text^1.0 dateFiled^1.0 court^1.0 caseName^3 docketNumber^1.0 westCite^1.0 neutralCite^1.0 lexisCite^1.0 status^1.25 caseNumber^1.25
+          text^1.0 dateFiled^1.0 court^1.0 caseName^3 docketNumber^1.0 neutralCite^1.0 lexisCite^1.0 status^1.25
        </str>
 
        <!--  default query -->
@@ -1510,14 +1510,15 @@
        results for a given query regardless of the normal lucene
        scoring.
     -->
-  <searchComponent name="elevator" class="solr.QueryElevationComponent" >
+    <!--mlr
+  <searchComponent name="elevator" class="solr.QueryElevationComponent" >-->
     <!-- pick a fieldType to analyze queries -->
-    <str name="queryFieldType">string</str>
+    <!--mlr <str name="queryFieldType">string</str>
     <str name="config-file">elevate.xml</str>
-  </searchComponent>
+  </searchComponent>-->
 
   <!-- A request handler for demonstrating the elevator component -->
-  <requestHandler name="/elevate" class="solr.SearchHandler" startup="lazy">
+  <!--mlr<requestHandler name="/elevate" class="solr.SearchHandler" startup="lazy">
     <lst name="defaults">
       <str name="echoParams">explicit</str>
       <str name="df">text</str>
@@ -1525,7 +1526,7 @@
     <arr name="last-components">
       <str>elevator</str>
     </arr>
-  </requestHandler>
+  </requestHandler>-->
 
   <requestHandler name="/reloadCache"
                 class="org.apache.solr.search.function.FileFloatSource$ReloadCacheRequestHandler" />

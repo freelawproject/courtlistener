@@ -1,0 +1,8 @@
+/var/log/redis/*.log {
+    rotate 36500
+    daily
+    dateext
+    notifempty
+    noolddir
+    sharedscripts
+}
