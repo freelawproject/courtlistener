@@ -21,6 +21,7 @@ urlpatterns = [
     url('', include('cl.simple_pages.urls')),
     url('', include('cl.users.urls')),
     url('', include('cl.favorites.urls')),
+    url('', include('cl.people_db.urls')),
     url('', include('cl.search.urls')),
     url('', include('cl.alerts.urls')),
     url('', include('cl.api.urls')),

@@ -140,7 +140,7 @@ class Command(BaseCommand):
             sys.stdout.flush()
             last_document = (count == processed_count)
             if (processed_count % 50 == 0) or last_document:
-                # Every 5000 documents, we send the subtasks off for processing
+                # Every 50 documents, we send the subtasks off for processing
                 # Poll to see when they're done.
                 job = TaskSet(tasks=subtasks)
                 result = job.apply_async()

@@ -1,10 +1,21 @@
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.utils import deepgetattr
 
-from datetime import datetime
-from datetime import time
+from datetime import datetime, date, time
 from django.core.urlresolvers import NoReverseMatch
 from django.template import loader
+
+
+def solr_list(m2m_list, field):
+    new_list = []
+    for obj in m2m_list:
+        obj = getattr(obj, field)
+        if obj is None:
+            continue
+        if isinstance(obj, date):
+            obj = datetime.combine(obj, time())
+        new_list.append(obj)
+    return new_list
 
 
 class InvalidDocumentError(Exception):
@@ -149,3 +160,99 @@ class SearchAudioFile(object):
 
         # For faceting
         self.court_exact = item.docket.court_id
+
+
+class SearchPerson(object):
+    def __init__(self, item):
+        self.id = item.pk
+        self.fjc_id = item.fjc_id
+        self.cl_id = item.cl_id
+        self.alias_ids = [alias.pk for alias in item.aliases.all()]
+        self.races = [r.get_race_display() for r in item.race.all()]
+        self.gender = item.get_gender_display()
+        self.religion = item.get_religion_display()
+        self.name = item.name_full
+        if item.date_dob is not None:
+            self.dob = datetime.combine(item.date_dob, time())
+        self.date_granularity_dob = item.date_granularity_dob
+        if item.date_dod is not None:
+            self.dod = datetime.combine(item.date_dod, time())
+        self.date_granularity_dod = item.date_granularity_dod
+        self.dob_city = item.dob_city
+        self.dob_state = item.get_dob_state_display()
+        self.absolute_url = item.get_absolute_url()
+
+        # Joined Values. Brace yourself.
+        positions = item.positions.all()
+        if positions.count() > 0:
+            self.court_id = [p.court.pk for p in positions if
+                             p.court is not None]
+            self.position_type = [p.get_position_type_display() for p in positions]
+            self.appointer = [p.apppointer.name_full for p in positions
+                              if p.appointer is not None]
+            self.supervisor = [p.supervisor.name_full for p in positions
+                               if p.supervisor is not None]
+            self.predecessor = [p.predecessor.name_full for p in positions
+                                if p.predecessor is not None]
+
+            self.date_nominated = solr_list(positions, 'date_nominated')
+            self.date_elected = solr_list(positions, 'date_elected')
+            self.date_recess_appointment = solr_list(
+                positions, 'date_recess_appointment',
+            )
+            self.date_referred_to_judicial_committee = solr_list(
+                positions, 'date_referred_to_judicial_committee',
+            )
+            self.date_judicial_committee_action =solr_list(
+                positions, 'date_judicial_committee_action',
+            )
+            self.date_hearing = solr_list(positions, 'date_hearing')
+            self.date_confirmation = solr_list(positions, 'date_confirmation')
+            self.date_start = solr_list(positions, 'date_start')
+            self.date_granularity_start = solr_list(
+                positions, 'date_granularity_start',
+            )
+            self.date_retirement = solr_list(
+                positions, 'date_retirement',
+            )
+            self.date_termination = solr_list(
+                positions, 'date_termination',
+            )
+            self.date_granularity_termination = solr_list(
+                positions, 'date_granularity_termination',
+            )
+            self.judicial_committee_action = [
+                p.get_judicial_committee_action_display() for p in positions if
+                p.judicial_committee_action is not None
+            ]
+            self.nomination_process = [
+                p.get_nomination_process_display() for p in positions if
+                p.nomination_process is not None
+            ]
+            self.selection_method = [
+                p.get_how_selected_display() for p in positions if
+                p.how_selected is not None
+            ]
+            self.termination_reason = [
+                p.get_termination_reason_display() for p in positions if
+                p.termination_reason is not None
+            ]
+
+        self.school = [e.school.name for e in item.educations.all()]
+
+        self.political_affiliation = [
+            pa.get_political_party_display() for pa in
+            item.political_affiliations.all() if pa is not None
+        ]
+
+        self.aba_rating = [
+            r.get_rating_display() for r in item.aba_ratings.all() if
+            r is not None
+        ]
+
+        text_template = loader.get_template('indexes/person_text.txt')
+        context = {'item': item}
+        self.text = text_template.render(context).translate(null_map)
+
+        # For faceting
+        self.court_exact = [p.court.pk for p in positions if p.court is not None]
