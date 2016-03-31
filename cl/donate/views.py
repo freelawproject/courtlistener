@@ -6,40 +6,11 @@ from cl.donate.stripe_helpers import process_stripe_payment
 from cl.users.utils import create_stub_account
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.mail import send_mail
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 
 logger = logging.getLogger(__name__)
-
-
-def send_thank_you_email(donation):
-    user = donation.donor
-    email_subject = 'Thanks for your donation to Free Law Project!'
-    email_body = ('Hello %s,\n\nThanks for your donation of $%0.2f to Free '
-                  'Law Project. We are currently using donations like yours '
-                  'for a variety of important projects that would never exist '
-                  'without your help.\n\n'
-
-                  'We are a federally-recognized 501(c)(3) public charity '
-                  'and a California non-profit public benefit corporation. '
-                  'Our EIN is %s.\n\n'
-
-                  'If you have any questions about your donation, please '
-                  'don\'t hesitate to get in touch.\n\n'
-
-                  'Thanks again,\n\n'
-                  'Michael Lissner and Brian Carver\n'
-                  'Founders of Free Law Project\n'
-                  'https://free.law/contact/') % \
-                 (user.first_name, donation.amount, settings.EIN, )
-    send_mail(
-        email_subject,
-        email_body,
-        'Free Law Project <donate@free.law>',
-        [user.email]
-    )
 
 
 def route_and_process_donation(cd_donation_form, cd_user_form, stripe_token):

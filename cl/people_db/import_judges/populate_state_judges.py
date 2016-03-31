@@ -16,6 +16,9 @@ def make_state_judge(item, testing=False):
     Saves the judge to the DB.
     """
 
+    if pd.isnull(item['startyear']):
+        return
+
     date_dob, date_granularity_dob = process_date(item['birthyear'],
                                                   item['birthmonth'],
                                                   item['birthday'])
@@ -29,10 +32,7 @@ def make_state_judge(item, testing=False):
     check = Person.objects.filter(name_first=item['firstname'],
                                   name_last=item['lastname'], date_dob=date_dob)
     if len(check) > 0:
-        print(
-            'Warning: ' + item['firstname'] + ' ' + item[
-                'lastname'] + ' ' + str(
-                    date_dob) + ' exists.')
+        print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.')
         person = check[0]
     else:
 
@@ -61,6 +61,9 @@ def make_state_judge(item, testing=False):
     date_start, date_granularity_start = process_date(item['startyear'],
                                                       item['startmonth'],
                                                       item['startday'])
+
+    if not pd.isnull(item['endyear']) and item['endyear'] < 2016:
+        item['endyear'] = None
     date_termination, date_granularity_termination = process_date(
             item['endyear'],
             item['endmonth'],
@@ -171,5 +174,7 @@ def make_state_judge(item, testing=False):
                     notes=item['notes'],
                     url=url
             )
+
             if not testing:
                 source.save()
+

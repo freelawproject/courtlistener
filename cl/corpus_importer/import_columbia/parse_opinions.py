@@ -57,22 +57,41 @@ def parse_file(file_path, court_fallback=''):
     info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
     info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
     info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or None
-    # get opinions
+    # condense opinion texts if there isn't an associated byline
+    # print a warning whenever we're appending multiple texts together
     info['opinions'] = []
-    for opinion in raw_info.get('opinions', []):
-        full_opinion = {
-            'opinion': opinion['opinion']
-            ,'type': opinion['type']
-            ,'author': None
-            ,'joining': []
-        }
-        if opinion['byline']:
-            judges = find_judges(opinion['byline'])
-            if judges:
-                full_opinion['author'] = judges[0]
-            if len(judges) > 1:
-                full_opinion['joining'] = judges[1:]
-        info['opinions'].append(full_opinion)
+    for current_type in OPINION_TYPES:
+        last_texts = []
+        for opinion in raw_info.get('opinions', []):
+            if opinion['type'] != current_type:
+                continue
+            last_texts.append(opinion['opinion'])
+            if opinion['byline']:
+                if len(last_texts) > 1:
+                    print "Combining multiple %s texts in '%s'." % (current_type, file_path)
+                # add the opinion and all of the previous texts
+                judges = find_judges(opinion['byline'])
+                info['opinions'].append({
+                    'opinion': '\n'.join(last_texts)
+                    ,'type': current_type
+                    ,'author': judges[0] if judges else None
+                    ,'joining': judges[1:] if len(judges) > 0 else []
+                })
+                last_texts = []
+        # if there are remaining texts without bylines, either add them to the last opinion of this type, or if there
+        # are none, make a new opinion without an author
+        if last_texts:
+            relevant_opinions = [o for o in info['opinions'] if o['type'] == current_type]
+            if relevant_opinions:
+                print "Combining multiple %s texts in '%s'." % (current_type, file_path)
+                relevant_opinions[-1]['opinion'] += '\n%s' % '\n'.join(last_texts)
+            else:
+                info['opinions'].append({
+                    'opinion': '\n'.join(last_texts)
+                    ,'type': current_type
+                    ,'author': None
+                    ,'joining': []
+                })
     return info
 
 
@@ -207,5 +226,5 @@ def get_court_object(raw_court, fallback=''):
 
 
 if __name__ == '__main__':
-    parsed = parse_file("test_opinions/0b59c80d9043a003.xml")
+    parsed = parse_file('/vagrant/flp/columbia_data/opinions/e6054c371b81a4b7.xml')
     pass

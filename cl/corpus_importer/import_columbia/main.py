@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 
-# for testing on a machine without cl set up properly
-NO_CL = True
-
 import os
 import fnmatch
 from random import shuffle
@@ -10,8 +7,7 @@ import re
 import traceback
 
 from parse_opinions import parse_file
-if not NO_CL:
-    from populate_opinions import make_and_save
+from populate_opinions import make_and_save
 
 
 def do_many(dir_path, limit=None, random_order=True, status_interval=100):
@@ -47,12 +43,13 @@ def do_many(dir_path, limit=None, random_order=True, status_interval=100):
             # try to parse/save the case and print any exceptions with full tracebacks
             try:
                 parsed = parse_file(path, court_fallback=court_fallback)
-                if not NO_CL:
-                    make_and_save(parsed)
+                make_and_save(parsed)
             except Exception as e:
                 # print simple exception summaries for known problems
                 if 'mismatched tag' in str(e):
                     print "Mismatched tag exception encountered in file '%s':%s" % (path, str(e).split(':', 1)[1])
+                elif 'Failed to get a citation' in str(e):
+                    print "Exception in file '%s': %s" % (path, str(e))
                 else:
                     # otherwise, print generic traceback
                     print
@@ -67,5 +64,6 @@ def do_many(dir_path, limit=None, random_order=True, status_interval=100):
                 return
 
 
-if __name__ == '__main__':
-    do_many(r'C:\Users\Jeff\Dropbox\court-listener\data', limit=10000)
+import django
+django.setup()
+do_many('/vagrant/flp/columbia_data/opinions/', random_order=True)
