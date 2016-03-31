@@ -260,12 +260,6 @@ class Docket(models.Model):
         default=False,
     )
 
-    sha1 = models.CharField(
-        help_text="Used for FDSYS dockets",
-        max_length=40,
-        blank=True,
-    )
-
     class Meta:
         unique_together = ('court', 'pacer_case_id')
 
@@ -384,7 +378,6 @@ class RECAPDocument(models.Model):
         help_text="The ID of the document in PACER. This information is "
                   "provided by RECAP.",
         max_length=32,  # Same as in RECAP
-        unique=True
     )
     is_available = models.NullBooleanField(
         help_text="True if the item is available in RECAP",

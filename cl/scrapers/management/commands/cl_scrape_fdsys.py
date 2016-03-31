@@ -121,54 +121,37 @@ class Command(BaseCommand):
         dup_checker = DupChecker(court, full_crawl=full_crawl)
         abort = dup_checker.abort_by_url_hash(mods_data.url, mods_data.hash)
 
-        # todo add timeouts for the requests
         if not abort:
-            msg, r = get_binary_content(
-                mods_data.download_url,
-                mods_data.cookies,
-                mods_data._get_adapter_instance(),
-                method=mods_data.method
+
+            docket, case_parties, docket_entries, recap_docs, error = self.make_objects(
+                mods_data, court, dup_checker
             )
-            if msg:
-                logging.warn(msg)
-                ErrorLog(log_level='WARNING',
-                         court=court,
-                         message=msg).save()
+
+            if error:
+                download_error = True
             else:
-                docket_sha1 = hashlib.sha1(r.content).hexdigest()
-                lookup_params = {
-                    'lookup_value': docket_sha1,
-                    'lookup_by': 'sha1'
-                }
+                docket.save()
 
-                onwards = dup_checker.press_on(Docket, None, None, **lookup_params)
-                if onwards:
-                    # Not a duplicate, carry on
-                    logging.warning(
-                        'Adding new document found at: {url}'.format(
-                            url=mods_data.download_url.encode('utf-8'))
-                    )
-                    dup_checker.reset()
+                for case_partie in case_parties:
+                    case_partie.save()
 
-                    docket, error = self.make_objects(
-                        mods_data, court, r.content, dup_checker, docket_sha1
-                    )
+                for docket in docket_entries:
+                    docket.save()
 
-                    if error:
-                        download_error = True
-                    else:
-                        logging.warning("Successfully added doc {pk}: {name}".format(
-                            pk=docket.pk,
-                            name=mods_data.case_name.encode('utf-8'),
-                        ))
+                for doc in recap_docs:
+                    doc.save()
+                logging.warning("Successfully added doc {pk}: {name}".format(
+                    pk=docket.pk,
+                    name=mods_data.case_name.encode('utf-8'),
+                ))
 
-                        # Update the hash if everything finishes properly.
-                        logging.warning("{}: Successfully crawled opinions.".format(mods_data.court_id))
+                # Update the hash if everything finishes properly.
+                logging.warning("{}: Successfully crawled opinions.".format(mods_data.court_id))
             if not download_error:
                 # Only update the hash if no errors occurred.
                 dup_checker.update_site_hash(mods_data.hash)
 
-    def make_objects(self, item, court, content, dup_checker, docket_sha1):
+    def make_objects(self, item, court, dup_checker):
         """Takes the meta data from the scraper and associates it with objects.
 
         Returns the created objects.
@@ -184,13 +167,16 @@ class Command(BaseCommand):
         error = False
         case_name_short = self.cnt.make_case_name_short(item.case_name)
 
+        case_parties_list = []
+        docket_entries = []
+        recap_docs = []
+
         docket, _ = Docket.objects.get_or_create(
             fdsys_case_id=item.fdsys_id,
             court=court,
             source=Docket.FDSYS
         )
 
-        docket.sha1 = docket_sha1
         docket.docket_number = item.docket_number
         docket.case_name = item.case_name
         docket.case_name_short = case_name_short
@@ -198,27 +184,10 @@ class Command(BaseCommand):
         docket.date_blocked = date_blocked
         docket.fdsys_url = item.download_url
 
-        try:
-            logging.warning('Saving the content for docket: {nr}'.format(nr=docket.docket_number))
-            cf = ContentFile(content)
-            extension = get_extension(content)
-            file_name = trunc(item.case_name.lower(), 75) + extension
-            docket.filepath_local.save(file_name, cf, save=True)
-            docket.save()
-            logging.warning('===============SAVED++++++++++++++')
-        except Exception as e:
-            msg = ('Unable to save binary to disk. Deleted '
-                   'item: %s.\n %s' %
-                   (item.case_name, traceback.format_exc()))
-            logging.warning(msg.encode('utf-8'))
-            ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
-            error = True
-            return docket, error
-
         # adding the parties
         for parties in item.parties:
 
-            case_parties, _ = CaseParties.objects.get_or_create(
+            case_parties, was_created = CaseParties.objects.get_or_create(
                 docket=docket,
                 name_first=parties['name_first'],
                 name_last=parties['name_last'],
@@ -226,9 +195,8 @@ class Command(BaseCommand):
                 name_suffix=parties['name_suffix'],
                 role=parties['role']
             )
-            logging.warning('Saving Parties {}'.format(case_parties.name_first))
-            if _:
-                case_parties.save()
+            if was_created:
+                case_parties_list.append(case_parties)
 
         # adding the documents
         for document in item.documents:
@@ -238,8 +206,7 @@ class Command(BaseCommand):
                 date_filed=document['date_filed']
             )
             docket_entry.description = document['description']
-            logging.warning('Saving docket entry {}'.format(docket_entry.date_filed))
-            docket_entry.save()
+            docket_entries.append(docket_entry)
 
             recap_document, _ = RECAPDocument.objects.get_or_create(
                 docket_entry=docket_entry,
@@ -282,9 +249,8 @@ class Command(BaseCommand):
                         extension = get_extension(r.content)
                         file_name = trunc(item.case_name.lower(), 75) + extension
                         recap_document.filepath_local.save(file_name, cf, save=True)
-                        logging.warning('Saving recap document {}'.format(recap_document.filepath_local))
                         recap_document.sha1 = rc_sha1_hash
-                        recap_document.save()
+                        recap_docs.append(recap_document)
             except Exception as e:
                 msg = ('Unable to save binary to disk. Deleted '
                        'item: %s.\n %s' %
@@ -292,6 +258,5 @@ class Command(BaseCommand):
                 logging.warning(msg.encode('utf-8'))
                 ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
                 error = True
-                return docket, error
 
-        return docket, error
+        return docket, case_parties_list, docket_entries, recap_docs, error
