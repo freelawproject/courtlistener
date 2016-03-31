@@ -62,7 +62,11 @@ urlpatterns = [
     ),
 
     # Sitemap:
-    url(r'^sitemap-simple-pages\.xml$', sitemap_maker),
+    url(
+        r'^sitemap-simple-pages\.xml$',
+        sitemap_maker,
+        name='simple_pages_sitemap',
+    ),
 
     # SEO-related stuff
     url(r'^BingSiteAuth.xml$', validate_for_bing),
