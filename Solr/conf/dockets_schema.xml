@@ -103,26 +103,8 @@
              stored="true"
              required="true"
              multiValued="false"/>
-      <field name="docket_id"
-             type="int"
-             indexed="true"
-             stored="true"
-             required="true"
-             multiValued="false"/>
       <field name="court_id"
              type="string"
-             indexed="true"
-             stored="true"
-             required="true"
-             multiValued="false"/>
-      <field name="docketentry_id"
-             type="int"
-             indexed="true"
-             stored="true"
-             required="true"
-             multiValued="false"/>
-      <field name="recap_document_id"
-             type="int"
              indexed="true"
              stored="true"
              required="true"
@@ -155,9 +137,7 @@
              indexed="true"
              stored="true"
              multiValued="false"
-             termVectors="true"
-             termPositions="true"
-             termOffsets="true"/>
+             termVectors="true"/>
       <field name="caseName"
              type="text_en_splitting_cl"
              indexed="true"
@@ -170,10 +150,7 @@
              type="int"
              indexed="true"
              stored="true"
-             multiValued="false"
-             termVectors="true"
-             termPositions="true"
-             termOffsets="true"/>
+             multiValued="false"/>
       <field name="cause"
              type="text_en_splitting_cl"
              indexed="true"
@@ -191,22 +168,7 @@
              multiValued="false"/>
 
       <!--DocketEntry-->
-      <field name="docketentryFiledDate"
-             type="date"
-             indexed="true"
-             stored="true"
-             multiValued="false"
-             docValues="true"/>
-      <field name="docketentryEntryNumber"
-             type="int"
-             indexed="false"
-             stored="true"
-             multiValued="false"
-             docValues="true"
-             termVectors="true"
-             termPositions="true"
-             termOffsets="true"/>
-      <field name="docketentryDescription"
+      <field name="docketEntries"
              type="text_en_splitting"
              indexed="true"
              stored="true"
@@ -227,13 +189,6 @@
              type="text_en_splitting_cl"
              indexed="true"
              stored="true"
-             multiValued="false"/>
-
-
-      <!--Faceting-->
-      <field name="court_exact" type="string" indexed="true" stored="true"
-             multiValued="false"/>
-      <field name="judge_exact" type="string" indexed="true" stored="true"
              multiValued="false"/>
 
       <!--special fields-->
@@ -608,6 +563,7 @@
 	 removes stop words from case-insensitive "stopwords.txt"
 	 (empty by default), and down cases.  At query time only, it
 	 also applies synonyms. -->
+
     <fieldType name="text_general" class="solr.TextField" positionIncrementGap="100">
       <analyzer type="index">
         <tokenizer class="solr.StandardTokenizerFactory"/>

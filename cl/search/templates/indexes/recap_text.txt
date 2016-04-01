@@ -1,0 +1,6 @@
+{# TESTING Getting the docketEntries and appending them one after other to form a big text data set #}
+{# Getting the Docket Entries one by one with filed date #}
+
+{% for docket_entry in docket_entries_seq %}
+{{ docket_entry.date_filed|date:"Y-m-d" }}    {{ docket_entry.entry_number }}    {{ docket_entry.description }}
+{% endfor %}

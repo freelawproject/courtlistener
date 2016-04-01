@@ -4,9 +4,9 @@ from cl.audio.models import Audio
 from cl.celery import app
 from cl.lib.sunburnt import SolrError
 from cl.lib import sunburnt
-from cl.search.models import Opinion, OpinionCluster
+from cl.search.models import Opinion, OpinionCluster, Docket, DocketEntry
 from cl.search.search_indexes import InvalidDocumentError, SearchAudioFile
-from cl.search.search_indexes import SearchDocument
+from cl.search.search_indexes import SearchDocument, SearchDocketFile
 
 from django.conf import settings
 
@@ -68,6 +68,17 @@ def add_or_update_audio_files(item_pks, force_commit=True):
             si.commit()
     except SolrError, exc:
         add_or_update_audio_files.retry(exc=exc, countdown=30)
+
+@app.task
+def add_or_update_recap_dockets(item_pks, force_commit=True):
+    si = sunburnt.SolrInterface(settings.SOLR_RECAP_DOCKET_URL, mode='w')
+    try:
+        si.add([SearchDocketFile(item) for item in
+                Docket.objects.filter(pk__in=item_pks)])
+        if force_commit:
+            si.commit()
+    except SolrError, exc:
+        add_or_update_recap_dockets.retry(exc=exc, countdown=30)
 
 
 @app.task

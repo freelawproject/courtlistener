@@ -1,5 +1,6 @@
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.utils import deepgetattr
+from cl.search.models import DocketEntry
 
 from datetime import datetime
 from datetime import time
@@ -150,8 +151,61 @@ class SearchAudioFile(object):
         # For faceting
         self.court_exact = item.docket.court_id
 
-class SearchDocket(object):
+class SearchDocketFile(object):
+
     def __init__(self, item):
         self.id = item.pk
-        self.court_id = item.docket.court.pk
-        self.docket_id = item.docket.pk
+        self.court_id = item.court.pk
+        # Docket
+        if item.date_argued is not None:
+            self.dateArgued = datetime.combine(
+                item.date_argued,
+                time()
+            )
+        if item.date_reargued is not None:
+            self.dateReargued = datetime.combine(
+                item.date_reargued,
+                time()
+            )
+        if item.date_reargument_denied is not None:
+            self.dateReargumentDenied = datetime.combine(
+                item.date_reargument_denied,
+                time()
+            )
+        if item.date_filed is not None:
+            self.dateFiled = datetime.combine(
+                item.date_filed,
+                time()
+            )
+        self.docketNumber = item.docket_number
+        self.caseName = item.case_name
+        self.pacerCaseId = item.pacer_case_id
+        self.court = item.court.full_name
+        if item.cause is not None:
+            self.cause = item.cause
+        if item.jury_demand is not None:
+            self.juryDemand = item.jury_demand
+        if item.jurisdiction_type is not None:
+            self.jurisdictionType = item.jurisdiction_type
+        # Judge the docket is assigned to
+        if item.assigned_to is not None:
+            self.assignedTo = SearchDocket.get_judge_name(item.assigned_to)
+
+        # Getting all the DocketEntries of the docket.
+        docket_entries = DocketEntry.objects.filter(docket=item)
+        text_template = loader.get_template('indexes/recap_text.txt')
+        # Docket Entries are extracted in the template.
+        context = {'item': item, 'docket_entries_seq' : docket_entries}
+
+        self.docketEntries = text_template.render(context).translate(null_map)
+
+
+    @staticmethod
+    def get_judge_name(person_obj):
+        fname = "%s "%person_obj.name_first if person_obj.name_first else ""
+        lname = "%s"%person_obj.name_last if person_obj.name_last else ""
+        mname = "%s "%person_obj.name_middle if person_obj.name_middle else ""
+
+        sname = " %s"%person_obj.name_suffix if person_obj.name_suffix else ""
+
+        return "{0}{1}{2}{3}".format(fname, mname, lname, sname).strip()

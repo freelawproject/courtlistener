@@ -58,11 +58,11 @@ def create_default_cores():
         instance_dir='/usr/local/solr/example/solr/audio',
     )
     create_solr_core(
-        core_name='recap',
-        data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_recap'),
+        core_name='dockets',
+        data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_dockets'),
         schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                            'recap_schema.xml'),
-        instance_dir='/usr/local/solr/example/solr/recap',
+                            'dockets_schema.xml'),
+        instance_dir='/usr/local/solr/example/solr/dockets',
     )
 
 def delete_solr_core(core_name, delete_index=True, delete_data_dir=False):
