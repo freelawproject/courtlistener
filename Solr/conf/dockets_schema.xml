@@ -198,6 +198,27 @@
       <field name="django_id" type="string" indexed="true" stored="true"
              multiValued="false"/>
 
+      <!--copy fields-->
+      <field name="text" type="text_en_splitting"
+             indexed="true"
+             stored="true"
+             multiValued="true"
+             termVectors="true"
+             termPositions="true"
+             termOffsets="true"/>
+
+      <copyField source="court_id" dest="text" maxChars="30000"/>
+      <copyField source="docketNumber" dest="text" maxChars="30000"/>
+      <copyField source="caseName" dest="text" maxChars="30000"/>
+      <copyField source="pacerCaseId" dest="text" maxChars="30000"/>
+      <copyField source="cause" dest="text" maxChars="30000"/>
+      <copyField source="jurisdictionType" dest="text" maxChars="30000"/>
+      <copyField source="docketEntries" dest="text" maxChars="100000"/>
+      <copyField source="assignedTo" dest="text" maxChars="30000"/>
+      <copyField source="court" dest="text" maxChars="30000"/>
+
+
+
     <!-- mlr
     <field name="sku" type="text_en_splitting_tight" indexed="true" stored="true" omitNorms="true"/>
     <field name="name" type="text_general" indexed="true" stored="true"/>
