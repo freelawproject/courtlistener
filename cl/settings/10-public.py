@@ -273,6 +273,7 @@ REST_FRAMEWORK = {
     # Filtering
     'DEFAULT_FILTER_BACKENDS': (
         'rest_framework.filters.DjangoFilterBackend',
+        'rest_framework.filters.OrderingFilter',
     ),
 
     # Assorted & Sundry

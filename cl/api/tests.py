@@ -156,6 +156,30 @@ def assertCount(cls, path, q, expected_count):
                     msg="r.data was: %s" % r.data)
 
 
+class DRFOrderingTests(TestCase):
+    """Does ordering work generally and specifically?"""
+    fixtures = ['judge_judy.json', 'user_with_judge_access.json',
+                'court_data.json', 'test_objects_search.json']
+
+    def test_position_ordering(self):
+        path = reverse('position-list', kwargs={'version': 'v3'})
+        r = self.client.get(path, {'order_by': 'date_start'})
+        self.assertLess(r.data['results'][0]['date_start'],
+                        r.data['results'][-1]['date_start'])
+        r = self.client.get(path, {'order_by': '-date_start'})
+        self.assertGreater(r.data['results'][0]['date_start'],
+                           r.data['results'][-1]['date_start'])
+
+    def test_opinion_ordering_by_id(self):
+        path = reverse('opinion-list', kwargs={'version': 'v3'})
+        r = self.client.get(path, {'order_by': 'id'})
+        self.assertLess(r.data['results'][0]['resource_uri'],
+                        r.data['results'][-1]['resource_uri'])
+        r = self.client.get(path, {'order_by': '-id'})
+        self.assertGreater(r.data['results'][0]['resource_uri'],
+                           r.data['results'][-1]['resource_uri'])
+
+
 class DRFJudgeApiFilterTests(TestCase):
     """Do the filters work properly?"""
     fixtures = ['judge_judy.json', 'user_with_judge_access.json',
