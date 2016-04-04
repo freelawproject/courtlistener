@@ -193,7 +193,7 @@ class SearchDocketFile(object):
 
         # Getting all the DocketEntries of the docket.
         docket_entries = DocketEntry.objects.filter(docket=item)
-        text_template = loader.get_template('indexes/recap_text.txt')
+        text_template = loader.get_template('indexes/dockets_text.txt')
         # Docket Entries are extracted in the template.
         context = {'item': item, 'docket_entries_seq' : docket_entries}
 

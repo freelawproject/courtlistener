@@ -1384,7 +1384,7 @@
 
     -->
   <searchComponent name="clustering"
-                   enable="${solr.clustering.enabled:false}
+                   enable="${solr.clustering.enabled:false}"
                    class="solr.clustering.ClusteringComponent" >
     <!-- Declare an engine -->
     <lst name="engine">

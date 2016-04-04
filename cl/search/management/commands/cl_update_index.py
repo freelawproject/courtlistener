@@ -3,7 +3,7 @@ import sys
 import time
 from cl.audio.models import Audio
 from cl.lib import sunburnt
-from cl.lib.argparse_types import valid_date_time, valid_obj_type
+from cl.lib.argparse_types import valid_date_time, valid_obj_type, valid_source
 from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
 from cl.search.models import Opinion, Docket
@@ -134,8 +134,8 @@ class Command(BaseCommand):
                  'date and time (YYYY-MM-DD HH:MM:SS)'
         )
         act_upon_group.add_argument(
-            '--recap',
-            action='store_true',
+            '--source',
+            type=valid_source,
             help='Take action on only the Dockets from RECAP stored in the local database.'
         )
 
@@ -159,8 +159,10 @@ class Command(BaseCommand):
                 sys.exit(1)
             elif options.get('items'):
                 self.add_or_update(*options['items'])
-            elif options.get('recap'):
-                self.add_or_update_all_recap_dockets()
+            elif options.get('source'):
+                source_val = options['source']
+                if source_val == Docket.RECAP:
+                    self.add_or_update_all_recap_files()
 
         elif options.get('delete'):
             if self.verbosity >= 1:
@@ -308,18 +310,20 @@ class Command(BaseCommand):
             add_or_update_audio_files.delay(items)
 
     @print_timing
-    def add_or_update_all_recap_dockets(self):
+    def add_or_update_all_recap_files(self):
         """
         Updates The index of all the dockets whose source is RECAP.
         :return:
         """
-        self.stdout.write("Adding or updating all RECAP dockets.")
+        self.stdout.write("Adding or updating all RECAP files.")
         # Doing the updating asynchronously.
         if self.type == Docket:
+            self.stdout.write("Adding or updating all RECAP dockets.")
             pk_list = []
             for docket in Docket.objects.filter(source=Docket.RECAP):
                 pk_list.append(docket.pk)
             add_or_update_recap_dockets.delay(pk_list)
+
 
     @print_timing
     def add_or_update_by_datetime(self, dt):
