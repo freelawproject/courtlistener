@@ -8,7 +8,7 @@ from requests.exceptions import HTTPError
 
 from cl.celery import app
 from cl.visualizations.models import Referer
-from cl.visualizations.utils import emails
+from cl.visualizations.utils import emails, new_title_for_viz
 
 
 def blacklisted_url(url):
@@ -75,13 +75,16 @@ def get_title(self, referer_id):
         )
         referer.save()
 
-        email = emails['referer_detected']
-        email_body = email['body'] % (referer.url, referer.page_title, reverse(
-                'admin:visualizations_referer_change',
-                args=(referer.pk,)
-        ))
-        send_mail(email['subject'], email_body, email['from'],
-                  email['to'])
+        if new_title_for_viz(referer):
+            # Only send the email if we haven't seen this page title before for
+            # this visualization.
+            email = emails['referer_detected']
+            email_body = email['body'] % (referer.url, referer.page_title, reverse(
+                    'admin:visualizations_referer_change',
+                    args=(referer.pk,)
+            ))
+            send_mail(email['subject'], email_body, email['from'],
+                      email['to'])
     else:
         try:
             # Create an exception to catch.

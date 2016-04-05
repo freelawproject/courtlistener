@@ -1,6 +1,20 @@
 from django.conf import settings
 from django.contrib import messages
 
+from cl.visualizations.models import Referer
+
+
+def new_title_for_viz(referer):
+    """Check if a visualization already has a referer with a given title."""
+    matching_title_on_viz_exists = Referer.objects.filter(
+        page_title=referer.page_title,
+        map=referer.map
+    ).exists()
+
+    if not matching_title_on_viz_exists:
+        return True
+    return False
+
 
 def reverse_endpoints_if_needed(start, end):
     """Make sure start date < end date, and flip if needed.
