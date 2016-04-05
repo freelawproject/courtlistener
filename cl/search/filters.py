@@ -77,7 +77,7 @@ class OpinionFilter(filters.FilterSet):
     class Meta:
         model = Opinion
         fields = {
-            'id': ['exact'],
+            'id': INTEGER_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_created': DATETIME_LOOKUPS,
             'sha1': ['exact'],
