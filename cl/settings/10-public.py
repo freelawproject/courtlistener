@@ -114,14 +114,17 @@ MESSAGE_TAGS = {
 SOLR_OPINION_URL = 'http://127.0.0.1:8983/solr/collection1'
 SOLR_AUDIO_URL = 'http://127.0.0.1:8983/solr/audio'
 SOLR_PEOPLE_URL = 'http://127.0.0.1:8983/solr/person'
+SOLR_RECAP_DOCKET_URL = 'http://127.0.0.1:8983/solr/dockets'
 
 SOLR_OPINION_TEST_CORE_NAME = 'opinion_test'
 SOLR_AUDIO_TEST_CORE_NAME = 'audio_test'
 SOLR_PEOPLE_TEST_CORE_NAME = 'person_test'
+SOLR_RECAP_TEST_CORE_NAME = 'dockets_test'
 
 SOLR_OPINION_TEST_URL = 'http://127.0.0.1:8983/solr/opinion_test'
 SOLR_AUDIO_TEST_URL = 'http://127.0.0.1:8983/solr/audio_test'
 SOLR_PEOPLE_TEST_URL = 'http://127.0.0.1:8983/solr/person_test'
+SOLR_DOCKETS_TEST_URL = 'http://127.0.0.1:8983/solr/dockets_test'
 
 
 #########
@@ -278,6 +281,7 @@ REST_FRAMEWORK = {
     # Filtering
     'DEFAULT_FILTER_BACKENDS': (
         'rest_framework.filters.DjangoFilterBackend',
+        'rest_framework.filters.OrderingFilter',
     ),
 
     # Assorted & Sundry

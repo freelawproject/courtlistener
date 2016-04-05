@@ -5,8 +5,8 @@ from cl.lib import sunburnt
 from cl.lib.argparse_types import valid_date_time, valid_obj_type
 from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
+from cl.search.models import Opinion, Docket
 from cl.people_db.models import Person
-from cl.search.models import Opinion
 from cl.search.tasks import (delete_items, add_or_update_audio_files,
                              add_or_update_opinions, add_or_update_items)
 from celery.task.sets import TaskSet
@@ -60,8 +60,8 @@ class Command(BaseCommand):
             required=True,
             help='Because the Solr indexes are loosely bound to the database, '
                  'commands require that the correct model is provided in this '
-                 'argument. Current choices are "audio", "opinions", or '
-                 '"people".'
+                 'argument. Current choices are "audio", "opinions", "people", '
+                 'and "dockets".'
         )
         parser.add_argument(
             '--solr-url',
@@ -317,6 +317,8 @@ class Command(BaseCommand):
         self.stdout.write("Adding or updating all items...\n")
         if self.type == Person:
             q = self.type.objects.filter(is_alias_of=None)
+        elif self.type == Docket:
+            q = self.type.objects.filter(source=Docket.RECAP)
         else:
             q = self.type.objects.all()
         items = queryset_generator(q, chunksize=5000)

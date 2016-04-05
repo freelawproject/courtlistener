@@ -56,8 +56,8 @@ urlpatterns = [
         name='pagerank_file'),
 
     # Deprecation Dates:
-    # v1: 2015-11-01
-    # v2: 2015-11-01
+    # v1: 2016-04-01
+    # v2: 2016-04-01
     url(r'^api/rest/v(?P<v>[12])/.*',
         views.deprecated_api,
         name='deprecated_api'),

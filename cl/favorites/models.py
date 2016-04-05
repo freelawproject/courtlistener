@@ -44,5 +44,11 @@ class Favorite(models.Model):
         blank=True
     )
 
+    class Meta:
+        unique_together = (
+            ('cluster_id', 'user'),
+            ('audio_id', 'user'),
+        )
+
     def __unicode__(self):
         return u'Favorite %s' % self.id

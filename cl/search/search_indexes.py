@@ -1,5 +1,6 @@
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.utils import deepgetattr
+from cl.search.models import DocketEntry
 
 from datetime import datetime, date, time
 from django.core.urlresolvers import NoReverseMatch
@@ -160,6 +161,57 @@ class SearchAudioFile(object):
 
         # For faceting
         self.court_exact = item.docket.court_id
+
+
+class SearchDocketFile(object):
+
+    def __init__(self, item):
+        self.id = item.pk
+        self.court_id = item.court.pk
+        # Docket
+        if item.date_argued is not None:
+            self.dateArgued = datetime.combine(
+                item.date_argued,
+                time()
+            )
+        if item.date_reargued is not None:
+            self.dateReargued = datetime.combine(
+                item.date_reargued,
+                time()
+            )
+        if item.date_reargument_denied is not None:
+            self.dateReargumentDenied = datetime.combine(
+                item.date_reargument_denied,
+                time()
+            )
+        if item.date_filed is not None:
+            self.dateFiled = datetime.combine(
+                item.date_filed,
+                time()
+            )
+        self.docketNumber = item.docket_number
+        self.caseName = item.case_name
+        self.pacerCaseId = item.pacer_case_id
+        self.court = item.court.full_name
+        if item.nature_of_suit is not None:
+            self.natureOfSuit = item.nature_of_suit
+        if item.cause is not None:
+            self.cause = item.cause
+        if item.jury_demand is not None:
+            self.juryDemand = item.jury_demand
+        if item.jurisdiction_type is not None:
+            self.jurisdictionType = item.jurisdiction_type
+        # Judge the docket is assigned to
+        if item.assigned_to is not None:
+            self.assignedTo = item.assigned_to.name_full
+
+        # Getting all the DocketEntries of the docket.
+        docket_entries = DocketEntry.objects.filter(docket=item)
+        text_template = loader.get_template('indexes/dockets_text.txt')
+        # Docket Entries are extracted in the template.
+        context = {'item': item, 'docket_entries_seq' : docket_entries}
+
+        self.docketEntries = text_template.render(context).translate(null_map)
 
 
 class SearchPerson(object):

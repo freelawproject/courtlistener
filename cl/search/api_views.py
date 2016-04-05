@@ -48,7 +48,7 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionSerializer
     filter_class = OpinionFilter
     ordering_fields = (
-        'date_created', 'date_modified',
+        'id', 'date_created', 'date_modified',
     )
 
 
