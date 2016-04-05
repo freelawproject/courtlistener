@@ -151,6 +151,11 @@
              indexed="true"
              stored="true"
              multiValued="false"/>
+      <field name="natureOfSuit"
+             type="string"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
       <field name="cause"
              type="text_en_splitting_cl"
              indexed="true"
@@ -193,15 +198,11 @@
 
       <!--special fields-->
       <field name="_version_" type="long" indexed="true" stored="true"/>
-      <field name="django_ct" type="string" indexed="true" stored="true"
-             multiValued="false"/>
-      <field name="django_id" type="string" indexed="true" stored="true"
-             multiValued="false"/>
 
       <!--copy fields-->
       <field name="text" type="text_en_splitting"
              indexed="true"
-             stored="true"
+             stored="false"
              multiValued="true"
              termVectors="true"
              termPositions="true"
@@ -211,6 +212,7 @@
       <copyField source="docketNumber" dest="text" maxChars="30000"/>
       <copyField source="caseName" dest="text" maxChars="30000"/>
       <copyField source="pacerCaseId" dest="text" maxChars="30000"/>
+      <copyField source="natureOfSuit" dest="text" maxChars="30000"/>
       <copyField source="cause" dest="text" maxChars="30000"/>
       <copyField source="jurisdictionType" dest="text" maxChars="30000"/>
       <copyField source="docketEntries" dest="text" maxChars="100000"/>
@@ -290,12 +292,6 @@
      -->
 
    <field name="timestamp" type="date" indexed="true" stored="true" default="NOW" multiValued="false"/>
-
-   <field name="pagerank"
-          type="pagerank"
-          indexed="true"
-          stored="true"
-          omitNorms="false"/>
 
    <!-- Dynamic field definitions allow using convention over configuration
        for fields via the specification of patterns to match field names.

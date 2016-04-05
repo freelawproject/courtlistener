@@ -33,6 +33,8 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
                 search_item_list.append(SearchAudioFile(item))
             elif type(item) == Opinion:
                 search_item_list.append(SearchDocument(item))
+            elif type(item) == Docket:
+                search_item_list.append(SearchDocketFile(item))
         except AttributeError as e:
             print "AttributeError trying to add: %s\n  %s" % (item, e)
         except ValueError as e:
@@ -68,17 +70,6 @@ def add_or_update_audio_files(item_pks, force_commit=True):
             si.commit()
     except SolrError, exc:
         add_or_update_audio_files.retry(exc=exc, countdown=30)
-
-@app.task
-def add_or_update_recap_dockets(item_pks, force_commit=True):
-    si = sunburnt.SolrInterface(settings.SOLR_RECAP_DOCKET_URL, mode='w')
-    try:
-        si.add([SearchDocketFile(item) for item in
-                Docket.objects.filter(pk__in=item_pks)])
-        if force_commit:
-            si.commit()
-    except SolrError, exc:
-        add_or_update_recap_dockets.retry(exc=exc, countdown=30)
 
 
 @app.task

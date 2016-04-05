@@ -181,6 +181,8 @@ class SearchDocketFile(object):
         self.caseName = item.case_name
         self.pacerCaseId = item.pacer_case_id
         self.court = item.court.full_name
+        if item.nature_of_suit is not None:
+            self.natureOfSuit = item.nature_of_suit
         if item.cause is not None:
             self.cause = item.cause
         if item.jury_demand is not None:

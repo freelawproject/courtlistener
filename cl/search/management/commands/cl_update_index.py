@@ -151,7 +151,10 @@ class Command(BaseCommand):
             if self.verbosity >= 1:
                 self.stdout.write('Running in update mode...\n')
             if options.get('everything'):
-                self.add_or_update_all()
+                source_val = None
+                if options.get('source'):
+                    source_val = options['source']
+                self.add_or_update_all(source_val)
             elif options.get('datetime'):
                 self.add_or_update_by_datetime(options['datetime'])
             elif options.get('query'):
@@ -159,10 +162,6 @@ class Command(BaseCommand):
                 sys.exit(1)
             elif options.get('items'):
                 self.add_or_update(*options['items'])
-            elif options.get('source'):
-                source_val = options['source']
-                if source_val == Docket.RECAP:
-                    self.add_or_update_all_recap_files()
 
         elif options.get('delete'):
             if self.verbosity >= 1:
@@ -310,22 +309,6 @@ class Command(BaseCommand):
             add_or_update_audio_files.delay(items)
 
     @print_timing
-    def add_or_update_all_recap_files(self):
-        """
-        Updates The index of all the dockets whose source is RECAP.
-        :return:
-        """
-        self.stdout.write("Adding or updating all RECAP files.")
-        # Doing the updating asynchronously.
-        if self.type == Docket:
-            self.stdout.write("Adding or updating all RECAP dockets.")
-            pk_list = []
-            for docket in Docket.objects.filter(source=Docket.RECAP):
-                pk_list.append(docket.pk)
-            add_or_update_recap_dockets.delay(pk_list)
-
-
-    @print_timing
     def add_or_update_by_datetime(self, dt):
         """
         Given a datetime, adds or updates all items newer than that time.
@@ -337,15 +320,20 @@ class Command(BaseCommand):
         self._chunk_queryset_into_tasks(items, count)
 
     @print_timing
-    def add_or_update_all(self):
+    def add_or_update_all(self, source=None):
         """
         Iterates over the entire corpus, adding it to the index. Can be run on
         an empty index or an existing one.
 
         If run on an existing index, existing items will be updated.
+
+        :param source : The source of the items (Optional). One of the constants mentioned in the Docket Model choices.
         """
         self.stdout.write("Adding or updating all items...\n")
-        q = self.type.objects.all()
+        if source:
+            q = self.type.objects.filter(source=source)
+        else:
+            q = self.type.objects.all()
         items = queryset_generator(q, chunksize=5000)
         count = q.count()
         self._chunk_queryset_into_tasks(items, count)

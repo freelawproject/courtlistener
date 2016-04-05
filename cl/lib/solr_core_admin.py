@@ -65,6 +65,7 @@ def create_default_cores():
         instance_dir='/usr/local/solr/example/solr/dockets',
     )
 
+
 def delete_solr_core(core_name, delete_index=True, delete_data_dir=False):
     """ Delete a solr core by name."""
     params = {
