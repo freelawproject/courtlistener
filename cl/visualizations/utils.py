@@ -1,11 +1,10 @@
 from django.conf import settings
 from django.contrib import messages
 
-from cl.visualizations.models import Referer
-
 
 def new_title_for_viz(referer):
     """Check if a visualization already has a referer with a given title."""
+    from cl.visualizations.models import Referer
     matching_title_on_viz_exists = Referer.objects.filter(
         page_title=referer.page_title,
         map=referer.map
