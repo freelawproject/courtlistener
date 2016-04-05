@@ -191,7 +191,7 @@ class SearchDocketFile(object):
             self.jurisdictionType = item.jurisdiction_type
         # Judge the docket is assigned to
         if item.assigned_to is not None:
-            self.assignedTo = item.assigned_to.name_full()
+            self.assignedTo = item.assigned_to.name_full
 
         # Getting all the DocketEntries of the docket.
         docket_entries = DocketEntry.objects.filter(docket=item)
@@ -202,12 +202,3 @@ class SearchDocketFile(object):
         self.docketEntries = text_template.render(context).translate(null_map)
 
 
-    @staticmethod
-    def get_judge_name(person_obj):
-        fname = "%s "%person_obj.name_first if person_obj.name_first else ""
-        lname = "%s"%person_obj.name_last if person_obj.name_last else ""
-        mname = "%s "%person_obj.name_middle if person_obj.name_middle else ""
-
-        sname = " %s"%person_obj.name_suffix if person_obj.name_suffix else ""
-
-        return "{0}{1}{2}{3}".format(fname, mname, lname, sname).strip()
