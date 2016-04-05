@@ -191,7 +191,7 @@ class SearchDocketFile(object):
             self.jurisdictionType = item.jurisdiction_type
         # Judge the docket is assigned to
         if item.assigned_to is not None:
-            self.assignedTo = SearchDocket.get_judge_name(item.assigned_to)
+            self.assignedTo = item.assigned_to.name_full()
 
         # Getting all the DocketEntries of the docket.
         docket_entries = DocketEntry.objects.filter(docket=item)
