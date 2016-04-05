@@ -7,7 +7,7 @@ from cl.lib.argparse_types import valid_date_time, valid_obj_type, valid_source
 from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
 from cl.search.models import Opinion, Docket
-from cl.search.tasks import (delete_items, add_or_update_audio_files, add_or_update_recap_dockets,
+from cl.search.tasks import (delete_items, add_or_update_audio_files,
                              add_or_update_opinions, add_or_update_items)
 from celery.task.sets import TaskSet
 from django.core.management.base import BaseCommand
@@ -107,6 +107,11 @@ class Command(BaseCommand):
             default=False,
             help='Performs a simple commit and nothing more.'
         )
+        parser.add_argument(
+            '--source',
+            type=valid_source,
+            help='Take action on only the Dockets from RECAP stored in the local database.'
+        )
 
         act_upon_group = parser.add_mutually_exclusive_group()
         act_upon_group.add_argument(
@@ -132,11 +137,6 @@ class Command(BaseCommand):
             type=valid_date_time,
             help='Take action on items newer than a date (YYYY-MM-DD) or a '
                  'date and time (YYYY-MM-DD HH:MM:SS)'
-        )
-        act_upon_group.add_argument(
-            '--source',
-            type=valid_source,
-            help='Take action on only the Dockets from RECAP stored in the local database.'
         )
 
     def handle(self, *args, **options):

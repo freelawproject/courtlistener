@@ -1,1 +1,0 @@
-# Run the sh file 'index_recap_dockets.sh' to index the entire database.
