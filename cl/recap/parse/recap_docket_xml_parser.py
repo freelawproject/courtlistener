@@ -272,9 +272,10 @@ def parser(recap_docket_xml_filepath):
                     date_filed = get_reformated_value_from_xml(document_tag.date_filed, FormatType.DATE)
                     docket_entry_text = get_reformated_value_from_xml(document_tag.long_desc, FormatType.STRING)
                     # Updating the DocketEntry object
-                    docket_entry_obj.date_filed = date_filed
-                    docket_entry_obj.description = docket_entry_text
-                    docket_entry_obj.save()
+                    if date_filed and docket_entry_text:
+                        docket_entry_obj.date_filed = date_filed
+                        docket_entry_obj.description = docket_entry_text
+                        docket_entry_obj.save()
 
                 # Obtaining the document contents.
                 pacer_document_id = get_reformated_value_from_xml(document_tag.pacer_doc_id, FormatType.STRING)
