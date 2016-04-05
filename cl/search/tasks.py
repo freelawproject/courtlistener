@@ -4,7 +4,7 @@ from cl.audio.models import Audio
 from cl.celery import app
 from cl.lib.sunburnt import SolrError
 from cl.lib import sunburnt
-from cl.search.models import Opinion, OpinionCluster, Docket, DocketEntry
+from cl.search.models import Opinion, OpinionCluster, Docket
 from cl.search.search_indexes import InvalidDocumentError, SearchAudioFile
 from cl.search.search_indexes import SearchDocument, SearchDocketFile
 

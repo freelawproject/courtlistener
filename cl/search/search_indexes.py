@@ -151,6 +151,7 @@ class SearchAudioFile(object):
         # For faceting
         self.court_exact = item.docket.court_id
 
+
 class SearchDocketFile(object):
 
     def __init__(self, item):

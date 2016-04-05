@@ -3,7 +3,7 @@ import sys
 import time
 from cl.audio.models import Audio
 from cl.lib import sunburnt
-from cl.lib.argparse_types import valid_date_time, valid_obj_type, valid_source
+from cl.lib.argparse_types import valid_date_time, valid_obj_type
 from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
 from cl.search.models import Opinion, Docket
@@ -60,7 +60,8 @@ class Command(BaseCommand):
             required=True,
             help='Because the Solr indexes are loosely bound to the database, '
                  'commands require that the correct model is provided in this '
-                 'argument. Current choices are "audio", "opinions" and "dockets".'
+                 'argument. Current choices are "audio", "opinions" and '
+                 '"dockets".'
         )
         parser.add_argument(
             '--solr-url',
@@ -107,11 +108,6 @@ class Command(BaseCommand):
             default=False,
             help='Performs a simple commit and nothing more.'
         )
-        parser.add_argument(
-            '--source',
-            type=valid_source,
-            help='Take action on only the Dockets from RECAP stored in the local database.'
-        )
 
         act_upon_group = parser.add_mutually_exclusive_group()
         act_upon_group.add_argument(
@@ -151,10 +147,7 @@ class Command(BaseCommand):
             if self.verbosity >= 1:
                 self.stdout.write('Running in update mode...\n')
             if options.get('everything'):
-                source_val = None
-                if options.get('source'):
-                    source_val = options['source']
-                self.add_or_update_all(source_val)
+                self.add_or_update_all()
             elif options.get('datetime'):
                 self.add_or_update_by_datetime(options['datetime'])
             elif options.get('query'):
@@ -174,8 +167,6 @@ class Command(BaseCommand):
                 self.delete_by_query(options['query'])
             elif options.get('items'):
                 self.delete(*options['items'])
-            #elif options.get('recap'):
-                #self.delete_all_recap_dockets()
 
         elif options.get('do_commit'):
             self.commit()
@@ -320,18 +311,17 @@ class Command(BaseCommand):
         self._chunk_queryset_into_tasks(items, count)
 
     @print_timing
-    def add_or_update_all(self, source=None):
+    def add_or_update_all(self):
         """
         Iterates over the entire corpus, adding it to the index. Can be run on
         an empty index or an existing one.
 
         If run on an existing index, existing items will be updated.
-
-        :param source : The source of the items (Optional). One of the constants mentioned in the Docket Model choices.
         """
         self.stdout.write("Adding or updating all items...\n")
-        if source:
-            q = self.type.objects.filter(source=source)
+        if self.type == Docket:
+            # For now, only put RECAP dockets in search
+            q = self.type.objects.filter(source=Docket.RECAP)
         else:
             q = self.type.objects.all()
         items = queryset_generator(q, chunksize=5000)

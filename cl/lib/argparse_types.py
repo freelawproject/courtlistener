@@ -16,14 +16,6 @@ def valid_date(s):
         raise argparse.ArgumentTypeError(
             "Unable to parse date, %s" % s)
 
-def valid_source(src):
-    options_dict = {'recap': Docket.RECAP}
-
-    lsrc = src.lower()
-    if lsrc not in options_dict.keys():
-        raise argparse.ArgumentTypeError("Unable to parse type %s"%src)
-    else:
-        return options_dict[lsrc]
 
 def valid_date_time(s):
     try:
