@@ -1,0 +1,50 @@
+<div class="sidebar-section" id="type-switcher">
+    <h3 class="bottom">
+        <label for="id_type_0"
+               class="pointer
+                           {% if type == 'o' %}
+                                selected
+                           {% endif %}"
+               tabindex="198">
+            <input {% if type == 'o' %}
+                checked="checked"
+            {% endif %}
+                class="external-input hidden"
+                id="id_type_0"
+                name="type"
+                value="o"
+                type="radio">Opinions</label>
+    </h3>
+    <h3 class="top bottom">
+        <label for="id_type_1"
+               class="pointer
+                           {% if type == 'oa' %}
+                               selected
+                           {% endif %}"
+               tabindex="199">
+            <input {% if type == 'oa' %}
+                checked="checked"
+            {% endif %}
+                class="external-input hidden"
+                id="id_type_1"
+                name="type"
+                value="oa"
+                type="radio">Oral Arguments</label>
+    </h3>
+    <h3 class="top">
+        <label for="id_type_2"
+               class="pointer
+                           {% if type == 'p' %}
+                               selected
+                           {% endif %}"
+               tabindex="199.1">
+            <input {% if type == 'p' %}
+                checked="checked"
+            {% endif %}
+                class="external-input hidden"
+                id="id_type_2"
+                name="type"
+                value="p"
+                type="radio">Judges</label>
+    </h3>
+</div>

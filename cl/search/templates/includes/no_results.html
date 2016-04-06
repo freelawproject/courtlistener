@@ -1,0 +1,42 @@
+{% if not error %}
+    <h2 class="alt">Your search
+        {% if request.GET.q %}
+            &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
+        {% endif %}
+        had no results.</h2>
+    <p>Search tips:</p>
+    <ul>
+        <li>Check your spelling</li>
+        <li>Try fewer filters</li>
+        <li>Remove quotes if you used them</li>
+        <li>Try searching
+            {% if type == 'o' %}
+                oral arguments
+            {% elif type == 'oa' %}
+                opinions
+            {% endif %}
+            instead
+        </li>
+    </ul>
+    <p>Our <a href="{% url "coverage" %}">coverage page</a> details which cases
+        we
+        have. If you expected more results than this, <a
+                href="{% url "contact" %}">let us know</a>.
+        We value your feedback.</p>
+{% else %}
+    <h2 class="alt">Your search
+        {% if request.GET.q %}
+            &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
+        {% endif %}
+        encountered a <strong>deadly</strong> error.</h2>
+    <p class="bottom">This could be because:</p>
+    <ul>
+        <li>CourtListener couldn't make sense of your query</li>
+        <li>Our system is down and can't respond</li>
+        <li>Some other reason</li>
+    </ul>
+    <p>We log these errors and work to resolve them, but if you think we can
+        benefit from your experience, don't hesitate to <a
+                href="{% url "contact" %}">let us know</a>! We value your
+        feedback.</p>
+{% endif %}

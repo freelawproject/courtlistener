@@ -1,0 +1,141 @@
+{% load humanize %}
+
+{% if not error %}
+    <div class="sidebar-section">
+        <h3><span>Refine Your Query</span></h3>
+        <form action="/" method="get" id="sidebar-search-form">
+            <div id="sidebar-facet-placeholder">
+                <div id="extra-search-fields">
+                    {#  Modal is at bottom of results, so it loads last. #}
+                    <div class="cursor v-offset-below-2"
+                         data-toggle="modal"
+                         data-target="#court-picker">
+                        <label class="bottom cursor">
+                            Select Jurisdictions <i
+                                class="gray fa fa-external-link"></i>
+                        </label>
+
+                        <p class="top"><span
+                                id="jurisdiction-count">{{ court_count_human }}</span>
+                            Jurisdictions Selected</p>
+                    </div>
+
+                    {% if type == 'o' or type == 'oa' %}
+                        <div class="form-group">
+                            {{ search_form.case_name.label_tag }}
+                            {{ search_form.case_name }}
+                        </div>
+
+                        <div class="form-group">
+                            {{ search_form.judge.label_tag }}
+                            {{ search_form.judge }}
+                        </div>
+                    {% endif %}
+
+                    {% if type == 'o' %}
+                        <div class="v-offset-below-2">
+                            <label>Precedential Status</label>
+                            {% for status in status_facets %}
+                                <div class="sidebar-checkbox">
+                                    <input
+                                            id="id_{{ status.1 }}"
+                                            type="checkbox"
+                                            name="{{ status.1 }}"
+                                            class="external-input status-checkbox left"
+                                            {% if status.3 %}checked="checked"{% endif %}
+                                            tabindex="{{ status.5 }}">
+                                    <label
+                                            for="id_{{ status.1 }}"
+                                            class="pointer {% if status.2 == 0 %}gray{% endif %}">
+                                        <div>{{ status.0 }}&nbsp;<span
+                                                class="gray small">({{ status.2|intcomma }})</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.filed_after.label_tag }}
+                                    {{ search_form.filed_after }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.filed_before.label_tag }}
+                                    {{ search_form.filed_before }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            {{ search_form.citation.label_tag }}
+                            {{ search_form.citation }}
+                            <p class="gray"><a
+                                    href="{% url "citation_redirector" %}">Look
+                                up a specific citation</a>.
+                            </p>
+                        </div>
+
+                        <div class="form-group">
+                            {{ search_form.neutral_cite.label_tag }}
+                            {{ search_form.neutral_cite }}
+                        </div>
+
+                    {% elif type == 'oa' %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.argued_after.label_tag }}
+                                    {{ search_form.argued_after }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.argued_before.label_tag }}
+                                    {{ search_form.argued_before }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if type == 'o' or type == 'oa' %}
+                        <div class="form-group">
+                            {{ search_form.docket_number.label_tag }}
+                            {{ search_form.docket_number }}
+                        </div>
+                    {% endif %}
+
+                    {% if type == 'o' %}
+                        <div class="row">
+                            <div class="col-xs-6">
+                                <div class="form-group">
+                                    {{ search_form.cited_gt.label_tag }}
+                                    {{ search_form.cited_gt }}
+                                </div>
+                            </div>
+                            <div class="col-xs-6">
+                                <div class="form-group">
+                                    {{ search_form.cited_lt.label_tag }}
+                                    {{ search_form.cited_lt }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <button type="submit"
+                            class="btn btn-primary title"
+                            name="search"
+                            tabindex="227"><i class="fa fa-search"></i>&nbsp;Search
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if type == 'o' or type == 'oa' %}
+        {% include "includes/alert_sidebar_section.html" %}
+    {% endif %}
+{% endif %}

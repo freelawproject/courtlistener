@@ -32,329 +32,66 @@
 
 
 {% block sidebar %}
+{% with type=search_form.type.value %}
     <div class="col-sm-3 search-page" id="sidebar">
         <div class="sidebar-section visible-xs">
             <a class="btn btn-default" href="#search-results">Jump to
                 Results</a>
         </div>
-        <div class="sidebar-section" id="type-switcher">
-            <h3 class="bottom">
-                <label for="id_type_0"
-                       class="pointer
-                           {% if search_form.type.value == 'o' %}
-                                selected
-                           {% endif %}"
-                       tabindex="198">
-                    <input {% if search_form.type.value == 'o' %}
-                                checked="checked"
-                           {% endif %}
-                           class="external-input hidden"
-                           id="id_type_0"
-                           name="type"
-                           value="o"
-                           type="radio">Opinions</label>
-            </h3>
-            <h3 class="top bottom">
-                <label for="id_type_1"
-                       class="pointer
-                           {% if search_form.type.value == 'oa' %}
-                               selected
-                           {% endif %}"
-                       tabindex="199">
-                    <input {% if search_form.type.value == 'oa' %}
-                               checked="checked"
-                           {% endif %}
-                           class="external-input hidden"
-                           id="id_type_1"
-                           name="type"
-                           value="oa"
-                           type="radio">Oral Arguments</label>
-            </h3>
-            <h3 class="top">
-                <label for="id_type_2"
-                       class="pointer
-                           {% if search_form.type.value == 'p' %}
-                               selected
-                           {% endif %}"
-                       tabindex="199.1">
-                    <input {% if search_form.type.value == 'p' %}
-                               checked="checked"
-                           {% endif %}
-                           class="external-input hidden"
-                           id="id_type_2"
-                           name="type"
-                           value="p"
-                           type="radio">Judges</label>
-            </h3>
-        </div>
-
-        {% if not error %}
-        <div class="sidebar-section">
-            <h3><span>Refine Your Query</span></h3>
-            <form action="/" method="get" id="sidebar-search-form">
-                <div id="sidebar-facet-placeholder">
-                    {% if not error %}
-                        <div id="extra-search-fields">
-                            <div id="extra-sidebar-fields">
-                                {#  Modal is at bottom of results, so it loads last. #}
-                                <div class="cursor v-offset-below-2"
-                                     data-toggle="modal"
-                                     data-target="#court-picker">
-                                    <label class="bottom cursor">
-                                        Select Jurisdictions <i class="gray fa fa-external-link"></i>
-                                    </label>
-
-                                    <p class="top"><span id="jurisdiction-count">{{ court_count_human }}</span>
-                                        Jurisdictions Selected</p>
-                                </div>
-
-                                {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
-                                    <div class="form-group">
-                                        {{ search_form.case_name.label_tag }}
-                                        {{ search_form.case_name }}
-                                    </div>
-
-                                    <div class="form-group">
-                                        {{ search_form.judge.label_tag }}
-                                        {{ search_form.judge }}
-                                    </div>
-                                {% endif %}
-
-                                {% if search_form.type.value == 'o' %}
-                                    <div class="v-offset-below-2">
-                                        <label>Precedential Status</label>
-                                        {% for status in status_facets %}
-                                            <div class="sidebar-checkbox">
-                                                <input
-                                                        id="id_{{ status.1 }}"
-                                                        type="checkbox"
-                                                        name="{{ status.1 }}"
-                                                        class="external-input status-checkbox left"
-                                                        {% if status.3 %}checked="checked"{% endif %}
-                                                        tabindex="{{ status.5 }}">
-                                                <label
-                                                        for="id_{{ status.1 }}"
-                                                        class="pointer {% if status.2 == 0 %}gray{% endif %}">
-                                                    <div>{{ status.0 }}&nbsp;<span
-                                                            class="gray small">({{ status.2|intcomma }})</span></div>
-                                                </label>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                {{ search_form.filed_after.label_tag }}
-                                                {{ search_form.filed_after }}
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                {{ search_form.filed_before.label_tag }}
-                                                {{ search_form.filed_before }}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="form-group">
-                                        {{ search_form.citation.label_tag }}
-                                        {{ search_form.citation }}
-                                        <p class="gray"><a
-                                                href="{% url "citation_redirector" %}">Look
-                                            up a specific citation</a>.
-                                        </p>
-                                    </div>
-
-                                    <div class="form-group">
-                                        {{ search_form.neutral_cite.label_tag }}
-                                        {{ search_form.neutral_cite }}
-                                    </div>
-
-                                {% elif search_form.type.value == 'oa' %}
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                {{ search_form.argued_after.label_tag }}
-                                                {{ search_form.argued_after }}
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                {{ search_form.argued_before.label_tag }}
-                                                {{ search_form.argued_before }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endif %}
-
-                                {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
-                                    <div class="form-group">
-                                        {{ search_form.docket_number.label_tag }}
-                                        {{ search_form.docket_number }}
-                                    </div>
-                                {% endif %}
-
-                                {% if search_form.type.value == 'o' %}
-                                    <div class="row">
-                                        <div class="col-xs-6">
-                                            <div class="form-group">
-                                                {{ search_form.cited_gt.label_tag }}
-                                                {{ search_form.cited_gt }}
-                                            </div>
-                                        </div>
-                                        <div class="col-xs-6">
-                                            <div class="form-group">
-                                                {{ search_form.cited_lt.label_tag }}
-                                                {{ search_form.cited_lt }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endif %}
-
-                                <button type="submit"
-                                        class="btn btn-primary title"
-                                        name="search"
-                                        tabindex="227"><i class="fa fa-search"></i>&nbsp;Search
-                                </button>
-                            </div>
-                        </div>
-                    {% endif %}
-                </div>
-            </form>
-        </div>
-
-        <div class="sidebar-section">
-            <h3 id="create-alert-header">
-                {% if request.GET.edit_alert %}
-                    <span>Edit Your Alert</span> <i class="fa fa-pencil gray"></i>
-                {% else %}
-                    <span>Create an Alert</span> <i class="fa fa-bell gold"></i>
-                {% endif %}
-            </h3>
-            {% if user.is_authenticated %}
-                {% if get_string %}
-                    {% if not request.GET.edit_alert %}
-                        <p>Get regular notifications about this query by creating an alert.</p>
-                    {% endif %}
-                    <form action="" method="post">{% csrf_token %}
-                        {{ alert_form.query }}
-                        <div class="form-group">
-                            <label for="id_name">Give the alert a name</label>
-                            {{ alert_form.name }}
-                            {% if alert_form.name.errors %}
-                                <p class="help-block">
-                                    {% for error in alert_form.name.errors %}
-                                        {{ error|escape }}
-                                    {% endfor %}
-                                </p>
-                            {% endif %}
-                        </div>
-
-                        <div class="form-group">
-                            <label for="id_rate">How often should we notify you?</label>
-                            {{ alert_form.rate }}
-                            {% if alert_form.rate.errors %}
-                                <p class="help-block">
-                                    {% for error in alert_form.rate.errors %}
-                                        {{ error|escape }}
-                                    {% endfor %}
-                                </p>
-                            {% endif %}
-                        </div>
-
-                        {# Hidden unless shown by JS #}
-                        <div class="alert alert-warning hidden"
-                             id="donate-for-rt">
-                            <p>
-                                CourtListener is a project of <a
-                                    href="https://free.law"
-                                    target="_blank">Free Law Project</a>, a
-                                federally-recognized 501(c)(3) non-profit.
-                                <a href="{% url "faq" %}#real-time-alerts"
-                                   target="_blank">Real Time Alerts</a> are
-                                only supported for users that donate at
-                                least $10 per year.
-                            </p>
-                            <p>Select another option or donate to create this
-                                alert.
-                            </p>
-
-                            <p class="bottom">
-                                <a href="{% url "donate" %}?referrer=rt-alerts"
-                                   class="btn btn-danger"
-                                   target="_blank">Donate Now</a>
-                            </p>
-                        </div>
-                        {% if request.GET.edit_alert %}
-                            {# Used when editing an alert. #}
-                            <input class="editing-alert"
-                                   type="hidden"
-                                   value="{{ request.GET.edit_alert }}"
-                                   name="edit_alert">
-                        {% endif %}
-                        <button type="submit"
-                                class="btn btn-primary title"
-                                name="alertSave"
-                                id="alertSave"
-                                tabindex="254">
-                            {% if request.GET.edit_alert %}Save Changes{% else %}Create Alert{% endif %}
-                        </button>
-                    </form>
-                    <p class="gray">Some jurisdictions do not yet support alerts. Check
-                        <a href="{% url "coverage" %}#scraped-jurisdictions">our list</a> to be
-                        sure your query is supported.</p>
-                {% else %}
-                    <p>To create an alert, place a query.</p>
-                {% endif %}
-            {% else %}
-                {# User is not authenticated #}
-                <p>To get daily alerts for this search, <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">sign in</a> or
-                <a href="{% url "register" %}?next={{ request.path }}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">register</a> as a new user.</p>
-            {% endif %}
-        </div>
-        {% endif %}
+        {% include "includes/result_type_chooser.html" %}
+        {% include "includes/sidebar_filters.html" %}
     </div>
+{% endwith %}
 {% endblock %}
 
+
 {% block content %}
+{% with type=search_form.type.value %}
     <div id="search-results" class="col-lg-7 col-sm-9 search-page">
         {% include "includes/messages.html" %}
-        {% if alert_form.errors %}
-            <div class="alert alert-danger hidden-xs" role="alert">
-                <p class="bottom">There was an error creating your alert. Please
-                    <a href="#create-alert-header">see below</a>.
-                </p>
-            </div>
-        {% endif %}
-        {% if request.GET.edit_alert %}
-            <div class="alert alert-warning" role="alert">
-                <div class="row">
-                    <div class="col-sm-6">
-                        <p class="bottom">You are editing your alert,
-                        "<strong>{{ alert_form.name.value }}</strong>".</p>
-                    </div>
-                    <div class="col-sm-6 text-right">
-                        <a class="btn btn-default btn-sm"
-                           href="?{{ get_string_sans_alert }}">
-                            Cancel Editing
-                        </a>
+        {% if type == 'o' or type == 'oa' %}
+            {% if alert_form.errors %}
+                <div class="alert alert-danger hidden-xs" role="alert">
+                    <p class="bottom">There was an error creating your alert. Please
+                        <a href="#create-alert-header">see below</a>.
+                    </p>
+                </div>
+            {% endif %}
+            {% if request.GET.edit_alert %}
+                <div class="alert alert-warning" role="alert">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <p class="bottom">You are editing your alert,
+                            "<strong>{{ alert_form.name.value }}</strong>".</p>
+                        </div>
+                        <div class="col-sm-6 text-right">
+                            <a class="btn btn-default btn-sm"
+                               href="?{{ get_string_sans_alert }}">
+                                Cancel Editing
+                            </a>
+                        </div>
                     </div>
                 </div>
-            </div>
+            {% endif %}
         {% endif %}
 
         {% if results.paginator.count > 0 %}
             <div class="row">
                 <div class="col-sm-6">
                     <h2 id="result-count" class="bottom">
-                        {{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}
-                        {% if search_form.type.value == 'o' %}
+                        {% if type == 'o' %}
+                            {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
+                        {% elif type == 'oa' %}
+                            {{ results.paginator.count|intcomma }} Oral Argument{{ results.paginator.count|pluralize }}
+                        {% elif type == 'p' %}
+                            {{ results.paginator.count|intcomma }} Judge{{ results.paginator.count|pluralize }}
+                        {% endif %}
+                        {% if type == 'o' %}
                             <a href="/feed/search/?{{ get_string }}">
                                 <i class="gray fa fa-rss"
                                    title="Subscribe to a feed of these results"></i>
                             </a>
-                        {% elif search_form.type.value == 'oa' %}
+                        {% elif type == 'oa' %}
                             <a href="/podcast/search/?{{ get_string }}">
                                 <i class="gray fa fa-rss"
                                    title="Subscribe to a podcast of these results"></i>
@@ -373,47 +110,12 @@
             </div>
             {% include "includes/search_result.html" %}
         {% else %}
-            {% if not error %}
-                <h2 class="alt">Your search
-                    {% if request.GET.q != "" %}
-                        &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
-                    {% endif %}
-                    had no results.</h2>
-                <p>Search tips:</p>
-                <ul>
-                    <li>Check your spelling</li>
-                    <li>Try fewer filters</li>
-                    <li>Remove quotes if you used them</li>
-                    <li>Try searching
-                        {% if search_form.type.value == 'o' %}
-                            oral arguments
-                        {% elif search_form.type.value == 'oa' %}
-                            opinions
-                        {% endif %}
-                        instead
-                    </li>
-                </ul>
-                <p>Our <a href="{% url "coverage" %}">coverage page</a> details which cases we
-                have. If you expected more results than this, <a href="{% url "contact" %}">let us know</a>.
-                We value your feedback.</p>
-            {% else %}
-                <h2 class="alt">Your search
-                    {% if request.GET.q %}
-                        &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
-                    {% endif %}
-                    encountered a <strong>deadly</strong> error.</h2>
-                <p class="bottom">This could be because:</p>
-                <ul>
-                    <li>CourtListener couldn't make sense of your query</li>
-                    <li>Our system is down and can't respond</li>
-                    <li>Some other reason</li>
-                </ul>
-                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to    <a href="{% url "contact" %}">let us know</a>! We value your feedback.</p>
-            {% endif %}
+            {% include "includes/no_results.html" %}
         {% endif %}
 
         {% include "includes/pagination.html" %}
         {% include "includes/random_tip.html" %}
         {% include "includes/jurisdiction_picker_modal.html" %}
     </div>
+{% endwith %}
 {% endblock %}
