@@ -6,7 +6,7 @@ $(document).ready(function() {
     var citedGreaterThan = $('#id_cited_gt');
     var citedLessThan = $('#id_cited_lt');
 
-    function makeSearchPath(tabSwitch) {
+    function makeSearchPath() {
         // Empty the sliders if they are both at their max
         if (citedGreaterThan.val() === 0 && citedLessThan.val() === 20000) {
         // see https://github.com/freelawproject/courtlistener/issues/303
@@ -17,34 +17,8 @@ $(document).ready(function() {
         // Gather all form fields that are necessary
         var gathered = $();
 
-        // If the user is switching tabs, then make sure their ordering is
-        // valid for the tab they're headed to.
-        var dropDown = $('#id_order_by');
-        if (tabSwitch){
-            var value;
-            switch (dropDown.val()) {
-                case 'dateFiled desc':
-                    value = 'dateArgued desc';
-                    break;
-                case 'dateFiled asc':
-                    value = 'dateArgued asc';
-                    break;
-                case 'dateArgued desc':
-                    value = 'dateFiled desc';
-                    break;
-                case 'dateArgued asc':
-                    value = 'dateFiled asc';
-                    break;
-                default:
-                    value = 'score desc';
-                    break;
-            }
-            var el = $('<input type="hidden" name="order_by" />').val(value);
-            gathered = gathered.add(el);
-        } else {
-            // Not a tab switch; make sure to gather the element regardless.
-            gathered = gathered.add(dropDown);
-        }
+        // Add the ordering drop down
+        gathered = gathered.add($('#id_order_by'));
 
         // Add the input boxes that aren't empty
         var selector = '.external-input[type=text]';
@@ -131,7 +105,7 @@ $(document).ready(function() {
         document.location = makeSearchPath(false);
     });
 
-    $('#id_order_by').change(function () {
+    $('.search-page #id_order_by').change(function () {
         $('#search-form').submit();
     });
 
@@ -160,9 +134,7 @@ $(document).ready(function() {
     // Result Type Switching //
     ///////////////////////////
     $('#type-switcher label:not(.selected) input[name=type]').click(function () {
-        // Note that we can't do submit here, because that'd trigger a
-        // switching of the the checked radio button, and nothing would happen.
-        document.location = makeSearchPath(true);
+        document.location = '/?type=' + this.value;
     });
 
 

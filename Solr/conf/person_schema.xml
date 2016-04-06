@@ -141,6 +141,14 @@
             termOffsets="true"
             termPositions="true"
             termVectors="true"/>
+     <field name="name_reverse"
+            type="string"
+            indexed="true"
+            stored="true"
+            multiValued="false"
+            termOffsets="true"
+            termPositions="true"
+            termVectors="true"/>
 
      <field name="dob"
             type="date"
@@ -166,12 +174,18 @@
             type="string"
             indexed="true"
             stored="true"
-            multiValued="false"/>
+            multiValued="false"
+            termVectors="true"
+            termPositions="true"
+            termOffsets="true"/>
      <field name="dob_state"
             type="string"
             index="true"
             stored="true"
-            multiValued="false"/>
+            multiValued="false"
+            termVectors="true"
+            termPositions="true"
+            termOffsets="true"/>
      <field name="absolute_url"
             type="string"
             indexed="false"
@@ -292,7 +306,10 @@
             type="string"
             indexed="true"
             stored="true"
-            multiValued="true"/>
+            multiValued="true"
+            termVectors="true"
+            termPositions="true"
+            termOffsets="true"/>
      <field name="political_affiliation"
             type="string"
             indexed="true"
@@ -303,6 +320,7 @@
             indexed="true"
             stored="true"
             multiValued="true"/>
+
 
      <!--Faceting-->
      <field name="court_exact"

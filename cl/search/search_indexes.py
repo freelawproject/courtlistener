@@ -224,6 +224,7 @@ class SearchPerson(object):
         self.gender = item.get_gender_display()
         self.religion = item.get_religion_display()
         self.name = item.name_full
+        self.name_reverse = item.name_full_reverse
         if item.date_dob is not None:
             self.dob = datetime.combine(item.date_dob, time())
         self.date_granularity_dob = item.date_granularity_dob
@@ -240,7 +241,7 @@ class SearchPerson(object):
             self.court_id = [p.court.pk for p in positions if
                              p.court is not None]
             self.position_type = [p.get_position_type_display() for p in positions]
-            self.appointer = [p.apppointer.name_full for p in positions
+            self.appointer = [p.appointer.name_full for p in positions
                               if p.appointer is not None]
             self.supervisor = [p.supervisor.name_full for p in positions
                                if p.supervisor is not None]

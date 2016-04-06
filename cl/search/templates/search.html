@@ -54,7 +54,7 @@
                            value="o"
                            type="radio">Opinions</label>
             </h3>
-            <h3 class="top">
+            <h3 class="top bottom">
                 <label for="id_type_1"
                        class="pointer
                            {% if search_form.type.value == 'oa' %}
@@ -69,6 +69,22 @@
                            name="type"
                            value="oa"
                            type="radio">Oral Arguments</label>
+            </h3>
+            <h3 class="top">
+                <label for="id_type_2"
+                       class="pointer
+                           {% if search_form.type.value == 'p' %}
+                               selected
+                           {% endif %}"
+                       tabindex="199.1">
+                    <input {% if search_form.type.value == 'p' %}
+                               checked="checked"
+                           {% endif %}
+                           class="external-input hidden"
+                           id="id_type_2"
+                           name="type"
+                           value="p"
+                           type="radio">Judges</label>
             </h3>
         </div>
 
@@ -92,15 +108,17 @@
                                         Jurisdictions Selected</p>
                                 </div>
 
-                                <div class="form-group">
-                                    {{ search_form.case_name.label_tag }}
-                                    {{ search_form.case_name }}
-                                </div>
+                                {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
+                                    <div class="form-group">
+                                        {{ search_form.case_name.label_tag }}
+                                        {{ search_form.case_name }}
+                                    </div>
 
-                                <div class="form-group">
-                                    {{ search_form.judge.label_tag }}
-                                    {{ search_form.judge }}
-                                </div>
+                                    <div class="form-group">
+                                        {{ search_form.judge.label_tag }}
+                                        {{ search_form.judge }}
+                                    </div>
+                                {% endif %}
 
                                 {% if search_form.type.value == 'o' %}
                                     <div class="v-offset-below-2">
@@ -153,7 +171,6 @@
                                         {{ search_form.neutral_cite }}
                                     </div>
 
-
                                 {% elif search_form.type.value == 'oa' %}
                                     <div class="row">
                                         <div class="col-md-6">
@@ -171,10 +188,12 @@
                                     </div>
                                 {% endif %}
 
-                                <div class="form-group">
-                                    {{ search_form.docket_number.label_tag }}
-                                    {{ search_form.docket_number }}
-                                </div>
+                                {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
+                                    <div class="form-group">
+                                        {{ search_form.docket_number.label_tag }}
+                                        {{ search_form.docket_number }}
+                                    </div>
+                                {% endif %}
 
                                 {% if search_form.type.value == 'o' %}
                                     <div class="row">
@@ -192,6 +211,7 @@
                                         </div>
                                     </div>
                                 {% endif %}
+
                                 <button type="submit"
                                         class="btn btn-primary title"
                                         name="search"

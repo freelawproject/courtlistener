@@ -20,6 +20,7 @@
       "is_alias_of": null,
       "date_created": "2016-03-12T01:40:19.324Z",
       "fjc_id": null,
+      "cl_id": "1",
       "dob_state": "",
       "slug": "bill-clinton"
     },
@@ -48,6 +49,7 @@
       "is_alias_of": null,
       "date_created": "2016-03-12T01:41:56.580Z",
       "fjc_id": null,
+      "cl_id": "2",
       "dob_state": "NY",
       "slug": "judith-susan-sheindlin"
     },

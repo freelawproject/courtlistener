@@ -35,5 +35,22 @@
                 {% if search_form.order_by.value == "dateArgued asc" %}
                     selected="selected"
                 {% endif %}>Oldest First</option>
+    {% elif request.GET.type == 'p' %}
+        <option value="name_reverse asc"
+                {% if search_form.order_by.value == "name_reverse asc" %}
+                    selected="selected"
+                {% endif %}>Last Name</option>
+        <option value="date_dob desc"
+                {% if search_form.order_by.value == "date_dob desc" %}
+                    selected="selected"
+                {% endif %}>Most Recently Born</option>
+        <option value="date_dob asc"
+                {% if search_form.order_by.value == "date_dob asc" %}
+                    selected="selected"
+                {% endif %}>Least Recently Born</option>
+        <option value="date_dod desc"
+                {% if search_form.order_by.value == "date_dod desc" %}
+                    selected="selected"
+                {% endif %}>Most Recently Deceased</option>
     {% endif %}
 </select>

@@ -1,3 +1,4 @@
+from cl.people_db.models import Position, PoliticalAffiliation
 from cl.search.fields import CeilingDateField
 from cl.search.fields import FloorDateField
 from cl.search.models import Court
@@ -6,19 +7,25 @@ from django import forms
 
 import re
 
+
 OPINION_ORDER_BY_CHOICES = (
-    ('score desc',      'Relevance'),
-    ('dateFiled desc',  'Newest First'),
-    ('dateFiled asc',   'Oldest First'),
-    ('citeCount desc',  'Most Cited First'),
-    ('citeCount asc',   'Least Cited First'),
-    ('dateArgued desc', 'Newest First'),
-    ('dateArgued asc',  'Oldest First'),
+    ('score desc',       'Relevance'),
+    ('dateFiled desc',   'Newest First'),
+    ('dateFiled asc',    'Oldest First'),
+    ('citeCount desc',   'Most Cited First'),
+    ('citeCount asc',    'Least Cited First'),
+    ('dateArgued desc',  'Newest First'),
+    ('dateArgued asc',   'Oldest First'),
+    ('name_reverse asc', 'Name'),
+    ('dob desc',         'Most Recently Born'),
+    ('dob asc',          'Least Recently Born'),
+    ('dod desc',         'Most Recently Deceased'),
 )
 
 TYPE_CHOICES = (
     ('o', 'Opinions'),
     ('oa', 'Oral Arguments'),
+    ('p', 'People'),
 )
 
 
@@ -65,6 +72,24 @@ class SearchForm(forms.Form):
     q = forms.CharField(
         required=False
     )
+    court = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput()
+    )
+    order_by = forms.ChoiceField(
+        choices=OPINION_ORDER_BY_CHOICES,
+        required=False,
+        label='Result Ordering',
+        initial='score desc',
+        widget=forms.Select(
+            attrs={'class': 'external-input form-control',
+                   'tabindex': '201'}
+        )
+    )
+
+    #
+    # Oral argument and Opinion shared fields
+    #
     case_name = forms.CharField(
         required=False,
         label='Case Name',
@@ -83,10 +108,6 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off',
                    'tabindex': '203'}
         )
-    )
-    court = forms.CharField(
-        required=False,
-        widget=forms.HiddenInput()
     )
     docket_number = forms.CharField(
         required=False,
@@ -123,16 +144,6 @@ class SearchForm(forms.Form):
     #
     # Opinion fields
     #
-    order_by = forms.ChoiceField(
-        choices=OPINION_ORDER_BY_CHOICES,
-        required=False,
-        label='Result Ordering',
-        initial='score desc',
-        widget=forms.Select(
-            attrs={'class': 'external-input form-control',
-                   'tabindex': '201'}
-        )
-    )
     filed_after = FloorDateField(
         required=False,
         label='Filed After',
@@ -184,11 +195,91 @@ class SearchForm(forms.Form):
     cited_lt = forms.CharField(
         required=False,
         label='Max Cites',
-        initial=20000,
+        initial=60000,
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
                    'autocomplete': 'off',
                    'tabindex': '223'}
+        )
+    )
+
+    #
+    # Judge fields
+    #
+    name = forms.CharField(
+        required=False,
+        label='Name',
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    born_after = FloorDateField(
+        required=False,
+        label="Born After",
+        widget=forms.TextInput(
+            attrs={'placeholder': 'YYYY-MM-DD',
+                   'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    born_before = CeilingDateField(
+        required=False,
+        label="Born Before",
+        widget=forms.TextInput(
+            attrs={'placeholder': 'YYYY-MM-DD',
+                   'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    dob_city = forms.CharField(
+        required=False,
+        label='Birth City',
+        widget=forms.TextInput(
+                attrs={'class': 'external-input form-control',
+                       'autocomplete': 'off'}
+        )
+    )
+    dob_state = forms.CharField(
+        required=False,
+        label='Birth State',
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    school = forms.CharField(
+        required=False,
+        label='School Attended',
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    appointer = forms.CharField(
+        required=False,
+        label='Appointed By',
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    selection_method = forms.ChoiceField(
+        choices=Position.SELECTION_METHODS,
+        required=False,
+        label='Selection Method',
+        initial='None',
+        widget=forms.Select(
+            attrs={'class': 'external-input form-control'}
+        )
+    )
+    political_party = forms.ChoiceField(
+        choices=PoliticalAffiliation.POLITICAL_PARTIES,
+        required=False,
+        label='Political Party',
+        initial='None',
+        widget=forms.Select(
+            attrs={'class': 'external-input form-control'}
         )
     )
 
@@ -234,9 +325,9 @@ class SearchForm(forms.Form):
     #  2. In our search form, part of what we do is clean up the GET requests
     #     that the user sent. This is completed in clean_form(). This allows a
     #     user to be taught what better queries look like. To do this, we have
-    #     to make a temporary variable in _clean_opinion_form() and assign it
+    #     to make a temporary variable in _clean_form() and assign it
     #     the values of the cleaned_data. The upshot of this is that most
-    #     changes made here will also need to be made in _clean_opinion_form().
+    #     changes made here will also need to be made in _clean_form().
     #     Failure to do that will result in the query being processed correctly
     #     (search results are all good), but the form on the UI won't be
     #     cleaned up for the user, making things rather confusing.
@@ -281,6 +372,9 @@ class SearchForm(forms.Form):
         elif self.cleaned_data['type'] == 'oa':
             if not self.cleaned_data['order_by']:
                 return 'dateArgued desc'
+        elif self.cleaned_data['type'] == 'p':
+            if not self.cleaned_data['order_by']:
+                return self.fields['order_by'].initial
         return self.cleaned_data['order_by']
 
     def clean_type(self):

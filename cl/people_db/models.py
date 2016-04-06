@@ -158,12 +158,19 @@ class Person(models.Model):
 
     @property
     def name_full(self):
-        return ' '.join([
+        return u' '.join([
             self.name_first,
             self.name_middle,
             self.name_last,
             self.get_name_suffix_display(),
         ]).strip()
+
+    @property
+    def name_full_reverse(self):
+        return u'{name_last}, {name_first} {name_middle}, {suffix}'.format(
+            suffix=self.get_name_suffix_display(),
+            **self.__dict__
+        ).strip(', ')
 
     class Meta:
         verbose_name_plural = "people"
