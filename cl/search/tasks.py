@@ -4,9 +4,12 @@ from cl.audio.models import Audio
 from cl.celery import app
 from cl.lib.sunburnt import SolrError
 from cl.lib import sunburnt
-from cl.search.models import Opinion, OpinionCluster, Docket, DocketEntry
-from cl.search.search_indexes import InvalidDocumentError, SearchAudioFile
-from cl.search.search_indexes import SearchDocument, SearchDocketFile
+from cl.people_db.models import Person
+from cl.search.models import Opinion, OpinionCluster, Docket
+from cl.search.search_indexes import (
+    InvalidDocumentError, SearchAudioFile, SearchDocument, SearchPerson,
+    SearchDocketFile,
+)
 
 from django.conf import settings
 
@@ -35,6 +38,9 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
                 search_item_list.append(SearchDocument(item))
             elif type(item) == Docket:
                 search_item_list.append(SearchDocketFile(item))
+            elif type(item) == Person:
+                search_item_list.append(SearchPerson(item))
+
         except AttributeError as e:
             print "AttributeError trying to add: %s\n  %s" % (item, e)
         except ValueError as e:

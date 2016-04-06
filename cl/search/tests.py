@@ -320,6 +320,20 @@ class SearchTest(IndexedSolrTestCase):
                       msg="Invalid search did not result in \"deadly\" error.")
 
 
+class JudgeSearchTest(IndexedSolrTestCase):
+    def test_sorting(self):
+        """Can we do sorting on various fields?"""
+        sort_fields = ['name_reverse asc', 'dob desc', 'dod desc']
+        for sort_field in sort_fields:
+            r = self.client.get('/', {'type': 'p', 'ordered_by': sort_field})
+            self.assertNotIn(
+                'deadly',
+                r.content.lower(),
+                msg="Got a deadly error when doing a judge search ordered "
+                    "by %s" % sort_field
+            )
+
+
 class FeedTest(IndexedSolrTestCase):
     def test_jurisdiction_feed(self):
         """Can we simply load the jurisdiction feed?"""

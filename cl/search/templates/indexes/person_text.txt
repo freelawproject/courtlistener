@@ -1,0 +1,37 @@
+{# Audio file #}
+{{ item.name_full }}
+{% for alias in item.aliases.all %}
+    {{ alias.name_full }}
+{% endfor %}
+
+{{ item.dob_city }}
+{{ item.get_dob_state_display }}
+{% for p in item.positions.all %}
+    {{ p.get_position_type_display }}
+    {{ p.get_nomination_process_display }}
+    {{ p.get_judicial_committee_action_display }}
+    {{ p.get_how_selected_display }}
+    {{ p.get_termination_reason_display }}
+    {{ p.court.full_name }}
+    {{ p.court.citation_string }}
+    {{ p.court.pk }}
+    {{ p.organization_name }}
+    {{ p.job_title }}
+{% endfor %}
+
+{% for pa in item.political_affiliations.all %}
+    {{ pa.get_political_party_display }}
+{% endfor %}
+
+{% for e in item.educations.all %}
+    {{ e.school.name }}
+{% endfor %}
+
+{% for aba in item.aba_ratings.all %}
+    {{ aba.get_rating_display }}
+{% endfor %}
+
+{{ item.fjc_id }}
+{{ item.cl_id }}
+{{ item.get_gender_display }}
+{{ item.get_religion_display }}

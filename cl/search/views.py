@@ -37,9 +37,9 @@ def do_search(request, rows=20, order_by=None, type=None):
     if search_form.is_valid():
         cd = search_form.cleaned_data
         # Allows an override by calling methods.
-        if order_by:
+        if order_by is not None:
             cd['order_by'] = order_by
-        if type:
+        if type is not None:
             cd['type'] = type
         search_form = _clean_form(request, cd)
 
@@ -54,15 +54,21 @@ def do_search(request, rows=20, order_by=None, type=None):
                 conn = sunburnt.SolrInterface(
                     settings.SOLR_AUDIO_URL, mode='r')
                 status_facets = None
+            elif cd['type'] == 'p':
+                conn = sunburnt.SolrInterface(
+                    settings.SOLR_PEOPLE_URL, mode='r')
+                status_facets = None
             results_si = conn.raw_query(**search_utils.build_main_query(cd))
 
             courts = Court.objects.filter(in_use=True).values(
-                'pk', 'short_name', 'jurisdiction',
-                'has_oral_argument_scraper')
+                'pk', 'short_name', 'jurisdiction', 'has_oral_argument_scraper'
+            )
             courts, court_count_human, court_count = search_utils\
                 .merge_form_with_courts(courts, search_form)
 
         except Exception, e:
+            if settings.DEBUG is True:
+                print e
             logger.warning("Error loading search with request: %s" % request.GET)
             logger.warning("Error was %s" % e)
             return {'error': True}
@@ -88,6 +94,8 @@ def do_search(request, rows=20, order_by=None, type=None):
         # Catches any Solr errors, and aborts.
         logger.warning("Error loading pagination on search page with request: %s" % request.GET)
         logger.warning("Error was: %s" % e)
+        if settings.DEBUG is True:
+            print e
         return {'error': True}
 
     return {'search_form': search_form,

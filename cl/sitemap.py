@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 from django.template import loader
 from django.views.decorators.cache import never_cache
@@ -35,24 +36,23 @@ def index_sitemap_maker(request):
     Counts the number of cases in the site, divides by `items_per_sitemap` and
     provides links items.
     """
-    connection_string_obj_type_pairs = (
-        (settings.SOLR_OPINION_URL, 'opinions'),
-        (settings.SOLR_AUDIO_URL, 'oral-arguments'),
+    connection_string_sitemap_path_pairs = (
+        (settings.SOLR_OPINION_URL, reverse('opinion_sitemap')),
+        (settings.SOLR_AUDIO_URL, reverse('oral_argument_sitemap')),
+        (settings.SOLR_PEOPLE_URL, reverse('people_sitemap')),
     )
     sites = []
-    for connection_string, obj_type in connection_string_obj_type_pairs:
+    for connection_string, path in connection_string_sitemap_path_pairs:
         conn = sunburnt.SolrInterface(connection_string, mode='r')
         search_results_object = conn.raw_query(**index_solr_params).execute()
         count = search_results_object.result.numFound
         num_pages = count / items_per_sitemap + 1
         for i in range(1, num_pages + 1):
-            sites.append(
-                'https://www.courtlistener.com/sitemap-%s.xml?p=%s' % (obj_type, i)
-            )
+            sites.append('https://www.courtlistener.com%s?p=%s' % (path, i))
 
     # Random additional sitemaps.
     sites.extend([
-        'https://www.courtlistener.com/sitemap-simple-pages.xml',
+        'https://www.courtlistener.com%s' % reverse('simple_pages_sitemap'),
         'https://www.courtlistener.com/sitemap-visualizations.xml',
     ])
 
