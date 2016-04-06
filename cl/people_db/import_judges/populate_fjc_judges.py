@@ -49,6 +49,11 @@ def make_federal_judge(item, testing=False):
     # if foreign-dead, leave blank for now.
     if len(dod_state) > 2:
         dod_state = ''
+        
+    if not pd.isnull(item['midname']):
+        if len(item['midname']) == 1:
+            item['midname'] = item['midname'] + '.'
+
 
     # instantiate Judge object
     person = Person(
