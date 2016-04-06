@@ -6,7 +6,8 @@ from dateutil import parser
 from django.utils.timezone import is_naive, make_aware, utc
 
 from cl.audio.models import Audio
-from cl.search.models import Opinion
+from cl.people_db.models import Person
+from cl.search.models import Opinion, Docket
 
 
 def valid_date(s):
@@ -46,11 +47,15 @@ def readable_dir(prospective_dir):
 
 
 def valid_obj_type(s):
-    options = ('opinions', 'audio')
+    options = ('opinions', 'audio', 'dockets', 'people')
     if s.lower() == 'opinions':
         return Opinion
     elif s.lower() == 'audio':
         return Audio
+    elif s.lower() == 'people':
+        return Person
+    elif s.lower() == 'dockets':
+        return Docket
     else:
         raise argparse.ArgumentTypeError(
             "Unable to parse type, %s. Valid options are %s" % (s, options))

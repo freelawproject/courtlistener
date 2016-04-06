@@ -307,99 +307,101 @@ def make_qf_string(qf):
     return ' '.join(qf_array)
 
 
-def build_main_query(cd, highlight='all', order_by=''):
-    main_params = {
-        'q': cd['q'] or '*:*',
-        'sort': cd.get('order_by', order_by),
-        'caller': 'build_main_query',
-    }
-
-    if str(main_params['sort']).startswith('score') and \
-            cd['type'] == 'o':
+def add_boosts(main_params, cd):
+    """Add any boosts that make sense for the query."""
+    if cd['type'] == 'o' and main_params['sort'].startswith('score'):
         main_params['boost'] = 'pagerank'
 
-    # Give a boost on the case_name field if it's obviously a case_name query.
-    vs_query = any([' v ' in main_params['q'],
-                    ' v. ' in main_params['q'],
-                    ' vs. ' in main_params['q']])
-    in_re_query = main_params['q'].lower().startswith('in re ')
-    matter_of_query = main_params['q'].lower().startswith('matter of ')
-    ex_parte_query = main_params['q'].lower().startswith('ex parte ')
-    if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
-        qf.update({'caseName': 50})
-        main_params['qf'] = make_qf_string(qf)
+    if cd['type'] in ['oa', 'o']:
+        # Give a boost on the case_name field if it's obviously a case_name
+        # query.
+        vs_query = any([' v ' in main_params['q'],
+                        ' v. ' in main_params['q'],
+                        ' vs. ' in main_params['q']])
+        in_re_query = main_params['q'].lower().startswith('in re ')
+        matter_of_query = main_params['q'].lower().startswith('matter of ')
+        ex_parte_query = main_params['q'].lower().startswith('ex parte ')
+        if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
+            qf.update({'caseName': 50})
+            main_params['qf'] = make_qf_string(qf)
 
-    if highlight:
-        # Common highlighting params up here.
-        main_params.update({
-            'hl': 'true',
-            'f.text.hl.snippets': '5',
-            'f.text.hl.maxAlternateFieldLength': '500',
-            'f.text.hl.alternateField': 'text',
-        })
+    return main_params
 
-        if highlight == 'all':
-            # Requested fields for the main query. We only need the fields
-            # here that are not requested as part of highlighting. Facet
-            # params are not set here because they do not retrieve results,
-            # only counts (they are set to 0 rows).
-            common_fl = ['id', 'absolute_url', 'court_id',
-                          'local_path', 'source', 'download_url']
-            common_hlfl = ['text', 'caseName', 'judge', 'docketNumber',
-                            'court_citation_string']
 
-            if cd['type'] == 'o':
-                main_params.update({
-                    'fl': ','.join(common_fl + ['status', 'dateFiled',
-                                                 'citeCount', 'sibling_ids']),
-                    'hl.fl': ','.join(common_hlfl +
-                                      ['suitNature', 'citation', 'neutralCite',
-                                       'lexisCite']),
-                    'f.suitNature.hl.fragListBuilder': 'single',
-                    'f.citation.hl.fragListBuilder': 'single',
-                    'f.neutralCite.hl.fragListBuilder': 'single',
-                    'f.lexisCite.hl.fragListBuilder': 'single',
-                    'f.suitNature.hl.alternateField': 'suitNature',
-                    'f.citation.hl.alternateField': 'citation',
-                    'f.neutralCite.hl.alternateField': 'neutralCite',
-                    'f.lexisCite.hl.alternateField': 'lexisCite',
-                })
-            elif cd['type'] == 'oa':
-                main_params.update({
-                    'fl': ','.join(common_fl + ['docket_id', 'dateArgued', 'duration']),
-                    'hl.fl': ','.join(common_hlfl),
-                })
-            main_params.update({
-                'f.caseName.hl.fragListBuilder': 'single',
-                'f.judge.hl.fragListBuilder': 'single',
-                'f.docketNumber.hl.fragListBuilder': 'single',
-                'f.court_citation_string.hl.fragListBuilder': 'single',
+def add_highlighting(main_params, cd, highlight):
+    """Add any parameters relating to highlighting."""
 
-                # If there aren't any hits in the text return the field instead
-                'f.caseName.hl.alternateField': 'caseName',
-                'f.judge.hl.alternateField': 'judge',
-                'f.docketNumber.hl.alternateField': 'docketNumber',
-                'f.court_citation_string.hl.alternateField': 'court_citation_string',
-            })
-        elif highlight == 'text':
-            main_params['hl.fl'] = 'text'
-    else:
+    if not highlight:
         # highlighting is off, therefore we get the default fl parameter,
         # which gives us all fields. We could set it manually, but there's
         # no need.
-        pass
+        return main_params
 
+    # Common highlighting params up here.
+    main_params.update({
+        'hl': 'true',
+        'f.text.hl.snippets': '5',
+        'f.text.hl.maxAlternateFieldLength': '500',
+        'f.text.hl.alternateField': 'text',
+    })
+
+    if highlight == 'text':
+        main_params['hl.fl'] = 'text'
+        return main_params
+
+    assert highlight == 'all', "Got unexpected highlighting value."
+    # Requested fields for the main query. We only need the fields
+    # here that are not requested as part of highlighting. Facet
+    # params are not set here because they do not retrieve results,
+    # only counts (they are set to 0 rows).
+
+    def add_hl_and_fl(fl, hlfl):
+        main_params.update({
+            'fl': ','.join(fl),
+            'hl.fl': ','.join(hlfl),
+        })
+        for field in hlfl:
+            if field == 'text':
+                continue
+            main_params['f.%s.hl.fragListBuilder' % field] = 'single'
+            main_params['f.%s.hl.alternateField' % field] = field
+
+    if cd['type'] == 'o':
+        fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
+              'download_url', 'status', 'dateFiled', 'citeCount',
+              'sibling_ids']
+        hlfl = ['text', 'caseName', 'judge', 'docketNumber',
+                'court_citation_string', 'suitNature', 'citation',
+                'neutralCite', 'lexisCite']
+        add_hl_and_fl(fl, hlfl)
+    elif cd['type'] == 'oa':
+        fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
+              'download_url', 'docket_id', 'dateArgued', 'duration']
+        hlfl = ['text', 'caseName', 'judge', 'docketNumber',
+                'court_citation_string']
+        add_hl_and_fl(fl, hlfl)
+    elif cd['type'] == 'p':
+        fl = ['id', 'absolute_url', 'dob', 'date_granularity_dob', 'dod',
+              'date_granularity_dod', 'political_affiliation',
+              'aba_rating']
+        hlfl = ['school', 'name', 'dob_city', 'dob_state', 'name_reverse']
+        add_hl_and_fl(fl, hlfl)
+
+    return main_params
+
+
+def add_fq(main_params, cd):
+    """Add the fq params"""
     # Changes here are usually mirrored in place_facet_queries, below.
     main_fq = []
 
-    if cd['case_name']:
-        main_fq.append(make_fq(cd, 'caseName', 'case_name'))
-    if cd['judge']:
-        main_fq.append(make_fq(cd, 'judge', 'judge'))
-    if cd['docket_number']:
-        main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
-
     if cd['type'] == 'o':
+        if cd['case_name']:
+            main_fq.append(make_fq(cd, 'caseName', 'case_name'))
+        if cd['judge']:
+            main_fq.append(make_fq(cd, 'judge', 'judge'))
+        if cd['docket_number']:
+            main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
         if cd['citation']:
             main_fq.append(make_fq_proximity_query(cd, 'citation', 'citation'))
         if cd['neutral_cite']:
@@ -411,6 +413,12 @@ def build_main_query(cd, highlight='all', order_by=''):
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
     elif cd['type'] == 'oa':
+        if cd['case_name']:
+            main_fq.append(make_fq(cd, 'caseName', 'case_name'))
+        if cd['judge']:
+            main_fq.append(make_fq(cd, 'judge', 'judge'))
+        if cd['docket_number']:
+            main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
         main_fq.append(make_date_query('dateArgued', cd['argued_before'],
                                        cd['argued_after']))
 
@@ -434,7 +442,23 @@ def build_main_query(cd, highlight='all', order_by=''):
     if len(main_fq) > 0:
         main_params['fq'] = main_fq
 
-    #print "Params sent to search are: %s" % '&'.join(['%s=%s' % (k, v) for k, v in main_params.items()])
+    return main_params
+
+
+def build_main_query(cd, highlight='all', order_by=''):
+    main_params = {
+        'q': cd['q'] or '*:*',
+        'sort': cd.get('order_by', order_by),
+        'caller': 'build_main_query',
+    }
+
+    main_params = add_boosts(main_params, cd)
+    main_params = add_highlighting(main_params, cd, highlight)
+    main_params = add_fq(main_params, cd)
+
+    # print "Params sent to search are: %s" % '&'.join(
+    #         ['%s=%s' % (k, v) for k, v in main_params.items()]
+    # )
     #print results_si.execute()
     return main_params
 

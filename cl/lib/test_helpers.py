@@ -1,6 +1,7 @@
 import os
 from cl.lib import sunburnt
-from cl.lib.solr_core_admin import create_solr_core, delete_solr_core
+from cl.lib.solr_core_admin import create_solr_core, delete_solr_core, \
+    create_default_cores
 from cl.search.models import Court
 from django.conf import settings
 from django.core.management import call_command
@@ -12,6 +13,7 @@ from lxml import etree
 @override_settings(
     SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
+    SOLR_PEOPLE_URL=settings.SOLR_PEOPLE_TEST_URL,
 )
 class EmptySolrTestCase(TestCase):
     """Sets up an empty Solr index for tests that need to set up data manually.
@@ -24,6 +26,7 @@ class EmptySolrTestCase(TestCase):
         # Set up testing cores in Solr and swap them in
         self.core_name_opinion = settings.SOLR_OPINION_TEST_CORE_NAME
         self.core_name_audio = settings.SOLR_AUDIO_TEST_CORE_NAME
+        self.core_name_people = settings.SOLR_PEOPLE_TEST_CORE_NAME
         create_solr_core(self.core_name_opinion)
         create_solr_core(
             self.core_name_audio,
@@ -31,21 +34,23 @@ class EmptySolrTestCase(TestCase):
                                 'audio_schema.xml'),
             instance_dir='/usr/local/solr/example/solr/audio',
         )
-        # swap_solr_core('collection1', self.core_name_opinion)
-        # swap_solr_core('audio', self.core_name_audio)
+        create_solr_core(
+            self.core_name_people,
+            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+                                'person_schema.xml'),
+            instance_dir='/usr/local/solr/example/solr/person',
+        )
         self.si_opinion = sunburnt.SolrInterface(
             settings.SOLR_OPINION_URL, mode='rw')
         self.si_audio = sunburnt.SolrInterface(
             settings.SOLR_AUDIO_URL, mode='rw')
-
-        self.si_opinion.commit()
-        self.si_audio.commit()
+        self.si_people = sunburnt.SolrInterface(
+            settings.SOLR_PEOPLE_URL, mode='rw')
 
     def tearDown(self):
-        # swap_solr_core(self.core_name_opinion, 'collection1')
-        # swap_solr_core(self.core_name_audio, 'audio')
         delete_solr_core(self.core_name_opinion)
         delete_solr_core(self.core_name_audio)
+        delete_solr_core(self.core_name_people)
 
 
 class SolrTestCase(EmptySolrTestCase):
@@ -74,6 +79,7 @@ class IndexedSolrTestCase(SolrTestCase):
         for obj_type, core_name in {
             'audio': self.core_name_audio,
             'opinions': self.core_name_opinion,
+            'people': self.core_name_people,
         }.items():
             args = [
                 '--type', obj_type,

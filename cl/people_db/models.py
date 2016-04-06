@@ -48,6 +48,7 @@ class Person(models.Model):
     )
     is_alias_of = models.ForeignKey(
         'self',
+        related_name="aliases",
         blank=True,
         null=True,
     )
@@ -130,7 +131,7 @@ class Person(models.Model):
     gender = models.CharField(
         choices=GENDERS,
         max_length=2,
-        blank = True
+        blank=True,
     )
     religion = models.CharField(
         choices=RELIGIONS,
@@ -142,7 +143,7 @@ class Person(models.Model):
         return u'%s: %s' % (self.pk, self.name_full)
 
     def get_absolute_url(self):
-        return reverse('view_judge', args=[self.pk, self.slug])
+        return reverse('view_person', args=[self.pk, self.slug])
 
     def save(self, *args, **kwargs):
         self.slug = slugify(trunc(self.name_full, 158))
@@ -156,12 +157,19 @@ class Person(models.Model):
 
     @property
     def name_full(self):
-        return ' '.join([
+        return u' '.join([
             self.name_first,
             self.name_middle,
             self.name_last,
             self.get_name_suffix_display(),
         ]).strip()
+
+    @property
+    def name_full_reverse(self):
+        return u'{name_last}, {name_first} {name_middle}, {suffix}'.format(
+            suffix=self.get_name_suffix_display(),
+            **self.__dict__
+        ).strip(', ')
 
     class Meta:
         verbose_name_plural = "people"
