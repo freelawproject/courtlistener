@@ -65,6 +65,18 @@ def validate_partial_date(instance, field):
         })
 
 
+def validate_is_not_alias(instance, field):
+    """Ensure that an alias to a person is not being used instead of the person
+    themself.
+    """
+    person = getattr(instance, field)
+    if person.is_alias:
+        raise ValidationError({
+            field: 'Cannot set %s to an alias of a Person. Hint: "%s" is an '
+                   'alias of "%s"' % (field, person, person.is_alias_of)
+        })
+
+
 def disable_auto_now_fields(*models):
     """Turns off the auto_now and auto_now_add attributes on a Model's fields,
     so that an instance of the Model can be saved with a custom value.

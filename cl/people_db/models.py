@@ -3,7 +3,7 @@ from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
 from localflavor.us import models as local_models
-from cl.lib.model_helpers import validate_partial_date
+from cl.lib.model_helpers import validate_partial_date, validate_is_not_alias
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -154,6 +154,7 @@ class Person(models.Model):
     def clean_fields(self, *args, **kwargs):
         for field in ['dob', 'dod']:
             validate_partial_date(self, field)
+        validate_is_not_alias(self, 'is_alias_of')
         super(Person, self).clean_fields(*args, **kwargs)
 
     @property
@@ -171,6 +172,10 @@ class Person(models.Model):
             suffix=self.get_name_suffix_display(),
             **self.__dict__
         ).strip(', ')
+
+    @property
+    def is_alias(self):
+        return True if self.is_alias_of is not None else False
 
     class Meta:
         verbose_name_plural = "people"
@@ -518,6 +523,9 @@ class Position(models.Model):
         for field in ['start', 'termination']:
             validate_partial_date(self, field)
 
+        for field in ['person', 'appointer', 'supervisor', 'predecessor']:
+            validate_is_not_alias(self, field)
+
         super(Position, self).clean_fields(*args, **kwargs)
 
 
@@ -623,6 +631,11 @@ class Education(models.Model):
             self.pk, self.degree, self.school.name, self.degree_year
         )
 
+    def clean_fields(self, *args, **kwargs):
+        # Note that this isn't run during updates, alas.
+        validate_is_not_alias(self, 'person')
+        super(Education, self).clean_fields(*args, **kwargs)
+
 
 class Race(models.Model):
     RACES = (
@@ -707,6 +720,9 @@ class PoliticalAffiliation(models.Model):
     def clean_fields(self, *args, **kwargs):
         for field in ['start', 'end']:
             validate_partial_date(self, field)
+
+        validate_is_not_alias(self, 'person')
+
         super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
 
 
@@ -784,4 +800,5 @@ class ABARating(models.Model):
 
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, 'rated')
+        validate_is_not_alias(self, 'person')
         super(ABARating, self).clean_fields(*args, **kwargs)
