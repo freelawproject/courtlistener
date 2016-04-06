@@ -167,8 +167,6 @@ class Command(BaseCommand):
                 self.delete_by_query(options['query'])
             elif options.get('items'):
                 self.delete(*options['items'])
-            #elif options.get('recap'):
-                #self.delete_all_recap_dockets()
 
         elif options.get('do_commit'):
             self.commit()
@@ -315,10 +313,8 @@ class Command(BaseCommand):
         an empty index or an existing one.
 
         If run on an existing index, existing items will be updated.
-
         """
         self.stdout.write("Adding or updating all items...\n")
-
         if self.type == Person:
             q = self.type.objects.filter(is_alias_of=None)
         elif self.type == Docket:
