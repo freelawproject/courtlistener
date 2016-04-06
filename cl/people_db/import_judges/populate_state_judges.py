@@ -52,9 +52,13 @@ def make_state_judge(item, testing=False):
         if not testing:
             person.save()
 
-    courtid = get_court_object(item['court'] + ' of ' + item['state'])
+    if 'colr' in item['cl_id']:
+        courtid = get_court_object(item['court'] + ' of ' + item['state'])
+    else:
+        courtid = get_court_object(item['court'])
 
     if courtid is None:
+        print(item)
         raise
 
     # assign start date
