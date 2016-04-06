@@ -1,3 +1,4 @@
+{% load extras %}
 {% load text_filters %}
 {% load humanize %}
 
@@ -38,7 +39,55 @@
                     {% endif %}
                 </time>
             </div>
+        {% elif search_form.type.value == 'p' or type_override == 'oa' %}
+            <div class="inline nowrap">
+                <span class="meta-data-header">Born:</span>
+                <time class="meta-data-value"
+                      datetime="{% granular_date result.dob granularity=result.date_granularity_dob iso=True %}">
+                    {% granular_date result.dob granularity=result.date_granularity_dob %}
+                </time>
+            </div>
+            {% if result.dod %}
+                <div class="inline nowrap">
+                    <span class="meta-data-header">Deceased:</span>
+                    <time class="meta-data-value"
+                          datetime="{% granular_date result.dod granularity=result.date_granularity_dod iso=True %}">
+                        {% granular_date result.dod granularity=result.date_granularity_dod %}
+                    </time>
+                </div>
+            {% endif %}
+            {% if result.political_affiliation %}
+                <div class="inline nowrap">
+                    <span class="meta-data-header">Political Affiliations:</span>
+                    <span class="meta-data-value">{{ result.political_affiliation|uniq|safeseq|join:", " }}</span>
+                </div>
+            {% endif %}
+            {% if result.aba_rating %}
+                <div class="inline nowrap">
+                    <span class="meta-data-header"><abbr title="American Bar Association">ABA</abbr> Ratings:</span>
+                    <span class="meta-data-value">{{ result.aba_rating|uniq|safeseq|join:", " }}</span>
+                </div>
+            {% endif %}
+            {% if result.appointer %}
+                <div class="inline">
+                    <span class="meta-data-header">Appointers:</span>
+                    <span class="meta-data-value">{{ result.appointer|uniq|safeseq|join:", " }}</span>
+                </div>
+            {% endif %}
+            {% if result.supervisor %}
+                <div class="inline">
+                    <span class="meta-data-header">Supervisors:</span>
+                    <span class="meta-data-value">{{ result.supervisor|uniq|safeseq|join:", " }}</span>
+                </div>
+            {% endif %}
+            {% if result.predecessor %}
+                <div class="inline">
+                    <span class="meta-data-header">Predecessors:</span>
+                    <span class="meta-data-value">{{ result.predecessor|uniq|safeseq|join:", " }}</span>
+                </div>
+            {% endif %}
         {% endif %}
+
         {% if search_form.type.value == 'o' or type_override == 'o' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Status:</span>
@@ -80,6 +129,13 @@
                             {{ result.solr_highlights.suitNature.0|safe }}
                         </a>
                     </span>
+                </div>
+            {% endif %}
+        {% elif search_form.type.value == 'p' or type_override == 'oa' %}
+            {% if result.school %}
+                <div class="inline">
+                    <span class="meta-data-header">Schools:</span>
+                    <span class="meta-data-value">{{ result.school|uniq|safeseq|join:", " }}</span>
                 </div>
             {% endif %}
         {% endif %}
