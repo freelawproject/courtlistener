@@ -26,6 +26,11 @@ class PositionAdmin(admin.ModelAdmin):
         'predecessor',
     )
 
+    def save_model(self, request, obj, form, change):
+        obj.save()
+        from cl.search.tasks import add_or_update_people
+        add_or_update_people.delay([obj.person_id], force_commit=False)
+
 
 class PositionInline(admin.StackedInline):
     model = Position
@@ -100,6 +105,11 @@ class PersonAdmin(admin.ModelAdmin):
         'gender',
         'fjc_id',
     )
+
+    def save_model(self, request, obj, form, change):
+        obj.save()
+        from cl.search.tasks import add_or_update_people
+        add_or_update_people.delay([obj.pk], force_commit=False)
 
 
 class RaceAdmin(admin.ModelAdmin):

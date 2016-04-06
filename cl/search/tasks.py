@@ -79,6 +79,17 @@ def add_or_update_audio_files(item_pks, force_commit=True):
 
 
 @app.task
+def add_or_update_people(item_pks, force_commit=True):
+    si = sunburnt.SolrInterface(settings.SOLR_PEOPLE_URL, mode='w')
+    try:
+        si.add([SearchPerson(item) for item in
+                Person.objects.filter(pk__in=item_pks)])
+        if force_commit:
+            si.commit()
+    except SolrError, exc:
+        add_or_update_people.retry(exc=exc, countdown=30)
+
+@app.task
 def delete_items(items, solr_url):
     si = sunburnt.SolrInterface(solr_url, mode='w')
     si.delete(list(items))
