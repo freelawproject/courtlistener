@@ -990,3 +990,33 @@ class OpinionsCited(models.Model):
         verbose_name_plural = 'Opinions cited'
         unique_together = ("citing_opinion", "cited_opinion")
 
+class AppellateReview(models.Model):
+    STANDARD_TYPES = (
+        ('d', 'Discretionary'),
+        ('m', 'Mandatory'),
+        ('s', 'Special or Mixed'),        
+    )
+    upper_court = models.ForeignKey(
+        Court,
+        related_name='lower_courts_reviewed',
+    )
+    lower_court = models.ForeignKey(
+        Court,
+        related_name='reviewed_by',
+    )
+    date_start = models.DateTimeField(
+        help_text="The date this appellate review relationship began",
+        db_index=True,
+        null=True
+    )
+    date_end = models.DateTimeField(
+        help_text="The date this appellate review relationship ended",
+        db_index=True,
+        null=True
+    )
+    def __unicode__(self):
+        return u'%s ⤜--reviewed by⟶  %s' % (self.lower_court.id,
+                                        self.upper_court.id)
+
+    class Meta:        
+        unique_together = ("upper_court", "lower_court")
