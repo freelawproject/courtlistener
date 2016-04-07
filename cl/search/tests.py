@@ -10,6 +10,7 @@ from django.core.urlresolvers import reverse
 from django.http import HttpRequest
 from django.test import TestCase, override_settings
 from lxml import etree, html
+from rest_framework.status import HTTP_200_OK
 
 from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase
@@ -155,7 +156,7 @@ class SearchTest(IndexedSolrTestCase):
         """Does typing into the main query box work?"""
         r = self.client.get('/', {'q': 'supreme'})
         self.assertIn('Honda', r.content)
-        self.assertIn('1 Result', r.content)
+        self.assertIn('1 Opinion', r.content)
 
     def test_a_case_name_query(self):
         """Does querying by case name work?"""
@@ -303,6 +304,18 @@ class SearchTest(IndexedSolrTestCase):
             "deadly",
             r.content,
             msg="Got a deadly error when doing a Date Argued filter."
+        )
+
+    def test_oa_search_api(self):
+        """Can we get oa results on the search endpoint?"""
+        r = self.client.get(
+            reverse('search-list', kwargs={'version': 'v3'}),
+            {'type': 'oa'}
+        )
+        self.assertEqual(
+            r.status_code,
+            HTTP_200_OK,
+            msg="Did not get good status code from oral arguments API endpoint"
         )
 
     def test_homepage(self):
