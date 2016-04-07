@@ -991,7 +991,7 @@ class OpinionsCited(models.Model):
         unique_together = ("citing_opinion", "cited_opinion")
 
 class AppellateReview(models.Model):
-    STANDARD_TYPES = (
+    REVIEW_STANDARDS = (
         ('d', 'Discretionary'),
         ('m', 'Mandatory'),
         ('s', 'Special or Mixed'),        
@@ -1013,6 +1013,10 @@ class AppellateReview(models.Model):
         help_text="The date this appellate review relationship ended",
         db_index=True,
         null=True
+    )
+    review_standard =  models.CharField(
+        max_length=1,
+        choices=REVIEW_STANDARDS,
     )
     def __unicode__(self):
         return u'%s ⤜--reviewed by⟶  %s' % (self.lower_court.id,

@@ -14,9 +14,8 @@ for opinion in opinion_list:
     
     # get list of cited opinions from reviewed courts
     cited = OpinionsCited.objects.filter(citing_opinion=opinion,
-                                         cited_opinion.court_id.lower_courts_reviewed
+                                         cited_opinion__court__in = citing_opinion__court__lower_courts_reviewed
                                          )
-    
     # if any of them have the same party names, set link.
     
     # if no matches, run search of lower courts in last 4 years
