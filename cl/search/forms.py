@@ -1,3 +1,5 @@
+from localflavor.us.us_states import STATE_CHOICES
+
 from cl.people_db.models import Position, PoliticalAffiliation
 from cl.search.fields import CeilingDateField
 from cl.search.fields import FloorDateField
@@ -46,6 +48,16 @@ def _clean_form(request, cd):
         after = cd['filed_after']
         mutable_get['filed_after'] = '%s-%02d-%02d' % \
                                      (after.year, after.month, after.day)
+    if mutable_get.get('born_before') and cd.get('born_before') is not None:
+        # Don't use strftime since it won't work prior to 1900.
+        before = cd['born_before']
+        mutable_get['born_before'] = '%s-%02d-%02d' % \
+                                     (before.year, before.month, before.day)
+    if mutable_get.get('born_after') and cd.get('born_after') is not None:
+        after = cd['born_after']
+        mutable_get['born_after'] = '%s-%02d-%02d' % \
+                                    (after.year, after.month, after.day)
+
     mutable_get['order_by'] = cd['order_by']
     mutable_get['type'] = cd['type']
 
@@ -161,8 +173,7 @@ class SearchForm(forms.Form):
             attrs={'placeholder': 'YYYY-MM-DD',
                    'class': 'external-input form-control',
                    'autocomplete': 'off',
-                   'tabindex': '221'
-            }
+                   'tabindex': '221'}
         )
     )
     citation = forms.CharField(
@@ -240,12 +251,12 @@ class SearchForm(forms.Form):
                        'autocomplete': 'off'}
         )
     )
-    dob_state = forms.CharField(
+    dob_state = forms.ChoiceField(
+        choices=[('', '---------')] + list(STATE_CHOICES),
         required=False,
         label='Birth State',
-        widget=forms.TextInput(
-            attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off'}
+        widget=forms.Select(
+            attrs={'class': 'external-input form-control'}
         )
     )
     school = forms.CharField(
@@ -265,7 +276,7 @@ class SearchForm(forms.Form):
         )
     )
     selection_method = forms.ChoiceField(
-        choices=Position.SELECTION_METHODS,
+        choices=[('', '---------')] + list(Position.SELECTION_METHODS),
         required=False,
         label='Selection Method',
         initial='None',
@@ -273,10 +284,10 @@ class SearchForm(forms.Form):
             attrs={'class': 'external-input form-control'}
         )
     )
-    political_party = forms.ChoiceField(
-        choices=PoliticalAffiliation.POLITICAL_PARTIES,
+    political_affiliation = forms.ChoiceField(
+        choices=[('', '---------')] + list(PoliticalAffiliation.POLITICAL_PARTIES),
         required=False,
-        label='Political Party',
+        label='Political Affiliation',
         initial='None',
         widget=forms.Select(
             attrs={'class': 'external-input form-control'}
@@ -399,6 +410,16 @@ class SearchForm(forms.Form):
                 # the dates so their query is like this: a-->   <--b
                 cleaned_data['filed_before'] = after
                 cleaned_data['filed_after'] = before
+
+        before = cleaned_data.get('born_before')
+        after = cleaned_data.get('born_after')
+        if before and after:
+            # Only do something if both fields are valid so far.
+            if before < after:
+                # The user is requesting dates like this: <--b  a-->. Switch
+                # the dates so their query is like this: a-->   <--b
+                cleaned_data['born_before'] = after
+                cleaned_data['born_after'] = before
 
         # 2. Convert the value in the court field to the various court_* fields
         court_str = cleaned_data.get('court')
