@@ -114,6 +114,7 @@ def get_binary_content(download_url, cookies, adapter, method='GET'):
                 download_url,
                 verify=False,  # WA has a certificate we don't understand
                 headers=headers,
+                timeout=60,
                 cookies=cookies
             )
 

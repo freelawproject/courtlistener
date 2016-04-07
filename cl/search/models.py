@@ -17,17 +17,17 @@ from cl.lib.string_utils import trunc
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
 
 JURISDICTIONS = (
-    ('F',   'Federal Appellate'),
-    ('FD',  'Federal District'),
-    ('FB',  'Federal Bankruptcy'),
+    ('F', 'Federal Appellate'),
+    ('FD', 'Federal District'),
+    ('FB', 'Federal Bankruptcy'),
     ('FBP', 'Federal Bankruptcy Panel'),
-    ('FS',  'Federal Special'),
-    ('S',   'State Supreme'),
-    ('SA',  'State Appellate'),
-    ('ST',  'State Trial'),
-    ('SS',  'State Special'),
-    ('C',   'Committee'),
-    ('T',   'Testing'),
+    ('FS', 'Federal Special'),
+    ('S', 'State Supreme'),
+    ('SA', 'State Appellate'),
+    ('ST', 'State Trial'),
+    ('SS', 'State Special'),
+    ('C', 'Committee'),
+    ('T', 'Testing'),
 )
 
 DOCUMENT_STATUSES = (
@@ -72,35 +72,37 @@ class Docket(models.Model):
     DEFAULT = 0
     RECAP = 1
     SCRAPER = 2
+    FDSYS = 3
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
-        (SCRAPER, "Scraper")
+        (SCRAPER, "Scraper"),
+        (FDSYS, "FDSYS")
     )
 
     source = models.SmallIntegerField(
-            help_text="contains the source of the Docket.",
-            choices=SOURCE_CHOICES,
+        help_text="contains the source of the Docket.",
+        choices=SOURCE_CHOICES,
     )
     court = models.ForeignKey(
-            'Court',
-            help_text="The court where the docket was filed",
-            db_index=True,
-            related_name='dockets',
+        'Court',
+        help_text="The court where the docket was filed",
+        db_index=True,
+        related_name='dockets',
     )
     assigned_to = models.ForeignKey(
-            'people_db.Person',
-            related_name='assigning',
-            help_text="The judge the case was assigned to.",
-            null=True,
-            blank=True,
+        'people_db.Person',
+        related_name='assigning',
+        help_text="The judge the case was assigned to.",
+        null=True,
+        blank=True,
     )
     referred_to = models.ForeignKey(
-            'people_db.Person',
-            related_name='referring',
-            help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
-            null=True,
-            blank=True,
+        'people_db.Person',
+        related_name='referring',
+        help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
+        null=True,
+        blank=True,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -191,6 +193,13 @@ class Docket(models.Model):
         blank=True,
         db_index=True,
     )
+    fdsys_case_id = models.CharField(
+        help_text="The cased ID provided by FDSYS.",
+        null=True,
+        blank=True,
+        max_length=100,
+        db_index=True,
+    )
     cause = models.CharField(
         help_text="The cause for the case.",
         max_length=200,
@@ -230,18 +239,25 @@ class Docket(models.Model):
         null=True,
         blank=True,
     )
+    fdsys_url = models.CharField(
+        help_text="Path to the Docket XML page in FDSYS site",
+        max_length=1000,
+        null=True,
+        blank=True,
+    )
+
     date_blocked = models.DateField(
-            help_text="The date that this opinion was blocked from indexing by "
-                      "search engines",
-            blank=True,
-            null=True,
-            db_index=True,
+        help_text="The date that this opinion was blocked from indexing by "
+                  "search engines",
+        blank=True,
+        null=True,
+        db_index=True,
     )
     blocked = models.BooleanField(
-            help_text="Whether a document should be blocked from indexing by "
-                      "search engines",
-            db_index=True,
-            default=False,
+        help_text="Whether a document should be blocked from indexing by "
+                  "search engines",
+        db_index=True,
+        default=False,
     )
 
     class Meta:
@@ -255,7 +271,7 @@ class Docket(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        if self.source == 1 and not self.pacer_case_id:
+        if self.source == 1 and not self.fdsys_case_id:
             raise ValidationError("pacer_case_id cannot be Null or empty in "
                                   "RECAP documents.")
 
@@ -266,7 +282,6 @@ class Docket(models.Model):
 
 
 class DocketEntry(models.Model):
-
     docket = models.ForeignKey(
         Docket,
         help_text="Foreign key as a relation to the corresponding Docket "
@@ -287,6 +302,11 @@ class DocketEntry(models.Model):
     )
     entry_number = models.PositiveIntegerField(
         help_text="# on the PACER docket page.",
+        null=True
+    )
+    fdsys_entry_number = models.PositiveIntegerField(
+        help_text="# on the FDSYS docket page.",
+        null=True
     )
     description = models.TextField(
         help_text="The text content of the docket entry that appears in the "
@@ -296,7 +316,6 @@ class DocketEntry(models.Model):
 
     class Meta:
         unique_together = ('docket', 'entry_number')
-
 
     def __unicode__(self):
         return "<DocketEntry ---> %s >" % (self.description[:50])
@@ -309,9 +328,11 @@ class RECAPDocument(models.Model):
 
     PACER_DOCUMENT = 1
     ATTACHMENT = 2
+    FDSYS_DOCUMENT = 3
     DOCUMENT_TYPES = (
         (PACER_DOCUMENT, "PACER Document"),
         (ATTACHMENT, "Attachment"),
+        (FDSYS_DOCUMENT, "FDSYS Document")
     )
     docket_entry = models.ForeignKey(
         DocketEntry,
@@ -330,10 +351,10 @@ class RECAPDocument(models.Model):
         db_index=True,
     )
     date_upload = models.DateTimeField(
-            help_text="upload_date in RECAP. The date the file was uploaded to "
-                      "RECAP. This information is provided by RECAP.",
-            blank=True,
-            null=True,
+        help_text="upload_date in RECAP. The date the file was uploaded to "
+                  "RECAP. This information is provided by RECAP.",
+        blank=True,
+        null=True,
     )
     document_type = models.IntegerField(
         help_text="Whether this is a regular document or an attachment.",
@@ -343,6 +364,8 @@ class RECAPDocument(models.Model):
     document_number = models.PositiveIntegerField(
         help_text="If the file is a document, the number is the "
                   "document_number in RECAP docket.",
+        blank=True,
+        null=True
     )
     attachment_number = models.SmallIntegerField(
         help_text="If the file is an attachment, the number is the attachment "
@@ -350,11 +373,11 @@ class RECAPDocument(models.Model):
         blank=True,
         null=True,
     )
+    # todo this generates an error for fdsys
     pacer_doc_id = models.CharField(
         help_text="The ID of the document in PACER. This information is "
                   "provided by RECAP.",
         max_length=32,  # Same as in RECAP
-        unique = True
     )
     is_available = models.NullBooleanField(
         help_text="True if the item is available in RECAP",
@@ -376,17 +399,29 @@ class RECAPDocument(models.Model):
     filepath_ia = models.CharField(
         help_text="The URL of the file in IA",
         max_length=1000,
+        null=True
+    )
+    fdsys_url = models.CharField(
+        help_text="The URL of the file in FDSYS",
+        max_length=1000,
+        null=True
+    )
+    fdsys_document_number = models.PositiveIntegerField(
+        help_text="document_number in FDSYS docket.",
+        blank=True,
+        null=True
     )
 
     class Meta:
-        unique_together = ('docket_entry', 'document_number', 'attachment_number')
+        unique_together = ('docket_entry', 'document_number', 'attachment_number', 'fdsys_document_number')
 
     def __unicode__(self):
-        return "Docket_%s , document_number_%s , attachment_number_%s" % (self.docket_entry.docket.docket_number, self.document_number, self.attachment_number)
+        return "Docket_%s , document_number_%s , attachment_number_%s" % (
+        self.docket_entry.docket.docket_number, self.document_number, self.attachment_number)
 
     def save(self, *args, **kwargs):
-        if self.document_type ==  self.ATTACHMENT:
-            if self.attachment_number == None:
+        if self.document_type == self.ATTACHMENT:
+            if self.attachment_number is None:
                 raise ValidationError('attachment_number cannot be null for an attachment.')
 
         super(RECAPDocument, self).save(*args, **kwargs)
@@ -474,6 +509,40 @@ class Court(models.Model):
 
     class Meta:
         ordering = ["position"]
+
+
+class CaseParties(models.Model):
+    """A class representing a party in a case"""
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket that the case party is a part of",
+        related_name='parties'
+    )
+    name_first = models.CharField(
+        help_text="First name",
+        max_length=500,
+        blank=True
+    )
+    name_last = models.CharField(
+        help_text="Last name",
+        max_length=500,
+        blank=True
+    )
+    name_middle = models.CharField(
+        help_text="Middle name",
+        max_length=500,
+        blank=True
+    )
+    name_suffix = models.CharField(
+        help_text='Suffix name',
+        max_length=500,
+        blank=True
+    )
+    role = models.CharField(
+        help_text="Parties role in the case",
+        max_length=500,
+        blank=True
+    )
 
 
 class OpinionCluster(models.Model):
@@ -968,6 +1037,7 @@ class OpinionsCited(models.Model):
         Opinion,
         related_name='citing_opinions',
     )
+
     # depth = models.IntegerField(
     #     help_text='The number of times the cited opinion was cited '
     #               'in the citing opinion',
@@ -979,14 +1049,13 @@ class OpinionsCited(models.Model):
     #     default=False,
     #     db_index=True,
     # )
-    #treatment: positive, negative, etc.
+    # treatment: positive, negative, etc.
     #
 
     def __unicode__(self):
         return u'%s ⤜--cites⟶  %s' % (self.citing_opinion.id,
-                                        self.cited_opinion.id)
+                                      self.cited_opinion.id)
 
     class Meta:
         verbose_name_plural = 'Opinions cited'
         unique_together = ("citing_opinion", "cited_opinion")
-
