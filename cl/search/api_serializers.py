@@ -158,8 +158,10 @@ class SearchResultSerializer(serializers.Serializer):
             drf_field = self._get_drf_field(field_obj)
             fields[field_name] = drf_field(read_only=True)
 
+        fields_key_list = fields.keys()
         for field in self.skipped_fields:
-            fields.pop(field)
+            if field in fields_key_list:
+                fields.pop(field)
         fields = OrderedDict(sorted(fields.items()))  # Sort by key
         return fields
 

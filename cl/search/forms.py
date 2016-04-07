@@ -26,6 +26,7 @@ TYPE_CHOICES = (
     ('o', 'Opinions'),
     ('oa', 'Oral Arguments'),
     ('p', 'People'),
+    ('d', 'Docket')
 )
 
 
