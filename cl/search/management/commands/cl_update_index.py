@@ -8,7 +8,8 @@ from cl.lib.timer import print_timing
 from cl.search.models import Opinion, Docket
 from cl.people_db.models import Person
 from cl.search.tasks import (delete_items, add_or_update_audio_files,
-                             add_or_update_opinions, add_or_update_items)
+                             add_or_update_opinions, add_or_update_items,
+                             add_or_update_people)
 from celery.task.sets import TaskSet
 from django.core.management.base import BaseCommand
 
@@ -294,6 +295,8 @@ class Command(BaseCommand):
             add_or_update_opinions.delay(items)
         elif self.type == Audio:
             add_or_update_audio_files.delay(items)
+        elif self.type == Person:
+            add_or_update_people.delay(items)
 
     @print_timing
     def add_or_update_by_datetime(self, dt):
@@ -316,14 +319,36 @@ class Command(BaseCommand):
         """
         self.stdout.write("Adding or updating all items...\n")
         if self.type == Person:
-            q = self.type.objects.filter(is_alias_of=None)
+            q = self.type.objects.filter(
+                is_alias_of=None
+            ).prefetch_related(
+                'positions',
+                'positions__predecessor',
+                'positions__supervisor',
+                'positions__appointer',
+                'positions__court',
+                'political_affiliations',
+                'aba_ratings',
+                'educations__school',
+                'aliases',
+                'race',
+            )
+            count = q.count()
         elif self.type == Docket:
             q = self.type.objects.filter(source=Docket.RECAP)
+            count = q.count()
+            q = queryset_generator(
+                q,
+                chunksize=5000,
+            )
         else:
             q = self.type.objects.all()
-        items = queryset_generator(q, chunksize=5000)
-        count = q.count()
-        self._chunk_queryset_into_tasks(items, count)
+            count = q.count()
+            q = queryset_generator(
+                q,
+                chunksize=5000,
+            )
+        self._chunk_queryset_into_tasks(q, count)
 
     @print_timing
     def optimize(self):
