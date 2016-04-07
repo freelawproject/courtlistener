@@ -125,6 +125,52 @@
                         </div>
                     {% endif %}
 
+                    {% if type == 'p' %}
+                        <div class="form-group">
+                            {{ search_form.name.label_tag }}
+                            {{ search_form.name }}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.born_after.label_tag }}
+                                    {{ search_form.born_after }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.born_before.label_tag }}
+                                    {{ search_form.born_before }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.dob_city.label_tag }}
+                            {{ search_form.dob_city }}
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.dob_state.label_tag }}
+                            {{ search_form.dob_state }}
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.school.label_tag }}
+                            {{ search_form.school }}
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.appointer.label_tag }}
+                            {{ search_form.appointer }}
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.selection_method.label_tag }}
+                            {{ search_form.selection_method }}
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.political_affiliation.label_tag }}
+                            {{ search_form.political_affiliation }}
+                        </div>
+
+                    {% endif %}
+
                     <button type="submit"
                             class="btn btn-primary title"
                             name="search"
