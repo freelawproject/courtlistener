@@ -5,11 +5,12 @@
 {% endcomment %}
 
 <select class="external-input v-offset-above-2" id="id_order_by" name="order_by">
+    {% if request.GET.type == 'o' or not request.GET.type %}
         <option value="score desc"
                 {% if search_form.order_by.value == "score desc" %}
-                    selected="selected"
-                {% endif %}>Relevance</option>
-    {% if request.GET.type == 'o' or not request.GET.type %}
+                selected="selected"
+                {% endif %}>Relevance
+        </option>
         <option value="dateFiled desc"
                 {% if search_form.order_by.value == "dateFiled desc" %}
                     selected="selected"
@@ -27,6 +28,11 @@
                     selected="selected"
                 {% endif %}>Least Cited First</option>
     {% elif request.GET.type == 'oa' %}
+        <option value="score desc"
+                {% if search_form.order_by.value == "score desc" %}
+                selected="selected"
+                {% endif %}>Relevance
+        </option>
         <option value="dateArgued desc"
                 {% if search_form.order_by.value == "dateArgued desc" %}
                     selected="selected"
