@@ -3,7 +3,8 @@ from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
 from localflavor.us import models as local_models
-from cl.lib.model_helpers import validate_partial_date, validate_is_not_alias
+from cl.lib.model_helpers import validate_partial_date, validate_is_not_alias, \
+    validate_only_one_location, validate_only_one_job_type
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -337,6 +338,11 @@ class Position(models.Model):
         blank=True,
         null=True,
     )
+    job_title = models.CharField(
+        help_text="If title isn't in list, type here.",
+        max_length=100,
+        blank=True,
+    )
     person = models.ForeignKey(
         Person,
         related_name='positions',
@@ -346,6 +352,18 @@ class Position(models.Model):
     court = models.ForeignKey(
         Court,
         related_name='court_positions',
+        blank=True,
+        null=True,
+    )
+    school = models.ForeignKey(
+        School,
+        help_text="If academic job, the school where they work.",
+        blank=True,
+        null=True,
+    )
+    organization_name = models.CharField(
+        help_text="If org isn't court or school, type here.",
+        max_length=120,
         blank=True,
         null=True,
     )
@@ -366,23 +384,6 @@ class Position(models.Model):
     )
     predecessor = models.ForeignKey(
         Person,
-        blank=True,
-        null=True,
-    )
-    school = models.ForeignKey(
-        School,
-        help_text="If academic job, the school where they work.",
-        blank=True,
-        null=True,
-    )
-    job_title = models.CharField(
-        help_text="If title isn't in list, type here.",
-        max_length=100,
-        blank=True,
-    )
-    organization_name = models.CharField(
-        help_text="If org isnt court or school, type here.",
-        max_length=120,
         blank=True,
         null=True,
     )
@@ -525,6 +526,8 @@ class Position(models.Model):
 
         for field in ['person', 'appointer', 'supervisor', 'predecessor']:
             validate_is_not_alias(self, field)
+        validate_only_one_location(self)
+        validate_only_one_job_type(self)
 
         super(Position, self).clean_fields(*args, **kwargs)
 

@@ -70,11 +70,32 @@ def validate_is_not_alias(instance, field):
     themself.
     """
     person = getattr(instance, field)
-    if person.is_alias:
+    if person is not None and person.is_alias:
         raise ValidationError({
             field: 'Cannot set %s to an alias of a Person. Hint: "%s" is an '
                    'alias of "%s"' % (field, person, person.is_alias_of)
         })
+
+
+def validate_only_one_location(instance):
+    location_fields = ['school', 'organization_name', 'court']
+    num_completed_fields = sum(1 for x in location_fields if getattr(instance, x))
+    completed_fields = [x for x in location_fields if getattr(instance, x)]
+    if num_completed_fields > 1:
+        raise ValidationError(
+            "More than one of the location fields is completed. %s are: %s!" % (
+                num_completed_fields,
+                ", ".join(completed_fields),
+            ))
+
+
+def validate_only_one_job_type(instance):
+    if instance.position_type and instance.job_title:
+        raise ValidationError("Cannot have values for both job_title and "
+                              "position_type")
+    if not any([instance.position_type, instance.job_title]):
+        raise ValidationError("Either job_title or position_type must be "
+                              "completed.")
 
 
 def disable_auto_now_fields(*models):
