@@ -5,7 +5,7 @@ from django.utils.text import slugify
 from localflavor.us import models as local_models
 from cl.lib.model_helpers import validate_partial_date, validate_is_not_alias, \
     validate_only_one_location, validate_only_one_job_type, \
-    validate_if_degree_detail_then_degree
+    validate_if_degree_detail_then_degree, make_choices_group_lookup
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -156,6 +156,7 @@ class Person(models.Model):
     def clean_fields(self, *args, **kwargs):
         for field in ['dob', 'dod']:
             validate_partial_date(self, field)
+        # An alias cannot be an alias.
         validate_is_not_alias(self, 'is_alias_of')
         super(Person, self).clean_fields(*args, **kwargs)
 
@@ -178,6 +179,16 @@ class Person(models.Model):
     @property
     def is_alias(self):
         return True if self.is_alias_of is not None else False
+
+    @property
+    def is_judge(self):
+        """Examine the positions a person has had and identify if they were ever
+        a judge.
+        """
+        for position in self.positions.all():
+            if position.is_judicial_position:
+                return True
+        return False
 
     class Meta:
         verbose_name_plural = "people"
@@ -219,6 +230,15 @@ class School(models.Model):
             return u'%s: %s' % (
                 self.pk, self.name
             )
+
+    @property
+    def is_alias(self):
+        return True if self.is_alias_of is not None else False
+
+    def clean_fields(self, *args, **kwargs):
+        # An alias cannot be an alias.
+        validate_is_not_alias(self, 'is_alias_of')
+        super(School, self).clean_fields(*args, **kwargs)
 
 
 class Position(models.Model):
@@ -302,6 +322,7 @@ class Position(models.Model):
         ('pub_def', 'Public Defender'),
         ('legis',   'Legislator'),
     )
+    POSITION_TYPE_GROUPS = make_choices_group_lookup(POSITION_TYPES)
     NOMINATION_PROCESSES = (
         ('fed_senate', 'U.S. Senate'),
         ('state_senate', 'State Senate'),
@@ -515,6 +536,13 @@ class Position(models.Model):
     def __unicode__(self):
         return u'%s: %s at %s' % (self.pk, self.person.name_full, self.court_id)
 
+    @property
+    def is_judicial_position(self):
+        """Return True if the position is judicial."""
+        if self.POSITION_TYPE_GROUPS[self.position_type] == 'Judge':
+            return True
+        return False
+
     def save(self, *args, **kwargs):
         self.full_clean()
         super(Position, self).save(*args, **kwargs)
@@ -529,7 +557,8 @@ class Position(models.Model):
         for field in ['start', 'termination']:
             validate_partial_date(self, field)
 
-        for field in ['person', 'appointer', 'supervisor', 'predecessor']:
+        for field in ['person', 'appointer', 'supervisor', 'predecessor',
+                      'school']:
             validate_is_not_alias(self, field)
         validate_only_one_location(self)
         validate_only_one_job_type(self)
@@ -642,6 +671,7 @@ class Education(models.Model):
     def clean_fields(self, *args, **kwargs):
         # Note that this isn't run during updates, alas.
         validate_is_not_alias(self, 'person')
+        validate_is_not_alias(self, 'school')
         validate_if_degree_detail_then_degree(self)
         super(Education, self).clean_fields(*args, **kwargs)
 
@@ -806,6 +836,10 @@ class ABARating(models.Model):
         choices=ABA_RATINGS,
         max_length=5,
     )
+
+    class Meta:
+        verbose_name = 'American Bar Association Rating'
+        verbose_name_plural = 'American Bar Association Ratings'
 
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, 'rated')

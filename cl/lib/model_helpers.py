@@ -66,14 +66,18 @@ def validate_partial_date(instance, field):
 
 
 def validate_is_not_alias(instance, field):
-    """Ensure that an alias to a person is not being used instead of the person
-    themself.
+    """Ensure that an alias to an object is not being used instead of the object
+    itself.
+
+    Requires that the object have an is_alias property or attribute.
     """
-    person = getattr(instance, field)
-    if person is not None and person.is_alias:
+    referenced_object = getattr(instance, field)
+    if referenced_object is not None and referenced_object.is_alias:
         raise ValidationError({
-            field: 'Cannot set %s to an alias of a Person. Hint: "%s" is an '
-                   'alias of "%s"' % (field, person, person.is_alias_of)
+            field: 'Cannot set "%s" field to an alias of a "%s". Hint: "%s" is '
+                   'an alias of "%s"' % (field, type(referenced_object).__name__,
+                                      referenced_object,
+                                      referenced_object.is_alias_of)
         })
 
 
@@ -101,6 +105,20 @@ def validate_only_one_job_type(instance):
 def validate_if_degree_detail_then_degree(instance):
     if instance.degree_detail and not instance.degree_level:
         raise ValidationError("Cannot have degree_detail without degree_level.")
+
+
+def make_choices_group_lookup(c):
+    """Invert a choices variable in a model to get the group name for a
+    tuple.
+    """
+    d = {}
+    for choice, value in c:
+        if isinstance(value, (list, tuple)):
+            for t in value:
+                d[t[0]] = choice
+        else:
+            d[choice] = value
+    return d
 
 
 def disable_auto_now_fields(*models):
