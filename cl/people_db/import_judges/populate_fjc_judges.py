@@ -213,7 +213,7 @@ def make_federal_judge(item, testing=False):
                 degree = Education(
                         person=person,
                         school=school,
-                        degree=degtype,
+                        degree_detail=degtype,
                         degree_level=deg_level,
                         degree_year=degyear
                 )

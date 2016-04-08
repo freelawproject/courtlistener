@@ -98,6 +98,11 @@ def validate_only_one_job_type(instance):
                               "completed.")
 
 
+def validate_if_degree_detail_then_degree(instance):
+    if instance.degree_detail and not instance.degree_level:
+        raise ValidationError("Cannot have degree_detail without degree_level.")
+
+
 def disable_auto_now_fields(*models):
     """Turns off the auto_now and auto_now_add attributes on a Model's fields,
     so that an instance of the Model can be saved with a custom value.

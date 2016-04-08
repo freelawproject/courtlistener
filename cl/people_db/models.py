@@ -4,7 +4,8 @@ from django.db import models
 from django.utils.text import slugify
 from localflavor.us import models as local_models
 from cl.lib.model_helpers import validate_partial_date, validate_is_not_alias, \
-    validate_only_one_location, validate_only_one_job_type
+    validate_only_one_location, validate_only_one_job_type, \
+    validate_if_degree_detail_then_degree
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -460,20 +461,29 @@ class Position(models.Model):
         choices=DATE_GRANULARITIES,
         max_length=15,
     )
-    date_retirement = models.DateField(
+    date_termination = models.DateField(
+        help_text="The last date of their employment. The compliment to "
+                  "date_start",
         null=True,
         blank=True,
         db_index=True,
     )
-    date_termination = models.DateField(
-        null=True,
+    termination_reason = models.CharField(
+        choices=TERMINATION_REASONS,
+        max_length=25,
         blank=True,
-        db_index=True,
     )
     date_granularity_termination = models.CharField(
         choices=DATE_GRANULARITIES,
         max_length=15,
         blank=True,
+    )
+    date_retirement = models.DateField(
+        help_text="The date when they become a senior judge by going into "
+                  "active retirement",
+        null=True,
+        blank=True,
+        db_index=True,
     )
     judicial_committee_action = models.CharField(
         choices=JUDICIAL_COMMITTEE_ACTIONS,
@@ -499,11 +509,6 @@ class Position(models.Model):
     how_selected = models.CharField(
         choices=SELECTION_METHODS,
         max_length=20,
-        blank=True,
-    )
-    termination_reason = models.CharField(
-        choices=TERMINATION_REASONS,
-        max_length=25,
         blank=True,
     )
 
@@ -619,7 +624,7 @@ class Education(models.Model):
         max_length=3,
         blank=True,
     )
-    degree = models.CharField(
+    degree_detail = models.CharField(
         max_length=100,
         blank=True,
     )
@@ -631,12 +636,13 @@ class Education(models.Model):
 
     def __unicode__(self):
         return u'%s: Degree in %s from %s in the year %s' % (
-            self.pk, self.degree, self.school.name, self.degree_year
+            self.pk, self.degree_detail, self.school.name, self.degree_year
         )
 
     def clean_fields(self, *args, **kwargs):
         # Note that this isn't run during updates, alas.
         validate_is_not_alias(self, 'person')
+        validate_if_degree_detail_then_degree(self)
         super(Education, self).clean_fields(*args, **kwargs)
 
 
