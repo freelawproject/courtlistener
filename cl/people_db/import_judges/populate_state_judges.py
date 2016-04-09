@@ -28,6 +28,9 @@ def make_state_judge(item, testing=False):
 
     if item['firstname'] == '':
         return
+    if not pd.isnull(item['midname']):
+        if len(item['midname']) == 1:
+            item['midname'] = item['midname'] + '.'
 
     check = Person.objects.filter(name_first=item['firstname'],
                                   name_last=item['lastname'], date_dob=date_dob)
@@ -52,9 +55,13 @@ def make_state_judge(item, testing=False):
         if not testing:
             person.save()
 
-    courtid = get_court_object(item['court'] + ' of ' + item['state'])
+    if 'colr' in item['cl_id']:
+        courtid = get_court_object(item['court'] + ' of ' + item['state'])
+    else:
+        courtid = get_court_object(item['court'])
 
     if courtid is None:
+        print(item)
         raise
 
     # assign start date
