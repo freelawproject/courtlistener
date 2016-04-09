@@ -3286,6 +3286,42 @@
     "model": "search.court",
     "pk": "massappct"
   },
+  {  
+    "fields": {
+      "jurisdiction": "SA",
+      "end_date": null,
+      "short_name": "Massachusetts District Court",
+      "citation_string": "Mass. Dist. Ct.",
+      "in_use": true,
+      "url": "http://www.mass.gov/courts/court-info/trial-court/dc/",
+      "notes": "",
+      "date_modified": "2014-04-06T14:49:06.297Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "Massachusetts District Court",      
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "massdistct"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "end_date": null,
+      "short_name": "Massachusetts Superior Court",
+      "citation_string": "Mass. Super. Ct.",
+      "in_use": true,
+      "url": "http://www.mass.gov/courts/court-info/trial-court/sc/",
+      "notes": "",
+      "date_modified": "2014-07-17T14:49:06.297Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "Massachusetts Superior Court",      
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "masssuperct"
+  },
   {
     "fields": {
       "jurisdiction": "FS",

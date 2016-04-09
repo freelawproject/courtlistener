@@ -77,8 +77,7 @@ class Person(models.Model):
         help_text="A unique identifier for judge, also indicating source of "
                   "data.",
         unique=True,
-        db_index=True,
-        null=True,
+        db_index=True
     )
     slug = models.SlugField(
         max_length=158  # len(self.name_full)
