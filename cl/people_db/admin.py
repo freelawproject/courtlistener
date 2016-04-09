@@ -105,6 +105,9 @@ class PersonAdmin(admin.ModelAdmin):
         'gender',
         'fjc_id',
     )
+    raw_id_fields = (
+        'is_alias_of',
+    )
 
     def save_model(self, request, obj, form, change):
         obj.save()

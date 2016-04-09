@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% load extras %}
+{% load admin_urls %}
+
+{% block title %}{{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}{{ title }} – CourtListener.com{% endblock %}
+{% block description %}{{ title }} – CourtListener.com{% endblock %}
+{% block og_description %}{{ title }} – CourtListener.com{% endblock %}
+
+{% block sidebar %}{% endblock sidebar %}
+
+{% block content %}
+    <div class="col-xs-12">
+        {% if perms.people_db.change_person %}
+            <p class="float-right">
+                <a href="{% url 'admin:people_db_person_change' person.id %}"
+                   class="btn btn-primary btn-xs">Edit&nbsp;Person&nbsp;<i
+                   class="fa fa-pencil"></i>
+                </a>
+            </p>
+        {% endif %}
+        <div class="row">
+            <div class="col-xs-2 col-md-4 col-lg-3">
+                <img src="{{ STATIC_PREFIX }}judge-pics/128/adkins-jesse.jpeg"
+                     alt="Judge Portrait"
+                     width="95"
+                     class="hidden-md hidden-lg"
+                />
+                <img src="{{ STATIC_PREFIX }}judge-pics/256/adkins-jesse.jpeg"
+                     alt="Judge Portrait"
+                     width="256"
+                     class="hidden-xs hidden-sm"
+                />
+            </div>
+            <div class="col-xs-10 col-md-8 col-lg-9">
+                <h2 class="bottom">{{ title }}</h2>
+                <span class="small gray top">
+                    CourtListener ID: {{ person.cl_id }}{% if person.fjc_id %}, FJC ID: {{ person.fjc_id }}{% endif %}
+                </span>
+
+                <div class="row v-offset-below-3">
+                    <div class="col-xs-12">
+                        <h3><i class="gray fa fa-info"></i> Biographical Information</h3>
+                        <hr class="top">
+                    </div>
+                    {% if person.date_dob or person.dob_city or person.dob_state or person.date_dod or person.dod_city or person.dod_state%}
+                    <div class="col-xs-12 col-md-4">
+                        {% if person.date_dob or person.dob_city or person.dob_state %}
+                        <p>
+                            <span class="meta-data-header">Born:</span>
+                            <span class="meta-data-value">
+                                {% granular_date person.date_dob granularity=person.date_granularity_dob default="On an unknown date " %}
+                                {% spaceless %}
+                                    {% if person.dob_city or person.dob_state %}
+                                        <span class="gray">in </span>
+                                        {% if person.dob_city %}
+                                            <span>{{ person.dob_city }}</span>
+                                        {% endif %}
+                                        {% if person.dob_city and person.dob_state %}
+                                            <span class="gray">, </span>
+                                        {% endif %}
+                                        {% if person.dob_state %}
+                                            <span>{{ person.dob_state }}</span>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endspaceless %}
+                            </span>
+                        </p>
+                        {% endif %}
+                        {% if person.date_dod or person.dod_state or person.dod_city %}
+                        <p>
+                            <span class="meta-data-header">Died:</span>
+                            <span class="meta-data-value">
+                                {% granular_date person.date_dod granularity=person.date_granularity_dod default="On an unknown date " %}
+                                {% spaceless %}
+                                    {% if person.dod_city or person.dod_state %}
+                                        <span class="gray">in </span>
+                                        {% if person.dod_city %}
+                                            <span>{{ person.dod_city }}</span>
+                                        {% endif %}
+                                        {% if person.dod_city and person.dod_state %}
+                                            <span class="gray">, </span>
+                                        {% endif %}
+                                        {% if person.dod_state %}
+                                            <span>{{ person.dod_state }}</span>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endspaceless %}
+                            </span>
+                        </p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if person.race.count > 0 or person.gender or person.religion %}
+                    <div class="col-xs-12 col-md-4">
+                        {% if person.race.count > 0 %}
+                        <p>
+                            <span class="meta-data-header">Race{{ person.race.count|pluralize }}:</span>
+                            <span class="meta-data-value">
+                                {% for race in person.race.all %}{% if not forloop.first %}, {% endif %}{{ race.get_race_display }}{% endfor %}
+                            </span>
+                        </p>
+                        {% endif %}
+                        {% if person.gender %}
+                        <p>
+                            <span class="meta-data-header">Gender:</span>
+                            <span class="meta-data-value">
+                                {{ person.get_gender_display }}
+                                {% if person.gender == 'm' %}
+                                    <i class="fa fa-mars gray"></i>
+                                {% elif person.gender == 'f' %}
+                                    <i class="fa fa-venus gray"></i>
+                                {% elif person.gender == 'o' %}
+                                    <i class="fa fa-transgender gray"></i>
+                                {% endif %}
+                            </span>
+                        </p>
+                        {% endif %}
+                        {% if person.religion %}
+                        <p>
+                            <span class="meta-data-header">Religion:</span>
+                            <span class="meta-data-value">{{ person.get_religion_display }}</span>
+                        </p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if person.aliases.count > 0 or aba_ratings.count > 0 %}
+                    <div class="col-xs-12 col-md-4">
+                        {% if aba_ratings.count > 0 %}
+                        <p>
+                            <span class="meta-data-header">
+                                <abbr title="American Bar Association">ABA</abbr> Ratings:
+                            </span>
+                            {% for rating in aba_ratings.all %}{% if not forloop.first %}, {% endif %}{{ rating.get_rating_display }}{% if rating.date_rated %} ({% granular_date rating.date_rated granularity=rating.date_granularity_rated %}){% endif %}
+                            {% endfor %}
+                        </p>
+                        {% endif %}
+                        {% if person.aliases.count > 0 %}
+                        <p>
+                            <span class="meta-data-header">Alias{{ person.aliases.count|pluralize:"es" }}:</span>
+                            {% for alias in person.aliases.all %}
+                                {% if not forloop.first %}, {% endif %}
+                                {{ alias.name_full }}
+                            {% endfor %}
+                        </p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+
+        {% if political_affiliations.count > 0 or educations.count > 0%}
+        <div class="row v-offset-below-3">
+            {% if political_affiliations.count > 0 %}
+            <div class="col-xs-12 col-md-5">
+                <h3><i class="fa fa-umbrella gray"></i> Political Affiliations</h3>
+                <p class="gray">Affiliations have been gathered from ballots, appointments, and original research.
+                </p>
+                <hr class="top">
+                <ul>
+                {% for pa in political_affiliations %}
+                    <li>
+                        {% if pa.date_start and pa.date_end %}
+                            From
+                            {% granular_date pa.date_start granularity=pa.date_granularity_start %}
+                            to
+                            {% granular_date pa.date_end granularity=pa.date_granularity_end %}:
+                        {% elif not pa.date_start and pa.date_end %}
+                            Until
+                            {% granular_date pa.date_end granularity=pa.date_granularity_end %}:
+                        {% elif pa.date_start and not pa.date_end %}
+                            Beginning
+                            {% granular_date pa.date_start granularity=pa.date_granularity_start %}:
+                        {% elif not pa.date_start and not pa.date_end %}
+                            {# pass - no data #}
+                        {% endif %}
+                        {{ pa.get_political_party_display }}
+                    </li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if educations.count > 0 %}
+            <div class="col-xs-12 col-md-6 col-md-offset-1">
+                <h3><i class="gray fa fa-graduation-cap"></i> Education History</h3>
+                <hr class="top">
+                <ul>
+                    {% for e in educations %}
+                        <li>
+                            Attended
+                            {{ e.school.name }}
+                            {% if e.degree_detail or e.degree_level or e.degree_year %}
+                                and received a
+                                {% if e.degree_level %}
+                                    {{ e.get_degree_level_display }}
+                                {% else %}
+                                    {{ e.degree_detail }}
+                                {% endif %}
+                                {% if e.degree_year %}
+                                    in {{ e.degree_year }}
+                                {% endif %}
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if positions.count > 0 %}
+        <div class="row v-offset-below-3">
+            <div class="col-xs-12">
+                <h3 class="bottom"><i class="gray fa fa-balance-scale"></i>
+                    Roles <span class="alt">&amp;</span> Positions</h3>
+                <p class="gray">Includes a variety of known roles, such as judges, governors, presidents, clerks, practitioners, public defenders, attorneys general, professors, etc.</p>
+                <hr class="top">
+                {% for position in positions %}
+                    <h4 class="text-uppercase">
+                        {% if position.get_position_type_display %}
+                            {{ position.get_position_type_display }}
+                        {% else %}
+                            {{ position.job_title }}
+                        {% endif %}
+                    </h4>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+{% endblock %}

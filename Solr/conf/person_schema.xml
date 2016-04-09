@@ -142,7 +142,7 @@
             termPositions="true"
             termVectors="true"/>
      <field name="name_reverse"
-            type="text_en_splitting_cl"
+            type="string"
             indexed="true"
             stored="true"
             multiValued="false"

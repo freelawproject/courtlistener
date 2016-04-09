@@ -385,7 +385,7 @@ class SearchForm(forms.Form):
                 return 'dateArgued desc'
         elif self.cleaned_data['type'] == 'p':
             if not self.cleaned_data['order_by']:
-                return self.fields['order_by'].initial
+                return 'name_reverse asc'
         return self.cleaned_data['order_by']
 
     def clean_type(self):
