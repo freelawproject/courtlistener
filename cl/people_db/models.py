@@ -141,6 +141,11 @@ class Person(models.Model):
         max_length=2,
         blank=True
     )
+    has_photo = models.BooleanField(
+        help_text="Whether there is a photo corresponding to this person in "
+                  "the judge pics project.",
+        default=False,
+    )
 
     def __unicode__(self):
         return u'%s: %s' % (self.pk, self.name_full)
@@ -162,12 +167,12 @@ class Person(models.Model):
 
     @property
     def name_full(self):
-        return u' '.join([
+        return u' '.join([v for v in [
             self.name_first,
             self.name_middle,
             self.name_last,
             self.get_name_suffix_display(),
-        ]).strip()
+        ] if v]).strip()
 
     @property
     def name_full_reverse(self):
