@@ -472,10 +472,11 @@ def build_main_query(cd, highlight='all', order_by=''):
     main_params = add_highlighting(main_params, cd, highlight)
     main_params = add_fq(main_params, cd)
 
-    # print "Params sent to search are: %s" % '&'.join(
-    #         ['%s=%s' % (k, v) for k, v in main_params.items()]
-    # )
-    #print results_si.execute()
+    if settings.DEBUG:
+        print "Params sent to search are:\n%s" % ' &\n'.join(
+                ['  %s = %s' % (k, v) for k, v in main_params.items()]
+        )
+        #print results_si.execute()
     return main_params
 
 
