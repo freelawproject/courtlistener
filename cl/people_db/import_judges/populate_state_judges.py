@@ -54,6 +54,17 @@ def make_state_judge(item, testing=False):
 
         if not testing:
             person.save()
+            
+        if not pd.isnull(item['nickname']):
+            person_alias = Person(               
+                    name_first=item['nickname'],
+                    name_middle=item['midname'],
+                    name_last=item['lastname'],
+                    name_suffix=get_suffix(item['suffname']),
+                    is_alias_of=person
+                    )
+            if not testing:
+                person_alias.save()
 
     if 'colr' in item['cl_id']:
         courtid = get_court_object(item['court'] + ' of ' + item['state'])
