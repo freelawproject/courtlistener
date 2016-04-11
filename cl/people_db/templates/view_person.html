@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load extras %}
 {% load admin_urls %}
+{% load staticfiles %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
@@ -11,29 +12,33 @@
 
 {% block content %}
     <div class="col-xs-12">
-        {% if perms.people_db.change_person %}
-            <p class="float-right">
-                <a href="{% url 'admin:people_db_person_change' person.id %}"
-                   class="btn btn-primary btn-xs">Edit&nbsp;Person&nbsp;<i
-                   class="fa fa-pencil"></i>
-                </a>
-            </p>
-        {% endif %}
-        <div class="row">
-            <div class="col-xs-2 col-md-4 col-lg-3">
-                <img src="{{ STATIC_PREFIX }}judge-pics/128/adkins-jesse.jpeg"
-                     alt="Judge Portrait"
-                     width="95"
-                     class="hidden-md hidden-lg"
-                />
-                <img src="{{ STATIC_PREFIX }}judge-pics/256/adkins-jesse.jpeg"
-                     alt="Judge Portrait"
-                     width="256"
-                     class="hidden-xs hidden-sm"
-                />
+         <div class="row">
+            <div class="col-xs-6 col-sm-4 col-md-4 col-lg-3">
+                <h2>
+                    {% if person.has_photo %}
+                        <img src="{% static "judge_pics/256/adkins-jesse.jpeg" %}"
+                             alt="Portrait of {{ person.name_first }} {{ person.name_last }}"
+                             width="256"
+                             class="img-responsive v-offset-above-2"
+                        />
+                    {% else %}
+                        <img src="{% static "" %}"
+                             alt="Blank image"
+                    {% endif %}
+                </h2>
             </div>
-            <div class="col-xs-10 col-md-8 col-lg-9">
-                <h2 class="bottom">{{ title }}</h2>
+            <div class="col-xs-6 col-sm-8 col-md-8 col-lg-9">
+                <h2 class="bottom">
+                    {{ title }}
+                    {% if perms.people_db.change_person %}
+                        <p class="float-right">
+                            <a href="{% url 'admin:people_db_person_change' person.id %}"
+                               class="btn btn-primary btn-xs">Edit&nbsp;Person&nbsp;<i
+                                    class="fa fa-pencil"></i>
+                            </a>
+                        </p>
+                    {% endif %}
+                </h2>
                 <span class="small gray top">
                     CourtListener ID: {{ person.cl_id }}{% if person.fjc_id %}, FJC ID: {{ person.fjc_id }}{% endif %}
                 </span>
