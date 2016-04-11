@@ -335,7 +335,7 @@ class Command(BaseCommand):
             )
             # Filter out non-judges -- they don't get searched.
             q = [item for item in q if item.is_judge]
-            count = len(q)  # Has to be done Python-side, b/c
+            count = len(q)
         elif self.type == Docket:
             q = self.type.objects.filter(source=Docket.RECAP)
             count = q.count()
