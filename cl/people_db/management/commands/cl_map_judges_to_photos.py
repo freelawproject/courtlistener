@@ -1,11 +1,11 @@
 import os
 
 from django.core.management import BaseCommand
-from django.utils.formats import date_format
 from django.utils.text import slugify
 from judge_pics import judge_root
 
-from cl.people_db.models import Person, GRANULARITY_DAY
+from cl.people_db.models import Person
+from cl.custom_filters.templatetags.extras import granular_date
 
 
 class Command(BaseCommand):
@@ -35,7 +35,7 @@ class Command(BaseCommand):
         the risk of duplicate issues.
         """
         # Create a dict of judge paths, mapping paths to empty lists.
-        judge_paths = os.listdir(os.path.join(judge_root, '128'))
+        judge_paths = os.listdir(os.path.join(judge_root, 'orig'))
         judge_map = {}
         for path in judge_paths:
             judge_map[path] = []
@@ -45,11 +45,15 @@ class Command(BaseCommand):
         for person in people:
             slug_name = slugify("%s %s" % (person.name_last,
                                            person.name_first)) + ".jpeg"
-            if person.date_granularity_dob == GRANULARITY_DAY:
-                slug_name_dob = slug_name.rsplit('.')[0] + date_format(
-                        person.date_dob, "-Y-m-d") + ".jpeg"
-            else:
-                slug_name_dob = None
+
+            slug_name_dob = "{slug}-{date}.jpeg".format(
+                slug=slug_name.rsplit('.')[0],
+                date=granular_date(
+                    person.date_dob,
+                    granularity=person.date_granularity_dob,
+                    iso=True,
+                ).lower()
+            )
             for name in [slug_name, slug_name_dob]:
                 if name in judge_map:
                     # If there's a hit, add the path to the dict of judge paths.
@@ -69,15 +73,19 @@ class Command(BaseCommand):
                 missed += 1
             if len(people) == 1:
                 person = people[0]
-                print "INFO: Updating judge %s" % person
                 found += 1
                 if not self.debug:
+                    print "INFO: Updating judge %s" % person
                     person.has_photo = True
                     person.save()
             if len(people) > 1:
                 print "WARNING: Found more than one match for %s\nFound:" % path
                 for person in people:
-                    print "    %s - %s" % (person, person.date_dob)
+                    print "    %s - %s" % (person, granular_date(
+                        person.date_dob,
+                        granularity=person.date_granularity_dob,
+                        iso=True,
+                    ))
                 multi += 1
 
         print "\n\n%s Matches\n%s Missed\n%s Multiple results" % (found, missed,
