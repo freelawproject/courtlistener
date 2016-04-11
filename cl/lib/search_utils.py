@@ -136,6 +136,7 @@ def merge_form_with_courts(courts, search_form):
                 # to find the right value.
                 if 'court_%s' % court['pk'] == field.html_name:
                     court['checked'] = field.value()
+                    break
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
     court_tabs = {
@@ -354,18 +355,6 @@ def add_highlighting(main_params, cd, highlight):
     # here that are not requested as part of highlighting. Facet
     # params are not set here because they do not retrieve results,
     # only counts (they are set to 0 rows).
-
-    def add_hl_and_fl(fl, hlfl):
-        main_params.update({
-            'fl': ','.join(fl),
-            'hl.fl': ','.join(hlfl),
-        })
-        for field in hlfl:
-            if field == 'text':
-                continue
-            main_params['f.%s.hl.fragListBuilder' % field] = 'single'
-            main_params['f.%s.hl.alternateField' % field] = field
-
     if cd['type'] == 'o':
         fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
               'download_url', 'status', 'dateFiled', 'citeCount',
@@ -373,26 +362,35 @@ def add_highlighting(main_params, cd, highlight):
         hlfl = ['text', 'caseName', 'judge', 'docketNumber',
                 'court_citation_string', 'suitNature', 'citation',
                 'neutralCite', 'lexisCite']
-        add_hl_and_fl(fl, hlfl)
     elif cd['type'] == 'oa':
         fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
               'download_url', 'docket_id', 'dateArgued', 'duration']
         hlfl = ['text', 'caseName', 'judge', 'docketNumber',
                 'court_citation_string']
-        add_hl_and_fl(fl, hlfl)
     elif cd['type'] == 'p':
         fl = ['id', 'absolute_url', 'dob', 'date_granularity_dob', 'dod',
               'date_granularity_dod', 'political_affiliation',
-              'aba_rating']
-        hlfl = ['school', 'name', 'dob_city', 'dob_state', 'name_reverse']
-        add_hl_and_fl(fl, hlfl)
-
+              'aba_rating', 'school', 'appointer', 'supervisor', 'predecessor',
+              'selection_method', 'court']
+        hlfl = ['name', 'dob_city', 'dob_state', 'name_reverse']
     elif cd['type'] == 'd':
         fl = ['id', 'court_id', 'dateFiled', 'docketNumber','caseName'
               'natureOfSuit', 'court', 'courtJurisdiction', 'assignedTo']
         hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
                 'docketNumber', 'natureOfSuit']
         add_hl_and_fl(fl, hlfl)
+
+    main_params.update({
+        'fl': ','.join(fl),
+        'hl.fl': ','.join(hlfl),
+    })
+    for field in hlfl:
+        if field == 'text':
+            continue
+        main_params['f.%s.hl.fragListBuilder' % field] = 'single'
+        main_params['f.%s.hl.alternateField' % field] = field
+
+
 
     return main_params
 
@@ -438,6 +436,7 @@ def add_fq(main_params, cd):
         # Citation count
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
+
     elif cd['type'] == 'oa':
         if cd['case_name']:
             main_fq.append(make_fq(cd, 'caseName', 'case_name'))
@@ -458,6 +457,23 @@ def add_fq(main_params, cd):
         main_fq.append(make_date_query('dateFiled', cd['filed_before'],
                                        cd['filed_after']))
 
+    elif cd['type'] == 'p':
+        if cd['name']:
+            main_fq.append(make_fq(cd, 'name', "name"))
+        if cd['dob_city']:
+            main_fq.append(make_fq(cd, 'dob_city', 'dob_city'))
+        if cd['dob_state']:
+            main_fq.append(make_fq(cd, 'dob_state_id', 'dob_state'))
+        if cd['school']:
+            main_fq.append(make_fq(cd, 'school', 'school'))
+        if cd['appointer']:
+            main_fq.append(make_fq(cd, 'appointer', 'appointer'))
+        if cd['selection_method']:
+            main_fq.append(make_fq(cd, 'selection_method_id', 'selection_method'))
+        if cd['political_affiliation']:
+            main_fq.append(make_fq(cd, 'political_affiliation_id', 'political_affiliation'))
+        main_fq.append(make_date_query('dob', cd['born_before'],
+                                       cd['born_after']))
 
     # Facet filters
     selected_courts_string = get_selected_field_string(cd, 'court_')
@@ -468,7 +484,7 @@ def add_fq(main_params, cd):
                 '{!tag=dt}status_exact:(%s)' % selected_stats_string,
                 '{!tag=dt}court_exact:(%s)' % selected_courts_string
             ])
-    elif cd['type'] == 'oa':
+    elif cd['type'] in ['oa', 'p']:
         if len(selected_courts_string) > 0:
             main_fq.extend([
                 '{!tag=dt}court_exact:(%s)' % selected_courts_string

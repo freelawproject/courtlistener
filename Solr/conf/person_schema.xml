@@ -130,11 +130,11 @@
             indexed="true"
             multiValued="false"/>
      <field name="religion"
-            type="string"
+            type="text_en_splitting_cl"
             indexed="true"
             multiValued="false"/>
      <field name="name"
-            type="string"
+            type="text_en_splitting_cl"
             indexed="true"
             stored="true"
             multiValued="false"
@@ -157,7 +157,7 @@
             multiValued="false"/>
      <field name="date_granularity_dob"
             type="string"
-            indexed="true"
+            indexed="false"
             stored="true"
             multiValued="false"/>
      <field name="dod"
@@ -167,11 +167,11 @@
             multiValued="false"/>
      <field name="date_granularity_dod"
             type="string"
-            indexed="true"
+            indexed="false"
             stored="true"
             multiValued="false"/>
      <field name="dob_city"
-            type="string"
+            type="text_en_splitting_cl"
             indexed="true"
             stored="true"
             multiValued="false"
@@ -179,13 +179,17 @@
             termPositions="true"
             termOffsets="true"/>
      <field name="dob_state"
-            type="string"
+            type="text_en_splitting_cl"
             index="true"
             stored="true"
             multiValued="false"
             termVectors="true"
             termPositions="true"
             termOffsets="true"/>
+     <field name="dob_state_id"
+            type="string"
+            index="true"
+            stored="true"/>
      <field name="absolute_url"
             type="string"
             indexed="false"
@@ -193,7 +197,12 @@
             multiValued="false"/>
 
      <!-- Joined Values -->
-     <field name="court_id"
+     <field name="court"
+            type="text_en_splitting_cl"
+            indexed="false"
+            stored="true"
+            multiValued="true"/>
+     <field name="court_exact"
             type="string"
             indexed="true"
             stored="true"
@@ -204,20 +213,29 @@
             stored="true"
             multiValued="true"/>
      <field name="appointer"
-            type="string"
+            type="text_en_splitting_cl"
             indexed="true"
             stored="true"
-            multiValued="true"/>
+            multiValued="true"
+            termOffsets="true"
+            termPositions="true"
+            termVectors="true"/>
      <field name="supervisor"
-            type="string"
+            type="text_en_splitting_cl"
             indexed="true"
             stored="true"
-            multiValued="true"/>
+            multiValued="true"
+            termOffsets="true"
+            termPositions="true"
+            termVectors="true"/>
      <field name="predecessor"
-            type="string"
+            type="text_en_splitting_cl"
             indexed="true"
             stored="true"
-            multiValued="true"/>
+            multiValued="true"
+            termOffsets="true"
+            termPositions="true"
+            termVectors="true"/>
 
      <!--dates and date granularities-->
      <field name="date_nominated"
@@ -262,7 +280,7 @@
             multiValued="true"/>
      <field name="date_granularity_start"
             type="string"
-            indexed="true"
+            indexed="false"
             stored="true"
             multiValued="true"/>
      <field name="date_retirement"
@@ -277,7 +295,7 @@
             multiValued="true"/>
      <field name="date_granularity_termination"
             type="string"
-            indexed="true"
+            indexed="false"
             stored="true"
             multiValued="true"/>
 
@@ -296,6 +314,11 @@
             indexed="true"
             stored="true"
             multiValued="true"/>
+     <field name="selection_method_id"
+            type="string"
+            indexed="true"
+            storied="true"
+            multiValued="true"/>
      <field name="termination_reason"
             type="string"
             indexed="true"
@@ -303,7 +326,7 @@
             multiValued="true"/>
 
      <field name="school"
-            type="string"
+            type="text_en_splitting_cl"
             indexed="true"
             stored="true"
             multiValued="true"
@@ -311,20 +334,17 @@
             termPositions="true"
             termOffsets="true"/>
      <field name="political_affiliation"
-            type="string"
+            type="text_en_splitting_cl"
             indexed="true"
             stored="true"
+            multiValued="true"/>
+     <field name="political_affiliation_id"
+            type="string"
+            indexed="true"
+            storied="true"
             multiValued="true"/>
      <field name="aba_rating"
-            type="string"
-            indexed="true"
-            stored="true"
-            multiValued="true"/>
-
-
-     <!--Faceting-->
-     <field name="court_exact"
-            type="string"
+            type="text_en_splitting_cl"
             indexed="true"
             stored="true"
             multiValued="true"/>

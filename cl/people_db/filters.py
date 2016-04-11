@@ -74,7 +74,7 @@ class EducationFilter(filters.FilterSet):
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'degree_year': ['exact'],
-            'degree': BASIC_TEXT_LOOKUPS,
+            'degree_detail': BASIC_TEXT_LOOKUPS,
             'degree_level': ['exact'],
             'person': ['exact'],
         }

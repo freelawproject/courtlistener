@@ -204,7 +204,7 @@
   {
     "fields": {
       "school": 3938,
-      "degree": "",
+      "degree_detail": "",
       "date_modified": "2016-03-12T01:41:56.606Z",
       "degree_level": "jd",
       "person": 2,
@@ -217,7 +217,7 @@
   {
     "fields": {
       "school": 6041,
-      "degree": "",
+      "degree_detail": "",
       "date_modified": "2016-03-12T01:41:56.608Z",
       "degree_level": "ba",
       "person": 2,

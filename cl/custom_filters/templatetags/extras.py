@@ -1,3 +1,8 @@
+from django.utils.formats import date_format
+
+from cl.people_db.models import GRANULARITY_DAY, GRANULARITY_MONTH, \
+    GRANULARITY_YEAR
+
 from django import template
 from django.utils.safestring import mark_safe
 
@@ -35,3 +40,31 @@ def get_full_host(context, username=None, password=None):
         password='' if password is None else ':' + password + '@',
         domain_and_port=domain_and_port,
     ))
+
+
+@register.simple_tag(takes_context=False)
+def granular_date(d, granularity=GRANULARITY_DAY, iso=False, default="Unknown"):
+    """Return the date truncated according to its granularity.
+
+    :param d: The date to be converted to a string.
+    :param granularity: A strftime format indicating how much granularity we
+        know.
+    :param iso: Whether to return an iso8601 date or a human readable one.
+    :return: A string representation of the date.
+    """
+    if not d:
+        return default
+    if iso is False:
+        if granularity == GRANULARITY_DAY:
+            return date_format(d, format='F j, Y')
+        elif granularity == GRANULARITY_MONTH:
+            return date_format(d, format='F, Y')
+        elif granularity == GRANULARITY_YEAR:
+            return date_format(d, format='Y')
+    else:
+        if granularity == GRANULARITY_DAY:
+            return date_format(d, format='Y-m-d')
+        elif granularity == GRANULARITY_MONTH:
+            return date_format(d, format='Y-m')
+        elif granularity == GRANULARITY_YEAR:
+            return date_format(d, format='Y')

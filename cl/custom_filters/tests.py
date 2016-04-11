@@ -1,8 +1,11 @@
+import datetime
 from django.template import Context
 from django.test import TestCase, RequestFactory
 
-from cl.custom_filters.templatetags.extras import get_full_host
+from cl.custom_filters.templatetags.extras import get_full_host, granular_date
 from cl.custom_filters.templatetags.text_filters import naturalduration
+from cl.people_db.models import GRANULARITY_DAY, GRANULARITY_MONTH, \
+    GRANULARITY_YEAR
 
 
 class TestNaturalDuration(TestCase):
@@ -86,3 +89,31 @@ class TestExtras(TestCase):
             get_full_host(c, username='billy', password='crystal'),
             'http://billy:crystal@testserver',
         )
+
+    def test_granular_dates(self):
+        """Can we get the correct values for granular dates?"""
+        d = datetime.date(year=1982, month=6, day=9)
+        q_a = (
+            ((d, GRANULARITY_DAY, True), "1982-06-09"),
+            ((d, GRANULARITY_MONTH, True), "1982-06"),
+            ((d, GRANULARITY_YEAR, True), "1982"),
+            ((d, GRANULARITY_DAY, False), "June 9, 1982"),
+            ((d, GRANULARITY_MONTH, False), "June, 1982"),
+            ((d, GRANULARITY_YEAR, False), "1982"),
+        )
+        for q, a in q_a:
+            result = granular_date(*q)
+            self.assertEqual(
+                result,
+                a,
+                msg=("Incorrect granular date conversion. Got: %s instead of "
+                     "%s" % (result, a))
+            )
+
+    def test_old_granular_dates(self):
+        """Can we parse dates older than 1900 without strftime barfing?"""
+        d = datetime.date(year=1899, month=1, day=23)
+        try:
+            granular_date(d)
+        except ValueError:
+            self.fail("Granular date failed while parsing date prior to 1900.")
