@@ -39,8 +39,12 @@ for i, row in df.iterrows():
     
     if len(candidates) == 1:
         author = candidates[0]
-    if len(candidates) > 1:
+        print(author)
+    elif len(candidates) > 1:
         panel = candidates
+        print(panel)
+    else:
+        print('No match.',row.judges)
     
     if len(candidates) == 1:
         matchcount += 1
