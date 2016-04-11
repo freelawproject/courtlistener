@@ -81,6 +81,13 @@ def validate_is_not_alias(instance, field):
         })
 
 
+def validate_has_full_name(instance):
+    if not all([instance.name_first, instance.name_last]):
+        raise ValidationError(
+            "Both first and last names are required."
+        )
+
+
 def validate_only_one_location(instance):
     location_fields = ['school', 'organization_name', 'court']
     num_completed_fields = sum(1 for x in location_fields if getattr(instance, x))

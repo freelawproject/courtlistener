@@ -3,9 +3,15 @@ from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
 from localflavor.us import models as local_models
-from cl.lib.model_helpers import validate_partial_date, validate_is_not_alias, \
-    validate_only_one_location, validate_only_one_job_type, \
-    validate_if_degree_detail_then_degree, make_choices_group_lookup
+from cl.lib.model_helpers import (
+    make_choices_group_lookup,
+    validate_has_full_name,
+    validate_if_degree_detail_then_degree,
+    validate_is_not_alias,
+    validate_partial_date,
+    validate_only_one_job_type,
+    validate_only_one_location,
+)
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -162,6 +168,7 @@ class Person(models.Model):
             validate_partial_date(self, field)
         # An alias cannot be an alias.
         validate_is_not_alias(self, 'is_alias_of')
+        validate_has_full_name(self)
         super(Person, self).clean_fields(*args, **kwargs)
 
     @property
