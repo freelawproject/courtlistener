@@ -54,9 +54,10 @@ def make_state_judge(item, testing=False):
 
         if not testing:
             person.save()
-            
+
         if not pd.isnull(item['nickname']):
-            person_alias = Person(               
+            person_alias = Person(
+                    cl_id=item['cl_id'] + "-alias-1",
                     name_first=item['nickname'],
                     name_middle=item['midname'],
                     name_last=item['lastname'],
