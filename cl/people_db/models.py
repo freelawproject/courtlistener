@@ -11,6 +11,8 @@ from cl.lib.model_helpers import (
     validate_partial_date,
     validate_only_one_job_type,
     validate_only_one_location,
+    validate_nomination_fields_ok,
+    validate_votes_yes_and_no_or_neither
 )
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
@@ -348,12 +350,18 @@ class Position(models.Model):
         ('rec_bad', 'Recommended Unfavorably'),
     )
     SELECTION_METHODS = (
-        ('e_part', 'Partisan Election'),
-        ('e_non_part', 'Non-Partisan Election'),
-        ('a_pres', 'Appointment (President)'),
-        ('a_gov', 'Appointment (Governor)'),
-        ('a_legis', 'Appointment (Legislature)'),
+        ('Election', (
+            ('e_part', 'Partisan Election'),
+            ('e_non_part', 'Non-Partisan Election'),
+
+        )),
+        ('Appointment', (
+            ('a_pres', 'Appointment (President)'),
+            ('a_gov', 'Appointment (Governor)'),
+            ('a_legis', 'Appointment (Legislature)'),
+        )),
     )
+    SELECTION_METHOD_GROUPS = make_choices_group_lookup(SELECTION_METHODS)
     TERMINATION_REASONS = (
         ('ded', 'Death'),
         ('retire_vol', 'Voluntary Retirement'),
@@ -471,6 +479,11 @@ class Position(models.Model):
         blank=True,
         db_index=True,
     )
+    judicial_committee_action = models.CharField(
+        choices=JUDICIAL_COMMITTEE_ACTIONS,
+        max_length=20,
+        blank=True,
+    )
     date_hearing = models.DateField(
         help_text="After being nominated, a judge is usually subject to a "
                   "hearing. This is the date of that hearing.",
@@ -516,11 +529,6 @@ class Position(models.Model):
         null=True,
         blank=True,
         db_index=True,
-    )
-    judicial_committee_action = models.CharField(
-        choices=JUDICIAL_COMMITTEE_ACTIONS,
-        max_length=20,
-        blank=True,
     )
     nomination_process = models.CharField(
         choices=NOMINATION_PROCESSES,
@@ -573,6 +581,8 @@ class Position(models.Model):
             validate_is_not_alias(self, field)
         validate_only_one_location(self)
         validate_only_one_job_type(self)
+        validate_nomination_fields_ok(self)
+        validate_votes_yes_and_no_or_neither(self)
 
         super(Position, self).clean_fields(*args, **kwargs)
 
@@ -624,6 +634,10 @@ class RetentionEvent(models.Model):
         null=True,
         blank=True,
     )
+
+    def clean_fields(self, *args, **kwargs):
+        validate_votes_yes_and_no_or_neither(self)
+        super(RetentionEvent, self).clean_fields(*args, **kwargs)
 
 
 class Education(models.Model):
