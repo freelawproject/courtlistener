@@ -89,6 +89,9 @@ def validate_has_full_name(instance):
 
 
 def validate_only_one_location(instance):
+    """Ensures that a position is either at a court, school, or organization,
+       but never at more than one of those places.
+    """
     location_fields = ['school', 'organization_name', 'court']
     num_completed_fields = sum(1 for x in location_fields if getattr(instance, x))
     completed_fields = [x for x in location_fields if getattr(instance, x)]

@@ -73,6 +73,10 @@ class TestNaturalDuration(TestCase):
             )
 
 
+class DummyObject(object):
+    pass
+
+
 class TestExtras(TestCase):
 
     factory = RequestFactory()
@@ -92,17 +96,20 @@ class TestExtras(TestCase):
 
     def test_granular_dates(self):
         """Can we get the correct values for granular dates?"""
-        d = datetime.date(year=1982, month=6, day=9)
         q_a = (
-            ((d, GRANULARITY_DAY, True), "1982-06-09"),
-            ((d, GRANULARITY_MONTH, True), "1982-06"),
-            ((d, GRANULARITY_YEAR, True), "1982"),
-            ((d, GRANULARITY_DAY, False), "June 9, 1982"),
-            ((d, GRANULARITY_MONTH, False), "June, 1982"),
-            ((d, GRANULARITY_YEAR, False), "1982"),
+            ((GRANULARITY_DAY, True), "1982-06-09"),
+            ((GRANULARITY_MONTH, True), "1982-06"),
+            ((GRANULARITY_YEAR, True), "1982"),
+            ((GRANULARITY_DAY, False), "June 9, 1982"),
+            ((GRANULARITY_MONTH, False), "June, 1982"),
+            ((GRANULARITY_YEAR, False), "1982"),
         )
+        d = datetime.date(year=1982, month=6, day=9)
+        obj = DummyObject()
         for q, a in q_a:
-            result = granular_date(*q)
+            setattr(obj, 'date_start', d)
+            setattr(obj, 'date_granularity_start', q[0])
+            result = granular_date(obj, 'date_start', *q)
             self.assertEqual(
                 result,
                 a,
@@ -112,8 +119,26 @@ class TestExtras(TestCase):
 
     def test_old_granular_dates(self):
         """Can we parse dates older than 1900 without strftime barfing?"""
+        obj = DummyObject()
         d = datetime.date(year=1899, month=1, day=23)
+        obj.date_start = d
+        obj.date_granularity_start = GRANULARITY_DAY
+
         try:
-            granular_date(d)
+            granular_date(obj, 'date_start')
         except ValueError:
             self.fail("Granular date failed while parsing date prior to 1900.")
+
+    def test_granularity_missing_date(self):
+        """Does granularity code work with missing data?"""
+        obj = DummyObject()
+        d = ''
+        obj.date_start = d
+        obj.date_granularity_start = GRANULARITY_DAY
+
+        # Missing date value
+        self.assertEqual(
+            granular_date(obj, 'date_start'),
+            "Unknown"
+        )
+

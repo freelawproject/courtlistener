@@ -17,7 +17,7 @@
                 {% if person.has_photo %}
                     <h2>
                     {% with "judge_pics/"|add:person.name_last|add:"-"|add:person.name_first|lower as img_path %}
-                        <img src="{% static img_path %}{% granular_date person.date_dob granularity=person.date_granularity_dob default="" iso=True %}.jpeg"
+                        <img src="{% static img_path %}{% granular_date person 'date_dob' default="" iso=True %}.jpeg"
                          alt="Portrait of {{ person.name_first }} {{ person.name_last }}"
                          width="256"
                          class="img-responsive v-offset-above-2"
@@ -61,7 +61,7 @@
                         <p>
                             <span class="meta-data-header">Born:</span>
                             <span class="meta-data-value">
-                                {% granular_date person.date_dob granularity=person.date_granularity_dob default="On an unknown date " %}
+                                {% granular_date person 'date_dob' default="On an unknown date " %}
                                 {% spaceless %}
                                     {% if person.dob_city or person.dob_state %}
                                         <span class="gray">in </span>
@@ -83,7 +83,7 @@
                         <p>
                             <span class="meta-data-header">Died:</span>
                             <span class="meta-data-value">
-                                {% granular_date person.date_dod granularity=person.date_granularity_dod default="On an unknown date " %}
+                                {% granular_date person 'date_dod' default="On an unknown date " %}
                                 {% spaceless %}
                                     {% if person.dod_city or person.dod_state %}
                                         <span class="gray">in </span>
@@ -145,7 +145,7 @@
                             <span class="meta-data-header">
                                 <abbr title="American Bar Association">ABA</abbr> Ratings:
                             </span>
-                            {% for rating in aba_ratings.all %}{% if not forloop.first %}, {% endif %}{{ rating.get_rating_display }}{% if rating.date_rated %} ({% granular_date rating.date_rated granularity=rating.date_granularity_rated %}){% endif %}
+                            {% for rating in aba_ratings.all %}{% if not forloop.first %}, {% endif %}{{ rating.get_rating_display }}{% if rating.date_rated %} ({% granular_date rating 'date_rated' %}){% endif %}
                             {% endfor %}
                         </p>
                         {% endif %}
@@ -178,15 +178,15 @@
                     <li>
                         {% if pa.date_start and pa.date_end %}
                             From
-                            {% granular_date pa.date_start granularity=pa.date_granularity_start %}
+                            {% granular_date pa 'date_start' %}
                             to
-                            {% granular_date pa.date_end granularity=pa.date_granularity_end %}:
+                            {% granular_date pa 'date_end' %}:
                         {% elif not pa.date_start and pa.date_end %}
                             Until
-                            {% granular_date pa.date_end granularity=pa.date_granularity_end %}:
+                            {% granular_date pa 'date_end' %}:
                         {% elif pa.date_start and not pa.date_end %}
                             Beginning
-                            {% granular_date pa.date_start granularity=pa.date_granularity_start %}:
+                            {% granular_date pa 'date_start' %}:
                         {% elif not pa.date_start and not pa.date_end %}
                             {# pass - no data #}
                         {% endif %}
@@ -232,14 +232,26 @@
                     Roles <span class="alt">&amp;</span> Positions</h3>
                 <p class="gray">Includes a variety of known roles, such as judges, governors, presidents, clerks, practitioners, public defenders, attorneys general, professors, etc.</p>
                 <hr class="top">
-                {% for position in positions %}
-                    <h4 class="text-uppercase">
-                        {% if position.get_position_type_display %}
-                            {{ position.get_position_type_display }}
-                        {% else %}
-                            {{ position.job_title }}
-                        {% endif %}
-                    </h4>
+                {% for p in positions %}
+                    <div class="row">
+                        <div class="col-xs-12">
+                            <h4 class="text-uppercase">
+                                {% if p.get_position_type_display %}
+                                    {{ p.get_position_type_display }}
+                                {% else %}
+                                    {{ p.job_title }}
+                                {% endif %}
+                                {% if p.date_start or p.date_termination %}
+                                {% filter cut:" " %}
+                                    ({% granular_date p 'date_start' default="Unknown date" %}
+                                    &ndash;
+                                    {% granular_date p 'date_termination' %})
+                                {% endfilter %}
+
+                            </h4>
+                            <
+                        </div>
+                    </div>
                 {% endfor %}
             </div>
         </div>

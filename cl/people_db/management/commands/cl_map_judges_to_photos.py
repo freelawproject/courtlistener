@@ -35,8 +35,8 @@ class Command(BaseCommand):
         slug_name_dob = "{slug}-{date}.jpeg".format(
             slug=slug_name.rsplit('.')[0],
             date=granular_date(
-                person.date_dob,
-                granularity=person.date_granularity_dob,
+                person,
+                'date_dob',
                 iso=True,
             ).lower()
         )
@@ -86,8 +86,8 @@ class Command(BaseCommand):
                 print "WARNING: Found more than one match for %s\nFound:" % path
                 for person in people:
                     print "    %s - %s" % (person, granular_date(
-                        person.date_dob,
-                        granularity=person.date_granularity_dob,
+                        person,
+                        'date_dob',
                         iso=True,
                     ))
                 multi += 1

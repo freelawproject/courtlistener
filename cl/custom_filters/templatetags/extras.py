@@ -43,15 +43,23 @@ def get_full_host(context, username=None, password=None):
 
 
 @register.simple_tag(takes_context=False)
-def granular_date(d, granularity=GRANULARITY_DAY, iso=False, default="Unknown"):
+def granular_date(obj, field_name, granularity=None, iso=False,
+                  default="Unknown"):
     """Return the date truncated according to its granularity.
 
-    :param d: The date to be converted to a string.
-    :param granularity: A strftime format indicating how much granularity we
-        know.
+    :param obj: The object to get the value from
+    :param field_name: The attribute to be converted to a string.
+    :param granularity: The granularity to perform. If None, we assume that
+        getattr(obj, 'date_%s_field_name') will work.
     :param iso: Whether to return an iso8601 date or a human readable one.
     :return: A string representation of the date.
     """
+    d = getattr(obj, field_name)
+    if granularity is None:
+        date_parts = field_name.split('_')
+        granularity = getattr(obj, "%s_granularity_%s" % (date_parts[0],
+                                                          date_parts[1]))
+
     if not d:
         return default
     if iso is False:
