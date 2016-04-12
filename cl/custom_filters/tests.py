@@ -142,3 +142,20 @@ class TestExtras(TestCase):
             "Unknown"
         )
 
+    def test_granularity_dict_or_obj(self):
+        """Can you pass a dict or an object and will both work?
+
+        This is important because some objects in Django templates are dicts...
+        others are objects.
+        """
+        obj = {}
+        d = ''
+        obj['date_start'] = d
+        obj['date_granularity_start'] = GRANULARITY_DAY
+
+        self.assertEqual(
+            granular_date(obj, 'date_start'),
+            "Unknown",
+        )
+
+

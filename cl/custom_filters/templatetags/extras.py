@@ -54,11 +54,15 @@ def granular_date(obj, field_name, granularity=None, iso=False,
     :param iso: Whether to return an iso8601 date or a human readable one.
     :return: A string representation of the date.
     """
-    d = getattr(obj, field_name)
+    if not isinstance(obj, dict):
+        # Convert it to a dict. It's easier to convert this way than from a dict
+        # to an object.
+        obj = obj.__dict__
+
+    d = obj.get(field_name, None)
     if granularity is None:
         date_parts = field_name.split('_')
-        granularity = getattr(obj, "%s_granularity_%s" % (date_parts[0],
-                                                          date_parts[1]))
+        granularity = obj["%s_granularity_%s" % (date_parts[0], date_parts[1])]
 
     if not d:
         return default
