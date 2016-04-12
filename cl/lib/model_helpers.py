@@ -117,6 +117,40 @@ def validate_if_degree_detail_then_degree(instance):
         raise ValidationError("Cannot have degree_detail without degree_level.")
 
 
+def validate_nomination_fields_ok(instance):
+    """Validate a few things:
+     - date_nominated and date_elected cannot both have values
+     - if nominated, then date_elected not complete and vice versa.
+    """
+    if instance.date_nominated and instance.date_elected:
+        raise ValidationError(
+            "Cannot have both a date nominated and a date elected."
+        )
+
+    if instance.how_selected:
+        selection_type_group = instance.SELECTION_METHOD_GROUPS[instance.how_selected]
+        if selection_type_group == 'Election' and instance.date_nominated:
+            raise ValidationError(
+                "Cannot have a nomination date for a position with how_selected of "
+                "%s" % instance.get_how_selected_display()
+            )
+        if selection_type_group == 'Appointment' and instance.date_elected:
+            raise ValidationError(
+                "Cannot have an election date for a position with how_selected of "
+                "%s" % instance.get_how_selected_display()
+            )
+
+
+def validate_votes_yes_and_no_or_neither(instance):
+    """Ensure that we have both or neither of votes_yes and votes_no"""
+    yes_not_no = instance.votes_yes is not None and instance.votes_no is None
+    no_not_yes = instance.votes_no is not None and instance.votes_yes is None
+    if yes_not_no or no_not_yes:
+        raise ValidationError(
+            "If votes yes or votes no has a value, the other must also."
+        )
+
+
 def make_choices_group_lookup(c):
     """Invert a choices variable in a model to get the group name for a
     tuple.
