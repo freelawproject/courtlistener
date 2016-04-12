@@ -66,13 +66,13 @@
                                     {% if person.dob_city or person.dob_state %}
                                         <span class="gray">in </span>
                                         {% if person.dob_city %}
-                                            <span>{{ person.dob_city }}</span>
+                                            <a href="{% url "show_results" %}?type=p&amp;dob_city=&quot;{{ person.dob_city }}&quot;">{{ person.dob_city }}</a>
                                         {% endif %}
                                         {% if person.dob_city and person.dob_state %}
                                             <span class="gray">, </span>
                                         {% endif %}
                                         {% if person.dob_state %}
-                                            <span>{{ person.dob_state }}</span>
+                                            <a href="{% url "show_results" %}?type=p&amp;dob_state={{ person.dob_state }}">{{ person.dob_state }}</a>
                                         {% endif %}
                                     {% endif %}
                                 {% endspaceless %}
@@ -190,7 +190,7 @@
                         {% elif not pa.date_start and not pa.date_end %}
                             {# pass - no data #}
                         {% endif %}
-                        {{ pa.get_political_party_display }}
+                        <a href="{% url "show_results" %}?type=p&amp;political_affiliation={{ pa.political_party }}">{{ pa.get_political_party_display }}</a>
                     </li>
                 {% endfor %}
                 </ul>
@@ -205,7 +205,7 @@
                     {% for e in educations %}
                         <li>
                             Attended
-                            {{ e.school.name }}
+                            <a href="{% url "show_results" %}?type=p&amp;school=&quot;{{ e.school.name }}&quot;">{{ e.school.name }}</a>
                             {% if e.degree_detail or e.degree_level or e.degree_year %}
                                 and received a
                                 {% if e.degree_level %}
@@ -297,7 +297,7 @@
                                     <p>
                                         <span class="meta-data-header">Selected By:</span>
                                         <span class="meta-data-value">
-                                            {{ p.get_how_selected_display }}
+                                            <a href="{% url "show_results" %}?type=p&amp;selection_method={{ p.how_selected }}">{{ p.get_how_selected_display }}</a>
                                             {% if p.date_elected %}
                                                 <span class="alt">on</span> {{ p.date_elected|default:"" }}
                                             {% elif p.date_nominated %}
@@ -365,7 +365,7 @@
                                             {% if p.voice_vote %}
                                                 By voice vote,
                                             {% endif %}
-                                            {{ p.votes_yes }} in favor and {{ p.votes_no }} opposed
+                                            {{ p.votes_yes }} in favor <span class="alt">and</span> {{ p.votes_no }} opposed
                                         </span>
                                     </p>
                                 {% endif %}
