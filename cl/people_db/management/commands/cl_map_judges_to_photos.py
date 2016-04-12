@@ -27,6 +27,21 @@ class Command(BaseCommand):
         # Run the requested method.
         self.map_judges_to_photos()
 
+    @staticmethod
+    def make_slugs(person):
+        slug_name = slugify("%s %s" % (person.name_last,
+                                       person.name_first)) + ".jpeg"
+
+        slug_name_dob = "{slug}-{date}.jpeg".format(
+            slug=slug_name.rsplit('.')[0],
+            date=granular_date(
+                person.date_dob,
+                granularity=person.date_granularity_dob,
+                iso=True,
+            ).lower()
+        )
+        return slug_name, slug_name_dob
+
     def map_judges_to_photos(self):
         """Identify which of the judges in the DB have photos.
 
@@ -43,18 +58,8 @@ class Command(BaseCommand):
         # Iterate over the people, attempting to look them up in the list
         people = Person.objects.filter(is_alias_of=None)
         for person in people:
-            slug_name = slugify("%s %s" % (person.name_last,
-                                           person.name_first)) + ".jpeg"
 
-            slug_name_dob = "{slug}-{date}.jpeg".format(
-                slug=slug_name.rsplit('.')[0],
-                date=granular_date(
-                    person.date_dob,
-                    granularity=person.date_granularity_dob,
-                    iso=True,
-                ).lower()
-            )
-            for name in [slug_name, slug_name_dob]:
+            for name in self.make_slugs(person):
                 if name in judge_map:
                     # If there's a hit, add the path to the dict of judge paths.
                     judge_map[name].append(person)
