@@ -38,7 +38,8 @@ def make_federal_judge(item, testing=False):
         print(
         'Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(
             date_dob) + ' exists.')
-        return
+        if not testing:
+            return
 
     date_dod, date_granularity_dod = process_date(item['Death year'],
                                                   item['Death month'],
@@ -98,16 +99,16 @@ def make_federal_judge(item, testing=False):
             raise
 
         date_nominated = process_date_string(
-                item['Nomination Date Senate Executive Journal'])
+                item['Nomination Date Senate Executive Journal' + pos_str])
         date_recess_appointment = process_date_string(
                 item['Recess Appointment date'])
         date_referred_to_judicial_committee = process_date_string(
-                item['Referral date (referral to Judicial Committee)'])
+                item['Referral date (referral to Judicial Committee)' + pos_str])
         date_judicial_committee_action = process_date_string(
                 item['Committee action date'])
-        date_hearing = process_date_string(item['Hearings'])
+        date_hearing = process_date_string(item['Hearings' + pos_str])
         date_confirmation = process_date_string(
-                item['Senate Vote Date (Confirmation Date)'])
+                item['Senate Vote Date (Confirmation Date)' + pos_str])
 
         # assign start date
         date_start = process_date_string(item['Commission Date' + pos_str])
@@ -126,8 +127,12 @@ def make_federal_judge(item, testing=False):
         else:
             date_granularity_termination = '%Y-%m-%d'
 
-        votes_yes = None
-        votes_no = None
+        votes = item['Senate vote Ayes/Nays']
+        if not pd.isnull(votes):
+            votes_yes, votes_no = votes.split('/')
+        else:
+            votes_yes = None
+            votes_no = None
 
         termdict = {'Abolition of Court': 'abolished',
                     'Death': 'ded',
