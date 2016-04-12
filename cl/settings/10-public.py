@@ -2,7 +2,10 @@ import datetime
 import os
 import re
 import sys
+
 from django.contrib.messages import constants as message_constants
+
+from judge_pics import judge_root
 
 # Loads the variable INSTALL_ROOT
 execfile('/etc/courtlistener')
@@ -205,7 +208,10 @@ SCRAPER_ADMINS = (
 ###############
 MEDIA_ROOT = os.path.join(INSTALL_ROOT, 'cl/assets/media/')
 STATIC_URL = '/static/'
-STATICFILES_DIRS = (os.path.join(INSTALL_ROOT, 'cl/assets/static-global/'),)
+STATICFILES_DIRS = (
+    os.path.join(INSTALL_ROOT, 'cl/assets/static-global/'),
+    ('judge_pics', os.path.join(judge_root, '256')),
+)
 # This is where things get collected to
 STATIC_ROOT = os.path.join(INSTALL_ROOT, 'cl/assets/static/')
 

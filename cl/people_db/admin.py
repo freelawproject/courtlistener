@@ -108,6 +108,9 @@ class PersonAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'is_alias_of',
     )
+    readonly_fields = (
+        'has_photo',
+    )
 
     def save_model(self, request, obj, form, change):
         obj.save()

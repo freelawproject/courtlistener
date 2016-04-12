@@ -58,7 +58,6 @@ class Command(BaseCommand):
         # Iterate over the people, attempting to look them up in the list
         people = Person.objects.filter(is_alias_of=None)
         for person in people:
-
             for name in self.make_slugs(person):
                 if name in judge_map:
                     # If there's a hit, add the path to the dict of judge paths.
