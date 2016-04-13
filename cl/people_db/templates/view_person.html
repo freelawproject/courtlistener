@@ -153,7 +153,7 @@
                             <span class="meta-data-header">
                                 <abbr title="American Bar Association">ABA</abbr> Ratings:
                             </span>
-                            {% for rating in aba_ratings.all %}{% if not forloop.first %}, {% endif %}{{ rating.get_rating_display }}{% if rating.date_rated %} ({% granular_date rating 'date_rated' %}){% endif %}
+                            {% for rating in aba_ratings.all %}{% if not forloop.first %}, {% endif %}{{ rating.get_rating_display }}{% if rating.year_rated %} ({{ rating.year_rated }}){% endif %}
                             {% endfor %}
                         </p>
                         {% endif %}

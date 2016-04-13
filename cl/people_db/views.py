@@ -39,7 +39,7 @@ def view_person(request, pk, slug):
         'view_person.html',
         {'person': person,
          'title': title,
-         'aba_ratings': person.aba_ratings.all().order_by('-date_rated'),
+         'aba_ratings': person.aba_ratings.all().order_by('-year_rated'),
          'political_affiliations': (person.political_affiliations.all()
                                     .order_by('-date_start')),
          'positions': positions,
