@@ -84,6 +84,7 @@ def make_federal_judge(item, testing=False):
         if not testing:
             person.race.add(r)
 
+    prev_politics = None
     # add position items (up to 6 of them)
     for posnum in range(1, 7):
         if posnum > 1:
@@ -126,8 +127,16 @@ def make_federal_judge(item, testing=False):
         else:
             date_granularity_termination = '%Y-%m-%d'
 
-        votes_yes = None
-        votes_no = None
+        votes = item['Senate vote Ayes/Nays' + pos_str]
+        if not pd.isnull(votes):
+            votes_yes, votes_no = votes.split('/')
+        else:
+            votes_yes = None
+            votes_no = None
+        if item['Senate voice vote' + pos_str] == "Yes":
+            voice_vote = True
+        else:
+            voice_vote = False
 
         termdict = {'Abolition of Court': 'abolished',
                     'Death': 'ded',
@@ -161,8 +170,10 @@ def make_federal_judge(item, testing=False):
                 date_granularity_termination=date_granularity_termination,
                 date_retirement=date_retirement,
 
+                voice_vote=voice_vote,
                 votes_yes=votes_yes,
                 votes_no=votes_no,
+                vote_type = 's',
                 how_selected='a_pres',
                 termination_reason=term_reason
         )
@@ -174,19 +185,36 @@ def make_federal_judge(item, testing=False):
         p = item['Party Affiliation of President' + pos_str]
         if not pd.isnull(p) and p not in ['Assignment', 'Reassignment']:
             party = get_party(item['Party Affiliation of President' + pos_str])
-            politics = PoliticalAffiliation(
-                    person=person,
-                    political_party=party,
-                    source='a'
-            )
-            if not testing:
-                politics.save()
-
+            if prev_politics is None:
+                politics = PoliticalAffiliation(
+                        person=person,
+                        political_party=party,
+                        date_start = date_nominated,
+                        source='a'
+                )
+                if not testing:
+                    politics.save()
+                prev_politics = party
+            elif party != prev_politics:
+                # account for changing political affiliation
+                politics.date_end = date_nominated
+                if not testing:
+                    politics.save()
+                politics = PoliticalAffiliation(
+                        person=person,
+                        political_party=party,
+                        date_start = date_nominated,
+                        source='a'
+                )
+                if not testing:
+                    politics.save()
         rating = get_aba(item['ABA Rating' + pos_str])
         if rating is not None:
+            nom_year = date_nominated.year
             aba = ABARating(
                     person=person,
-                    rating=rating
+                    rating=rating,
+                    year_rated=nom_year
             )
             if not testing:
                 aba.save()
@@ -218,7 +246,7 @@ def make_federal_judge(item, testing=False):
                 degree = Education(
                         person=person,
                         school=school,
-                        degree_detail=degtype,
+                        degree=degtype,
                         degree_level=deg_level,
                         degree_year=degyear
                 )

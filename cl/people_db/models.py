@@ -342,6 +342,11 @@ class Position(models.Model):
         ('election', 'Primary Election'),
         ('merit_comm', 'Merit Commission'),
     )
+    VOTE_TYPES = (
+        ('s', 'Senate'),
+        ('p', 'Partisan Election'),
+        ('np', 'Non-Partisan Election')        
+    )
     JUDICIAL_COMMITTEE_ACTIONS = (
         ('no_rep', 'Not Reported'),
         ('rep_w_rec', 'Reported with Recommendation'),
@@ -535,14 +540,27 @@ class Position(models.Model):
         max_length=20,
         blank=True,
     )
+    vote_type = models.CharField(
+        choices=VOTE_TYPES,
+        max_length=2,
+        blank=True,
+    )
     voice_vote = models.NullBooleanField(
         blank=True,
     )
-    votes_yes = models.PositiveSmallIntegerField(
+    votes_yes = models.PositiveIntegerField(
         null=True,
         blank=True,
     )
-    votes_no = models.PositiveSmallIntegerField(
+    votes_no = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+    votes_yes_percent = models.FloatField(
+        null=True,
+        blank=True,
+    )
+    votes_no_percent = models.FloatField(
         null=True,
         blank=True,
     )
@@ -618,11 +636,19 @@ class RetentionEvent(models.Model):
     date_retention = models.DateField(
         db_index=True,
     )
-    votes_yes = models.PositiveSmallIntegerField(
+    votes_yes = models.PositiveIntegerField(
         null=True,
         blank=True,
     )
-    votes_no = models.PositiveSmallIntegerField(
+    votes_no = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+    votes_yes_percent = models.FloatField(
+        null=True,
+        blank=True,
+    )
+    votes_no_percent = models.FloatField(
         null=True,
         blank=True,
     )
@@ -823,7 +849,6 @@ class Source(models.Model):
         blank=True,
     )
 
-
 class ABARating(models.Model):
     ABA_RATINGS = (
         ('ewq', 'Exceptionally Well Qualified'),
@@ -848,25 +873,16 @@ class ABARating(models.Model):
         auto_now=True,
         db_index=True,
     )
-    date_rated = models.DateField(
-        null=True,
-        blank=True,
-    )
-    date_granularity_rated = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
+    year_rated =  models.PositiveSmallIntegerField(
+        help_text="The year of the rating.",
+        null=True
     )
     rating = models.CharField(
         choices=ABA_RATINGS,
         max_length=5,
     )
 
-    class Meta:
-        verbose_name = 'American Bar Association Rating'
-        verbose_name_plural = 'American Bar Association Ratings'
-
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, 'rated')
-        validate_is_not_alias(self, 'person')
         super(ABARating, self).clean_fields(*args, **kwargs)
+        
