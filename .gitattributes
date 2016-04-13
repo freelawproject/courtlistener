@@ -1,2 +1,34 @@
 # Prevent Windows git clients for goofing up files that must run on Linux
 * text eol=lf
+
+# Image files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.psd binary
+
+# Audio files
+*.wma binary
+*.mp3 binary
+
+# Compressed files
+*.jar binary
+*.exe binary
+*.bz2 binary
+*.gz binary
+
+# Fonts
+*.ttf binary
+*.woff binary
+
+# File formats
+*.ods binary
+*.otf binary
+*.pdf binary
+*.xls binary
+*.wpd binary
+
+# Other
+*.traineddata binary
+
