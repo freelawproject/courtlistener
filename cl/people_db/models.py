@@ -823,7 +823,6 @@ class Source(models.Model):
         blank=True,
     )
 
-
 class ABARating(models.Model):
     ABA_RATINGS = (
         ('ewq', 'Exceptionally Well Qualified'),
@@ -848,25 +847,16 @@ class ABARating(models.Model):
         auto_now=True,
         db_index=True,
     )
-    date_rated = models.DateField(
-        null=True,
-        blank=True,
-    )
-    date_granularity_rated = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
+    year_rated =  models.PositiveSmallIntegerField(
+        help_text="The year of the rating.",
+        null=True
     )
     rating = models.CharField(
         choices=ABA_RATINGS,
         max_length=5,
     )
 
-    class Meta:
-        verbose_name = 'American Bar Association Rating'
-        verbose_name_plural = 'American Bar Association Ratings'
-
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, 'rated')
-        validate_is_not_alias(self, 'person')
         super(ABARating, self).clean_fields(*args, **kwargs)
+        

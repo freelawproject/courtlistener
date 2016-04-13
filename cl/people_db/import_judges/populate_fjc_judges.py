@@ -38,8 +38,7 @@ def make_federal_judge(item, testing=False):
         print(
         'Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(
             date_dob) + ' exists.')
-        if not testing:
-            return
+        return
 
     date_dod, date_granularity_dod = process_date(item['Death year'],
                                                   item['Death month'],
@@ -85,6 +84,7 @@ def make_federal_judge(item, testing=False):
         if not testing:
             person.race.add(r)
 
+    prev_politics = None
     # add position items (up to 6 of them)
     for posnum in range(1, 7):
         if posnum > 1:
@@ -99,16 +99,16 @@ def make_federal_judge(item, testing=False):
             raise
 
         date_nominated = process_date_string(
-                item['Nomination Date Senate Executive Journal' + pos_str])
+                item['Nomination Date Senate Executive Journal'])
         date_recess_appointment = process_date_string(
                 item['Recess Appointment date'])
         date_referred_to_judicial_committee = process_date_string(
-                item['Referral date (referral to Judicial Committee)' + pos_str])
+                item['Referral date (referral to Judicial Committee)'])
         date_judicial_committee_action = process_date_string(
                 item['Committee action date'])
-        date_hearing = process_date_string(item['Hearings' + pos_str])
+        date_hearing = process_date_string(item['Hearings'])
         date_confirmation = process_date_string(
-                item['Senate Vote Date (Confirmation Date)' + pos_str])
+                item['Senate Vote Date (Confirmation Date)'])
 
         # assign start date
         date_start = process_date_string(item['Commission Date' + pos_str])
@@ -127,12 +127,8 @@ def make_federal_judge(item, testing=False):
         else:
             date_granularity_termination = '%Y-%m-%d'
 
-        votes = item['Senate vote Ayes/Nays']
-        if not pd.isnull(votes):
-            votes_yes, votes_no = votes.split('/')
-        else:
-            votes_yes = None
-            votes_no = None
+        votes_yes = None
+        votes_no = None
 
         termdict = {'Abolition of Court': 'abolished',
                     'Death': 'ded',
@@ -179,19 +175,36 @@ def make_federal_judge(item, testing=False):
         p = item['Party Affiliation of President' + pos_str]
         if not pd.isnull(p) and p not in ['Assignment', 'Reassignment']:
             party = get_party(item['Party Affiliation of President' + pos_str])
-            politics = PoliticalAffiliation(
-                    person=person,
-                    political_party=party,
-                    source='a'
-            )
-            if not testing:
-                politics.save()
-
+            if prev_politics is None:
+                politics = PoliticalAffiliation(
+                        person=person,
+                        political_party=party,
+                        date_start = date_nominated,
+                        source='a'
+                )
+                if not testing:
+                    politics.save()
+                prev_politics = party
+            elif party != prev_politics:
+                # account for changing political affiliation
+                politics.date_end = date_nominated
+                if not testing:
+                    politics.save()
+                politics = PoliticalAffiliation(
+                        person=person,
+                        political_party=party,
+                        date_start = date_nominated,
+                        source='a'
+                )
+                if not testing:
+                    politics.save()
         rating = get_aba(item['ABA Rating' + pos_str])
         if rating is not None:
+            nom_year = date_nominated.year
             aba = ABARating(
                     person=person,
-                    rating=rating
+                    rating=rating,
+                    year_rated=nom_year
             )
             if not testing:
                 aba.save()
@@ -223,7 +236,7 @@ def make_federal_judge(item, testing=False):
                 degree = Education(
                         person=person,
                         school=school,
-                        degree_detail=degtype,
+                        degree=degtype,
                         degree_level=deg_level,
                         degree_year=degyear
                 )
