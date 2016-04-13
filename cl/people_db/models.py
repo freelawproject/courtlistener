@@ -321,7 +321,7 @@ class Position(models.Model):
             ('dep-sol-gen',      'Deputy Solicitor General'),
         )),
         ('Appointing Authority', (
-            ('pres',          'President'),
+            ('pres',          'President of the United States'),
             ('gov',           'Governor'),
         )),
         ('Clerkships', (
