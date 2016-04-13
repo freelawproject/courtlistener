@@ -1,3 +1,8 @@
+from django.utils.formats import date_format
+
+from cl.people_db.models import GRANULARITY_DAY, GRANULARITY_MONTH, \
+    GRANULARITY_YEAR
+
 from django import template
 from django.utils.safestring import mark_safe
 
@@ -35,3 +40,43 @@ def get_full_host(context, username=None, password=None):
         password='' if password is None else ':' + password + '@',
         domain_and_port=domain_and_port,
     ))
+
+
+@register.simple_tag(takes_context=False)
+def granular_date(obj, field_name, granularity=None, iso=False,
+                  default="Unknown"):
+    """Return the date truncated according to its granularity.
+
+    :param obj: The object to get the value from
+    :param field_name: The attribute to be converted to a string.
+    :param granularity: The granularity to perform. If None, we assume that
+        getattr(obj, 'date_%s_field_name') will work.
+    :param iso: Whether to return an iso8601 date or a human readable one.
+    :return: A string representation of the date.
+    """
+    if not isinstance(obj, dict):
+        # Convert it to a dict. It's easier to convert this way than from a dict
+        # to an object.
+        obj = obj.__dict__
+
+    d = obj.get(field_name, None)
+    if granularity is None:
+        date_parts = field_name.split('_')
+        granularity = obj["%s_granularity_%s" % (date_parts[0], date_parts[1])]
+
+    if not d:
+        return default
+    if iso is False:
+        if granularity == GRANULARITY_DAY:
+            return date_format(d, format='F j, Y')
+        elif granularity == GRANULARITY_MONTH:
+            return date_format(d, format='F, Y')
+        elif granularity == GRANULARITY_YEAR:
+            return date_format(d, format='Y')
+    else:
+        if granularity == GRANULARITY_DAY:
+            return date_format(d, format='Y-m-d')
+        elif granularity == GRANULARITY_MONTH:
+            return date_format(d, format='Y-m')
+        elif granularity == GRANULARITY_YEAR:
+            return date_format(d, format='Y')

@@ -65,6 +65,106 @@ def validate_partial_date(instance, field):
         })
 
 
+def validate_is_not_alias(instance, field):
+    """Ensure that an alias to an object is not being used instead of the object
+    itself.
+
+    Requires that the object have an is_alias property or attribute.
+    """
+    referenced_object = getattr(instance, field)
+    if referenced_object is not None and referenced_object.is_alias:
+        raise ValidationError({
+            field: 'Cannot set "%s" field to an alias of a "%s". Hint: "%s" is '
+                   'an alias of "%s"' % (field, type(referenced_object).__name__,
+                                      referenced_object,
+                                      referenced_object.is_alias_of)
+        })
+
+
+def validate_has_full_name(instance):
+    if not all([instance.name_first, instance.name_last]):
+        raise ValidationError(
+            "Both first and last names are required."
+        )
+
+
+def validate_only_one_location(instance):
+    """Ensures that a position is either at a court, school, or organization,
+       but never at more than one of those places.
+    """
+    location_fields = ['school', 'organization_name', 'court']
+    num_completed_fields = sum(1 for x in location_fields if getattr(instance, x))
+    completed_fields = [x for x in location_fields if getattr(instance, x)]
+    if num_completed_fields > 1:
+        raise ValidationError(
+            "More than one of the location fields is completed. %s are: %s!" % (
+                num_completed_fields,
+                ", ".join(completed_fields),
+            ))
+
+
+def validate_only_one_job_type(instance):
+    if instance.position_type and instance.job_title:
+        raise ValidationError("Cannot have values for both job_title and "
+                              "position_type")
+    if not any([instance.position_type, instance.job_title]):
+        raise ValidationError("Either job_title or position_type must be "
+                              "completed.")
+
+
+def validate_if_degree_detail_then_degree(instance):
+    if instance.degree_detail and not instance.degree_level:
+        raise ValidationError("Cannot have degree_detail without degree_level.")
+
+
+def validate_nomination_fields_ok(instance):
+    """Validate a few things:
+     - date_nominated and date_elected cannot both have values
+     - if nominated, then date_elected not complete and vice versa.
+    """
+    if instance.date_nominated and instance.date_elected:
+        raise ValidationError(
+            "Cannot have both a date nominated and a date elected."
+        )
+
+    if instance.how_selected:
+        selection_type_group = instance.SELECTION_METHOD_GROUPS[instance.how_selected]
+        if selection_type_group == 'Election' and instance.date_nominated:
+            raise ValidationError(
+                "Cannot have a nomination date for a position with how_selected of "
+                "%s" % instance.get_how_selected_display()
+            )
+        if selection_type_group == 'Appointment' and instance.date_elected:
+            raise ValidationError(
+                "Cannot have an election date for a position with how_selected of "
+                "%s" % instance.get_how_selected_display()
+            )
+
+
+def validate_votes_yes_and_no_or_neither(instance):
+    """Ensure that we have both or neither of votes_yes and votes_no"""
+    yes_not_no = instance.votes_yes is not None and instance.votes_no is None
+    no_not_yes = instance.votes_no is not None and instance.votes_yes is None
+    if yes_not_no or no_not_yes:
+        raise ValidationError(
+            "If votes yes or votes no has a value, the other must also."
+        )
+
+
+def make_choices_group_lookup(c):
+    """Invert a choices variable in a model to get the group name for a
+    tuple.
+    """
+    d = {}
+    for choice, value in c:
+        if isinstance(value, (list, tuple)):
+            for t in value:
+                d[t[0]] = choice
+        else:
+            d[choice] = value
+    return d
+
+
 def disable_auto_now_fields(*models):
     """Turns off the auto_now and auto_now_add attributes on a Model's fields,
     so that an instance of the Model can be saved with a custom value.

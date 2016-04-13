@@ -32,31 +32,40 @@ def make_state_judge(item, testing=False):
         if len(item['midname']) == 1:
             item['midname'] = item['midname'] + '.'
 
+    had_alias_result = False
     check = Person.objects.filter(name_first=item['firstname'],
                                   name_last=item['lastname'], date_dob=date_dob)
-    if len(check) > 0:
+    if check.count() > 0:
         print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.')
         person = check[0]
+        if person.is_alias:
+            # Grab the correct person and set our alias variable to True
+            person = person.is_alias_of
+            had_alias_result = True
     else:
 
         person = Person(
-                cl_id=item['cl_id'],
-                name_first=item['firstname'],
-                name_middle=item['midname'],
-                name_last=item['lastname'],
-                name_suffix=get_suffix(item['suffname']),
                 gender=item['gender'],
                 date_dob=date_dob,
                 date_granularity_dob=date_granularity_dob,
                 date_dod=date_dod,
                 date_granularity_dod=date_granularity_dod
         )
+        if not had_alias_result:
+            # Only set the name and ID values on non-alias results, otherwise
+            # you overwrite the good name with the alias name.
+            person.cl_id = item['cl_id']
+            person.name_first = item['firstname']
+            person.name_middle = item['midname']
+            person.name_last = item['lastname']
+            person.name_suffix = get_suffix(item['suffname'])
 
         if not testing:
             person.save()
-            
+
         if not pd.isnull(item['nickname']):
-            person_alias = Person(               
+            person_alias = Person(
+                    cl_id=item['cl_id'] + "-alias-1",
                     name_first=item['nickname'],
                     name_middle=item['midname'],
                     name_last=item['lastname'],

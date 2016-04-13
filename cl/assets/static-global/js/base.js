@@ -17,12 +17,14 @@ $(document).ready(function() {
         // Gather all form fields that are necessary
         var gathered = $();
 
-        // Add the ordering drop down
-        gathered = gathered.add($('#id_order_by'));
-
         // Add the input boxes that aren't empty
         var selector = '.external-input[type=text]';
         gathered = gathered.add($(selector).filter(function () {
+            return this.value !== '';
+        }));
+
+        selector = 'select.external-input';
+        gathered = gathered.add($(selector).filter(function() {
             return this.value !== '';
         }));
 

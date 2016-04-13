@@ -10,6 +10,7 @@ from django.core.urlresolvers import reverse
 from django.http import HttpRequest
 from django.test import TestCase, override_settings
 from lxml import etree, html
+from rest_framework.status import HTTP_200_OK
 
 from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase
@@ -155,7 +156,7 @@ class SearchTest(IndexedSolrTestCase):
         """Does typing into the main query box work?"""
         r = self.client.get('/', {'q': 'supreme'})
         self.assertIn('Honda', r.content)
-        self.assertIn('1 Result', r.content)
+        self.assertIn('1 Opinion', r.content)
 
     def test_a_case_name_query(self):
         """Does querying by case name work?"""
@@ -305,6 +306,18 @@ class SearchTest(IndexedSolrTestCase):
             msg="Got a deadly error when doing a Date Argued filter."
         )
 
+    def test_oa_search_api(self):
+        """Can we get oa results on the search endpoint?"""
+        r = self.client.get(
+            reverse('search-list', kwargs={'version': 'v3'}),
+            {'type': 'oa'}
+        )
+        self.assertEqual(
+            r.status_code,
+            HTTP_200_OK,
+            msg="Did not get good status code from oral arguments API endpoint"
+        )
+
     def test_homepage(self):
         """Is the homepage loaded when no GET parameters are provided?"""
         response = self.client.get('/')
@@ -332,6 +345,94 @@ class JudgeSearchTest(IndexedSolrTestCase):
                 msg="Got a deadly error when doing a judge search ordered "
                     "by %s" % sort_field
             )
+
+    def _test_aricle_count(self, params, expected_count, field_name):
+        r = self.client.get('/', params)
+        tree = html.fromstring(r.content)
+        got = len(tree.xpath('//article'))
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results with %s "
+                "filter applied.\n"
+                "Expected: %s\n"
+                "     Got: %s\n\n"
+                "Params were: %s" % (
+                    field_name, expected_count, got, params,
+                )
+        )
+
+    def test_name_field(self):
+        self._test_aricle_count({'type': 'p', 'name': 'judith'}, 1, 'name')
+
+    def test_court_filter(self):
+        self._test_aricle_count({'type': 'p', 'court': 'ca1'}, 1, 'court')
+        self._test_aricle_count({'type': 'p', 'court': 'scotus'}, 0, 'court')
+        self._test_aricle_count({'type': 'p', 'court': 'scotus ca1'}, 1, 'court')
+
+    def test_dob_filters(self):
+        self._test_aricle_count(
+            {'type': 'p', 'born_after': '1941', 'born_before': '1943'},
+            1,
+            'born_{before|after}',
+        )
+        # Are reversed dates corrected?
+        self._test_aricle_count(
+            {'type': 'p', 'born_after': '1943', 'born_before': '1941'},
+            1,
+            'born_{before|after}',
+        )
+        # Just one filter, but Judy is older than this.
+        self._test_aricle_count(
+            {'type': 'p', 'born_after': '1946'}, 0, 'born_{before|after}'
+        )
+
+    def test_birth_location(self):
+        """Can we filter by city and state?"""
+        self._test_aricle_count(
+            {'type': 'p', 'dob_city': 'brookyln'}, 1, 'dob_city'
+        )
+        self._test_aricle_count(
+            {'type': 'p', 'dob_city': 'brooklyn2'}, 0, 'dob_city'
+        )
+        self._test_aricle_count(
+            {'type': 'p', 'dob_city': 'brookyln', 'dob_state': 'NY'}, 1, 'dob_city'
+        )
+        self._test_aricle_count(
+            {'type': 'p', 'dob_city': 'brookyln', 'dob_state': 'OK'}, 0, 'dob_city'
+        )
+
+    def test_schools_filter(self):
+        self._test_aricle_count(
+            {'type': 'p', 'school': 'american'}, 1, 'school',
+        )
+        self._test_aricle_count(
+            {'type': 'p', 'school': 'pitzer'}, 0, 'school',
+        )
+
+    def test_appointer_filter(self):
+        self._test_aricle_count(
+            {'type': 'p', 'appointer': 'clinton'}, 1, 'appointer',
+        )
+        self._test_aricle_count(
+            {'type': 'p', 'appointer': 'obama'}, 0, 'appointer',
+        )
+
+    def test_selection_method_filter(self):
+        self._test_aricle_count(
+            {'type': 'p', 'selection_method': 'e_part'}, 1, 'selection_method',
+        )
+        self._test_aricle_count(
+            {'type': 'p', 'selection_method': 'e_non_part'}, 0, 'selection_method',
+        )
+
+    def test_political_affiliation_filter(self):
+        self._test_aricle_count(
+            {'type': 'p', 'political_affiliation': 'd'}, 1, 'political_affiliation',
+        )
+        self._test_aricle_count(
+            {'type': 'p', 'political_affiliation': 'r'}, 0, 'political_affiliation',
+        )
 
 
 class FeedTest(IndexedSolrTestCase):
