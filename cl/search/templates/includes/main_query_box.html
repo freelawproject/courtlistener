@@ -43,5 +43,9 @@
                 </div>
             {% endif %}
         </div>
+        {% if type %}
+            <input class="external-input hidden"
+                   id="id_type" name="type" value="{{ type }}" type="text">
+        {% endif %}
     </form>
 </div>

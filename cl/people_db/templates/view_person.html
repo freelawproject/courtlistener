@@ -10,6 +10,10 @@
 
 {% block sidebar %}{% endblock sidebar %}
 
+{% block search-form %}
+    {% include "includes/main_query_box.html" with homepage=False type="p" %}
+{% endblock %}
+
 {% block content %}
     <div class="col-xs-12">
          <div class="row">
