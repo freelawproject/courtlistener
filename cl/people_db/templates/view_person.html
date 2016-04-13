@@ -21,8 +21,12 @@
                 {% if person.has_photo %}
                     <h2>
                     {% with "judge_pics/"|add:person.name_last|add:"-"|add:person.name_first|lower as img_path %}
-                        <img src="{% static img_path %}{% granular_date person 'date_dob' default="" iso=True %}.jpeg"
-                         alt="Portrait of {{ person.name_first }} {{ person.name_last }}"
+                        {% if person.date_dob %}
+                            <img src="{% static img_path %}-{% granular_date person 'date_dob' default="" iso=True %}.jpeg"
+                        {% else %}
+                            <img src="{% static img_path %}.jpeg"
+                        {% endif %}
+                         alt="Portrait of {{ person.name_full }}"
                          width="256"
                          class="img-responsive v-offset-above-2"
                         />
@@ -51,7 +55,7 @@
                     {% endif %}
                 </h2>
                 <span class="small gray top">
-                    CourtListener ID: {{ person.cl_id }}{% if person.fjc_id %}, FJC ID: {{ person.fjc_id }}{% endif %}
+                    CourtListener ID: {{ person.cl_id }}{% if person.fjc_id %}, FJC ID: <a href="http://www.fjc.gov/servlet/nGetInfo?jid={{ person.fjc_id }}">{{ person.fjc_id }}</a>{% endif %}
                 </span>
 
                 <div class="row v-offset-below-3">
@@ -229,14 +233,26 @@
         </div>
         {% endif %}
 
-        {% if positions.count > 0 %}
+        {% if positions %}
         <div class="row v-offset-below-3">
             <div class="col-xs-12">
-                <h3 class="bottom"><i class="gray fa fa-balance-scale"></i>
-                    Roles <span class="alt">&amp;</span> Positions</h3>
-                <p class="gray">Includes a variety of known roles, such as judges, governors, presidents, clerks, practitioners, public defenders, attorneys general, professors, etc.</p>
-                <hr class="top">
                 {% for p in positions %}
+                    {% ifchanged p.is_judicial_position %}
+                        {% if p.is_judicial_position %}
+                            <h3 class="bottom">
+                                <i class="gray fa fa-balance-scale"></i> Judicial
+                                Positions
+                            </h3>
+                        {% else %}
+                            <h3 class="bottom">
+                                <i class="gray fa fa-briefcase"></i> Non-Judicial Positions
+                            </h3>
+                            <p class="gray">Includes a variety of positions such as governor,
+                                president, clerk, practitioner, public defender,
+                                attorneys general, and professor.</p>
+                        {% endif %}
+                        <hr class="top">
+                    {% endifchanged %}
                     <div class="row v-offset-below-3">
                         <div class="col-xs-12">
                             <h4 class="text-uppercase">
