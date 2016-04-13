@@ -139,3 +139,9 @@ def best_case_name(obj):
         return obj.case_name_full
     else:
         return obj.case_name_short
+
+
+@register.filter(is_safe=True)
+def uniq(iterable):
+    """Take an iterable and make it unique. Sorting is not maintained."""
+    return list(set(iterable))

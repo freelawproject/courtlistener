@@ -233,20 +233,21 @@ class SearchPerson(object):
         self.date_granularity_dod = item.date_granularity_dod
         self.dob_city = item.dob_city
         self.dob_state = item.get_dob_state_display()
+        self.dob_state_id = item.dob_state
         self.absolute_url = item.get_absolute_url()
 
         # Joined Values. Brace yourself.
         positions = item.positions.all()
         if positions.count() > 0:
-            self.court_id = [p.court.pk for p in positions if
-                             p.court is not None]
+            self.court = [p.court.short_name for p in positions if p.court]
+            self.court_exact = [p.court.pk for p in positions if p.court]
             self.position_type = [p.get_position_type_display() for p in positions]
-            self.appointer = [p.appointer.name_full for p in positions
-                              if p.appointer is not None]
-            self.supervisor = [p.supervisor.name_full for p in positions
-                               if p.supervisor is not None]
-            self.predecessor = [p.predecessor.name_full for p in positions
-                                if p.predecessor is not None]
+            self.appointer = [p.appointer.name_full_reverse for p in positions
+                              if p.appointer]
+            self.supervisor = [p.supervisor.name_full_reverse for p in positions
+                               if p.supervisor]
+            self.predecessor = [p.predecessor.name_full_reverse for p in positions
+                                if p.predecessor]
 
             self.date_nominated = solr_list(positions, 'date_nominated')
             self.date_elected = solr_list(positions, 'date_elected')
@@ -276,36 +277,41 @@ class SearchPerson(object):
             )
             self.judicial_committee_action = [
                 p.get_judicial_committee_action_display() for p in positions if
-                p.judicial_committee_action is not None
+                p.judicial_committee_action
             ]
             self.nomination_process = [
                 p.get_nomination_process_display() for p in positions if
-                p.nomination_process is not None
+                p.nomination_process
             ]
             self.selection_method = [
                 p.get_how_selected_display() for p in positions if
-                p.how_selected is not None
+                p.how_selected
+            ]
+            self.selection_method_id = [
+                p.how_selected for p in positions if
+                p.how_selected
             ]
             self.termination_reason = [
                 p.get_termination_reason_display() for p in positions if
-                p.termination_reason is not None
+                p.termination_reason
             ]
 
         self.school = [e.school.name for e in item.educations.all()]
 
         self.political_affiliation = [
             pa.get_political_party_display() for pa in
-            item.political_affiliations.all() if pa is not None
+            item.political_affiliations.all() if pa
+        ]
+        self.political_affiliation_id = [
+            pa.political_party for pa in
+            item.political_affiliations.all() if pa
         ]
 
         self.aba_rating = [
             r.get_rating_display() for r in item.aba_ratings.all() if
-            r is not None
+            r
         ]
 
         text_template = loader.get_template('indexes/person_text.txt')
         context = {'item': item}
         self.text = text_template.render(context).translate(null_map)
-
-        # For faceting
-        self.court_exact = [p.court.pk for p in positions if p.court is not None]

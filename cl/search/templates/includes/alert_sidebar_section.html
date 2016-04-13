@@ -1,0 +1,95 @@
+<div class="sidebar-section">
+    <h3 id="create-alert-header">
+        {% if request.GET.edit_alert %}
+            <span>Edit Your Alert</span> <i class="fa fa-pencil gray"></i>
+        {% else %}
+            <span>Create an Alert</span> <i class="fa fa-bell gold"></i>
+        {% endif %}
+    </h3>
+    {% if user.is_authenticated %}
+        {% if get_string %}
+            {% if not request.GET.edit_alert %}
+                <p>Get regular notifications about this query by creating an
+                    alert.</p>
+            {% endif %}
+            <form action="" method="post">{% csrf_token %}
+                {{ alert_form.query }}
+                <div class="form-group">
+                    <label for="id_name">Give the alert a name</label>
+                    {{ alert_form.name }}
+                    {% if alert_form.name.errors %}
+                        <p class="help-block">
+                            {% for error in alert_form.name.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="id_rate">How often should we notify you?</label>
+                    {{ alert_form.rate }}
+                    {% if alert_form.rate.errors %}
+                        <p class="help-block">
+                            {% for error in alert_form.rate.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                </div>
+
+                {# Hidden unless shown by JS #}
+                <div class="alert alert-warning hidden"
+                     id="donate-for-rt">
+                    <p>
+                        CourtListener is a project of <a
+                            href="https://free.law"
+                            target="_blank">Free Law Project</a>, a
+                        federally-recognized 501(c)(3) non-profit.
+                        <a href="{% url "faq" %}#real-time-alerts"
+                           target="_blank">Real Time Alerts</a> are
+                        only supported for users that donate at
+                        least $10 per year.
+                    </p>
+                    <p>Select another option or donate to create this
+                        alert.
+                    </p>
+
+                    <p class="bottom">
+                        <a href="{% url "donate" %}?referrer=rt-alerts"
+                           class="btn btn-danger"
+                           target="_blank">Donate Now</a>
+                    </p>
+                </div>
+                {% if request.GET.edit_alert %}
+                    {# Used when editing an alert. #}
+                    <input class="editing-alert"
+                           type="hidden"
+                           value="{{ request.GET.edit_alert }}"
+                           name="edit_alert">
+                {% endif %}
+                <button type="submit"
+                        class="btn btn-primary title"
+                        name="alertSave"
+                        id="alertSave"
+                        tabindex="254">
+                    {% if request.GET.edit_alert %}Save Changes{% else %}Create
+                        Alert{% endif %}
+                </button>
+            </form>
+            <p class="gray">Some jurisdictions do not yet support alerts. Check
+                <a href="{% url "coverage" %}#scraped-jurisdictions">our
+                    list</a> to be
+                sure your query is supported.</p>
+        {% else %}
+            <p>To create an alert, place a query.</p>
+        {% endif %}
+    {% else %}
+        {# User is not authenticated #}
+        <p>To get daily alerts for this search, <a
+                href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">sign
+            in</a> or
+            <a href="{% url "register" %}?next={{ request.path }}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">register</a>
+            as a new user.</p>
+    {% endif %}
+</div>

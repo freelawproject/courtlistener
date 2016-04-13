@@ -3,7 +3,17 @@ from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
 from localflavor.us import models as local_models
-from cl.lib.model_helpers import validate_partial_date
+from cl.lib.model_helpers import (
+    make_choices_group_lookup,
+    validate_has_full_name,
+    validate_if_degree_detail_then_degree,
+    validate_is_not_alias,
+    validate_partial_date,
+    validate_only_one_job_type,
+    validate_only_one_location,
+    validate_nomination_fields_ok,
+    validate_votes_yes_and_no_or_neither
+)
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -138,6 +148,11 @@ class Person(models.Model):
         max_length=2,
         blank=True
     )
+    has_photo = models.BooleanField(
+        help_text="Whether there is a photo corresponding to this person in "
+                  "the judge pics project.",
+        default=False,
+    )
 
     def __unicode__(self):
         return u'%s: %s' % (self.pk, self.name_full)
@@ -153,16 +168,19 @@ class Person(models.Model):
     def clean_fields(self, *args, **kwargs):
         for field in ['dob', 'dod']:
             validate_partial_date(self, field)
+        # An alias cannot be an alias.
+        validate_is_not_alias(self, 'is_alias_of')
+        validate_has_full_name(self)
         super(Person, self).clean_fields(*args, **kwargs)
 
     @property
     def name_full(self):
-        return u' '.join([
+        return u' '.join([v for v in [
             self.name_first,
             self.name_middle,
             self.name_last,
             self.get_name_suffix_display(),
-        ]).strip()
+        ] if v]).strip()
 
     @property
     def name_full_reverse(self):
@@ -170,6 +188,20 @@ class Person(models.Model):
             suffix=self.get_name_suffix_display(),
             **self.__dict__
         ).strip(', ')
+
+    @property
+    def is_alias(self):
+        return True if self.is_alias_of is not None else False
+
+    @property
+    def is_judge(self):
+        """Examine the positions a person has had and identify if they were ever
+        a judge.
+        """
+        for position in self.positions.all():
+            if position.is_judicial_position:
+                return True
+        return False
 
     class Meta:
         verbose_name_plural = "people"
@@ -211,6 +243,15 @@ class School(models.Model):
             return u'%s: %s' % (
                 self.pk, self.name
             )
+
+    @property
+    def is_alias(self):
+        return True if self.is_alias_of is not None else False
+
+    def clean_fields(self, *args, **kwargs):
+        # An alias cannot be an alias.
+        validate_is_not_alias(self, 'is_alias_of')
+        super(School, self).clean_fields(*args, **kwargs)
 
 
 class Position(models.Model):
@@ -294,11 +335,17 @@ class Position(models.Model):
         ('pub_def', 'Public Defender'),
         ('legis',   'Legislator'),
     )
+    POSITION_TYPE_GROUPS = make_choices_group_lookup(POSITION_TYPES)
     NOMINATION_PROCESSES = (
         ('fed_senate', 'U.S. Senate'),
         ('state_senate', 'State Senate'),
         ('election', 'Primary Election'),
         ('merit_comm', 'Merit Commission'),
+    )
+    VOTE_TYPES = (
+        ('s', 'Senate'),
+        ('p', 'Partisan Election'),
+        ('np', 'Non-Partisan Election')        
     )
     JUDICIAL_COMMITTEE_ACTIONS = (
         ('no_rep', 'Not Reported'),
@@ -308,12 +355,18 @@ class Position(models.Model):
         ('rec_bad', 'Recommended Unfavorably'),
     )
     SELECTION_METHODS = (
-        ('e_part', 'Partisan Election'),
-        ('e_non_part', 'Non-Partisan Election'),
-        ('a_pres', 'Appointment (President)'),
-        ('a_gov', 'Appointment (Governor)'),
-        ('a_legis', 'Appointment (Legislature)'),
+        ('Election', (
+            ('e_part', 'Partisan Election'),
+            ('e_non_part', 'Non-Partisan Election'),
+
+        )),
+        ('Appointment', (
+            ('a_pres', 'Appointment (President)'),
+            ('a_gov', 'Appointment (Governor)'),
+            ('a_legis', 'Appointment (Legislature)'),
+        )),
     )
+    SELECTION_METHOD_GROUPS = make_choices_group_lookup(SELECTION_METHODS)
     TERMINATION_REASONS = (
         ('ded', 'Death'),
         ('retire_vol', 'Voluntary Retirement'),
@@ -331,6 +384,11 @@ class Position(models.Model):
         blank=True,
         null=True,
     )
+    job_title = models.CharField(
+        help_text="If title isn't in list, type here.",
+        max_length=100,
+        blank=True,
+    )
     person = models.ForeignKey(
         Person,
         related_name='positions',
@@ -340,6 +398,18 @@ class Position(models.Model):
     court = models.ForeignKey(
         Court,
         related_name='court_positions',
+        blank=True,
+        null=True,
+    )
+    school = models.ForeignKey(
+        School,
+        help_text="If academic job, the school where they work.",
+        blank=True,
+        null=True,
+    )
+    organization_name = models.CharField(
+        help_text="If org isn't court or school, type here.",
+        max_length=120,
         blank=True,
         null=True,
     )
@@ -360,23 +430,6 @@ class Position(models.Model):
     )
     predecessor = models.ForeignKey(
         Person,
-        blank=True,
-        null=True,
-    )
-    school = models.ForeignKey(
-        School,
-        help_text="If academic job, the school where they work.",
-        blank=True,
-        null=True,
-    )
-    job_title = models.CharField(
-        help_text="If title isn't in list, type here.",
-        max_length=100,
-        blank=True,
-    )
-    organization_name = models.CharField(
-        help_text="If org isnt court or school, type here.",
-        max_length=120,
         blank=True,
         null=True,
     )
@@ -431,6 +484,11 @@ class Position(models.Model):
         blank=True,
         db_index=True,
     )
+    judicial_committee_action = models.CharField(
+        choices=JUDICIAL_COMMITTEE_ACTIONS,
+        max_length=20,
+        blank=True,
+    )
     date_hearing = models.DateField(
         help_text="After being nominated, a judge is usually subject to a "
                   "hearing. This is the date of that hearing.",
@@ -453,39 +511,56 @@ class Position(models.Model):
         choices=DATE_GRANULARITIES,
         max_length=15,
     )
-    date_retirement = models.DateField(
+    date_termination = models.DateField(
+        help_text="The last date of their employment. The compliment to "
+                  "date_start",
         null=True,
         blank=True,
         db_index=True,
     )
-    date_termination = models.DateField(
-        null=True,
+    termination_reason = models.CharField(
+        choices=TERMINATION_REASONS,
+        max_length=25,
         blank=True,
-        db_index=True,
     )
     date_granularity_termination = models.CharField(
         choices=DATE_GRANULARITIES,
         max_length=15,
         blank=True,
     )
-    judicial_committee_action = models.CharField(
-        choices=JUDICIAL_COMMITTEE_ACTIONS,
-        max_length=20,
+    date_retirement = models.DateField(
+        help_text="The date when they become a senior judge by going into "
+                  "active retirement",
+        null=True,
         blank=True,
+        db_index=True,
     )
     nomination_process = models.CharField(
         choices=NOMINATION_PROCESSES,
         max_length=20,
         blank=True,
     )
+    vote_type = models.CharField(
+        choices=VOTE_TYPES,
+        max_length=2,
+        blank=True,
+    )
     voice_vote = models.NullBooleanField(
         blank=True,
     )
-    votes_yes = models.PositiveSmallIntegerField(
+    votes_yes = models.PositiveIntegerField(
         null=True,
         blank=True,
     )
-    votes_no = models.PositiveSmallIntegerField(
+    votes_no = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+    votes_yes_percent = models.FloatField(
+        null=True,
+        blank=True,
+    )
+    votes_no_percent = models.FloatField(
         null=True,
         blank=True,
     )
@@ -494,14 +569,16 @@ class Position(models.Model):
         max_length=20,
         blank=True,
     )
-    termination_reason = models.CharField(
-        choices=TERMINATION_REASONS,
-        max_length=25,
-        blank=True,
-    )
 
     def __unicode__(self):
         return u'%s: %s at %s' % (self.pk, self.person.name_full, self.court_id)
+
+    @property
+    def is_judicial_position(self):
+        """Return True if the position is judicial."""
+        if self.POSITION_TYPE_GROUPS[self.position_type] == 'Judge':
+            return True
+        return False
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -516,6 +593,14 @@ class Position(models.Model):
 
         for field in ['start', 'termination']:
             validate_partial_date(self, field)
+
+        for field in ['person', 'appointer', 'supervisor', 'predecessor',
+                      'school']:
+            validate_is_not_alias(self, field)
+        validate_only_one_location(self)
+        validate_only_one_job_type(self)
+        validate_nomination_fields_ok(self)
+        validate_votes_yes_and_no_or_neither(self)
 
         super(Position, self).clean_fields(*args, **kwargs)
 
@@ -551,11 +636,19 @@ class RetentionEvent(models.Model):
     date_retention = models.DateField(
         db_index=True,
     )
-    votes_yes = models.PositiveSmallIntegerField(
+    votes_yes = models.PositiveIntegerField(
         null=True,
         blank=True,
     )
-    votes_no = models.PositiveSmallIntegerField(
+    votes_no = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+    votes_yes_percent = models.FloatField(
+        null=True,
+        blank=True,
+    )
+    votes_no_percent = models.FloatField(
         null=True,
         blank=True,
     )
@@ -567,6 +660,10 @@ class RetentionEvent(models.Model):
         null=True,
         blank=True,
     )
+
+    def clean_fields(self, *args, **kwargs):
+        validate_votes_yes_and_no_or_neither(self)
+        super(RetentionEvent, self).clean_fields(*args, **kwargs)
 
 
 class Education(models.Model):
@@ -607,7 +704,7 @@ class Education(models.Model):
         max_length=3,
         blank=True,
     )
-    degree = models.CharField(
+    degree_detail = models.CharField(
         max_length=100,
         blank=True,
     )
@@ -619,8 +716,15 @@ class Education(models.Model):
 
     def __unicode__(self):
         return u'%s: Degree in %s from %s in the year %s' % (
-            self.pk, self.degree, self.school.name, self.degree_year
+            self.pk, self.degree_detail, self.school.name, self.degree_year
         )
+
+    def clean_fields(self, *args, **kwargs):
+        # Note that this isn't run during updates, alas.
+        validate_is_not_alias(self, 'person')
+        validate_is_not_alias(self, 'school')
+        validate_if_degree_detail_then_degree(self)
+        super(Education, self).clean_fields(*args, **kwargs)
 
 
 class Race(models.Model):
@@ -706,6 +810,9 @@ class PoliticalAffiliation(models.Model):
     def clean_fields(self, *args, **kwargs):
         for field in ['start', 'end']:
             validate_partial_date(self, field)
+
+        validate_is_not_alias(self, 'person')
+
         super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
 
 
@@ -742,7 +849,6 @@ class Source(models.Model):
         blank=True,
     )
 
-
 class ABARating(models.Model):
     ABA_RATINGS = (
         ('ewq', 'Exceptionally Well Qualified'),
@@ -767,14 +873,9 @@ class ABARating(models.Model):
         auto_now=True,
         db_index=True,
     )
-    date_rated = models.DateField(
-        null=True,
-        blank=True,
-    )
-    date_granularity_rated = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
+    year_rated =  models.PositiveSmallIntegerField(
+        help_text="The year of the rating.",
+        null=True
     )
     rating = models.CharField(
         choices=ABA_RATINGS,
@@ -784,3 +885,4 @@ class ABARating(models.Model):
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, 'rated')
         super(ABARating, self).clean_fields(*args, **kwargs)
+        

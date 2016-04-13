@@ -8,6 +8,10 @@
 {% block og_description %}Oral Argument for {{ title }}{% endblock %}
 {% block search-form %}{% endblock %}
 
+{% block search-form %}
+    {% include "includes/main_query_box.html" with homepage=False type="oa" %}
+{% endblock %}
+
 {% block head %}
     <meta property="og:audio:url"
           content="https://www.courtlistener.com/{{ af.local_path_mp3 }}">
