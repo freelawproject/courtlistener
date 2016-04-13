@@ -127,8 +127,16 @@ def make_federal_judge(item, testing=False):
         else:
             date_granularity_termination = '%Y-%m-%d'
 
-        votes_yes = None
-        votes_no = None
+        votes = item['Senate vote Ayes/Nays' + pos_str]
+        if not pd.isnull(votes):
+            votes_yes, votes_no = votes.split('/')
+        else:
+            votes_yes = None
+            votes_no = None
+        if item['Senate voice vote' + pos_str] == "Yes":
+            voice_vote = True
+        else:
+            voice_vote = False
 
         termdict = {'Abolition of Court': 'abolished',
                     'Death': 'ded',
@@ -162,8 +170,10 @@ def make_federal_judge(item, testing=False):
                 date_granularity_termination=date_granularity_termination,
                 date_retirement=date_retirement,
 
+                voice_vote=voice_vote,
                 votes_yes=votes_yes,
                 votes_no=votes_no,
+                vote_type = 's',
                 how_selected='a_pres',
                 termination_reason=term_reason
         )

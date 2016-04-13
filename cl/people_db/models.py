@@ -342,6 +342,11 @@ class Position(models.Model):
         ('election', 'Primary Election'),
         ('merit_comm', 'Merit Commission'),
     )
+    VOTE_TYPES = (
+        ('s', 'Senate'),
+        ('p', 'Partisan Election'),
+        ('np', 'Non-Partisan Election')        
+    )
     JUDICIAL_COMMITTEE_ACTIONS = (
         ('no_rep', 'Not Reported'),
         ('rep_w_rec', 'Reported with Recommendation'),
@@ -533,6 +538,11 @@ class Position(models.Model):
     nomination_process = models.CharField(
         choices=NOMINATION_PROCESSES,
         max_length=20,
+        blank=True,
+    )
+    vote_type = models.CharField(
+        choices=VOTE_TYPES,
+        max_length=2,
         blank=True,
     )
     voice_vote = models.NullBooleanField(
