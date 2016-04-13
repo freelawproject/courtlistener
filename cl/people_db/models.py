@@ -548,11 +548,19 @@ class Position(models.Model):
     voice_vote = models.NullBooleanField(
         blank=True,
     )
-    votes_yes = models.PositiveSmallIntegerField(
+    votes_yes = models.PositiveIntegerField(
         null=True,
         blank=True,
     )
-    votes_no = models.PositiveSmallIntegerField(
+    votes_no = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+    votes_yes_percent = models.FloatField(
+        null=True,
+        blank=True,
+    )
+    votes_no_percent = models.FloatField(
         null=True,
         blank=True,
     )
@@ -628,11 +636,19 @@ class RetentionEvent(models.Model):
     date_retention = models.DateField(
         db_index=True,
     )
-    votes_yes = models.PositiveSmallIntegerField(
+    votes_yes = models.PositiveIntegerField(
         null=True,
         blank=True,
     )
-    votes_no = models.PositiveSmallIntegerField(
+    votes_no = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+    votes_yes_percent = models.FloatField(
+        null=True,
+        blank=True,
+    )
+    votes_no_percent = models.FloatField(
         null=True,
         blank=True,
     )
