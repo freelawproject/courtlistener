@@ -1,3 +1,5 @@
+from operator import xor
+
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
 
@@ -136,13 +138,35 @@ def validate_all_or_none(instance, fields):
         )
 
 
-def validate_exactly_one(instance, fields):
-    """Ensure that exactly one of the fields has a value."""
+def validate_exactly_n(instance, n, fields):
+    """Ensure that exactly n of the fields has a value."""
     completed_fields = sum(1 for f in fields if getattr(instance, f))
-    if completed_fields != 1:
+    if completed_fields != n:
         raise ValidationError(
-            "Exactly one of the following fields can be completed (currently "
-            "%s are: %s" % (completed_fields, ", ".join(fields))
+            "Exactly %s of the following fields can be completed (currently "
+            "%s are): %s" % (n, completed_fields, ", ".join(fields))
+        )
+
+
+def validate_at_most_n(instance, n, fields):
+    """Ensure that at most n fields are complete."""
+    completed_fields = sum(1 for f in fields if getattr(instance, f))
+    if completed_fields > n:
+        raise ValidationError(
+                "Exactly %s of the following fields can be completed (currently "
+                "%s are): %s" % (n, completed_fields, ", ".join(fields))
+        )
+
+
+def validate_not_all(instance, fields):
+    """Make sure that all of the passed fields are not complete."""
+    num_fields = len(fields)
+    num_completed_fields = sum(1 for f in fields if getattr(instance, f))
+    if num_completed_fields == num_fields:
+        # They're all completed. Boo!
+        raise ValidationError(
+            "All of the following fields cannot be completed: %s" %
+            ', '.join(fields)
         )
 
 

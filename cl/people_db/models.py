@@ -9,8 +9,9 @@ from cl.lib.model_helpers import (
     validate_partial_date,
     validate_nomination_fields_ok,
     validate_all_or_none,
-    validate_exactly_one,
-)
+    validate_exactly_n,
+    validate_not_all,
+    validate_at_most_n)
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -575,6 +576,29 @@ class Position(models.Model):
             return True
         return False
 
+    @property
+    def vote_string(self):
+        """Make a human-friendly string from the vote information"""
+        vote_string = ''
+
+        # Do vote type first
+        if self.vote_type == 's':
+            vote_string += "Senate voted"
+            if self.voice_vote:
+                vote_string += ' <span class="alt">by</span> voice vote'
+        elif self.vote_string in ['p', 'np']:
+            vote_string += self.get_vote_type_display()
+
+        # Then do vote counts/percentages, if we have that info.
+        if self.votes_yes:
+            vote_string += ', %s in favor <span class="alt">and</span> %s ' \
+                           'opposed' % (self.votes_yes, self.votes_no)
+        elif self.votes_yes_percent:
+            vote_string += ', %g%% in favor <span class="alt">and</span> ' \
+                           '%g%% opposed' % (self.votes_yes_percent,
+                                             self.votes_no_percent)
+        return vote_string
+
     def save(self, *args, **kwargs):
         self.full_clean()
         super(Position, self).save(*args, **kwargs)
@@ -583,12 +607,13 @@ class Position(models.Model):
         validate_partial_date(self, ['start', 'termination'])
         validate_is_not_alias(self, ['person', 'appointer', 'supervisor',
                                      'predecessor', 'school'])
-        validate_exactly_one(self, ['school', 'organization_name', 'court'])
-        validate_exactly_one(self, ['position_type', 'job_title'])
+        validate_at_most_n(self, 1, ['school', 'organization_name', 'court'])
+        validate_exactly_n(self, 1, ['position_type', 'job_title'])
         validate_nomination_fields_ok(self)
-        validate_all_or_none(self, ['vote_type', 'votes_yes', 'votes_no'])
-        validate_all_or_none(self, ['vote_type', 'votes_yes_percent',
-                                    'votes_no_percent'])
+        validate_all_or_none(self, ['votes_yes', 'votes_no'])
+        validate_all_or_none(self, ['votes_yes_percent', 'votes_no_percent'])
+        validate_not_all(self, ['votes_yes', 'votes_no', 'votes_yes_percent',
+                                'votes_no_percent'])
 
         super(Position, self).clean_fields(*args, **kwargs)
 

@@ -364,7 +364,7 @@
                             </div>
                         {% endif %}
 
-                        {% if p.date_hearing or p.date_confirmation or p.votes_yes %}
+                        {% if p.date_hearing or p.date_confirmation or p.vote_string %}
                             <div class="col-xs-4">
                                 {% if p.date_hearing %}
                                     <p>
@@ -378,14 +378,11 @@
                                         <span class="meta-data-value">{{ p.date_confirmation }}</span>
                                     </p>
                                 {% endif %}
-                                {% if p.votes_yes %}
+                                {% if p.vote_string %}
                                     <p>
-                                        <span class="meta-data-header">Vote:</span>
+                                        <span class="meta-data-header">Vote Info:</span>
                                         <span class="meta-data-value">
-                                            {% if p.voice_vote %}
-                                                By voice vote,
-                                            {% endif %}
-                                            {{ p.votes_yes }} in favor <span class="alt">and</span> {{ p.votes_no }} opposed
+                                            {{ p.vote_string|safe }}
                                         </span>
                                     </p>
                                 {% endif %}
@@ -444,6 +441,14 @@
             </div>
         </div>
         {% endif %}
+
+        <div class="row">
+            <div class="col-xs-12">
+                <p class="gray">Sources: Elliott Ash, Princeton University and University of
+                    Warwick; Bentley MacLeod, Columbia University; Federal
+                    Judicial Center.</p>
+            </div>
+        </div>
 
     </div>
 {% endblock %}

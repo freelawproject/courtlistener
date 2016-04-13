@@ -49,7 +49,7 @@ def make_federal_judge(item, testing=False):
     # if foreign-dead, leave blank for now.
     if len(dod_state) > 2:
         dod_state = ''
-        
+
     if not pd.isnull(item['midname']):
         if len(item['midname']) == 1:
             item['midname'] = item['midname'] + '.'
@@ -244,11 +244,11 @@ def make_federal_judge(item, testing=False):
             school = get_school(schoolname)
             if school is not None:
                 degree = Education(
-                        person=person,
-                        school=school,
-                        degree=degtype,
-                        degree_level=deg_level,
-                        degree_year=degyear
+                    person=person,
+                    school=school,
+                    degree_detail=degtype,
+                    degree_level=deg_level,
+                    degree_year=degyear
                 )
                 if not testing:
                     degree.save()
