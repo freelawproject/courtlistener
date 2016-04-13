@@ -87,6 +87,10 @@ def validate_is_not_alias(instance, fields):
 
 
 def validate_has_full_name(instance):
+    """This ensures that blank values are not passed to the first and last name
+    fields. Normally this can be done by the DB layer, but people could still
+    pass blank strings through, and this blocks even that.
+    """
     if not all([instance.name_first, instance.name_last]):
         raise ValidationError(
             "Both first and last names are required."
