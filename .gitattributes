@@ -19,12 +19,14 @@
 *.gz binary
 
 # Fonts
+*.eot binary
+*.otf binary
 *.ttf binary
 *.woff binary
+*.woff2 binary
 
 # File formats
 *.ods binary
-*.otf binary
 *.pdf binary
 *.xls binary
 *.wpd binary
