@@ -53,22 +53,29 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
         Does the feeds page show all the proper links for each jurisdiction?
         """
-        courts = Court.objects.all()
+        courts = Court.objects.filter(
+            in_use=True,
+            has_opinion_scraper=True,
+        )
         self.browser.get('%s%s' % (self.server_url, reverse('feeds_info')))
         self.assert_text_in_body('Jurisdiction Feeds for Opinions')
 
         for court in courts:
             link = self.browser.find_element_by_link_text(court.full_name)
+            print "Testing link to %s..." % court.full_name,
             self.assertEqual(
                 link.get_attribute('href'),
                 '%s/feed/court/%s/' % (self.server_url, court.pk,)
             )
             link.click()
+            print "clicked...",
             self.assertIn(
                 'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
                 self.browser.page_source
             )
             self.browser.back()
+            print "✓"
+
 
     def test_all_jurisdiction_opinion_rss_feeds_usable_in_rss_reader(self):
         """
