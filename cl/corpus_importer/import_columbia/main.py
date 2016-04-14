@@ -63,7 +63,3 @@ def do_many(dir_path, limit=None, random_order=True, status_interval=100):
             if count == limit:
                 return
 
-
-import django
-django.setup()
-do_many('/vagrant/flp/columbia_data/opinions/', random_order=True)
