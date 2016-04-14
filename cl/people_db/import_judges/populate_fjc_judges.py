@@ -20,7 +20,7 @@ def get_court_object(raw_court):
 def process_career(career_string):    
     """Extract data from Employment Text Field"""
 
-for i, row in df.iterrows():
+for i, row in wb.iterrows():
     #positions, startyears, endyears = process_career(row['Employment text field'])
 
     career_string = row['Employment text field']
@@ -40,8 +40,8 @@ for i, row in df.iterrows():
         else:
             itemsplit = re.split("\,+\s+(?=\d)+", item, 1)
         
-            if len(employ_list[i][j]) > 1:
-                A = employ_list[i][j][0].split(',')
+            if len(itemsplit) > 1:
+                A = itemsplit[0].split(',')
                 if len(A) == 1:
                     employ_list[i][j].insert(1, None)
                 if len(A) == 2:
