@@ -303,9 +303,8 @@
       "rating": "nq",
       "date_modified": "2016-03-12T01:41:56.613Z",
       "person": 2,
-      "date_granularity_rated": "%Y-%m-%d",
       "date_created": "2016-03-12T01:41:56.613Z",
-      "date_rated": "2015-12-14"
+      "year_rated": "2015"
     },
     "model": "people_db.abarating",
     "pk": 1

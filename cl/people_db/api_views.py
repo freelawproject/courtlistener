@@ -81,5 +81,5 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = ABARatingSerializer
     filter_class = ABARatingFilter
     ordering_fields = (
-        'date_created', 'date_modified', 'date_rated',
+        'date_created', 'date_modified', 'year_rated',
     )

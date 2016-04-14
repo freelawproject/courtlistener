@@ -21,8 +21,12 @@
                 {% if person.has_photo %}
                     <h2>
                     {% with "judge_pics/"|add:person.name_last|add:"-"|add:person.name_first|lower as img_path %}
-                        <img src="{% static img_path %}{% granular_date person 'date_dob' default="" iso=True %}.jpeg"
-                         alt="Portrait of {{ person.name_first }} {{ person.name_last }}"
+                        {% if person.date_dob %}
+                            <img src="{% static img_path %}-{% granular_date person 'date_dob' default="" iso=True %}.jpeg"
+                        {% else %}
+                            <img src="{% static img_path %}.jpeg"
+                        {% endif %}
+                         alt="Portrait of {{ person.name_full }}"
                          width="256"
                          class="img-responsive v-offset-above-2"
                         />
@@ -51,7 +55,7 @@
                     {% endif %}
                 </h2>
                 <span class="small gray top">
-                    CourtListener ID: {{ person.cl_id }}{% if person.fjc_id %}, FJC ID: {{ person.fjc_id }}{% endif %}
+                    CourtListener ID: {{ person.cl_id }}{% if person.fjc_id %}, FJC ID: <a href="http://www.fjc.gov/servlet/nGetInfo?jid={{ person.fjc_id }}">{{ person.fjc_id }}</a>{% endif %}
                 </span>
 
                 <div class="row v-offset-below-3">
@@ -149,7 +153,7 @@
                             <span class="meta-data-header">
                                 <abbr title="American Bar Association">ABA</abbr> Ratings:
                             </span>
-                            {% for rating in aba_ratings.all %}{% if not forloop.first %}, {% endif %}{{ rating.get_rating_display }}{% if rating.date_rated %} ({% granular_date rating 'date_rated' %}){% endif %}
+                            {% for rating in aba_ratings.all %}{% if not forloop.first %}, {% endif %}{{ rating.get_rating_display }}{% if rating.year_rated %} ({{ rating.year_rated }}){% endif %}
                             {% endfor %}
                         </p>
                         {% endif %}
@@ -229,14 +233,26 @@
         </div>
         {% endif %}
 
-        {% if positions.count > 0 %}
+        {% if positions %}
         <div class="row v-offset-below-3">
             <div class="col-xs-12">
-                <h3 class="bottom"><i class="gray fa fa-balance-scale"></i>
-                    Roles <span class="alt">&amp;</span> Positions</h3>
-                <p class="gray">Includes a variety of known roles, such as judges, governors, presidents, clerks, practitioners, public defenders, attorneys general, professors, etc.</p>
-                <hr class="top">
                 {% for p in positions %}
+                    {% ifchanged p.is_judicial_position %}
+                        {% if p.is_judicial_position %}
+                            <h3 class="bottom">
+                                <i class="gray fa fa-balance-scale"></i> Judicial
+                                Positions
+                            </h3>
+                        {% else %}
+                            <h3 class="bottom">
+                                <i class="gray fa fa-briefcase"></i> Non-Judicial Positions
+                            </h3>
+                            <p class="gray">Includes a variety of positions such as governor,
+                                president, clerk, practitioner, public defender,
+                                attorneys general, and professor.</p>
+                        {% endif %}
+                        <hr class="top">
+                    {% endifchanged %}
                     <div class="row v-offset-below-3">
                         <div class="col-xs-12">
                             <h4 class="text-uppercase">
@@ -348,7 +364,7 @@
                             </div>
                         {% endif %}
 
-                        {% if p.date_hearing or p.date_confirmation or p.votes_yes %}
+                        {% if p.date_hearing or p.date_confirmation or p.vote_string %}
                             <div class="col-xs-4">
                                 {% if p.date_hearing %}
                                     <p>
@@ -362,14 +378,11 @@
                                         <span class="meta-data-value">{{ p.date_confirmation }}</span>
                                     </p>
                                 {% endif %}
-                                {% if p.votes_yes %}
+                                {% if p.vote_string %}
                                     <p>
-                                        <span class="meta-data-header">Vote:</span>
+                                        <span class="meta-data-header">Vote Info:</span>
                                         <span class="meta-data-value">
-                                            {% if p.voice_vote %}
-                                                By voice vote,
-                                            {% endif %}
-                                            {{ p.votes_yes }} in favor <span class="alt">and</span> {{ p.votes_no }} opposed
+                                            {{ p.vote_string|safe }}
                                         </span>
                                     </p>
                                 {% endif %}
@@ -428,6 +441,14 @@
             </div>
         </div>
         {% endif %}
+
+        <div class="row">
+            <div class="col-xs-12">
+                <p class="gray">Sources: Elliott Ash, Princeton University and University of
+                    Warwick; Bentley MacLeod, Columbia University; Federal
+                    Judicial Center.</p>
+            </div>
+        </div>
 
     </div>
 {% endblock %}

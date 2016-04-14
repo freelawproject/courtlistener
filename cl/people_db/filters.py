@@ -25,7 +25,7 @@ class ABARatingFilter(filters.FilterSet):
             'id': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
-            'date_rated': DATE_LOOKUPS,
+            'year_rated': INTEGER_LOOKUPS,
             'rating': ['exact'],
             'person': ['exact'],
         }
