@@ -17,6 +17,83 @@ def get_court_object(raw_court):
             return value
     return None
 
+def process_career(career_string):    
+    """Extract data from Employment Text Field"""
+
+for i, row in wb.iterrows():
+    #positions, startyears, endyears = process_career(row['Employment text field'])
+
+    career_string = row['Employment text field']
+    if pd.isnull(career_string):
+        #return(None,None,None)
+        continue
+        
+    items = re.split('<BR>|;|<br>', career_string)
+    
+    positions, startyears, endyears = [], [], []
+        
+    for item in items:
+        if item.startswith('Nominated'):
+            # this means there was a nomination that didnt pass
+            # need to extract this somehow
+            continue                   
+        else:
+            itemsplit = re.split("\,+\s+(?=\d)+", item, 1)
+        
+            if len(itemsplit) > 1:
+                A = itemsplit[0].split(',')
+                if len(A) == 1:
+                    employ_list[i][j].insert(1, None)
+                if len(A) == 2:
+                    employ_list[i][j][0] = A[0]
+                    employ_list[i][j].insert(1, A[1])
+                elif len(A) >= 3:
+                    position = ",".join(A[:-2])
+                    location = A[-2] + "," + A[-1]
+                    employ_list[i][j][0] = position
+                    employ_list[i][j].insert(1, location)
+            else:
+                employ_list[i][j].insert(1, None)
+                employ_list[i][j].insert(2, None)
+    employ_list = [[[None if a == 'None' else a for a in col] for col in row] for row in employ_list]
+    print('Employment Text Field list saved as employ_list')
+    
+    return(None,None,None)
+
+# test process career
+    
+def process_bankrupty_magistrates(career_string):    
+    '''Extract data from the Bankruptcy and Magistrate Service Field'''
+    
+    month_list = ['June','March','January','February','April','May','July','August','September','October','November','December','Fall','Spring']
+    bankruptcy_field_pd = wb['Bankruptcy and Magistrate service'].str.split('<BR>|;|<br>', expand=True)
+    bankruptcy_array = pd.np.array(bankruptcy_field_pd)
+    bankruptcy_list = bankruptcy_array.tolist()
+    bankruptcy_list = [[str(a) if a is not str else a for a in row] for row in bankruptcy_list]
+    bankruptcy_list = [[None if a is None else re.split("\,+\s+(?=\d)+", a, 1) if not any(
+        month in a for month in month_list) else re.split(
+        ",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+", a, 1)
+                        for a in row] for row in bankruptcy_list]
+    for i in range(len(bankruptcy_list)):
+        for j in range(len(bankruptcy_list[1])):
+            if len(bankruptcy_list[i][j]) > 1:
+                B = bankruptcy_list[i][j][0].split(',')
+                if len(B) == 1:
+                    bankruptcy_list[i][j].insert(1, None)
+                if len(B) == 2:
+                    bankruptcy_list[i][j][0] = B[0]
+                    bankruptcy_list[i][j].insert(1, B[1])
+                elif len(B) >= 3:
+                    position = ",".join(B[:-2])
+                    location = B[-2] + "," + B[-1]
+                    bankruptcy_list[i][j][0] = position
+                    bankruptcy_list[i][j].insert(1, location)
+            else:
+                bankruptcy_list[i][j].insert(1, None)
+                bankruptcy_list[i][j].insert(2, None)
+    bankruptcy_list = [[[None if a == 'None' else a for a in col] for col in row] for row in bankruptcy_list]
+    print('Bankruptcy and Magistrate Service saved as bankruptcy_list')
+
 
 def make_federal_judge(item, testing=False):
     """Takes the federal judge data <item> and associates it with a Judge object.
@@ -253,6 +330,12 @@ def make_federal_judge(item, testing=False):
                 if not testing:
                     degree.save()
 
+    # Non-judicial positions
+    jobs = process_career(item['Employment text field'])
+    for job in jobs:
+        
+
+    
     if not pd.isnull(item['Employment text field']):
         notes = item['Employment text field']
         source = Source(

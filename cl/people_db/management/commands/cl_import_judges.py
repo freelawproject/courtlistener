@@ -63,7 +63,7 @@ class Command(BaseCommand):
         df = pd.read_excel(self.options['input_file'], 0)
         for x in textfields:
             df[x] = df[x].replace(np.nan, '', regex=True)
-
+        df['Employment text field'].replace(to_replace=r';\sno', value=r', no', inplace = True, regex = True)    
         for i, row in df.iterrows():
             make_federal_judge(dict(row), testing=self.debug)
 
