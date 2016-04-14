@@ -22,6 +22,8 @@ Solr/data/
 Solr/data_audio/
 Solr/data_opinion_test/
 Solr/data_audio_test/
+Solr/data_dockets/
+Solr/data_person/
 
 # IntelliJ IDEA files
 .idea
