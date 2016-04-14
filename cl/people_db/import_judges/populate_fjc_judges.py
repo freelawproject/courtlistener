@@ -19,13 +19,27 @@ def get_court_object(raw_court):
 
 def process_career(career_string):    
     """Extract data from Employment Text Field"""
-    
-    row = re.split('<BR>|;|<br>', career_string)
-    
-    row = [[a] if a is None or a.startswith('Nominated') else re.split("\,+\s+(?=\d)+", a, 1) for a in row]
+
+for i, row in df.iterrows():
+    #positions, startyears, endyears = process_career(row['Employment text field'])
+
+    career_string = row['Employment text field']
+    if pd.isnull(career_string):
+        #return(None,None,None)
+        continue
         
-    for i in range(len(employ_list)):
-        for j in range(len(employ_list[1])):
+    items = re.split('<BR>|;|<br>', career_string)
+    
+    positions, startyears, endyears = [], [], []
+        
+    for item in items:
+        if item.startswith('Nominated'):
+            # this means there was a nomination that didnt pass
+            # need to extract this somehow
+            continue                   
+        else:
+            itemsplit = re.split("\,+\s+(?=\d)+", item, 1)
+        
             if len(employ_list[i][j]) > 1:
                 A = employ_list[i][j][0].split(',')
                 if len(A) == 1:
@@ -43,6 +57,10 @@ def process_career(career_string):
                 employ_list[i][j].insert(2, None)
     employ_list = [[[None if a == 'None' else a for a in col] for col in row] for row in employ_list]
     print('Employment Text Field list saved as employ_list')
+    
+    return(None,None,None)
+
+# test process career
     
 def process_bankrupty_magistrates(career_string):    
     '''Extract data from the Bankruptcy and Magistrate Service Field'''
