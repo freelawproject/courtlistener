@@ -590,11 +590,13 @@ class Position(models.Model):
             vote_string += self.get_vote_type_display()
 
         # Then do vote counts/percentages, if we have that info.
+        if self.vote_type:
+            vote_string += ', '
         if self.votes_yes:
-            vote_string += ', %s in favor <span class="alt">and</span> %s ' \
+            vote_string += '%s in favor <span class="alt">and</span> %s ' \
                            'opposed' % (self.votes_yes, self.votes_no)
         elif self.votes_yes_percent:
-            vote_string += ', %g%% in favor <span class="alt">and</span> ' \
+            vote_string += '%g%% in favor <span class="alt">and</span> ' \
                            '%g%% opposed' % (self.votes_yes_percent,
                                              self.votes_no_percent)
         return vote_string
