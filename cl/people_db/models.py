@@ -409,15 +409,15 @@ class Position(models.Model):
         blank=True,
         null=True,
     )
-    appointer = models.ForeignKey(
-        Person,
-        related_name='appointed_positions',
-        help_text="If this is an appointed position, "
-                  "the person responsible for the appointing.",
-        blank=True,
-        null=True,
-    )
-    supervisor = models.ForeignKey(
+#    appointer = models.ForeignKey(
+#        'self',
+#        related_name='appointed_positions',
+#        help_text="If this is an appointed position, "
+#                  "the person-position responsible for the appointing.",
+#        blank=True,
+#        null=True,
+#    )
+    clerk_supervisor = models.ForeignKey(
         Person,
         related_name='supervised_positions',
         help_text="If this is a clerkship, the supervising judge.",
