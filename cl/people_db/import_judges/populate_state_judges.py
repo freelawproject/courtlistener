@@ -35,14 +35,16 @@ def make_state_judge(item, testing=False):
     had_alias_result = False
     check = Person.objects.filter(name_first=item['firstname'],
                                   name_last=item['lastname'], date_dob=date_dob)
+    name = "%s: %s %s %s" % (item['cl_id'], item['firstname'], item['lastname'],
+                             date_dob)
     if check.count() > 0:
-        print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.')
+        print('Warning: %s exists.' % name)
         person = check[0]
         if person.is_alias:
             # Grab the correct person and set our alias variable to True
             person = person.is_alias_of
-            had_alias_result = True
     else:
+        print "Now processing: %s" % name
 
         person = Person(
                 gender=item['gender'],
@@ -184,7 +186,7 @@ def make_state_judge(item, testing=False):
     if not pd.isnull(item['politics']):
         politics = PoliticalAffiliation(
                 person=person,
-                political_party=item['politics']
+                political_party=item['politics'].lower()
         )
         if not testing:
             politics.save()
