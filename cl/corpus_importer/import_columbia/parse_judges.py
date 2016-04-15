@@ -15,8 +15,8 @@ NOT_JUDGE = [
     ,'superior', 'court', 'pro', 'tem', 'participating', 'appeals', 'appellate', 'per', 'curiam', 'presiding'
     ,'supernumerary', 'circuit', 'appellate', 'part', 'division', 'vice', 'result', 'judgment', 'special', 'italic'
     ,'bold', 'denials', 'transfer', 'center', 'with', 'indiana', 'commissioner', 'dissents', 'acting', 'footnote'
-    ,'reference', 'concurred', 'district', 'for', 'designation', 'cause',
-    'briefs', 'considered','banc','constituting'
+    ,'reference', 'concurred', 'district', 'for', 'designation', 'cause', 'briefs', 'considered', 'banc', 'constituting'
+    ,'number', 'associate'
 ]
 
 # judge names can only be this size or larger

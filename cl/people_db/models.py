@@ -141,9 +141,8 @@ class Person(models.Model):
         max_length=2,
         blank=True,
     )
-    religion = models.CharField(
-        choices=RELIGIONS,
-        max_length=2,
+    religion = models.CharField(        
+        max_length=30,
         blank=True
     )
     has_photo = models.BooleanField(
@@ -414,10 +413,10 @@ class Position(models.Model):
         null=True,
     )
     appointer = models.ForeignKey(
-        Person,
+        'self',
         related_name='appointed_positions',
         help_text="If this is an appointed position, "
-                  "the person responsible for the appointing.",
+                  "the person-position responsible for the appointing.",
         blank=True,
         null=True,
     )

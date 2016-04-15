@@ -57,6 +57,17 @@ def parse_file(file_path, court_fallback=''):
     info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
     info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
     info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or None
+    # figure out if this case was heard per curiam by checking the first chunk of text in fields in which this is
+    # usually indicated
+    info['per_curiam'] = False
+    first_chunk = 1000
+    for opinion in raw_info.get('opinions', []):
+        if 'per curiam' in opinion['opinion'][:first_chunk].lower():
+            info['per_curiam'] = True
+            break
+        if opinion['byline'] and 'per curiam' in opinion['byline'][:first_chunk].lower():
+            info['per_curiam'] = True
+            break
     # condense opinion texts if there isn't an associated byline
     # print a warning whenever we're appending multiple texts together
     info['opinions'] = []
@@ -67,15 +78,18 @@ def parse_file(file_path, court_fallback=''):
                 continue
             last_texts.append(opinion['opinion'])
             if opinion['byline']:
+                # condense opinion texts
                 if len(last_texts) > 1:
                     print "Combining multiple %s texts in '%s'." % (current_type, file_path)
                 # add the opinion and all of the previous texts
                 judges = find_judges(opinion['byline'])
                 info['opinions'].append({
                     'opinion': '\n'.join(last_texts)
+                    ,'opinion_texts': last_texts
                     ,'type': current_type
                     ,'author': judges[0] if judges else None
                     ,'joining': judges[1:] if len(judges) > 0 else []
+                    ,'byline': opinion['byline']
                 })
                 last_texts = []
         # if there are remaining texts without bylines, either add them to the last opinion of this type, or if there
@@ -85,13 +99,32 @@ def parse_file(file_path, court_fallback=''):
             if relevant_opinions:
                 print "Combining multiple %s texts in '%s'." % (current_type, file_path)
                 relevant_opinions[-1]['opinion'] += '\n%s' % '\n'.join(last_texts)
+                relevant_opinions[-1]['opinion_texts'].extend(last_texts)
             else:
                 info['opinions'].append({
                     'opinion': '\n'.join(last_texts)
+                    ,'opinion_texts': last_texts
                     ,'type': current_type
                     ,'author': None
                     ,'joining': []
+                    ,'byline': ''
                 })
+    # check if opinions were heard per curiam by checking if the first chunk of text in the byline or in
+    #  any of its associated opinion texts indicate this
+    for opinion in info['opinions']:
+        per_curiam = False
+        first_chunk = 1000
+        if 'per curiam' in opinion['byline'][:first_chunk].lower():
+            per_curiam = True
+        else:
+            for text in opinion['opinion_texts']:
+                if 'per curiam' in text[:first_chunk].lower():
+                    per_curiam = True
+                    break
+        opinion['per_curiam'] = per_curiam
+        # there shouldn't be a per curiam opinion with a specific author
+        if opinion['author'] > 0 and per_curiam:
+            print "Warning: Per curiam opinion with an author in '%s'." % file_path
     return info
 
 
@@ -226,5 +259,5 @@ def get_court_object(raw_court, fallback=''):
 
 
 if __name__ == '__main__':
-    parsed = parse_file('/vagrant/flp/columbia_data/opinions/e6054c371b81a4b7.xml')
+    parsed = parse_file('/vagrant/flp/columbia_data/opinions/01910ad13eb152b3.xml')
     pass
