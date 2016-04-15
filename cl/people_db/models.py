@@ -244,6 +244,10 @@ class School(models.Model):
     def is_alias(self):
         return True if self.is_alias_of is not None else False
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(School, self).save(*args, **kwargs)
+
     def clean_fields(self, *args, **kwargs):
         # An alias cannot be an alias.
         validate_is_not_alias(self, ['is_alias_of'])
@@ -586,7 +590,7 @@ class Position(models.Model):
             vote_string += "Senate voted"
             if self.voice_vote:
                 vote_string += ' <span class="alt">by</span> voice vote'
-        elif self.vote_string in ['p', 'np']:
+        elif self.vote_type in ['p', 'np']:
             vote_string += self.get_vote_type_display()
 
         # Then do vote counts/percentages, if we have that info.
@@ -676,6 +680,10 @@ class RetentionEvent(models.Model):
         blank=True,
     )
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(RetentionEvent, self).save(*args, **kwargs)
+
     def clean_fields(self, *args, **kwargs):
         validate_all_or_none(self, ['votes_yes', 'votes_no'])
         validate_all_or_none(self, ['votes_yes_percent', 'votes_no_percent'])
@@ -734,6 +742,10 @@ class Education(models.Model):
         return u'%s: Degree in %s from %s in the year %s' % (
             self.pk, self.degree_detail, self.school.name, self.degree_year
         )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(Education, self).save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         # Note that this isn't run during updates, alas.
@@ -822,6 +834,10 @@ class PoliticalAffiliation(models.Model):
         blank=True,
     )
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(PoliticalAffiliation, self).save(*args, **kwargs)
+
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, ['start', 'end'])
         validate_is_not_alias(self, ['person'])
@@ -898,6 +914,10 @@ class ABARating(models.Model):
     class Meta:
         verbose_name = 'American Bar Association Rating'
         verbose_name_plural = 'American Bar Association Ratings'
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(ABARating, self).save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_is_not_alias(self, ['person'])

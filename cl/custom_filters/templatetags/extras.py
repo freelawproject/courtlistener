@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.utils.formats import date_format
 
 from cl.people_db.models import GRANULARITY_DAY, GRANULARITY_MONTH, \
@@ -80,3 +81,10 @@ def granular_date(obj, field_name, granularity=None, iso=False,
             return date_format(d, format='Y-m')
         elif granularity == GRANULARITY_YEAR:
             return date_format(d, format='Y')
+
+    raise ValidationError(
+        u"Fell through date granularity template tag. This could mean that you "
+        u"have a date without an associated granularity. Did you apply the "
+        u"validation rules? Is full_clean() getting called in your save() "
+        u"method?"
+    )
