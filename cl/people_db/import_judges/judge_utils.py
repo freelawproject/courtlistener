@@ -101,6 +101,7 @@ def get_school(schoolname, testing=False):
     C[schoolname+',no-matches'] += 1
     return None
 
+
 def get_degree_level(degstr):
     if pd.isnull(degstr) or degstr == '':
         return ''
@@ -119,7 +120,7 @@ def get_degree_level(degstr):
                'mba': ['mba'],
               }
     deg = re.sub(r"[^a-z]+", '', degstr.lower())
-    for k in degdict:
+    for k in degdict.keys():
         if deg in degdict[k]:
             return k
 
@@ -129,6 +130,7 @@ def get_degree_level(degstr):
         return 'ma'
     print(degstr+' not in degdict.')
     return ''
+
 
 def get_party(partystr):
     partydict =  dict([(v,k) for (k,v) in [('d', 'Democrat'),
