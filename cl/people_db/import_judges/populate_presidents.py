@@ -71,7 +71,6 @@ def make_president(item, testing=False):
     position = Position(
             person=person,
             position_type='pres',
-
             date_start=date(item['term_start'],1,1),
             date_granularity_start=GRANULARITY_YEAR,
             date_termination=date(item['term_end'],1,1),

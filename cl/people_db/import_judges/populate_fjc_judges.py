@@ -205,16 +205,27 @@ def make_federal_judge(item, testing=False):
             appointstr = item['Renominating President name' + pos_str]
         else:
             appointstr = item['President name' + pos_str]
-        if appointstr != 'Reassignment':
+        appointer = None
+        if appointstr not in ['Assignment', 'Reassignment']:
             names = appointstr.split()
-            first, last = names[0], names[-1]
-                
-            appoint_search = Person.objects.filter(name_first__icontains=first,
-                                                   name_last__icontains=last)
-            if len(appoint_search) == 1:
-                appointer = appoint_search[0]
+            
+            if len(names) == 3:
+                first, mid, last = names
             else:
-                print(names,appoint_search)
+                first, last = names[0], names[-1]
+                mid = ''
+            appoint_search = Position.objects.filter(person__name_first__iexact=first,
+                       person__name_last__iexact=last)
+            if len(appoint_search) > 1:
+                appoint_search = Position.objects.filter(person__name_first__iexact=first,
+                                                   person__name_last__iexact=last,
+                                                   person__name_middle__iexact=mid)
+            if len(appoint_search) == 0:
+                print(names, appoint_search)                   
+            if len(appoint_search) > 1:
+                print(names, appoint_search)                   
+            if len(appoint_search) == 1:
+                appointer = appoint_search[0]                
 
         # senate votes data
         votes = item['Senate vote Ayes/Nays' + pos_str]
