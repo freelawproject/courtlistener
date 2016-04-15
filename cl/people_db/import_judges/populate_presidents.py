@@ -16,12 +16,15 @@ def make_president(item, testing=False):
     dob_city = item['birth city'].strip()
     dob_state = item['birth state'].strip()
     
-    date_dod, dod_city, dod_state = None, None, None
+    date_dod, dod_city, dod_state = None, '', ''
     if not pd.isnull(item['Died']):
         m,d,y = [int(x) for x in item['Died'].split('/')]
         date_dod = date(y,m,d)     
         dod_city = item['death city'].strip()
         dod_state = item['death state'].strip()
+        death_gran = GRANULARITY_DAY
+    else:
+        death_gran = ''
 
     if not pd.isnull(item['midname']):
         if len(item['midname']) == 1:
@@ -40,7 +43,7 @@ def make_president(item, testing=False):
             dob_city=dob_city,
             dob_state=dob_state,
             date_dod=date_dod,
-            date_granularity_dod=GRANULARITY_DAY,
+            date_granularity_dod=death_gran,
             dod_city=dod_city,
             dod_state=dod_state,
             religion=item['Religion']
@@ -69,9 +72,9 @@ def make_president(item, testing=False):
             person=person,
             position_type='pres',
 
-            date_start=item['term_start'],
+            date_start=date(item['term_start'],1,1),
             date_granularity_start=GRANULARITY_YEAR,
-            date_termination=item['term_end'],
+            date_termination=date(item['term_end'],1,1),
             date_granularity_termination=GRANULARITY_YEAR,
     )
 

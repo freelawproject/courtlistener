@@ -199,6 +199,24 @@ def make_federal_judge(item, testing=False):
         else:
             date_granularity_termination = '%Y-%m-%d'
 
+
+        # assign appointing president
+        if not pd.isnull(item['Renominating President name' + pos_str]):
+            appointstr = item['Renominating President name' + pos_str]
+        else:
+            appointstr = item['President name' + pos_str]
+        if appointstr != 'Reassignment':
+            names = appointstr.split()
+            first, last = names[0], names[-1]
+                
+            appoint_search = Person.objects.filter(name_first__icontains=first,
+                                                   name_last__icontains=last)
+            if len(appoint_search) == 1:
+                appointer = appoint_search[0]
+            else:
+                print(names,appoint_search)
+
+        # senate votes data
         votes = item['Senate vote Ayes/Nays' + pos_str]
         if not pd.isnull(votes):
             votes_yes, votes_no = votes.split('/')
@@ -224,6 +242,8 @@ def make_federal_judge(item, testing=False):
             term_reason = ''
         else:
             term_reason = termdict[term_reason]
+            
+
 
         position = Position(
                 person=person,
@@ -241,6 +261,8 @@ def make_federal_judge(item, testing=False):
                 date_termination=date_termination,
                 date_granularity_termination=date_granularity_termination,
                 date_retirement=date_retirement,
+                
+                appointer = appointer,
 
                 voice_vote=voice_vote,
                 votes_yes=votes_yes,
