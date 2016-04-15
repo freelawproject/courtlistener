@@ -21,8 +21,7 @@ def process_career(career_string):
     """Extract data from Employment Text Field"""
     
     if pd.isnull(career_string):
-        #return(None,None,None)
-        continue
+        return(None,None,None,None)        
         
     items = re.split('<BR>|;|<br>', career_string)
     
@@ -32,7 +31,7 @@ def process_career(career_string):
         if item.startswith('Nominated'):
             # this means there was a nomination that didnt pass
             # need to extract this somehow
-            continue                   
+            return(None,None,None,None)                           
         else:
             itemsplit = re.split("\,+\s+(?=\d)+", item, 1)
         
