@@ -11,14 +11,15 @@ def make_president(item, testing=False):
     Returns a Judge object.
     """
 
-    
-    date_dob = date(item['Born'].split('/'))
+    m,d,y = [int(x) for x in item['Born'].split('/')]
+    date_dob = date(y,m,d)
     dob_city = item['birth city'].strip()
     dob_state = item['birth state'].strip()
     
     date_dod, dod_city, dod_state = None, None, None
     if not pd.isnull(item['Died']):
-        date_dod = date(item['Died'].split('/'))            
+        m,d,y = [int(x) for x in item['Died'].split('/')]
+        date_dod = date(y,m,d)     
         dod_city = item['death city'].strip()
         dod_state = item['death state'].strip()
 
@@ -52,7 +53,8 @@ def make_president(item, testing=False):
         race = Race.objects.get(race='b')
     else:
         race = Race.objects.get(race='w')
-    person.race.add(race)        
+    if not testing:
+        person.race.add(race)        
     
     party = item['party'].lower()
     politics = PoliticalAffiliation(

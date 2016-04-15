@@ -62,7 +62,7 @@ class Command(BaseCommand):
         textfields = ['firstname', 'midname', 'lastname', 'gender',
                       'Place of Birth (City)', 'Place of Birth (State)',
                       'Place of Death (City)', 'Place of Death (State)']
-        df = pd.read_excel(self.options['input_file'], 0)
+        df = pd.read_excel(infile, 0)
         for x in textfields:
             df[x] = df[x].replace(np.nan, '', regex=True)
         df['Employment text field'].replace(to_replace=r';\sno', value=r', no', inplace = True, regex = True)    
@@ -74,7 +74,7 @@ class Command(BaseCommand):
             self.ensure_input_file()
             infile = self.options['input_file']
         textfields = ['firstname', 'midname', 'lastname', 'gender', 'howended']
-        df = pd.read_excel(self.options['input_file'], 0)
+        df = pd.read_excel(infile, 0)
         for x in textfields:
             df[x] = df[x].replace(np.nan, '', regex=True)
         for i, row in df.iterrows():
@@ -93,10 +93,14 @@ class Command(BaseCommand):
 
     def import_all(self):
         datadir = self.options['input_file']
+        print('importing presidents...')
         self.import_presidents(infile=datadir+'/presidents.xlsx')
-        self.import_fjc_judges(infile=datadir+'fjc-data.xlsx')
-        self.import_state_judges(infile=datadir+'state-supreme-court-bios-2016-04-06.xlsx')
-        self.import_state_judges(infile=datadir+'state-iac-bios-2016-04-06.xlsx')
+        print('importing FJC judges...')
+        self.import_fjc_judges(infile=datadir+'/fjc-data.xlsx')
+        print('importing state supreme court judges...')
+        self.import_state_judges(infile=datadir+'/state-supreme-court-bios-2016-04-06.xlsx')
+        print('importing state IAC judges...')
+        self.import_state_judges(infile=datadir+'/state-iac-bios-2016-04-06.xlsx')
         
 
     VALID_ACTIONS = {
