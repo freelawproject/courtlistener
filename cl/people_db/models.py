@@ -11,7 +11,9 @@ from cl.lib.model_helpers import (
     validate_all_or_none,
     validate_exactly_n,
     validate_not_all,
-    validate_at_most_n)
+    validate_at_most_n,
+    validate_supervisor,
+)
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -141,7 +143,7 @@ class Person(models.Model):
         max_length=2,
         blank=True,
     )
-    religion = models.CharField(        
+    religion = models.CharField(
         max_length=30,
         blank=True
     )
@@ -580,6 +582,13 @@ class Position(models.Model):
         return False
 
     @property
+    def is_clerkship(self):
+        """Return True if the position is a clerkship."""
+        if self.POSITION_TYPE_GROUPS[self.position_type] == 'Clerkships':
+            return True
+        return False
+
+    @property
     def vote_string(self):
         """Make a human-friendly string from the vote information"""
         vote_string = ''
@@ -610,15 +619,16 @@ class Position(models.Model):
 
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, ['start', 'termination'])
-        validate_is_not_alias(self, ['person', 'appointer', 'supervisor',
-                                     'predecessor', 'school'])
+        validate_is_not_alias(self, ['person', 'supervisor', 'predecessor',
+                                     'school'])
         validate_at_most_n(self, 1, ['school', 'organization_name', 'court'])
         validate_exactly_n(self, 1, ['position_type', 'job_title'])
-        validate_nomination_fields_ok(self)
         validate_all_or_none(self, ['votes_yes', 'votes_no'])
         validate_all_or_none(self, ['votes_yes_percent', 'votes_no_percent'])
         validate_not_all(self, ['votes_yes', 'votes_no', 'votes_yes_percent',
                                 'votes_no_percent'])
+        validate_nomination_fields_ok(self)
+        validate_supervisor(self)
 
         super(Position, self).clean_fields(*args, **kwargs)
 
@@ -787,7 +797,8 @@ class PoliticalAffiliation(models.Model):
         ('l', 'Libertarian'),
         ('f', 'Federalist'),
         ('w', 'Whig'),
-        ('j', 'Jeffersonian Republican')
+        ('j', 'Jeffersonian Republican'),
+        ('u', 'National Union'),
     )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
