@@ -65,11 +65,11 @@ class Command(BaseCommand):
         df = pd.read_excel(infile, 0)
         for x in textfields:
             df[x] = df[x].replace(np.nan, '', regex=True)
-        df['Employment text field'].replace(to_replace=r';\sno', value=r', no', inplace = True, regex = True)    
+        df['Employment text field'].replace(to_replace=r';\sno', value=r', no', inplace = True, regex = True)
         for i, row in df.iterrows():
             make_federal_judge(dict(row), testing=self.debug)
 
-    def import_state_judges(self,infile=None):
+    def import_state_judges(self, infile=None):
         if infile is None:
             self.ensure_input_file()
             infile = self.options['input_file']
@@ -80,7 +80,7 @@ class Command(BaseCommand):
         for i, row in df.iterrows():
             make_state_judge(dict(row), testing=self.debug)
 
-    def import_presidents(self,infile=None):
+    def import_presidents(self, infile=None):
         if infile is None:
             self.ensure_input_file()
             infile = self.options['input_file']
@@ -101,7 +101,7 @@ class Command(BaseCommand):
         self.import_state_judges(infile=datadir+'/state-supreme-court-bios-2016-04-06.xlsx')
         print('importing state IAC judges...')
         self.import_state_judges(infile=datadir+'/state-iac-bios-2016-04-06.xlsx')
-        
+
 
     VALID_ACTIONS = {
         'import-fjc-judges': import_fjc_judges,

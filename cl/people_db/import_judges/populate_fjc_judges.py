@@ -5,7 +5,7 @@ import re
 
 from cl.corpus_importer.court_regexes import fd_pairs
 from cl.people_db.models import Person, Position, Education, Race, \
-    PoliticalAffiliation, Source, ABARating
+    PoliticalAffiliation, Source, ABARating, GRANULARITY_DAY
 from cl.people_db.import_judges.judge_utils import get_school, process_date, \
     get_races, get_party, get_suffix, get_aba, get_degree_level, \
     process_date_string
@@ -17,24 +17,25 @@ def get_court_object(raw_court):
             return value
     return None
 
-def process_career(career_string):    
+
+def process_career(career_string):
     """Extract data from Employment Text Field"""
-    
+
     if pd.isnull(career_string):
-        return(None,None,None,None)        
-        
+        return (None, None, None, None)
+
     items = re.split('<BR>|;|<br>', career_string)
-    
-    positions, locations,startyears, endyears = [], [], []
-        
+
+    positions, locations, startyears, endyears = [], [], []
+
     for item in items:
         if item.startswith('Nominated'):
             # this means there was a nomination that didnt pass
             # need to extract this somehow
-            return(None,None,None,None)                           
+            return (None, None, None, None)
         else:
             itemsplit = re.split("\,+\s+(?=\d)+", item, 1)
-        
+
             if len(itemsplit) > 1:
                 A = itemsplit[0].split(',')
                 if len(A) == 1:
@@ -50,25 +51,33 @@ def process_career(career_string):
             else:
                 employ_list[i][j].insert(1, None)
                 employ_list[i][j].insert(2, None)
-    employ_list = [[[None if a == 'None' else a for a in col] for col in row] for row in employ_list]
+    employ_list = [[[None if a == 'None' else a for a in col] for col in row]
+                   for row in employ_list]
     print('Employment Text Field list saved as employ_list')
-    
-    return(positions, locations,startyears, endyears)
+
+    return (positions, locations, startyears, endyears)
+
 
 # test process career
-    
-def process_bankrupty_magistrates(career_string):    
+
+def process_bankrupty_magistrates(career_string):
     '''Extract data from the Bankruptcy and Magistrate Service Field'''
-    
-    month_list = ['June','March','January','February','April','May','July','August','September','October','November','December','Fall','Spring']
-    bankruptcy_field_pd = wb['Bankruptcy and Magistrate service'].str.split('<BR>|;|<br>', expand=True)
+
+    month_list = ['June', 'March', 'January', 'February', 'April', 'May',
+                  'July', 'August', 'September', 'October', 'November',
+                  'December', 'Fall', 'Spring']
+    bankruptcy_field_pd = wb['Bankruptcy and Magistrate service'].str.split(
+        '<BR>|;|<br>', expand=True)
     bankruptcy_array = pd.np.array(bankruptcy_field_pd)
     bankruptcy_list = bankruptcy_array.tolist()
-    bankruptcy_list = [[str(a) if a is not str else a for a in row] for row in bankruptcy_list]
-    bankruptcy_list = [[None if a is None else re.split("\,+\s+(?=\d)+", a, 1) if not any(
-        month in a for month in month_list) else re.split(
-        ",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+", a, 1)
-                        for a in row] for row in bankruptcy_list]
+    bankruptcy_list = [[str(a) if a is not str else a for a in row] for row in
+                       bankruptcy_list]
+    bankruptcy_list = [
+        [None if a is None else re.split("\,+\s+(?=\d)+", a, 1) if not any(
+                month in a for month in month_list) else re.split(
+                ",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
+                a, 1)
+         for a in row] for row in bankruptcy_list]
     for i in range(len(bankruptcy_list)):
         for j in range(len(bankruptcy_list[1])):
             if len(bankruptcy_list[i][j]) > 1:
@@ -86,7 +95,9 @@ def process_bankrupty_magistrates(career_string):
             else:
                 bankruptcy_list[i][j].insert(1, None)
                 bankruptcy_list[i][j].insert(2, None)
-    bankruptcy_list = [[[None if a == 'None' else a for a in col] for col in row] for row in bankruptcy_list]
+    bankruptcy_list = [
+        [[None if a == 'None' else a for a in col] for col in row] for row in
+        bankruptcy_list]
     print('Bankruptcy and Magistrate Service saved as bankruptcy_list')
 
 
@@ -106,11 +117,13 @@ def make_federal_judge(item, testing=False):
         dob_state = ''
 
     check = Person.objects.filter(fjc_id=item['Judge Identification Number'])
+    name = "%s: %s %s %s" % (item['cl_id'], item['firstname'], item['lastname'],
+                             str(date_dob))
     if len(check) > 0:
-        print(
-        'Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(
-            date_dob) + ' exists.')
+        print 'Warning: %s exists' % name
         return
+    else:
+        print "Now processing: %s" % name
 
     date_dod, date_granularity_dod = process_date(item['Death year'],
                                                   item['Death month'],
@@ -124,8 +137,7 @@ def make_federal_judge(item, testing=False):
 
     if not pd.isnull(item['midname']):
         if len(item['midname']) == 1:
-            item['midname'] = item['midname'] + '.'
-
+            item['midname'] += '.'
 
     # instantiate Judge object
     person = Person(
@@ -197,8 +209,7 @@ def make_federal_judge(item, testing=False):
         if date_termination is None:
             date_granularity_termination = ''
         else:
-            date_granularity_termination = '%Y-%m-%d'
-
+            date_granularity_termination = GRANULARITY_DAY
 
         # assign appointing president
         if not pd.isnull(item['Renominating President name' + pos_str]):
@@ -208,24 +219,26 @@ def make_federal_judge(item, testing=False):
         appointer = None
         if appointstr not in ['Assignment', 'Reassignment']:
             names = appointstr.split()
-            
+
             if len(names) == 3:
                 first, mid, last = names
             else:
                 first, last = names[0], names[-1]
                 mid = ''
-            appoint_search = Position.objects.filter(person__name_first__iexact=first,
-                       person__name_last__iexact=last)
+            appoint_search = Position.objects.filter(
+                person__name_first__iexact=first,
+                person__name_last__iexact=last)
             if len(appoint_search) > 1:
-                appoint_search = Position.objects.filter(person__name_first__iexact=first,
-                                                   person__name_last__iexact=last,
-                                                   person__name_middle__iexact=mid)
+                appoint_search = Position.objects.filter(
+                    person__name_first__iexact=first,
+                    person__name_last__iexact=last,
+                    person__name_middle__iexact=mid)
             if len(appoint_search) == 0:
-                print(names, appoint_search)                   
+                print(names, appoint_search)
             if len(appoint_search) > 1:
-                print(names, appoint_search)                   
+                print(names, appoint_search)
             if len(appoint_search) == 1:
-                appointer = appoint_search[0]                
+                appointer = appoint_search[0]
 
         # senate votes data
         votes = item['Senate vote Ayes/Nays' + pos_str]
@@ -253,8 +266,6 @@ def make_federal_judge(item, testing=False):
             term_reason = ''
         else:
             term_reason = termdict[term_reason]
-            
-
 
         position = Position(
                 person=person,
@@ -268,17 +279,17 @@ def make_federal_judge(item, testing=False):
                 date_hearing=date_hearing,
                 date_confirmation=date_confirmation,
                 date_start=date_start,
-                date_granularity_start='%Y-%m-%d',
+                date_granularity_start=GRANULARITY_DAY,
                 date_termination=date_termination,
                 date_granularity_termination=date_granularity_termination,
                 date_retirement=date_retirement,
-                
-                appointer = appointer,
+
+                appointer=appointer,
 
                 voice_vote=voice_vote,
                 votes_yes=votes_yes,
                 votes_no=votes_no,
-                vote_type = 's',
+                vote_type='s',
                 how_selected='a_pres',
                 termination_reason=term_reason
         )
@@ -294,8 +305,9 @@ def make_federal_judge(item, testing=False):
                 politics = PoliticalAffiliation(
                         person=person,
                         political_party=party,
-                        date_start = date_nominated,
-                        source='a'
+                        date_start=date_nominated,
+                        date_granularity_start=GRANULARITY_DAY,
+                        source='a',
                 )
                 if not testing:
                     politics.save()
@@ -303,13 +315,15 @@ def make_federal_judge(item, testing=False):
             elif party != prev_politics:
                 # account for changing political affiliation
                 politics.date_end = date_nominated
+                politics.date_granularity_end = GRANULARITY_DAY
                 if not testing:
                     politics.save()
                 politics = PoliticalAffiliation(
-                        person=person,
-                        political_party=party,
-                        date_start = date_nominated,
-                        source='a'
+                    person=person,
+                    political_party=party,
+                    date_start=date_nominated,
+                    date_granularity_start=GRANULARITY_DAY,
+                    source='a'
                 )
                 if not testing:
                     politics.save()
@@ -349,21 +363,19 @@ def make_federal_judge(item, testing=False):
             school = get_school(schoolname)
             if school is not None:
                 degree = Education(
-                    person=person,
-                    school=school,
-                    degree_detail=degtype,
-                    degree_level=deg_level,
-                    degree_year=degyear
+                        person=person,
+                        school=school,
+                        degree_detail=degtype,
+                        degree_level=deg_level,
+                        degree_year=degyear
                 )
                 if not testing:
                     degree.save()
 
     # Non-judicial positions
-    #jobs = process_career(item['Employment text field'])
-    #for job in jobs:
-        
+    # jobs = process_career(item['Employment text field'])
+    # for job in jobs:
 
-    
     if not pd.isnull(item['Employment text field']):
         notes = item['Employment text field']
         source = Source(
@@ -381,5 +393,3 @@ def make_federal_judge(item, testing=False):
         )
         if not testing:
             source.save()
-
-
