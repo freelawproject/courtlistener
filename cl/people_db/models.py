@@ -141,9 +141,8 @@ class Person(models.Model):
         max_length=2,
         blank=True,
     )
-    religion = models.CharField(
-        choices=RELIGIONS,
-        max_length=2,
+    religion = models.CharField(        
+        max_length=30,
         blank=True
     )
     has_photo = models.BooleanField(

@@ -2,109 +2,27 @@
 
 import pandas as pd
 import re
-
+from datetime import date
 from cl.corpus_importer.court_regexes import fd_pairs
-from cl.people_db.models import Person, Position, Education, Race, \
-    PoliticalAffiliation, Source, ABARating
-from cl.people_db.import_judges.judge_utils import get_school, process_date, \
-    get_races, get_party, get_suffix, get_aba, get_degree_level, \
-    process_date_string
+from cl.people_db.models import Person, Position, Race, \
+    PoliticalAffiliation, GRANULARITY_DAY
 
-
-def get_court_object(raw_court):
-    for regex, value in fd_pairs:
-        if re.search(regex, raw_court):
-            return value
-    return None
-
-def process_career(career_string):    
-    """Extract data from Employment Text Field"""
-    
-    if pd.isnull(career_string):
-        #return(None,None,None)
-        continue
-        
-    items = re.split('<BR>|;|<br>', career_string)
-    
-    positions, locations,startyears, endyears = [], [], []
-        
-    for item in items:
-        if item.startswith('Nominated'):
-            # this means there was a nomination that didnt pass
-            # need to extract this somehow
-            continue                   
-        else:
-            itemsplit = re.split("\,+\s+(?=\d)+", item, 1)
-        
-            if len(itemsplit) > 1:
-                A = itemsplit[0].split(',')
-                if len(A) == 1:
-                    employ_list[i][j].insert(1, None)
-                if len(A) == 2:
-                    employ_list[i][j][0] = A[0]
-                    employ_list[i][j].insert(1, A[1])
-                elif len(A) >= 3:
-                    position = ",".join(A[:-2])
-                    location = A[-2] + "," + A[-1]
-                    employ_list[i][j][0] = position
-                    employ_list[i][j].insert(1, location)
-            else:
-                employ_list[i][j].insert(1, None)
-                employ_list[i][j].insert(2, None)
-    employ_list = [[[None if a == 'None' else a for a in col] for col in row] for row in employ_list]
-    print('Employment Text Field list saved as employ_list')
-    
-    return(positions, locations,startyears, endyears)
-
-# test process career
-    
-def process_bankrupty_magistrates(career_string):    
-    '''Extract data from the Bankruptcy and Magistrate Service Field'''
-    
-    month_list = ['June','March','January','February','April','May','July','August','September','October','November','December','Fall','Spring']
-    bankruptcy_field_pd = wb['Bankruptcy and Magistrate service'].str.split('<BR>|;|<br>', expand=True)
-    bankruptcy_array = pd.np.array(bankruptcy_field_pd)
-    bankruptcy_list = bankruptcy_array.tolist()
-    bankruptcy_list = [[str(a) if a is not str else a for a in row] for row in bankruptcy_list]
-    bankruptcy_list = [[None if a is None else re.split("\,+\s+(?=\d)+", a, 1) if not any(
-        month in a for month in month_list) else re.split(
-        ",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+", a, 1)
-                        for a in row] for row in bankruptcy_list]
-    for i in range(len(bankruptcy_list)):
-        for j in range(len(bankruptcy_list[1])):
-            if len(bankruptcy_list[i][j]) > 1:
-                B = bankruptcy_list[i][j][0].split(',')
-                if len(B) == 1:
-                    bankruptcy_list[i][j].insert(1, None)
-                if len(B) == 2:
-                    bankruptcy_list[i][j][0] = B[0]
-                    bankruptcy_list[i][j].insert(1, B[1])
-                elif len(B) >= 3:
-                    position = ",".join(B[:-2])
-                    location = B[-2] + "," + B[-1]
-                    bankruptcy_list[i][j][0] = position
-                    bankruptcy_list[i][j].insert(1, location)
-            else:
-                bankruptcy_list[i][j].insert(1, None)
-                bankruptcy_list[i][j].insert(2, None)
-    bankruptcy_list = [[[None if a == 'None' else a for a in col] for col in row] for row in bankruptcy_list]
-    print('Bankruptcy and Magistrate Service saved as bankruptcy_list')
-
-
-def make_federal_judge(item, testing=False):
+def make_president(item, testing=False):
     """Takes the federal judge data <item> and associates it with a Judge object.
     Returns a Judge object.
     """
 
-    date_dob, date_granularity_dob = process_date(item['Birth year'],
-                                                  item['Birth month'],
-                                                  item['Birth day'])
-
-    dob_city = item['Place of Birth (City)']
-    dob_state = item['Place of Birth (State)']
+    
+    birthdate = date(item['Born'].split('/'))
+    dob_city = item['birth city'].strip()
+    dob_state = item['birth state'].strip()
+    
+    
     # if foreign-born, leave blank for now.
     if len(dob_state) > 2:
         dob_state = ''
+        deathdate = date(item['Died'].split('/'))        
+    
 
     check = Person.objects.filter(fjc_id=item['Judge Identification Number'])
     if len(check) > 0:
@@ -133,19 +51,18 @@ def make_federal_judge(item, testing=False):
             name_first=item['firstname'],
             name_middle=item['midname'],
             name_last=item['lastname'],
-            name_suffix=get_suffix(item['suffname']),
-            gender=item['gender'],
-            fjc_id=item['Judge Identification Number'],
+            gender='m',            
             cl_id=item['cl_id'],
 
             date_dob=date_dob,
-            date_granularity_dob=date_granularity_dob,
+            date_granularity_dob=GRANULARITY_DAY,
             dob_city=dob_city,
             dob_state=dob_state,
             date_dod=date_dod,
-            date_granularity_dod=date_granularity_dod,
+            date_granularity_dod=GRANULARITY_DAY,
             dod_city=dod_city,
-            dod_state=dod_state
+            dod_state=dod_state,
+            re
     )
 
     if not testing:
@@ -327,8 +244,8 @@ def make_federal_judge(item, testing=False):
                     degree.save()
 
     # Non-judicial positions
-    #jobs = process_career(item['Employment text field'])
-    #for job in jobs:
+    jobs = process_career(item['Employment text field'])
+    for job in jobs:
         
 
     
