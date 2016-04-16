@@ -75,6 +75,8 @@ def make_president(item, testing=False):
             date_granularity_start=GRANULARITY_YEAR,
             date_termination=date(item['term_end'],1,1),
             date_granularity_termination=GRANULARITY_YEAR,
+            location_city = 'Washington',
+            location_state = 'DC'
     )
 
     if not testing:

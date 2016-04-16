@@ -424,7 +424,6 @@ class Position(models.Model):
         help_text="If not a court or school, the state where person worked.",
         blank=True,
     )
-
     appointer = models.ForeignKey(
         'self',
         related_name='appointed_positions',
