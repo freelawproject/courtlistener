@@ -222,7 +222,7 @@ class SearchPerson(object):
         self.alias_ids = [alias.pk for alias in item.aliases.all()]
         self.races = [r.get_race_display() for r in item.race.all()]
         self.gender = item.get_gender_display()
-        self.religion = item.get_religion_display()
+        self.religion = item.religion
         self.name = item.name_full
         self.name_reverse = item.name_full_reverse
         if item.date_dob is not None:
@@ -242,8 +242,8 @@ class SearchPerson(object):
             self.court = [p.court.short_name for p in positions if p.court]
             self.court_exact = [p.court.pk for p in positions if p.court]
             self.position_type = [p.get_position_type_display() for p in positions]
-            self.appointer = [p.appointer.name_full_reverse for p in positions
-                              if p.appointer]
+            self.appointer = [p.appointer.person.name_full_reverse for p in
+                              positions if p.appointer]
             self.supervisor = [p.supervisor.name_full_reverse for p in positions
                                if p.supervisor]
             self.predecessor = [p.predecessor.name_full_reverse for p in positions

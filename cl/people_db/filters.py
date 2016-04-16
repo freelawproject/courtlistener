@@ -101,7 +101,6 @@ class PositionFilter(filters.FilterSet):
     court = filters.RelatedFilter(CourtFilter, name='court')
     retention_events = filters.RelatedFilter(
             RetentionEventFilter, name='retention_events')
-    appointer = filters.RelatedFilter('cl.people_db.filters.PersonFilter', name='appointer')
 
     class Meta:
         model = Position
