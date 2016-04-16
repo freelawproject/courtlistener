@@ -124,35 +124,48 @@
                     </div>
                     {% if search_form.type.value in 'op' or not request.GET.type %}
                         <div class="tab-pane" id="tab-federal-district">
-                            <div class="row">
-                                {% for row in courts.district|rows:4 %}
-                                    <div class="col-sm-3">
-                                        {% for court in row %}
-                                            <div class="checkbox">
-                                                <label for="id_{{ court.pk }}">
-                                                <input
-                                                        id="id_{{ court.pk }}"
-                                                        name="{{ court.pk }}"
-                                                        {% if court.checked %}checked="checked"{% endif %}
-                                                        type="checkbox"
-                                                        class="external-input court-checkbox">
-                                                    {{ court.short_name }}
-                                                </label>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                {% endfor %}
-                            </div>
+                            {# Regroup into closed/open courts #}
+                            {% regroup  courts.district|dictsort:"is_terminated" by is_terminated as district_courts %}
+
+                            {% for group in district_courts %}
+                                <h3 class="bottom inline">
+                                    {% if group.grouper %}
+                                        Terminated Courts
+                                    {% else %}
+                                        Active Courts
+                                    {% endif %}
+                                </h3>
+                                <div class="row">
+                                    {% for row in group.list|rows:4 %}
+                                        <div class="col-sm-3">
+                                            {% for court in row %}
+                                                <div class="checkbox">
+                                                    <label for="id_{{ court.pk }}">
+                                                        <input
+                                                                id="id_{{ court.pk }}"
+                                                                name="{{ court.pk }}"
+                                                                {% if court.checked %}checked="checked"{% endif %}
+                                                                type="checkbox"
+                                                                class="external-input court-checkbox">
+                                                        {{ court.short_name }}
+                                                    </label>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
                         </div>
+
                         <div class="tab-pane" id="tab-bankruptcy">
                             {% for bank_bundle in courts.bankruptcy %}
-                                <h4 class="bottom inline">
+                                <h3 class="bottom inline">
                                     {% if forloop.counter == 1 %}
                                         Bankruptcy Appellate Panels
                                     {% else %}
                                         Bankruptcy District Courts
                                     {% endif %}
-                                </h4>
+                                </h3>
                                 <div class="row">
                                     {% for row in bank_bundle|rows:4 %}
                                         <div class="col-sm-3">

@@ -472,6 +472,12 @@ class Court(models.Model):
     def __unicode__(self):
         return u'{name}'.format(name=self.full_name)
 
+    @property
+    def is_terminated(self):
+        if self.end_date:
+            return True
+        return False
+
     class Meta:
         ordering = ["position"]
 
@@ -994,7 +1000,7 @@ class OpinionsCited(models.Model):
 #    REVIEW_STANDARDS = (
 #        ('d', 'Discretionary'),
 #        ('m', 'Mandatory'),
-#        ('s', 'Special or Mixed'),        
+#        ('s', 'Special or Mixed'),
 #    )
 #    upper_court = models.ForeignKey(
 #        Court,
@@ -1022,5 +1028,5 @@ class OpinionsCited(models.Model):
 #        return u'%s ⤜--reviewed by⟶  %s' % (self.lower_court.id,
 #                                        self.upper_court.id)
 #
-#    class Meta:        
+#    class Meta:
 #        unique_together = ("upper_court", "lower_court")
