@@ -390,10 +390,6 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
         q['sub_opinions__author'] = 2
         assertCount(self, path, q, 4)
 
-        # Boolean filter
-        q['per_curiam'] = False
-        assertCount(self, path, q, 4)
-
         # Integer lookups
         q = dict()
         q['scdb_votes_majority__gt'] = 10
@@ -411,6 +407,10 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
         assertCount(self, path, q, 0)
         q['sha1'] = 'asdfasdfasdfasdfasdfasddf'
         assertCount(self, path, q, 6)
+
+        # Boolean filter
+        q['per_curiam'] = False
+        assertCount(self, path, q, 4)
 
         # Related filters
         q['cluster__panel'] = 1

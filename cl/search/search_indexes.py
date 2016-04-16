@@ -65,8 +65,7 @@ class SearchDocument(object):
         self.panel_ids = [judge.pk for judge in item.cluster.panel.all()]
         self.non_participating_judge_ids = [judge.pk for judge in
                                             item.cluster.non_participating_judges.all()]
-        self.judge = item.cluster.judges
-        self.per_curiam = item.cluster.per_curiam
+        self.judge = item.cluster.judges        
         if item.cluster.date_filed is not None:
             self.dateFiled = datetime.combine(
                 item.cluster.date_filed,
@@ -86,6 +85,7 @@ class SearchDocument(object):
         # Opinion
         self.cites = [opinion.pk for opinion in item.opinions_cited.all()]
         self.author_id = getattr(item.author, 'pk', None)
+        self.per_curiam = itemper_curiam        
         self.joined_by_ids = [judge.pk for judge in item.joined_by.all()]
         self.type = item.type
         self.download_url = item.download_url or None

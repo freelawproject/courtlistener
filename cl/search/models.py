@@ -513,10 +513,6 @@ class OpinionCluster(models.Model):
                   "be placed into the panel field.",
         blank=True,
     )
-    per_curiam = models.BooleanField(
-        help_text="Was this case heard per curiam?",
-        default=False,
-    )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -855,13 +851,17 @@ class Opinion(models.Model):
         symmetrical=False,
         related_name="opinions_citing",
         blank=True,
-    )
+    )    
     author = models.ForeignKey(
         'people_db.Person',
         help_text="The primary author of this opinion",
         related_name='opinions_written',
         blank=True,
         null=True,
+    )
+    per_curiam = models.BooleanField(
+        help_text="Is this opinion per curiam, without a single author?",
+        default=False,
     )
     joined_by = models.ManyToManyField(
         'people_db.Person',
