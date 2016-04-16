@@ -17,88 +17,124 @@ def get_court_object(raw_court):
             return value
     return None
 
-
-def process_career(career_string):
-    """Extract data from Employment Text Field"""
-
-    if pd.isnull(career_string):
-        return (None, None, None, None)
-
-    items = re.split('<BR>|;|<br>', career_string)
-
-    positions, locations, startyears, endyears = [], [], []
-
-    for item in items:
-        if item.startswith('Nominated'):
-            # this means there was a nomination that didnt pass
-            # need to extract this somehow
-            return (None, None, None, None)
+def transform_employ(string):
+    string_list = re.split('<BR>|;|<br>', string)
+    #  separate dates from the rest
+    employ_list = [[a] if a is None or a.startswith('Nominated') else re.split("\,+\s+(?=\d)+", a, 1) for a in string_list]
+    #  extract position and location
+    for j in range(len(employ_list)):
+        if len(employ_list[j]) > 1:
+            A = employ_list[j][0].split(',')
+            if len(A) == 1:
+                employ_list[j].insert(1, None)
+            if len(A) == 2:
+                employ_list[j][0] = A[0]
+                employ_list[j].insert(1, A[1])
+            elif len(A) >= 3:
+                position = ",".join(A[:-2])
+                location = A[-2] + "," + A[-1]
+                employ_list[j][0] = position
+                employ_list[j].insert(1, location)
         else:
-            itemsplit = re.split("\,+\s+(?=\d)+", item, 1)
+            employ_list[j].insert(1, None)
+            employ_list[j].insert(2, None)
+    #  extract start dates and end dates from dates
+    j = 0
+    while j < len(employ_list):
+        if employ_list[j][-1] is None:  # in case there are
+            employ_list[j].insert(-1, None)
+        else:
 
-            if len(itemsplit) > 1:
-                A = itemsplit[0].split(',')
+            B = employ_list[j][-1].split(',')
+            if len(B) == 2:
+                c = employ_list[j][:]
+                employ_list.insert(j + 1, c)
+                employ_list[j][-1] = B[0]
+                employ_list[j + 1][-1] = B[1]
+                tmp_year = employ_list[j].pop()
+                employ_list[j].extend(tmp_year.split('-'))
+            elif len(B) == 1:
+                tmp_year = employ_list[j].pop()
+                try:
+                    employ_list[j].extend(tmp_year.split('-'))
+                except AttributeError:
+                    employ_list[j].append(None)
+            # if i == 19 and j == 0: print(employ_list[j])
+            else:
+                employ_list[j].append(None)
+        j += 1
+    employ_list = [list(e) for e in zip(*employ_list)]
+    position, location, start_year, end_year = employ_list[0],employ_list[1],employ_list[2],employ_list[3]
+    return position, location, start_year, end_year
+
+
+def transform_bankruptcy(string):
+    month_list = ['June', 'March', 'January', 'February', 'April', 'May', 'July', 'August', 'September', 'October',
+                  'November', 'December', 'Fall', 'Spring']
+    month = ['June', 'March', 'January', 'February', 'April', 'May', 'July', 'August', 'September', 'October', 'November',
+         'December']
+    season = ['Spring', 'Fall']
+    if string is None:
+        bankruptcy_list = [None, None, None, None]
+        # return
+    else:
+        string_list = str(string)
+        string_list = re.split('<BR>|;|<br>', string_list)
+        bankruptcy_list = [None if a is None else re.split("\,+\s+(?=\d)+", a, 1) if not any(
+            month in a for month in month_list) else re.split(
+            ",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
+            a, 1)
+                           for a in string_list]
+
+        #  extract position and location
+        for j in range(len(bankruptcy_list)):
+            if len(bankruptcy_list[j]) > 1:
+                A = bankruptcy_list[j][0].split(',')
                 if len(A) == 1:
-                    employ_list[i][j].insert(1, None)
+                    bankruptcy_list[j].insert(1, None)
                 if len(A) == 2:
-                    employ_list[i][j][0] = A[0]
-                    employ_list[i][j].insert(1, A[1])
+                    bankruptcy_list[j][0] = A[0]
+                    bankruptcy_list[j].insert(1, A[1])
                 elif len(A) >= 3:
                     position = ",".join(A[:-2])
                     location = A[-2] + "," + A[-1]
-                    employ_list[i][j][0] = position
-                    employ_list[i][j].insert(1, location)
+                    bankruptcy_list[j][0] = position
+                    bankruptcy_list[j].insert(1, location)
             else:
-                employ_list[i][j].insert(1, None)
-                employ_list[i][j].insert(2, None)
-    employ_list = [[[None if a == 'None' else a for a in col] for col in row]
-                   for row in employ_list]
-    print('Employment Text Field list saved as employ_list')
+                bankruptcy_list[j].insert(1, None)
+                bankruptcy_list[j].insert(2, None)
 
-    return (positions, locations, startyears, endyears)
-
-
-# test process career
-
-def process_bankrupty_magistrates(career_string):
-    '''Extract data from the Bankruptcy and Magistrate Service Field'''
-
-    month_list = ['June', 'March', 'January', 'February', 'April', 'May',
-                  'July', 'August', 'September', 'October', 'November',
-                  'December', 'Fall', 'Spring']
-    bankruptcy_field_pd = wb['Bankruptcy and Magistrate service'].str.split(
-        '<BR>|;|<br>', expand=True)
-    bankruptcy_array = pd.np.array(bankruptcy_field_pd)
-    bankruptcy_list = bankruptcy_array.tolist()
-    bankruptcy_list = [[str(a) if a is not str else a for a in row] for row in
-                       bankruptcy_list]
-    bankruptcy_list = [
-        [None if a is None else re.split("\,+\s+(?=\d)+", a, 1) if not any(
-                month in a for month in month_list) else re.split(
-                ",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
-                a, 1)
-         for a in row] for row in bankruptcy_list]
-    for i in range(len(bankruptcy_list)):
-        for j in range(len(bankruptcy_list[1])):
-            if len(bankruptcy_list[i][j]) > 1:
-                B = bankruptcy_list[i][j][0].split(',')
-                if len(B) == 1:
-                    bankruptcy_list[i][j].insert(1, None)
-                if len(B) == 2:
-                    bankruptcy_list[i][j][0] = B[0]
-                    bankruptcy_list[i][j].insert(1, B[1])
-                elif len(B) >= 3:
-                    position = ",".join(B[:-2])
-                    location = B[-2] + "," + B[-1]
-                    bankruptcy_list[i][j][0] = position
-                    bankruptcy_list[i][j].insert(1, location)
+        #  extract dates into start date and end date for each job
+        j = 0
+        while j < len(bankruptcy_list):
+            if bankruptcy_list[j][-1] is None:  # empty cell
+                bankruptcy_list[j].insert(-1, None)
             else:
-                bankruptcy_list[i][j].insert(1, None)
-                bankruptcy_list[i][j].insert(2, None)
-    bankruptcy_list = [
-        [[None if a == 'None' else a for a in col] for col in row] for row in
-        bankruptcy_list]
-    print('Bankruptcy and Magistrate Service saved as bankruptcy_list')
+                if any(word in bankruptcy_list[j][-1] for word in month) or bankruptcy_list[j][-1].startswith(
+                        '1') or \
+                        bankruptcy_list[j][-1].startswith('2'):
+                    tmp_year = bankruptcy_list[j].pop()
+                    bankruptcy_list[j].extend(tmp_year.split('-'))
+                elif any(word in bankruptcy_list[j][-1] for word in season):
+                    c = bankruptcy_list[j][:]
+                    B = c[-1].split(',')
+                    bankruptcy_list[j][-1] = B[0]
+                    n = len(B)
+                    for k in range(1, n):
+                        d = c[:]
+                        bankruptcy_list.insert(j + k, d)
+                        bankruptcy_list[j + k][-1] = B[k]
+                    tmp_year = bankruptcy_list[j].pop()
+                    bankruptcy_list[j].extend(tmp_year.split('-'))
+                    if len(bankruptcy_list[j]) == 3:
+                        bankruptcy_list[j].append(None)
+                else:
+                    bankruptcy_list[j].append(None)
+            j += 1
+
+    bankruptcy_list = [list(e) for e in zip(*bankruptcy_list)]
+    position, location, start_year, end_year = bankruptcy_list[0], bankruptcy_list[1], bankruptcy_list[2], bankruptcy_list[3]
+    return position, location, start_year, end_year
 
 
 def make_federal_judge(item, testing=False):
@@ -373,8 +409,8 @@ def make_federal_judge(item, testing=False):
                     degree.save()
 
     # Non-judicial positions
-    # jobs = process_career(item['Employment text field'])
-    # for job in jobs:
+    jobs = transform_employ(item['Employment text field'])
+    for job in jobs:
 
     if not pd.isnull(item['Employment text field']):
         notes = item['Employment text field']

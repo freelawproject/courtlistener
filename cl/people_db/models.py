@@ -390,7 +390,7 @@ class Position(models.Model):
         help_text="If title isn't in list, type here.",
         max_length=100,
         blank=True,
-    )
+    )    
     person = models.ForeignKey(
         Person,
         related_name='positions',
@@ -415,6 +415,16 @@ class Position(models.Model):
         blank=True,
         null=True,
     )
+    location_city = models.CharField(
+        help_text="If not a court or school, the city where person worked.",
+        max_length=50,
+        blank=True,
+    )
+    location_state = local_models.USStateField(
+        help_text="If not a court or school, the state where person worked.",
+        blank=True,
+    )
+
     appointer = models.ForeignKey(
         'self',
         related_name='appointed_positions',
