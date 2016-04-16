@@ -2,6 +2,7 @@ from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
 from localflavor.us import models as local_models
+from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
     validate_has_full_name,
@@ -591,27 +592,56 @@ class Position(models.Model):
     @property
     def vote_string(self):
         """Make a human-friendly string from the vote information"""
-        vote_string = ''
+        s = ''
 
         # Do vote type first
         if self.vote_type == 's':
-            vote_string += "Senate voted"
+            s += "Senate voted"
             if self.voice_vote:
-                vote_string += ' <span class="alt">by</span> voice vote'
+                s += ' <span class="alt">by</span> voice vote'
         elif self.vote_type in ['p', 'np']:
-            vote_string += self.get_vote_type_display()
+            s += self.get_vote_type_display()
 
         # Then do vote counts/percentages, if we have that info.
         if self.vote_type:
-            vote_string += ', '
+            s += ', '
         if self.votes_yes:
-            vote_string += '%s in favor <span class="alt">and</span> %s ' \
+            s += '%s in favor <span class="alt">and</span> %s ' \
                            'opposed' % (self.votes_yes, self.votes_no)
         elif self.votes_yes_percent:
-            vote_string += '%g%% in favor <span class="alt">and</span> ' \
+            s += '%g%% in favor <span class="alt">and</span> ' \
                            '%g%% opposed' % (self.votes_yes_percent,
                                              self.votes_no_percent)
-        return vote_string
+        return s
+
+    @property
+    def html_title(self):
+        """Display the position as a title."""
+        s = ''
+
+        # Title
+        if self.get_position_type_display():
+            s += self.get_position_type_display()
+        else:
+            s += self.job_title
+
+        # Where
+        if self.school or self.organization_name or self.court:
+            s += ' <span class="alt text-lowercase">at</span> '
+            if self.court:
+                s += self.court.full_name
+            elif self.school:
+                s += self.school
+            elif self.organization_name:
+                s += self.organization_name
+
+        # When
+        if self.date_start or self.date_termination:
+            s += ' <span class="text-capitalize">(%s &ndash; %s)' % (
+                granular_date(self, 'date_start', default="Unknown Date"),
+                granular_date(self, 'date_termination', default="Present"),
+            )
+        return s
 
     def save(self, *args, **kwargs):
         self.full_clean()

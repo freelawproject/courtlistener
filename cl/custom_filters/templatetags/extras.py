@@ -1,10 +1,6 @@
+from django import template
 from django.core.exceptions import ValidationError
 from django.utils.formats import date_format
-
-from cl.people_db.models import GRANULARITY_DAY, GRANULARITY_MONTH, \
-    GRANULARITY_YEAR
-
-from django import template
 from django.utils.safestring import mark_safe
 
 register = template.Library()
@@ -55,6 +51,8 @@ def granular_date(obj, field_name, granularity=None, iso=False,
     :param iso: Whether to return an iso8601 date or a human readable one.
     :return: A string representation of the date.
     """
+    from cl.people_db.models import GRANULARITY_DAY, GRANULARITY_MONTH, \
+        GRANULARITY_YEAR
     if not isinstance(obj, dict):
         # Convert it to a dict. It's easier to convert this way than from a dict
         # to an object.
