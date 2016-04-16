@@ -1,5 +1,3 @@
-from operator import xor
-
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
 
@@ -50,7 +48,8 @@ def validate_partial_date(instance, fields):
         if any([d, granularity]) and not all([d, granularity]):
             raise ValidationError({
                 'date_%s' % field: 'Date and granularity must both be complete '
-                                   'or blank.'
+                                   'or blank. Hint: The values are: date: %s, '
+                                   'granularity: %s' % (d, granularity)
             })
 
         # If a partial date, are days/month set to 1?
@@ -121,6 +120,33 @@ def validate_nomination_fields_ok(instance):
                 "Cannot have an election date for a position with how_selected of "
                 "%s" % instance.get_how_selected_display()
             )
+
+
+def validate_supervisor(instance):
+    """Ensure that the supervisor field makes sense.
+
+     - Supervisors can only be judges.
+     - Supervisor field can only be completed when the position is that of a
+       clerk.
+    """
+    sup = instance.supervisor
+    if sup:
+        if not sup.is_judge:
+            raise ValidationError(
+                {'supervisor': "The supervisor field can only be set to a "
+                               "judge, but '%s' does not appear to have ever "
+                               "been a judge." % sup.name_full
+                 }
+            )
+
+    if sup and not instance.is_clerkship:
+        raise ValidationError(
+            "You have configured a supervisor for this field ('%s'), but it "
+            "the position_type is not a clerkship. Instead it's: '%s'" % (
+                sup.name_full,
+                instance.position_type,
+            )
+        )
 
 
 def validate_all_or_none(instance, fields):
