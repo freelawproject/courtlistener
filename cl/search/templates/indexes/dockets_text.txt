@@ -1,7 +1,27 @@
 {# Getting the Docket Entries one by one with filed date #}
 
+{{ item.court.pk }}  {{ item.court.full_name }}
+{# Court Jurisdiction #}
+{{ item.court.jurisdiction }}
+
+{{ item.docket_number }}
+{{ item.case_name }}
+{{ item.pacer_case_id }}
+
+{% if item.nature_of_suit %}
+    {{ item.nature_of_suit }}
+{% endif %}
+{% if item.cause %}
+    {{ item.cause }}
+{% endif %}
+{% if item.jurisdiction_type %}
+    {{ item.jurisdiction_type }}
+{% endif %}
+{% if item.assigned_to %}
+    {{ item.assigned_to }}
+{% endif %}
+
 {% for docket_entry in docket_entries_seq %}
-    {{ docket_entry.date_filed|date:"Y-m-d" }}
-    {{ docket_entry.entry_number }}
+    {{ docket_entry.date_filed|date:"Y-m-d" }}  {{ docket_entry.entry_number }}
     {{ docket_entry.description }}
 {% endfor %}

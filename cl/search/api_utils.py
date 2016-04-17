@@ -58,6 +58,9 @@ class SolrList(object):
         elif self.type == 'oa':
             self.conn = sunburnt.SolrInterface(
                     settings.SOLR_AUDIO_URL, mode='r')
+        elif self.type == 'd':
+            self.conn = sunburnt.SolrInterface(
+                    settings.SOLR_RECAP_DOCKET_URL, mode='r')
         self._length = length
 
     def __len__(self):

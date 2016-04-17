@@ -172,15 +172,6 @@
              stored="true"
              multiValued="false"/>
 
-      <!--DocketEntry-->
-      <field name="docketEntries"
-             type="text_en_splitting"
-             indexed="true"
-             stored="true"
-             multiValued="false"
-             termVectors="true"
-             termPositions="true"
-             termOffsets="true"/>
 
       <!--Judge-->
       <field name="assignedTo"
@@ -191,7 +182,13 @@
 
       <!--Court-->
       <field name="court"
-             type="text_en_splitting_cl"
+             type="string"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
+
+      <field name="courtJurisdiction"
+             type="string"
              indexed="true"
              stored="true"
              multiValued="false"/>
@@ -199,25 +196,14 @@
       <!--special fields-->
       <field name="_version_" type="long" indexed="true" stored="true"/>
 
-      <!--copy fields-->
+      <!--DocketEntries with all other searchable tags-->
       <field name="text" type="text_en_splitting"
              indexed="true"
-             stored="false"
-             multiValued="true"
+             stored="true"
+             multiValued="false"
              termVectors="true"
              termPositions="true"
              termOffsets="true"/>
-
-      <copyField source="court_id" dest="text" maxChars="30000"/>
-      <copyField source="docketNumber" dest="text" maxChars="30000"/>
-      <copyField source="caseName" dest="text" maxChars="30000"/>
-      <copyField source="pacerCaseId" dest="text" maxChars="30000"/>
-      <copyField source="natureOfSuit" dest="text" maxChars="30000"/>
-      <copyField source="cause" dest="text" maxChars="30000"/>
-      <copyField source="jurisdictionType" dest="text" maxChars="30000"/>
-      <copyField source="docketEntries" dest="text" maxChars="100000"/>
-      <copyField source="assignedTo" dest="text" maxChars="30000"/>
-      <copyField source="court" dest="text" maxChars="30000"/>
 
 
 
