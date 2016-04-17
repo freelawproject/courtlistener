@@ -1,10 +1,11 @@
+from datetime import datetime, date, time
+
+from django.core.urlresolvers import NoReverseMatch
+from django.template import loader
+
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.utils import deepgetattr
 from cl.search.models import DocketEntry
-
-from datetime import datetime, date, time
-from django.core.urlresolvers import NoReverseMatch
-from django.template import loader
 
 
 def solr_list(m2m_list, field):
@@ -316,7 +317,4 @@ class SearchPerson(object):
         text_template = loader.get_template('indexes/person_text.txt')
         context = {'item': item}
         self.text = text_template.render(context).translate(null_map)
-
-        # For faceting
-        self.court_exact = [p.court.pk for p in positions if p.court is not None]
 

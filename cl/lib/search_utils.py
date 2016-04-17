@@ -1,10 +1,11 @@
 import re
 from urllib import urlencode
 from urlparse import parse_qs
+
+from django.conf import settings
 from django.utils.timezone import now
 
 from cl.lib import sunburnt
-from django.conf import settings
 
 
 def make_get_string(request, nuke_fields=None):
@@ -371,7 +372,6 @@ def add_highlighting(main_params, cd, highlight):
               'natureOfSuit', 'court', 'courtJurisdiction', 'assignedTo']
         hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
                 'docketNumber', 'natureOfSuit']
-        add_hl_and_fl(fl, hlfl)
 
     main_params.update({
         'fl': ','.join(fl),
@@ -383,28 +383,7 @@ def add_highlighting(main_params, cd, highlight):
         main_params['f.%s.hl.fragListBuilder' % field] = 'single'
         main_params['f.%s.hl.alternateField' % field] = field
 
-
-
     return main_params
-
-'''
-def add_faceting(main_params, cd):
-    """
-    adds Facet fields
-    :return:
-    """
-    facet_field = ''
-    def add_facet_fields(facet):
-        if facet_field:
-            main_params.update(
-                {'facet.field': facet}
-            )
-
-    if cd['type'] == 'd':
-        facet_field = 'court'
-    add_facet_fields(facet_field)
-
-    return main_params'''
 
 
 def add_fq(main_params, cd):
@@ -501,7 +480,6 @@ def build_main_query(cd, highlight='all', order_by=''):
     main_params = add_boosts(main_params, cd)
     main_params = add_highlighting(main_params, cd, highlight)
     main_params = add_fq(main_params, cd)
-    # main_params = add_faceting(main_params, cd)
 
     if settings.DEBUG:
         print "Params sent to search are:\n%s" % ' &\n'.join(
