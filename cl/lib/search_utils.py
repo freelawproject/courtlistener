@@ -1,10 +1,11 @@
 import re
 from urllib import urlencode
 from urlparse import parse_qs
+
+from django.conf import settings
 from django.utils.timezone import now
 
 from cl.lib import sunburnt
-from django.conf import settings
 
 
 def make_get_string(request, nuke_fields=None):
@@ -306,7 +307,7 @@ def add_boosts(main_params, cd):
     if cd['type'] == 'o' and main_params['sort'].startswith('score'):
         main_params['boost'] = 'pagerank'
 
-    if cd['type'] in ['oa', 'o']:
+    if cd['type'] in ['oa', 'o', 'd']:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         vs_query = any([' v ' in main_params['q'],
@@ -366,6 +367,11 @@ def add_highlighting(main_params, cd, highlight):
               'aba_rating', 'school', 'appointer', 'supervisor', 'predecessor',
               'selection_method', 'court']
         hlfl = ['name', 'dob_city', 'dob_state', 'name_reverse']
+    elif cd['type'] == 'd':
+        fl = ['id', 'court_id', 'dateFiled', 'docketNumber','caseName'
+              'natureOfSuit', 'court', 'courtJurisdiction', 'assignedTo']
+        hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
+                'docketNumber', 'natureOfSuit']
 
     main_params.update({
         'fl': ','.join(fl),
@@ -412,6 +418,16 @@ def add_fq(main_params, cd):
             main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
         main_fq.append(make_date_query('dateArgued', cd['argued_before'],
                                        cd['argued_after']))
+
+    elif cd['type'] == 'd':
+        if cd['case_name']:
+            main_fq.append(make_fq(cd, 'caseName', 'case_name'))
+        if cd['judge']:
+            main_fq.append(make_fq(cd, 'judge', 'judge'))
+        if cd['docket_number']:
+            main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
+        main_fq.append(make_date_query('dateFiled', cd['filed_before'],
+                                       cd['filed_after']))
 
     elif cd['type'] == 'p':
         if cd['name']:
