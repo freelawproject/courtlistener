@@ -1,7 +1,9 @@
 import rest_framework_filters as filters
 
-from cl.api.utils import DATETIME_LOOKUPS, \
-    DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, INTEGER_LOOKUPS, ALL_TEXT_LOOKUPS
+from cl.api.utils import (
+    DATETIME_LOOKUPS, DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, INTEGER_LOOKUPS,
+    ALL_TEXT_LOOKUPS
+)
 from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, \
     Race
@@ -108,6 +110,7 @@ class PositionFilter(filters.FilterSet):
             'id': ['exact'],
             'position_type': ['exact'],
             'person': ['exact'],
+            'appointer': ['exact'],
             'predecessor': ['exact'],
             'job_title': ALL_TEXT_LOOKUPS,
             'date_created': DATETIME_LOOKUPS,
@@ -129,7 +132,8 @@ class PositionFilter(filters.FilterSet):
             'votes_no': INTEGER_LOOKUPS,
             'how_selected': ['exact'],
             'termination_reason': ['exact'],
-
+            'location_city': BASIC_TEXT_LOOKUPS,
+            'location_state': BASIC_TEXT_LOOKUPS,
         }
 
 
