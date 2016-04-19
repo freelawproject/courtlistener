@@ -263,7 +263,7 @@ def make_federal_judge(item, testing=False):
                                             person=person,                                            
                                             position_type='jud',
                                             date_start=date_start,
-                                            date_end=date_end)
+                                            date_termination=date_termination)
         if len(dupe_search) > 0:
             print('Duplicate position:',dupe_search)
             continue
