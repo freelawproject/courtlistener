@@ -774,11 +774,13 @@ class Education(models.Model):
         related_name='educations',
     )
     degree_level = models.CharField(
+        help_text = "Normalized degree level, e.g. BA, JD.",
         choices=DEGREE_LEVELS,
         max_length=4,
         blank=True,
     )
     degree_detail = models.CharField(
+        help_text = "Detailed degree description, e.g. including major.",
         max_length=100,
         blank=True,
     )
