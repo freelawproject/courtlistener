@@ -17,7 +17,7 @@ def view_person(request, pk, slug):
 
     # Make the title string.
     locations = ', '.join(
-        [p.court.short_name for p in person.positions.all() if p.court]
+        {p.court.short_name for p in person.positions.all() if p.court}
     )
     title = person.name_full
     if locations:
