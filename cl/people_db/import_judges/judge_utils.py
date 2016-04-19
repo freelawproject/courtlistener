@@ -114,7 +114,7 @@ def get_degree_level(degstr):
                'llb': ['llb','bsl','bl'],
                'jd': ['jd'],
                'llm': ['llm','ml', 'mjs', 'mj', 'diploma in law', 'diploma in foreign and comparative law'],
-               'jsd': ['jsd','sjd'],
+               'jsd': ['jsd','sjd','dcl','lld','driur','drjur'],
                'phd': ['phd','edd','ded','dma','dphil'],
                'md': ['md','dmd','rn','phg'],
                'mba': ['mba'],
@@ -132,7 +132,7 @@ def get_degree_level(degstr):
         return 'ba'
     if deg.startswith('m'):
         return 'ma'
-    if deg.startswith('diploma'):
+    if deg.startswith('dipl'):
         return 'ma'
     print(degstr+' not in degdict.')
     return ''
