@@ -242,7 +242,7 @@ def make_federal_judge(item, testing=False):
                 item['Senate Vote Date (Confirmation Date)' + pos_str])
 
         # assign start date
-        date_start = process_date_string(item['Commission Date' + pos_str])
+        date_start = process_date_string(item['Commission Date' + pos_str])                
         if pd.isnull(date_start) and not pd.isnull(date_recess_appointment):
             date_start = date_recess_appointment
         if pd.isnull(date_start):
@@ -257,6 +257,16 @@ def make_federal_judge(item, testing=False):
             date_granularity_termination = ''
         else:
             date_granularity_termination = GRANULARITY_DAY
+            
+        # check duplicate position
+        dupe_search = Position.objects.filter(
+                                            person=person,                                            
+                                            position_type='jud',
+                                            date_start=date_start,
+                                            date_termination=date_termination)
+        if len(dupe_search) > 0:
+            print('Duplicate position:',dupe_search)
+            continue
 
         # assign appointing president
         if not pd.isnull(item['Renominating President name' + pos_str]):
