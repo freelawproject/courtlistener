@@ -749,7 +749,9 @@ class Education(models.Model):
         ('phd', 'Doctor of Philosophy (PhD)'),
         ('aa', 'Associate (e.g. A.A.)'),
         ('md', 'Medical Degree (M.D.)'),
-        ('mba', 'Master of Business Administration (M.B.A.)')
+        ('mba', 'Master of Business Administration (M.B.A.)'),
+        ('cfa', 'Accounting Certification (C.P.A., C.M.A., C.F.A.)'),
+        ('cert', 'Certificate')
     )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -773,7 +775,7 @@ class Education(models.Model):
     )
     degree_level = models.CharField(
         choices=DEGREE_LEVELS,
-        max_length=3,
+        max_length=4,
         blank=True,
     )
     degree_detail = models.CharField(

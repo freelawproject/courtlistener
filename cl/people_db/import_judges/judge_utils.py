@@ -106,27 +106,33 @@ def get_degree_level(degstr):
     if pd.isnull(degstr) or degstr == '':
         return ''
     degdict = {'ba': ['ba','ab','bs','bae','barch','bba','bbs','bcs',
-                      'bsee','phb','blitt','littb'],
+                      'bsee','phb','blitt','littb','sb'],
                'aa': ['aa','as', 'aas'],
                'ma': ['ma','ms', 'msc','am', 'mst','mfa','mph','msw','mia','mpa','msed'
                        'mbe','mssp','mcit','mes','mse','mcp','mpa',
                        'mpp','mdiv', 'mls'],
                'llb': ['llb','bsl','bl'],
                'jd': ['jd'],
-               'llm': ['llm','ml', 'mjs', 'mj'],
+               'llm': ['llm','ml', 'mjs', 'mj', 'diploma in law', 'diploma in foreign and comparative law'],
                'jsd': ['jsd','sjd'],
                'phd': ['phd','edd','ded','dma','dphil'],
-               'md': ['md','dmd','rn'],
+               'md': ['md','dmd','rn','phg'],
                'mba': ['mba'],
+               'cfa': ['cfa','cma','cpa'],
+               'cert': ['cjuris']
               }
     deg = re.sub(r"[^a-z]+", '', degstr.lower())
     for k in degdict.keys():
         if deg in degdict[k]:
             return k
 
+    if deg.startswith('cert'):
+        return 'cert'
     if deg.startswith('b'):
         return 'ba'
     if deg.startswith('m'):
+        return 'ma'
+    if deg.startswith('diploma'):
         return 'ma'
     print(degstr+' not in degdict.')
     return ''
