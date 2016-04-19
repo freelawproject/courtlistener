@@ -153,50 +153,58 @@ def make_federal_judge(item, testing=False):
     # if foreign-born, leave blank for now.
     if len(dob_state) > 2:
         dob_state = ''
-
-    check = Person.objects.filter(fjc_id=item['Judge Identification Number'])
     name = "%s: %s %s %s" % (item['cl_id'], item['firstname'], item['lastname'],
                              str(date_dob))
-    if len(check) > 0:
+    fjc_check = Person.objects.filter(fjc_id=item['Judge Identification Number'])
+    if len(fjc_check) > 0:
         print ('Warning: %s exists' % name)
         return
-    else:
-        print ("Now processing: %s" % name)
+   
+    pres_check = Person.objects.filter(name_first=item['firstname'],
+                                  name_last=item['lastname'], date_dob=date_dob)
+
+    if not testing:
+        print ("Now processing: %s" % name)    
+        #pass
+    if len(pres_check) > 0:
+        print ('%s is a president.' % name)
+        person = pres_check[0]
+        person.fjc_id = item['Judge Identification Number']
         
-
-    date_dod, date_granularity_dod = process_date(item['Death year'],
-                                                  item['Death month'],
-                                                  item['Death day'])
-
-    dod_city = item['Place of Death (City)']
-    dod_state = item['Place of Death (State)']
-    # if foreign-dead, leave blank for now.
-    if len(dod_state) > 2:
-        dod_state = ''
-
-    if not pd.isnull(item['midname']):
-        if len(item['midname']) == 1:
-            item['midname'] += '.'
-
-    # instantiate Judge object
-    person = Person(
-            name_first=item['firstname'],
-            name_middle=item['midname'],
-            name_last=item['lastname'],
-            name_suffix=get_suffix(item['suffname']),
-            gender=item['gender'],
-            fjc_id=item['Judge Identification Number'],
-            cl_id=item['cl_id'],
-
-            date_dob=date_dob,
-            date_granularity_dob=date_granularity_dob,
-            dob_city=dob_city,
-            dob_state=dob_state,
-            date_dod=date_dod,
-            date_granularity_dod=date_granularity_dod,
-            dod_city=dod_city,
-            dod_state=dod_state
-    )
+    else:
+        date_dod, date_granularity_dod = process_date(item['Death year'],
+                                                      item['Death month'],
+                                                      item['Death day'])
+    
+        dod_city = item['Place of Death (City)']
+        dod_state = item['Place of Death (State)']
+        # if foreign-dead, leave blank for now.
+        if len(dod_state) > 2:
+            dod_state = ''
+    
+        if not pd.isnull(item['midname']):
+            if len(item['midname']) == 1:
+                item['midname'] += '.'
+    
+        # instantiate Judge object
+        person = Person(
+                name_first=item['firstname'],
+                name_middle=item['midname'],
+                name_last=item['lastname'],
+                name_suffix=get_suffix(item['suffname']),
+                gender=item['gender'],
+                fjc_id=item['Judge Identification Number'],
+                cl_id=item['cl_id'],
+    
+                date_dob=date_dob,
+                date_granularity_dob=date_granularity_dob,
+                dob_city=dob_city,
+                dob_state=dob_state,
+                date_dod=date_dod,
+                date_granularity_dod=date_granularity_dod,
+                dod_city=dod_city,
+                dod_state=dod_state
+        )
 
     if not testing:
         person.save()
@@ -271,7 +279,8 @@ def make_federal_judge(item, testing=False):
                 appoint_search = Position.objects.filter(
                     person__name_first__iexact=first,
                     person__name_last__iexact=last,
-                    person__name_middle__iexact=mid)
+                    person__name_middle__iexact=mid,
+                    position_type='pres')
             if len(appoint_search) == 0:
                 print(names, appoint_search)
             if len(appoint_search) > 1:
@@ -341,11 +350,15 @@ def make_federal_judge(item, testing=False):
         if not pd.isnull(p) and p not in ['Assignment', 'Reassignment']:
             party = get_party(item['Party Affiliation of President' + pos_str])
             if prev_politics is None:
+                if pd.isnull(date_nominated):
+                    politicsgran = ''
+                else:
+                    politicsgran = GRANULARITY_DAY
                 politics = PoliticalAffiliation(
                         person=person,
                         political_party=party,
                         date_start=date_nominated,
-                        date_granularity_start=GRANULARITY_DAY,
+                        date_granularity_start=politicsgran,
                         source='a',
                 )
                 if not testing:
@@ -426,66 +439,63 @@ def make_federal_judge(item, testing=False):
         location = locations[i]
         start_year = startyears[i]
         end_year = endyears[i]
-        
-        try:       
-            job_title = job_title.strip()
-            if pd.isnull(start_year) or start_year == '':
-                #print
-                #print(name)            
-                #print(job_title,location,start_year,end_year)
-                #print('No start date.')
-                continue
-            else:
-                start_year = int(start_year)
-                date_start = date(start_year,1,1)
-                date_start_granularity = GRANULARITY_YEAR
-            if not pd.isnull(end_year) and end_year != '':
-                end_year = int(end_year)
-                date_end = date(end_year,1,1)
-                date_end_granularity = GRANULARITY_YEAR
-            else:
-                date_end = None
-                date_end_granularity = ''
-
-            if not pd.isnull(location):   
-                location = location.strip()              
-                if ',' in location:            
-                    city, state = [x.strip() for x in location.split(',')]
-                    org = ''
-                    if state in STATES_NORMALIZED.values():
-                        pass
-                    elif state.lower() in STATES_NORMALIZED.keys():
-                        state = STATES_NORMALIZED[state.lower()]
-                    else:                        
-                        city, state = '',''
-                        org = location
-                else:
-                    city, state = '',''
-                    org = location                    
-                 # test for schools and courts
-            else:
-                city,state,org = '','',''
-                    
-            position = Position(
-                    person=person,                
-                    job_title=job_title,
-                    
-                    date_start=date_start,
-                    date_granularity_start=date_start_granularity,
-                    date_termination=date_end,
-                    date_granularity_termination=date_end_granularity,
-                    
-                    location_city = city,
-                    location_state = state,
-                    organization_name = org
-            )
-            if not testing:
-                position.save()
-            
-        except Exception, e:
-            continue
+  
+        job_title = job_title.strip()
+        if pd.isnull(start_year) or start_year == '':
             #print
             #print(name)            
             #print(job_title,location,start_year,end_year)
-            #print(e)
-            
+            #print('No start date.')
+            continue
+        else:
+            try:
+                start_year = int(start_year)
+            except:
+                continue
+            date_start = date(start_year,1,1)
+            date_start_granularity = GRANULARITY_YEAR
+        if not pd.isnull(end_year) and end_year.isdigit():
+            end_year = int(end_year)            
+            date_end = date(end_year,1,1)
+            date_end_granularity = GRANULARITY_YEAR
+        else:
+            date_end = None
+            date_end_granularity = ''
+
+        if not pd.isnull(location):   
+            location = location.strip()              
+            if ',' in location:            
+                city, state = [x.strip() for x in location.split(',')]
+                org = ''
+                if state in STATES_NORMALIZED.values():
+                    pass
+                elif state.lower() in STATES_NORMALIZED.keys():
+                    state = STATES_NORMALIZED[state.lower()]
+                else:                        
+                    city, state = '',''
+                    org = location
+            else:
+                city, state = '',''
+                org = location                    
+             # test for schools and courts
+        else:
+            city,state,org = '','',''
+                
+        position = Position(
+                person=person,                
+                job_title=job_title,
+                
+                date_start=date_start,
+                date_granularity_start=date_start_granularity,
+                date_termination=date_end,
+                date_granularity_termination=date_end_granularity,
+                
+                location_city = city,
+                location_state = state,
+                organization_name = org
+        )
+        if not testing:
+            try:
+                position.save()            
+            except Exception, e:
+                continue
