@@ -194,6 +194,7 @@ class SearchDocketFile(object):
         self.caseName = item.case_name
         self.pacerCaseId = item.pacer_case_id
         self.court = item.court.full_name
+        self.courtJurisdiction = item.court.jurisdiction
         if item.nature_of_suit is not None:
             self.natureOfSuit = item.nature_of_suit
         if item.cause is not None:
@@ -212,7 +213,7 @@ class SearchDocketFile(object):
         # Docket Entries are extracted in the template.
         context = {'item': item, 'docket_entries_seq' : docket_entries}
 
-        self.docketEntries = text_template.render(context).translate(null_map)
+        self.text = text_template.render(context).translate(null_map)
 
 
 class SearchPerson(object):
@@ -316,3 +317,4 @@ class SearchPerson(object):
         text_template = loader.get_template('indexes/person_text.txt')
         context = {'item': item}
         self.text = text_template.render(context).translate(null_map)
+
