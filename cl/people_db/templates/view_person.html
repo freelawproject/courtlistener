@@ -2,6 +2,7 @@
 {% load extras %}
 {% load admin_urls %}
 {% load staticfiles %}
+{% load humanize %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
@@ -13,6 +14,19 @@
 {% block search-form %}
     {% include "includes/main_query_box.html" with homepage=False type="p" %}
 {% endblock %}
+
+{% block footer-scripts %}
+<script type="text/javascript">
+    $(document).ready(function(){
+        $(".show-all-appointments").click(function (event) {
+            var button = $(this);
+            button.addClass('hidden');
+            button.siblings('ul').children('li').removeClass('hidden');
+        });
+    });
+</script>
+{% endblock %}
+
 
 {% block content %}
     <div class="col-xs-12">
@@ -80,7 +94,7 @@
                                             <span class="gray">, </span>
                                         {% endif %}
                                         {% if person.dob_state %}
-                                            <a href="{% url "show_results" %}?type=p&amp;dob_state={{ person.dob_state }}">{{ person.dob_state }}</a>
+                                            <a href="{% url "show_results" %}?type=p&amp;dob_state={{ person.dob_state }}">{{ person.get_dob_state_display }}</a>
                                         {% endif %}
                                     {% endif %}
                                 {% endspaceless %}
@@ -102,7 +116,7 @@
                                             <span class="gray">, </span>
                                         {% endif %}
                                         {% if person.dod_state %}
-                                            <span>{{ person.dod_state }}</span>
+                                            <span>{{ person.get_dod_state_display }}</span>
                                         {% endif %}
                                     {% endif %}
                                 {% endspaceless %}
@@ -385,16 +399,22 @@
 
                         {% if p.appointed_positions.count %}
                             <div class="col-xs-12">
-                                <h4>Judicial Appointments</h4>
+                                <h4>Judicial Appointments ({{ p.appointed_positions.count|intcomma}})</h4>
                                 <ul>
-                                    {% for ap in p.appointed_positions.all %}
-                                        <li>
+                                    {% for ap in p.sorted_appointed_positions %}
+
+                                        <li {% if forloop.counter >= 10 %}class="hidden"{% endif %}>
                                             <p>
                                                 <a href="{{ ap.person.get_absolute_url }}">{{ ap.person.name_full }}</a><br>{{ ap.html_title|safe }}
                                             </p>
                                         </li>
                                     {% endfor %}
                                 </ul>
+                                {% if p.appointed_positions.count > 10 %}
+                                    <p class="btn btn-primary show-all-appointments">
+                                        Show All Appointments
+                                    </p>
+                                {% endif %}
                             </div>
                         {% endif %}
 

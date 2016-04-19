@@ -588,14 +588,14 @@ class Position(models.Model):
     @property
     def is_judicial_position(self):
         """Return True if the position is judicial."""
-        if self.POSITION_TYPE_GROUPS[self.position_type] == 'Judge':
+        if self.POSITION_TYPE_GROUPS.get(self.position_type) == 'Judge':
             return True
         return False
 
     @property
     def is_clerkship(self):
         """Return True if the position is a clerkship."""
-        if self.POSITION_TYPE_GROUPS[self.position_type] == 'Clerkships':
+        if self.POSITION_TYPE_GROUPS.get(self.position_type) == 'Clerkships':
             return True
         return False
 
@@ -613,7 +613,7 @@ class Position(models.Model):
             s += self.get_vote_type_display()
 
         # Then do vote counts/percentages, if we have that info.
-        if self.vote_type:
+        if self.votes_yes or self.votes_yes_percent:
             s += ', '
         if self.votes_yes:
             s += '%s in favor <span class="alt">and</span> %s ' \
@@ -652,6 +652,11 @@ class Position(models.Model):
                 granular_date(self, 'date_termination', default="Present"),
             )
         return s
+
+    @property
+    def sorted_appointed_positions(self):
+        """Appointed positions, except sorted by date instead of name."""
+        return self.appointed_positions.all().order_by('-date_start')
 
     def save(self, *args, **kwargs):
         self.full_clean()
