@@ -800,7 +800,7 @@ class Education(models.Model):
     def clean_fields(self, *args, **kwargs):
         # Note that this isn't run during updates, alas.
         validate_is_not_alias(self, ['person', 'school'])
-        validate_all_or_none(self, ['degree_detail', 'degree_level'])
+        #validate_all_or_none(self, ['degree_detail', 'degree_level'])
         super(Education, self).clean_fields(*args, **kwargs)
 
 
