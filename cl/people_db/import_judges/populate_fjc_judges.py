@@ -10,6 +10,7 @@ from cl.people_db.import_judges.judge_utils import get_school, process_date, \
     get_races, get_party, get_suffix, get_aba, get_degree_level, \
     process_date_string
 from datetime import date
+from localflavor.us.us_states import STATES_NORMALIZED
 
 def get_court_object(raw_court):
     for regex, value in fd_pairs:
@@ -19,10 +20,11 @@ def get_court_object(raw_court):
 
 def transform_employ(string):
     if pd.isnull(string): 
-        return None,None,None,None
+        return [None],[None],[None],[None]
     string_list = re.split('<BR>|;|<br>', string)
     #  separate dates from the rest
-    employ_list = [[a] if a is None or a.startswith('Nominated') else re.split("\,+\s+(?=\d)+", a, 1) for a in string_list]
+    employ_list = [[a] if a is None or a.startswith('Nominated') else re.split("\,+\s+(?=\d)+|\,+\s+(?=\-)", a, 1) for a in string_list]
+
     #  extract position and location
     for j in range(len(employ_list)):
         if len(employ_list[j]) > 1:
@@ -46,29 +48,25 @@ def transform_employ(string):
         if employ_list[j][-1] is None:  # in case there are
             employ_list[j].insert(-1, None)
         else:
-            B = employ_list[j][-1].split(',')
-            # print(B)
-            if len(B) == 2:
-                c = employ_list[j][:]
-                employ_list.insert(j + 1, c)
-                employ_list[j][-1] = B[0]
-                employ_list[j + 1][-1] = B[1]
-                tmp_year = employ_list[j].pop()
-                if len(tmp_year.split('-')) == 1: employ_list[j].extend([tmp_year,None])
-                else: employ_list[j].extend(tmp_year.split('-'))
-                # employ_list[j].extend(tmp_year.split('-'))
-            elif len(B) == 1:
-                tmp_year = employ_list[j].pop()
-                try:
-                    if len(tmp_year.split('-')) == 1:
-                        employ_list[j].extend(tmp_year.split('-'))
-                        employ_list[j].append(None)
-                    else: employ_list[j].extend(tmp_year.split('-'))
-                except AttributeError: employ_list[j].append(None)
-            else: employ_list[j].append(None)
+            c = employ_list[j][:]
+            B = c[-1].split(',')
+            employ_list[j][-1] = B[0]
+            n = len(B)
+            for k in range(1, n):
+                d = c[:]
+                employ_list.insert(j + k, d)
+                employ_list[j + k][-1] = B[k]
+            tmp_year = employ_list[j].pop()
+            if len(tmp_year.split('-')) >= 1:
+                if len(tmp_year.split('-')) == 1:
+                    employ_list[j].extend([tmp_year, None])
+                else:
+                    employ_list[j].extend(tmp_year.split('-'))
+            else:
+                employ_list[j].append(None)
         j += 1
     employ_list = [list(e) for e in zip(*employ_list)]
-    position, location, start_year, end_year = employ_list
+    position, location, start_year, end_year = employ_list[0],employ_list[1],employ_list[2],employ_list[3]
     return position, location, start_year, end_year
 
 
@@ -80,9 +78,9 @@ def transform_bankruptcy(string):
     season = ['Spring', 'Fall']
     
     if pd.isnull(string): 
-        return None,None,None,None
+        return [None],[None],[None],[None]
     if 'Allotment as Circuit Justice' in string:        
-        return None,None,None,None
+        return [None],[None],[None],[None]
    
     string_list = str(string)
     string_list = re.split('<BR>|;|<br>', string_list)
@@ -163,8 +161,8 @@ def make_federal_judge(item, testing=False):
         print ('Warning: %s exists' % name)
         return
     else:
-        #print ("Now processing: %s" % name)
-        pass
+        print ("Now processing: %s" % name)
+        
 
     date_dod, date_granularity_dod = process_date(item['Death year'],
                                                   item['Death month'],
@@ -224,16 +222,16 @@ def make_federal_judge(item, testing=False):
             raise
 
         date_nominated = process_date_string(
-                item['Nomination Date Senate Executive Journal'])
+                item['Nomination Date Senate Executive Journal' + pos_str])
         date_recess_appointment = process_date_string(
-                item['Recess Appointment date'])
+                item['Recess Appointment date' + pos_str])
         date_referred_to_judicial_committee = process_date_string(
-                item['Referral date (referral to Judicial Committee)'])
+                item['Referral date (referral to Judicial Committee)' + pos_str])
         date_judicial_committee_action = process_date_string(
-                item['Committee action date'])
-        date_hearing = process_date_string(item['Hearings'])
+                item['Committee action date' + pos_str])
+        date_hearing = process_date_string(item['Hearings' + pos_str])
         date_confirmation = process_date_string(
-                item['Senate Vote Date (Confirmation Date)'])
+                item['Senate Vote Date (Confirmation Date)' + pos_str])
 
         # assign start date
         date_start = process_date_string(item['Commission Date' + pos_str])
@@ -415,129 +413,79 @@ def make_federal_judge(item, testing=False):
 
     # Non-judicial positions
     titles, locations, startyears, endyears = transform_employ(item['Employment text field'])
-    if titles is not None:
-        for i in range(len(titles)):
-            job_title = titles[i]
-            location = locations[i]
-            start_year = startyears[i]
-            end_year = endyears[i]
-            
-            try:
-                if not pd.isnull(job_title):        
-                    job_title = job_title.strip()
-                else:
-                    job_title = ''
-                if not pd.isnull(start_year) and start_year != '':
-                    start_year = int(start_year)
-                    date_start = date(start_year,1,1)
-                    date_start_granularity = GRANULARITY_YEAR
-                else:
-                    date_start = None
-                    date_start_granularity = ''
-                if not pd.isnull(end_year) and end_year != '':
-                    end_year = int(end_year)
-                    date_end = date(end_year,1,1)
-                    date_end_granularity = GRANULARITY_YEAR
-                else:
-                    date_end = None
-                    date_end_granularity = ''
+    titles2, locations2, startyears2, endyears2 = transform_bankruptcy(item['Bankruptcy and Magistrate service'])
+    titles = titles + titles2
+    locations = locations + locations2
+    startyears = startyears + startyears2
+    endyears = endyears + endyears2
+   
+    for i in range(len(titles)):
+        job_title = titles[i]
+        if pd.isnull(job_title) or job_title=='' or job_title.startswith('Nominated'):
+            continue
+        location = locations[i]
+        start_year = startyears[i]
+        end_year = endyears[i]
+        
+        try:       
+            job_title = job_title.strip()
+            if pd.isnull(start_year) or start_year == '':
+                #print
+                #print(name)            
+                #print(job_title,location,start_year,end_year)
+                #print('No start date.')
+                continue
+            else:
+                start_year = int(start_year)
+                date_start = date(start_year,1,1)
+                date_start_granularity = GRANULARITY_YEAR
+            if not pd.isnull(end_year) and end_year != '':
+                end_year = int(end_year)
+                date_end = date(end_year,1,1)
+                date_end_granularity = GRANULARITY_YEAR
+            else:
+                date_end = None
+                date_end_granularity = ''
 
-                if not pd.isnull(location):   
-                    location = location.strip()              
-                    if ',' in location:            
-                        city, state = [x.strip() for x in location.split(',')]
-                        org = ''
-                    else:
+            if not pd.isnull(location):   
+                location = location.strip()              
+                if ',' in location:            
+                    city, state = [x.strip() for x in location.split(',')]
+                    org = ''
+                    if state in STATES_NORMALIZED.values():
+                        pass
+                    elif state.lower() in STATES_NORMALIZED.keys():
+                        state = STATES_NORMALIZED[state.lower()]
+                    else:                        
                         city, state = '',''
-                        org = location                    
-                     # test for schools and courts
+                        org = location
                 else:
-                    city,state,org = '','',''
-                        
-                position = Position(
-                        person=person,                
-                        job_title=job_title,
-                        
-                        date_start=date_start,
-                        date_granularity_start=date_start_granularity,
-                        date_termination=date_end,
-                        date_granularity_termination=date_end_granularity,
-                        
-                        location_city = city,
-                        location_state = state,
-                        organization_name = org
-                )
-                
-            except Exception, e:
-                pass
-#                print
-#                print(name)
-#                print(e)
-#                print(job_title,location,start_year,end_year)
-                
+                    city, state = '',''
+                    org = location                    
+                 # test for schools and courts
+            else:
+                city,state,org = '','',''
+                    
+            position = Position(
+                    person=person,                
+                    job_title=job_title,
+                    
+                    date_start=date_start,
+                    date_granularity_start=date_start_granularity,
+                    date_termination=date_end,
+                    date_granularity_termination=date_end_granularity,
+                    
+                    location_city = city,
+                    location_state = state,
+                    organization_name = org
+            )
             if not testing:
                 position.save()
-
-    # bankruptcy positions
-    titles, locations, startyears, endyears = transform_bankruptcy(item['Bankruptcy and Magistrate service'])
-    if titles is not None:
-        for i in range(len(titles)):
-            job_title = titles[i]
-            location = locations[i]
-            start_year = startyears[i]
-            end_year = endyears[i]
             
-            try:
-                if not pd.isnull(job_title):        
-                    job_title = job_title.strip()
-                else:
-                    job_title = ''
-                if not pd.isnull(start_year) and start_year != '':
-                    start_year = int(start_year)
-                    date_start = date(start_year,1,1)
-                    date_start_granularity = GRANULARITY_YEAR
-                else:
-                    date_start = None
-                    date_start_granularity = ''
-                if not pd.isnull(end_year) and end_year != '':
-                    end_year = int(end_year)
-                    date_end = date(end_year,1,1)
-                    date_end_granularity = GRANULARITY_YEAR
-                else:
-                    date_end = None
-                    date_end_granularity = ''
-
-                if not pd.isnull(location):   
-                    location = location.strip()              
-                    if ',' in location:            
-                        city, state = [x.strip() for x in location.split(',')]
-                        org = ''
-                    else:
-                        city, state = '',''
-                        org = location                    
-                     # test for schools and courts
-                else:
-                    city,state,org = '','',''
-                        
-                position = Position(
-                        person=person,                
-                        job_title=job_title,
-                        
-                        date_start=date_start,
-                        date_granularity_start=date_start_granularity,
-                        date_termination=date_end,
-                        date_granularity_termination=date_end_granularity,
-                        
-                        location_city = city,
-                        location_state = state,
-                        organization_name = org
-                )
-                
-            except Exception, e:
-                print
-                print(name)
-                print(e)
-                print(job_title,location,start_year,end_year)
-                
-            if not testing:
-                position.save()
+        except Exception, e:
+            continue
+            #print
+            #print(name)            
+            #print(job_title,location,start_year,end_year)
+            #print(e)
+            
