@@ -2,6 +2,7 @@ from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
 from localflavor.us import models as local_models
+
 from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
@@ -390,7 +391,7 @@ class Position(models.Model):
         help_text="If title isn't in list, type here.",
         max_length=100,
         blank=True,
-    )    
+    )
     person = models.ForeignKey(
         Person,
         related_name='positions',
@@ -802,7 +803,6 @@ class Education(models.Model):
     def clean_fields(self, *args, **kwargs):
         # Note that this isn't run during updates, alas.
         validate_is_not_alias(self, ['person', 'school'])
-        #validate_all_or_none(self, ['degree_detail', 'degree_level'])
         super(Education, self).clean_fields(*args, **kwargs)
 
 
