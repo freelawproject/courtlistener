@@ -5,11 +5,12 @@ import re
 
 from cl.corpus_importer.court_regexes import fd_pairs
 from cl.people_db.models import Person, Position, Education, Race, \
-    PoliticalAffiliation, Source, ABARating, GRANULARITY_DAY
+    PoliticalAffiliation, Source, ABARating, GRANULARITY_DAY, GRANULARITY_YEAR
 from cl.people_db.import_judges.judge_utils import get_school, process_date, \
     get_races, get_party, get_suffix, get_aba, get_degree_level, \
     process_date_string
-
+from datetime import date
+from localflavor.us.us_states import STATES_NORMALIZED
 
 def get_court_object(raw_court):
     for regex, value in fd_pairs:
@@ -18,57 +19,54 @@ def get_court_object(raw_court):
     return None
 
 def transform_employ(string):
-    if string is None: position, location, start_year, end_year = [None], [None], [None],[None]
-    else:
-        string_list = re.split('<BR>|;|<br>', string)
-        #  separate dates from the rest
-        employ_list = [[a] if a is None or a.startswith('Nominated') else re.split("\,+\s+(?=\d)+", a, 1) for a in string_list]
-        #  extract position and location
-        for j in range(len(employ_list)):
-            if len(employ_list[j]) > 1:
-                A = employ_list[j][0].split(',')
-                if len(A) == 1:
-                    employ_list[j].insert(1, None)
-                if len(A) == 2:
-                    employ_list[j][0] = A[0]
-                    employ_list[j].insert(1, A[1])
-                elif len(A) >= 3:
-                    position = ",".join(A[:-2])
-                    location = A[-2] + "," + A[-1]
-                    employ_list[j][0] = position
-                    employ_list[j].insert(1, location)
-            else:
+    if pd.isnull(string): 
+        return [None],[None],[None],[None]
+    string_list = re.split('<BR>|;|<br>', string)
+    #  separate dates from the rest
+    employ_list = [[a] if a is None or a.startswith('Nominated') else re.split("\,+\s+(?=\d)+|\,+\s+(?=\-)", a, 1) for a in string_list]
+
+    #  extract position and location
+    for j in range(len(employ_list)):
+        if len(employ_list[j]) > 1:
+            A = employ_list[j][0].split(',')
+            if len(A) == 1:
                 employ_list[j].insert(1, None)
-                employ_list[j].insert(2, None)
-        #  extract start dates and end dates from dates
-        j = 0
-        while j < len(employ_list):
-            if employ_list[j][-1] is None:  # in case there are
-                employ_list[j].insert(-1, None)
+            if len(A) == 2:
+                employ_list[j][0] = A[0]
+                employ_list[j].insert(1, A[1])
+            elif len(A) >= 3:
+                position = ",".join(A[:-2])
+                location = A[-2] + "," + A[-1]
+                employ_list[j][0] = position
+                employ_list[j].insert(1, location)
+        else:
+            employ_list[j].insert(1, None)
+            employ_list[j].insert(2, None)
+    #  extract start dates and end dates from dates
+    j = 0
+    while j < len(employ_list):
+        if employ_list[j][-1] is None:  # in case there are
+            employ_list[j].insert(-1, None)
+        else:
+            c = employ_list[j][:]
+            B = c[-1].split(',')
+            employ_list[j][-1] = B[0]
+            n = len(B)
+            for k in range(1, n):
+                d = c[:]
+                employ_list.insert(j + k, d)
+                employ_list[j + k][-1] = B[k]
+            tmp_year = employ_list[j].pop()
+            if len(tmp_year.split('-')) >= 1:
+                if len(tmp_year.split('-')) == 1:
+                    employ_list[j].extend([tmp_year, None])
+                else:
+                    employ_list[j].extend(tmp_year.split('-'))
             else:
-                B = employ_list[j][-1].split(',')
-                # print(B)
-                if len(B) == 2:
-                    c = employ_list[j][:]
-                    employ_list.insert(j + 1, c)
-                    employ_list[j][-1] = B[0]
-                    employ_list[j + 1][-1] = B[1]
-                    tmp_year = employ_list[j].pop()
-                    if len(tmp_year.split('-')) == 1: employ_list[j].extend([tmp_year,None])
-                    else: employ_list[j].extend(tmp_year.split('-'))
-                    # employ_list[j].extend(tmp_year.split('-'))
-                elif len(B) == 1:
-                    tmp_year = employ_list[j].pop()
-                    try:
-                        if len(tmp_year.split('-')) == 1:
-                            employ_list[j].extend(tmp_year.split('-'))
-                            employ_list[j].append(None)
-                        else: employ_list[j].extend(tmp_year.split('-'))
-                    except AttributeError: employ_list[j].append(None)
-                else: employ_list[j].append(None)
-            j += 1
-        employ_list = [list(e) for e in zip(*employ_list)]
-        position, location, start_year, end_year = employ_list
+                employ_list[j].append(None)
+        j += 1
+    employ_list = [list(e) for e in zip(*employ_list)]
+    position, location, start_year, end_year = employ_list[0],employ_list[1],employ_list[2],employ_list[3]
     return position, location, start_year, end_year
 
 
@@ -78,62 +76,66 @@ def transform_bankruptcy(string):
     month = ['June', 'March', 'January', 'February', 'April', 'May', 'July', 'August', 'September', 'October', 'November',
          'December']
     season = ['Spring', 'Fall']
-    if string is None: position, location, start_year, end_year = [None], [None], [None],[None]
-    else:
-        string_list = str(string)
-        string_list = re.split('<BR>|;|<br>', string_list)
-        bankruptcy_list = [None if a is None else re.split("\,+\s+(?=\d)+", a, 1) if not any(
-            month in a for month in month_list) else re.split(
-            ",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
-            a, 1)
-                           for a in string_list]
-        #  extract position and location
-        for j in range(len(bankruptcy_list)):
-            if len(bankruptcy_list[j]) > 1:
-                A = bankruptcy_list[j][0].split(',')
-                if len(A) == 1:
-                    bankruptcy_list[j].insert(1, None)
-                if len(A) == 2:
-                    bankruptcy_list[j][0] = A[0]
-                    bankruptcy_list[j].insert(1, A[1])
-                elif len(A) >= 3:
-                    position = ",".join(A[:-2])
-                    location = A[-2] + "," + A[-1]
-                    bankruptcy_list[j][0] = position
-                    bankruptcy_list[j].insert(1, location)
-            else:
+    
+    if pd.isnull(string): 
+        return [None],[None],[None],[None]
+    if 'Allotment as Circuit Justice' in string:        
+        return [None],[None],[None],[None]
+   
+    string_list = str(string)
+    string_list = re.split('<BR>|;|<br>', string_list)
+    bankruptcy_list = [None if a is None else re.split("\,+\s+(?=\d)+", a, 1) if not any(
+        month in a for month in month_list) else re.split(
+        ",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
+        a, 1)
+                       for a in string_list]
+    #  extract position and location
+    for j in range(len(bankruptcy_list)):
+        if len(bankruptcy_list[j]) > 1:
+            A = bankruptcy_list[j][0].split(',')
+            if len(A) == 1:
                 bankruptcy_list[j].insert(1, None)
-                bankruptcy_list[j].insert(2, None)
-        #  extract dates into start date and end date for each job
-        j = 0
-        while j < len(bankruptcy_list):
-            if bankruptcy_list[j][-1] is None:  # empty cell
-                bankruptcy_list[j].insert(-1, None)
-            else:
-                if any(word in bankruptcy_list[j][-1] for word in month) or bankruptcy_list[j][-1].startswith(
-                        '1') or \
-                        bankruptcy_list[j][-1].startswith('2'):
-                    tmp_year = bankruptcy_list[j].pop()
-                    if len(tmp_year.split('-')) == 1: bankruptcy_list[j].extend([tmp_year, None])
-                    else: bankruptcy_list[j].extend(tmp_year.split('-'))
-                elif any(word in bankruptcy_list[j][-1] for word in season):
-                    c = bankruptcy_list[j][:]
-                    B = c[-1].split(',')
-                    bankruptcy_list[j][-1] = B[0]
-                    n = len(B)
-                    for k in range(1, n):
-                        d = c[:]
-                        bankruptcy_list.insert(j + k, d)
-                        bankruptcy_list[j + k][-1] = B[k]
-                    tmp_year = bankruptcy_list[j].pop()
-                    if len(tmp_year.split('-')) == 1: bankruptcy_list[j].extend([tmp_year, None])
-                    else: bankruptcy_list[j].extend(tmp_year.split('-'))
-                    if len(bankruptcy_list[j]) == 3:
-                        bankruptcy_list[j].append(None)
-                else: bankruptcy_list[j].append(None)
-            j += 1
-        bankruptcy_list = [list(e) for e in zip(*bankruptcy_list)]
-        position, location, start_year, end_year = bankruptcy_list
+            if len(A) == 2:
+                bankruptcy_list[j][0] = A[0]
+                bankruptcy_list[j].insert(1, A[1])
+            elif len(A) >= 3:
+                position = ",".join(A[:-2])
+                location = A[-2] + "," + A[-1]
+                bankruptcy_list[j][0] = position
+                bankruptcy_list[j].insert(1, location)
+        else:
+            bankruptcy_list[j].insert(1, None)
+            bankruptcy_list[j].insert(2, None)
+    #  extract dates into start date and end date for each job
+    j = 0
+    while j < len(bankruptcy_list):
+        if bankruptcy_list[j][-1] is None:  # empty cell
+            bankruptcy_list[j].insert(-1, None)
+        else:
+            if any(word in bankruptcy_list[j][-1] for word in month) or bankruptcy_list[j][-1].startswith(
+                    '1') or \
+                    bankruptcy_list[j][-1].startswith('2'):
+                tmp_year = bankruptcy_list[j].pop()
+                if len(tmp_year.split('-')) == 1: bankruptcy_list[j].extend([tmp_year, None])
+                else: bankruptcy_list[j].extend(tmp_year.split('-'))
+            elif any(word in bankruptcy_list[j][-1] for word in season):
+                c = bankruptcy_list[j][:]
+                B = c[-1].split(',')
+                bankruptcy_list[j][-1] = B[0]
+                n = len(B)
+                for k in range(1, n):
+                    d = c[:]
+                    bankruptcy_list.insert(j + k, d)
+                    bankruptcy_list[j + k][-1] = B[k]
+                tmp_year = bankruptcy_list[j].pop()
+                if len(tmp_year.split('-')) == 1: bankruptcy_list[j].extend([tmp_year, None])
+                else: bankruptcy_list[j].extend(tmp_year.split('-'))
+                if len(bankruptcy_list[j]) == 3:
+                    bankruptcy_list[j].append(None)
+            else: bankruptcy_list[j].append(None)
+        j += 1
+    bankruptcy_list = [list(e) for e in zip(*bankruptcy_list)]
+    position, location, start_year, end_year = bankruptcy_list
     return position, location, start_year, end_year
 
 
@@ -151,49 +153,58 @@ def make_federal_judge(item, testing=False):
     # if foreign-born, leave blank for now.
     if len(dob_state) > 2:
         dob_state = ''
-
-    check = Person.objects.filter(fjc_id=item['Judge Identification Number'])
     name = "%s: %s %s %s" % (item['cl_id'], item['firstname'], item['lastname'],
                              str(date_dob))
-    if len(check) > 0:
+    fjc_check = Person.objects.filter(fjc_id=item['Judge Identification Number'])
+    if len(fjc_check) > 0:
         print ('Warning: %s exists' % name)
         return
+   
+    pres_check = Person.objects.filter(name_first=item['firstname'],
+                                  name_last=item['lastname'], date_dob=date_dob)
+
+    if not testing:
+        print ("Now processing: %s" % name)    
+        #pass
+    if len(pres_check) > 0:
+        print ('%s is a president.' % name)
+        person = pres_check[0]
+        person.fjc_id = item['Judge Identification Number']
+        
     else:
-        print ("Now processing: %s" % name)
-
-    date_dod, date_granularity_dod = process_date(item['Death year'],
-                                                  item['Death month'],
-                                                  item['Death day'])
-
-    dod_city = item['Place of Death (City)']
-    dod_state = item['Place of Death (State)']
-    # if foreign-dead, leave blank for now.
-    if len(dod_state) > 2:
-        dod_state = ''
-
-    if not pd.isnull(item['midname']):
-        if len(item['midname']) == 1:
-            item['midname'] += '.'
-
-    # instantiate Judge object
-    person = Person(
-            name_first=item['firstname'],
-            name_middle=item['midname'],
-            name_last=item['lastname'],
-            name_suffix=get_suffix(item['suffname']),
-            gender=item['gender'],
-            fjc_id=item['Judge Identification Number'],
-            cl_id=item['cl_id'],
-
-            date_dob=date_dob,
-            date_granularity_dob=date_granularity_dob,
-            dob_city=dob_city,
-            dob_state=dob_state,
-            date_dod=date_dod,
-            date_granularity_dod=date_granularity_dod,
-            dod_city=dod_city,
-            dod_state=dod_state
-    )
+        date_dod, date_granularity_dod = process_date(item['Death year'],
+                                                      item['Death month'],
+                                                      item['Death day'])
+    
+        dod_city = item['Place of Death (City)']
+        dod_state = item['Place of Death (State)']
+        # if foreign-dead, leave blank for now.
+        if len(dod_state) > 2:
+            dod_state = ''
+    
+        if not pd.isnull(item['midname']):
+            if len(item['midname']) == 1:
+                item['midname'] += '.'
+    
+        # instantiate Judge object
+        person = Person(
+                name_first=item['firstname'],
+                name_middle=item['midname'],
+                name_last=item['lastname'],
+                name_suffix=get_suffix(item['suffname']),
+                gender=item['gender'],
+                fjc_id=item['Judge Identification Number'],
+                cl_id=item['cl_id'],
+    
+                date_dob=date_dob,
+                date_granularity_dob=date_granularity_dob,
+                dob_city=dob_city,
+                dob_state=dob_state,
+                date_dod=date_dod,
+                date_granularity_dod=date_granularity_dod,
+                dod_city=dod_city,
+                dod_state=dod_state
+        )
 
     if not testing:
         person.save()
@@ -219,16 +230,16 @@ def make_federal_judge(item, testing=False):
             raise
 
         date_nominated = process_date_string(
-                item['Nomination Date Senate Executive Journal'])
+                item['Nomination Date Senate Executive Journal' + pos_str])
         date_recess_appointment = process_date_string(
-                item['Recess Appointment date'])
+                item['Recess Appointment date' + pos_str])
         date_referred_to_judicial_committee = process_date_string(
-                item['Referral date (referral to Judicial Committee)'])
+                item['Referral date (referral to Judicial Committee)' + pos_str])
         date_judicial_committee_action = process_date_string(
-                item['Committee action date'])
-        date_hearing = process_date_string(item['Hearings'])
+                item['Committee action date' + pos_str])
+        date_hearing = process_date_string(item['Hearings' + pos_str])
         date_confirmation = process_date_string(
-                item['Senate Vote Date (Confirmation Date)'])
+                item['Senate Vote Date (Confirmation Date)' + pos_str])
 
         # assign start date
         date_start = process_date_string(item['Commission Date' + pos_str])
@@ -268,7 +279,8 @@ def make_federal_judge(item, testing=False):
                 appoint_search = Position.objects.filter(
                     person__name_first__iexact=first,
                     person__name_last__iexact=last,
-                    person__name_middle__iexact=mid)
+                    person__name_middle__iexact=mid,
+                    position_type='pres')
             if len(appoint_search) == 0:
                 print(names, appoint_search)
             if len(appoint_search) > 1:
@@ -338,11 +350,15 @@ def make_federal_judge(item, testing=False):
         if not pd.isnull(p) and p not in ['Assignment', 'Reassignment']:
             party = get_party(item['Party Affiliation of President' + pos_str])
             if prev_politics is None:
+                if pd.isnull(date_nominated):
+                    politicsgran = ''
+                else:
+                    politicsgran = GRANULARITY_DAY
                 politics = PoliticalAffiliation(
                         person=person,
                         political_party=party,
                         date_start=date_nominated,
-                        date_granularity_start=GRANULARITY_DAY,
+                        date_granularity_start=politicsgran,
                         source='a',
                 )
                 if not testing:
@@ -409,23 +425,77 @@ def make_federal_judge(item, testing=False):
                     degree.save()
 
     # Non-judicial positions
-    jobs = transform_employ(item['Employment text field'])
-    for job in jobs:
+    titles, locations, startyears, endyears = transform_employ(item['Employment text field'])
+    titles2, locations2, startyears2, endyears2 = transform_bankruptcy(item['Bankruptcy and Magistrate service'])
+    titles = titles + titles2
+    locations = locations + locations2
+    startyears = startyears + startyears2
+    endyears = endyears + endyears2
+   
+    for i in range(len(titles)):
+        job_title = titles[i]
+        if pd.isnull(job_title) or job_title=='' or job_title.startswith('Nominated'):
+            continue
+        location = locations[i]
+        start_year = startyears[i]
+        end_year = endyears[i]
+  
+        job_title = job_title.strip()
+        if pd.isnull(start_year) or start_year == '':
+            #print
+            #print(name)            
+            #print(job_title,location,start_year,end_year)
+            #print('No start date.')
+            continue
+        else:
+            try:
+                start_year = int(start_year)
+            except:
+                continue
+            date_start = date(start_year,1,1)
+            date_start_granularity = GRANULARITY_YEAR
+        if not pd.isnull(end_year) and end_year.isdigit():
+            end_year = int(end_year)            
+            date_end = date(end_year,1,1)
+            date_end_granularity = GRANULARITY_YEAR
+        else:
+            date_end = None
+            date_end_granularity = ''
 
-    if not pd.isnull(item['Employment text field']):
-        notes = item['Employment text field']
-        source = Source(
-                person=person,
-                notes=notes
+        if not pd.isnull(location):   
+            location = location.strip()              
+            if ',' in location:            
+                city, state = [x.strip() for x in location.split(',')]
+                org = ''
+                if state in STATES_NORMALIZED.values():
+                    pass
+                elif state.lower() in STATES_NORMALIZED.keys():
+                    state = STATES_NORMALIZED[state.lower()]
+                else:                        
+                    city, state = '',''
+                    org = location
+            else:
+                city, state = '',''
+                org = location                    
+             # test for schools and courts
+        else:
+            city,state,org = '','',''
+                
+        position = Position(
+                person=person,                
+                job_title=job_title,
+                
+                date_start=date_start,
+                date_granularity_start=date_start_granularity,
+                date_termination=date_end,
+                date_granularity_termination=date_end_granularity,
+                
+                location_city = city,
+                location_state = state,
+                organization_name = org
         )
         if not testing:
-            source.save()
-
-    if not pd.isnull(item['Bankruptcy and Magistrate service']):
-        notes = item['Bankruptcy and Magistrate service']
-        source = Source(
-                person=person,
-                notes=notes
-        )
-        if not testing:
-            source.save()
+            try:
+                position.save()            
+            except Exception, e:
+                continue

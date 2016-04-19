@@ -749,7 +749,9 @@ class Education(models.Model):
         ('phd', 'Doctor of Philosophy (PhD)'),
         ('aa', 'Associate (e.g. A.A.)'),
         ('md', 'Medical Degree (M.D.)'),
-        ('mba', 'Master of Business Administration (M.B.A.)')
+        ('mba', 'Master of Business Administration (M.B.A.)'),
+        ('cfa', 'Accounting Certification (C.P.A., C.M.A., C.F.A.)'),
+        ('cert', 'Certificate')
     )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -772,11 +774,13 @@ class Education(models.Model):
         related_name='educations',
     )
     degree_level = models.CharField(
+        help_text = "Normalized degree level, e.g. BA, JD.",
         choices=DEGREE_LEVELS,
-        max_length=3,
+        max_length=4,
         blank=True,
     )
     degree_detail = models.CharField(
+        help_text = "Detailed degree description, e.g. including major.",
         max_length=100,
         blank=True,
     )
@@ -798,7 +802,7 @@ class Education(models.Model):
     def clean_fields(self, *args, **kwargs):
         # Note that this isn't run during updates, alas.
         validate_is_not_alias(self, ['person', 'school'])
-        validate_all_or_none(self, ['degree_detail', 'degree_level'])
+        #validate_all_or_none(self, ['degree_detail', 'degree_level'])
         super(Education, self).clean_fields(*args, **kwargs)
 
 
