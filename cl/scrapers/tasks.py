@@ -1,28 +1,28 @@
 # -*- coding: utf-8 -*-
-from cl.audio.models import Audio
-from cl.celery import app
-from cl.citations.tasks import update_document_by_id
-from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.string_utils import anonymize, trunc
-from cl.lib.mojibake import fix_mojibake
-from cl.scrapers.models import ErrorLog
-from cl.search.models import Opinion
+import glob
+import os
+import subprocess
+import time
+import traceback
+
+import eyed3
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
 from django.utils.timezone import now
 from eyed3 import id3
-from lxml.html.clean import Cleaner
 from lxml.etree import XMLSyntaxError
+from lxml.html.clean import Cleaner
 from seal_rookery import seals_data, seals_root
 
-import os
-import eyed3
-import glob
-import subprocess
-import time
-import traceback
-
+from cl.audio.models import Audio
+from cl.celery import app
+from cl.citations.tasks import update_document_by_id
+from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.mojibake import fix_mojibake
+from cl.lib.string_utils import anonymize, trunc
+from cl.scrapers.models import ErrorLog
+from cl.search.models import Opinion
 
 DEVNULL = open('/dev/null', 'w')
 
@@ -345,7 +345,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     for frame in flp_image_frames:
         with open(os.path.join(settings.INSTALL_ROOT,
                                'cl', 'audio', 'static', 'png',
-                               'producer.png'), 'r') as f:
+                               'producer-300x300.png'), 'r') as f:
             audio_file.tag.images.set(
                 frame,
                 f.read(),
