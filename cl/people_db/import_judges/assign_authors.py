@@ -17,6 +17,14 @@ def assign_authors(testing=False):
     for cluster in clusters:
         print("Processing: %s" % cluster)
         print("  Judge string: %s" % cluster.judges)
+        
+        if 'curiam' in cluster.judges.lower():
+            opinion = cluster.sub_opinions.all()[0]
+            opinion.per_curiam = True
+            print '  Per Curiam assigned.'
+            if not testing:
+                opinion.save()
+            
 
         judges = find_judges(cluster.judges)
 
