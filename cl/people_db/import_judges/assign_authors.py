@@ -15,6 +15,8 @@ def assign_authors(testing=False):
     clusters = OpinionCluster.objects.exclude(judges='')
 
     for cluster in clusters:
+        print("Processing: %s" % cluster)
+        print("  Judge string: %s" % cluster.judges)
 
         judges = find_judges(cluster.judges)
 
@@ -32,12 +34,12 @@ def assign_authors(testing=False):
 
         if len(candidates) == 1:
             opinion.author = candidates[0]
-            print(cluster,'-- author assigned -- ',candidates[0])
+            print('  Author assigned: ', candidates[0])
         elif len(candidates) > 1:
             opinion.panel = candidates
-            print(cluster,'-- panel assigned  -- ',candidates)
+            print('  Panel assigned:', candidates)
         else:
-            print(cluster,'-- no match -- ',cluster.judges)
+            print('  No match.')
 
         if not testing:
             opinion.save()
