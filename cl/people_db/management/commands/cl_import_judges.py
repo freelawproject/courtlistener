@@ -8,6 +8,7 @@ from django.core.management import BaseCommand
 from cl.people_db.import_judges.populate_state_judges import make_state_judge
 from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge
 from cl.people_db.import_judges.populate_presidents import make_president
+from cl.people_db.import_judges.assign_authors import assign_authors
 
 class Command(BaseCommand):
     help = 'Import judge data from various files.'
@@ -102,12 +103,16 @@ class Command(BaseCommand):
         print('importing state IAC judges...')
         self.import_state_judges(infile=datadir+'/state-iac-bios-2016-04-06.xlsx')
 
+    def assign_judges(self):
+        print('Assigning authors...')
+        assign_authors(testing=self.debug)
 
     VALID_ACTIONS = {
         'import-fjc-judges': import_fjc_judges,
         'import-state-judges': import_state_judges,
         'import-presidents': import_presidents,
-        'import-all': import_all
+        'import-all': import_all,
+        'assign-judges': assign_judges
     }
 
 
