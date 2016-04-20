@@ -28,7 +28,7 @@ def assign_authors(testing=False):
                                           case_date=cluster.date_filed))
         candidates = [c for c in candidates if c is not None]
 
-        opinion = cluster.opinions[0]
+        opinion = cluster.sub_opinions.all()[0]
 
         if len(candidates) == 1:
             opinion.author = candidates[0]
