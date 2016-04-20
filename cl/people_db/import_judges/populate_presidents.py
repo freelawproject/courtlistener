@@ -52,13 +52,15 @@ def make_president(item, testing=False):
     if not testing:
         person.save()
 
-    if item['lastname'] == 'Obama':    
-        race = Race.objects.get(race='b')
-    else:
-        race = Race.objects.get(race='w')
+    race = Race.objects.get(race='w')
     if not testing:
         person.race.add(race)        
     
+    if item['lastname'] == 'Obama':    
+        race = Race.objects.get(race='b')
+        if not testing:
+            person.race.add(race)        
+
     party = item['party'].lower()
     politics = PoliticalAffiliation(
             person=person,
