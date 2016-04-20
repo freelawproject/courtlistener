@@ -152,7 +152,9 @@ def validate_supervisor(instance):
 def validate_all_or_none(instance, fields):
     """Ensure that all fields are complete or that none are complete"""
     num_fields = len(fields)
-    completed_fields = sum(1 for f in fields if getattr(instance, f))
+    completed_fields = sum(1 for f in fields if
+                           getattr(instance, f) and
+                           getattr(instance, f) != 0)
     all_complete = completed_fields == num_fields
     none_complete = completed_fields == 0
     if not any([all_complete, none_complete]):
