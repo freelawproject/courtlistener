@@ -29,7 +29,7 @@ def make_president(item, testing=False):
     if not pd.isnull(item['midname']):
         if len(item['midname']) == 1:
             item['midname'] = item['midname'] + '.'
-
+    
     # instantiate Judge object
     person = Person(
             name_first=item['firstname'],
@@ -82,3 +82,16 @@ def make_president(item, testing=False):
     if not testing:
         position.save()
 
+    if not pd.isnull(item['start2']):
+            position = Position(
+            person=person,
+            position_type='pres',
+            date_start=date(item['start2'],1,1),
+            date_granularity_start=GRANULARITY_YEAR,
+            date_termination=date(item['end2'],1,1),
+            date_granularity_termination=GRANULARITY_YEAR,
+            location_city = 'Washington',
+            location_state = 'DC'
+        )   
+        if not testing:
+            position.save()
