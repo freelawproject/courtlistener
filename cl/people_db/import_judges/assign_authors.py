@@ -34,12 +34,12 @@ def assign_authors(testing=False):
 
         if len(candidates) == 1:
             opinion.author = candidates[0]
-            print('  Author assigned: ', candidates[0])
+            print '  Author assigned: ', candidates[0]
         elif len(candidates) > 1:
             opinion.panel = candidates
-            print('  Panel assigned:', candidates)
+            print '  Panel assigned:', candidates
         else:
-            print('  No match.')
+            print '  No match.'
 
         if not testing:
             opinion.save()
