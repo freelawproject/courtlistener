@@ -44,7 +44,7 @@ def make_state_judge(item, testing=False):
             # Grab the correct person and set our alias variable to True
             person = person.is_alias_of
     else:
-        print "Now processing: %s" % name
+        print("Now processing: %s" % name)
 
         person = Person(
                 gender=item['gender'],
@@ -91,7 +91,7 @@ def make_state_judge(item, testing=False):
                                                       item['startmonth'],
                                                       item['startday'])
 
-    if not pd.isnull(item['endyear']) and item['endyear'] < 2016:
+    if item['endyear'] > 2016:
         item['endyear'] = None
     date_termination, date_granularity_termination = process_date(
             item['endyear'],
