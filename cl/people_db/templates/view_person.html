@@ -213,6 +213,9 @@
                             {# pass - no data #}
                         {% endif %}
                         <a href="{% url "show_results" %}?type=p&amp;political_affiliation={{ pa.political_party }}">{{ pa.get_political_party_display }}</a>
+                        {% if pa.source and pa.source != 'o' %}
+                            (via {{ pa.get_source_display|lower }})
+                        {% endif %}
                     </li>
                 {% endfor %}
                 </ul>
@@ -455,7 +458,9 @@
 
         <div class="row">
             <div class="col-xs-12">
-                <p class="gray">Sources: <a href="http://www.elliottash.com">Elliott Ash</a>, Princeton University and University of Warwick; Bentley MacLeod, Columbia University; Federal Judicial Center.
+                <p class="text-right">Something isn't right? <a href="{% url "contact" %}">Get in touch with a correction</a>.
+                </p>
+                <p class="text-right">Curious about our sources? <a href="https://free.law/2016/04/19/judicial-database-announcement/">Learn more</a>.
                 </p>
             </div>
         </div>
