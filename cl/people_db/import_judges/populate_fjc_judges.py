@@ -290,7 +290,17 @@ def make_federal_judge(item, testing=False):
                     person__name_first__iexact=first,
                     person__name_last__iexact=last,
                     person__name_middle__iexact=mid,
-                    position_type='pres')
+                    position_type='pres',
+                    )
+            if len(appoint_search) > 1:
+                appoint_search = Position.objects.filter(
+                    person__name_first__iexact=first,
+                    person__name_last__iexact=last,
+                    person__name_middle__iexact=mid,
+                    position_type='pres',
+                    date_start__lte=date_nominated,
+                    date_termination__gte=date_nominated
+                    )
             if len(appoint_search) == 0:
                 print(names, appoint_search)
             if len(appoint_search) > 1:
