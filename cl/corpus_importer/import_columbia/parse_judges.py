@@ -26,6 +26,8 @@ NOT_JUDGE = {
 # judge names can only be this size or larger
 NAME_CUTOFF = 3
 
+# for judges with small names, need an override
+IS_JUDGE = {'wu', 're', 'du'}
 
 def find_judges(text, first_names=False):
     """Returns a list of last names of judges in `text`.
@@ -46,7 +48,7 @@ def find_judges(text, first_names=False):
     line = ''.join([c if c.isalpha() else ' ' for c in line.lower()])
     names = []
     for word in line.split():
-        if len(word) < NAME_CUTOFF or word in NOT_JUDGE:
+        if (len(word) < NAME_CUTOFF and word not in IS_JUDGE) or word in NOT_JUDGE:
             continue
         names.append(word)
     # try to identify which names are first and last names
