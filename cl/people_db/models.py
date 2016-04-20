@@ -647,9 +647,19 @@ class Position(models.Model):
 
         # When
         if self.date_start or self.date_termination:
+            if self.date_termination:
+                end_date = granular_date(self, 'date_termination')
+            else:
+                # If we don't know when the position ended, we use a ? if the
+                # person has died, or say Present if they're alive.
+                if self.person.date_dod:
+                    end_date = "?"
+                else:
+                    end_date = "Present"
+
             s += ' <span class="text-capitalize">(%s &ndash; %s)' % (
                 granular_date(self, 'date_start', default="Unknown Date"),
-                granular_date(self, 'date_termination', default="Present"),
+                end_date,
             )
         return s
 
