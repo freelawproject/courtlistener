@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load extras %}
 {% load admin_urls %}
+{% load staticfiles %}
+{% load humanize %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
@@ -9,33 +11,65 @@
 
 {% block sidebar %}{% endblock sidebar %}
 
+{% block search-form %}
+    {% include "includes/main_query_box.html" with homepage=False type="p" %}
+{% endblock %}
+
+{% block footer-scripts %}
+<script type="text/javascript">
+    $(document).ready(function(){
+        $(".show-all-appointments").click(function (event) {
+            var button = $(this);
+            button.addClass('hidden');
+            button.siblings('ul').children('li').removeClass('hidden');
+        });
+    });
+</script>
+{% endblock %}
+
+
 {% block content %}
     <div class="col-xs-12">
-        {% if perms.people_db.change_person %}
-            <p class="float-right">
-                <a href="{% url 'admin:people_db_person_change' person.id %}"
-                   class="btn btn-primary btn-xs">Edit&nbsp;Person&nbsp;<i
-                   class="fa fa-pencil"></i>
-                </a>
-            </p>
-        {% endif %}
-        <div class="row">
-            <div class="col-xs-2 col-md-4 col-lg-3">
-                <img src="{{ STATIC_PREFIX }}judge-pics/128/adkins-jesse.jpeg"
-                     alt="Judge Portrait"
-                     width="95"
-                     class="hidden-md hidden-lg"
-                />
-                <img src="{{ STATIC_PREFIX }}judge-pics/256/adkins-jesse.jpeg"
-                     alt="Judge Portrait"
-                     width="256"
-                     class="hidden-xs hidden-sm"
-                />
+         <div class="row">
+            <div class="col-xs-6 col-sm-4 col-md-4 col-lg-3">
+                {% if person.has_photo %}
+                    <h2>
+                    {% with "judge_pics/"|add:person.name_last|add:"-"|add:person.name_first|lower as img_path %}
+                        {% if person.date_dob %}
+                            <img src="{% static img_path %}-{% granular_date person 'date_dob' default="" iso=True %}.jpeg"
+                        {% else %}
+                            <img src="{% static img_path %}.jpeg"
+                        {% endif %}
+                         alt="Portrait of {{ person.name_full }}"
+                         width="256"
+                         class="img-responsive v-offset-above-2"
+                        />
+                    {% endwith %}
+                    </h2>
+                {% else %}
+                    <div class="well">
+                        <p class="text-center v-offset-above-3">Have a portrait of {{ person.name_full }} you can share?
+                        </p>
+                        <p class="text-center v-offset-above-3 v-offset-below-6">
+                            <a href="https://github.com/freelawproject/judge-pics/blob/master/README.md" class="btn btn-primary">Send It In</a>
+                        </p>
+                    </div>
+                {% endif %}
             </div>
-            <div class="col-xs-10 col-md-8 col-lg-9">
-                <h2 class="bottom">{{ title }}</h2>
+            <div class="col-xs-6 col-sm-8 col-md-8 col-lg-9">
+                <h2 class="bottom">
+                    {{ title }}
+                    {% if perms.people_db.change_person %}
+                        <p class="float-right">
+                            <a href="{% url 'admin:people_db_person_change' person.id %}"
+                               class="btn btn-primary btn-xs">Edit&nbsp;Person&nbsp;<i
+                                    class="fa fa-pencil"></i>
+                            </a>
+                        </p>
+                    {% endif %}
+                </h2>
                 <span class="small gray top">
-                    CourtListener ID: {{ person.cl_id }}{% if person.fjc_id %}, FJC ID: {{ person.fjc_id }}{% endif %}
+                    CourtListener ID: {{ person.cl_id }}{% if person.fjc_id %}, FJC ID: <a href="http://www.fjc.gov/servlet/nGetInfo?jid={{ person.fjc_id }}">{{ person.fjc_id }}</a>{% endif %}
                 </span>
 
                 <div class="row v-offset-below-3">
@@ -49,18 +83,18 @@
                         <p>
                             <span class="meta-data-header">Born:</span>
                             <span class="meta-data-value">
-                                {% granular_date person.date_dob granularity=person.date_granularity_dob default="On an unknown date " %}
+                                {% granular_date person 'date_dob' default="On an unknown date " %}
                                 {% spaceless %}
                                     {% if person.dob_city or person.dob_state %}
                                         <span class="gray">in </span>
                                         {% if person.dob_city %}
-                                            <span>{{ person.dob_city }}</span>
+                                            <a href="{% url "show_results" %}?type=p&amp;dob_city=&quot;{{ person.dob_city }}&quot;">{{ person.dob_city }}</a>
                                         {% endif %}
                                         {% if person.dob_city and person.dob_state %}
                                             <span class="gray">, </span>
                                         {% endif %}
                                         {% if person.dob_state %}
-                                            <span>{{ person.dob_state }}</span>
+                                            <a href="{% url "show_results" %}?type=p&amp;dob_state={{ person.dob_state }}">{{ person.get_dob_state_display }}</a>
                                         {% endif %}
                                     {% endif %}
                                 {% endspaceless %}
@@ -71,7 +105,7 @@
                         <p>
                             <span class="meta-data-header">Died:</span>
                             <span class="meta-data-value">
-                                {% granular_date person.date_dod granularity=person.date_granularity_dod default="On an unknown date " %}
+                                {% granular_date person 'date_dod' default="On an unknown date " %}
                                 {% spaceless %}
                                     {% if person.dod_city or person.dod_state %}
                                         <span class="gray">in </span>
@@ -82,7 +116,7 @@
                                             <span class="gray">, </span>
                                         {% endif %}
                                         {% if person.dod_state %}
-                                            <span>{{ person.dod_state }}</span>
+                                            <span>{{ person.get_dod_state_display }}</span>
                                         {% endif %}
                                     {% endif %}
                                 {% endspaceless %}
@@ -120,7 +154,7 @@
                         {% if person.religion %}
                         <p>
                             <span class="meta-data-header">Religion:</span>
-                            <span class="meta-data-value">{{ person.get_religion_display }}</span>
+                            <span class="meta-data-value">{{ person.religion }}</span>
                         </p>
                         {% endif %}
                     </div>
@@ -133,7 +167,7 @@
                             <span class="meta-data-header">
                                 <abbr title="American Bar Association">ABA</abbr> Ratings:
                             </span>
-                            {% for rating in aba_ratings.all %}{% if not forloop.first %}, {% endif %}{{ rating.get_rating_display }}{% if rating.date_rated %} ({% granular_date rating.date_rated granularity=rating.date_granularity_rated %}){% endif %}
+                            {% for rating in aba_ratings.all %}{% if not forloop.first %}, {% endif %}{{ rating.get_rating_display }}{% if rating.year_rated %} ({{ rating.year_rated }}){% endif %}
                             {% endfor %}
                         </p>
                         {% endif %}
@@ -166,19 +200,22 @@
                     <li>
                         {% if pa.date_start and pa.date_end %}
                             From
-                            {% granular_date pa.date_start granularity=pa.date_granularity_start %}
+                            {% granular_date pa 'date_start' %}
                             to
-                            {% granular_date pa.date_end granularity=pa.date_granularity_end %}:
+                            {% granular_date pa 'date_end' %}:
                         {% elif not pa.date_start and pa.date_end %}
                             Until
-                            {% granular_date pa.date_end granularity=pa.date_granularity_end %}:
+                            {% granular_date pa 'date_end' %}:
                         {% elif pa.date_start and not pa.date_end %}
                             Beginning
-                            {% granular_date pa.date_start granularity=pa.date_granularity_start %}:
+                            {% granular_date pa 'date_start' %}:
                         {% elif not pa.date_start and not pa.date_end %}
                             {# pass - no data #}
                         {% endif %}
-                        {{ pa.get_political_party_display }}
+                        <a href="{% url "show_results" %}?type=p&amp;political_affiliation={{ pa.political_party }}">{{ pa.get_political_party_display }}</a>
+                        {% if pa.source and pa.source != 'o' %}
+                            (via {{ pa.get_source_display|lower }})
+                        {% endif %}
                     </li>
                 {% endfor %}
                 </ul>
@@ -193,7 +230,7 @@
                     {% for e in educations %}
                         <li>
                             Attended
-                            {{ e.school.name }}
+                            <a href="{% url "show_results" %}?type=p&amp;school=&quot;{{ e.school.name }}&quot;">{{ e.school.name }}</a>
                             {% if e.degree_detail or e.degree_level or e.degree_year %}
                                 and received a
                                 {% if e.degree_level %}
@@ -213,25 +250,220 @@
         </div>
         {% endif %}
 
-        {% if positions.count > 0 %}
+        {% if positions %}
         <div class="row v-offset-below-3">
             <div class="col-xs-12">
-                <h3 class="bottom"><i class="gray fa fa-balance-scale"></i>
-                    Roles <span class="alt">&amp;</span> Positions</h3>
-                <p class="gray">Includes a variety of known roles, such as judges, governors, presidents, clerks, practitioners, public defenders, attorneys general, professors, etc.</p>
-                <hr class="top">
-                {% for position in positions %}
-                    <h4 class="text-uppercase">
-                        {% if position.get_position_type_display %}
-                            {{ position.get_position_type_display }}
+                {% for p in positions %}
+                    {% ifchanged p.is_judicial_position %}
+                        {% if p.is_judicial_position %}
+                            <h3 class="bottom">
+                                <i class="gray fa fa-balance-scale"></i> Judicial
+                                Positions
+                            </h3>
                         {% else %}
-                            {{ position.job_title }}
+                            <h3 class="bottom">
+                                <i class="gray fa fa-briefcase"></i> Non-Judicial Positions
+                            </h3>
+                            <p class="gray">Includes a variety of positions such as governor,
+                                president, clerk, practitioner, public defender,
+                                attorneys general, and professor.</p>
                         {% endif %}
-                    </h4>
+                        <hr class="top">
+                    {% endifchanged %}
+                    <div class="row v-offset-below-3">
+                        <div class="col-xs-12">
+                            <h4 class="text-uppercase">
+                                {{ p.html_title|safe }}
+                            </h4>
+                        </div>
+                        {% if p.appointer or p.supervisor or p.predecessor %}
+                            <div class="col-xs-4">
+                                {% if p.appointer %}
+                                <p>
+                                    <span class="meta-data-header">Appointed By:</span>
+                                    <span class="meta-data-value">
+                                        <a href="{{ p.appointer.person.get_absolute_url }}">{{ p.appointer.person.name_full }}</a>
+                                    </span>
+                                </p>
+                                {% endif %}
+                                {% if p.supervisor %}
+                                    <p>
+                                        <span class="meta-data-header">Supervisor:</span>
+                                        <span class="meta-data-value">
+                                            <a href="{{ p.supervisor.get_absolute_url }}">{{ p.supervisor.name_full }}</a>
+                                        </span>
+                                    </p>
+                                {% endif %}
+                                {% if p.predecessor %}
+                                    <p>
+                                        <span class="meta-data-header">Predecessor:</span>
+                                        <span class="meta-data-value">
+                                            <a href="{{ p.predecessor.get_absolute_url }}">{{ p.predecessor.name_full }}</a>
+                                        </span>
+                                    </p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        {% if p.nomination_process or p.how_selected or p.date_recess_appointment %}
+                            <div class="col-xs-4">
+                                {% if p.how_selected %}
+                                    <p>
+                                        <span class="meta-data-header">Selected By:</span>
+                                        <span class="meta-data-value">
+                                            <a href="{% url "show_results" %}?type=p&amp;selection_method={{ p.how_selected }}">{{ p.get_how_selected_display }}</a>
+                                            {% if p.date_elected %}
+                                                <span class="alt">on</span> {{ p.date_elected|default:"" }}
+                                            {% elif p.date_nominated %}
+                                                <span class="alt">on</span> {{ p.date_nominated|default:"" }}
+                                            {% endif %}
+                                        </span>
+                                    </p>
+                                {% endif %}
+                                {% if p.nomination_process %}
+                                    <p>
+                                        <span class="meta-data-header">Nomination Process:</span>
+                                        <span class="meta-data-value">{{ p.get_nomination_process_display }}</span>
+                                    </p>
+                                {% endif %}
+                                {% if p.date_recess_appointment %}
+                                    <p>
+                                        <span class="meta-data-header">Recess Appointment Date:</span>
+                                        <span class="meta-data-value">{{ p.date_recess_appointment }}</span>
+                                    </p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        {% if p.date_referred_to_judicial_committee or p.date_judicial_committee_action or p.judicial_committee_action %}
+                            <div class="col-xs-4">
+                                {% if p.date_referred_to_judicial_commitee %}
+                                    <p>
+                                        <span class="meta-data-header">Judicial Committee Referral Date:</span>
+                                        <span class="meta-data-value">{{ p.date_referred_to_judicial_committee }}</span>
+                                    </p>
+                                {% endif %}
+                                {% if p.date_judicial_committee_action %}
+                                    <p>
+                                        <span class="meta-data-header">Judicial Committee Action Date:</span>
+                                        <span class="meta-data-value">{{ p.date_judicial_committee_action }}</span>
+                                    </p>
+                                {% endif %}
+                                {% if p.judicial_committee_action %}
+                                    <p>
+                                        <span class="meta-data-header">Judicial Committee Action:</span>
+                                        <span class="meta-data-value">{{ p.get_judicial_committee_action_display }}</span>
+                                    </p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        {% if p.date_hearing or p.date_confirmation or p.vote_string %}
+                            <div class="col-xs-4">
+                                {% if p.date_hearing %}
+                                    <p>
+                                        <span class="meta-data-header">Nomination Hearing Date:</span>
+                                        <span class="meta-data-value">{{ p.date_hearing }}</span>
+                                    </p>
+                                {% endif %}
+                                {% if p.date_confirmation %}
+                                    <p>
+                                        <span class="meta-data-header">Confirmation Date:</span>
+                                        <span class="meta-data-value">{{ p.date_confirmation }}</span>
+                                    </p>
+                                {% endif %}
+                                {% if p.vote_string %}
+                                    <p>
+                                        <span class="meta-data-header">Vote Info:</span>
+                                        <span class="meta-data-value">
+                                            {{ p.vote_string|safe }}
+                                        </span>
+                                    </p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        {% if p.termination_reason or p.date_retirement %}
+                            <div class="col-xs-4">
+                                {% if p.termination_reason %}
+                                    <p>
+                                        <span class="meta-data-header">Termination Reason:</span>
+                                        <span class="meta-data-value">{{ p.get_termination_reason_display }}</span>
+                                    </p>
+                                {% endif %}
+                                {% if p.date_retirement %}
+                                    <p>
+                                        <span class="meta-data-header">Senior Status Date:</span>
+                                        <span class="meta-data-value">{{ p.date_retirement }}</span>
+                                    </p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        {% if p.appointed_positions.count %}
+                            <div class="col-xs-12">
+                                <h4>Judicial Appointments ({{ p.appointed_positions.count|intcomma}})</h4>
+                                <ul>
+                                    {% for ap in p.sorted_appointed_positions %}
+
+                                        <li {% if forloop.counter >= 10 %}class="hidden"{% endif %}>
+                                            <p>
+                                                <a href="{{ ap.person.get_absolute_url }}">{{ ap.person.name_full }}</a><br>{{ ap.html_title|safe }}
+                                            </p>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                                {% if p.appointed_positions.count > 10 %}
+                                    <p class="btn btn-primary show-all-appointments">
+                                        Show All Appointments
+                                    </p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        {% if p.retention_events.count %}
+                            <div class="col-xs-12">
+                                <h4>Retention Events for this Position</h4>
+                                <ul>
+                                    {% for e in p.retention_events.all %}
+                                        <li>
+                                            {% if e.won %}
+                                                <span class="text-uppercase bold">
+                                                {{ e.won|yesno:"Won,Lost" }}:
+                                            </span>
+                                            {% endif %}
+                                            {% if e.retention_type %}
+                                                {{ e.get_retention_type_display }}
+                                            {% endif %}
+                                            {% if e.date_retention %}
+                                                <span class="alt">on</span> {{ e.date_retention }}
+                                            {% endif %}
+                                            {% if e.votes_yes %}
+                                                <span class="alt">with</span> {{ e.votes_yes }} in favor
+                                                <span class="alt">and</span> {{ e.votes_no }} opposed
+                                            {% endif %}
+                                            {% if e.unopposed %}
+                                                (unopposed)
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                    </div>
                 {% endfor %}
             </div>
         </div>
         {% endif %}
+
+        <div class="row">
+            <div class="col-xs-12">
+                <p class="text-right">Something isn't right? <a href="{% url "contact" %}">Get in touch with a correction</a>.
+                </p>
+                <p class="text-right">Curious about our sources? <a href="https://free.law/2016/04/19/judicial-database-announcement/">Learn more</a>.
+                </p>
+            </div>
+        </div>
 
     </div>
 {% endblock %}

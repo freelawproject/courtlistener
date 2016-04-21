@@ -1,7 +1,9 @@
 import rest_framework_filters as filters
 
-from cl.api.utils import DATETIME_LOOKUPS, \
-    DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, INTEGER_LOOKUPS, ALL_TEXT_LOOKUPS
+from cl.api.utils import (
+    DATETIME_LOOKUPS, DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, INTEGER_LOOKUPS,
+    ALL_TEXT_LOOKUPS
+)
 from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, \
     Race
@@ -25,7 +27,7 @@ class ABARatingFilter(filters.FilterSet):
             'id': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
-            'date_rated': DATE_LOOKUPS,
+            'year_rated': INTEGER_LOOKUPS,
             'rating': ['exact'],
             'person': ['exact'],
         }
@@ -101,7 +103,6 @@ class PositionFilter(filters.FilterSet):
     court = filters.RelatedFilter(CourtFilter, name='court')
     retention_events = filters.RelatedFilter(
             RetentionEventFilter, name='retention_events')
-    appointer = filters.RelatedFilter('cl.people_db.filters.PersonFilter', name='appointer')
 
     class Meta:
         model = Position
@@ -109,6 +110,7 @@ class PositionFilter(filters.FilterSet):
             'id': ['exact'],
             'position_type': ['exact'],
             'person': ['exact'],
+            'appointer': ['exact'],
             'predecessor': ['exact'],
             'job_title': ALL_TEXT_LOOKUPS,
             'date_created': DATETIME_LOOKUPS,
@@ -130,7 +132,8 @@ class PositionFilter(filters.FilterSet):
             'votes_no': INTEGER_LOOKUPS,
             'how_selected': ['exact'],
             'termination_reason': ['exact'],
-
+            'location_city': BASIC_TEXT_LOOKUPS,
+            'location_state': BASIC_TEXT_LOOKUPS,
         }
 
 

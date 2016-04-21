@@ -1,10 +1,11 @@
 import re
 from urllib import urlencode
 from urlparse import parse_qs
+
+from django.conf import settings
 from django.utils.timezone import now
 
 from cl.lib import sunburnt
-from django.conf import settings
 
 
 def make_get_string(request, nuke_fields=None):
@@ -129,13 +130,13 @@ def merge_form_with_courts(courts, search_form):
     for field in search_form:
         if no_facets_selected:
             for court in courts:
-                court['checked'] = True
+                court.checked = True
         else:
             for court in courts:
                 # We're merging two lists, so we have to do a nested loop
                 # to find the right value.
-                if 'court_%s' % court['pk'] == field.html_name:
-                    court['checked'] = field.value()
+                if 'court_%s' % court.pk == field.html_name:
+                    court.checked = field.value()
                     break
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
@@ -151,26 +152,19 @@ def merge_form_with_courts(courts, search_form):
     state_bundle = []
     state_bundles = []
     for court in courts:
-        if court['jurisdiction'] == 'F':
-            court['tab'] = 'federal'
-        elif court['jurisdiction'] == 'FD':
-            court['tab'] = 'district'
-        elif court['jurisdiction'] in ['FB', 'FBP']:
-            court['tab'] = 'bankruptcy'
-        elif court['jurisdiction'].startswith('S'):
-            court['tab'] = 'state'  # Merge all state courts.
-        elif court['jurisdiction'] in ['FS', 'C']:
-            court['tab'] = 'special'
-
-        if court['tab'] == 'bankruptcy':
+        if court.jurisdiction == 'F':
+            court_tabs['federal'].append(court)
+        elif court.jurisdiction == 'FD':
+            court_tabs['district'].append(court)
+        elif court.jurisdiction in ['FB', 'FBP']:
             # Bankruptcy gets bundled into BAPs and regular courts.
-            if court['jurisdiction'] == 'FBP':
+            if court.jurisdiction == 'FBP':
                 bap_bundle.append(court)
             else:
                 b_bundle.append(court)
-        elif court['tab'] == 'state':
+        elif court.jurisdiction.startswith('S'):
             # State courts get bundled by supreme courts
-            if court['jurisdiction'] == 'S':
+            if court.jurisdiction == 'S':
                 # Whenever we hit a state supreme court, we append the
                 # previous bundle and start a new one.
                 if state_bundle:
@@ -178,9 +172,9 @@ def merge_form_with_courts(courts, search_form):
                 state_bundle = [court]
             else:
                 state_bundle.append(court)
-        else:
-            court_tabs[court['tab']].append(court)
-    state_bundles.append(state_bundle)  # appends the final state bundle after the loop ends. Hack?
+        elif court.jurisdiction in ['FS', 'C']:
+            court_tabs['special'].append(court)
+    state_bundles.append(state_bundle)  # append the final state bundle after the loop ends. Hack?
 
     # Put the bankruptcy bundles in the courts dict
     court_tabs['bankruptcy'].append(bap_bundle)
@@ -378,7 +372,6 @@ def add_highlighting(main_params, cd, highlight):
               'natureOfSuit', 'court', 'courtJurisdiction', 'assignedTo']
         hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
                 'docketNumber', 'natureOfSuit']
-        add_hl_and_fl(fl, hlfl)
 
     main_params.update({
         'fl': ','.join(fl),
@@ -451,7 +444,7 @@ def add_fq(main_params, cd):
         if cd['case_name']:
             main_fq.append(make_fq(cd, 'caseName', 'case_name'))
         if cd['judge']:
-            main_fq.append(make_fq(cd, 'assignedTo', 'judge'))
+            main_fq.append(make_fq(cd, 'judge', 'judge'))
         if cd['court']:
             main_fq.append(make_fq(cd, 'court_id', 'court'))
         if cd['nature_of_suit']:
@@ -516,10 +509,11 @@ def build_main_query(cd, highlight='all', order_by=''):
     main_params = add_fq(main_params, cd)
     # main_params = add_faceting(main_params, cd)
 
-    # print "Params sent to search are: %s" % '&'.join(
-    #         ['%s=%s' % (k, v) for k, v in main_params.items()]
-    # )
-    #print results_si.execute()
+    if settings.DEBUG:
+        print "Params sent to search are:\n%s" % ' &\n'.join(
+                ['  %s = %s' % (k, v) for k, v in main_params.items()]
+        )
+        #print results_si.execute()
     return main_params
 
 

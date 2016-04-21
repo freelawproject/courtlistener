@@ -611,7 +611,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         searchbox = self.browser.find_element_by_id('id_q')
         searchbox.send_keys('\n')
         result_count = self.browser.find_element_by_id('result-count')
-        self.assertIn('Results', result_count.text)
+        self.assertIn('Opinions', result_count.text)
 
     def test_toggle_to_oral_args_search_results(self):
         # Dora navigates to the global SERP from the homepage
@@ -827,7 +827,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # results. She notices her query is still in the searchbox and
         # has the ability to refine via facets
         result_count = self.browser.find_element_by_id('result-count')
-        self.assertIn('1 Result', result_count.text)
+        self.assertIn('1 Opinion', result_count.text)
         search_box = self.browser.find_element_by_id('id_q')
         self.assertEqual('lissner', search_box.get_attribute('value'))
 

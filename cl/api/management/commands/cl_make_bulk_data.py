@@ -9,6 +9,11 @@ from cl.api.tasks import make_bulk_data_and_swap_it_in
 from cl.audio.api_serializers import AudioSerializer
 from cl.audio.models import Audio
 from cl.lib.utils import mkdir_p
+from cl.people_db.api_serializers import PersonSerializer, PositionSerializer, \
+    RetentionEventSerializer, EducationSerializer, SchoolSerializer, \
+    PoliticalAffiliationSerializer
+from cl.people_db.models import Person, Position, RetentionEvent, Education, \
+    School, PoliticalAffiliation
 from cl.search.api_serializers import OpinionClusterSerializer, \
     OpinionSerializer, DocketSerializer, CourtSerializer
 from cl.search.models import Court, Docket, OpinionCluster, Opinion
@@ -52,61 +57,42 @@ class Command(BaseCommand):
                 'court_attr': 'docket.court_id',
                 'serializer': AudioSerializer,
             },
-            # has_beta_api_access
-            # {
-            #     'obj_type_str': 'judges',
-            #     'obj_type': Judge,
-            #     'court_attr': None,
-            #     'serializer': JudgeSerializer,
-            # },
-            # {
-            #     'obj_type_str': 'positions',
-            #     'obj_type': Position,
-            #     'court_attr': None,
-            #     'serializer': PositionSerializer,
-            # },
-            # {
-            #     'obj_type_str': 'politicians',
-            #     'obj_type': Politician,
-            #     'court_attr': None,
-            #     'serializer': PoliticianSerializer,
-            # },
-            # {
-            #     'obj_type_str': 'retention-events',
-            #     'obj_type': RetentionEvent,
-            #     'court_attr': None,
-            #     'serializer': RetentionEventSerializer,
-            # },
-            # {
-            #     'obj_type_str': 'educations',
-            #     'obj_type': Education,
-            #     'court_attr': None,
-            #     'serializer': EducationSerializer,
-            # },
-            # {
-            #     'obj_type_str': 'schools',
-            #     'obj_type': School,
-            #     'court_attr': None,
-            #     'serializer': SchoolSerializer,
-            # },
-            # {
-            #     'obj_type_str': 'careers',
-            #     'obj_type': Career,
-            #     'court_attr': None,
-            #     'serializer': CareerSerializer,
-            # },
-            # {
-            #     'obj_type_str': 'titles',
-            #     'obj_type': Title,
-            #     'court_attr': None,
-            #     'serializer': TitleSerializer,
-            # },
-            # {
-            #     'obj_type_str': 'politicial-affiliations',
-            #     'obj_type': PoliticalAffiliation,
-            #     'court_attr': None,
-            #     'serializer': PoliticalAffiliationSerializer,
-            # },
+            {
+                'obj_type_str': 'people',
+                'obj_type': Person,
+                'court_attr': None,
+                'serializer': PersonSerializer,
+            },
+            {
+                'obj_type_str': 'schools',
+                'obj_type': School,
+                'court_attr': None,
+                'serializer': SchoolSerializer,
+            },
+            {
+                'obj_type_str': 'positions',
+                'obj_type': Position,
+                'court_attr': None,
+                'serializer': PositionSerializer,
+            },
+            {
+                'obj_type_str': 'retention-events',
+                'obj_type': RetentionEvent,
+                'court_attr': None,
+                'serializer': RetentionEventSerializer,
+            },
+            {
+                'obj_type_str': 'educations',
+                'obj_type': Education,
+                'court_attr': None,
+                'serializer': EducationSerializer,
+            },
+            {
+                'obj_type_str': 'politicial-affiliations',
+                'obj_type': PoliticalAffiliation,
+                'court_attr': None,
+                'serializer': PoliticalAffiliationSerializer,
+            },
         ]
 
         print 'Starting bulk file creation with %s celery tasks...' % \

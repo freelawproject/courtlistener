@@ -46,8 +46,8 @@
             <div class="inline nowrap">
                 <span class="meta-data-header">Born:</span>
                 <span class="meta-data-value"
-                      datetime="{% granular_date result.dob granularity=result.date_granularity_dob iso=True %}">
-                    {% granular_date result.dob granularity=result.date_granularity_dob %}
+                      datetime="{% granular_date result 'dob' granularity=result.date_granularity_dob iso=True %}">
+                    {% granular_date result 'dob' granularity=result.date_granularity_dob %}
                     {% spaceless %}
                     {% if result.solr_highlights.dob_city or result.solr_highlights.dob_state %}
                         <span class="gray">in </span>
@@ -67,8 +67,8 @@
                 <div class="inline nowrap">
                     <span class="meta-data-header">Deceased:</span>
                     <time class="meta-data-value"
-                          datetime="{% granular_date result.dod granularity=result.date_granularity_dod iso=True %}">
-                        {% granular_date result.dod granularity=result.date_granularity_dod %}
+                          datetime="{% granular_date result 'dod' granularity=result.date_granularity_dod iso=True %}">
+                        {% granular_date result 'dod' granularity=result.date_granularity_dod %}
                     </time>
                 </div>
             {% endif %}

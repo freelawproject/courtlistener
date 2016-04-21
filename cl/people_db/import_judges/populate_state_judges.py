@@ -28,33 +28,62 @@ def make_state_judge(item, testing=False):
 
     if item['firstname'] == '':
         return
+    if not pd.isnull(item['midname']):
+        if len(item['midname']) == 1:
+            item['midname'] = item['midname'] + '.'
 
+    had_alias_result = False
     check = Person.objects.filter(name_first=item['firstname'],
                                   name_last=item['lastname'], date_dob=date_dob)
-    if len(check) > 0:
-        print('Warning: ' + item['firstname'] + ' ' + item['lastname'] + ' ' + str(date_dob) + ' exists.')
+    name = "%s: %s %s %s" % (item['cl_id'], item['firstname'], item['lastname'],
+                             date_dob)
+    if check.count() > 0:
+        print('Warning: %s exists.' % name)
         person = check[0]
+        if person.is_alias:
+            # Grab the correct person and set our alias variable to True
+            person = person.is_alias_of
     else:
+        print("Now processing: %s" % name)
 
         person = Person(
-                cl_id=item['cl_id'],
-                name_first=item['firstname'],
-                name_middle=item['midname'],
-                name_last=item['lastname'],
-                name_suffix=get_suffix(item['suffname']),
                 gender=item['gender'],
                 date_dob=date_dob,
                 date_granularity_dob=date_granularity_dob,
                 date_dod=date_dod,
                 date_granularity_dod=date_granularity_dod
         )
+        if not had_alias_result:
+            # Only set the name and ID values on non-alias results, otherwise
+            # you overwrite the good name with the alias name.
+            person.cl_id = item['cl_id']
+            person.name_first = item['firstname']
+            person.name_middle = item['midname']
+            person.name_last = item['lastname']
+            person.name_suffix = get_suffix(item['suffname'])
 
         if not testing:
             person.save()
 
-    courtid = get_court_object(item['court'] + ' of ' + item['state'])
+        if not pd.isnull(item['nickname']):
+            person_alias = Person(
+                    cl_id=item['cl_id'] + "-alias-1",
+                    name_first=item['nickname'],
+                    name_middle=item['midname'],
+                    name_last=item['lastname'],
+                    name_suffix=get_suffix(item['suffname']),
+                    is_alias_of=person
+                    )
+            if not testing:
+                person_alias.save()
+
+    if 'colr' in item['cl_id']:
+        courtid = get_court_object(item['court'] + ' of ' + item['state'])
+    else:
+        courtid = get_court_object(item['court'])
 
     if courtid is None:
+        print(item)
         raise
 
     # assign start date
@@ -62,7 +91,7 @@ def make_state_judge(item, testing=False):
                                                       item['startmonth'],
                                                       item['startday'])
 
-    if not pd.isnull(item['endyear']) and item['endyear'] < 2016:
+    if item['endyear'] > 2016:
         item['endyear'] = None
     date_termination, date_granularity_termination = process_date(
             item['endyear'],
@@ -157,7 +186,7 @@ def make_state_judge(item, testing=False):
     if not pd.isnull(item['politics']):
         politics = PoliticalAffiliation(
                 person=person,
-                political_party=item['politics']
+                political_party=item['politics'].lower()
         )
         if not testing:
             politics.save()

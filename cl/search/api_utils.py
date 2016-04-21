@@ -54,13 +54,24 @@ class SolrList(object):
         self._item_cache = []
         if self.type == 'o':
             self.conn = sunburnt.SolrInterface(
-                    settings.SOLR_OPINION_URL, mode='r')
+                settings.SOLR_OPINION_URL,
+                mode='r',
+            )
         elif self.type == 'oa':
             self.conn = sunburnt.SolrInterface(
-                    settings.SOLR_AUDIO_URL, mode='r')
+                settings.SOLR_AUDIO_URL,
+                mode='r',
+            )
         elif self.type == 'd':
             self.conn = sunburnt.SolrInterface(
-                    settings.SOLR_RECAP_DOCKET_URL, mode='r')
+                settings.SOLR_RECAP_DOCKET_URL,
+                mode='r',
+            )
+        elif self.type == 'p':
+            self.conn = sunburnt.SolrInterface(
+                settings.SOLR_PEOPLE_URL,
+                mode='r',
+            )
         self._length = length
 
     def __len__(self):

@@ -324,12 +324,10 @@ class DRFJudgeApiFilterTests(TestCase):
         q['retention_events__retention_type'] = 'reapp_gov'
         assertCount(self, path, q, 1)
 
-        # Appointer was Bill, a Democrat
-        q['appointer__name_first__istartswith'] = 'bill'
-        q['appointer__political_affiliations__political_party'] = 'd'
+        # Appointer was Bill, id of 1
+        q['appointer'] = 1
         assertCount(self, path, q, 1)
-        # She was not appointed by a Republican
-        q['appointer__political_affiliations__political_party'] = 'r'
+        q['appointer'] = 3
         assertCount(self, path, q, 0)
 
     def test_racial_filters(self):
@@ -390,10 +388,6 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
         q['sub_opinions__author'] = 2
         assertCount(self, path, q, 4)
 
-        # Boolean filter
-        q['per_curiam'] = False
-        assertCount(self, path, q, 4)
-
         # Integer lookups
         q = dict()
         q['scdb_votes_majority__gt'] = 10
@@ -410,6 +404,10 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
         q['sha1'] = 'asdfasdfasdfasdfasdfasddf-nope'
         assertCount(self, path, q, 0)
         q['sha1'] = 'asdfasdfasdfasdfasdfasddf'
+        assertCount(self, path, q, 6)
+
+        # Boolean filter
+        q['per_curiam'] = False
         assertCount(self, path, q, 6)
 
         # Related filters

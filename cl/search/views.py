@@ -1,4 +1,5 @@
 import logging
+import traceback
 from datetime import date, datetime, timedelta
 from urllib import quote
 
@@ -60,15 +61,13 @@ def do_search(request, rows=20, order_by=None, type=None):
                 status_facets = None
             results_si = conn.raw_query(**search_utils.build_main_query(cd))
 
-            courts = Court.objects.filter(in_use=True).values(
-                'pk', 'short_name', 'jurisdiction', 'has_oral_argument_scraper'
-            )
+            courts = Court.objects.filter(in_use=True)
             courts, court_count_human, court_count = search_utils\
                 .merge_form_with_courts(courts, search_form)
 
-        except Exception, e:
+        except Exception as e:
             if settings.DEBUG is True:
-                print e
+                traceback.print_exc()
             logger.warning("Error loading search with request: %s" % request.GET)
             logger.warning("Error was %s" % e)
             return {'error': True}

@@ -1,11 +1,21 @@
-from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
 from localflavor.us import models as local_models
-from cl.lib.model_helpers import validate_partial_date, validate_is_not_alias, \
-    validate_only_one_location, validate_only_one_job_type, \
-    validate_if_degree_detail_then_degree, make_choices_group_lookup
+
+from cl.custom_filters.templatetags.extras import granular_date
+from cl.lib.model_helpers import (
+    make_choices_group_lookup,
+    validate_has_full_name,
+    validate_is_not_alias,
+    validate_partial_date,
+    validate_nomination_fields_ok,
+    validate_all_or_none,
+    validate_exactly_n,
+    validate_not_all,
+    validate_at_most_n,
+    validate_supervisor,
+)
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -77,8 +87,7 @@ class Person(models.Model):
         help_text="A unique identifier for judge, also indicating source of "
                   "data.",
         unique=True,
-        db_index=True,
-        null=True,
+        db_index=True
     )
     slug = models.SlugField(
         max_length=158  # len(self.name_full)
@@ -137,8 +146,7 @@ class Person(models.Model):
         blank=True,
     )
     religion = models.CharField(
-        choices=RELIGIONS,
-        max_length=2,
+        max_length=30,
         blank=True
     )
     has_photo = models.BooleanField(
@@ -159,10 +167,9 @@ class Person(models.Model):
         super(Person, self).save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
-        for field in ['dob', 'dod']:
-            validate_partial_date(self, field)
-        # An alias cannot be an alias.
-        validate_is_not_alias(self, 'is_alias_of')
+        validate_partial_date(self, ['dob', 'dod'])
+        validate_is_not_alias(self, ['is_alias_of'])
+        validate_has_full_name(self)
         super(Person, self).clean_fields(*args, **kwargs)
 
     @property
@@ -240,9 +247,13 @@ class School(models.Model):
     def is_alias(self):
         return True if self.is_alias_of is not None else False
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(School, self).save(*args, **kwargs)
+
     def clean_fields(self, *args, **kwargs):
         # An alias cannot be an alias.
-        validate_is_not_alias(self, 'is_alias_of')
+        validate_is_not_alias(self, ['is_alias_of'])
         super(School, self).clean_fields(*args, **kwargs)
 
 
@@ -313,7 +324,7 @@ class Position(models.Model):
             ('dep-sol-gen',      'Deputy Solicitor General'),
         )),
         ('Appointing Authority', (
-            ('pres',          'President'),
+            ('pres',          'President of the United States'),
             ('gov',           'Governor'),
         )),
         ('Clerkships', (
@@ -334,6 +345,11 @@ class Position(models.Model):
         ('election', 'Primary Election'),
         ('merit_comm', 'Merit Commission'),
     )
+    VOTE_TYPES = (
+        ('s', 'Senate'),
+        ('p', 'Partisan Election'),
+        ('np', 'Non-Partisan Election'),
+    )
     JUDICIAL_COMMITTEE_ACTIONS = (
         ('no_rep', 'Not Reported'),
         ('rep_w_rec', 'Reported with Recommendation'),
@@ -342,12 +358,18 @@ class Position(models.Model):
         ('rec_bad', 'Recommended Unfavorably'),
     )
     SELECTION_METHODS = (
-        ('e_part', 'Partisan Election'),
-        ('e_non_part', 'Non-Partisan Election'),
-        ('a_pres', 'Appointment (President)'),
-        ('a_gov', 'Appointment (Governor)'),
-        ('a_legis', 'Appointment (Legislature)'),
+        ('Election', (
+            ('e_part', 'Partisan Election'),
+            ('e_non_part', 'Non-Partisan Election'),
+
+        )),
+        ('Appointment', (
+            ('a_pres', 'Appointment (President)'),
+            ('a_gov', 'Appointment (Governor)'),
+            ('a_legis', 'Appointment (Legislature)'),
+        )),
     )
+    SELECTION_METHOD_GROUPS = make_choices_group_lookup(SELECTION_METHODS)
     TERMINATION_REASONS = (
         ('ded', 'Death'),
         ('retire_vol', 'Voluntary Retirement'),
@@ -394,11 +416,20 @@ class Position(models.Model):
         blank=True,
         null=True,
     )
+    location_city = models.CharField(
+        help_text="If not a court or school, the city where person worked.",
+        max_length=50,
+        blank=True,
+    )
+    location_state = local_models.USStateField(
+        help_text="If not a court or school, the state where person worked.",
+        blank=True,
+    )
     appointer = models.ForeignKey(
-        Person,
+        'self',
         related_name='appointed_positions',
         help_text="If this is an appointed position, "
-                  "the person responsible for the appointing.",
+                  "the person-position responsible for the appointing.",
         blank=True,
         null=True,
     )
@@ -465,6 +496,11 @@ class Position(models.Model):
         blank=True,
         db_index=True,
     )
+    judicial_committee_action = models.CharField(
+        choices=JUDICIAL_COMMITTEE_ACTIONS,
+        max_length=20,
+        blank=True,
+    )
     date_hearing = models.DateField(
         help_text="After being nominated, a judge is usually subject to a "
                   "hearing. This is the date of that hearing.",
@@ -511,24 +547,32 @@ class Position(models.Model):
         blank=True,
         db_index=True,
     )
-    judicial_committee_action = models.CharField(
-        choices=JUDICIAL_COMMITTEE_ACTIONS,
-        max_length=20,
-        blank=True,
-    )
     nomination_process = models.CharField(
         choices=NOMINATION_PROCESSES,
         max_length=20,
         blank=True,
     )
+    vote_type = models.CharField(
+        choices=VOTE_TYPES,
+        max_length=2,
+        blank=True,
+    )
     voice_vote = models.NullBooleanField(
         blank=True,
     )
-    votes_yes = models.PositiveSmallIntegerField(
+    votes_yes = models.PositiveIntegerField(
         null=True,
         blank=True,
     )
-    votes_no = models.PositiveSmallIntegerField(
+    votes_no = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+    votes_yes_percent = models.FloatField(
+        null=True,
+        blank=True,
+    )
+    votes_no_percent = models.FloatField(
         null=True,
         blank=True,
     )
@@ -544,29 +588,102 @@ class Position(models.Model):
     @property
     def is_judicial_position(self):
         """Return True if the position is judicial."""
-        if self.POSITION_TYPE_GROUPS[self.position_type] == 'Judge':
+        if self.POSITION_TYPE_GROUPS.get(self.position_type) == 'Judge':
             return True
         return False
+
+    @property
+    def is_clerkship(self):
+        """Return True if the position is a clerkship."""
+        if self.POSITION_TYPE_GROUPS.get(self.position_type) == 'Clerkships':
+            return True
+        return False
+
+    @property
+    def vote_string(self):
+        """Make a human-friendly string from the vote information"""
+        s = ''
+
+        # Do vote type first
+        if self.vote_type == 's':
+            s += "Senate voted"
+            if self.voice_vote:
+                s += ' <span class="alt">by</span> voice vote'
+        elif self.vote_type in ['p', 'np']:
+            s += self.get_vote_type_display()
+
+        # Then do vote counts/percentages, if we have that info.
+        if self.votes_yes or self.votes_yes_percent:
+            s += ', '
+        if self.votes_yes:
+            s += '%s in favor <span class="alt">and</span> %s ' \
+                           'opposed' % (self.votes_yes, self.votes_no)
+        elif self.votes_yes_percent:
+            s += '%g%% in favor <span class="alt">and</span> ' \
+                           '%g%% opposed' % (self.votes_yes_percent,
+                                             self.votes_no_percent)
+        return s
+
+    @property
+    def html_title(self):
+        """Display the position as a title."""
+        s = ''
+
+        # Title
+        if self.get_position_type_display():
+            s += self.get_position_type_display()
+        else:
+            s += self.job_title
+
+        # Where
+        if self.school or self.organization_name or self.court:
+            s += ' <span class="alt text-lowercase">at</span> '
+            if self.court:
+                s += self.court.full_name
+            elif self.school:
+                s += self.school
+            elif self.organization_name:
+                s += self.organization_name
+
+        # When
+        if self.date_start or self.date_termination:
+            if self.date_termination:
+                end_date = granular_date(self, 'date_termination')
+            else:
+                # If we don't know when the position ended, we use a ? if the
+                # person has died, or say Present if they're alive.
+                if self.person.date_dod:
+                    end_date = "?"
+                else:
+                    end_date = "Present"
+
+            s += ' <span class="text-capitalize">(%s &ndash; %s)' % (
+                granular_date(self, 'date_start', default="Unknown Date"),
+                end_date,
+            )
+        return s
+
+    @property
+    def sorted_appointed_positions(self):
+        """Appointed positions, except sorted by date instead of name."""
+        return self.appointed_positions.all().order_by('-date_start')
 
     def save(self, *args, **kwargs):
         self.full_clean()
         super(Position, self).save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
-        # Note that this isn't run during updates, alas.
-        if any([self.votes_yes, self.votes_no]) and not \
-                all([self.votes_yes, self.votes_no]):
-            return ValidationError("votes_yes and votes_no must both be either "
-                                   "empty or completed.")
-
-        for field in ['start', 'termination']:
-            validate_partial_date(self, field)
-
-        for field in ['person', 'appointer', 'supervisor', 'predecessor',
-                      'school']:
-            validate_is_not_alias(self, field)
-        validate_only_one_location(self)
-        validate_only_one_job_type(self)
+        validate_partial_date(self, ['start', 'termination'])
+        validate_is_not_alias(self, ['person', 'supervisor', 'predecessor',
+                                     'school'])
+        validate_at_most_n(self, 1, ['school', 'organization_name', 'court'])
+        validate_exactly_n(self, 1, ['position_type', 'job_title'])
+        validate_all_or_none(self, ['votes_yes', 'votes_no'])
+        validate_all_or_none(self, ['votes_yes_percent', 'votes_no_percent'])
+        validate_not_all(self, ['votes_yes', 'votes_no', 'votes_yes_percent',
+                                'votes_no_percent'])
+        validate_nomination_fields_ok(self)
+        validate_supervisor(self)
 
         super(Position, self).clean_fields(*args, **kwargs)
 
@@ -602,11 +719,19 @@ class RetentionEvent(models.Model):
     date_retention = models.DateField(
         db_index=True,
     )
-    votes_yes = models.PositiveSmallIntegerField(
+    votes_yes = models.PositiveIntegerField(
         null=True,
         blank=True,
     )
-    votes_no = models.PositiveSmallIntegerField(
+    votes_no = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+    votes_yes_percent = models.FloatField(
+        null=True,
+        blank=True,
+    )
+    votes_no_percent = models.FloatField(
         null=True,
         blank=True,
     )
@@ -618,6 +743,15 @@ class RetentionEvent(models.Model):
         null=True,
         blank=True,
     )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(RetentionEvent, self).save(*args, **kwargs)
+
+    def clean_fields(self, *args, **kwargs):
+        validate_all_or_none(self, ['votes_yes', 'votes_no'])
+        validate_all_or_none(self, ['votes_yes_percent', 'votes_no_percent'])
+        super(RetentionEvent, self).clean_fields(*args, **kwargs)
 
 
 class Education(models.Model):
@@ -631,7 +765,9 @@ class Education(models.Model):
         ('phd', 'Doctor of Philosophy (PhD)'),
         ('aa', 'Associate (e.g. A.A.)'),
         ('md', 'Medical Degree (M.D.)'),
-        ('mba', 'Master of Business Administration (M.B.A.)')
+        ('mba', 'Master of Business Administration (M.B.A.)'),
+        ('cfa', 'Accounting Certification (C.P.A., C.M.A., C.F.A.)'),
+        ('cert', 'Certificate')
     )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -654,11 +790,13 @@ class Education(models.Model):
         related_name='educations',
     )
     degree_level = models.CharField(
+        help_text = "Normalized degree level, e.g. BA, JD.",
         choices=DEGREE_LEVELS,
-        max_length=3,
+        max_length=4,
         blank=True,
     )
     degree_detail = models.CharField(
+        help_text = "Detailed degree description, e.g. including major.",
         max_length=100,
         blank=True,
     )
@@ -673,11 +811,13 @@ class Education(models.Model):
             self.pk, self.degree_detail, self.school.name, self.degree_year
         )
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(Education, self).save(*args, **kwargs)
+
     def clean_fields(self, *args, **kwargs):
         # Note that this isn't run during updates, alas.
-        validate_is_not_alias(self, 'person')
-        validate_is_not_alias(self, 'school')
-        validate_if_degree_detail_then_degree(self)
+        validate_is_not_alias(self, ['person', 'school'])
         super(Education, self).clean_fields(*args, **kwargs)
 
 
@@ -715,7 +855,8 @@ class PoliticalAffiliation(models.Model):
         ('l', 'Libertarian'),
         ('f', 'Federalist'),
         ('w', 'Whig'),
-        ('j', 'Jeffersonian Republican')
+        ('j', 'Jeffersonian Republican'),
+        ('u', 'National Union'),
     )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -761,12 +902,13 @@ class PoliticalAffiliation(models.Model):
         blank=True,
     )
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(PoliticalAffiliation, self).save(*args, **kwargs)
+
     def clean_fields(self, *args, **kwargs):
-        for field in ['start', 'end']:
-            validate_partial_date(self, field)
-
-        validate_is_not_alias(self, 'person')
-
+        validate_partial_date(self, ['start', 'end'])
+        validate_is_not_alias(self, ['person'])
         super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
 
 
@@ -828,14 +970,9 @@ class ABARating(models.Model):
         auto_now=True,
         db_index=True,
     )
-    date_rated = models.DateField(
-        null=True,
-        blank=True,
-    )
-    date_granularity_rated = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
+    year_rated = models.PositiveSmallIntegerField(
+        help_text="The year of the rating.",
+        null=True
     )
     rating = models.CharField(
         choices=ABA_RATINGS,
@@ -846,7 +983,10 @@ class ABARating(models.Model):
         verbose_name = 'American Bar Association Rating'
         verbose_name_plural = 'American Bar Association Ratings'
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(ABARating, self).save(*args, **kwargs)
+
     def clean_fields(self, *args, **kwargs):
-        validate_partial_date(self, 'rated')
-        validate_is_not_alias(self, 'person')
+        validate_is_not_alias(self, ['person'])
         super(ABARating, self).clean_fields(*args, **kwargs)

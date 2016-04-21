@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 from cl.search.models import Docket, Opinion, OpinionCluster
-from cl.people_db.models import Person
 from cl.citations.find_citations import get_citations
 from cl.lib.import_lib import map_citations_to_models, find_person
 
@@ -13,6 +12,7 @@ ARGUED_TAGS = ['argued', 'submitted', 'submitted on briefs', 'on briefs', 'heard
 REARGUE_DENIED_TAGS = [
     'reargument denied', 'rehearing denied', 'further rehearing denied', 'as modified on denial of rehearing'
     ,'order denying rehearing', 'petition for rehearing filed', 'motion for rehearing filed'
+    ,'rehearing denied to bar commission'
 ]
 REARGUE_TAGS = ['reargued', 'reheard']
 CERT_GRANTED_TAGS = ['certiorari granted']
@@ -57,7 +57,8 @@ def make_and_save(item):
                 print("Found unknown date tag '%s' with date '%s'." % date_info)
 
     docket = Docket(
-        date_argued=date_argued
+        source=Docket.DEFAULT
+        ,date_argued=date_argued
         ,date_reargued=date_reargued
         ,date_cert_granted=date_cert_granted
         ,date_cert_denied=date_cert_denied
@@ -112,6 +113,7 @@ def make_and_save(item):
         opinion = Opinion(
             cluster=cluster
             ,author=author
+            # ,per_curiam=opinion_info['per_curiam']  # TODO: un-comment once per_curiam has been migrated to Opinion
             ,type=OPINION_TYPE_MAPPING[opinion_info['type']]
             ,html_columbia=opinion_info['opinion']
         )

@@ -472,6 +472,12 @@ class Court(models.Model):
     def __unicode__(self):
         return u'{name}'.format(name=self.full_name)
 
+    @property
+    def is_terminated(self):
+        if self.end_date:
+            return True
+        return False
+
     class Meta:
         ordering = ["position"]
 
@@ -506,10 +512,6 @@ class OpinionCluster(models.Model):
                   "string. This field is used when normalized judges cannot "
                   "be placed into the panel field.",
         blank=True,
-    )
-    per_curiam = models.BooleanField(
-        help_text="Was this case heard per curiam?",
-        default=False,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -849,13 +851,17 @@ class Opinion(models.Model):
         symmetrical=False,
         related_name="opinions_citing",
         blank=True,
-    )
+    )    
     author = models.ForeignKey(
         'people_db.Person',
         help_text="The primary author of this opinion",
         related_name='opinions_written',
         blank=True,
         null=True,
+    )
+    per_curiam = models.BooleanField(
+        help_text="Is this opinion per curiam, without a single author?",
+        default=False,
     )
     joined_by = models.ManyToManyField(
         'people_db.Person',
@@ -990,3 +996,37 @@ class OpinionsCited(models.Model):
         verbose_name_plural = 'Opinions cited'
         unique_together = ("citing_opinion", "cited_opinion")
 
+#class AppellateReview(models.Model):
+#    REVIEW_STANDARDS = (
+#        ('d', 'Discretionary'),
+#        ('m', 'Mandatory'),
+#        ('s', 'Special or Mixed'),
+#    )
+#    upper_court = models.ForeignKey(
+#        Court,
+#        related_name='lower_courts_reviewed',
+#    )
+#    lower_court = models.ForeignKey(
+#        Court,
+#        related_name='reviewed_by',
+#    )
+#    date_start = models.DateTimeField(
+#        help_text="The date this appellate review relationship began",
+#        db_index=True,
+#        null=True
+#    )
+#    date_end = models.DateTimeField(
+#        help_text="The date this appellate review relationship ended",
+#        db_index=True,
+#        null=True
+#    )
+#    review_standard =  models.CharField(
+#        max_length=1,
+#        choices=REVIEW_STANDARDS,
+#    )
+#    def __unicode__(self):
+#        return u'%s ⤜--reviewed by⟶  %s' % (self.lower_court.id,
+#                                        self.upper_court.id)
+#
+#    class Meta:
+#        unique_together = ("upper_court", "lower_court")

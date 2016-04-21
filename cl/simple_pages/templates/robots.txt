@@ -8,30 +8,39 @@ User-agent: Googlebot
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/bulk-data/
+Disallow: /static/judge_pics/
 
 User-agent: bingbot
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
+Disallow: /api/rest/v2/
 Disallow: /api/bulk-data/
+Disallow: /static/judge_pics/
 
 User-agent: Slurp
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
+Disallow: /api/rest/v2/
 Disallow: /api/bulk-data/
+Disallow: /static/judge_pics/
 
 User-agent: DuckDuckBot
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
+Disallow: /api/rest/v2/
 Disallow: /api/bulk-data/
+Disallow: /static/judge_pics/
 
 User-agent: twitterbot
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
+Disallow: /api/rest/v2/
 Disallow: /api/bulk-data/
+Disallow: /static/judge_pics/
 
 # Yandex, Ask
 # These support meta robots, but not x-robots-tag
@@ -40,31 +49,37 @@ User-agent: YandexBot
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
+Disallow: /api/rest/v2/
 Disallow: /api/bulk-data/
 Disallow: /pdf/
 Disallow: /wpd/
 Disallow: /txt/
 Disallow: /doc/
+Disallow: /static/judge_pics/
 
 User-agent: teoma
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
+Disallow: /api/rest/v2/
 Disallow: /api/bulk-data/
 Disallow: /pdf/
 Disallow: /wpd/
 Disallow: /txt/
 Disallow: /doc/
+Disallow: /static/judge_pics/
 
 User-agent: ia_archiver
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
+Disallow: /api/rest/v2/
 Disallow: /api/bulk-data/
 Disallow: /pdf/
 Disallow: /wpd/
 Disallow: /txt/
 Disallow: /doc/
+Disallow: /static/judge_pics/
 
 
 # Baidu, Blekko, Others

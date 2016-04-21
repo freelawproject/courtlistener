@@ -38,7 +38,6 @@
       "source": "C",
       "state_cite_one": "33 state 1",
       "panel": [],
-      "per_curiam": false,
       "federal_cite_one": "22 fed 1",
       "judges": "",
       "case_name": "Voutila v. Bonvini",
@@ -77,6 +76,7 @@
       "joined_by": [],
       "date_created": "2015-08-15T14:10:56.801Z",
       "html_lawbox": null,
+      "per_curiam": false,
       "type": "010combined"
     },
     "model": "search.opinion",
@@ -121,7 +121,6 @@
       "source": "C",
       "state_cite_one": "33 state 1",
       "panel": [],
-      "per_curiam": false,
       "federal_cite_one": "22 fed 1",
       "judges": "",
       "case_name": "Voutila v. Bonvini, part 2",
@@ -160,6 +159,7 @@
       "joined_by": [],
       "date_created": "2015-08-15T14:10:56.801Z",
       "html_lawbox": null,
+      "per_curiam": false,
       "type": "010combined"
     },
     "model": "search.opinion",
@@ -184,7 +184,6 @@
       "source": "C",
       "state_cite_one": "33 state 1",
       "panel": [],
-      "per_curiam": false,
       "federal_cite_one": "22 fed 1",
       "judges": "",
       "case_name": "HTML Opinion",
@@ -223,6 +222,7 @@
       "joined_by": [],
       "date_created": "2015-08-15T14:10:56.801Z",
       "html_lawbox": null,
+      "per_curiam": false,
       "type": "010combined"
     },
     "model": "search.opinion",
@@ -267,7 +267,6 @@
       "source": "C",
       "state_cite_one": "33 state 1",
       "panel": [],
-      "per_curiam": false,
       "federal_cite_one": "22 fed 1",
       "judges": "",
       "case_name": "Bippity Boppity vs. Bonvini",
@@ -306,6 +305,7 @@
       "joined_by": [],
       "date_created": "2015-08-15T14:10:56.801Z",
       "html_lawbox": null,
+      "per_curiam": false,
       "type": "010combined"
     },
     "model": "search.opinion",

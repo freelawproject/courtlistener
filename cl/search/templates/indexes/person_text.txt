@@ -34,4 +34,4 @@
 {{ item.fjc_id }}
 {{ item.cl_id }}
 {{ item.get_gender_display }}
-{{ item.get_religion_display }}
+{{ item.religion }}

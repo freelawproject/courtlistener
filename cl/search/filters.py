@@ -79,9 +79,10 @@ class OpinionFilter(filters.FilterSet):
         fields = {
             'id': INTEGER_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
-            'date_created': DATETIME_LOOKUPS,
+            'date_created': DATETIME_LOOKUPS,            
             'sha1': ['exact'],
             'extracted_by_ocr': ['exact'],
+            'per_curiam': ['exact'],
         }
 
 
@@ -110,7 +111,6 @@ class OpinionClusterFilter(filters.FilterSet):
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_filed': DATE_LOOKUPS,
-            'per_curiam': ['exact'],
             'citation_id': ['exact'],
             'federal_cite_one': ['exact'],
             'federal_cite_two': ['exact'],

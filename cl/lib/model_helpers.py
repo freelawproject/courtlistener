@@ -32,7 +32,7 @@ def make_upload_path(instance, filename):
     )
 
 
-def validate_partial_date(instance, field):
+def validate_partial_date(instance, fields):
     """Ensure that partial dates make sense.
 
     Validates that:
@@ -41,70 +41,161 @@ def validate_partial_date(instance, field):
      - If a partial date, the day/month is/are set to 01.
     """
     from cl.people_db.models import GRANULARITY_MONTH, GRANULARITY_YEAR
-    d = getattr(instance, 'date_%s' % field)
-    granularity = getattr(instance, 'date_granularity_%s' % field)
+    for field in fields:
+        d = getattr(instance, 'date_%s' % field)
+        granularity = getattr(instance, 'date_granularity_%s' % field)
 
-    if any([d, granularity]) and not all([d, granularity]):
-        raise ValidationError({
-            'date_%s' % field: 'Date and granularity must both be complete or '
-                               'blank.'
-        })
+        if any([d, granularity]) and not all([d, granularity]):
+            raise ValidationError({
+                'date_%s' % field: 'Date and granularity must both be complete '
+                                   'or blank. Hint: The values are: date: %s, '
+                                   'granularity: %s' % (d, granularity)
+            })
 
-    # If a partial date, are days/month set to 1?
-    bad_date = False
-    if granularity == GRANULARITY_YEAR:
-        if d.month != 1 and d.day != 1:
-            bad_date = True
-    if granularity == GRANULARITY_MONTH:
-        if d.day != 1:
-            bad_date = True
-    if bad_date:
-        raise ValidationError({
-            'date_%s' % field: 'Granularity was set as partial, but date '
-                               'appears to include month/day other than 1.'
-        })
+        # If a partial date, are days/month set to 1?
+        bad_date = False
+        if granularity == GRANULARITY_YEAR:
+            if d.month != 1 and d.day != 1:
+                bad_date = True
+        if granularity == GRANULARITY_MONTH:
+            if d.day != 1:
+                bad_date = True
+        if bad_date:
+            raise ValidationError({
+                'date_%s' % field: 'Granularity was set as partial, but date '
+                                   'appears to include month/day other than 1.'
+            })
 
 
-def validate_is_not_alias(instance, field):
+def validate_is_not_alias(instance, fields):
     """Ensure that an alias to an object is not being used instead of the object
     itself.
 
     Requires that the object have an is_alias property or attribute.
     """
-    referenced_object = getattr(instance, field)
-    if referenced_object is not None and referenced_object.is_alias:
-        raise ValidationError({
-            field: 'Cannot set "%s" field to an alias of a "%s". Hint: "%s" is '
-                   'an alias of "%s"' % (field, type(referenced_object).__name__,
-                                      referenced_object,
-                                      referenced_object.is_alias_of)
-        })
+    for field in fields:
+        referenced_object = getattr(instance, field)
+        if referenced_object is not None and referenced_object.is_alias:
+            raise ValidationError({
+                field: 'Cannot set "%s" field to an alias of a "%s". Hint: '
+                       '"%s" is an alias of "%s"' % (
+                    field,
+                    type(referenced_object).__name__,
+                    referenced_object,
+                    referenced_object.is_alias_of
+                )
+            })
 
 
-def validate_only_one_location(instance):
-    location_fields = ['school', 'organization_name', 'court']
-    num_completed_fields = sum(1 for x in location_fields if getattr(instance, x))
-    completed_fields = [x for x in location_fields if getattr(instance, x)]
-    if num_completed_fields > 1:
+def validate_has_full_name(instance):
+    """This ensures that blank values are not passed to the first and last name
+    fields. Normally this can be done by the DB layer, but people could still
+    pass blank strings through, and this blocks even that.
+    """
+    if not all([instance.name_first, instance.name_last]):
         raise ValidationError(
-            "More than one of the location fields is completed. %s are: %s!" % (
-                num_completed_fields,
-                ", ".join(completed_fields),
-            ))
+            "Both first and last names are required."
+        )
 
 
-def validate_only_one_job_type(instance):
-    if instance.position_type and instance.job_title:
-        raise ValidationError("Cannot have values for both job_title and "
-                              "position_type")
-    if not any([instance.position_type, instance.job_title]):
-        raise ValidationError("Either job_title or position_type must be "
-                              "completed.")
+def validate_nomination_fields_ok(instance):
+    """Validate a few things:
+     - date_nominated and date_elected cannot both have values
+     - if nominated, then date_elected not complete and vice versa.
+    """
+    if instance.date_nominated and instance.date_elected:
+        raise ValidationError(
+            "Cannot have both a date nominated and a date elected."
+        )
+
+    if instance.how_selected:
+        selection_type_group = instance.SELECTION_METHOD_GROUPS[instance.how_selected]
+        if selection_type_group == 'Election' and instance.date_nominated:
+            raise ValidationError(
+                "Cannot have a nomination date for a position with how_selected of "
+                "%s" % instance.get_how_selected_display()
+            )
+        if selection_type_group == 'Appointment' and instance.date_elected:
+            raise ValidationError(
+                "Cannot have an election date for a position with how_selected of "
+                "%s" % instance.get_how_selected_display()
+            )
 
 
-def validate_if_degree_detail_then_degree(instance):
-    if instance.degree_detail and not instance.degree_level:
-        raise ValidationError("Cannot have degree_detail without degree_level.")
+def validate_supervisor(instance):
+    """Ensure that the supervisor field makes sense.
+
+     - Supervisors can only be judges.
+     - Supervisor field can only be completed when the position is that of a
+       clerk.
+    """
+    sup = instance.supervisor
+    if sup:
+        if not sup.is_judge:
+            raise ValidationError(
+                {'supervisor': "The supervisor field can only be set to a "
+                               "judge, but '%s' does not appear to have ever "
+                               "been a judge." % sup.name_full
+                 }
+            )
+
+    if sup and not instance.is_clerkship:
+        raise ValidationError(
+            "You have configured a supervisor for this field ('%s'), but it "
+            "the position_type is not a clerkship. Instead it's: '%s'" % (
+                sup.name_full,
+                instance.position_type,
+            )
+        )
+
+
+def validate_all_or_none(instance, fields):
+    """Ensure that all fields are complete or that none are complete"""
+    num_fields = len(fields)
+    completed_fields = sum(1 for f in fields if
+                           getattr(instance, f) or
+                           getattr(instance, f) == 0)
+    all_complete = completed_fields == num_fields
+    none_complete = completed_fields == 0
+    if not any([all_complete, none_complete]):
+        raise ValidationError(
+            "%s of the following fields are complete, but either all of them need to be, or none of them need to be: %s" % (
+                completed_fields,
+                ", ".join(fields),
+            )
+        )
+
+
+def validate_exactly_n(instance, n, fields):
+    """Ensure that exactly n of the fields has a value."""
+    completed_fields = sum(1 for f in fields if getattr(instance, f))
+    if completed_fields != n:
+        raise ValidationError(
+            "Exactly %s of the following fields can be completed (currently "
+            "%s are): %s" % (n, completed_fields, ", ".join(fields))
+        )
+
+
+def validate_at_most_n(instance, n, fields):
+    """Ensure that at most n fields are complete."""
+    completed_fields = sum(1 for f in fields if getattr(instance, f))
+    if completed_fields > n:
+        raise ValidationError(
+                "Exactly %s of the following fields can be completed (currently "
+                "%s are): %s" % (n, completed_fields, ", ".join(fields))
+        )
+
+
+def validate_not_all(instance, fields):
+    """Make sure that all of the passed fields are not complete."""
+    num_fields = len(fields)
+    num_completed_fields = sum(1 for f in fields if getattr(instance, f))
+    if num_completed_fields == num_fields:
+        # They're all completed. Boo!
+        raise ValidationError(
+            "All of the following fields cannot be completed: %s" %
+            ', '.join(fields)
+        )
 
 
 def make_choices_group_lookup(c):

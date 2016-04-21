@@ -1,9 +1,6 @@
-from django.utils.formats import date_format
-
-from cl.people_db.models import GRANULARITY_DAY, GRANULARITY_MONTH, \
-    GRANULARITY_YEAR
-
 from django import template
+from django.core.exceptions import ValidationError
+from django.utils.formats import date_format
 from django.utils.safestring import mark_safe
 
 register = template.Library()
@@ -43,15 +40,29 @@ def get_full_host(context, username=None, password=None):
 
 
 @register.simple_tag(takes_context=False)
-def granular_date(d, granularity=GRANULARITY_DAY, iso=False, default="Unknown"):
+def granular_date(obj, field_name, granularity=None, iso=False,
+                  default="Unknown"):
     """Return the date truncated according to its granularity.
 
-    :param d: The date to be converted to a string.
-    :param granularity: A strftime format indicating how much granularity we
-        know.
+    :param obj: The object to get the value from
+    :param field_name: The attribute to be converted to a string.
+    :param granularity: The granularity to perform. If None, we assume that
+        getattr(obj, 'date_%s_field_name') will work.
     :param iso: Whether to return an iso8601 date or a human readable one.
     :return: A string representation of the date.
     """
+    from cl.people_db.models import GRANULARITY_DAY, GRANULARITY_MONTH, \
+        GRANULARITY_YEAR
+    if not isinstance(obj, dict):
+        # Convert it to a dict. It's easier to convert this way than from a dict
+        # to an object.
+        obj = obj.__dict__
+
+    d = obj.get(field_name, None)
+    if granularity is None:
+        date_parts = field_name.split('_')
+        granularity = obj["%s_granularity_%s" % (date_parts[0], date_parts[1])]
+
     if not d:
         return default
     if iso is False:
@@ -68,3 +79,10 @@ def granular_date(d, granularity=GRANULARITY_DAY, iso=False, default="Unknown"):
             return date_format(d, format='Y-m')
         elif granularity == GRANULARITY_YEAR:
             return date_format(d, format='Y')
+
+    raise ValidationError(
+        u"Fell through date granularity template tag. This could mean that you "
+        u"have a date without an associated granularity. Did you apply the "
+        u"validation rules? Is full_clean() getting called in your save() "
+        u"method?"
+    )

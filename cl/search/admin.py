@@ -9,6 +9,7 @@ class OpinionAdmin(admin.ModelAdmin):
     fields = (
         'cluster',
         'author',
+        'per_curiam',
         'joined_by',
         'type',
         'sha1',
@@ -46,8 +47,7 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'docket',
         'panel',
         'non_participating_judges',
-        'judges',
-        'per_curiam',
+        'judges',        
         'date_filed',
         'slug',
         'citation_id',
