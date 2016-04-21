@@ -1,8 +1,9 @@
-from cl.lib.podcast import iTunesPodcastsFeedGenerator
+from django.conf import settings
+
 from cl.lib import search_utils, sunburnt
+from cl.lib.podcast import iTunesPodcastsFeedGenerator
 from cl.search.feeds import JurisdictionFeed
 from cl.search.forms import SearchForm
-from django.conf import settings
 
 
 class JurisdictionPodcast(JurisdictionFeed):
@@ -14,7 +15,7 @@ class JurisdictionPodcast(JurisdictionFeed):
     summary = description
     iTunes_name = u'Free Law Project'
     iTunes_email = u'feeds@courtlistener.com'
-    iTunes_image_url = u'https://www.courtlistener.com/static/png/producer.png'
+    iTunes_image_url = u'https://www.courtlistener.com/static/png/producer-2000x2000.png'
     iTunes_explicit = u'no'
 
     def title(self, obj):
@@ -58,7 +59,7 @@ class JurisdictionPodcast(JurisdictionFeed):
 
     description_template = None
     def item_description(self, item):
-        return None
+        return item['caseName']
 
     def item_categories(self, item):
         return None
@@ -67,7 +68,8 @@ class JurisdictionPodcast(JurisdictionFeed):
 
 
 class AllJurisdictionsPodcast(JurisdictionPodcast):
-    title = "CourtListener.com: Podcast of All Oral Arguments (High Volume)"
+    title = ("CourtListener.com: Podcast of All Oral Arguments available in "
+             "the Federal Circuit Courts (High Volume)")
 
     def get_object(self, request):
         return None
