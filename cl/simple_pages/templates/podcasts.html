@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load partition_util %}
+
+{% block title %}Podcasts – CourtListener.com{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="col-xs-12">
+        <div class="row v-offset-above-3">
+            <div class="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
+            <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
+                <h1 class="text-center">Podcasts of Oral Argument Audio&nbsp;<i
+                        class="gray fa fa-rss"></i>
+                </h1>
+                <p>Podcasts allow you to subscribe to oral argument audio as it is
+                    published by a court. Instead of having to regularly go to the
+                    court website to hear the latest oral arguments, you can simply
+                    subscribe to a podcast and it will show up in your audio player.
+                </p>
+                <p>The podcasts we provide require ongoing maintenance.
+                    We are able to add and support more podcasts as we receive
+                    <a href="{% url "donate" %}?referrer=podcasts">support
+                    from you.</a>
+                </p>
+            </div>
+        </div>
+
+        <h2>How to Subscribe</h2>
+        <p>Subscribing to our podcasts can be done in a few different ways. If you're an expert user, you can use any of the links below to subscribe to a podcast for that court or you can create your own podcast using the instructions below.
+        </p>
+        <div class="row">
+            {% for row in oral_argument_courts|rows:3 %}
+                <div class="col-sm-4">
+                    <ul {% if not forloop.last %}class="bottom"{% endif %}>
+                        {% for court in row %}
+                            <li>
+                                <a href="/podcast/court/{{ court.pk }}/">{{ court }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endfor %}
+            <div class="col-xs-12">
+                <p>We also have <a href="/podcast/court/all/">a podcast for all of the oral arguments listed above</a>.</p>
+                <p>Unfortunately, we do not have podcasts for the 2nd or 10th
+                    Circuits of Appeals. They do not post oral argument
+                    audio.
+                </p>
+            </div>
+        </div>
+
+
+        <h3>Using a Music Service</h3>
+        <div class="row">
+            <div class="col-xs-6">
+                <h4 class="text-center text-uppercase gray">Google Music</h4>
+                <a href="https://play.google.com/music/">
+                    <img src="{{ STATIC_URL }}svg/play_music_triangle.svg"
+                         alt="Google Play Logo"
+                         class="img-responsive center-block"
+                         height="200"
+                         width="200">
+                </a>
+                <p class="v-offset-above-2 text-center">To find our podcasts on <a href="https://play.google.com/music/">Google Music</a>, simply login and search for "CourtListener".
+                </p>
+            </div>
+            <div class="col-xs-6">
+                <h4 class="text-center text-uppercase gray">Stitcher Radio</h4>
+                <a href="https://www.stitcher.com">
+                    <img src="{{ STATIC_URL }}jpeg/stitcher_400x400.jpeg"
+                         alt="Google Play Logo"
+                         class="img-responsive center-block img-rounded"
+                         height="200"
+                         width="200">
+                </a>
+                <p class="v-offset-above-2 text-center">To find our podcasts on <a href="https://www.stitcher.com">Stitcher Radio</a>, install the app and search for "CourtListener".
+                </p>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-xs-12">
+                <h3>iTunes Support</h3>
+                <p>Unfortunately, iTunes does not support podcasts with strong encryption. This means that we have the choice of either lowering the security of the entire site or of simply not supporting iTunes. Until they offer better support, we have chosen the latter.
+                </p>
+            </div>
+        </div>
+
+
+        <h2>Creating a Custom Podcast</h2>
+        <p>Creating a custom podcast is easy. Simply do a search for oral arguments, and then click the podcast icon (<i class="gray fa fa-rss"></i>) at the top of the page. You can create a podcast for any term or jurisdiction that you can use in a search. For example, it's simple to create a podcast for multiple jurisdictions or for only cases containing "United States", or anything else you can think of.
+        </p>
+        <p>Podcasts created this way will need to be manually added to your music player.</p>
+    </div>
+{% endblock %}

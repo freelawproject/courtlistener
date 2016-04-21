@@ -7,6 +7,7 @@ from cl.simple_pages.views import (
     validate_for_bing, robots, advanced_search, contact_thanks, contact, feeds,
     coverage_graph, faq, about, browser_warning, serve_static_file, old_terms,
     latest_terms, contribute, markdown_help, humans,
+    podcasts
 )
 
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3')
@@ -18,6 +19,7 @@ urlpatterns = [
     url(r'^faq/$', faq, name="faq"),
     url(r'^coverage/$', coverage_graph, name='coverage'),
     url(r'^feeds/$', feeds, name='feeds_info'),
+    url(r'^podcasts/$', podcasts, name='podcasts'),
     url(r'^contribute/$', contribute, name='contribute'),
     url(r'^contact/$', contact, name="contact"),
     url(r'^contact/thanks/$', contact_thanks, name='contact_thanks'),
