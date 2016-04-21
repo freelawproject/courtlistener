@@ -423,7 +423,6 @@ class Court(models.Model):
     position = models.FloatField(
         help_text='A dewey-decimal-style numeral indicating a hierarchical '
                   'ordering of jurisdictions',
-        null=True,
         db_index=True,
         unique=True
     )
@@ -851,7 +850,7 @@ class Opinion(models.Model):
         symmetrical=False,
         related_name="opinions_citing",
         blank=True,
-    )    
+    )
     author = models.ForeignKey(
         'people_db.Person',
         help_text="The primary author of this opinion",

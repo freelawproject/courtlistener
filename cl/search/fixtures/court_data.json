@@ -3298,6 +3298,7 @@
       "date_modified": "2014-04-06T14:49:06.297Z",
       "has_oral_argument_scraper": false,
       "full_name": "Massachusetts District Court",
+      "position": 364.1,
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -3316,6 +3317,7 @@
       "date_modified": "2014-07-17T14:49:06.297Z",
       "has_oral_argument_scraper": false,
       "full_name": "Massachusetts Superior Court",
+      "position": 364.0,
       "has_opinion_scraper": false,
       "start_date": null
     },
