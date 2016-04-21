@@ -317,6 +317,3 @@ class SearchPerson(object):
         text_template = loader.get_template('indexes/person_text.txt')
         context = {'item': item}
         self.text = text_template.render(context).translate(null_map)
-
-        # For faceting
-        self.court_exact = [p.court.pk for p in positions if p.court is not None]
