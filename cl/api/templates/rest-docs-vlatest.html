@@ -515,23 +515,25 @@
         </ul>
 
         <h3 id="judge-endpoint">Judge Endpoints</h3>
-        {% if perms.judges.has_beta_api_access %}
-            <p>Thank you for being an early tester of our judicial database.</p>
-            <p>We will add notes here as we answer <a href="{% url "contact" %}">your questions</a> about these APIs. In the meantime, as with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options for any judicial endpoint by making an <code>OPTIONS</code> request.
-            </p>
-        {% else %}
-            <p>Unfortunately, these endpoints are not yet fully released.</p>
-            {% if request.user.is_anonymous %}
-                <p><a href="{% url "sign-in" %}?next={{ request.path }}">
-                    Sign in if you have been given early access to this feature. </a>
-                </p>
-                <p>If you wish to have early access to this feature, please <a href="{% url "contact" %}">contact us</a> to apply.
-                </p>
-            {% else %}
-                <p>You do not have permission to use these endpoints. Please <a href="{% url "contact" %}">contact us</a> to apply for early access.
-                </p>
-            {% endif %}
-        {% endif %}
+        <p>We are pleased to share the world's first REST API of federal and state judges. This database is very detailed, containing nearly 100 fields. As with the other endpoints, the best way to find field-level descriptions is by sending an <code>OPTIONS</code> request to an endpoint. If you don't have a clear understanding of a field after sending an options request and reading this documentation, please <a href="{% url "contact" %}">contact us</a> so we may help.
+        </p>
+        <h4>Endpoint-Level Notes</h4>
+        <p>The judicial REST API contains the following endpoints:</p>
+        <ul>
+            {% include "includes/judge-endpoints.html" %}
+            <li><strong>Sources</strong>: These are objects explaining the source of a piece of data. For example, it may provide a link or a text explanation of where something is from.
+            </li>
+            <li><strong>ABA Ratings</strong>: These are the American Bar Association ratings that are given to many judges, particularly those that are nominated to federal positions.
+            </li>
+        </ul>
+        <h4>Field-Level Notes</h4>
+        <ul>
+            <li>There are a number of date "granularity" fields. These are used to indicate how granular a date is known to be. For example, for many people we know the year they died but not the month or day. For these people, the <code>date_dod</code> field might be <code>2010-01-01</code>, and the <code>date_granularity_dod</code> field would be set to <code>%Y</code>, using <a href="https://secure.php.net/manual/en/function.strftime.php">strftime formatting</a> to indicate the granularity. If a date field has a granularity field, both fields will either be completed or null.
+            </li>
+            <li>There are a number of validation rules that can be useful for understanding this data. For example, one rule mandates that every position be affiliated with a school, a court, or an organization. These rules are written in Python and can be found by looking in the <code>clean_fields</code> method of the <code>Model</code> classes
+                <a href="https://github.com/freelawproject/courtlistener/blob/master/cl/people_db/models.py">found here.</a>.
+            </li>
+        </ul>
 
 
         <h2>Footnotes</h2>

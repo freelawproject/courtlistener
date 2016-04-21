@@ -56,10 +56,13 @@ class Person(models.Model):
     )
     race = models.ManyToManyField(
         'Race',
+        help_text="A person's race or races if they are multi-racial.",
         blank=True,
     )
     is_alias_of = models.ForeignKey(
         'self',
+        help_text="Any nicknames or other aliases that a person has. For "
+                  "example, William Jefferson Clinton has an alias to Bill",
         related_name="aliases",
         blank=True,
         null=True,
@@ -90,25 +93,32 @@ class Person(models.Model):
         db_index=True
     )
     slug = models.SlugField(
+        help_text="A generated path for this item as used in CourtListener "
+                  "URLs",
         max_length=158  # len(self.name_full)
     )
     name_first = models.CharField(
+        help_text="The first name of this person.",
         max_length=50,
     )
     name_middle = models.CharField(
+        help_text="The middle name or names of this person",
         max_length=50,
         blank=True,
     )
     name_last = models.CharField(
+        help_text="The last name of this person",
         max_length=50,
         db_index=True,
     )
     name_suffix = models.CharField(
+        help_text="Any suffixes that this person's name may have",
         choices=SUFFIXES,
         max_length=5,
         blank=True,
     )
     date_dob = models.DateField(
+        help_text="The date of birth for the person",
         null=True,
         blank=True,
     )
@@ -118,6 +128,7 @@ class Person(models.Model):
         blank=True,
     )
     date_dod = models.DateField(
+        help_text="The date of death for the person",
         null=True,
         blank=True,
     )
@@ -127,25 +138,31 @@ class Person(models.Model):
         blank=True,
     )
     dob_city = models.CharField(
+        help_text="The city where the person was born.",
         max_length=50,
         blank=True,
     )
     dob_state = local_models.USStateField(
+        help_text="The state where the person was born.",
         blank=True,
     )
     dod_city = models.CharField(
+        help_text="The city where the person died.",
         max_length=50,
         blank=True,
     )
     dod_state = local_models.USStateField(
+        help_text="The state where the person died.",
         blank=True,
     )
     gender = models.CharField(
+        help_text="The person's gender",
         choices=GENDERS,
         max_length=2,
         blank=True,
     )
     religion = models.CharField(
+        help_text="The religion of a person",
         max_length=30,
         blank=True
     )
@@ -209,6 +226,7 @@ class Person(models.Model):
 class School(models.Model):
     is_alias_of = models.ForeignKey(
         'self',
+        help_text="Any alternate names that a school may have",
         blank=True,
         null=True,
     )
@@ -223,6 +241,7 @@ class School(models.Model):
         db_index=True,
     )
     name = models.CharField(
+        help_text="The name of the school or alias",
         max_length=120,  # Dept. Ed. bulk data had a max of 91.
         db_index=True,
     )
@@ -382,36 +401,45 @@ class Position(models.Model):
         ('recess_not_confirmed', 'Recess Appointment Not Confirmed'),
     )
     position_type = models.CharField(
+        help_text="If this is a judicial position, this indicates the role the "
+                  "person had. This field may be blank if job_title is "
+                  "complete instead.",
         choices=POSITION_TYPES,
         max_length=20,
         blank=True,
         null=True,
     )
     job_title = models.CharField(
-        help_text="If title isn't in list, type here.",
+        help_text="If title isn't in position_type, a free-text position may "
+                  "be entered here.",
         max_length=100,
         blank=True,
     )
     person = models.ForeignKey(
         Person,
+        help_text="The person that held the position.",
         related_name='positions',
         blank=True,
         null=True,
     )
     court = models.ForeignKey(
         Court,
+        help_text="If this was a judicial position, this is the jurisdiction "
+                  "where it was held.",
         related_name='court_positions',
         blank=True,
         null=True,
     )
     school = models.ForeignKey(
         School,
-        help_text="If academic job, the school where they work.",
+        help_text="If this was an academic job, this is the school where the "
+                  "person worked.",
         blank=True,
         null=True,
     )
     organization_name = models.CharField(
-        help_text="If org isn't court or school, type here.",
+        help_text="If the organization where this position was held is not a "
+                  "school or court, this is the place it was held.",
         max_length=120,
         blank=True,
         null=True,
@@ -427,21 +455,25 @@ class Position(models.Model):
     )
     appointer = models.ForeignKey(
         'self',
+        help_text="If this is an appointed position, the person-position "
+                  "responsible for the appointment. This field references "
+                  "other positions instead of referencing people because that "
+                  "allows you to know the position a person held when an "
+                  "appointment was made.",
         related_name='appointed_positions',
-        help_text="If this is an appointed position, "
-                  "the person-position responsible for the appointing.",
         blank=True,
         null=True,
     )
     supervisor = models.ForeignKey(
         Person,
-        related_name='supervised_positions',
         help_text="If this is a clerkship, the supervising judge.",
+        related_name='supervised_positions',
         blank=True,
         null=True,
     )
     predecessor = models.ForeignKey(
         Person,
+        help_text="The person that previously held this position",
         blank=True,
         null=True,
     )
@@ -497,6 +529,8 @@ class Position(models.Model):
         db_index=True,
     )
     judicial_committee_action = models.CharField(
+        help_text="The action that the judicial committee took in response to "
+                  "a nomination",
         choices=JUDICIAL_COMMITTEE_ACTIONS,
         max_length=20,
         blank=True,
@@ -531,6 +565,7 @@ class Position(models.Model):
         db_index=True,
     )
     termination_reason = models.CharField(
+        help_text="The reason for a termination",
         choices=TERMINATION_REASONS,
         max_length=25,
         blank=True,
@@ -548,35 +583,49 @@ class Position(models.Model):
         db_index=True,
     )
     nomination_process = models.CharField(
+        help_text="The process by which a person was nominated into this "
+                  "position.",
         choices=NOMINATION_PROCESSES,
         max_length=20,
         blank=True,
     )
     vote_type = models.CharField(
+        help_text="The type of vote that resulted in this position.",
         choices=VOTE_TYPES,
         max_length=2,
         blank=True,
     )
     voice_vote = models.NullBooleanField(
+        help_text="Whether the Senate voted by voice vote for this position.",
         blank=True,
     )
     votes_yes = models.PositiveIntegerField(
+        help_text="If votes are an integer, this is the number of votes in "
+                  "favor of a position.",
         null=True,
         blank=True,
     )
     votes_no = models.PositiveIntegerField(
+        help_text="If votes are an integer, this is the number of votes "
+                  "opposed to a position.",
         null=True,
         blank=True,
     )
     votes_yes_percent = models.FloatField(
+        help_text="If votes are a percentage, this is the percentage of votes "
+                  "in favor of a position.",
         null=True,
         blank=True,
     )
     votes_no_percent = models.FloatField(
+        help_text="If votes are a percentage, this is the percentage of votes "
+                  "opposed to a position.",
         null=True,
         blank=True,
     )
     how_selected = models.CharField(
+        help_text="The method that was used for selecting this judge for this "
+                  "position (generally an election or appointment).",
         choices=SELECTION_METHODS,
         max_length=20,
         blank=True,
@@ -698,6 +747,7 @@ class RetentionEvent(models.Model):
     )
     position = models.ForeignKey(
         Position,
+        help_text="The position that was retained by this event.",
         related_name='retention_events',
         blank=True,
         null=True,
@@ -713,33 +763,46 @@ class RetentionEvent(models.Model):
         db_index=True,
     )
     retention_type = models.CharField(
+        help_text="The method through which this position was retained.",
         choices=RETENTION_TYPES,
         max_length=10,
     )
     date_retention = models.DateField(
+        help_text="The date of retention",
         db_index=True,
     )
     votes_yes = models.PositiveIntegerField(
+        help_text="If votes are an integer, this is the number of votes in "
+                  "favor of a position.",
         null=True,
         blank=True,
     )
     votes_no = models.PositiveIntegerField(
+        help_text="If votes are an integer, this is the number of votes "
+                  "opposed to a position.",
         null=True,
         blank=True,
     )
     votes_yes_percent = models.FloatField(
+        help_text="If votes are a percentage, this is the percentage of votes "
+                  "in favor of a position.",
         null=True,
         blank=True,
     )
     votes_no_percent = models.FloatField(
+        help_text="If votes are a percentage, this is the percentage of votes "
+                  "opposed to a position.",
         null=True,
         blank=True,
     )
     unopposed = models.NullBooleanField(
+        help_text="Whether the position was unopposed at the time of "
+                  "retention.",
         null=True,
         blank=True,
     )
     won = models.NullBooleanField(
+        help_text="Whether the retention event was won.",
         null=True,
         blank=True,
     )
@@ -781,22 +844,24 @@ class Education(models.Model):
     )
     person = models.ForeignKey(
         Person,
+        help_text="The person that completed this education",
         related_name='educations',
         blank=True,
         null=True,
     )
     school = models.ForeignKey(
         School,
+        help_text="The school where this education was compeleted",
         related_name='educations',
     )
     degree_level = models.CharField(
-        help_text = "Normalized degree level, e.g. BA, JD.",
+        help_text="Normalized degree level, e.g. BA, JD.",
         choices=DEGREE_LEVELS,
         max_length=4,
         blank=True,
     )
     degree_detail = models.CharField(
-        help_text = "Detailed degree description, e.g. including major.",
+        help_text="Detailed degree description, e.g. including major.",
         max_length=100,
         blank=True,
     )
@@ -870,20 +935,25 @@ class PoliticalAffiliation(models.Model):
     )
     person = models.ForeignKey(
         Person,
+        help_text="The person with the political affiliation",
         related_name='political_affiliations',
         blank=True,
         null=True,
     )
     political_party = models.CharField(
+        help_text="The political party the person is affiliated with.",
         choices=POLITICAL_PARTIES,
         max_length=5,
     )
     source = models.CharField(
+        help_text="The source of the political affiliation -- where it is "
+                  "documented that this affiliation exists.",
         choices=POLITICAL_AFFILIATION_SOURCE,
         max_length=5,
         blank=True,
     )
     date_start = models.DateField(
+        help_text="The date the political affiliation was first documented",
         null=True,
         blank=True,
     )
@@ -893,6 +963,7 @@ class PoliticalAffiliation(models.Model):
         blank=True,
     )
     date_end = models.DateField(
+        help_text="The date the affiliation ended.",
         null=True,
         blank=True,
     )
@@ -956,6 +1027,7 @@ class ABARating(models.Model):
     )
     person = models.ForeignKey(
         Person,
+        help_text="The person rated by the American Bar Association",
         related_name='aba_ratings',
         blank=True,
         null=True,
@@ -975,6 +1047,7 @@ class ABARating(models.Model):
         null=True
     )
     rating = models.CharField(
+        help_text="The rating given to the person.",
         choices=ABA_RATINGS,
         max_length=5,
     )
