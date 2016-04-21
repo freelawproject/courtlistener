@@ -3,34 +3,31 @@
 import re
 
 # list of words that aren't judge names
-NOT_JUDGE = {
-    'acting', 'active', 'adopted', 'although', 'and', 'appeals', 'appellate',
-    'argument', 'arj', 'associate', 'authorized', 'available', 'banc', 'bankruptcy','before',
-    'bold', 'briefs', 'but', 'capacity', 'case', 'cause', 'center', 'certified',
-    'chairman', 'chief', 'circuit', 'commissioner', 
-    'concur', 'concurred', 'concurrence', 'concurs', 'concurring', 
-    'conference', 'conferences', 'considered', 'constituting',
-    'consultation', 'continue', 'court', 'curiam', 'decided', 'decision', 'denials',
-    'designation', 'did', 'died', 
-    'dissent', 'dissenting', 'dissents', 'dissented',
-    'district', 'division', 'even', 'fellows', 'final', 'footnote', 'for',
-    'furth', 'further', 'his', 'ii', 'iii', 'indiana', 'initial', 'issuance', 
-    'italic', 'iv', 'joined', 'judge', 'judges', 'judgment', 'judgement', 
-    'justice', 'justices', 'judicial',
-    'majority', 'may', 'member', 'not', 'number', 'opinion', 'oral', 'order',
-    'page', 'panel', 'part', 'participate', 'participated', 'participating',
+NOT_JUDGE = [
+    'above', 'absent', 'acting', 'active', 'adopted', 'although', 'and',
+    'appeals', 'appellate', 'argument', 'arj', 'assignment', 'associate',
+    'authorized', 'available', 'banc', 'bankruptcy', 'before', 'bold', 'briefs',
+    'but', 'capacity', 'case', 'cause', 'center', 'certified', 'chairman',
+    'chief', 'circuit', 'commissioner', 'concur', 'concurred', 'concurrence',
+    'concurring', 'concurs', 'conference', 'conferences', 'considered',
+    'consisted', 'consists', 'constituting', 'consultation', 'continue',
+    'court', 'curiam', 'decided', 'decision', 'denials', 'designation', 'did',
+    'died', 'disqualified', 'dissent', 'dissented', 'dissenting', 'dissents',
+    'district', 'division', 'emeritus', 'even', 'facts', 'fellows', 'final',
+    'footnote', 'for', 'four', 'furth', 'further', 'his', 'ii', 'iii',
+    'indiana', 'initial', 'issuance', 'italic', 'iv', 'joined', 'judge',
+    'judgement', 'judges', 'judgment', 'judicial', 'justice', 'justices',
+    'magistrate', 'majority', 'making', 'maryland', 'may', 'member',
+    'memorandum', 'not', 'number', 'one', 'opinion', 'oral', 'order', 'page',
+    'pair', 'panel', 'part', 'participate', 'participated', 'participating',
     'participation', 'per', 'preparation', 'present', 'presiding', 'prior',
-    'pro', 'qualified', 'reference', 'resigned', 'resul', 'result', 'retired',
-    'sat', 'senior', 'sit', 'sitting', 'special', 'specially', 'submitted',
-    'superior', 'supernumerary', 'tem', 'the', 'this', 'though', 'time',
-    'transfer', 'vice', 'was', 'while', 'with', 'reverse','absent', 'making',
-    'chairman', 'warden', 'taking', 'states', 'memorandum','consists',
-    'pair', 'separate', 'magistrate', 'consisted', 'votes', 'disqualified',
-    'assignment', 'facts', 'recused', 'recuse','recusal',
-    'emeritus','two', 'which', 'vacancy', 'maryland', 'above',
-    'reported', 'report', 'one','three','four','reversed'
-    
-}
+    'pro', 'qualified', 'recusal', 'recuse', 'recused', 'reference', 'report',
+    'reported', 'resigned', 'resul', 'result', 'retired', 'reverse', 'reversed',
+    'sat', 'senior', 'separate', 'sit', 'sitting', 'special', 'specially',
+    'states', 'submitted', 'superior', 'supernumerary', 'taking', 'tem', 'the',
+    'this', 'though', 'three', 'time', 'transfer', 'two', 'vacancy', 'vice',
+    'votes', 'warden', 'was', 'which', 'while', 'with',
+]
 
 # judge names can only be this size or larger
 NAME_CUTOFF = 3
