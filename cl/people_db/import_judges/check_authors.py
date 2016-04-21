@@ -12,7 +12,8 @@ authors = 0
 
 string_misses = Counter()
 name_misses = Counter()
-
+word_misses = Counter()
+court_misses = Counter()
 court = None
 
 for line in open('assigning-authors-log.txt','rt'):
@@ -34,4 +35,6 @@ for line in open('assigning-authors-log.txt','rt'):
         name = seg1[:-1]
         court = seg2[10:-2]
         name_misses[court,name] += 1
+        court_misses[court] += 1
+        word_misses[name] += 1
         

@@ -5,22 +5,31 @@ import re
 # list of words that aren't judge names
 NOT_JUDGE = {
     'acting', 'active', 'adopted', 'although', 'and', 'appeals', 'appellate',
-    'argument', 'arj', 'associate', 'authorized', 'available', 'banc', 'before',
+    'argument', 'arj', 'associate', 'authorized', 'available', 'banc', 'bankruptcy','before',
     'bold', 'briefs', 'but', 'capacity', 'case', 'cause', 'center', 'certified',
-    'chief', 'circuit', 'commissioner', 'concurred', 'concurrence',
-    'concurring', 'conference', 'conferences', 'considered', 'constituting',
-    'consultation', 'continue', 'court', 'curiam', 'decision', 'denials',
-    'designation', 'did', 'died', 'dissent', 'dissenting', 'dissents',
+    'chairman', 'chief', 'circuit', 'commissioner', 
+    'concur', 'concurred', 'concurrence', 'concurs', 'concurring', 
+    'conference', 'conferences', 'considered', 'constituting',
+    'consultation', 'continue', 'court', 'curiam', 'decided', 'decision', 'denials',
+    'designation', 'did', 'died', 
+    'dissent', 'dissenting', 'dissents', 'dissented',
     'district', 'division', 'even', 'fellows', 'final', 'footnote', 'for',
-    'furth', 'further', 'his', 'indiana', 'initial', 'issuance', 'italic',
-    'joined', 'judge', 'judges', 'judgment', 'judgement', 'justice', 'justices',
+    'furth', 'further', 'his', 'ii', 'iii', 'indiana', 'initial', 'issuance', 
+    'italic', 'iv', 'joined', 'judge', 'judges', 'judgment', 'judgement', 
+    'justice', 'justices', 'judicial',
     'majority', 'may', 'member', 'not', 'number', 'opinion', 'oral', 'order',
     'page', 'panel', 'part', 'participate', 'participated', 'participating',
     'participation', 'per', 'preparation', 'present', 'presiding', 'prior',
     'pro', 'qualified', 'reference', 'resigned', 'resul', 'result', 'retired',
     'sat', 'senior', 'sit', 'sitting', 'special', 'specially', 'submitted',
     'superior', 'supernumerary', 'tem', 'the', 'this', 'though', 'time',
-    'transfer', 'vice', 'was', 'while', 'with',
+    'transfer', 'vice', 'was', 'while', 'with', 'reverse','absent', 'making',
+    'chairman', 'warden', 'taking', 'states', 'memorandum','consists',
+    'pair', 'separate', 'magistrate', 'consisted', 'votes', 'disqualified',
+    'assignment', 'facts', 'recused', 'recuse','recusal',
+    'emeritus','two', 'which', 'vacancy', 'maryland', 'above',
+    'reported', 'report', 'one','three','four','reversed'
+    
 }
 
 # judge names can only be this size or larger
