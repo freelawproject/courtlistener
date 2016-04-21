@@ -24,7 +24,7 @@ def assign_authors(testing=False):
             print '  Per Curiam assigned.'
             if not testing:
                 opinion.save()
-            
+            continue
 
         judges = find_judges(cluster.judges)
 
