@@ -38,16 +38,21 @@ def assign_authors(testing=False):
                                           case_date=cluster.date_filed))
         candidates = [c for c in candidates if c is not None]
 
+        if len(candidates) == 0:
+            # more than one judge token, but no DB matches
+            print '  No match.'
+            continue
+            
         opinion = cluster.sub_opinions.all()[0]
-
-        if len(candidates) == 1:
+        
+        if len(judges) == 1:
+            # one judge token, one DB match
             opinion.author = candidates[0]
             print '  Author assigned: ', candidates[0]
-        elif len(candidates) > 1:
+        else:
+            # more than one judge token, at least one DB math
             opinion.panel = candidates
             print '  Panel assigned:', candidates
-        else:
-            print '  No match.'
 
         if not testing:
             opinion.save()
