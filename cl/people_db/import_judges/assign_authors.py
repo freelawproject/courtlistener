@@ -45,12 +45,16 @@ def assign_authors(testing=False):
             
         opinion = cluster.sub_opinions.all()[0]
         
-        if len(judges) == 1:
+        if len(candidates) == 1 and len(judges) == 1:
             # one judge token, one DB match
             opinion.author = candidates[0]
             print '  Author assigned: ', candidates[0]
+        elif len(candidates) == 1 and len(judges) > 1:
+            # multiple judge tokens, one DB match
+            opinion.author = candidates[0]
+            print '  Author assigned: %s (with %d missing tokens)' % (candidates[0],len(judges)-1)
         else:
-            # more than one judge token, at least one DB math
+            # more than one DB match
             opinion.panel = candidates
             print '  Panel assigned:', candidates
 
