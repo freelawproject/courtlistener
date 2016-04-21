@@ -100,6 +100,17 @@ class SearchForm(forms.Form):
         )
     )
 
+    # Docket fields
+    nature_of_suit = forms.CharField(
+        required=False,
+        label= 'Nature Of Suit'
+    )
+
+    court_jurisdiction = forms.CharField(
+        required=False,
+        label= 'Nature Of Suit'
+    )
+
     #
     # Oral argument and Opinion shared fields
     #
@@ -387,6 +398,9 @@ class SearchForm(forms.Form):
         elif self.cleaned_data['type'] == 'p':
             if not self.cleaned_data['order_by']:
                 return 'name_reverse asc'
+        elif self.cleaned_data['type'] == 'd':
+            if not self.cleaned_data['order_by']:
+                return 'dateFiled desc'
         return self.cleaned_data['order_by']
 
     def clean_type(self):
