@@ -5,8 +5,8 @@ from django.conf import settings
 from django.core.mail import EmailMessage
 from django.core.urlresolvers import reverse
 from django.db.models import Count
-from django.http import HttpResponseRedirect, Http404
 from django.http import HttpResponse
+from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
 from django.template import loader
@@ -18,8 +18,8 @@ from cl.lib import magic
 from cl.lib import search_utils
 from cl.lib.bot_detector import is_bot
 from cl.lib.sunburnt import sunburnt
-from cl.search.models import Court, OpinionCluster, Opinion
 from cl.search.forms import SearchForm
+from cl.search.models import Court, OpinionCluster, Opinion
 from cl.simple_pages.forms import ContactForm
 from cl.stats import tally_stat
 
@@ -117,19 +117,27 @@ def coverage_graph(request):
 
 
 def feeds(request):
-    opinion_courts = Court.objects.filter(
-        in_use=True,
-        has_opinion_scraper=True
-    )
-    oral_argument_courts = Court.objects.filter(
-        in_use=True,
-        has_oral_argument_scraper=True
-    )
     return render_to_response(
         'feeds.html',
         {
-            'opinion_courts': opinion_courts,
-            'oral_argument_courts': oral_argument_courts,
+            'opinion_courts': Court.objects.filter(
+                in_use=True,
+                has_opinion_scraper=True
+            ),
+            'private': False
+        },
+        RequestContext(request)
+    )
+
+
+def podcasts(request):
+    return render_to_response(
+        'podcasts.html',
+        {
+            'oral_argument_courts': Court.objects.filter(
+                in_use=True,
+                has_oral_argument_scraper=True
+            ),
             'private': False
         },
         RequestContext(request)
