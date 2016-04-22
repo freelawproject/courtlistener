@@ -21,14 +21,14 @@ def assign_authors(testing=False):
 
     for cluster in clusters:
         i += 1
-        print "(%s/%s): Processing: %s, %s" % (i, total, cluster.pk,
+        print u"(%s/%s): Processing: %s, %s" % (i, total, cluster.pk,
                                                cluster.date_filed)
-        print "  Judge string: %s" % cluster.judges
+        print u"  Judge string: %s" % cluster.judges
 
         if 'curiam' in cluster.judges.lower():
             opinion = cluster.sub_opinions.all()[0]
             opinion.per_curiam = True
-            print '  Per Curiam assigned.'
+            print u'  Per Curiam assigned.'
             if not testing:
                 opinion.save(index=False)
             continue
@@ -47,7 +47,7 @@ def assign_authors(testing=False):
 
         if len(candidates) == 0:
             # more than one judge token, but no DB matches
-            print '  No match.'
+            print u'  No match.'
             continue
 
         opinion = cluster.sub_opinions.all()[0]
@@ -55,15 +55,15 @@ def assign_authors(testing=False):
         if len(candidates) == 1 and len(judges) == 1:
             # one judge token, one DB match
             opinion.author = candidates[0]
-            print '  Author assigned: ', candidates[0]
+            print u'  Author assigned: ', candidates[0]
         elif len(candidates) == 1 and len(judges) > 1:
             # multiple judge tokens, one DB match
             opinion.author = candidates[0]
-            print '  Author assigned: %s (with %d missing tokens)' % (candidates[0],len(judges)-1)
+            print u'  Author assigned: %s (with %d missing tokens)' % (candidates[0],len(judges)-1)
         else:
             # more than one DB match
             opinion.panel = candidates
-            print '  Panel assigned:', candidates
+            print u'  Panel assigned:', candidates
 
         if not testing:
             opinion.save(index=False)
