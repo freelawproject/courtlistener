@@ -17,13 +17,13 @@ def assign_authors(testing=False):
     for cluster in clusters:
         print("Processing: %s, %s" % cluster, cluster.date_filed)
         print("  Judge string: %s" % cluster.judges)
-        
+
         if 'curiam' in cluster.judges.lower():
             opinion = cluster.sub_opinions.all()[0]
             opinion.per_curiam = True
             print '  Per Curiam assigned.'
             if not testing:
-                opinion.save()
+                opinion.save(index=False)
             continue
 
         judges = find_judges(cluster.judges)
@@ -42,9 +42,9 @@ def assign_authors(testing=False):
             # more than one judge token, but no DB matches
             print '  No match.'
             continue
-            
+
         opinion = cluster.sub_opinions.all()[0]
-        
+
         if len(candidates) == 1 and len(judges) == 1:
             # one judge token, one DB match
             opinion.author = candidates[0]
@@ -59,6 +59,6 @@ def assign_authors(testing=False):
             print '  Panel assigned:', candidates
 
         if not testing:
-            opinion.save()
+            opinion.save(index=False)
 
 
