@@ -12,11 +12,18 @@ from cl.search.models import OpinionCluster
 
 def assign_authors(testing=False):
 
-    clusters = OpinionCluster.objects.exclude(judges='')
+    clusters = (OpinionCluster.objects
+                .exclude(judges='')
+                .select_related('docket__court__id')
+                .only('date_filed', 'judges', 'docket__court_id'))
+    total = clusters.count()
+    i = 0
 
     for cluster in clusters:
-        print("Processing: %s, %s" % cluster, cluster.date_filed)
-        print("  Judge string: %s" % cluster.judges)
+        i += 1
+        print "(%s/%s): Processing: %s, %s" % (i, total, cluster.pk,
+                                               cluster.date_filed)
+        print "  Judge string: %s" % cluster.judges
 
         if 'curiam' in cluster.judges.lower():
             opinion = cluster.sub_opinions.all()[0]
