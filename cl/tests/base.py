@@ -47,13 +47,11 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             super(BaseSeleniumTest, cls).tearDownClass()
 
     def setUp(self):
-        # self.browser = webdriver.PhantomJS(
-        #     executable_path='/usr/local/phantomjs/phantomjs',
-        #     service_log_path='/var/log/courtlistener/django.log',
-        # )
-        from pyvirtualdisplay import Display
-        self.display = Display().start()
-        self.browser = webdriver.Firefox()
+        self.browser = webdriver.PhantomJS(
+            executable_path='/usr/local/phantomjs/phantomjs',
+            service_log_path='/var/log/courtlistener/django.log',
+        )
+        #self.browser = webdriver.Firefox()
         self.browser.implicitly_wait(3)
         self.browser.set_window_size(*DESKTOP_WINDOW)
         self._initialize_test_solr()
@@ -65,7 +63,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             print '\nSaving screenshot: %s' % (filename,)
             self.browser.save_screenshot(type(self).__name__ + '.png')
         self.browser.quit()
-        self.display.stop()
         self._teardown_test_solr()
 
     def assert_text_in_body(self, text):
