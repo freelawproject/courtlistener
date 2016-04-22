@@ -182,8 +182,8 @@ def merge_form_with_courts(courts, search_form):
 
     # Divide the state bundles into the correct partitions
     court_tabs['state'].append(state_bundles[:16])
-    court_tabs['state'].append(state_bundles[16:35])
-    court_tabs['state'].append(state_bundles[35:])
+    court_tabs['state'].append(state_bundles[16:34])
+    court_tabs['state'].append(state_bundles[34:])
 
     return court_tabs, court_count_human, court_count
 

@@ -1,0 +1,15 @@
+{% if DEBUG %}
+    <script src="{{ STATIC_URL }}js/anchor.js"></script>
+{% else %}
+    <script src="{{ STATIC_URL }}js/anchor.min.js"></script>
+{% endif %}
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        anchors.options = {
+            'visible': 'touch',
+            'class': 'gray'
+        };
+        anchors.add();
+    });
+</script>

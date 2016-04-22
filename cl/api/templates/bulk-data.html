@@ -4,29 +4,35 @@
 {% block title %}Bulk Data – CourtListener.com{% endblock %}
 {% block description %}
     Free legal bulk data for federal and state opinions,
-    dockets and oral arguments from Free Law Project, a
-    501(c)(3) nonprofit. A complete Supreme Court corpus.
+    dockets, oral arguments, and judges from Free Law Project, a
+    501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete
+    and comprehensive database of American judges.
 {% endblock %}
 {% block og_description %}
     Free legal bulk data for federal and state opinions,
-    dockets and oral arguments from Free Law Project, a
-    501(c)(3) nonprofit. A complete Supreme Court corpus.
+    dockets, oral arguments, and judges from Free Law Project, a
+    501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete
+    and comprehensive database of American judges.
 {% endblock %}
 {% block search-form %}{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
+{% block footer-scripts %}
+    {% include "includes/anchors.html" %}
+{% endblock %}
+
 {% block content %}
     <div class="col-sm-7">
-        <h2 id="about">Bulk Data</h2>
+        <h1 id="about">Bulk Data</h1>
         <p>For hackers, legal analysts and anybody else that might want them, we provide bulk files containing all of our data. Several types of files are available as listed below, but in general the files that are available correspond to the major types of data we have in our database.
         </p>
 
 
-        <h3 id="bulk-data">Bulk Data Files</h3>
-        <p>Bulk data is handled in one of two ways. For data types where it makes sense, JSON files are made for every object, and they are then placed in compressed tar.gz files by jurisdiction. These are then made available, and an additional file, all.tar, is produced containing all of the compressed jurisdictional files.
+        <h2 id="bulk-data">Bulk Data Files</h2>
+        <p>Bulk data is handled in one of two ways. For data types where it makes sense, JSON files are made for every object, and they are then placed in compressed tar.gz files by jurisdiction. These are then made available, and an additional file, all.tar, is produced containing all of the compressed jurisdictional files (note that this file is <em>not</em> directly compressed and is not a <code>gz</code> file because it contains only compressed files).
         </p>
-        <p>For some data types, jurisdictional archives don't make sense. So instead, we produce the JSON files then gather then up into a single all.tar.gz file.
+        <p>For some data types, jurisdictional archives don't make sense. So instead, we produce the JSON files and gather those up into a single all.tar.gz file.
         </p>
         <p>You will also find <code>info.json</code> files tucked into the archives. These describe the last time the bulk data was created and how long it took to generate (in seconds).
         </p>
@@ -81,13 +87,22 @@
         <p>You can see all the types of data available at <a href="/api/bulk-data/">the root of the bulk data</a>.
         <p>These files are always generated using the latest version of the <a href="{% url "rest_docs" %}">REST API</a> and follow the schemas described there. The files inside the tar archives have names corresponding to the ID of each item, and are formatted as JSON. If you wish to see a sample file, we advise selecting a small or secretive jurisdiction (such as the FISA court) and using that to get an idea of what the bulk files contain.
         </p>
-        <p>A list of all current jurisdictions is on the right and we regularly
-            add new jurisdictions. To monitor for new jurisdictions, you may
-            want to look at the <a href="{% url "rest_docs" %}#jurisdiction-endpoint">Jurisdiction endpoint</a> of the REST API.
+        <p>A list of all current jurisdictions is on the right and we regularly add new jurisdictions as our content expands (at this point these tend to be terminated or otherwise obscure jurisdictions). To monitor for new jurisdictions, you may want to look at the <a href="{% url "rest_docs" %}#jurisdiction-endpoint">Jurisdiction endpoint</a> of the REST API.
         </p>
 
 
-        <h3 id="citation-data">Citation Bulk Data File</h3>
+
+        <h2 id="judge-data">Bulk Judicial Database Files</h2>
+        <p>The bulk data for the judicial database is generated in the same manner as the other content above, using the latest version of the REST API. You can find detailed explanations in <a href="{% url "rest_docs" %}#judge-endpoint">the documentation for the REST API</a>.
+        </p>
+        <p>In general, the bulk data that is generated for the judicial database is as follows:</p>
+        <ul>
+            {% include "includes/judge-endpoints.html" %}
+        </ul>
+        <p>This bulk data is a work in progress and we expect it to grow and change.</p>
+
+
+        <h2 id="citation-data">Citation Bulk Data File</h2>
         <p>
             A new file that is available in the latest updates to our bulk data system is a CSV that contains all of the citation relationships between opinions in our database. This file has millions lines, one per citation between opinions.
         </p>
@@ -100,11 +115,11 @@
                 <a href="/api/bulk-data/citations/all.csv.gz">{% get_full_host %}/api/bulk-data/citations/all.csv.gz</a>
             </code>
         </blockquote>
-        <p>The format of the file is two columns. The first column is the <code>opinion</code> that cites the second. This was simplified when v3 of the API was released.
+        <p>The format of the file is two columns. The first column is the <code>opinion</code> that cites the second. Note that these are Opinion IDs, not OpinionCluster IDs, though in many cases these are equivalent. This was simplified when v3 of the API was released.
         </p>
 
 
-        <h3 id="citegeist">The CiteGeist Bulk Data File</h3>
+        <h2 id="citegeist">The CiteGeist Bulk Data File</h2>
         <p>
             On the 15th of each month, we re-generate the <a href="https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/">CiteGeist scores</a> for the entire collection. Since a single new citation can have a ripple effect across the entire citation network, we store these values in a flat file rather than in our database. This saves us from having to update millions of records every month.
         </p>
@@ -119,25 +134,28 @@
         </p>
 
 
-        <h3>Generation Times</h3>
+        <h2>Generation Times</h2>
         <p>As can be seen on the public <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">CourtListener maintenance calendar</a>, bulk data files are regenerated on the last day of every month beginning at 3AM PST. Generation can take many hours, but in general is expected to conclude before the 1st of each month. On the last day of the month, we do not guarantee that you will get either the new or old archives, as archives are updated in place as their generation completes. You can verify the generation time using the <code>info.json</code> files.
         </p>
 
 
-        <h3>Donations</h3>
-        <p><a href="https://free.law">Free Law Project</a> has been providing bulk data for many years but is opposed to charging for public domain data. However, if you find these files valuable to your work, we ask that you seriously consider how much they might cost otherwise and consider making a <a href="{% url "donate" %}?referrer=bulk-data">donation</a> in a similar amount. Free Law Project is a federally-recognized 501(c)(3) public charity and a California non-profit public benefit corporation. We rely on your support to survive. Please donate or this resource <em>will</em> go away.
+        <h2>Donations</h2>
+        <p><a href="https://free.law">Free Law Project</a> has been providing bulk data for many years but is opposed to charging for public domain data. However, if you find these files valuable to your work, we ask that you seriously consider how much they might cost otherwise and consider making a <a href="{% url "donate" %}?referrer=bulk-data">donation</a> in a similar amount. Free Law Project is a federally-recognized 501(c)(3) public charity and a California non-profit public benefit corporation. We rely on your support to survive. Please donate or this resource is likely to go away.
+        </p>
+        <p>
+            <a href="{% url "donate" %}?referrer=bulk-data" class="btn btn-lg btn-danger">Donate Now</a>
         </p>
 
 
 
-        <h3>Adding Features and Fixing Bugs</h3>
+        <h2>Adding Features and Fixing Bugs</h2>
         <p>Like all Free Law Project initiatives, CourtListener is an open source project. If you are a developer and you notice bugs or missing features, we enthusiastically welcome your contributions <a href="https://github.com/freelawproject/courtlistener">on Github</a>.
         </p>
         <p>Unfortunately, there are always more bugs than time.</p>
 
 
 
-        <h3>Obsoleted Bulk Data APIs</h3>
+        <h2>Obsoleted Bulk Data APIs</h2>
         <p>In the past, bulk data files were available by day, month, or year
             for every jurisdiction, and a single file was available containing
             all data. Without community objection, these APIs <a href="https://github.com/freelawproject/courtlistener/issues/285">were sunsetted</a>

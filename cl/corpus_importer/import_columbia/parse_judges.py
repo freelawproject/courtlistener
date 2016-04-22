@@ -3,29 +3,37 @@
 import re
 
 # list of words that aren't judge names
-NOT_JUDGE = {
-    'acting', 'active', 'adopted', 'although', 'and', 'appeals', 'appellate',
-    'argument', 'arj', 'associate', 'authorized', 'available', 'banc', 'before',
-    'bold', 'briefs', 'but', 'capacity', 'case', 'cause', 'center', 'certified',
-    'chief', 'circuit', 'commissioner', 'concurred', 'concurrence',
-    'concurring', 'conference', 'conferences', 'considered', 'constituting',
-    'consultation', 'continue', 'court', 'curiam', 'decision', 'denials',
-    'designation', 'did', 'died', 'dissent', 'dissenting', 'dissents',
-    'district', 'division', 'even', 'fellows', 'final', 'footnote', 'for',
-    'furth', 'further', 'his', 'indiana', 'initial', 'issuance', 'italic',
-    'joined', 'judge', 'judges', 'judgment', 'judgement', 'justice', 'justices',
-    'majority', 'may', 'member', 'not', 'number', 'opinion', 'oral', 'order',
-    'page', 'panel', 'part', 'participate', 'participated', 'participating',
+NOT_JUDGE = [
+    'above', 'absent', 'acting', 'active', 'adopted', 'although', 'and',
+    'appeals', 'appellate', 'argument', 'arj', 'assignment', 'associate',
+    'authorized', 'available', 'banc', 'bankruptcy', 'before', 'bold', 'briefs',
+    'but', 'capacity', 'case', 'cause', 'center', 'certified', 'chairman',
+    'chief', 'circuit', 'commissioner', 'concur', 'concurred', 'concurrence',
+    'concurring', 'concurs', 'conference', 'conferences', 'considered',
+    'consisted', 'consists', 'constituting', 'consultation', 'continue',
+    'court', 'curiam', 'decided', 'decision', 'denials', 'designation', 'did',
+    'died', 'disqualified', 'dissent', 'dissented', 'dissenting', 'dissents',
+    'district', 'division', 'emeritus', 'even', 'facts', 'fellows', 'final',
+    'footnote', 'for', 'four', 'furth', 'further', 'his', 'ii', 'iii',
+    'indiana', 'initial', 'issuance', 'italic', 'iv', 'joined', 'judge',
+    'judgement', 'judges', 'judgment', 'judicial', 'justice', 'justices',
+    'magistrate', 'majority', 'making', 'maryland', 'may', 'member',
+    'memorandum', 'not', 'number', 'one', 'opinion', 'oral', 'order', 'page',
+    'pair', 'panel', 'part', 'participate', 'participated', 'participating',
     'participation', 'per', 'preparation', 'present', 'presiding', 'prior',
-    'pro', 'qualified', 'reference', 'resigned', 'resul', 'result', 'retired',
-    'sat', 'senior', 'sit', 'sitting', 'special', 'specially', 'submitted',
-    'superior', 'supernumerary', 'tem', 'the', 'this', 'though', 'time',
-    'transfer', 'vice', 'was', 'while', 'with',
-}
+    'pro', 'qualified', 'recusal', 'recuse', 'recused', 'reference', 'report',
+    'reported', 'resigned', 'resul', 'result', 'retired', 'reverse', 'reversed',
+    'sat', 'senior', 'separate', 'sit', 'sitting', 'special', 'specially',
+    'states', 'submitted', 'superior', 'supernumerary', 'taking', 'tem', 'the',
+    'this', 'though', 'three', 'time', 'transfer', 'two', 'vacancy', 'vice',
+    'votes', 'warden', 'was', 'which', 'while', 'with',
+]
 
 # judge names can only be this size or larger
 NAME_CUTOFF = 3
 
+# for judges with small names, need an override
+IS_JUDGE = {'wu', 're', 'du'}
 
 def find_judges(text, first_names=False):
     """Returns a list of last names of judges in `text`.
@@ -46,7 +54,7 @@ def find_judges(text, first_names=False):
     line = ''.join([c if c.isalpha() else ' ' for c in line.lower()])
     names = []
     for word in line.split():
-        if len(word) < NAME_CUTOFF or word in NOT_JUDGE:
+        if (len(word) < NAME_CUTOFF and word not in IS_JUDGE) or word in NOT_JUDGE:
             continue
         names.append(word)
     # try to identify which names are first and last names

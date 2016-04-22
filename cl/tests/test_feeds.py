@@ -3,10 +3,12 @@
 Functional testing of courtlistener RSS feeds
 """
 import os
+
 import feedparser
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
+
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.search.models import Court
 from cl.tests.base import BaseSeleniumTest
@@ -45,9 +47,9 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         link = self.browser.find_element_by_link_text('Feeds & Podcasts')
         link.click()
 
-        self.assertIn('Feeds & Podcasts', self.browser.title)
+        self.assertIn('Feeds', self.browser.title)
         self.assertIn('/feeds', self.browser.current_url)
-        self.assert_text_in_body('Feeds & Podcasts')
+        self.assert_text_in_body('Feeds')
 
     def test_feeds_page_shows_jurisdiction_links(self):
         """
