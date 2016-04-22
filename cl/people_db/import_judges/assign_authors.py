@@ -23,7 +23,7 @@ def assign_authors(testing=False):
         i += 1
         print u"(%s/%s): Processing: %s, %s" % (i, total, cluster.pk,
                                                cluster.date_filed)
-        print u"  Judge string: %s" % cluster.judges.encode('utf-8')
+        print u"  Judge string: %s".encode('utf-8') % cluster.judges
 
         if 'curiam' in cluster.judges.lower():
             opinion = cluster.sub_opinions.all()[0]
