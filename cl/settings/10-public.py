@@ -4,7 +4,7 @@ import re
 import sys
 
 from django.contrib.messages import constants as message_constants
-
+sys.path.append("")
 from judge_pics import judge_root
 
 # Loads the variable INSTALL_ROOT

@@ -103,12 +103,12 @@ class SearchForm(forms.Form):
     # Docket fields
     nature_of_suit = forms.CharField(
         required=False,
-        label= 'Nature Of Suit'
+        label='Nature Of Suit'
     )
 
-    court_jurisdiction = forms.CharField(
+    jurisdiction = forms.CharField(
         required=False,
-        label= 'Nature Of Suit'
+        label='Court Jurisdiction Type'
     )
 
     #

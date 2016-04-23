@@ -196,6 +196,7 @@ def make_fq(cd, field, key):
     method, in some cases Solr decides OR is a better approach. So, to work
     around this bug, we do some minimal query parsing ourselves.
     """
+
     if '"' in cd[key]:
         # User used quotes. Just pass it through.
         fq = '%s:(%s)' % (field, cd[key])
@@ -383,28 +384,7 @@ def add_highlighting(main_params, cd, highlight):
         main_params['f.%s.hl.fragListBuilder' % field] = 'single'
         main_params['f.%s.hl.alternateField' % field] = field
 
-
-
     return main_params
-
-'''
-def add_faceting(main_params, cd):
-    """
-    adds Facet fields
-    :return:
-    """
-    facet_field = ''
-    def add_facet_fields(facet):
-        if facet_field:
-            main_params.update(
-                {'facet.field': facet}
-            )
-
-    if cd['type'] == 'd':
-        facet_field = 'court'
-    add_facet_fields(facet_field)
-
-    return main_params'''
 
 
 def add_fq(main_params, cd):
@@ -449,8 +429,8 @@ def add_fq(main_params, cd):
             main_fq.append(make_fq(cd, 'court_id', 'court'))
         if cd['nature_of_suit']:
             main_fq.append(make_fq(cd, 'natureOfSuit', 'nature_of_suit'))
-        if cd['court_jurisdiction']:
-            main_fq.append(make_fq(cd, 'courtJurisdiction', 'court_jurisdiction'))
+        if cd['jurisdiction']:
+            main_fq.append(make_fq(cd, 'courtJurisdiction', 'jurisdiction'))
         if cd['docket_number']:
             main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
         main_fq.append(make_date_query('dateFiled', cd['filed_before'],
@@ -507,7 +487,6 @@ def build_main_query(cd, highlight='all', order_by=''):
     main_params = add_boosts(main_params, cd)
     main_params = add_highlighting(main_params, cd, highlight)
     main_params = add_fq(main_params, cd)
-    # main_params = add_faceting(main_params, cd)
 
     if settings.DEBUG:
         print "Params sent to search are:\n%s" % ' &\n'.join(

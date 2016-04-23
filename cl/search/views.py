@@ -59,6 +59,10 @@ def do_search(request, rows=20, order_by=None, type=None):
                 conn = sunburnt.SolrInterface(
                     settings.SOLR_PEOPLE_URL, mode='r')
                 status_facets = None
+            elif cd['type'] == 'd':
+                conn = sunburnt.SolrInterface(
+                    settings.SOLR_DOCKETS_URL, mode='r')
+                status_facets = None
             results_si = conn.raw_query(**search_utils.build_main_query(cd))
 
             courts = Court.objects.filter(in_use=True)
