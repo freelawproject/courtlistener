@@ -8,7 +8,7 @@ Created on Fri Mar 18 18:27:09 2016
 from cl.corpus_importer.import_columbia.parse_judges import find_judges
 from cl.lib.import_lib import find_person
 from cl.search.models import OpinionCluster
-
+from unidecode import unidecode
 
 def assign_authors(testing=False):
 
@@ -23,9 +23,12 @@ def assign_authors(testing=False):
         i += 1
         print u"(%s/%s): Processing: %s, %s" % (i, total, cluster.pk,
                                                cluster.date_filed)
-        print u"  Judge string: %s".encode('utf-8') % cluster.judges
+        #print u"  Judge string: %s".encode('utf-8') % cluster.judges
+                                               
+        judgestr = unidecode(cluster.judges)                                           
+        print "  Judge string: %s" % judgestr                                      
 
-        if 'curiam' in cluster.judges.lower():
+        if 'curiam' in judgestr.lower():
             opinion = cluster.sub_opinions.all()[0]
             opinion.per_curiam = True
             print u'  Per Curiam assigned.'
@@ -33,7 +36,9 @@ def assign_authors(testing=False):
                 opinion.save(index=False)
             continue
 
-        judges = find_judges(cluster.judges)
+        #judges = find_judges(cluster.judges)
+        
+        judges = find_judges(judgestr)
 
         if len(judges) == 0:
             continue
