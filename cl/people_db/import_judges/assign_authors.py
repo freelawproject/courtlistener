@@ -73,7 +73,8 @@ def assign_authors(testing=False):
             )
         else:
             # more than one DB match
-            opinion.panel = candidates
+            for candidate in candidates:
+                opinion.panel.add(candidate)
             print u'  Panel assigned: %s' % candidates
 
         if not testing:
