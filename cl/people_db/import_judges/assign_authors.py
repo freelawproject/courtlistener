@@ -5,10 +5,12 @@ Created on Fri Mar 18 18:27:09 2016
 @author: elliott
 """
 
+from unidecode import unidecode
+
 from cl.corpus_importer.import_columbia.parse_judges import find_judges
 from cl.lib.import_lib import find_person
 from cl.search.models import OpinionCluster
-from unidecode import unidecode
+
 
 def assign_authors(testing=False):
 
@@ -24,9 +26,9 @@ def assign_authors(testing=False):
         print u"(%s/%s): Processing: %s, %s" % (i, total, cluster.pk,
                                                cluster.date_filed)
         #print u"  Judge string: %s".encode('utf-8') % cluster.judges
-                                               
-        judgestr = unidecode(cluster.judges)                                           
-        print "  Judge string: %s" % judgestr                                      
+
+        judgestr = unidecode(cluster.judges)
+        print "  Judge string: %s" % judgestr
 
         if 'curiam' in judgestr.lower():
             opinion = cluster.sub_opinions.all()[0]
@@ -37,7 +39,7 @@ def assign_authors(testing=False):
             continue
 
         #judges = find_judges(cluster.judges)
-        
+
         judges = find_judges(judgestr)
 
         if len(judges) == 0:
@@ -60,15 +62,15 @@ def assign_authors(testing=False):
         if len(candidates) == 1 and len(judges) == 1:
             # one judge token, one DB match
             opinion.author = candidates[0]
-            print u'  Author assigned: ', candidates[0]
+            print '  Author assigned: %s' % unidecode(candidates[0])
         elif len(candidates) == 1 and len(judges) > 1:
             # multiple judge tokens, one DB match
             opinion.author = candidates[0]
-            print u'  Author assigned: %s (with %d missing tokens)' % (candidates[0],len(judges)-1)
+            print u'  Author assigned: %s (with %d missing tokens)' % (unidecode(candidates[0]), len(judges)-1)
         else:
             # more than one DB match
             opinion.panel = candidates
-            print u'  Panel assigned:', candidates
+            print u'  Panel assigned: %s' % candidates
 
         if not testing:
             opinion.save(index=False)
