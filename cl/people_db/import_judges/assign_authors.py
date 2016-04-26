@@ -54,28 +54,32 @@ def assign_authors(testing=False):
         candidates = [c for c in candidates if c is not None]
 
         if len(candidates) == 0:
-            # more than one judge token, but no DB matches
+            # more than one judge token, but no DB matches, continue
             print u'  No match.'
             continue
+        
+        if len(candidates) > 1:            
+            # more than one DB match, assign panel and continue   
+            for candidate in candidates:
+                cluster.panel.add(candidate)
+            print u'  Panel assigned: %s' % candidates
+            if not testing:
+                cluster.save(index=False)
+            continue
 
+        # only one candidate, assign author
         opinion = cluster.sub_opinions.all()[0]
-
-        if len(candidates) == 1 and len(judges) == 1:
+        if len(judges) == 1:
             # one judge token, one DB match
             opinion.author = candidates[0]
             print '  Author assigned: %s' % unidecode(str(candidates[0]))
-        elif len(candidates) == 1 and len(judges) > 1:
+        else:
             # multiple judge tokens, one DB match
             opinion.author = candidates[0]
             print '  Author assigned: %s (with %d missing tokens)' % (
                 unidecode(str(candidates[0])),
                 len(judges)-1
-            )
-        else:
-            # more than one DB match
-            for candidate in candidates:
-                opinion.panel.add(candidate)
-            print u'  Panel assigned: %s' % candidates
+            )        
 
         if not testing:
             opinion.save(index=False)
