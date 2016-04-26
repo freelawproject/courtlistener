@@ -62,11 +62,14 @@ def assign_authors(testing=False):
         if len(candidates) == 1 and len(judges) == 1:
             # one judge token, one DB match
             opinion.author = candidates[0]
-            print '  Author assigned: %s' % unidecode(candidates[0])
+            print '  Author assigned: %s' % unidecode(str(candidates[0]))
         elif len(candidates) == 1 and len(judges) > 1:
             # multiple judge tokens, one DB match
             opinion.author = candidates[0]
-            print u'  Author assigned: %s (with %d missing tokens)' % (unidecode(candidates[0]), len(judges)-1)
+            print u'  Author assigned: %s (with %d missing tokens)' % (
+                unidecode(str(candidates[0])),
+                len(judges)-1
+            )
         else:
             # more than one DB match
             opinion.panel = candidates
