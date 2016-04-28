@@ -196,7 +196,6 @@ def make_fq(cd, field, key):
     method, in some cases Solr decides OR is a better approach. So, to work
     around this bug, we do some minimal query parsing ourselves.
     """
-
     if '"' in cd[key]:
         # User used quotes. Just pass it through.
         fq = '%s:(%s)' % (field, cd[key])

@@ -317,3 +317,4 @@ class SearchPerson(object):
         text_template = loader.get_template('indexes/person_text.txt')
         context = {'item': item}
         self.text = text_template.render(context).translate(null_map)
+

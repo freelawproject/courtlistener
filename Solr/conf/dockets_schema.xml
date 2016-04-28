@@ -197,7 +197,6 @@
       <field name="_version_" type="long" indexed="true" stored="true"/>
 
       <!--DocketEntries with all other searchable tags-->
-
       <field name="text" type="text_en_splitting_cl"
              indexed="true"
              stored="true"
