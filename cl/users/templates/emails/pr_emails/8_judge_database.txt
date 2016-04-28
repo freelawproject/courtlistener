@@ -1,0 +1,80 @@
+Free Law Project Newsletter - 22 April 2016
+===========================================
+
+As always, things have been busy at Free Law Project, and we're writing today with a few big announcements and a few little ones.
+
+
+The Launch of our Judicial Database
+-----------------------------------
+The biggest piece of news is that we launched a judicial database containing nearly 8,500 judges. This database was funded by the Knight Foundation and by an NSF grant, and was a collaboration between Free Law Project and scholars at Princeton and Columbia.
+
+You can read more about the database on our blog:
+
+ - https://free.law/2016/04/19/judicial-database-announcement/
+
+And you can get started reading the documentation here:
+
+ - https://www.courtlistener.com/api/rest-info/#judge-endpoint
+
+We believe this database is a first-of-its-kind resource that will be hugely valuable to researchers and legal practitioners. Give it a look, and if you have any ideas for making it better, let us know!
+
+
+Oral Argument Podcasts in Google Play
+-------------------------------------
+We're happy to share that we've added our oral argument podcasts to Google Play Music and created a new page explaining how to use the podcasts:
+
+ - https://www.courtlistener.com/podcasts/
+
+If you are interested in listening to oral arguments from any of the Circuit Courts that post them, you can now simply search for "Oral Arguments" and they'll right come up.
+
+As always, if you're interested in only oral arguments that trigger a certain search query, you can always make your own custom podcast. See the link above for instructions.
+
+
+Free Law Project Data Services
+------------------------------
+Free Law Project has launched a data service offering to help people understand and work with the complex legal data that we have. You can read the announcement here:
+
+ - https://free.law/2016/03/07/announcing-free-law-project-data-services/
+
+And read more about the service here:
+
+ - https://free.law/data-consulting/
+
+The idea of this service is that the legal data we have has grown increasingly complex, and we frequently find ourselves working with people to manipulate and analyze it. In the past we have done this for free, but this gives us a way to do that work in a more formal manner while maintaining our non-profit goals.
+
+
+New PACER Lawsuit Filed
+-----------------------
+Yesterday a lawsuit was filed against the U.S. government by a trio of non-profits. The non-profits allege that PACER fees are too high and that the fees violate the legal limitations created by Congress in the E-Government Act. This lawsuit is one of several in the past year, and it looks like an interesting one to follow. You can read the original documents in this case in our RECAP archive:
+
+ - https://ia801505.us.archive.org/0/items/gov.uscourts.dcd.178502/gov.uscourts.dcd.178502.docket.html
+
+
+Developer News
+--------------
+For our volunteer developers, we've launched a Vagrant box that they can use to get up to speed:
+
+ - https://free.law/2016/03/01/its-easier-than-ever-to-contribute-to-courtlistener-and-free-law-project/
+
+This deprecates our old system of using a VM to do all our work and makes it really quite easy to get involved.
+
+
+What's Next?
+------------
+The next six months are exciting for Free Law Project. We're wrapping up a number of big projects and we're starting a bunch of new ones. In the next six months we plan to:
+
+ - Create a better search tool for PACER and RECAP
+ - Add campaign finance data and financial disclosures to our new judge database
+ - Add millions of new opinions to our database and link them to the existing opinions
+ - Add a few more funded projects to our pipeline
+
+These are lofty goals and we hope you'll support them with your time as a volunteer or with your donations, if you can.
+
+Thanks for subscribing to the newsletter!
+
+
+Mike Lissner
+Executive Director, FLP
+
+-----------
+If you wish to unsubscribe from these newsletters, just reply and we'll take you right off.

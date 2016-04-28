@@ -707,6 +707,10 @@ class OpinionCluster(models.Model):
             return caption  # neutral cites lack the parentheses, so we're done here.
         elif self.federal_cite_one:
             caption += ", %s" % self.federal_cite_one
+        elif self.federal_cite_two:
+            caption += ", %s" % self.federal_cite_two
+        elif self.federal_cite_three:
+            caption += ", %s" % self.federal_cite_three
         elif self.specialty_cite_one:
             caption += ", %s" % self.specialty_cite_one
         elif self.state_cite_regional:
