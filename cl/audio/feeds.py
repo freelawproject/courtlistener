@@ -10,7 +10,7 @@ class JurisdictionPodcast(JurisdictionFeed):
     feed_type = iTunesPodcastsFeedGenerator
     description = ("A chronological podcast of oral arguments with improved "
                    "files and meta data. Hosted by Free Law Project through "
-                   "the CourtListener.com initiative.")
+                   "the CourtListener.com initiative. Not an official podcast.")
     subtitle = description
     summary = description
     iTunes_name = u'Free Law Project'
@@ -38,10 +38,19 @@ class JurisdictionPodcast(JurisdictionFeed):
         return conn.raw_query(**params).execute()
 
     def feed_extra_kwargs(self, obj):
-        return {'iTunes_name': self.iTunes_name,
-                'iTunes_email': self.iTunes_email,
-                'iTunes_image_url': self.iTunes_image_url,
-                'iTunes_explicit': self.iTunes_explicit}
+        extra_args = {
+            'iTunes_name': u'Free Law Project',
+            'iTunes_email': u'feeds@courtlistener.com',
+            'iTunes_explicit': u'no',
+        }
+        if hasattr(obj, 'pk'):
+            path = u'/static/png/producer-%s-2000x2000.png' % obj.pk
+        else:
+            # Not a jurisdiction API -- A search API.
+            path = u'/static/png/producer-2000x2000.png'
+        extra_args['iTunes_image_url'] = 'https://www.courtlistener.com%s' % path
+
+        return extra_args
 
     def item_extra_kwargs(self, item):
         return {'author': item['court'],
