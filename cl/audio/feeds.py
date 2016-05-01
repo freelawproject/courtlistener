@@ -19,8 +19,7 @@ class JurisdictionPodcast(JurisdictionFeed):
     iTunes_explicit = u'no'
 
     def title(self, obj):
-        return ("Podcast of All Oral Arguments for the "
-                "%s" % obj.full_name)
+        return "Oral Arguments for the %s" % obj.full_name
 
     def items(self, obj):
         """
