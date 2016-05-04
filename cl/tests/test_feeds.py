@@ -44,12 +44,21 @@ class FeedsFunctionalTest(BaseSeleniumTest):
     def test_can_get_to_feeds_from_homepage(self):
         """Can we get to the feeds/podcasts page from the homepage?"""
         self.browser.get(self.server_url)
-        link = self.browser.find_element_by_link_text('Feeds & Podcasts')
+        link = self.browser.find_element_by_link_text('Feeds')
         link.click()
 
         self.assertIn('Feeds', self.browser.title)
         self.assertIn('/feeds', self.browser.current_url)
         self.assert_text_in_body('Feeds')
+
+        # Podcasts
+        self.browser.get(self.server_url)
+        link = self.browser.find_element_by_link_text("Podcasts")
+        link.click()
+
+        self.assertIn("Podcasts", self.browser.title)
+        self.assertIn("/podcasts", self.browser.current_url)
+        self.assert_text_in_body("Podcasts")
 
     def test_feeds_page_shows_jurisdiction_links(self):
         """
