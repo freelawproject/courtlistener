@@ -19,7 +19,7 @@ def people_sitemap_maker(request):
             'absolute_url',
             'timestamp',
         ]),
-        'sort': 'dob asc',
+        'sort': 'dob asc,name_reverse asc',
         'caller': 'people_sitemap_maker',
     }
     results = conn.raw_query(**params).execute()
