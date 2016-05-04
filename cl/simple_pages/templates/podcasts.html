@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load partition_util %}
+{% load humanize %}
 
 {% block title %}Podcasts – CourtListener.com{% endblock %}
 {% block sidebar %}{% endblock %}
@@ -50,9 +51,13 @@
         </div>
 
 
-        <h3>Using a Music Service</h3>
+        <h3>Using a Podcast App</h3>
         <div class="row">
-            <div class="col-xs-6">
+            <div class="col-xs-12">
+                <p>Our podcasts are available in a number of music services and apps. To find our podcasts, just search for "CourtListener".
+                </p>
+            </div>
+            <div class="col-xs-3">
                 <h4 class="text-center text-uppercase gray">Google Music</h4>
                 <a href="https://play.google.com/music/">
                     <img src="{{ STATIC_URL }}svg/play_music_triangle.svg"
@@ -61,10 +66,9 @@
                          height="200"
                          width="200">
                 </a>
-                <p class="v-offset-above-2 text-center">To find our podcasts on <a href="https://play.google.com/music/">Google Music</a>, simply login and search for "CourtListener".
-                </p>
             </div>
-            <div class="col-xs-6">
+
+            <div class="col-xs-3">
                 <h4 class="text-center text-uppercase gray">Stitcher Radio</h4>
                 <a href="https://www.stitcher.com">
                     <img src="{{ STATIC_URL }}jpeg/stitcher_400x400.jpeg"
@@ -73,8 +77,28 @@
                          height="200"
                          width="200">
                 </a>
-                <p class="v-offset-above-2 text-center">To find our podcasts on <a href="https://www.stitcher.com">Stitcher Radio</a>, install the app and search for "CourtListener".
-                </p>
+            </div>
+
+            <div class="col-xs-3">
+                <h4 class="text-center text-uppercase gray">Pocket Casts</h4>
+                <a href="http://pocketcasts.com">
+                    <img src="{{ STATIC_URL }}png/pocketcasts_200x200.png"
+                         alt="Pocket Casts Logo"
+                         class="img-responsive center-block img-rounded"
+                         height="200"
+                         width="200">
+                </a>
+            </div>
+
+            <div class="col-xs-3">
+                <h4 class="text-center text-uppercase gray">PlayerFM</h4>
+                <a href="https://player.fm">
+                    <img src="{{ STATIC_URL }}png/playerfm_200x200.png"
+                         alt="PlayerFM Logo"
+                         class="img-responsive center-block img-rounded"
+                         height="200"
+                         width="200">
+                </a>
             </div>
         </div>
 
