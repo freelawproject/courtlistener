@@ -136,8 +136,9 @@ def podcasts(request):
         {
             'oral_argument_courts': Court.objects.filter(
                 in_use=True,
-                has_oral_argument_scraper=True
+                has_oral_argument_scraper=True,
             ),
+            'count': Audio.objects.all().count(),
             'private': False
         },
         RequestContext(request)
@@ -173,7 +174,8 @@ def contact(
             cd = form.cleaned_data
             default_from = settings.DEFAULT_FROM_EMAIL
             EmailMessage(
-                subject=u'[CourtListener] Contact form message',
+                subject=u'[CourtListener] Contact form message: '
+                        u'{subject}'.format(**cd),
                 body=u'Subject: {subject}\n'
                      u'From: {name} ({email})\n'
                      u'Browser: {browser}\n'
