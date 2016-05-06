@@ -1,6 +1,7 @@
 '''
     Hopefully this makes slicing out production data simpler.
 '''
+import random
 from django.core import serializers
 from django.core.management.base import BaseCommand
 from cl.search.models import Docket, OpinionCluster, Opinion
@@ -33,8 +34,14 @@ class Command(BaseCommand):
         self.stdout.write(
             'Generating dump of up to %s randomly selected Opinions' % n
         )
-
-        pks = Opinion.objects.values_list('id', flat=True).order_by('?')[:n]
+        pk_qs = Opinion.objects.values_list('id', flat=True)
+        if pk_qs.count() < n:
+            n = pk_qs.count()
+        
+        pks = random.sample(
+            pk_qs.all(),
+            n
+        )
         cluster_pks = OpinionCluster.objects.filter(sub_opinions__in=pks) \
                                     .values_list('id', flat=True).all()
 
