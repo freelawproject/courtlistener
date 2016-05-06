@@ -73,7 +73,10 @@ def find_person(name_last, court_id, name_first=None, case_date=None,
             positions__court_id=court_id,
         )
         if len(candidates) == 0:
-            print("No judge: Last name '%s', position '%s'." % (name_last,court_id))
+            print("No judge: Last name '%s', position '%s'." % (
+                name_last.encode('utf-8'),
+                court_id
+            ))
             return None
         if len(candidates) == 1:
             return candidates[0]
