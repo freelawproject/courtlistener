@@ -37,14 +37,36 @@ class Command(BaseCommand):
         n = options['n']
         fmt = options['format']
 
-        self.stdout.write('-n was set to: %s' % n)
+        self.stdout.write(
+            'Generating dump of up to %s randomly selected Opinions' % n
+        )
 
         pks = Opinion.objects.values_list('id', flat=True).order_by('?')[:n]
-        opinions = Opinion.objects.filter(id__in=pks).all()
-        self.stdout.write('Opinions:\n%s' % (opinions))
+        cluster_pks = OpinionCluster.objects.filter(sub_opinions__in=pks) \
+                                    .values_list('id', flat=True).all()
 
-        clusters = OpinionCluster.objects.filter(sub_opinions__in=pks).all()
-        self.stdout.write('Clusters:\n%s' % (clusters))
+        self.stdout.write('Writing Opinions to opinions.json...')
+        with open('opinions.json', 'w') as stream:
+            serializers.serialize(
+                'json',
+                Opinion.objects.filter(id__in=pks).all(),
+                stream=stream
+            )
 
-        dockets = Docket.objects.filter(clusters__in=clusters).all()
-        self.stdout.write('Dockets:\n%s' % (dockets))
+        self.stdout.write('Writing OpinionClusters to clusters.json...')
+        with open('clusters.json', 'w') as stream:
+            serializers.serialize(
+                'json',
+                OpinionCluster.objects.filter(id__in=cluster_pks).all(),
+                stream=stream
+            )
+
+        self.stdout.write('Writing Dockets to dockets.json...')
+        with open('dockets.json', 'w') as stream:
+            serializers.serialize(
+                'json',
+                Docket.objects.filter(clusters__in=cluster_pks).all(),
+                stream=stream
+            )
+
+        self.stdout.write('Done!')
