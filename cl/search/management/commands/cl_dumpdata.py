@@ -1,7 +1,9 @@
 '''
     Hopefully this makes slicing out production data simpler.
 '''
+import calendar
 import random
+import time
 from django.core import serializers
 from django.core.management.base import BaseCommand
 from cl.search.models import Docket, OpinionCluster, Opinion
@@ -37,19 +39,20 @@ class Command(BaseCommand):
         pk_qs = Opinion.objects.values_list('id', flat=True)
         if pk_qs.count() < n:
             n = pk_qs.count()
-        
+
+        random.seed(calendar.timegm(time.gmtime()))
         pks = random.sample(
-            pk_qs.all(),
+            pk_qs,
             n
         )
         cluster_pks = OpinionCluster.objects.filter(sub_opinions__in=pks) \
-                                    .values_list('id', flat=True).all()
+                                    .values_list('id', flat=True)
 
         self.stdout.write('Writing Opinions to opinions.json...')
         with open('opinions.json', 'w') as stream:
             serializers.serialize(
                 fmt,
-                Opinion.objects.filter(id__in=pks).all(),
+                Opinion.objects.filter(id__in=pks),
                 stream=stream
             )
 
@@ -57,7 +60,7 @@ class Command(BaseCommand):
         with open('clusters.json', 'w') as stream:
             serializers.serialize(
                 fmt,
-                OpinionCluster.objects.filter(id__in=cluster_pks).all(),
+                OpinionCluster.objects.filter(id__in=cluster_pks),
                 stream=stream
             )
 
@@ -65,7 +68,7 @@ class Command(BaseCommand):
         with open('dockets.json', 'w') as stream:
             serializers.serialize(
                 fmt,
-                Docket.objects.filter(clusters__in=cluster_pks).all(),
+                Docket.objects.filter(clusters__in=cluster_pks),
                 stream=stream
             )
 
