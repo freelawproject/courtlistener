@@ -7,8 +7,7 @@ from cl.search.models import Docket, OpinionCluster, Opinion
 
 
 class Command(BaseCommand):
-    help = ('Wraps the core dumpdata management command with CL friendly export'
-            'settings')
+    help = ('CL-specific data dumper for making fixtures from production')
 
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
@@ -26,12 +25,6 @@ class Command(BaseCommand):
             default='json',
             help='Serialization format [json, xml, yaml]'
         )
-        parser.add_argument(
-            '-o',
-            type=str,
-            default='dump.json',
-            help='Name of output file to serialize data into'
-        )
 
     def handle(self, *args, **options):
         n = options['n']
@@ -48,7 +41,7 @@ class Command(BaseCommand):
         self.stdout.write('Writing Opinions to opinions.json...')
         with open('opinions.json', 'w') as stream:
             serializers.serialize(
-                'json',
+                fmt,
                 Opinion.objects.filter(id__in=pks).all(),
                 stream=stream
             )
@@ -56,7 +49,7 @@ class Command(BaseCommand):
         self.stdout.write('Writing OpinionClusters to clusters.json...')
         with open('clusters.json', 'w') as stream:
             serializers.serialize(
-                'json',
+                fmt,
                 OpinionCluster.objects.filter(id__in=cluster_pks).all(),
                 stream=stream
             )
@@ -64,7 +57,7 @@ class Command(BaseCommand):
         self.stdout.write('Writing Dockets to dockets.json...')
         with open('dockets.json', 'w') as stream:
             serializers.serialize(
-                'json',
+                fmt,
                 Docket.objects.filter(clusters__in=cluster_pks).all(),
                 stream=stream
             )
