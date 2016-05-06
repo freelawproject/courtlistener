@@ -1,0 +1,21 @@
+[
+{
+  "fields": {
+    "jurisdiction": "T",
+    "end_date": null,
+    "short_name": "PACER Training Site",
+    "citation_string": "Test.",
+    "in_use": false,
+    "url": "https://dcecf.psc.uscourts.gov/cgi-bin/ShowIndex.pl",
+    "notes": "",
+    "date_modified": "2016-04-30T00:11:51.389Z",
+    "has_oral_argument_scraper": false,
+    "full_name": "U.S. DISTRICT COURT for the PACER Training Site",
+    "position": 999.1,
+    "has_opinion_scraper": false,
+    "start_date": null
+  },
+  "model": "search.court",
+  "pk": "psc"
+}
+]
