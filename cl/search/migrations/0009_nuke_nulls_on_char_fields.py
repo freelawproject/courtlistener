@@ -58,12 +58,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterField(
             model_name='docket',
-            name='pacer_case_id',
-            field=models.CharField(default='', help_text=b'The cased ID provided by PACER.', max_length=100, db_index=True, blank=True),
-            preserve_default=False,
-        ),
-        migrations.AlterField(
-            model_name='docket',
             name='slug',
             field=models.SlugField(default='', help_text=b'URL that the document should map to (the slug)', max_length=75, db_index=False, blank=True),
             preserve_default=False,

@@ -237,9 +237,6 @@ class Docket(models.Model):
         default=False,
     )
 
-    class Meta:
-        unique_together = ('court', 'pacer_case_id')
-
     def __unicode__(self):
         if self.case_name:
             return smart_unicode('%s: %s' % (self.pk, self.case_name))
