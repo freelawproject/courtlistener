@@ -424,6 +424,12 @@ def add_fq(main_params, cd):
             main_fq.append(make_fq(cd, 'caseName', 'case_name'))
         if cd['judge']:
             main_fq.append(make_fq(cd, 'judge', 'judge'))
+        if cd['court']:
+            main_fq.append(make_fq(cd, 'court_id', 'court'))
+        if cd['nature_of_suit']:
+            main_fq.append(make_fq(cd, 'natureOfSuit', 'nature_of_suit'))
+        if cd['jurisdiction']:
+            main_fq.append(make_fq(cd, 'courtJurisdiction', 'jurisdiction'))
         if cd['docket_number']:
             main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
         main_fq.append(make_date_query('dateFiled', cd['filed_before'],
