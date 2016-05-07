@@ -11,6 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('search', '0008_load_new_courts'),
+        ('search', '0009_blankify_fields'),
     ]
 
     operations = [
