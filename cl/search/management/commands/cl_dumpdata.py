@@ -6,6 +6,7 @@ import random
 import time
 from django.core import serializers
 from django.core.management.base import BaseCommand
+from django.db.models.query_utils import Q
 from cl.search.models import Docket, OpinionCluster, Opinion, OpinionsCited
 
 
@@ -63,7 +64,7 @@ class Command(BaseCommand):
                 serializers.serialize(
                     fmt,
                     OpinionsCited.objects.filter(
-                        citing_opinion__in=pks | cited_opinion__in=pks
+                        Q(citing_opinion__in=pks) | Q(cited_opinion__in=pks)
                     ),
                     stream=stream
                 )
