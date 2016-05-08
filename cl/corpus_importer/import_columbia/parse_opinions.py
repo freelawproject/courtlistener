@@ -2,17 +2,16 @@
 
 # Functions to parse court data in XML format into a list of dictionaries.
 
-import xml.etree.cElementTree as ET
-import re
 import os
-import dateutil.parser as dparser
+import re
+import xml.etree.cElementTree as ET
 
+import dateutil.parser as dparser
 from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
 
 from cl.corpus_importer.court_regexes import state_pairs
+from parse_judges import find_judge_names
 from regexes_columbia import SPECIAL_REGEXES
-from parse_judges import find_judges
-
 
 # initialized once since it takes resources
 CASE_NAME_TWEAKER = CaseNameTweaker()
@@ -49,7 +48,7 @@ def parse_file(file_path, court_fallback=''):
     info['attorneys'] = ''.join(raw_info.get('attorneys', [])) or None
     info['posture'] = ''.join(raw_info.get('posture', [])) or None
     info['court_id'] = get_court_object(''.join(raw_info.get('court', [])), court_fallback) or None
-    info['panel'] = find_judges(''.join(raw_info.get('panel', []))) or []
+    info['panel'] = find_judge_names(''.join(raw_info.get('panel', []))) or []
     # get dates
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates)
@@ -82,7 +81,7 @@ def parse_file(file_path, court_fallback=''):
                 if len(last_texts) > 1:
                     print "Combining multiple %s texts in '%s'." % (current_type, file_path)
                 # add the opinion and all of the previous texts
-                judges = find_judges(opinion['byline'])
+                judges = find_judge_names(opinion['byline'])
                 info['opinions'].append({
                     'opinion': '\n'.join(last_texts)
                     ,'opinion_texts': last_texts

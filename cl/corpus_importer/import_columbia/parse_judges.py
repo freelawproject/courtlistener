@@ -5,35 +5,35 @@ import re
 # list of words that aren't judge names
 NOT_JUDGE = [
     'above', 'absent', 'acting', 'active', 'adopted', 'affirm', 'after',
-    'although', 'and', 
-    'appeals', 'appellate', 'argument', 'arj', 
+    'although', 'and',
+    'appeals', 'appellate', 'argument', 'arj',
     'ass', 'assign', 'assigned', 'assignment', 'associate',
     'authorized', 'available', 'banc', 'bankruptcy', 'before', 'bold', 'briefs',
     'but', 'capacity', 'case', 'cause', 'center', 'certified', 'chairman',
-    'chief', 'circuit', 'columbia', 'commissioner', 
+    'chief', 'circuit', 'columbia', 'commissioner',
     'concur', 'concurred', 'concurrence',
     'concurring', 'concurs', 'conference', 'conferences', 'considered',
     'consisted', 'consists', 'constituting', 'consultation', 'continue',
     'court', 'curiam', 'decided', 'decision', 'denials', 'designation', 'did',
-    'died', 'disqualified', 'dissent', 'dissented', 'dissenting', 'dissents',
+    'died', 'discovery', 'disqualified', 'dissent', 'dissented', 'dissenting', 'dissents',
     'district', 'division', 'emeritus', 'even', 'facts', 'fellows', 'final',
-    'footnote', 'for', 'four', 'furth', 'further', 'his', 'ii', 'iii',
+    'footnote', 'for', 'four', 'furth', 'further', 'his', 'honorable', 'ii', 'iii',
     'indiana', 'initial', 'issuance', 'italic', 'iv', 'joined', 'judge',
     'judgement', 'judges', 'judgment', 'judicial', 'justice', 'justices',
     'magistrate', 'majority', 'making', 'maryland', 'may', 'member',
-    'memorandum', 'not', 'number', 'one', 'opinion', 'oral', 'order', 
-    'page', 'pair', 'panel', 'part', 'participate', 'participated', 
-    'participating', 'participation', 'per', 'preparation', 'present', 
+    'memorandum', 'not', 'number', 'one', 'opinion', 'oral', 'order',
+    'page', 'pair', 'panel', 'part', 'participate', 'participated',
+    'participating', 'participation', 'per', 'preparation', 'present',
     'president', 'presiding', 'prior',
     'pro', 'qualified', 'recusal', 'recuse', 'recused', 'reference', 'report',
     'reported', 'resigned', 'resul', 'result', 'retired', 'reverse', 'reversed',
     'sat', 'senior', 'separate', 'sit', 'sitting', 'special', 'specially',
     'statement', 'states', 'stating',
-    'submitted', 'superior', 'supernumerary', 'taking', 'tem', 
+    'submitted', 'superior', 'supernumerary', 'taking', 'tem',
     'territorial', 'the',
-    'this', 'though', 'three', 'time', 'transfer', 'two', 
-    'united', 
-    'vacancy', 'vice', 'votes', 
+    'this', 'though', 'three', 'time', 'transfer', 'two',
+    'united',
+    'vacancy', 'vice', 'votes',
     'warden', 'was', 'which', 'while', 'with',
 ]
 
@@ -43,11 +43,13 @@ NAME_CUTOFF = 3
 # for judges with small names, need an override
 IS_JUDGE = {'wu', 're', 'du'}
 
-def find_judges(text, first_names=False):
+
+def find_judge_names(text, first_names=False):
     """Returns a list of last names of judges in `text`.
 
-    :param first_names: If True, will return a list of `(first, last)` tuples, in which `first` will usually be None
-    unless a judge's first name is identified.
+    :param first_names: If True, will return a list of `(first, last)` tuples,
+    in which `first` will usually be None unless a judge's first name is
+    identified.
     """
     text = text.lower() or ''
     # just use the first nonempty line (there's sometimes a useless second line)

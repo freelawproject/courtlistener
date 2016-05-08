@@ -4,7 +4,6 @@ import shutil
 import tarfile
 from os.path import join
 
-
 from django.conf import settings
 from django.test import RequestFactory
 from rest_framework.renderers import JSONRenderer
@@ -109,8 +108,7 @@ def write_json_to_disk(courts, obj_type_str, obj_type, court_attr,
 
     The main trick is that we identify if we are creating a bulk archive
     from scratch. If so, we iterate over everything. If not, we only
-    iterate over items that have been modified in the last 32 days because
-    it's assumed that the bulk files are generated once per month.
+    iterate over items that have been modified since the last good date.
     """
     # Are there already bulk files?
     history = BulkJsonHistory(obj_type_str)
