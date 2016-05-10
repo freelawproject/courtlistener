@@ -300,6 +300,10 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     cursor: hand;
 }
 
+.cursor-help {
+    cursor: help;
+}
+
 mark {
     /* Needs extra declarations for old browsers */
     background-color: #ffffbf;
