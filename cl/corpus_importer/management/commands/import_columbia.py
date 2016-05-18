@@ -12,10 +12,11 @@ from cl.corpus_importer.import_columbia.populate_opinions import make_and_save
 
 # court IDs and court strings from the xml files that are known to be missing from the database
 MISSING_COURT_IDS = [
-    'kanattygenop', 'mdattygenop', 'ortc', 'ncworkcompcom', 'ncworkcompcom', 'flaattygenop','calattygenop',
-    'laattygenop', 'maworkcompcom', 'moattygenop', 'oklaattygenop', 'nebattygenop', 'wisattygenop', 'oklaattygenop',
-    'delcompl', 'washattygenop', 'coloworkcompcom', 'texattygenop', 'coloattygenop', 'arkattygenop', 'nyattygenop',
-    'coloattygenop', 'connworkcompcom', 'nysupremect', 'risuperct', 'arkworkcompcom', 'nylowercourts'
+    'arkattygenop', 'arkworkcompcom', 'calappdeptsuperct', 'calattygenop', 'coloattygenop', 'coloworkcompcom',
+    'connworkcompcom', 'delcompl', 'flaattygenop', 'kanattygenop', 'laattygenop', 'massworkcompcom', 'maworkcompcom',
+    'mdattygenop', 'moattygenop', 'montattygenop', 'ncsuperct', 'ncworkcompcom', 'nebattygenop', 'nyattygenop',
+    'nycivct', 'nycrimct', 'nylowercourts', 'nysupremect', 'ohioappct', 'ohiolowercourts', 'oklaattygenop', 'ortc',
+    'risuperct', 'texattygenop', 'washattygenop', 'wisattygenop'
 ]
 
 

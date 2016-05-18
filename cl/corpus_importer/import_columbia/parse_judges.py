@@ -10,7 +10,7 @@ NOT_JUDGE = [
     'ass', 'assign', 'assigned', 'assignment', 'associate',
     'authorized', 'available', 'banc', 'bankruptcy', 'before', 'bold', 'briefs',
     'but', 'capacity', 'case', 'cause', 'center', 'certified', 'chancellor', 'chairman',
-    'chief', 'circuit', 'columbia', 'commissioner', 'composed'
+    'chief', 'circuit', 'columbia', 'commission', 'commissioner', 'composed'
     'concur', 'concurred', 'concurrence',
     'concurring', 'concurs', 'conference', 'conferences', 'considered',
     'consisted', 'consists', 'constituting', 'consultation', 'continue',
@@ -27,12 +27,12 @@ NOT_JUDGE = [
     'president', 'presiding', 'prior',
     'pro', 'qualified', 'recusal', 'recuse', 'recused', 'reference', 'rehearing', 'report',
     'reported', 'resigned', 'resul', 'result', 'retired', 'reverse', 'reversed',
-    'sat', 'senior', 'separate', 'sit', 'sitting', 'special', 'specially',
+    'sat', 'section', 'senior', 'separate', 'sit', 'sitting', 'special', 'specially',
     'statement', 'states', 'stating',
     'submitted', 'superior', 'supernumerary', 'taking', 'tem', 
     'term', 'territorial', 'the',
     'this', 'though', 'three', 'time', 'transfer', 'two', 
-    'unpublished', 'underline', 'united',
+    'unanimous', 'unpublished', 'underline', 'united',
     'vacancy', 'vice', 'votes', 
     'warden', 'was', 'which', 'while', 'with',
 

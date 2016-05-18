@@ -14,7 +14,8 @@ DECIDED_TAGS = ['decided', 'date decided']
 ARGUED_TAGS = [
     'argued', 'submitted', 'submitted on briefs', 'on briefs', 'heard', 'considered on briefs',
     'argued and submitted', 'opinion', 'opinions delivered', 'opinion delivered', 'assigned on briefs',
-    'opinion issued', 'delivered', 'rendered', 'considered on briefs on', 'opinion delivered and filed', 'orally argued'
+    'opinion issued', 'delivered', 'rendered', 'considered on briefs on', 'opinion delivered and filed', 'orally argued',
+    'rendered on'
 ]
 REARGUE_DENIED_TAGS = [
     'reargument denied', 'rehearing denied', 'further rehearing denied', 'as modified on denial of rehearing',
@@ -24,7 +25,7 @@ REARGUE_DENIED_TAGS = [
     'petition and crosspetition for review denied', 'opinion modified and as modified rehearing denied',
     'motion for rehearing andor transfer to supreme court denied', 'petition for rehearing denied',
     'leave to appeal denied', 'rehearings denied', 'motion for rehearing denied', 'second rehearing denied',
-    'petition for review denied'
+    'petition for review denied', 'appeal dismissed'
 ]
 REARGUE_TAGS = ['reargued', 'reheard', 'upon rehearing', 'on rehearing']
 CERT_GRANTED_TAGS = ['certiorari granted']
@@ -36,10 +37,12 @@ UNKNOWN_TAGS = [
     'suggestion of error overruled', 'cv', 'case stored in record room',
     'met to file petition for review disposed granted', 'rehearing granted', 'opinion released',
     'permission to appeal denied by supreme court', 'rehearing pending', 'application for transfer denied',
-    'effective date', 'modified', 'opinion modified', 'transfer granted', 'no', 'discretionary review denied',
+    'effective date', 'modified', 'opinion modified', 'transfer granted', 'discretionary review denied',
     'application for leave to file second petition for rehearing denied', 'final', 'date of judgment entry on appeal',
     'petition for review pending', 'writ denied', 'rehearing filed', 'as extended', 'officially released',
-    'appendix filed', 'spring sessions'
+    'appendix filed', 'spring sessions', 'summer sessions', 'fall sessions', 'winter sessions',
+    'discretionary review denied by supreme court', 'dissenting opinion', 'en banc reconsideration denied',
+    'answer returned'
 
 ]
 
