@@ -6,17 +6,42 @@ from cl.lib.import_lib import map_citations_to_models, find_person
 
 
 # used to identify dates
-FILED_TAGS = ['filed']
-DECIDED_TAGS = ['decided']
-ARGUED_TAGS = ['argued', 'submitted', 'submitted on briefs', 'on briefs', 'heard']
-REARGUE_DENIED_TAGS = [
-    'reargument denied', 'rehearing denied', 'further rehearing denied', 'as modified on denial of rehearing'
-    ,'order denying rehearing', 'petition for rehearing filed', 'motion for rehearing filed'
-    ,'rehearing denied to bar commission'
+FILED_TAGS = [
+    'filed', 'opinion filed', 'date', 'order filed', 'delivered and filed', 'letter filed', 'dated', 'release date',
+    'filing date', 'filed date', 'date submitted', 'as of'
 ]
-REARGUE_TAGS = ['reargued', 'reheard']
+DECIDED_TAGS = ['decided', 'date decided']
+ARGUED_TAGS = [
+    'argued', 'submitted', 'submitted on briefs', 'on briefs', 'heard', 'considered on briefs',
+    'argued and submitted', 'opinion', 'opinions delivered', 'opinion delivered', 'assigned on briefs',
+    'opinion issued', 'delivered', 'rendered', 'considered on briefs on', 'opinion delivered and filed', 'orally argued'
+]
+REARGUE_DENIED_TAGS = [
+    'reargument denied', 'rehearing denied', 'further rehearing denied', 'as modified on denial of rehearing',
+    'order denying rehearing', 'petition for rehearing filed', 'motion for rehearing filed',
+    'rehearing denied to bar commission', 'reconsideration denied', 'denied', 'review denied',
+    'motion for rehearing and/or transfer to supreme court denied', 'motion for reargument denied',
+    'petition and crosspetition for review denied', 'opinion modified and as modified rehearing denied',
+    'motion for rehearing andor transfer to supreme court denied', 'petition for rehearing denied',
+    'leave to appeal denied', 'rehearings denied', 'motion for rehearing denied', 'second rehearing denied',
+    'petition for review denied'
+]
+REARGUE_TAGS = ['reargued', 'reheard', 'upon rehearing', 'on rehearing']
 CERT_GRANTED_TAGS = ['certiorari granted']
-CERT_DENIED_TAGS = ['certiorari denied', 'certiorari quashed']
+CERT_DENIED_TAGS = ['certiorari denied', 'certiorari quashed', 'certiorari denied by supreme court']
+UNKNOWN_TAGS = [
+    'petition for review allowed', 'affirmed', 'reversed and remanded', 'rehearing overruled',
+    'review granted', 'decision released', 'transfer denied', 'released for publication',
+    'application to transfer denied', 'amended', 'reversed', 'opinion on petition to rehear',
+    'suggestion of error overruled', 'cv', 'case stored in record room',
+    'met to file petition for review disposed granted', 'rehearing granted', 'opinion released',
+    'permission to appeal denied by supreme court', 'rehearing pending', 'application for transfer denied',
+    'effective date', 'modified', 'opinion modified', 'transfer granted', 'no', 'discretionary review denied',
+    'application for leave to file second petition for rehearing denied', 'final', 'date of judgment entry on appeal',
+    'petition for review pending', 'writ denied', 'rehearing filed', 'as extended', 'officially released',
+    'appendix filed', 'spring sessions'
+
+]
 
 # used to map the parsed opinion types to their tags in the populated opinion objects
 OPINION_TYPE_MAPPING = {
@@ -28,6 +53,7 @@ OPINION_TYPE_MAPPING = {
 def make_and_save(item):
     """Associates case data from `parse_opinions` with objects. Saves these objects."""
     date_filed = date_argued = date_reargued = date_reargument_denied = date_cert_granted = date_cert_denied = None
+    unknown_date = None
     for date_cluster in item['dates']:
         for date_info in date_cluster:
             # check for any dates that clearly aren't dates
@@ -54,7 +80,14 @@ def make_and_save(item):
             elif date_info[0] in CERT_DENIED_TAGS:
                 date_cert_denied = date_info[1]
             else:
-                print("Found unknown date tag '%s' with date '%s'." % date_info)
+                unknown_date = date_info[1]
+                if date_info[0] not in UNKNOWN_TAGS:
+                    print "Found unknown date tag '%s' with date '%s'." % date_info
+
+    # the main date (used for date_filed in OpinionCluster) and panel dates (used for finding judges) are ordered in
+    # terms of which type of dates best reflect them
+    main_date = date_filed or date_argued or date_reargued or date_reargument_denied or unknown_date
+    panel_date = date_argued or date_reargued or date_reargument_denied or date_filed or unknown_date
 
     docket = Docket(
         source=Docket.DEFAULT
@@ -85,7 +118,7 @@ def make_and_save(item):
     cluster = OpinionCluster(
         docket=docket
         ,precedential_status=('Unpublished' if item['unpublished'] else 'Published')
-        ,date_filed=date_filed
+        ,date_filed=main_date
         ,case_name_short=item['case_name_short'] or ''
         ,case_name=item['case_name'] or ''
         ,case_name_full=item['case_name_full'] or ''
@@ -95,12 +128,8 @@ def make_and_save(item):
         ,**citations_map
     )
     cluster.save()
-    
-    if date_argued is not None:
-        paneldate = date_argued
-    else:
-        paneldate = date_filed
-    panel = [find_person(n, item['court_id'], paneldate) for n in item['panel']]
+
+    panel = [find_person(n, item['court_id'], case_date=panel_date) for n in item['panel']]
     panel = [x for x in panel if x is not None]
     for member in panel:
         cluster.panel.add(member)
@@ -109,16 +138,16 @@ def make_and_save(item):
         if opinion_info['author'] is None:
             author = None
         else:
-            author = find_person(opinion_info['author'], item['court_id'], date_filed or date_argued)
+            author = find_person(opinion_info['author'], item['court_id'], case_date=panel_date)
         opinion = Opinion(
             cluster=cluster
             ,author=author
-            # ,per_curiam=opinion_info['per_curiam']  # TODO: un-comment once per_curiam has been migrated to Opinion
+            ,per_curiam=opinion_info['per_curiam']
             ,type=OPINION_TYPE_MAPPING[opinion_info['type']]
             ,html_columbia=opinion_info['opinion']
         )
         opinion.save()
-        joined_by = [find_person(n, item['court_id'], paneldate) for n in opinion_info['joining']]
+        joined_by = [find_person(n, item['court_id'], case_date=panel_date) for n in opinion_info['joining']]
         joined_by = [x for x in joined_by if x is not None]
         for joiner in joined_by:
             opinion.joined_by.add(joiner)

@@ -10,7 +10,7 @@ import dateutil.parser as dparser
 from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
 
 from cl.corpus_importer.court_regexes import state_pairs
-from regexes_columbia import SPECIAL_REGEXES
+from regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
 from parse_judges import find_judges
 
 
@@ -49,6 +49,8 @@ def parse_file(file_path, court_fallback=''):
     info['attorneys'] = ''.join(raw_info.get('attorneys', [])) or None
     info['posture'] = ''.join(raw_info.get('posture', [])) or None
     info['court_id'] = get_court_object(''.join(raw_info.get('court', [])), court_fallback) or None
+    if not info['court_id']:
+        raise Exception('Failed to find a court ID for "%s".' % ''.join(raw_info.get('court', [])))
     info['panel'] = find_judges(''.join(raw_info.get('panel', []))) or []
     # get dates
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
@@ -78,9 +80,6 @@ def parse_file(file_path, court_fallback=''):
                 continue
             last_texts.append(opinion['opinion'])
             if opinion['byline']:
-                # condense opinion texts
-                if len(last_texts) > 1:
-                    print "Combining multiple %s texts in '%s'." % (current_type, file_path)
                 # add the opinion and all of the previous texts
                 judges = find_judges(opinion['byline'])
                 info['opinions'].append({
@@ -97,7 +96,6 @@ def parse_file(file_path, court_fallback=''):
         if last_texts:
             relevant_opinions = [o for o in info['opinions'] if o['type'] == current_type]
             if relevant_opinions:
-                print "Combining multiple %s texts in '%s'." % (current_type, file_path)
                 relevant_opinions[-1]['opinion'] += '\n%s' % '\n'.join(last_texts)
                 relevant_opinions[-1]['opinion_texts'].extend(last_texts)
             else:
@@ -213,6 +211,8 @@ def parse_dates(raw_dates):
                 no_month = True
                 if re.search('[0-9][0-9][0-9][0-9]', raw_part) is None:
                     continue
+            # strip parenthesis from the raw string (this messes with the date parser)
+            raw_part = raw_part.replace('(', '').replace(')', '')
             # try to grab a date from the string using an intelligent library
             try:
                 date = dparser.parse(raw_part, fuzzy=True).date()
@@ -223,6 +223,9 @@ def parse_dates(raw_dates):
                 text = re.compile('(\d+)').split(raw_part.lower())[0].strip()
             else:
                 text = months.split(raw_part.lower())[0].strip()
+            # remove footnotes and non-alphanumeric characters
+            text = re.sub('(\[fn.?\])', '', text)
+            text = re.sub('[^A-Za-z ]', '', text).strip()
             # if we ended up getting some text, add it, else ignore it
             if text:
                 inner_dates.append((clean_string(text), date))
@@ -246,7 +249,8 @@ def get_court_object(raw_court, fallback=''):
     if '.' in raw_court:
         j = raw_court.find('.')
         raw_court = raw_court[:j]
-    if ',' in raw_court:
+    # we need to comma to successfully match Superior Courts, the name of which comes after the comma
+    if ',' in raw_court and 'Superior Court' not in raw_court:
         j = raw_court.find(',')
         raw_court = raw_court[:j]
     for regex, value in state_pairs:
@@ -256,6 +260,8 @@ def get_court_object(raw_court, fallback=''):
         for regex, value in SPECIAL_REGEXES:
             if re.search(regex, raw_court):
                 return value
+    if fallback in FOLDER_DICT:
+        return FOLDER_DICT[fallback]
 
 
 if __name__ == '__main__':

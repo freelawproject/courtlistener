@@ -10,6 +10,15 @@ from cl.corpus_importer.import_columbia.parse_opinions import parse_file
 from cl.corpus_importer.import_columbia.populate_opinions import make_and_save
 
 
+# court IDs and court strings from the xml files that are known to be missing from the database
+MISSING_COURT_IDS = [
+    'kanattygenop', 'mdattygenop', 'ortc', 'ncworkcompcom', 'ncworkcompcom', 'flaattygenop','calattygenop',
+    'laattygenop', 'maworkcompcom', 'moattygenop', 'oklaattygenop', 'nebattygenop', 'wisattygenop', 'oklaattygenop',
+    'delcompl', 'washattygenop', 'coloworkcompcom', 'texattygenop', 'coloattygenop', 'arkattygenop', 'nyattygenop',
+    'coloattygenop', 'connworkcompcom', 'nysupremect', 'risuperct', 'arkworkcompcom', 'nylowercourts'
+]
+
+
 class Command(BaseCommand):
     help = ('Parses the xml files in the specified directory into opinion objects that are saved.')
 
@@ -77,13 +86,19 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100):
         except Exception as e:
             # print simple exception summaries for known problems
             if 'mismatched tag' in str(e):
-                print "Mismatched tag exception encountered in file '%s':%s" % (path, str(e).split(':', 1)[1])
+                print "Mismatched tag exception encountered in file '%s': %s" % (path, str(e).split(':', 1)[1])
             elif 'Failed to get a citation' in str(e):
-                print "Exception in file '%s': %s" % (path, str(e))
+                print str(e)
+            elif 'Failed to find a court ID' in str(e):
+                print "Known exception in file '%s': %s" % (path, str(e))
+            elif 'is not present in table "search_court"' in str(e):
+                court_id = str(e).split('(')[2].split(')')[0]
+                if court_id not in MISSING_COURT_IDS:
+                    print "Court ID '%s' not in database." % court_id
             else:
                 # otherwise, print generic traceback
                 print
-                print "Exception encountered in file '%s':" % path
+                print "Unknown exception in file '%s':" % path
                 print traceback.format_exc()
                 print
         # status update

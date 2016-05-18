@@ -4,37 +4,39 @@ import re
 
 # list of words that aren't judge names
 NOT_JUDGE = [
-    'above', 'absent', 'acting', 'active', 'adopted', 'affirm', 'after',
-    'although', 'and', 
-    'appeals', 'appellate', 'argument', 'arj', 
+    'above', 'absent', 'acting', 'active', 'adopted', 'affirm', 'after', 'agrees',
+    'all', 'although', 'and',
+    'appeals', 'appellate', 'argument', 'argued', 'arj',
     'ass', 'assign', 'assigned', 'assignment', 'associate',
     'authorized', 'available', 'banc', 'bankruptcy', 'before', 'bold', 'briefs',
-    'but', 'capacity', 'case', 'cause', 'center', 'certified', 'chairman',
-    'chief', 'circuit', 'columbia', 'commissioner', 
+    'but', 'capacity', 'case', 'cause', 'center', 'certified', 'chancellor', 'chairman',
+    'chief', 'circuit', 'columbia', 'commissioner', 'composed'
     'concur', 'concurred', 'concurrence',
     'concurring', 'concurs', 'conference', 'conferences', 'considered',
     'consisted', 'consists', 'constituting', 'consultation', 'continue',
-    'court', 'curiam', 'decided', 'decision', 'denials', 'designation', 'did',
+    'court', 'curiam', 'decided', 'decision', 'delivered', 'denial', 'denials', 'designation', 'did',
     'died', 'disqualified', 'dissent', 'dissented', 'dissenting', 'dissents',
-    'district', 'division', 'emeritus', 'even', 'facts', 'fellows', 'final',
-    'footnote', 'for', 'four', 'furth', 'further', 'his', 'ii', 'iii',
-    'indiana', 'initial', 'issuance', 'italic', 'iv', 'joined', 'judge',
+    'district', 'division', 'editor', 'emeritus', 'even', 'facts', 'fellows', 'final',
+    'footnote', 'for', 'foregoing', 'four', 'furth', 'further', 'his', 'heard', 'ii', 'iii',
+    'indiana', 'indicated', 'initial', 'issuance', 'issuing', 'italic', 'iv', 'joined', 'joins', 'judge',
     'judgement', 'judges', 'judgment', 'judicial', 'justice', 'justices',
     'magistrate', 'majority', 'making', 'maryland', 'may', 'member',
-    'memorandum', 'not', 'number', 'one', 'opinion', 'oral', 'order', 
+    'memorandum', 'not', 'note', 'number', 'october', 'one', 'opinion', 'oral', 'order',
     'page', 'pair', 'panel', 'part', 'participate', 'participated', 
-    'participating', 'participation', 'per', 'preparation', 'present', 
+    'participating', 'participation', 'petition', 'per', 'preparation', 'present',
     'president', 'presiding', 'prior',
-    'pro', 'qualified', 'recusal', 'recuse', 'recused', 'reference', 'report',
+    'pro', 'qualified', 'recusal', 'recuse', 'recused', 'reference', 'rehearing', 'report',
     'reported', 'resigned', 'resul', 'result', 'retired', 'reverse', 'reversed',
     'sat', 'senior', 'separate', 'sit', 'sitting', 'special', 'specially',
     'statement', 'states', 'stating',
     'submitted', 'superior', 'supernumerary', 'taking', 'tem', 
-    'territorial', 'the',
+    'term', 'territorial', 'the',
     'this', 'though', 'three', 'time', 'transfer', 'two', 
-    'united', 
+    'unpublished', 'underline', 'united',
     'vacancy', 'vice', 'votes', 
     'warden', 'was', 'which', 'while', 'with',
+
+    'january', 'february', 'march', 'april', 'june', 'july', 'august', 'september', 'october', 'november', 'december'
 ]
 
 # judge names can only be this size or larger

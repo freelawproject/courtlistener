@@ -560,6 +560,7 @@ state_pairs = (
     (re.compile('Connecticut Compensation Review Board', re.I), 'connworkcompcom'),
     (re.compile('Commonwealth of Massachusetts Department of Industrial Accidents', re.I), 'maworkcompcom'),
     (re.compile('North Carolina Industrial Commission', re.I), 'ncworkcompcom'),
+    (re.compile('Arkansas Workers\' Compensation Commission', re.I), 'arkworkcompcom'),
 )
 
 
