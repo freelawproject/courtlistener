@@ -112,10 +112,11 @@ def make_and_save(item):
     for c in item['citations']:
         found = get_citations(c)
         if not found:
-            raise Exception("Failed to get a citation from the string '%s'." % c)
-        elif len(found) > 1:
-            raise Exception("Got multiple citations from string '%s' when there should have been one." % c)
-        found_citations.append(found[0])
+            print "Failed to get a citation from the string '%s'." % c
+        else:
+            if len(found) > 1:
+                print "Got multiple citations from string '%s' when there should have been one." % c
+            found_citations.append(found[0])
     citations_map = map_citations_to_models(found_citations)
 
     cluster = OpinionCluster(

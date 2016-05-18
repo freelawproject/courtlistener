@@ -10,16 +10,6 @@ from cl.corpus_importer.import_columbia.parse_opinions import parse_file
 from cl.corpus_importer.import_columbia.populate_opinions import make_and_save
 
 
-# court IDs and court strings from the xml files that are known to be missing from the database
-MISSING_COURT_IDS = [
-    'arkattygenop', 'arkworkcompcom', 'calappdeptsuperct', 'calattygenop', 'coloattygenop', 'coloworkcompcom',
-    'connworkcompcom', 'delcompl', 'flaattygenop', 'kanattygenop', 'laattygenop', 'massworkcompcom', 'maworkcompcom',
-    'mdattygenop', 'moattygenop', 'montattygenop', 'ncsuperct', 'ncworkcompcom', 'nebattygenop', 'nyattygenop',
-    'nycivct', 'nycrimct', 'nylowercourts', 'nysupremect', 'ohioappct', 'ohiolowercourts', 'oklaattygenop', 'ortc',
-    'risuperct', 'texattygenop', 'washattygenop', 'wisattygenop'
-]
-
-
 class Command(BaseCommand):
     help = ('Parses the xml files in the specified directory into opinion objects that are saved.')
 
@@ -92,10 +82,6 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100):
                 print str(e)
             elif 'Failed to find a court ID' in str(e):
                 print "Known exception in file '%s': %s" % (path, str(e))
-            elif 'is not present in table "search_court"' in str(e):
-                court_id = str(e).split('(')[2].split(')')[0]
-                if court_id not in MISSING_COURT_IDS:
-                    print "Court ID '%s' not in database." % court_id
             else:
                 # otherwise, print generic traceback
                 print
