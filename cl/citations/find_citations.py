@@ -316,6 +316,9 @@ def extract_base_citation(words, reporter_index):
     page = strip_punct(words[reporter_index + 1])
     if page.isdigit():
         page = int(page)
+    elif isroman(page.upper()):
+        # Some places like Nebraska have Roman numerals, e.g. in '250 Neb. xxiv (1996)'
+        page = roman2int(page.upper())
     else:
         # No page, therefore not a valid citation
         return None
@@ -323,6 +326,31 @@ def extract_base_citation(words, reporter_index):
     reporter = words[reporter_index]
     return Citation(reporter, page, volume, reporter_found=reporter,
                     reporter_index=reporter_index)
+
+
+def isroman(s):
+    """Checks if a (uppercase) string is a valid Roman numeral.
+
+    Based on: http://www.diveintopython.net/regular_expressions/n_m_syntax.html
+    """
+    return bool(re.search('^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$', s))
+
+
+def roman2int(s):
+    """Converts a valid (uppercase) string of Roman numerals to an int.
+
+    Based on: http://codereview.stackexchange.com/questions/5091
+    """
+    table = (
+        ('M', 1000), ('CM', 900), ('D', 500), ('CD', 400), ('C', 100), ('XC', 90),
+        ('L', 50), ('XL', 40), ('X', 10), ('IX', 9), ('V', 5), ('IV', 4), ('I', 1)
+    )
+    result = 0
+    for k, v in table:
+        while s.startswith(k):
+            result += v
+            s = s[len(k):]
+    return result
 
 
 def is_date_in_reporter(editions, year):
