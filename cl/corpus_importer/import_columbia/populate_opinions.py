@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import re
+import string
+import calendar
 
 from cl.search.models import Docket, Opinion, OpinionCluster
 from cl.citations.find_citations import get_citations
@@ -8,16 +10,18 @@ from cl.lib.import_lib import map_citations_to_models, find_person
 
 
 # used to identify dates
+# the order of these dates matters, as if there are multiple matches in an opinion for one type of date tag,
+# the date associated to the --last-- matched tag will be the ones used for that type of date
 FILED_TAGS = [
     'filed', 'opinion filed', 'date', 'order filed', 'delivered and filed', 'letter filed', 'dated', 'release date',
-    'filing date', 'filed date', 'date submitted', 'as of'
+    'filing date', 'filed date', 'date submitted', 'as of', 'opinions filed', 'filed on'
 ]
-DECIDED_TAGS = ['decided', 'date decided']
+DECIDED_TAGS = ['decided', 'date decided', 'decided on']
 ARGUED_TAGS = [
     'argued', 'submitted', 'submitted on briefs', 'on briefs', 'heard', 'considered on briefs',
     'argued and submitted', 'opinion', 'opinions delivered', 'opinion delivered', 'assigned on briefs',
     'opinion issued', 'delivered', 'rendered', 'considered on briefs on', 'opinion delivered and filed', 'orally argued',
-    'rendered on'
+    'rendered on', 'oral argument'
 ]
 REARGUE_DENIED_TAGS = [
     'reargument denied', 'rehearing denied', 'further rehearing denied', 'as modified on denial of rehearing',
@@ -27,10 +31,12 @@ REARGUE_DENIED_TAGS = [
     'petition and crosspetition for review denied', 'opinion modified and as modified rehearing denied',
     'motion for rehearing andor transfer to supreme court denied', 'petition for rehearing denied',
     'leave to appeal denied', 'rehearings denied', 'motion for rehearing denied', 'second rehearing denied',
-    'petition for review denied', 'appeal dismissed'
+    'petition for review denied', 'appeal dismissed', 'rehearing en banc denied',
+    'rehearing and rehearing en banc denied', 'order denying petition for rehearing',
+    'all petitions for review denied', 'petition for allowance of appeal denied'
 ]
 REARGUE_TAGS = ['reargued', 'reheard', 'upon rehearing', 'on rehearing']
-CERT_GRANTED_TAGS = ['certiorari granted']
+CERT_GRANTED_TAGS = ['certiorari granted', 'petition and crosspetition for writ of certiorari granted']
 CERT_DENIED_TAGS = ['certiorari denied', 'certiorari quashed', 'certiorari denied by supreme court']
 UNKNOWN_TAGS = [
     'petition for review allowed', 'affirmed', 'reversed and remanded', 'rehearing overruled',
@@ -44,8 +50,23 @@ UNKNOWN_TAGS = [
     'petition for review pending', 'writ denied', 'rehearing filed', 'as extended', 'officially released',
     'appendix filed', 'spring sessions', 'summer sessions', 'fall sessions', 'winter sessions',
     'discretionary review denied by supreme court', 'dissenting opinion', 'en banc reconsideration denied',
-    'answer returned'
+    'answer returned', 'refiled', 'revised', 'modified upon denial of rehearing', 'session mailed',
+    'reversed and remanded with instructions', 'writ granted', 'date of judgment entry', 'preliminary ruling rendered',
+    'amended on', 'dissenting opinion filed', 'concurring opinion filed', 'memorandum dated',
+    'mandamus denied on mandate', 'updated'
 
+]
+
+# used to check if a docket number appears in what should be a citation string
+# the order matters, as these are stripped from a docket string in order
+DOCKET_JUNK = ['c.a. no. kc', 'c.a. no. pm', 'i.c. no.', 'case no.', 'no.']
+
+# known abbreviations that indicate if a citation isn't actually a citation
+BAD_CITES = ['Iowa App.']
+
+# used to figure out if a "citation text" is really a citation
+TRIVIAL_CITE_WORDS = [n.lower() for n in calendar.month_name] + [n.lower()[:3] for n in calendar.month_name] + [
+    'no'
 ]
 
 # used to map the parsed opinion types to their tags in the populated opinion objects
@@ -87,7 +108,9 @@ def make_and_save(item):
             else:
                 unknown_date = date_info[1]
                 if date_info[0] not in UNKNOWN_TAGS:
+                    print
                     print "Found unknown date tag '%s' with date '%s'." % date_info
+                    print
 
     # the main date (used for date_filed in OpinionCluster) and panel dates (used for finding judges) are ordered in
     # terms of which type of dates best reflect them
@@ -114,15 +137,30 @@ def make_and_save(item):
     for c in item['citations']:
         found = get_citations(c)
         if not found:
-            # if the docket number is in the citation string, we're likely dealing with a somewhat common triplet of
+            # if the docket number --is-- citation string, we're likely dealing with a somewhat common triplet of
             # (docket number, date, jurisdiction), which isn't a citation at all (so there's no problem)
-            if item['docket'] and item['docket'] in c:
+            if item['docket']:
+                docket_no = item['docket'].lower()
+                for junk in DOCKET_JUNK:
+                    docket_no = docket_no.replace(junk, '')
+                docket_no = docket_no.strip('.').strip()
+                if docket_no and docket_no in c.lower():
+                    continue
+            # there are a trivial number of letters (except for months and a few trivial words) in the citation,
+            # then it's not a citation at all
+            non_trivial = c.lower()
+            for trivial in TRIVIAL_CITE_WORDS:
+                non_trivial = non_trivial.replace(trivial, '')
+            num_letters = sum(non_trivial.count(letter) for letter in string.lowercase)
+            if num_letters < 3:
                 continue
-            # there are no letters in the citation, then it's just a reference and not a citation at all
-            if not re.search('[a-zA-Z]', c):
+            # if there is a string that's known to indicate a bad citation, then it's not a citation
+            if any(bad in c for bad in BAD_CITES):
                 continue
             # otherwise, this is a problem
-            raise Exception("Failed to get a citation from the string '%s' in court '%s'." % (c, item['court_id']))
+            raise Exception("Failed to get a citation from the string '%s' in court '%s' with docket '%s'." % (
+                c, item['court_id'], item['docket']
+            ))
         else:
             if len(found) > 1:
                 raise Exception("Got multiple citations from string '%s' when there should have been one." % c)

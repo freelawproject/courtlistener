@@ -110,6 +110,11 @@ def parse_file(file_path, court_fallback=''):
     # check if opinions were heard per curiam by checking if the first chunk of text in the byline or in
     #  any of its associated opinion texts indicate this
     for opinion in info['opinions']:
+        # if there's already an identified author, it's not per curiam
+        if opinion['author'] > 0:
+            opinion['per_curiam'] = False
+            continue
+        # otherwise, search through chunks of text for the phrase 'per curiam'
         per_curiam = False
         first_chunk = 1000
         if 'per curiam' in opinion['byline'][:first_chunk].lower():
@@ -120,9 +125,6 @@ def parse_file(file_path, court_fallback=''):
                     per_curiam = True
                     break
         opinion['per_curiam'] = per_curiam
-        # there shouldn't be a per curiam opinion with a specific author
-        if opinion['author'] > 0 and per_curiam:
-            print "Warning: Per curiam opinion with an author in '%s'." % file_path
     return info
 
 
