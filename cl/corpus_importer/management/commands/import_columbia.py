@@ -76,12 +76,12 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100):
             make_and_save(parsed)
         except Exception as e:
             # print simple exception summaries for known problems
-            if 'mismatched tag' in str(e):
-                print "Mismatched tag exception encountered in file '%s': %s" % (path, str(e).split(':', 1)[1])
-            elif 'Failed to get a citation' in str(e):
+            known = ['mismatched tag', 'Failed to get a citation', 'Got multiple citations']
+            if any(k in str(e) for k in known):
+                print
+                print "Known exception in file '%s':" % path
                 print str(e)
-            elif 'Failed to find a court ID' in str(e):
-                print "Known exception in file '%s': %s" % (path, str(e))
+                print
             else:
                 # otherwise, print generic traceback
                 print

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import re
+
 from cl.search.models import Docket, Opinion, OpinionCluster
 from cl.citations.find_citations import get_citations
 from cl.lib.import_lib import map_citations_to_models, find_person
@@ -112,10 +114,18 @@ def make_and_save(item):
     for c in item['citations']:
         found = get_citations(c)
         if not found:
-            print "Failed to get a citation from the string '%s'." % c
+            # if the docket number is in the citation string, we're likely dealing with a somewhat common triplet of
+            # (docket number, date, jurisdiction), which isn't a citation at all (so there's no problem)
+            if item['docket'] and item['docket'] in c:
+                continue
+            # there are no letters in the citation, then it's just a reference and not a citation at all
+            if not re.search('[a-zA-Z]', c):
+                continue
+            # otherwise, this is a problem
+            raise Exception("Failed to get a citation from the string '%s' in court '%s'." % (c, item['court_id']))
         else:
             if len(found) > 1:
-                print "Got multiple citations from string '%s' when there should have been one." % c
+                raise Exception("Got multiple citations from string '%s' when there should have been one." % c)
             found_citations.append(found[0])
     citations_map = map_citations_to_models(found_citations)
 
