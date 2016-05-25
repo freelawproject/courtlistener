@@ -111,6 +111,11 @@ class CiteTest(TestCase):
              [Citation(volume=12, reporter='Neb. Ct. App.', page=64, year=2004,
                       canonical_reporter=u'Neb. Ct. App.', lookup_index=0,
                       reporter_index=1, reporter_found='Neb. App.')]),
+            # Test with the 'digit-REPORTER-digit' corner-case formatting
+            ('2007-NMCERT-008',
+             [Citation(volume=2007, reporter='NMCERT', page=8,
+                      canonical_reporter=u'NMCERT', lookup_index=0,
+                      reporter_index=1, reporter_found='NMCERT')]),
         )
         for q, a in test_pairs:
             print "Testing citation extraction for %s..." % q,
