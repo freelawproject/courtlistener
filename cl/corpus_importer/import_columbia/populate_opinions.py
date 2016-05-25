@@ -74,9 +74,7 @@ DOCKET_JUNK = ['c.a. no. kc', 'c.a. no. pm', 'c.a. no.', 'i.c. no.', 'case no.',
 BAD_CITES = ['Iowa App.', 'R.I.Super.', 'Ma.Super.', 'Minn.App.', 'NCIC']
 
 # used to figure out if a "citation text" is really a citation
-TRIVIAL_CITE_WORDS = [n.lower() for n in calendar.month_name] + [n.lower()[:3] for n in calendar.month_name] + [
-    'no'
-]
+TRIVIAL_CITE_WORDS = [n.lower() for n in calendar.month_name] + [n.lower()[:3] for n in calendar.month_name] + ['no']
 
 # used to map the parsed opinion types to their tags in the populated opinion objects
 OPINION_TYPE_MAPPING = {

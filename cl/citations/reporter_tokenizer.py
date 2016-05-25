@@ -51,6 +51,10 @@ def tokenize(text):
        >>>tokenize('See Roe v. Wade, 410 U. S. 113 (1973)')
        ['See', 'Roe', 'v.', 'Wade,', '410', 'U.S.', '113', '(1973)']
     """
+    # if the text looks likes the corner-case 'digit-REPORTER-digit', splitting by spaces doesn't work
+    if re.match('\d+\-[A-Z]+\-\d+', text):
+        return text.split('-')
+    # otherwise, we just split on spaces to find words
     strings = REPORTER_RE.split(text)
     words = []
     for string in strings:
