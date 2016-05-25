@@ -248,10 +248,11 @@ def get_court_object(raw_court, fallback=''):
     :param raw_court: A raw court string, parsed from an XML file.
     :param fallback: If fail to find one, will apply the regexes associated to this key in `SPECIAL_REGEXES`.
     """
-    if '.' in raw_court:
+    # this messes up 'St. Louis' but works for all others
+    if '.' in raw_court and 'St. Louis' not in raw_court:
         j = raw_court.find('.')
         raw_court = raw_court[:j]
-    # we need to comma to successfully match Superior Courts, the name of which comes after the comma
+    # we need the comma to successfully match Superior Courts, the name of which comes after the comma
     if ',' in raw_court and 'Superior Court' not in raw_court:
         j = raw_court.find(',')
         raw_court = raw_court[:j]
@@ -259,7 +260,7 @@ def get_court_object(raw_court, fallback=''):
         if re.search(regex, raw_court):
             return value
     if fallback in SPECIAL_REGEXES:
-        for regex, value in SPECIAL_REGEXES:
+        for regex, value in SPECIAL_REGEXES[fallback]:
             if re.search(regex, raw_court):
                 return value
     if fallback in FOLDER_DICT:

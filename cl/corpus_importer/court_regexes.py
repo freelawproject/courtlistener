@@ -522,7 +522,7 @@ state_pairs = (
     (re.compile('Massachusetts Superior Court', re.I), 'masssuperct'),
     (re.compile('High Court of Errors and Appeals of Delaware', re.I), 'del'),
     (re.compile('Court of Errors and Appeals of Delaware', re.I), 'del'),
-    (re.compile('Court of Common Pleas of Delaware', re.I), 'delctcompl'),
+    (re.compile('Court of Common Pleas( Court )? of Delaware', re.I), 'delctcompl'),
     (re.compile('Hawaii Court of Appeals?', re.I), 'hawapp'),
     (re.compile('Hawaii Intermediate Court of Appeals?', re.I), 'hawapp'),    
     (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),    
