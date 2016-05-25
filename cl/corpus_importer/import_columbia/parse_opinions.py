@@ -41,6 +41,8 @@ def parse_file(file_path, court_fallback=''):
     """
     raw_info = get_text(file_path)
     info = {}
+    # throughout the process, collect all info about judges and at the end use it to populate info['judges']
+    judge_info = []
     # get basic info
     info['unpublished'] = raw_info['unpublished']
     info['file'] = os.path.splitext(os.path.basename(file_path))[0]
@@ -51,7 +53,11 @@ def parse_file(file_path, court_fallback=''):
     info['court_id'] = get_court_object(''.join(raw_info.get('court', [])), court_fallback) or None
     if not info['court_id']:
         raise Exception('Failed to find a court ID for "%s".' % ''.join(raw_info.get('court', [])))
-    info['panel'] = find_judges(''.join(raw_info.get('panel', []))) or []
+    # get the full panel text and extract judges from it
+    panel_text = ''.join(raw_info.get('panel', []))
+    if panel_text:
+        judge_info.append(('Panel\n-----', panel_text))
+    info['panel'] = find_judges(panel_text) or []
     # get dates
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates)
@@ -80,6 +86,10 @@ def parse_file(file_path, court_fallback=''):
                 continue
             last_texts.append(opinion['opinion'])
             if opinion['byline']:
+                judge_info.append((
+                    '%s Byline\n%s' % (current_type.title(), '-' * (len(current_type) + 7)),
+                    opinion['byline']
+                ))
                 # add the opinion and all of the previous texts
                 judges = find_judges(opinion['byline'])
                 info['opinions'].append({
@@ -125,6 +135,9 @@ def parse_file(file_path, court_fallback=''):
                     per_curiam = True
                     break
         opinion['per_curiam'] = per_curiam
+    # construct the plain text info['judges'] from collected judge data
+    info['judges'] = '\n\n'.join('%s\n%s' % i for i in judge_info)
+
     return info
 
 
@@ -248,8 +261,8 @@ def get_court_object(raw_court, fallback=''):
     :param raw_court: A raw court string, parsed from an XML file.
     :param fallback: If fail to find one, will apply the regexes associated to this key in `SPECIAL_REGEXES`.
     """
-    # this messes up 'St. Louis' but works for all others
-    if '.' in raw_court and 'St. Louis' not in raw_court:
+    # this messes up for, e.g. 'St. Louis', but works for all others
+    if '.' in raw_court and 'St.' not in raw_court:
         j = raw_court.find('.')
         raw_court = raw_court[:j]
     # we need the comma to successfully match Superior Courts, the name of which comes after the comma

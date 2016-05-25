@@ -125,17 +125,17 @@ def make_and_save(item):
     panel_date = date_argued or date_reargued or date_reargument_denied or date_filed or unknown_date
 
     docket = Docket(
-        source=Docket.DEFAULT
-        ,date_argued=date_argued
-        ,date_reargued=date_reargued
-        ,date_cert_granted=date_cert_granted
-        ,date_cert_denied=date_cert_denied
-        ,date_reargument_denied=date_reargument_denied
-        ,court_id=item['court_id']
-        ,case_name_short=item['case_name_short'] or ''
-        ,case_name=item['case_name'] or ''
-        ,case_name_full=item['case_name_full'] or ''
-        ,docket_number=item['docket'] or ''
+        source=Docket.DEFAULT,
+        date_argued=date_argued,
+        date_reargued=date_reargued,
+        date_cert_granted=date_cert_granted,
+        date_cert_denied=date_cert_denied,
+        date_reargument_denied=date_reargument_denied,
+        court_id=item['court_id'],
+        case_name_short=item['case_name_short'] or '',
+        case_name=item['case_name'] or '',
+        case_name_full=item['case_name_full'] or '',
+        docket_number=item['docket'] or ''
     )
     docket.save()
 
@@ -175,16 +175,17 @@ def make_and_save(item):
     citations_map = map_citations_to_models(found_citations)
 
     cluster = OpinionCluster(
-        docket=docket
-        ,precedential_status=('Unpublished' if item['unpublished'] else 'Published')
-        ,date_filed=main_date
-        ,case_name_short=item['case_name_short'] or ''
-        ,case_name=item['case_name'] or ''
-        ,case_name_full=item['case_name_full'] or ''
-        ,source='Z'
-        ,attorneys=item['attorneys'] or ''
-        ,posture=item['posture'] or ''
-        ,**citations_map
+        docket=docket,
+        judges=item['judges'] or '',
+        precedential_status=('Unpublished' if item['unpublished'] else 'Published'),
+        date_filed=main_date,
+        case_name_short=item['case_name_short'] or '',
+        case_name=item['case_name'] or '',
+        case_name_full=item['case_name_full'] or '',
+        source='Z',
+        attorneys=item['attorneys'] or '',
+        posture=item['posture'] or '',
+        **citations_map
     )
     cluster.save()
 
