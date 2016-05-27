@@ -8,6 +8,7 @@ from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 from django.utils.timezone import now
 from cl.citations import reporter_tokenizer
 from cl.search.models import Court
+from cl.lib.roman import isroman
 
 
 FORWARD_SEEK = 20
@@ -325,14 +326,6 @@ def extract_base_citation(words, reporter_index):
     reporter = words[reporter_index]
     return Citation(reporter, page, volume, reporter_found=reporter,
                     reporter_index=reporter_index)
-
-
-def isroman(s):
-    """Checks if a lowercase or uppercase string is a valid Roman numeral.
-
-    Based on: http://www.diveintopython.net/regular_expressions/n_m_syntax.html
-    """
-    return bool(re.search('^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$', s.upper()))
 
 
 def is_date_in_reporter(editions, year):
