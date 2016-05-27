@@ -137,7 +137,6 @@ def make_and_save(item):
         case_name_full=item['case_name_full'] or '',
         docket_number=item['docket'] or ''
     )
-    docket.save()
 
     # get citations in the form of, e.g. {'federal_cite_one': '1 U.S. 1', ...}
     found_citations = []
@@ -175,7 +174,6 @@ def make_and_save(item):
     citations_map = map_citations_to_models(found_citations)
 
     cluster = OpinionCluster(
-        docket=docket,
         judges=item['judges'] or '',
         precedential_status=('Unpublished' if item['unpublished'] else 'Published'),
         date_filed=main_date,
@@ -187,27 +185,41 @@ def make_and_save(item):
         posture=item['posture'] or '',
         **citations_map
     )
-    cluster.save()
-
     panel = [find_person(n, item['court_id'], case_date=panel_date) for n in item['panel']]
     panel = [x for x in panel if x is not None]
-    for member in panel:
-        cluster.panel.add(member)
 
+    opinions = []
     for opinion_info in item['opinions']:
         if opinion_info['author'] is None:
             author = None
         else:
             author = find_person(opinion_info['author'], item['court_id'], case_date=panel_date)
         opinion = Opinion(
-            cluster=cluster
-            ,author=author
-            ,per_curiam=opinion_info['per_curiam']
-            ,type=OPINION_TYPE_MAPPING[opinion_info['type']]
-            ,html_columbia=opinion_info['opinion']
+            author=author,
+            per_curiam=opinion_info['per_curiam'],
+            type=OPINION_TYPE_MAPPING[opinion_info['type']],
+            html_columbia=opinion_info['opinion']
         )
-        opinion.save()
         joined_by = [find_person(n, item['court_id'], case_date=panel_date) for n in opinion_info['joining']]
         joined_by = [x for x in joined_by if x is not None]
-        for joiner in joined_by:
-            opinion.joined_by.add(joiner)
+        opinions.append((opinion, joined_by))
+
+    # save all the objects
+    try:
+        docket.save()
+        cluster.docket = docket
+        cluster.save()
+        for member in panel:
+            cluster.panel.add(member)
+        for opinion, joined_by in opinions:
+            opinion.cluster = cluster
+            opinion.save()
+            for joiner in joined_by:
+                opinion.joined_by.add(joiner)
+    except:
+        # if anything goes wrong, try to delete everything
+        try:
+            docket.delete()
+        except:
+            pass
+        raise

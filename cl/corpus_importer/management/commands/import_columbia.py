@@ -3,6 +3,7 @@ import fnmatch
 from random import shuffle
 import re
 import traceback
+import logging
 
 from django.core.management.base import BaseCommand
 
@@ -38,12 +39,18 @@ class Command(BaseCommand):
             ,default=100
             ,help='How often a status update will be given. By default, every 100 files.'
         )
+        parser.add_argument(
+            '--log'
+            ,type=str
+            ,default=None
+            ,help='The file to which file paths that raise exceptions will be logged.'
+        )
 
     def handle(self, *args, **options):
-        do_many(options['dir'][0], options['limit'], options['random'], options['status'])
+        do_many(options['dir'][0], options['limit'], options['random'], options['status'], options['log'])
 
 
-def do_many(dir_path, limit=None, random_order=False, status_interval=100):
+def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_file=None):
     """Runs through a directory of the form /data/[state]/[sub]/.../[folders]/[.xml documents]. Parses each .xml
     document, instantiates the associated model object, and saves the object.
     Prints/logs status updates and tracebacks instead of raising exceptions.
@@ -52,6 +59,7 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100):
     :param limit: A limit on how many files to run through. If None, will run through all (or if random order, forever).
     :param random_order: If true, will run through the directories and files in random order.
     :param status_interval: How often a status update will be given.
+    :param log_file: If not None, file paths that raise Exceptions will be logged to this file.
     """
     if limit:
         total = limit
@@ -63,6 +71,13 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100):
             total += len(fnmatch.filter(file_names, '*.xml'))
     else:
         total = None
+    log = None
+    if log_file:
+        print "Logging problematic file paths to '%s' ..." % log_file
+        print
+        log = logging.getLogger(__name__)
+        log.setLevel(logging.INFO)
+        log.addHandler(logging.FileHandler(log_file))
     # go through the files, yielding parsed files and printing status updates as we go
     count = 0
     for path in file_generator(dir_path, random_order, limit):
@@ -79,6 +94,9 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100):
                 parsed = parse_file(path, court_fallback=court_fallback)
                 make_and_save(parsed)
             except Exception as e:
+                # log the file name
+                if log:
+                    log.info(path)
                 # print simple exception summaries for known problems
                 known = [
                     'mismatched tag', 'Failed to get a citation', 'Failed to find a court ID',
