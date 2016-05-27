@@ -100,7 +100,7 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_f
                 # print simple exception summaries for known problems
                 known = [
                     'mismatched tag', 'Failed to get a citation', 'Failed to find a court ID',
-                    'null value in column "date_filed"'
+                    'null value in column "date_filed"', 'duplicate(s)'
                 ]
                 if any(k in str(e) for k in known):
                     print

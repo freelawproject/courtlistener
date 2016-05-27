@@ -2,10 +2,19 @@
 
 import string
 import calendar
+from collections import OrderedDict
+import re
 
 from cl.search.models import Docket, Opinion, OpinionCluster
 from cl.citations.find_citations import get_citations
 from cl.lib.import_lib import map_citations_to_models, find_person
+from django.conf import settings
+from cl.lib import sunburnt
+from cl.lib.solr_core_admin import get_term_frequency
+
+
+# only make a solr connection onece
+SOLR_CONN = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
 
 
 # used to identify dates
@@ -204,6 +213,11 @@ def make_and_save(item):
         joined_by = [x for x in joined_by if x is not None]
         opinions.append((opinion, joined_by))
 
+    # check to see if this is a duplicate
+    dups = find_dups(docket, cluster, panel, opinions)
+    if dups:
+        raise Exception("Found %s duplicate(s)." % len(dups))
+
     # save all the objects
     try:
         docket.save()
@@ -223,3 +237,108 @@ def make_and_save(item):
         except:
             pass
         raise
+
+
+def find_dups(docket, cluster, panel, opinions):
+    """Finds the duplicate cases associated to a collection of objects.
+
+    :param docket: A `Docket` instance.
+    :param cluster: An `OpinionCluster` instance.
+    :param panel: A list of `Person` instances that is the panel for `cluster`.
+    :param opinions: A list of `(Opinion, joined_by)` tuples in which `joined_by` is a list of `Person` instances that
+        are the judges joining `Opinion.author` in that `Opinion` instance.
+    """
+    cites = [c for c in cluster.citation_list if c]
+    if not cites:
+        # if there aren't any citations, assume for now that there's no duplicate
+        return []
+    params = {
+        'fq': [
+            'court_id:%s' % docket.court_id,
+            'citation:(%s)' % ' OR '.join('"%s"~5' % c for c in cluster.citation_list if c)
+        ],
+        'rows': 100,
+        'caller': 'corpus_importer.import_columbia.populate_opinions'
+    }
+    results = SOLR_CONN.raw_query(**params).execute()
+    if len(results) == 1:
+        # found the duplicate
+        return results
+    elif len(results) > 1:
+        # narrow down the cases that match citations
+        remaining = []
+        base_words = get_case_name_words(docket.case_name)
+        for r in results:
+            # if the important words in case names don't match up, these aren't duplicates
+            if not r.get('caseName'):
+                continue
+            if get_case_name_words(r['caseName']) == base_words:
+                remaining.append(r)
+        if remaining:
+            # we successfully narrowed down the results
+            return remaining
+        # failed to narrow down results, so we just return the cases that match citations
+        return results
+    return []
+
+
+def get_case_name_words(case_name):
+    """Gets all the important words in a case name. Returns them as a set."""
+    case_name = case_name.lower()
+    filtered_words = []
+    all_words = case_name.split()
+    if ' v. ' in case_name:
+        v_index = all_words.index('v.')
+        # The first word of the defendant and the last word in the plaintiff that's
+        # not a bad word.
+        plaintiff_a = get_good_words(all_words[:v_index])
+        defendant_a = get_good_words(all_words[v_index + 1:])
+        if plaintiff_a:
+            filtered_words.append(plaintiff_a[-1])
+        if defendant_a:
+            # append the first good word that's not already in the array
+            try:
+                filtered_words.append([word for word in defendant_a if word not in filtered_words][0])
+            except IndexError:
+                # When no good words left in defendant_a
+                pass
+    elif 'in re ' in case_name or 'matter of ' in case_name or 'ex parte' in case_name:
+        try:
+            subject = re.search('(?:(?:in re)|(?:matter of)|(?:ex parte)) (.*)', case_name).group(1)
+        except TypeError:
+            subject = ''
+        good_words = get_good_words(subject.split())
+        if good_words:
+            filtered_words.append(good_words[0])
+    else:
+        filtered_words = get_good_words(all_words)
+    return set(filtered_words)
+
+
+def get_good_words(word_list, stop_words_size=500):
+    """Cleans out stop words, abbreviations, etc. from a list of words"""
+    stopwords = StopWords().stop_words
+    good_words = []
+    for word in word_list:
+        # Clean things up
+        word = re.sub(r"'s", '', word)
+        word = word.strip('*,();"')
+
+        # Boolean conditions
+        stop = word in stopwords[:stop_words_size]
+        bad_stuff = re.search('[0-9./()!:&\']', word)
+        too_short = (len(word) <= 1)
+        is_acronym = (word.isupper() and len(word) <= 3)
+        if any([stop, bad_stuff, too_short, is_acronym]):
+            continue
+        else:
+            good_words.append(word)
+    # Eliminate dups, but keep order.
+    return list(OrderedDict.fromkeys(good_words))
+
+
+class StopWords(object):
+    """A very simple object that can hold stopwords, but that is only
+    initialized once.
+    """
+    stop_words = get_term_frequency(result_type='list')
