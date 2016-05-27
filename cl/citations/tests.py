@@ -108,7 +108,7 @@ class CiteTest(TestCase):
                        reporter_index=5, reporter_found="Atl.")]),
             # Test with the page number as a Roman numeral
             ('12 Neb. App. lxiv (2004)',
-             [Citation(volume=12, reporter='Neb. Ct. App.', page=64, year=2004,
+             [Citation(volume=12, reporter='Neb. Ct. App.', page='lxiv', year=2004,
                       canonical_reporter=u'Neb. Ct. App.', lookup_index=0,
                       reporter_index=1, reporter_found='Neb. App.')]),
             # Test with the 'digit-REPORTER-digit' corner-case formatting
