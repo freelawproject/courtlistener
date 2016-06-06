@@ -535,8 +535,11 @@
             </li>
         </ul>
 
+        <h2 id="tips">Tips &amp; Tricks</h2>
+        <p>The SSL certificate issued by identrust.com, or <i>Let’s Encrypt</i>, which is used by CourtListener.com, has not been added to the Java JVM list of trusted Certificate Authorities as of version 8u74. There is a discussion on <i>Let's Encrypt</i> about thier progress getting their certificate trusted by various organizations at &quot;<a href="https://community.letsencrypt.org/t/inclusion-of-isrg-root/9002">Inclusion of ISRG Root.</a>&quot; For now, this causes an error when using Java libraries to access the REST api. The error shown is &quot;<pre>PKIX path  building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target.</pre>&quot; A workaround has been posted on StackOverflow under <a href="http://stackoverflow.com/questions/2893819/telling-java-to-accept-self-signed-ssl-certificate/36707080#36707080">telling java to accept self-signed ssl certificate</a>, which is pretty easy to implement.
+        </p>
 
-        <h2>Footnotes</h2>
+        <h2>Footnotes</h2> 
         <p id="fn1"><sup>1</sup> The <code>search</code> endpoint is handled by our search engine, not our database. Filters and ordering are thus applied using the same <code>GET</code> parameters as are created when using the front end of the website. Our recommendation is to hone your query there, then move the parameters to the API. See more details in <a href="#search-endpoint">the search section of this document</a>.
         </p>
         <p><a href="#fn-ref-1">Back to reference 1 &#8617;</a></p>
