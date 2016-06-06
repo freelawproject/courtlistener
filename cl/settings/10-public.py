@@ -259,7 +259,7 @@ REST_FRAMEWORK = {
         'scout': '10000/hour',
         'scout_test': '10000/hour',
         'waldo': '10000/hour',
-        'peidelman': '10000/hour',
+        'peidelman': '20000/hour',
     },
 
     # Auth
