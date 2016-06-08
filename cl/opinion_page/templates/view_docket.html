@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load text_filters %}
 {% load humanize %}
+{% load extras %}
 {% load admin_urls %}
 
 {% block title %}Docket for {{ docket|best_case_name }} –
@@ -10,72 +11,317 @@
 {% block description %}Docket for {{ docket|best_case_name }}{% endblock %}
 {% block og_description %}Docket for {{ docket|best_case_name }}{% endblock %}
 
-{% block sidebar %}
-    <div class="col-sm-3" id="sidebar">
-      {% if request.user.is_superuser %}
-        <div class="sidebar-section">
-          {% if private %}
-          <div class="btn btn-danger btn-xs">Blocked from Search Engines</div>
-          {% endif %}
-        </div>
-      {% endif %}
-    </div>
-{% endblock sidebar %}
+{% block footer-scripts %}
+    <script type="text/javascript">
+        $('#actions-picker').on('show.bs.modal', function (event) {
+            var row = $(event.relatedTarget);
+            var pk = row.data('docket-entry');
+
+            $.ajax({
+                method: "GET",
+                url: "/docket-entry/" + pk + "/",
+                success: function(data) {
+                    if (data.item_count > 0){
+                        // Build the table
+                        $.each(data.documents, function (i, item) {
+                            makeRow(item, "Entry ");
+                        });
+                        $.each(data.attachments, function (i, item) {
+                            makeRow(item, "Attachment ");
+                        });
+                    } else {
+                        // No items in RECAP -- throw an error.
+                        $('#document-table tbody').append(
+                        $('<tr>').append(
+                        $('<td>').attr('colspan', '3')
+                                 .text("Item not yet in our collection. Please download using RECAP and we'll have it soon.")
+                        ));
+                    }
+
+                },
+                error: function() {
+                    $('#document-table tbody').append(
+                    $('<tr>').append(
+                    $('<td>').attr('colspan', '3')
+                             .text("Oops! An error occurred. Please refresh " +
+                                   "the page and try again.")
+                    ));
+                }
+            });
+        });
+        $('#actions-picker').on('hide.bs.modal', function(event){
+            // Prepare for a different entry to be opened.
+            $('#document-table tbody').empty();
+        });
+
+        var makeRow = function (item, type) {
+            var row = $('<tr>');
+            var number_attr;
+            if (type === 'Entry ') {
+                number_attr = item.document_number;
+            } else {
+                number_attr = item.attachment_number;
+            }
+            row.append($('<td>').text(type + number_attr));
+
+            if (item.description) {
+                row.append($('<td>').text(item.description));
+                row.append($('<td>')
+                   .append($('<div>')
+                        .attr('class', 'float-right')
+                        .append(
+                            $('<a>')
+                                .attr({
+                                    'href': "/" + item.filepath_local,
+                                    'class': 'btn-primary btn'
+                                })
+                                .text("Download")
+                        )));
+            } else {
+                // Item not yet in CourtListener. For now, show an error.
+                // Later, we'll let people click to get the item.
+                row.append($('<td>')
+                           .attr('colspan', '3')
+                           .text("Item not yet in our collection. Please download using RECAP and we'll have it soon.")
+                );
+            }
+
+            row.appendTo('#document-table tbody');
+        };
+    </script>
+{% endblock %}
+
 
 {% block content %}
     <div class="col-xs-12">
-        {% if perms.search.change_docket %}
-            <p class="float-right">
-                <a href="{% url 'admin:search_docket_change' docket.id %}"
-                   class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;<i
-                   class="fa fa-pencil"></i>
-                </a>
-            </p>
-        {% endif %}
-        <h2>{{ docket|best_case_name|safe|v_wrapper }}</h2>
-
-        {% if docket.clusters.count %}
-        <div>
-            <h3>There {% if docket.clusters.count == 1 %}is{% else %}are{% endif %} {{ docket.clusters.count|apnumber|intcomma }} opinion{{ docket.clusters.count|pluralize }} associated with this docket.</h3>
-            <hr>
-            <ul>
-                {% for cluster in docket.clusters.all %}
-                    <li>
-                        <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                            {{ cluster.caption|safe|v_wrapper }}
+        <div class="row">
+            <div class="col-xs-12">
+                {% if perms.search.change_docket %}
+                    <p class="float-right">
+                        <a href="{% url 'admin:search_docket_change' docket.id %}"
+                           class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;<i
+                           class="fa fa-pencil"></i>
+                            {% if private and request.user.is_superuser %}
+                                &nbsp;<i class="fa fa-ban" title="Blocked from Search Engines"></i>
+                            {% endif %}
                         </a>
-                        {% if perms.search.change_document %}
-                            <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
-                               class="btn btn-primary btn-xs">Edit</a>
-                        {% endif %}
-                        <br/>
-                        {{ cluster.date_filed }}
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
+                    </p>
+                {% endif %}
+                <h2>
+                    {{ docket|best_case_name|safe|v_wrapper }}
+                    {% if docket.docket_number %}
+                        ({{ docket.docket_number }})
+                    {% endif %}
+                </h2>
+                <h3>{{ docket.court }}</h3>
 
-        {% if docket.audio_files.count %}
-        <div>
-            <h3>There {% if docket.audio_files.count == 1 %}is{% else %}are{% endif %} {{ docket.audio_files.count|apnumber|intcomma }} audio file{{ docket.audio_files.count|pluralize }} on this docket.</h3>
-            <hr>
-            <ul>
-                {% for af in docket.audio_files.all %}
-                    <li>
-                        <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                            {{ af|best_case_name|safe|v_wrapper }}
-                        </a>
-                        {% if perms.audio.change_audio %}
-                            <a href="{% url 'admin:audio_audio_change' af.pk %}"
-                               class="btn btn-primary btn-xs">Edit</a>
-                        {% endif %}
-                        <br/>
-                        {{ af.docket.date_argued }}
-                    </li>
-                {% endfor %}
-            </ul>
+
+                {% if docket.assigned_to %}
+                <p class="bottom">
+                    <span class="meta-data-header">Assigned To:</span>
+                    <span class="meta-data-value">
+                        <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
+                    </span>
+                </p>
+                {% endif %}
+
+                {% if docket.referred_to %}
+                <p class="bottom">
+                    <span class="meta-data-header">Referred To:</span>
+                    <span class="meta-data-value">
+                        <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
+                    </span>
+                </p>
+                {% endif %}
+
+                {% if docket.date_cert_granted %}
+                <p class="bottom">
+                    <span class="meta-data-header">Date Certiorari Granted:</span>
+                    <span class="meta-data-value">{{ docket.date_cert_granted }}</span>
+                </p>
+                {% endif %}
+
+                {% if docket.cert_denied %}
+                <p class="bottom">
+                    <span class="meta-data-header">Date Certiorari Denied:</span>
+                    <span class="meta-data-value">{{ docket.date_cert_denied }}</span>
+                </p>
+                {% endif %}
+
+                {% if docket.date_argued %}
+                <p class="bottom">
+                    <span class="meta-data-header">Date Argued:</span>
+                    <span class="meta-data-value">{{ docket.date_argued }}</span>
+                </p>
+                {% endif %}
+
+                {% if docket.date_reargued %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Date Reargued:</span>
+                        <span class="meta-data-value">{{ docket.date_reargued }}</span>
+                    </p>
+                {% endif %}
+
+                {% if docket.date_reargument_denied %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Date Reargument Denied:</span>
+                        <span class="meta-data-value">{{ docket.date_reargument_denied }}</span>
+                    </p>
+                {% endif %}
+
+                {% if docket.date_filed %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Date Filed:</span>
+                        <span class="meta-data-value">{{ docket.date_filed }}</span>
+                    </p>
+                {% endif %}
+
+                {% if docket.date_terminated %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Date Terminated:</span>
+                        <span class="meta-data-value">{{ docket.date_terminated }}</span>
+                    </p>
+                {% endif %}
+
+                {% if docket.date_last_filing %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Date of Last Known Filing:</span>
+                        <span class="meta-data-value">{{ docket.date_last_filing }}</span>
+                    </p>
+                {% endif %}
+
+                {% if docket.cause %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Cause:</span>
+                        <span class="meta-data-value">{{ docket.cause }}</span>
+                    </p>
+                {% endif %}
+
+                {% if docket.nature_of_suit %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Nature of Suit:</span>
+                        <span class="meta-data-value">{{ docket.nature_of_suit }}</span>
+                    </p>
+                {% endif %}
+            </div>
+
+
+            {% if docket.clusters.count %}
+            <div class="col-xs-6">
+                <h3>Opinions Outside of RECAP Collection</h3>
+                <hr>
+                <ul>
+                    {% for cluster in docket.clusters.all %}
+                        <li>
+                            <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                {{ cluster.caption|safe|v_wrapper }}
+                            </a>
+                            {% if perms.search.change_document %}
+                                <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
+                                   class="btn btn-primary btn-xs">Edit</a>
+                            {% endif %}
+                            <br/>
+                            {{ cluster.date_filed }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if docket.audio_files.count %}
+            <div class="col-xs-6">
+                <h3>Oral Argument Recordings</h3>
+                <hr>
+                <ul>
+                    {% for af in docket.audio_files.all %}
+                        <li>
+                            <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                {{ af|best_case_name|safe|v_wrapper }}
+                            </a>
+                            {% if perms.audio.change_audio %}
+                                <a href="{% url 'admin:audio_audio_change' af.pk %}"
+                                   class="btn btn-primary btn-xs">Edit</a>
+                            {% endif %}
+                            <br/>
+                            {{ af.docket.date_argued|default_if_none:"" }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
+
+        <div class="row">
+            <div class="col-xs-12">
+                {% if docket.docket_entries %}
+                    <h3>Docket Entries</h3>
+                    <table class="table table-responsive table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date&nbsp;Filed</th>
+                                <th class="text-center">Document Number</th>
+                                <th>Description</th>
+                                {% if perms.search.change_docketentry %}
+                                    <th class="text-center">Admin</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in docket.docket_entries.all %}
+                            <tr class="cursor" data-toggle="modal"
+                                data-docket-entry="{{ entry.pk }}"
+                                data-target="#actions-picker">
+                                <td>{{ entry.date_filed|date:"DATE_FORMAT"|nbsp }}</td>
+                                <td class="text-center">{{ entry.entry_number }}</td>
+                                <td>{{ entry.description|safe|default:"Description Unknown" }}</td>
+                                {% if perms.search.change_docketentry %}
+                                    <td>
+                                    <a href="{% url 'admin:search_docketentry_change' entry.pk %}"
+                                       class="btn btn-primary btn-xs">Edit DocketEntry&nbsp;<i class="fa fa-pencil"></i></a>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <div class="modal" id="actions-picker" tabindex="-1" role="dialog"
+                         aria-hidden="true">
+                        <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <button type="button" class="close"
+                                                data-dismiss="modal" aria-label="Close">
+                                            <span aria-hidden="true" class="large">&times;</span>
+                                        </button>
+                                        <h3 class="modal-title">Entries</h3>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="row">
+                                            <div class="col-xs-12">
+                                                <table class="table table-responsive" id="document-table">
+                                                    <thead>
+                                                    <tr>
+                                                        <th>Number</th>
+                                                        <th colspan="2">Description</th>
+                                                    </tr>
+                                                    </thead>
+                                                    <tbody id="tablebody">
+
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <button type="button"
+                                                    class="btn btn-default float-right"
+                                                    data-dismiss="modal">Close
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
 {% endblock %}
