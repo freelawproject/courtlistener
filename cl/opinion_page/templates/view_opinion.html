@@ -124,15 +124,12 @@
                         </li>
                     {% endfor %}
                 </ul>
-                <h4>
+                <p>
                     <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
                        class="btn btn-default">
                         View Full List
                     </a>
-                    <a href="{% url "new_visualization" %}"
-                       class="btn btn-success">
-                        <i class="fa fa-plus"></i>&nbsp;New Network</a>
-                </h4>
+                </p>
             </div>
         {% endif %}
 
