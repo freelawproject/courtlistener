@@ -172,7 +172,7 @@ class PacerXMLParser(object):
                         "Tried to create attachment without a DocketEntry "
                         "object to associate it with."
                     )
-                    return None
+                    continue
 
             if document_type == RECAPDocument.PACER_DOCUMENT:
                 date_filed = (
@@ -185,7 +185,7 @@ class PacerXMLParser(object):
                         entry_number,
                         attachment_number,
                     ))
-                    return None
+                    continue
                 docket_entry.date_filed = date_filed
                 docket_entry.description = (
                     self.get_str_from_node(doc_node, 'long_desc') or
