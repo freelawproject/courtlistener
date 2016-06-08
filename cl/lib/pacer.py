@@ -106,7 +106,7 @@ class PacerXMLParser(object):
 
         if not debug:
             d.save()
-            print "  Saved as Docket %s: http://127.0.0.1:8000%s" % (
+            print "  Saved as Docket %s: https://www.courtlistener.com%s" % (
                 d.pk,
                 d.get_absolute_url()
             )
