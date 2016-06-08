@@ -1,14 +1,15 @@
 import mimetypes
 import os
-import requests
 import traceback
-from django.conf import settings
-from lxml import html
 from urlparse import urljoin
 
-from cl.lib import magic
+import requests
+from django.conf import settings
 from juriscraper.AbstractSite import logger
-from juriscraper.tests import MockRequest
+from juriscraper.lib.test_utils import MockRequest
+from lxml import html
+
+from cl.lib import magic
 
 
 def test_for_meta_redirections(r):
