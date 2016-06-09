@@ -101,11 +101,19 @@ class Docket(models.Model):
         null=True,
         blank=True,
     )
+    assigned_to_str = models.TextField(
+        help_text="The judge that the case was assigned to, as a string.",
+        blank=True,
+    )
     referred_to = models.ForeignKey(
         'people_db.Person',
         related_name='referring',
         help_text="The judge to whom the 'assigned_to' judge is delegated.",
         null=True,
+        blank=True,
+    )
+    referred_to_str = models.TextField(
+        help_text="The judge that the case was referred to, as a string.",
         blank=True,
     )
     date_created = models.DateTimeField(

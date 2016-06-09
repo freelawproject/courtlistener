@@ -67,8 +67,8 @@ class PacerXMLParser(object):
             self.case_details, 'jury_demand')
         self.jurisdiction_type = self.get_str_from_node(
             self.case_details, 'jurisdiction')
-        self.assigned_to = self.get_judges('assigned_to')
-        self.referred_to = self.get_judges('referred_to')
+        self.assigned_to, self.assigned_to_str = self.get_judges('assigned_to')
+        self.referred_to, self.referred_to_str = self.get_judges('referred_to')
         self.blocked, self.date_blocked = self.set_blocked_fields()
 
         # Non-parsed fields
@@ -304,7 +304,7 @@ class PacerXMLParser(object):
             s = self.case_details.xpath('%s/text()' % node)[0].strip()
         except IndexError:
             print "  Couldn't get judge for node: %s" % node
-            return None
+            return None, ''
         else:
             judge_names = find_judge_names(s)
             judges = []
@@ -317,11 +317,12 @@ class PacerXMLParser(object):
                 logger.info("No judge for: %s" % (
                     (s, self.court.pk, self.date_filed),
                 ))
+                return None, ''
             elif len(judges) == 1:
-                return judges[0]
+                return judges[0], s
             elif len(judges) > 1:
                 print "  Too many judges found: %s" % len(judges)
-                return None
+                return None, s
 
     def set_blocked_fields(self):
         """Set the blocked status for the Docket.

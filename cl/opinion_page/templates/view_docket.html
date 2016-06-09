@@ -41,20 +41,28 @@
                 <h3>{{ docket.court }}</h3>
 
 
-                {% if docket.assigned_to %}
+                {% if docket.assigned_to or docket.assigned_to_str %}
                 <p class="bottom">
                     <span class="meta-data-header">Assigned To:</span>
                     <span class="meta-data-value">
-                        <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
+                        {% if docket.assigned_to %}
+                            <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
+                        {% elif docket.assigned_to_str %}
+                            {{ docket.assigned_to_str }}
+                        {% endif %}
                     </span>
                 </p>
                 {% endif %}
 
-                {% if docket.referred_to %}
+                {% if docket.referred_to or docket.referred_to_str %}
                 <p class="bottom">
                     <span class="meta-data-header">Referred To:</span>
                     <span class="meta-data-value">
-                        <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
+                        {% if docket.referred_to %}
+                            <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
+                        {% elif docket.referred_to_str %}
+                            {{ docket.referred_to_str }}
+                        {% endif %}
                     </span>
                 </p>
                 {% endif %}
