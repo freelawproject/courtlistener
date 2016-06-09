@@ -3,6 +3,7 @@ import os
 from datetime import date
 
 from dateutil import parser
+from dateutil.tz import gettz
 from django.db.models import Q
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from lxml import etree
@@ -49,12 +50,12 @@ class PacerXMLParser(object):
             self.case_details, 'docket_num')
         self.pacer_case_id = self.get_str_from_node(
             self.case_details, 'pacer_case_num')
-        self.date_filed = self.get_date_from_node(
-            self.case_details, 'date_case_filed')
-        self.date_terminated = self.get_date_from_node(
-            self.case_details, 'date_case_terminated')
-        self.date_last_filing = self.get_date_from_node(
-            self.case_details, 'date_last_filing')
+        self.date_filed = self.get_datetime_from_node(
+            self.case_details, 'date_case_filed', cast_to_date=True)
+        self.date_terminated = self.get_datetime_from_node(
+            self.case_details, 'date_case_terminated', cast_to_date=True)
+        self.date_last_filing = self.get_datetime_from_node(
+            self.case_details, 'date_last_filing', cast_to_date=True)
         self.case_name = harmonize(self.get_str_from_node(
             self.case_details, 'case_name'))
         self.case_name_short = self.cnt.make_case_name_short(self.case_name)
@@ -176,7 +177,8 @@ class PacerXMLParser(object):
 
             if document_type == RECAPDocument.PACER_DOCUMENT:
                 date_filed = (
-                    self.get_date_from_node(doc_node, 'date_filed') or
+                    self.get_datetime_from_node(doc_node, 'date_filed',
+                                                cast_to_date=True) or
                     docket_entry.date_filed
                 )
                 if not date_filed:
@@ -218,7 +220,7 @@ class PacerXMLParser(object):
                 docket_entry=docket_entry
             )
 
-        recap_doc.date_upload = self.get_date_from_node(doc_node, 'upload_date')
+        recap_doc.date_upload = self.get_datetime_from_node(doc_node, 'upload_date')
         recap_doc.document_type = document_type or recap_doc.document_type
         recap_doc.document_number = entry_number or recap_doc.document_number
         # If we can't parse the availability node (it returns None), default it
@@ -289,15 +291,18 @@ class PacerXMLParser(object):
             raise ParsingException("Cannot extract int for node %s" % node)
 
     @staticmethod
-    def get_date_from_node(node, path):
-        """Parse a date from the XML located at node."""
+    def get_datetime_from_node(node, path, cast_to_date=False):
+        """Parse a datetime from the XML located at node."""
         try:
             s = node.xpath('%s/text()' % path)[0].strip()
         except IndexError:
             print "  Couldn't get date from path: %s" % path
             return None
         else:
-            d = parser.parse(s).date()
+            d = parser.parse(s)
+            d = d.replace(tzinfo=d.tzinfo or gettz('UTC'))  # Set it to UTC.
+            if cast_to_date is True:
+                return d.date()
             return d
 
     def get_judges(self, node):
