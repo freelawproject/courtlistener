@@ -1,4 +1,7 @@
-$('#actions-picker').on('show.bs.modal', function (event) {
+var picker = $("#actions-picker"),
+    table_body = $('#document-table tbody');
+
+picker.on('show.bs.modal', function (event) {
     var row = $(event.relatedTarget);
     var pk = row.data('docket-entry');
 
@@ -16,7 +19,7 @@ $('#actions-picker').on('show.bs.modal', function (event) {
                 });
             } else {
                 // No items in RECAP -- throw an error.
-                $('#document-table tbody').append($('<tr>').append($('<td>', {
+                table_body.append($('<tr>').append($('<td>', {
                     'colspan': '3',
                     'html': 'Item not yet in our collection. Please download using <a href="https://free.law/recap/" target="_blank">RECAP</a> and we will have it soon.'
                 })));
@@ -24,7 +27,7 @@ $('#actions-picker').on('show.bs.modal', function (event) {
 
         },
         error: function () {
-            $('#document-table tbody').append(
+            table_body.append(
                 $('<tr>').append(
                     $('<td>', {
                         'colspan': '3',
@@ -36,9 +39,9 @@ $('#actions-picker').on('show.bs.modal', function (event) {
     });
 });
 
-$('#actions-picker').on('hide.bs.modal', function (event) {
+picker.on('hide.bs.modal', function (event) {
     // Prepare for a different entry to be opened.
-    $('#document-table tbody').empty();
+    table_body.empty();
 });
 
 var makeRow = function (item, type) {
@@ -50,28 +53,38 @@ var makeRow = function (item, type) {
         number_attr = item.attachment_number;
     }
     row.append($('<td>').text(type + number_attr));
-
-    if (item.filepath_local) {
-        row.append($('<td>').text(item.description || "Unknown Description"));
-        row.append($('<td>')
-            .append($('<div>')
-                .attr('class', 'float-right')
-                .append(
-                    $('<a>')
-                        .attr({
-                            'href': "/" + item.filepath_local,
-                            'class': 'btn-primary btn'
-                        })
-                        .text("Download")
-                )));
+    row.append($('<td>').text(item.description || "Unknown Description"));
+    var btn_attrs = {'text': "Download"},
+        div_attrs = {'class': 'float-right'};
+    if (item.filepath_local){
+        $.extend(btn_attrs, {
+            'href': "/" + item.filepath_local,
+            'class': 'btn-primary btn'
+        });
     } else {
-        // Item not yet in CourtListener. For now, show an error.
-        // Later, we'll let people click to get the item.
-        row.append($('<td>', {
-            'colspan': '3',
-            'html': 'Item not yet in our collection. Please download using <a href="https://free.law/recap/" target="_blank">RECAP</a> and we will have it soon.'
-        }));
+        // Item not yet in CourtListener. For now, show an error as a tooltip on
+        // the button (we might have the description). Later, we'll let people
+        // click to get the item.
+        $.extend(btn_attrs, {
+            'href': "#",
+            'class': "btn-primary btn disabled"
+        });
+        $.extend(div_attrs, {
+            'role': 'button',
+            'data-toggle': "tooltip",
+            'data-container': 'body',
+            'title': 'Item not yet in our collection. Please download using RECAP and we will have it soon.'
+        });
     }
 
+    row.append($('<td>')
+       .append($('<div>', div_attrs)
+       .append($('<a>', btn_attrs))));
+
     row.appendTo('#document-table tbody');
+
+    // Activate the tooltip.
+    row.find('[data-toggle="tooltip"]').tooltip();
 };
+
+
