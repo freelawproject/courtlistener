@@ -21,7 +21,7 @@ picker.on('show.bs.modal', function (event) {
                 // No items in RECAP -- throw an error.
                 table_body.append($('<tr>').append($('<td>', {
                     'colspan': '3',
-                    'html': 'Item not yet in our collection. Please download using <a href="https://free.law/recap/" target="_blank">RECAP</a> and we will have it soon.'
+                    'html': 'Item not yet in our collection. Please download it using <a href="https://free.law/recap/" target="_blank">RECAP</a> and we will have it soon.'
                 })));
             }
 
@@ -73,7 +73,7 @@ var makeRow = function (item, type) {
             'role': 'button',
             'data-toggle': "tooltip",
             'data-container': 'body',
-            'title': 'Item not yet in our collection. Please download using RECAP and we will have it soon.'
+            'title': 'Item not yet in our collection. Please download it using RECAP and we will have it soon.'
         });
     }
 

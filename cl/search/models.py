@@ -85,21 +85,21 @@ class Docket(models.Model):
     )
 
     source = models.SmallIntegerField(
-            help_text="contains the source of the Docket.",
-            choices=SOURCE_CHOICES,
+        help_text="contains the source of the Docket.",
+        choices=SOURCE_CHOICES,
     )
     court = models.ForeignKey(
-            'Court',
-            help_text="The court where the docket was filed",
-            db_index=True,
-            related_name='dockets',
+        'Court',
+        help_text="The court where the docket was filed",
+        db_index=True,
+        related_name='dockets',
     )
     assigned_to = models.ForeignKey(
-            'people_db.Person',
-            related_name='assigning',
-            help_text="The judge the case was assigned to.",
-            null=True,
-            blank=True,
+        'people_db.Person',
+        related_name='assigning',
+        help_text="The judge the case was assigned to.",
+        null=True,
+        blank=True,
     )
     referred_to = models.ForeignKey(
         'people_db.Person',
@@ -281,6 +281,8 @@ class DocketEntry(models.Model):
     )
     date_filed = models.DateField(
         help_text="The created date of the Docket Entry.",
+        null=True,
+        blank=True,
     )
     entry_number = models.PositiveIntegerField(
         help_text="# on the PACER docket page.",

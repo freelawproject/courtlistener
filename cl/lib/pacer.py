@@ -181,13 +181,6 @@ class PacerXMLParser(object):
                                                 cast_to_date=True) or
                     docket_entry.date_filed
                 )
-                if not date_filed:
-                    logger.error("Unable to find date_filed for document %s, "
-                                 "attachment %s" % (
-                        entry_number,
-                        attachment_number,
-                    ))
-                    continue
                 docket_entry.date_filed = date_filed
                 docket_entry.description = (
                     self.get_str_from_node(doc_node, 'long_desc') or

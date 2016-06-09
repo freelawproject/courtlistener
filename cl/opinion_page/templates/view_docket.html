@@ -196,7 +196,7 @@
                             <tr class="cursor" data-toggle="modal"
                                 data-docket-entry="{{ entry.pk }}"
                                 data-target="#actions-picker">
-                                <td>{{ entry.date_filed|date:"DATE_FORMAT"|nbsp }}</td>
+                                <td>{{ entry.date_filed|date:"DATE_FORMAT"|nbsp|default:"Unknown" }}</td>
                                 <td class="text-center">{{ entry.entry_number }}</td>
                                 <td>{{ entry.description|safe|default:"Description Unknown" }}</td>
                                 {% if perms.search.change_docketentry %}
