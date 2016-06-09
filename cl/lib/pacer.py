@@ -317,7 +317,7 @@ class PacerXMLParser(object):
                 logger.info("No judge for: %s" % (
                     (s, self.court.pk, self.date_filed),
                 ))
-                return None, ''
+                return None, s
             elif len(judges) == 1:
                 return judges[0], s
             elif len(judges) > 1:
