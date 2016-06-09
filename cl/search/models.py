@@ -374,10 +374,12 @@ class RECAPDocument(models.Model):
         upload_to=make_recap_path,
         storage=IncrementingFileSystemStorage(),
         max_length=1000,
+        blank=True,
     )
     filepath_ia = models.CharField(
         help_text="The URL of the file in IA",
         max_length=1000,
+        blank=True,
     )
     description = models.TextField(
         help_text="The short description of the docket entry that appears on "
@@ -388,6 +390,7 @@ class RECAPDocument(models.Model):
     class Meta:
         unique_together = ('docket_entry', 'document_number',
                            'attachment_number')
+        ordering = ('document_number', 'attachment_number')
 
     def __unicode__(self):
         return "Docket_%s , document_number_%s , attachment_number_%s" % (
