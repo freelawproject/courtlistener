@@ -130,7 +130,7 @@ class Command(BaseCommand):
                 completed += 1
                 continue
             else:
-                logger.info("Parsing docket: %s" % docket_path)
+                logger.info("%s: Parsing docket: %s" % (completed, docket_path))
 
                 pacer_doc = PacerXMLParser(docket_path)
 

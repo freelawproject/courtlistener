@@ -125,6 +125,9 @@ class DocketEntryAdmin(admin.ModelAdmin):
     inlines = (
         RECAPDocumentInline,
     )
+    raw_id_fields = (
+        'docket',
+    )
 
 
 class DocketEntryInline(admin.TabularInline):
