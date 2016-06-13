@@ -92,8 +92,9 @@ OPINION_TYPE_MAPPING = {
     ,'concurrence': '030concurrence'
 }
 
-def make_and_save(item):
-    """Associates case data from `parse_opinions` with objects. Saves these objects."""
+def make_and_save(item, skipdupes=False, newcases=False):
+    """Associates case data from `parse_opinions` with objects. Saves these objects.
+        min_date: if not none, will skip cases after min_date """
     date_filed = date_argued = date_reargued = date_reargument_denied = date_cert_granted = date_cert_denied = None
     unknown_date = None
     for date_cluster in item['dates']:
@@ -125,13 +126,20 @@ def make_and_save(item):
                 unknown_date = date_info[1]
                 if date_info[0] not in UNKNOWN_TAGS:
                     print
-                    print "Found unknown date tag '%s' with date '%s'." % date_info
+                    print ("Found unknown date tag '%s' with date '%s'." % date_info)
                     print
 
     # the main date (used for date_filed in OpinionCluster) and panel dates (used for finding judges) are ordered in
     # terms of which type of dates best reflect them
     main_date = date_filed or date_argued or date_reargued or date_reargument_denied or unknown_date
     panel_date = date_argued or date_reargued or date_reargument_denied or date_filed or unknown_date
+    
+    
+    if newcases:
+        min_date = None
+        if main_date > min_date:
+            print(main_date,'after',min_date,' -- skipping.')
+            return
 
     docket = Docket(
         source=Docket.DEFAULT,
@@ -213,10 +221,11 @@ def make_and_save(item):
         joined_by = [x for x in joined_by if x is not None]
         opinions.append((opinion, joined_by))
 
-    # check to see if this is a duplicate
-    dups = find_dups(docket, cluster, panel, opinions)
-    if dups:
-        raise Exception("Found %s duplicate(s)." % len(dups))
+    # check to see if this is a duplicate    
+    if not (newcases or skipdupes):
+        dups = find_dups(docket, cluster, panel, opinions)
+        if dups:
+            raise Exception("Found %s duplicate(s)." % len(dups))
 
     # save all the objects
     try:
