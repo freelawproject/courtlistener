@@ -57,9 +57,15 @@ class Command(BaseCommand):
             ,default=False
             ,help='If set, will skip duplicates.'
         )
+        parser.add_argument(
+            '--startfolder'
+            ,type=str
+            ,default=None
+            ,help='The folder (state name) to start on.'
+        )
     def handle(self, *args, **options):
         do_many(options['dir'][0], options['limit'], options['random'], options['status'], options['log']
-                , options['newcases'], options['skipdupes'])
+                , options['newcases'], options['skipdupes'], options['startfolder'])
 
 
 def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_file=None,
@@ -98,6 +104,7 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_f
     folders = glob(dir_path+'/*')
     folders.sort()
     count = 0
+    skip = False
     if startfolder is not None:
         skip = True    
     for folder in folders:
