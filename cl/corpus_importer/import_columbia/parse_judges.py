@@ -36,8 +36,8 @@ NOT_JUDGE = [
     'unanimous', 'unpublished', 'underline', 'united',
     'vacancy', 'vice', 'votes', 
     'warden', 'was', 'which', 'while', 'with', 'without', 'written',
-
-    'january', 'february', 'march', 'april', 'june', 'july', 'august', 'september', 'october', 'november', 'december'
+    'january', 'february', 'march', 'april', 'june', 'july', 'august', 
+    'september', 'october', 'november', 'december'
 ]
 
 # judge names can only be this size or larger
@@ -46,11 +46,13 @@ NAME_CUTOFF = 3
 # for judges with small names, need an override
 IS_JUDGE = {'wu', 're', 'du'}
 
-def find_judges(text, first_names=False):
+
+def find_judge_names(text, first_names=False):
     """Returns a list of last names of judges in `text`.
 
-    :param first_names: If True, will return a list of `(first, last)` tuples, in which `first` will usually be None
-    unless a judge's first name is identified.
+    :param first_names: If True, will return a list of `(first, last)` tuples,
+    in which `first` will usually be None unless a judge's first name is
+    identified.
     """
     text = text.lower() or ''
     # just use the first nonempty line (there's sometimes a useless second line)
@@ -109,4 +111,4 @@ def judges_exist(text, judges):
 
 if __name__ == '__main__':
     s = 'before: tom bryner, chief justice, tim v. matthews, eastaugh, fabe, and carpeneti, justices.'
-    print judges_exist(s, ['bryner', ('tim', 'matthews')])
+    print (judges_exist(s, ['bryner', ('tim', 'matthews')]))

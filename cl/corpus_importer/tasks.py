@@ -1,12 +1,13 @@
 import logging
 import os
-import requests
 import shutil
 
+import requests
+from bs4 import BeautifulSoup
+from django.conf import settings
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from cl.celery import app
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -40,3 +41,20 @@ def download_recap_item(self, url, filename):
             except ReadTimeoutError as exc:
                 os.remove(location)  # Cleanup
                 raise self.retry(exc=exc)
+
+
+@app.task
+def parse_recap_item(path):
+    """Parse a RECAP docket and save it to the database
+
+    If a judge string is found that cannot be looked up, save that value to a
+    CSV for later review.
+    """
+    logger.info("Parsing docket: %s" % path)
+
+    with open(path, 'r') as f:
+        docket_xml_content = f.read()
+        if not docket_xml_content:
+            raise Exception("Could not read the XML contents")
+
+    soup = BeautifulSoup(docket_xml_content, 'lxml-xml')

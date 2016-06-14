@@ -176,19 +176,18 @@ class Docket(models.Model):
         help_text="URL that the document should map to (the slug)",
         max_length=75,
         db_index=False,
-        null=True,
+        blank=True,
     )
     docket_number = models.CharField(
         help_text="The docket numbers of a case, can be consolidated and "
                   "quite long",
         max_length=5000,  # was 50, 100, 300, 1000
         blank=True,
-        null=True,
         db_index=True,
     )
-    pacer_case_id = models.PositiveIntegerField(
+    pacer_case_id = models.CharField(
         help_text="The cased ID provided by PACER.",
-        null=True,
+        max_length=100,
         blank=True,
         db_index=True,
     )
@@ -196,57 +195,48 @@ class Docket(models.Model):
         help_text="The cause for the case.",
         max_length=200,
         blank=True,
-        null=True,
     )
     nature_of_suit = models.CharField(
         help_text="The nature of suit code from PACER.",
         max_length=100,
         blank=True,
-        null=True,
     )
     jury_demand = models.CharField(
         help_text="The compensation demand.",
         max_length=500,
         blank=True,
-        null=True,
     )
     jurisdiction_type = models.CharField(
         help_text="Stands for jurisdiction in RECAP XML docket. For example, "
                   "'Diversity', 'U.S. Government Defendant'.",
         max_length=100,
         blank=True,
-        null=True,
     )
     filepath_local = models.FileField(
         help_text="Path to RECAP's Docket XML page.",
         upload_to=make_recap_path,
         storage=IncrementingFileSystemStorage(),
         max_length=1000,
-        null=True,
         blank=True,
     )
     filepath_ia = models.CharField(
         help_text="Path to the Docket XML page in The Internet Archive",
         max_length=1000,
-        null=True,
         blank=True,
     )
     date_blocked = models.DateField(
-            help_text="The date that this opinion was blocked from indexing by "
-                      "search engines",
-            blank=True,
-            null=True,
-            db_index=True,
+        help_text="The date that this opinion was blocked from indexing by "
+                  "search engines",
+        blank=True,
+        null=True,
+        db_index=True,
     )
     blocked = models.BooleanField(
-            help_text="Whether a document should be blocked from indexing by "
-                      "search engines",
-            db_index=True,
-            default=False,
+        help_text="Whether a document should be blocked from indexing by "
+                  "search engines",
+        db_index=True,
+        default=False,
     )
-
-    class Meta:
-        unique_together = ('court', 'pacer_case_id')
 
     def __unicode__(self):
         if self.case_name:
@@ -297,7 +287,6 @@ class DocketEntry(models.Model):
 
     class Meta:
         unique_together = ('docket', 'entry_number')
-
 
     def __unicode__(self):
         return "<DocketEntry ---> %s >" % (self.description[:50])

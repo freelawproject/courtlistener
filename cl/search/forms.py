@@ -1,3 +1,6 @@
+import re
+
+from django import forms
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.people_db.models import Position, PoliticalAffiliation
@@ -5,9 +8,6 @@ from cl.search.fields import CeilingDateField
 from cl.search.fields import FloorDateField
 from cl.search.models import Court
 from cl.search.models import DOCUMENT_STATUSES
-from django import forms
-
-import re
 
 
 OPINION_ORDER_BY_CHOICES = (
@@ -19,9 +19,9 @@ OPINION_ORDER_BY_CHOICES = (
     ('dateArgued desc',  'Newest First'),
     ('dateArgued asc',   'Oldest First'),
     ('name_reverse asc', 'Name'),
-    ('dob desc',         'Most Recently Born'),
-    ('dob asc',          'Least Recently Born'),
-    ('dod desc',         'Most Recently Deceased'),
+    ('dob desc,name_reverse asc', 'Most Recently Born'),
+    ('dob asc,name_reverse asc',  'Least Recently Born'),
+    ('dod desc,name_reverse asc', 'Most Recently Deceased'),
 )
 
 TYPE_CHOICES = (

@@ -46,16 +46,16 @@
                 {% if search_form.order_by.value == "name_reverse asc" %}
                     selected="selected"
                 {% endif %}>Last Name</option>
-        <option value="dob desc"
-                {% if search_form.order_by.value == "dob desc" %}
+        <option value="dob desc,name_reverse asc"
+                {% if search_form.order_by.value == "dob desc,name_reverse asc" %}
                     selected="selected"
                 {% endif %}>Most Recently Born</option>
-        <option value="dob asc"
-                {% if search_form.order_by.value == "dob asc" %}
+        <option value="dob asc,name_reverse asc"
+                {% if search_form.order_by.value == "dob asc,name_reverse asc" %}
                     selected="selected"
                 {% endif %}>Least Recently Born</option>
-        <option value="dod desc"
-                {% if search_form.order_by.value == "dod desc" %}
+        <option value="dod desc,name_reverse asc"
+                {% if search_form.order_by.value == "dod desc,name_reverse asc" %}
                     selected="selected"
                 {% endif %}>Most Recently Deceased</option>
     {% endif %}

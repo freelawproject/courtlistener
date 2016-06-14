@@ -7,7 +7,7 @@ Created on Fri Mar 18 18:27:09 2016
 
 from unidecode import unidecode
 
-from cl.corpus_importer.import_columbia.parse_judges import find_judges
+from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.lib.import_lib import find_person
 from cl.search.models import OpinionCluster
 
@@ -39,9 +39,9 @@ def assign_authors(testing=False):
                 opinion.save(index=False)
             continue
 
-        #judges = find_judges(cluster.judges)
+        #judges = find_judge_names(cluster.judges)
 
-        judges = find_judges(judgestr)
+        judges = find_judge_names(judgestr)
 
         if len(judges) == 0:
             continue
@@ -57,14 +57,13 @@ def assign_authors(testing=False):
             # more than one judge token, but no DB matches, continue
             print u'  No match.'
             continue
-        
-        if len(candidates) > 1:            
-            # more than one DB match, assign panel and continue   
-            for candidate in candidates:
-                cluster.panel.add(candidate)
+
+        if len(candidates) > 1:
+            # more than one DB match, assign panel and continue
             print u'  Panel assigned: %s' % candidates
             if not testing:
-                cluster.save(index=False)
+                for candidate in candidates:
+                    cluster.panel.add(candidate)
             continue
 
         # only one candidate, assign author
@@ -79,7 +78,7 @@ def assign_authors(testing=False):
             print '  Author assigned: %s (with %d missing tokens)' % (
                 unidecode(str(candidates[0])),
                 len(judges)-1
-            )        
+            )
 
         if not testing:
             opinion.save(index=False)

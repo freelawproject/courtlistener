@@ -2,16 +2,17 @@
 
 # Functions to parse court data in XML format into a list of dictionaries.
 
-import xml.etree.cElementTree as ET
-import re
 import os
-import dateutil.parser as dparser
+import re
+import xml.etree.cElementTree as ET
 
+import dateutil.parser as dparser
 from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
 
 from cl.corpus_importer.court_regexes import state_pairs
+
 from regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
-from parse_judges import find_judges
+from parse_judges import find_judge_names
 
 
 # initialized once since it takes resources
@@ -57,7 +58,7 @@ def parse_file(file_path, court_fallback=''):
     panel_text = ''.join(raw_info.get('panel', []))
     if panel_text:
         judge_info.append(('Panel\n-----', panel_text))
-    info['panel'] = find_judges(panel_text) or []
+    info['panel'] = find_judge_names(panel_text) or []
     # get dates
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates)
@@ -91,7 +92,7 @@ def parse_file(file_path, court_fallback=''):
                     opinion['byline']
                 ))
                 # add the opinion and all of the previous texts
-                judges = find_judges(opinion['byline'])
+                judges = find_judge_names(opinion['byline'])
                 info['opinions'].append({
                     'opinion': '\n'.join(last_texts)
                     ,'opinion_texts': last_texts

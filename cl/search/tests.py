@@ -15,8 +15,8 @@ from rest_framework.status import HTTP_200_OK
 from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase
 from cl.search.feeds import JurisdictionFeed
-from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.search.management.commands.cl_calculate_pagerank import Command
+from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.base import BaseSeleniumTest
 
 
@@ -336,7 +336,8 @@ class SearchTest(IndexedSolrTestCase):
 class JudgeSearchTest(IndexedSolrTestCase):
     def test_sorting(self):
         """Can we do sorting on various fields?"""
-        sort_fields = ['name_reverse asc', 'dob desc', 'dod desc']
+        sort_fields = ['name_reverse asc', 'dob desc,name_reverse asc',
+                       'dod desc,name_reverse asc']
         for sort_field in sort_fields:
             r = self.client.get('/', {'type': 'p', 'ordered_by': sort_field})
             self.assertNotIn(
