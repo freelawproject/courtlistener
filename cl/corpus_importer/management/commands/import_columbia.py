@@ -68,14 +68,22 @@ class Command(BaseCommand):
             ,type=str
             ,default=None
             ,help='The file name to start on (if resuming).'
-        )        
+        )
+        parser.add_argument(
+            '--debug',
+            action='store_true',
+            default=False,
+            help="Don't change the data."
+        )
+
     def handle(self, *args, **options):
         do_many(options['dir'][0], options['limit'], options['random'], options['status'], options['log']
-                , options['newcases'], options['skipdupes'], options['startfolder'])
+                , options['newcases'], options['skipdupes'], options['startfolder'], options['debug'])
 
 
 def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_file=None,
-                newcases=False, skipdupes=False, startfolder=None, startfile=None):
+                newcases=False, skipdupes=False, startfolder=None, startfile=None,
+                debug=False):
     """Runs through a directory of the form /data/[state]/[sub]/.../[folders]/[.xml documents]. Parses each .xml
     document, instantiates the associated model object, and saves the object.
     Prints/logs status updates and tracebacks instead of raising exceptions.
@@ -146,7 +154,7 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_f
                         skipfile = False
                     else:
                         continue        
-        print(path)
+            print(path)
             
             # grab the fallback text from the path if it's there
             court_fallback = ''
@@ -159,7 +167,7 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_f
                 # try to parse/save the case and print any exceptions with full tracebacks                
                 try:
                     parsed = parse_file(path, court_fallback=court_fallback)
-                    make_and_save(parsed,skipdupes, min_dates)
+                    make_and_save(parsed,skipdupes, min_dates, debug)
                 except Exception as e:
                     # log the file name
                     if log:
