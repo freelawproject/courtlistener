@@ -113,3 +113,15 @@ def find_person(name_last, court_id, name_first=None, case_date=None,
     if raise_mult:         
         raise Exception("Multiple judges: Last name '%s', court '%s', options: %s." % (name_last,court_id, str([c.name_first for c in candidates])))
 
+
+from cl.search.models import Court
+from django.db.models import Min
+
+def get_min_dates():
+    """returns a dictionary with key-value (courtid, minimum date)"""
+    min_dates = {}
+    courts = Court.objects.annotate(earliest_date=Min('dockets__clusters__date_filed'))    
+    for court in courts:
+        min_dates[court.pk] = min_dates = {}
+    return min_dates
+        
