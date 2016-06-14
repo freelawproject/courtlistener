@@ -90,14 +90,13 @@ class PacerXMLParser(object):
             d = Docket.objects.get(
                 Q(pacer_case_id=self.pacer_case_id) |
                 Q(docket_number=self.docket_number),
+                source=Docket.SCRAPER,
                 court=self.court,
             )
             if d.source == Docket.SCRAPER:
                 d.source = Docket.RECAP_AND_SCRAPER
         except Docket.DoesNotExist:
-            d = Docket(
-                source=Docket.RECAP,
-            )
+            d = Docket(source=Docket.RECAP)
         except Docket.MultipleObjectsReturned:
             print "  Got multiple results while attempting save."
             return None
