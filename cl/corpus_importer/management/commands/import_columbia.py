@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand
 
 from cl.corpus_importer.import_columbia.parse_opinions import parse_file
 from cl.corpus_importer.import_columbia.populate_opinions import make_and_save
-
+from cl.lib.import_lib import get_min_dates
 
 class Command(BaseCommand):
     help = ('Parses the xml files in the specified directory into opinion objects that are saved.')
@@ -63,13 +63,19 @@ class Command(BaseCommand):
             ,default=None
             ,help='The folder (state name) to start on.'
         )
+        parser.add_argument(
+            '--startfile'
+            ,type=str
+            ,default=None
+            ,help='The file name to start on (if resuming).'
+        )        
     def handle(self, *args, **options):
         do_many(options['dir'][0], options['limit'], options['random'], options['status'], options['log']
                 , options['newcases'], options['skipdupes'], options['startfolder'])
 
 
 def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_file=None,
-                newcases=False, skipdupes=False, startfolder=None):
+                newcases=False, skipdupes=False, startfolder=None, startfile=None):
     """Runs through a directory of the form /data/[state]/[sub]/.../[folders]/[.xml documents]. Parses each .xml
     document, instantiates the associated model object, and saves the object.
     Prints/logs status updates and tracebacks instead of raising exceptions.
@@ -82,6 +88,7 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_f
     :param newcases: If true, skip court-years that already have data.
     :param skipdupes: If true, skip duplicates.
     :param startfolder: If not None, start on startfolder
+    :param startfile: If not None, start on this file (for resuming)
     """
     if limit:
         total = limit
@@ -104,9 +111,18 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_f
     folders = glob(dir_path+'/*')
     folders.sort()
     count = 0
-    skip = False
+    
+    if newcases:
+        print('Only new cases: getting earliest dates by court.')
+        min_dates = get_min_dates()
+    
     if startfolder is not None:
-        skip = True    
+        skipfolder = True
+    else:
+        skipfolder = False
+    if startfile is not None:
+        skipfile = True
+        
     for folder in folders:
         print(folder)
         if folder == startfolder:
@@ -126,7 +142,7 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_f
                 # try to parse/save the case and print any exceptions with full tracebacks                
                 try:
                     parsed = parse_file(path, court_fallback=court_fallback)
-                    make_and_save(parsed,newcases,skipdupes)
+                    make_and_save(parsed,skipdupes, min_dates)
                 except Exception as e:
                     # log the file name
                     if log:
@@ -169,6 +185,7 @@ def file_generator(dir_path, random_order=False, limit=None):
     count = 0
     if not random_order:
         for root, dir_names, file_names in os.walk(dir_path):
+            file_names.sort()
             for file_name in fnmatch.filter(file_names, '*.xml'):
                 yield os.path.join(root, file_name).replace('\\', '/')
                 count += 1

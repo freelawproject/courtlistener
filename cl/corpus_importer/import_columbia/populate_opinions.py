@@ -92,7 +92,7 @@ OPINION_TYPE_MAPPING = {
     ,'concurrence': '030concurrence'
 }
 
-def make_and_save(item, skipdupes=False, newcases=False):
+def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
     """Associates case data from `parse_opinions` with objects. Saves these objects.
         min_date: if not none, will skip cases after min_date """
     date_filed = date_argued = date_reargued = date_reargument_denied = date_cert_granted = date_cert_denied = None
@@ -135,10 +135,9 @@ def make_and_save(item, skipdupes=False, newcases=False):
     panel_date = date_argued or date_reargued or date_reargument_denied or date_filed or unknown_date
     
     
-    if newcases:
-        min_date = None
-        if main_date > min_date:
-            print(main_date,'after',min_date,' -- skipping.')
+    if min_dates is not None:        
+        if main_date >= min_dates[item['court_id']]:
+            print(main_date,'after',min_dates[item['court_id']],' -- skipping.')
             return
 
     docket = Docket(
@@ -221,31 +220,35 @@ def make_and_save(item, skipdupes=False, newcases=False):
         joined_by = [x for x in joined_by if x is not None]
         opinions.append((opinion, joined_by))
 
-    # check to see if this is a duplicate    
-    if not (newcases or skipdupes):
+    if min_dates is None:
+        # check to see if this is a duplicate    
         dups = find_dups(docket, cluster, panel, opinions)
-        if dups:
-            raise Exception("Found %s duplicate(s)." % len(dups))
+        if dups:        
+            if skipdupes:
+                print('Duplicate. skipping.')
+            else:
+                raise Exception("Found %s duplicate(s)." % len(dups))
 
     # save all the objects
-    try:
-        docket.save()
-        cluster.docket = docket
-        cluster.save()
-        for member in panel:
-            cluster.panel.add(member)
-        for opinion, joined_by in opinions:
-            opinion.cluster = cluster
-            opinion.save()
-            for joiner in joined_by:
-                opinion.joined_by.add(joiner)
-    except:
-        # if anything goes wrong, try to delete everything
+    if not testing:
         try:
-            docket.delete()
+            docket.save()
+            cluster.docket = docket
+            cluster.save()
+            for member in panel:
+                cluster.panel.add(member)
+            for opinion, joined_by in opinions:
+                opinion.cluster = cluster
+                opinion.save()
+                for joiner in joined_by:
+                    opinion.joined_by.add(joiner)
         except:
-            pass
-        raise
+            # if anything goes wrong, try to delete everything
+            try:
+                docket.delete()
+            except:
+                pass
+            raise
 
 
 def find_dups(docket, cluster, panel, opinions):
