@@ -10,8 +10,10 @@ import dateutil.parser as dparser
 from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
 
 from cl.corpus_importer.court_regexes import state_pairs
+
+from regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
 from parse_judges import find_judge_names
-from regexes_columbia import SPECIAL_REGEXES
+
 
 # initialized once since it takes resources
 CASE_NAME_TWEAKER = CaseNameTweaker()
@@ -40,6 +42,8 @@ def parse_file(file_path, court_fallback=''):
     """
     raw_info = get_text(file_path)
     info = {}
+    # throughout the process, collect all info about judges and at the end use it to populate info['judges']
+    judge_info = []
     # get basic info
     info['unpublished'] = raw_info['unpublished']
     info['file'] = os.path.splitext(os.path.basename(file_path))[0]
@@ -48,7 +52,13 @@ def parse_file(file_path, court_fallback=''):
     info['attorneys'] = ''.join(raw_info.get('attorneys', [])) or None
     info['posture'] = ''.join(raw_info.get('posture', [])) or None
     info['court_id'] = get_court_object(''.join(raw_info.get('court', [])), court_fallback) or None
-    info['panel'] = find_judge_names(''.join(raw_info.get('panel', []))) or []
+    if not info['court_id']:
+        raise Exception('Failed to find a court ID for "%s".' % ''.join(raw_info.get('court', [])))
+    # get the full panel text and extract judges from it
+    panel_text = ''.join(raw_info.get('panel', []))
+    if panel_text:
+        judge_info.append(('Panel\n-----', panel_text))
+    info['panel'] = find_judge_names(panel_text) or []
     # get dates
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates)
@@ -77,9 +87,10 @@ def parse_file(file_path, court_fallback=''):
                 continue
             last_texts.append(opinion['opinion'])
             if opinion['byline']:
-                # condense opinion texts
-                if len(last_texts) > 1:
-                    print "Combining multiple %s texts in '%s'." % (current_type, file_path)
+                judge_info.append((
+                    '%s Byline\n%s' % (current_type.title(), '-' * (len(current_type) + 7)),
+                    opinion['byline']
+                ))
                 # add the opinion and all of the previous texts
                 judges = find_judge_names(opinion['byline'])
                 info['opinions'].append({
@@ -96,7 +107,6 @@ def parse_file(file_path, court_fallback=''):
         if last_texts:
             relevant_opinions = [o for o in info['opinions'] if o['type'] == current_type]
             if relevant_opinions:
-                print "Combining multiple %s texts in '%s'." % (current_type, file_path)
                 relevant_opinions[-1]['opinion'] += '\n%s' % '\n'.join(last_texts)
                 relevant_opinions[-1]['opinion_texts'].extend(last_texts)
             else:
@@ -111,6 +121,11 @@ def parse_file(file_path, court_fallback=''):
     # check if opinions were heard per curiam by checking if the first chunk of text in the byline or in
     #  any of its associated opinion texts indicate this
     for opinion in info['opinions']:
+        # if there's already an identified author, it's not per curiam
+        if opinion['author'] > 0:
+            opinion['per_curiam'] = False
+            continue
+        # otherwise, search through chunks of text for the phrase 'per curiam'
         per_curiam = False
         first_chunk = 1000
         if 'per curiam' in opinion['byline'][:first_chunk].lower():
@@ -121,9 +136,9 @@ def parse_file(file_path, court_fallback=''):
                     per_curiam = True
                     break
         opinion['per_curiam'] = per_curiam
-        # there shouldn't be a per curiam opinion with a specific author
-        if opinion['author'] > 0 and per_curiam:
-            print "Warning: Per curiam opinion with an author in '%s'." % file_path
+    # construct the plain text info['judges'] from collected judge data
+    info['judges'] = '\n\n'.join('%s\n%s' % i for i in judge_info)
+
     return info
 
 
@@ -212,6 +227,8 @@ def parse_dates(raw_dates):
                 no_month = True
                 if re.search('[0-9][0-9][0-9][0-9]', raw_part) is None:
                     continue
+            # strip parenthesis from the raw string (this messes with the date parser)
+            raw_part = raw_part.replace('(', '').replace(')', '')
             # try to grab a date from the string using an intelligent library
             try:
                 date = dparser.parse(raw_part, fuzzy=True).date()
@@ -222,6 +239,9 @@ def parse_dates(raw_dates):
                 text = re.compile('(\d+)').split(raw_part.lower())[0].strip()
             else:
                 text = months.split(raw_part.lower())[0].strip()
+            # remove footnotes and non-alphanumeric characters
+            text = re.sub('(\[fn.?\])', '', text)
+            text = re.sub('[^A-Za-z ]', '', text).strip()
             # if we ended up getting some text, add it, else ignore it
             if text:
                 inner_dates.append((clean_string(text), date))
@@ -242,19 +262,23 @@ def get_court_object(raw_court, fallback=''):
     :param raw_court: A raw court string, parsed from an XML file.
     :param fallback: If fail to find one, will apply the regexes associated to this key in `SPECIAL_REGEXES`.
     """
-    if '.' in raw_court:
+    # this messes up for, e.g. 'St. Louis', but works for all others
+    if '.' in raw_court and 'St.' not in raw_court:
         j = raw_court.find('.')
         raw_court = raw_court[:j]
-    if ',' in raw_court:
+    # we need the comma to successfully match Superior Courts, the name of which comes after the comma
+    if ',' in raw_court and 'Superior Court' not in raw_court:
         j = raw_court.find(',')
         raw_court = raw_court[:j]
     for regex, value in state_pairs:
         if re.search(regex, raw_court):
             return value
     if fallback in SPECIAL_REGEXES:
-        for regex, value in SPECIAL_REGEXES:
+        for regex, value in SPECIAL_REGEXES[fallback]:
             if re.search(regex, raw_court):
                 return value
+    if fallback in FOLDER_DICT:
+        return FOLDER_DICT[fallback]
 
 
 if __name__ == '__main__':

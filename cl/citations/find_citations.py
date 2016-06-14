@@ -8,6 +8,7 @@ from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 from django.utils.timezone import now
 from cl.citations import reporter_tokenizer
 from cl.search.models import Court
+from cl.lib.roman import isroman
 
 
 FORWARD_SEEK = 20
@@ -71,10 +72,10 @@ class Citation(object):
         ]
 
     def base_citation(self):
-        return u"%d %s %d" % (self.volume, self.reporter, self.page)
+        return u"%d %s %s" % (self.volume, self.reporter, self.page)
 
     def as_regex(self):
-        return r"%d(\s+)%s(\s+)%d" % (
+        return r"%d(\s+)%s(\s+)%s" % (
             self.volume,
             re.escape(self.reporter_found),
             self.page
@@ -87,7 +88,7 @@ class Citation(object):
         # 22 Cranch 1, which is totally wrong.
         template = u'<span class="volume">%(volume)d</span>\\1' \
                    u'<span class="reporter">%(reporter)s</span>\\2' \
-                   u'<span class="page">%(page)d</span>'
+                   u'<span class="page">%(page)s</span>'
         inner_html = template % self.__dict__
         span_class = "citation"
         if self.match_url:
@@ -303,7 +304,7 @@ def extract_base_citation(words, reporter_index):
     """Construct and return a citation object from a list of "words"
 
     Given a list of words and the index of a federal reporter, look before and
-    after for volume and page number.  If found, construct and return a
+    after for volume and page.  If found, construct and return a
     Citation object.
     """
     volume = strip_punct(words[reporter_index - 1])
@@ -315,9 +316,11 @@ def extract_base_citation(words, reporter_index):
 
     page = strip_punct(words[reporter_index + 1])
     if page.isdigit():
+        # Most page numbers will be digits.
         page = int(page)
-    else:
-        # No page, therefore not a valid citation
+    elif not isroman(page):
+        # Some places like Nebraska have Roman numerals, e.g. in '250 Neb. xxiv (1996)'
+        # If the page isn't a digit or a Roman numeral, it's not a valid citation.
         return None
 
     reporter = words[reporter_index]
@@ -462,7 +465,7 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
     words = reporter_tokenizer.tokenize(text)
     citations = []
     # Exclude first and last tokens when looking for reporters, because valid
-    # citations must have a volume before and a page number after the reporter.
+    # citations must have a volume before and a page after the reporter.
     for i in xrange(1, len(words) - 1):
         # Find reporter
         if words[i] in (EDITIONS.keys() + VARIATIONS_ONLY.keys()):

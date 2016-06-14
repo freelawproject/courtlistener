@@ -26,6 +26,7 @@ JURISDICTIONS = (
     ('SA',  'State Appellate'),
     ('ST',  'State Trial'),
     ('SS',  'State Special'),
+    ('SAG', 'State Attorney General'),
     ('C',   'Committee'),
     ('T',   'Testing'),
 )
