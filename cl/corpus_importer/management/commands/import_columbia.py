@@ -112,25 +112,42 @@ def do_many(dir_path, limit=None, random_order=False, status_interval=100, log_f
     folders.sort()
     count = 0
     
+    # get earliest dates for each court
     if newcases:
         print('Only new cases: getting earliest dates by court.')
         min_dates = get_min_dates()
     
+    # start/resume functionality
     if startfolder is not None:
         skipfolder = True
     else:
         skipfolder = False
     if startfile is not None:
         skipfile = True
+    else:
+        skipfile = False
         
     for folder in folders:
+        if skipfolder:
+            if startfolder is not None:
+                checkfolder = folder.split('/')[-1]
+                if checkfolder == startfolder:
+                    skipfolder = False
+                else:
+                    continue        
         print(folder)
-        if folder == startfolder:
-            skip = False
-        if skip:
-            continue
             
         for path in file_generator(folder, random_order, limit):
+            
+            if skipfile:
+                if startfile is not None:
+                    checkfile = path.split('/')[-1]
+                    if checkfile == startfile:
+                        skipfile = False
+                    else:
+                        continue        
+        print(path)
+            
             # grab the fallback text from the path if it's there
             court_fallback = ''
             matches = re.compile('data/([a-z_]+?/[a-z_]+?)/').findall(path)

@@ -135,10 +135,11 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
     panel_date = date_argued or date_reargued or date_reargument_denied or date_filed or unknown_date
     
     
-    if min_dates is not None:        
-        if main_date >= min_dates[item['court_id']]:
-            print(main_date,'after',min_dates[item['court_id']],' -- skipping.')
-            return
+    if min_dates is not None:    
+        if item['court_id'] in min_dates:
+            if main_date >= min_dates[item['court_id']]:
+                print(main_date,'after',min_dates[item['court_id']],' -- skipping.')
+                return
 
     docket = Docket(
         source=Docket.DEFAULT,
