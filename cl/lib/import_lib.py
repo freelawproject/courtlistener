@@ -1,8 +1,9 @@
 from dateutil.relativedelta import relativedelta
-from django.db.models import Q
+from django.db.models import Min, Q
 from reporters_db import REPORTERS
 
 from cl.people_db.models import Person
+from cl.search.models import Court
 
 
 def map_citations_to_models(citations):
@@ -95,11 +96,15 @@ def find_person(name_last, court_id, name_first=None, case_date=None,
         return candidates[0]
 
     if len(candidates) == 0:
-        print("No judge: Last name '%s', position '%s'." % (name_last,court_id))
+        print("No judge: Last name '%s', position '%s'." % (name_last,
+                                                            court_id))
         if raise_zero:
-            raise Exception("No judge: Last name '%s', position '%s'." % (name_last,court_id))
+            raise Exception("No judge: Last name '%s', position '%s'." % (
+                name_last,court_id
+            ))
         else:
-             print("No judge: Last name '%s', position '%s'." % (name_last,court_id))
+             print("No judge: Last name '%s', position '%s'." % (name_last,
+                                                                 court_id))
              return None
 
     if name_first is not None:
@@ -108,19 +113,16 @@ def find_person(name_last, court_id, name_first=None, case_date=None,
             Q(name_first__iexact=name_first),
             Q(positions__court_id=court_id),
             Q(positions__date_start__lt=case_date + relativedelta(years=1)),
-            Q(positions__date_termination__gt=case_date - relativedelta(years=1)) | Q( positions__date_termination=None)
+            Q(positions__date_termination__gt=case_date - relativedelta(years=1)) |
+            Q(positions__date_termination=None),
         )
         if len(candidates) == 1:
             return candidates[0]
         print('First name %s not found in group %s' % (name_first, str([c.name_first for c in candidates])))
 
-
     if raise_mult:
         raise Exception("Multiple judges: Last name '%s', court '%s', options: %s." % (name_last,court_id, str([c.name_first for c in candidates])))
 
-
-from cl.search.models import Court
-from django.db.models import Min
 
 def get_min_dates():
     """returns a dictionary with key-value (courtid, minimum date)"""
