@@ -78,11 +78,19 @@ class Docket(models.Model):
     RECAP = 1
     SCRAPER = 2
     RECAP_AND_SCRAPER = 3
+    COLUMBIA = 4
+    COLUMBIA_AND_RECAP = 5
+    COLUMBIA_AND_SCRAPER = 6
+    COLUMBIA_AND_RECAP_AND_SCRAPER = 7
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
         (SCRAPER, "Scraper"),
         (RECAP_AND_SCRAPER, "RECAP and Scraper"),
+        (COLUMBIA, "Columbia"),
+        (COLUMBIA_AND_SCRAPER, "Columbia and Scraper"),
+        (COLUMBIA_AND_RECAP, 'Columbia and RECAP'),
+        (COLUMBIA_AND_RECAP_AND_SCRAPER, "Columbia, RECAP and Scraper"),
     )
 
     source = models.SmallIntegerField(
