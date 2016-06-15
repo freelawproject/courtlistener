@@ -2,13 +2,13 @@ import argparse
 
 import numpy as np
 import pandas as pd
-
 from django.core.management import BaseCommand
 
-from cl.people_db.import_judges.populate_state_judges import make_state_judge
+from cl.people_db.import_judges.assign_authors import assign_authors
 from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge
 from cl.people_db.import_judges.populate_presidents import make_president
-from cl.people_db.import_judges.assign_authors import assign_authors
+from cl.people_db.import_judges.populate_state_judges import make_state_judge
+
 
 class Command(BaseCommand):
     help = 'Import judge data from various files.'

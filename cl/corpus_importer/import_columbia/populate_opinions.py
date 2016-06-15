@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 
-import string
 import calendar
-from collections import OrderedDict
 import re
+import string
+from collections import OrderedDict
 
-from cl.search.models import Docket, Opinion, OpinionCluster
-from cl.citations.find_citations import get_citations
-from cl.lib.import_lib import map_citations_to_models, find_person
 from django.conf import settings
-from cl.lib import sunburnt
-from cl.lib.solr_core_admin import get_term_frequency
 
+from cl.citations.find_citations import get_citations
+from cl.lib import sunburnt
+from cl.lib.import_lib import map_citations_to_models, find_person
+from cl.lib.solr_core_admin import get_term_frequency
+from cl.search.models import Docket, Opinion, OpinionCluster
 
 # only make a solr connection onece
 SOLR_CONN = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
@@ -85,12 +85,14 @@ BAD_CITES = ['Iowa App.', 'R.I.Super.', 'Ma.Super.', 'Minn.App.', 'NCIC']
 # used to figure out if a "citation text" is really a citation
 TRIVIAL_CITE_WORDS = [n.lower() for n in calendar.month_name] + [n.lower()[:3] for n in calendar.month_name] + ['no']
 
-# used to map the parsed opinion types to their tags in the populated opinion objects
+# used to map the parsed opinion types to their tags in the populated opinion
+# objects
 OPINION_TYPE_MAPPING = {
-    'opinion': '020lead'
-    ,'dissent': '040dissent'
-    ,'concurrence': '030concurrence'
+    'opinion': '020lead',
+    'dissent': '040dissent',
+    'concurrence': '030concurrence',
 }
+
 
 def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
     """Associates case data from `parse_opinions` with objects. Saves these objects.
@@ -133,16 +135,16 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
     # terms of which type of dates best reflect them
     main_date = date_filed or date_argued or date_reargued or date_reargument_denied or unknown_date
     panel_date = date_argued or date_reargued or date_reargument_denied or date_filed or unknown_date
-    
-    
-    if min_dates is not None:    
-        if item['court_id'] in min_dates:
+
+
+    if min_dates is not None:
+        if min_dates.get(item['court_id']) is not None:
             if main_date >= min_dates[item['court_id']]:
                 print(main_date,'after',min_dates[item['court_id']],' -- skipping.')
                 return
 
     docket = Docket(
-        source=Docket.DEFAULT,
+        source=Docket.COLUMBIA,
         date_argued=date_argued,
         date_reargued=date_reargued,
         date_cert_granted=date_cert_granted,
@@ -202,7 +204,8 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
         posture=item['posture'] or '',
         **citations_map
     )
-    panel = [find_person(n, item['court_id'], case_date=panel_date) for n in item['panel']]
+    panel = [find_person(n, item['court_id'], case_date=panel_date) for n in
+             item['panel']]
     panel = [x for x in panel if x is not None]
 
     opinions = []
@@ -215,16 +218,17 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
             author=author,
             per_curiam=opinion_info['per_curiam'],
             type=OPINION_TYPE_MAPPING[opinion_info['type']],
-            html_columbia=opinion_info['opinion']
+            html_columbia=opinion_info['opinion'],
+            sha1=opinion_info['sha1'],
         )
         joined_by = [find_person(n, item['court_id'], case_date=panel_date) for n in opinion_info['joining']]
         joined_by = [x for x in joined_by if x is not None]
         opinions.append((opinion, joined_by))
 
     if min_dates is None:
-        # check to see if this is a duplicate    
+        # check to see if this is a duplicate
         dups = find_dups(docket, cluster, panel, opinions)
-        if dups:        
+        if dups:
             if skipdupes:
                 print('Duplicate. skipping.')
             else:
@@ -243,6 +247,7 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
                 opinion.save()
                 for joiner in joined_by:
                     opinion.joined_by.add(joiner)
+            print("Created item at: https://courtlistener.com%s" % cluster.get_absolute_url())
         except:
             # if anything goes wrong, try to delete everything
             try:

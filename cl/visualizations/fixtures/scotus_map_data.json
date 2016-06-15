@@ -11,7 +11,7 @@
     "case_name": "Marsh v. Chambers",
     "date_created": "2016-02-16T19:49:54.519Z",
     "case_name_short": "Marsh",
-    "docket_number": null,
+    "docket_number": "1",
     "slug": "marsh-v-chambers",
     "source": 0,
     "blocked": false
@@ -31,7 +31,7 @@
     "case_name": "Lynch v. Donnelly",
     "date_created": "2016-02-16T19:49:54.540Z",
     "case_name_short": "Lynch",
-    "docket_number": null,
+    "docket_number": "2",
     "slug": "lynch-v-donnelly",
     "source": 0,
     "blocked": false
@@ -51,7 +51,7 @@
     "case_name": "WALLACE, GOVERNOR OF ALABAMA, et al. v. JAFFREE et al.",
     "date_created": "2016-02-16T19:49:54.557Z",
     "case_name_short": "Wallace",
-    "docket_number": null,
+    "docket_number": "3",
     "slug": "wallace-governor-of-alabama-et-al-v-jaffree-et-al",
     "source": 0,
     "blocked": false
@@ -71,7 +71,7 @@
     "case_name": "SCHOOL DISTRICT OF THE CITY OF GRAND RAPIDS et al. v. BALL et al.",
     "date_created": "2016-02-16T19:49:54.605Z",
     "case_name_short": "Ball",
-    "docket_number": null,
+    "docket_number": "4",
     "slug": "school-district-of-the-city-of-grand-rapids-et-al-v-ball-et-al",
     "source": 0,
     "blocked": false
@@ -91,7 +91,7 @@
     "case_name": "EDWARDS, GOVERNOR OF LOUISIANA, et al. v. AGUILLARD et al.",
     "date_created": "2016-02-16T19:49:54.623Z",
     "case_name_short": "Aguillard",
-    "docket_number": null,
+    "docket_number": "5",
     "slug": "edwards-governor-of-louisiana-et-al-v-aguillard-et-al",
     "source": 0,
     "blocked": false
@@ -111,7 +111,7 @@
     "case_name": "Allegheny County v. Greater Pittsburgh ACLU",
     "date_created": "2016-02-16T19:49:54.570Z",
     "case_name_short": "Allegheny County",
-    "docket_number": null,
+    "docket_number": "6",
     "slug": "allegheny-county-v-greater-pittsburgh-aclu",
     "source": 0,
     "blocked": false
@@ -131,7 +131,7 @@
     "case_name": "Harmelin v. Michigan",
     "date_created": "2016-02-16T19:49:54.529Z",
     "case_name_short": "Harmelin",
-    "docket_number": null,
+    "docket_number": "7",
     "slug": "harmelin-v-michigan",
     "source": 0,
     "blocked": false
@@ -151,7 +151,7 @@
     "case_name": "Lee v. Weisman",
     "date_created": "2016-02-16T19:49:54.578Z",
     "case_name_short": "Lee",
-    "docket_number": null,
+    "docket_number": "8",
     "slug": "lee-v-weisman",
     "source": 0,
     "blocked": false
@@ -171,7 +171,7 @@
     "case_name": "LAMB'S CHAPEL AND JOHN STEIGERWALD v. CENTER MORICHES UNION FREE SCHOOL DISTRICT et al.",
     "date_created": "2016-02-16T19:49:54.586Z",
     "case_name_short": "Lamb's Chapel",
-    "docket_number": null,
+    "docket_number": "9",
     "slug": "lambs-chapel-and-john-steigerwald-v-center-moriches-union-free-school",
     "source": 0,
     "blocked": false
@@ -191,7 +191,7 @@
     "case_name": "RONALD W. ROSENBERGER, et al. v. RECTOR AND VISITORS OF THE UNIVERSITY OF VIRGINIA et al.",
     "date_created": "2016-02-16T19:49:54.595Z",
     "case_name_short": "Rosenberger",
-    "docket_number": null,
+    "docket_number": "10",
     "slug": "ronald-w-rosenberger-et-al-v-rector-and-visitors-of-the-university-of",
     "source": 0,
     "blocked": false
@@ -211,7 +211,7 @@
     "case_name": "Santa Fe Independent School Dist. v. Doe",
     "date_created": "2016-02-16T19:49:54.548Z",
     "case_name_short": "Doe",
-    "docket_number": null,
+    "docket_number": "16",
     "slug": "santa-fe-independent-school-dist-v-doe",
     "source": 0,
     "blocked": false
@@ -231,7 +231,7 @@
     "case_name": "SUSAN TAVE ZELMAN, SUPERINTENDENT OF PUBLIC INSTRUCTION OF OHIO, et al. v. DORIS SIMMONS-HARRIS et al.",
     "date_created": "2016-02-16T19:49:54.613Z",
     "case_name_short": "Zelman",
-    "docket_number": null,
+    "docket_number": "11",
     "slug": "susan-tave-zelman-superintendent-of-public-instruction-of-ohio-et-al-v",
     "source": 0,
     "blocked": false
@@ -251,7 +251,7 @@
     "case_name": "Elk Grove Unified School Dist. v. Newdow",
     "date_created": "2016-02-16T19:49:54.652Z",
     "case_name_short": "Newdow",
-    "docket_number": null,
+    "docket_number": "12",
     "slug": "elk-grove-unified-school-dist-v-newdow",
     "source": 0,
     "blocked": false
@@ -271,7 +271,7 @@
     "case_name": "JON B. CUTTER, et al. v. REGINALD WILKINSON, DIRECTOR, OHIO DEPARTMENT OF REHABILITATION AND CORRECTION, et al.",
     "date_created": "2016-02-16T19:49:54.640Z",
     "case_name_short": "Cutter",
-    "docket_number": null,
+    "docket_number": "17",
     "slug": "jon-b-cutter-et-al-v-reginald-wilkinson-director-ohio-department-of",
     "source": 0,
     "blocked": false
@@ -291,7 +291,7 @@
     "case_name": "Van Orden v. Perry",
     "date_created": "2016-02-16T19:49:54.661Z",
     "case_name_short": "Van Orden",
-    "docket_number": null,
+    "docket_number": "13",
     "slug": "van-orden-v-perry",
     "source": 0,
     "blocked": false
@@ -311,7 +311,7 @@
     "case_name": "McCreary County v. American Civil Liberties Union of Ky.",
     "date_created": "2016-02-16T19:49:54.631Z",
     "case_name_short": "McCreary",
-    "docket_number": null,
+    "docket_number": "14",
     "slug": "mccreary-county-v-american-civil-liberties-union-of-ky",
     "source": 0,
     "blocked": false
@@ -331,7 +331,7 @@
     "case_name": "Town of Greece v. Galloway",
     "date_created": "2016-02-16T19:49:54.504Z",
     "case_name_short": "Town/Greece",
-    "docket_number": null,
+    "docket_number": "15",
     "slug": "town-of-greece-v-galloway",
     "source": 0,
     "blocked": false

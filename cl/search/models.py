@@ -70,38 +70,52 @@ class Docket(models.Model):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
     and link them together.
     """
+    # The source values are additive. That is, if you get content from a new
+    # source, you can add it to the previous one, and have a combined value.
+    # For example, if you start with a RECAP docket (1), then add scraped
+    # content (2), you can arrive at a combined docket (3) because 1 + 2 = 3.
     DEFAULT = 0
     RECAP = 1
     SCRAPER = 2
+    RECAP_AND_SCRAPER = 3
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
-        (SCRAPER, "Scraper")
+        (SCRAPER, "Scraper"),
+        (RECAP_AND_SCRAPER, "RECAP and Scraper"),
     )
 
     source = models.SmallIntegerField(
-            help_text="contains the source of the Docket.",
-            choices=SOURCE_CHOICES,
+        help_text="contains the source of the Docket.",
+        choices=SOURCE_CHOICES,
     )
     court = models.ForeignKey(
-            'Court',
-            help_text="The court where the docket was filed",
-            db_index=True,
-            related_name='dockets',
+        'Court',
+        help_text="The court where the docket was filed",
+        db_index=True,
+        related_name='dockets',
     )
     assigned_to = models.ForeignKey(
-            'people_db.Person',
-            related_name='assigning',
-            help_text="The judge the case was assigned to.",
-            null=True,
-            blank=True,
+        'people_db.Person',
+        related_name='assigning',
+        help_text="The judge the case was assigned to.",
+        null=True,
+        blank=True,
+    )
+    assigned_to_str = models.TextField(
+        help_text="The judge that the case was assigned to, as a string.",
+        blank=True,
     )
     referred_to = models.ForeignKey(
-            'people_db.Person',
-            related_name='referring',
-            help_text="The judge to whom the 'assigned_to' judge is delegated. (Not verified)",
-            null=True,
-            blank=True,
+        'people_db.Person',
+        related_name='referring',
+        help_text="The judge to whom the 'assigned_to' judge is delegated.",
+        null=True,
+        blank=True,
+    )
+    referred_to_str = models.TextField(
+        help_text="The judge that the case was referred to, as a string.",
+        blank=True,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -262,6 +276,7 @@ class DocketEntry(models.Model):
         Docket,
         help_text="Foreign key as a relation to the corresponding Docket "
                   "object. Specifies which docket the docket entry belongs to.",
+        related_name="docket_entries",
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created.",
@@ -275,6 +290,8 @@ class DocketEntry(models.Model):
     )
     date_filed = models.DateField(
         help_text="The created date of the Docket Entry.",
+        null=True,
+        blank=True,
     )
     entry_number = models.PositiveIntegerField(
         help_text="# on the PACER docket page.",
@@ -282,14 +299,19 @@ class DocketEntry(models.Model):
     description = models.TextField(
         help_text="The text content of the docket entry that appears in the "
                   "PACER docket page.",
-        db_index=True,
+        blank=True,
     )
 
     class Meta:
         unique_together = ('docket', 'entry_number')
+        verbose_name_plural = 'Docket Entries'
+        ordering = ('entry_number',)
 
     def __unicode__(self):
-        return "<DocketEntry ---> %s >" % (self.description[:50])
+        return "<DocketEntry:%s ---> %s >" % (
+            self.pk,
+            trunc(self.description, 50, ellipsis="...")
+        )
 
 
 class RECAPDocument(models.Model):
@@ -308,6 +330,7 @@ class RECAPDocument(models.Model):
         help_text="Foreign Key to the DocketEntry object to which it belongs. "
                   "Multiple documents can belong to a DocketEntry. "
                   "(Attachments and Documents together)",
+        related_name="recap_documents",
     )
     date_created = models.DateTimeField(
         help_text="The date the file was imported to Local Storage.",
@@ -320,10 +343,10 @@ class RECAPDocument(models.Model):
         db_index=True,
     )
     date_upload = models.DateTimeField(
-            help_text="upload_date in RECAP. The date the file was uploaded to "
-                      "RECAP. This information is provided by RECAP.",
-            blank=True,
-            null=True,
+        help_text="upload_date in RECAP. The date the file was uploaded to "
+                  "RECAP. This information is provided by RECAP.",
+        blank=True,
+        null=True,
     )
     document_type = models.IntegerField(
         help_text="Whether this is a regular document or an attachment.",
@@ -344,7 +367,7 @@ class RECAPDocument(models.Model):
         help_text="The ID of the document in PACER. This information is "
                   "provided by RECAP.",
         max_length=32,  # Same as in RECAP
-        unique = True
+        unique=True,
     )
     is_available = models.NullBooleanField(
         help_text="True if the item is available in RECAP",
@@ -362,22 +385,35 @@ class RECAPDocument(models.Model):
         upload_to=make_recap_path,
         storage=IncrementingFileSystemStorage(),
         max_length=1000,
+        blank=True,
     )
     filepath_ia = models.CharField(
         help_text="The URL of the file in IA",
         max_length=1000,
+        blank=True,
+    )
+    description = models.TextField(
+        help_text="The short description of the docket entry that appears on "
+                  "the attachments page.",
+        blank=True,
     )
 
     class Meta:
-        unique_together = ('docket_entry', 'document_number', 'attachment_number')
+        unique_together = ('docket_entry', 'document_number',
+                           'attachment_number')
+        ordering = ('document_number', 'attachment_number')
 
     def __unicode__(self):
-        return "Docket_%s , document_number_%s , attachment_number_%s" % (self.docket_entry.docket.docket_number, self.document_number, self.attachment_number)
+        return "Docket_%s , document_number_%s , attachment_number_%s" % (
+            self.docket_entry.docket.docket_number, self.document_number,
+            self.attachment_number
+        )
 
     def save(self, *args, **kwargs):
-        if self.document_type ==  self.ATTACHMENT:
-            if self.attachment_number == None:
-                raise ValidationError('attachment_number cannot be null for an attachment.')
+        if self.document_type == self.ATTACHMENT:
+            if self.attachment_number is None:
+                raise ValidationError('attachment_number cannot be null for an '
+                                      'attachment.')
 
         super(RECAPDocument, self).save(*args, **kwargs)
 
@@ -464,6 +500,12 @@ class Court(models.Model):
     @property
     def is_terminated(self):
         if self.end_date:
+            return True
+        return False
+
+    @property
+    def is_bankruptcy(self):
+        if self.jurisdiction in ['FB', 'FBP']:
             return True
         return False
 
@@ -932,6 +974,7 @@ class Opinion(models.Model):
 
     @property
     def siblings(self):
+        # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
 
     def __unicode__(self):

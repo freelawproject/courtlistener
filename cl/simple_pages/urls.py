@@ -10,7 +10,7 @@ from cl.simple_pages.views import (
     podcasts
 )
 
-mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3')
+mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3', 'recap')
 
 
 urlpatterns = [

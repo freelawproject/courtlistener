@@ -25,13 +25,12 @@ def assign_authors(testing=False):
     for cluster in clusters:
         i += 1
         print u"(%s/%s): Processing: %s, %s" % (i, total, cluster.pk,
-                                               cluster.date_filed)
-        #print u"  Judge string: %s".encode('utf-8') % cluster.judges
+                                                cluster.date_filed)
 
-        judgestr = unidecode(cluster.judges)
-        print "  Judge string: %s" % judgestr
+        judge_str = unidecode(cluster.judges)
+        print "  Judge string: %s" % judge_str
 
-        if 'curiam' in judgestr.lower():
+        if 'curiam' in judge_str.lower():
             opinion = cluster.sub_opinions.all()[0]
             opinion.per_curiam = True
             print u'  Per Curiam assigned.'
@@ -39,17 +38,14 @@ def assign_authors(testing=False):
                 opinion.save(index=False)
             continue
 
-        #judges = find_judge_names(cluster.judges)
-
-        judges = find_judge_names(judgestr)
+        judges = find_judge_names(judge_str)
 
         if len(judges) == 0:
             continue
 
         candidates = []
         for judge in judges:
-            candidates.append(find_person(judge,
-                                          cluster.docket.court_id,
+            candidates.append(find_person(judge, cluster.docket.court_id,
                                           case_date=cluster.date_filed))
         candidates = [c for c in candidates if c is not None]
 
@@ -82,5 +78,3 @@ def assign_authors(testing=False):
 
         if not testing:
             opinion.save(index=False)
-
-

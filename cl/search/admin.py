@@ -1,7 +1,8 @@
 from django.contrib import admin
 
 from cl.search.models import (
-    Docket, OpinionsCited, Court, Opinion, OpinionCluster
+    Docket, OpinionsCited, Court, Opinion, OpinionCluster,
+    DocketEntry, RECAPDocument
 )
 
 
@@ -47,7 +48,7 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'docket',
         'panel',
         'non_participating_judges',
-        'judges',        
+        'judges',
         'date_filed',
         'slug',
         'citation_id',
@@ -115,8 +116,30 @@ class CourtAdmin(admin.ModelAdmin):
     )
 
 
+class RECAPDocumentInline(admin.StackedInline):
+    model = RECAPDocument
+    extra = 1
+
+
+class DocketEntryAdmin(admin.ModelAdmin):
+    inlines = (
+        RECAPDocumentInline,
+    )
+    raw_id_fields = (
+        'docket',
+    )
+
+
+class DocketEntryInline(admin.TabularInline):
+    model = DocketEntry
+    extra = 1
+
+
 class DocketAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['case_name']}
+    inlines = (
+        DocketEntryInline,
+    )
     readonly_fields = (
         'date_modified',
     )
@@ -144,5 +167,6 @@ class OpinionsCitedAdmin(admin.ModelAdmin):
 admin.site.register(Opinion, OpinionAdmin)
 admin.site.register(Court, CourtAdmin)
 admin.site.register(Docket, DocketAdmin)
+admin.site.register(DocketEntry, DocketEntryAdmin)
 admin.site.register(OpinionsCited, OpinionsCitedAdmin)
 admin.site.register(OpinionCluster, OpinionClusterAdmin)

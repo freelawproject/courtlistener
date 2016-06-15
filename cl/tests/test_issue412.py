@@ -3,9 +3,8 @@
 Test Issue 412: Add admin-visible notice to various pages showing if they are
 blocked from search engines
 """
-from cl.tests.base import BaseSeleniumTest
 from cl.search.models import Docket
-
+from cl.tests.base import BaseSeleniumTest
 
 BLOCKED_MSG = 'Blocked from Search Engines'
 
@@ -91,8 +90,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         )
 
         # And sees a badge that lets her know it's blocked
-        sidebar = self.browser.find_element_by_id('sidebar')
-        self.assertIn(BLOCKED_MSG, sidebar.text)
+        self.assertIn(BLOCKED_MSG, self.browser.page_source)
 
     def test_non_admin_viewing_blocked_docket(self):
         """ For a blocked Docket, a Non-admin should see NO indication. """

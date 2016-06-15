@@ -1,8 +1,10 @@
+from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render_to_response
 from django.template import RequestContext
 
+from cl.lib.sunburnt import SolrInterface
 from cl.people_db.models import Person
 
 
@@ -35,6 +37,20 @@ def view_person(request, pk, slug):
             other_positions.append(p)
     positions = judicial_positions + other_positions
 
+    # Use Solr to get relevant opinions that the person wrote
+    conn = SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+    q = {
+        'q': 'author_id:{p} OR panel_ids:{p}'.format(p=person.pk),
+        'fl': ['id', 'court_id', 'caseName', 'absolute_url', 'court',
+               'court_citation_string', 'dateFiled', 'docketNumber',
+               'citeCount', 'status', 'citation'],
+        'rows': 5,
+        'start': 0,
+        'sort': 'score desc',
+        'caller': 'view_person',
+    }
+    authored_opinions = conn.raw_query(**q).execute()
+
     return render_to_response(
         'view_person.html',
         {'person': person,
@@ -44,6 +60,7 @@ def view_person(request, pk, slug):
                                     .order_by('-date_start')),
          'positions': positions,
          'educations': person.educations.all().order_by('-degree_year'),
+         'authored_opinions': authored_opinions,
          'private': False},
         RequestContext(request),
     )

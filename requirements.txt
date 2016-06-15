@@ -35,7 +35,8 @@ httplib2==0.9.1
 idna==2.1
 ipaddress==1.0.16
 ipython==3.2.0
-kombu==3.0.29
+juriscraper
+kombu==3.0.35
 logilab-common==0.63.2
 lxml==3.4.4
 markdown2==2.3.0
@@ -56,7 +57,7 @@ python-mimeparse==0.1.4
 pytz==2015.7
 redis==2.10.5
 requests==2.9.1
-selenium==2.48.0
+selenium==2.53.4
 simplejson
 six==1.9.0
 sqlparse==0.1.15

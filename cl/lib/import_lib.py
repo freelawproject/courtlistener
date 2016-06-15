@@ -125,8 +125,10 @@ from django.db.models import Min
 def get_min_dates():
     """returns a dictionary with key-value (courtid, minimum date)"""
     min_dates = {}
-    courts = Court.objects.annotate(earliest_date=Min('dockets__clusters__date_filed'))    
+    courts = (Court.objects
+                .exclude(dockets__clusters__source__contains="Z")
+                .annotate(earliest_date=Min('dockets__clusters__date_filed')))
     for court in courts:
         min_dates[court.pk] = court.earliest_date
     return min_dates
-        
+

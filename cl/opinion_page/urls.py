@@ -1,10 +1,10 @@
+from django.conf.urls import url
+
 from cl.opinion_page.sitemap import opinion_sitemap_maker
 from cl.opinion_page.views import (
     view_opinion, view_authorities, view_docket, cluster_visualizations,
-    citation_redirector
-)
-from django.conf.urls import url
-
+    citation_redirector,
+    view_recap_documents)
 
 urlpatterns = [
     url(
@@ -26,6 +26,11 @@ urlpatterns = [
         r'^docket/(\d*)/([^/]*)/$',
         view_docket,
         name="view_docket"
+    ),
+    url(
+        r'^docket-entry/(\d*)/$',
+        view_recap_documents,
+        name="view_recap_documents"
     ),
     url(
         r'^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,4})/(?P<page>\d{1,4})/)?$',

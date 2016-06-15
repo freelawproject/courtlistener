@@ -1,24 +1,25 @@
 from django.conf import settings
-from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.urlresolvers import reverse
 from django.db.models import Q
 from django.http import HttpResponsePermanentRedirect, HttpResponseRedirect
-from django.shortcuts import render_to_response
+from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
 
 from cl.citations.find_citations import get_citations
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.favorites.forms import FavoriteForm
+from cl.favorites.models import Favorite
 from cl.lib import search_utils
+from cl.lib import sunburnt
 from cl.lib.encode_decode import ascii_to_num
 from cl.lib.import_lib import map_citations_to_models
 from cl.lib.string_utils import trunc
-from cl.lib import sunburnt
-from cl.favorites.forms import FavoriteForm
-from cl.favorites.models import Favorite
 from cl.opinion_page.forms import CitationRedirectorForm
-from cl.search.models import Docket, OpinionCluster
+from cl.search.models import Docket, OpinionCluster, DocketEntry, RECAPDocument
 
 
 def view_docket(request, pk, _):
@@ -28,6 +29,39 @@ def view_docket(request, pk, _):
         {'docket': docket,
          'private': docket.blocked},
         RequestContext(request),
+    )
+
+
+def view_recap_documents(request, pk):
+    """This is the ajax view that powers the modals on the docket
+    page when a docket entry is clicked.
+    """
+    docs = DocketEntry.objects.get(pk=pk).recap_documents.all()
+
+    j = {'attachments': [], 'documents': [], 'item_count': 0}
+    for doc in docs:
+        date_upload = getattr(doc, 'date_upload', "")
+        if date_upload:
+            date_upload = date_upload.isoformat()
+
+        d = {
+            'date_upload': date_upload,
+            'document_number': doc.document_number,
+            'attachment_number': doc.attachment_number,
+            'is_available': doc.is_available,
+            'filepath_local': doc.filepath_local.name,
+            'description': doc.description
+        }
+
+        if doc.document_type == RECAPDocument.PACER_DOCUMENT:
+            j['documents'].append(d)
+        elif doc.document_type == RECAPDocument.ATTACHMENT:
+            j['attachments'].append(d)
+        j['item_count'] += 1
+
+    return JsonResponse(
+        j,
+        safe=False,
     )
 
 

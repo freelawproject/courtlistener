@@ -4,12 +4,11 @@ import logging
 import os
 import random
 
-from celery.task import TaskSet
 from django.conf import settings
 from django.core.management import BaseCommand
 from lxml import etree
 
-from cl.corpus_importer.tasks import parse_recap_item
+from cl.lib.pacer import PacerXMLParser
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +60,13 @@ class Command(BaseCommand):
             type=int,
             default=0,
             help='The line in the file where you wish to start processing.'
+        )
+        parser.add_argument(
+            '--max_items',
+            type=int,
+            default=-1,
+            help="The maximum number of items to parse. -1 indicates all items "
+                 "should be parsed."
         )
 
         # Data sampling
@@ -117,31 +123,27 @@ class Command(BaseCommand):
         """For every item in the directory, send it to Celery for processing"""
         docket_paths, file_count = get_docket_list()
 
-        subtasks = []
         completed = 0
         for docket_path in docket_paths:
             if completed < self.options['start_item'] - 1:
                 # Skip ahead if start_lines is provided.
                 completed += 1
                 continue
+            else:
+                logger.info("%s: Parsing docket: %s" % (completed, docket_path))
 
-            subtasks.append(parse_recap_item.subtask((
-                docket_path,
-                self.debug),
-            ))
+                pacer_doc = PacerXMLParser(docket_path)
 
-            # Every n items send the subtasks to Celery.
-            is_last_item = (file_count == completed + 1)
-            if (len(subtasks) == 50) or is_last_item:
-                msg = ("Sent subtasks to celery. We have processed %s "
-                       "rows so far." % (completed + 1))
-                logger.info(msg)
-                print msg
-                job = TaskSet(tasks=subtasks)
-                job.apply_async().join()
-                subtasks = []
+                docket = pacer_doc.save(self.debug)
+                if docket is not None:
+                    pacer_doc.make_documents(docket, self.debug)
 
-            completed += 1
+                completed += 1
+
+                max_items = self.options['max_items']
+                if completed >= max_items and max_items != -1:
+                    print "\n\nCompleted %s items. Aborting early." % max_items
+                    break
 
     VALID_ACTIONS = {
         'sample-dockets': sample_dockets,

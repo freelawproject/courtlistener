@@ -19,7 +19,7 @@ from cl.lib import search_utils
 from cl.lib.bot_detector import is_bot
 from cl.lib.sunburnt import sunburnt
 from cl.search.forms import SearchForm
-from cl.search.models import Court, OpinionCluster, Opinion
+from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument
 from cl.simple_pages.forms import ContactForm
 from cl.stats import tally_stat
 
@@ -326,6 +326,12 @@ def serve_static_file(request, file_path=''):
     if file_path.startswith('mp3'):
         item = get_object_or_404(Audio, local_path_mp3=file_path)
         mimetype = 'audio/mpeg'
+    elif file_path.startswith('recap'):
+        # Create an empty object, and set it to blocked. No need to hit the DB
+        # since all RECAP documents are blocked.
+        item = RECAPDocument()
+        item.blocked = True
+        mimetype = 'application/pdf'
     else:
         item = get_object_or_404(Opinion, local_path=file_path)
         item.blocked = item.cluster.blocked
