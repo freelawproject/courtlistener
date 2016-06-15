@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Functions to parse court data in XML format into a list of dictionaries.
-
+import hashlib
 import os
 import re
 import xml.etree.cElementTree as ET
@@ -10,10 +10,8 @@ import dateutil.parser as dparser
 from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
 
 from cl.corpus_importer.court_regexes import state_pairs
-
-from regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
 from parse_judges import find_judge_names
-
+from regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
 
 # initialized once since it takes resources
 CASE_NAME_TWEAKER = CaseNameTweaker()
@@ -34,15 +32,17 @@ OPINION_TYPES = ['opinion', 'dissent', 'concurrence']
 
 
 def parse_file(file_path, court_fallback=''):
-    """Parses a file, turning it into a correctly formatted dictionary, ready to be used by a populate script.
+    """Parses a file, turning it into a correctly formatted dictionary, ready to
+    be used by a populate script.
 
     :param file_path: A path the file to be parsed.
-    :param court_fallback: A string used as a fallback in getting the court object.
-        The regexes associated to its value in special_regexes will be used.
+    :param court_fallback: A string used as a fallback in getting the court
+    object. The regexes associated to its value in special_regexes will be used.
     """
     raw_info = get_text(file_path)
     info = {}
-    # throughout the process, collect all info about judges and at the end use it to populate info['judges']
+    # throughout the process, collect all info about judges and at the end use
+    # it to populate info['judges']
     judge_info = []
     # get basic info
     info['unpublished'] = raw_info['unpublished']
@@ -51,9 +51,12 @@ def parse_file(file_path, court_fallback=''):
     info['citations'] = raw_info.get('citation', [])
     info['attorneys'] = ''.join(raw_info.get('attorneys', [])) or None
     info['posture'] = ''.join(raw_info.get('posture', [])) or None
-    info['court_id'] = get_court_object(''.join(raw_info.get('court', [])), court_fallback) or None
+    info['court_id'] = get_court_object(''.join(raw_info.get('court', [])),
+                                        court_fallback) or None
     if not info['court_id']:
-        raise Exception('Failed to find a court ID for "%s".' % ''.join(raw_info.get('court', [])))
+        raise Exception('Failed to find a court ID for "%s".' %
+                        ''.join(raw_info.get('court', [])))
+
     # get the full panel text and extract judges from it
     panel_text = ''.join(raw_info.get('panel', []))
     if panel_text:
@@ -66,8 +69,9 @@ def parse_file(file_path, court_fallback=''):
     info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
     info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
     info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or None
-    # figure out if this case was heard per curiam by checking the first chunk of text in fields in which this is
-    # usually indicated
+
+    # figure out if this case was heard per curiam by checking the first chunk
+    # of text in fields in which this is usually indicated
     info['per_curiam'] = False
     first_chunk = 1000
     for opinion in raw_info.get('opinions', []):
@@ -77,6 +81,7 @@ def parse_file(file_path, court_fallback=''):
         if opinion['byline'] and 'per curiam' in opinion['byline'][:first_chunk].lower():
             info['per_curiam'] = True
             break
+
     # condense opinion texts if there isn't an associated byline
     # print a warning whenever we're appending multiple texts together
     info['opinions'] = []
@@ -94,16 +99,18 @@ def parse_file(file_path, court_fallback=''):
                 # add the opinion and all of the previous texts
                 judges = find_judge_names(opinion['byline'])
                 info['opinions'].append({
-                    'opinion': '\n'.join(last_texts)
-                    ,'opinion_texts': last_texts
-                    ,'type': current_type
-                    ,'author': judges[0] if judges else None
-                    ,'joining': judges[1:] if len(judges) > 0 else []
-                    ,'byline': opinion['byline']
+                    'opinion': '\n'.join(last_texts),
+                    'opinion_texts': last_texts,
+                    'type': current_type,
+                    'author': judges[0] if judges else None,
+                    'joining': judges[1:] if len(judges) > 0 else [],
+                    'byline': opinion['byline'],
                 })
                 last_texts = []
-        # if there are remaining texts without bylines, either add them to the last opinion of this type, or if there
-        # are none, make a new opinion without an author
+
+        # if there are remaining texts without bylines, either add them to the
+        # last opinion of this type, or if there are none, make a new opinion
+        # without an author
         if last_texts:
             relevant_opinions = [o for o in info['opinions'] if o['type'] == current_type]
             if relevant_opinions:
@@ -111,15 +118,16 @@ def parse_file(file_path, court_fallback=''):
                 relevant_opinions[-1]['opinion_texts'].extend(last_texts)
             else:
                 info['opinions'].append({
-                    'opinion': '\n'.join(last_texts)
-                    ,'opinion_texts': last_texts
-                    ,'type': current_type
-                    ,'author': None
-                    ,'joining': []
-                    ,'byline': ''
+                    'opinion': '\n'.join(last_texts),
+                    'opinion_texts': last_texts,
+                    'type': current_type,
+                    'author': None,
+                    'joining': [],
+                    'byline': '',
                 })
-    # check if opinions were heard per curiam by checking if the first chunk of text in the byline or in
-    #  any of its associated opinion texts indicate this
+
+    # check if opinions were heard per curiam by checking if the first chunk of
+    # text in the byline or in any of its associated opinion texts indicate this
     for opinion in info['opinions']:
         # if there's already an identified author, it's not per curiam
         if opinion['author'] > 0:
@@ -136,10 +144,26 @@ def parse_file(file_path, court_fallback=''):
                     per_curiam = True
                     break
         opinion['per_curiam'] = per_curiam
+
     # construct the plain text info['judges'] from collected judge data
     info['judges'] = '\n\n'.join('%s\n%s' % i for i in judge_info)
 
+    # Add the same sha1 value to every opinion (multiple opinions can come from
+    # a single XML file).
+    sha1 = get_sha1(file_path)
+    for opinion in info['opinions']:
+        opinion['sha1'] = sha1
+
     return info
+
+
+def get_sha1(file_path):
+    """Calculate the sha1 of a file at a given path."""
+    hasher = hashlib.sha1()
+    with open(file_path, 'rb') as f:
+        buf = f.read()
+        hasher.update(buf)
+    return hasher.hexdigest()
 
 
 def get_text(file_path):
@@ -150,26 +174,30 @@ def get_text(file_path):
     with open(file_path, 'r') as f:
         file_string = f.read()
     raw_info = {}
+
     # used when associating a byline of an opinion with the opinion's text
-    current_byline = {
-        'type': None
-        ,'name': None
-    }
-    # if this is an unpublished opinion, note this down and remove all <unpublished> tags
+    current_byline = {'type': None, 'name': None}
+
+    # if this is an unpublished opinion, note this down and remove all
+    # <unpublished> tags
     raw_info['unpublished'] = False
     if '<opinion unpublished=true>' in file_string:
         file_string = file_string.replace('<opinion unpublished=true>', '<opinion>')
         file_string = file_string.replace('<unpublished>', '').replace('</unpublished>', '')
         raw_info['unpublished'] = True
+
     # turn the file into a readable tree
     try:
         root = ET.fromstring(file_string)
     except ET.ParseError:
-        # these seem to be erroneously swapped quite often -- try to fix the misordered tags
-        file_string = file_string.replace('</footnote_body></block_quote>', '</block_quote></footnote_body>')
+        # these seem to be erroneously swapped quite often -- try to fix the
+        # misordered tags
+        file_string = file_string.replace('</footnote_body></block_quote>',
+                                          '</block_quote></footnote_body>')
         root = ET.fromstring(file_string)
     for child in root.iter():
-        # if this child is one of the ones identified by SIMPLE_TAGS, just grab its text
+        # if this child is one of the ones identified by SIMPLE_TAGS, just grab
+        # its text
         if child.tag in SIMPLE_TAGS:
             # strip unwanted tags and xml formatting
             text = get_xml_string(child)
@@ -185,13 +213,14 @@ def get_text(file_path):
                 current_byline['type'] = opinion_type
                 current_byline['name'] = get_xml_string(child)
                 break
-            # if this child is an opinion text blob, add it to an incomplete opinion and move into the info dict
+            # if this child is an opinion text blob, add it to an incomplete
+            # opinion and move into the info dict
             if child.tag == "%s_text" % opinion_type:
                 # add the full opinion info, possibly associating it to a byline
                 raw_info.setdefault('opinions', []).append({
-                    'type': opinion_type
-                    ,'byline': current_byline['name'] if current_byline['type'] == opinion_type else None
-                    ,'opinion': get_xml_string(child)
+                    'type': opinion_type,
+                    'byline': current_byline['name'] if current_byline['type'] == opinion_type else None,
+                    'opinion': get_xml_string(child)
                 })
                 current_byline['type'] = current_byline['name'] = None
                 break
