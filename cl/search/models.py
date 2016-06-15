@@ -974,6 +974,7 @@ class Opinion(models.Model):
 
     @property
     def siblings(self):
+        # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
 
     def __unicode__(self):
