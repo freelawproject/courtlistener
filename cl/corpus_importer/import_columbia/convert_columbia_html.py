@@ -15,7 +15,8 @@ def convert_columbia_html(text):
                     ('underline','u'),
                     ('strikethrough','strike'),
                     ('superscript','sup')
-                    ('subscript','sub')]
+                    ('subscript','sub'),
+                    ('heading','h1')]
     
     for (pattern, replacement) in conversions:
         text = re.sub('<'+pattern+'>', '<'+replacement+'>', text)
