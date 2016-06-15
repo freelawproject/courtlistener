@@ -485,8 +485,8 @@
                         <span class="meta-data-header">Date Filed:</span>
                         <time class="meta-data-value"
                               datetime="{{ o.dateFiled|date:'Y-m-d' }}">
-                            {% if result.dateFiled %}
-                                {{ result.dateFiled|date:"F jS, Y" }}
+                            {% if o.dateFiled %}
+                                {{ o.dateFiled|date:"F jS, Y" }}
                             {% else %}
                                 Unknown Date
                             {% endif %}
