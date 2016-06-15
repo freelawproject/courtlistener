@@ -522,8 +522,8 @@
                 </div>
                 {% endfor %}
 
-                <p class="btn btn-primary">
-                    Search for All Opinions Authored by {{ person.name_last }}
+                <p>
+                    <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}" class="btn btn-primary">Search for All Opinions Authored by {{ person.name_last }}</a>
                 </p>
             </div>
         </div>
