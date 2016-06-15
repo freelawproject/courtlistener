@@ -237,5 +237,6 @@ for folder in folders:
                     optext = op['opinion']
                     tags = re.findall('<.*?>',optext)
                     html_tab.update(tags)
+                        
         except:
             pass
