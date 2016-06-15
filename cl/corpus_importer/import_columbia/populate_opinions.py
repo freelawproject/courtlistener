@@ -12,6 +12,7 @@ from cl.lib import sunburnt
 from cl.lib.import_lib import map_citations_to_models, find_person
 from cl.lib.solr_core_admin import get_term_frequency
 from cl.search.models import Docket, Opinion, OpinionCluster
+from convert_columbia_html import convert_columbia_html
 
 # only make a solr connection onece
 SOLR_CONN = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
@@ -214,11 +215,12 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
             author = None
         else:
             author = find_person(opinion_info['author'], item['court_id'], case_date=panel_date)
+        converted_text = convert_columbia_html(opinion_info['opinion'])
         opinion = Opinion(
             author=author,
             per_curiam=opinion_info['per_curiam'],
             type=OPINION_TYPE_MAPPING[opinion_info['type']],
-            html_columbia=opinion_info['opinion'],
+            html_columbia=converted_text,
             sha1=opinion_info['sha1'],
         )
         joined_by = [find_person(n, item['court_id'], case_date=panel_date) for n in opinion_info['joining']]
