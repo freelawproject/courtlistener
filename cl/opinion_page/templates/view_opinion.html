@@ -137,13 +137,13 @@
         {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
             {% if sub_opinion.download_url or sub_opinion.local_path %}
                 <div class="sidebar-section">
-                    {% if sub_opinion.source != 'R' and sub_opinion.source != 'L' and sub_opinion.source != 'LR' %}
+                    {% if cluster.source != 'R' and cluster.source != 'L' and cluster.source != 'LR' and cluster.source != "Z" %}
                         <h3><span>Original {{sub_opinion.get_type_display}}</span></h3>
                         <p>
-                            {% if sub_opinion.download_url and sub_opinion.source != 'R' %}
+                            {% if sub_opinion.download_url and cluster.source != 'R' %}
                                 <a href="{{sub_opinion.download_url}}" class="visitable">From the court</a>
                             {% endif %}
-                            {% if sub_opinion.download_url and sub_opinion.source != 'R' and sub_opinion.local_path %}
+                            {% if sub_opinion.download_url and cluster.source != 'R' and sub_opinion.local_path %}
                                 &nbsp;&nbsp;|&nbsp;&nbsp;
                             {% endif %}
                             {% if sub_opinion.local_path %}
