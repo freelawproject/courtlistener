@@ -56,8 +56,8 @@ def parse_file(file_path, court_fallback=''):
         raise Exception('Failed to find a court ID for "%s".' % ''.join(raw_info.get('court', [])))
     # get the full panel text and extract judges from it
     panel_text = ''.join(raw_info.get('panel', []))
-    if panel_text:
-        judge_info.append(('Panel\n-----', panel_text))
+    #if panel_text:
+    #    judge_info.append(('Panel\n-----', panel_text))
     info['panel'] = find_judge_names(panel_text) or []
     # get dates
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
@@ -87,10 +87,10 @@ def parse_file(file_path, court_fallback=''):
                 continue
             last_texts.append(opinion['opinion'])
             if opinion['byline']:
-                judge_info.append((
-                    '%s Byline\n%s' % (current_type.title(), '-' * (len(current_type) + 7)),
-                    opinion['byline']
-                ))
+                #judge_info.append((
+                #    '%s Byline\n%s' % (current_type.title(), '-' * (len(current_type) + 7)),
+                #    opinion['byline']
+                #))
                 # add the opinion and all of the previous texts
                 judges = find_judge_names(opinion['byline'])
                 info['opinions'].append({
@@ -102,6 +102,9 @@ def parse_file(file_path, court_fallback=''):
                     ,'byline': opinion['byline']
                 })
                 last_texts = []
+                if current_type == 'opinion': 
+                    info['judges'] = opinion['byline']
+                    
         # if there are remaining texts without bylines, either add them to the last opinion of this type, or if there
         # are none, make a new opinion without an author
         if last_texts:
@@ -137,7 +140,7 @@ def parse_file(file_path, court_fallback=''):
                     break
         opinion['per_curiam'] = per_curiam
     # construct the plain text info['judges'] from collected judge data
-    info['judges'] = '\n\n'.join('%s\n%s' % i for i in judge_info)
+    #info['judges'] = '\n\n'.join('%s\n%s' % i for i in judge_info)
 
     return info
 
