@@ -131,11 +131,13 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
                     print ("Found unknown date tag '%s' with date '%s'." % date_info)
                     print
 
-    # the main date (used for date_filed in OpinionCluster) and panel dates (used for finding judges) are ordered in
-    # terms of which type of dates best reflect them
-    main_date = date_filed or date_argued or date_reargued or date_reargument_denied or unknown_date
-    panel_date = date_argued or date_reargued or date_reargument_denied or date_filed or unknown_date
-
+    # the main date (used for date_filed in OpinionCluster) and panel dates
+    # (used for finding judges) are ordered in terms of which type of dates
+    # best reflect them
+    main_date = (date_filed or date_argued or date_reargued or
+                 date_reargument_denied or unknown_date)
+    panel_date = (date_argued or date_reargued or date_reargument_denied or
+                  date_filed or unknown_date)
 
     if min_dates is not None:
         if min_dates.get(item['court_id']) is not None:
@@ -162,8 +164,10 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
     for c in item['citations']:
         found = get_citations(c)
         if not found:
-            # if the docket number --is-- citation string, we're likely dealing with a somewhat common triplet of
-            # (docket number, date, jurisdiction), which isn't a citation at all (so there's no problem)
+            # if the docket number --is-- citation string, we're likely dealing
+            # with a somewhat common triplet of (docket number, date,
+            # jurisdiction), which isn't a citation at all (so there's no
+            # problem)
             if item['docket']:
                 docket_no = item['docket'].lower()
                 if 'claim no.' in docket_no:
@@ -173,21 +177,25 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
                 docket_no = docket_no.strip('.').strip()
                 if docket_no and docket_no in c.lower():
                     continue
-            # there are a trivial number of letters (except for months and a few trivial words) in the citation,
-            # then it's not a citation at all
+
+            # there are a trivial number of letters (except for months and a few
+            # trivial words) in the citation, then it's not a citation at all
             non_trivial = c.lower()
             for trivial in TRIVIAL_CITE_WORDS:
                 non_trivial = non_trivial.replace(trivial, '')
             num_letters = sum(non_trivial.count(letter) for letter in string.lowercase)
             if num_letters < 3:
                 continue
-            # if there is a string that's known to indicate a bad citation, then it's not a citation
+
+            # if there is a string that's known to indicate a bad citation, then
+            # it's not a citation
             if any(bad in c for bad in BAD_CITES):
                 continue
             # otherwise, this is a problem
-            raise Exception("Failed to get a citation from the string '%s' in court '%s' with docket '%s'." % (
-                c, item['court_id'], item['docket']
-            ))
+            raise Exception("Failed to get a citation from the string '%s' in "
+                            "court '%s' with docket '%s'." % (
+                                c, item['court_id'], item['docket']
+                            ))
         else:
             found_citations.extend(found)
     citations_map = map_citations_to_models(found_citations)
@@ -213,13 +221,15 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
         if opinion_info['author'] is None:
             author = None
         else:
-            author = find_person(opinion_info['author'], item['court_id'], case_date=panel_date)
+            author = find_person(opinion_info['author'], item['court_id'],
+                                 case_date=panel_date)
         opinion = Opinion(
             author=author,
             per_curiam=opinion_info['per_curiam'],
             type=OPINION_TYPE_MAPPING[opinion_info['type']],
             html_columbia=opinion_info['opinion'],
             sha1=opinion_info['sha1'],
+            local_path=opinion_info['local_path'],
         )
         joined_by = [find_person(n, item['court_id'], case_date=panel_date) for n in opinion_info['joining']]
         joined_by = [x for x in joined_by if x is not None]

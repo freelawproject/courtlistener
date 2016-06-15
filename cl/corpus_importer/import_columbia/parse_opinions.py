@@ -148,11 +148,12 @@ def parse_file(file_path, court_fallback=''):
     # construct the plain text info['judges'] from collected judge data
     info['judges'] = '\n\n'.join('%s\n%s' % i for i in judge_info)
 
-    # Add the same sha1 value to every opinion (multiple opinions can come from
-    # a single XML file).
+    # Add the same sha1 and path values to every opinion (multiple opinions
+    # can come from a single XML file).
     sha1 = get_sha1(file_path)
     for opinion in info['opinions']:
         opinion['sha1'] = sha1
+        opinion['local_path'] = file_path
 
     return info
 
