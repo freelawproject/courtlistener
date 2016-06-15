@@ -466,7 +466,7 @@
             <div class="col-xs-12">
                 <h3 id="authored-opinions">
                     <i class="fa-file-text-o fa gray"></i>
-                    Opinions Authored by {{ person.name_last }}
+                    Opinions Authored by {{ person.name_last }} ({{ authored_opinions.result.numFound|intcomma }})
                 </h3>
                 <p class="gray">Includes opinions for which {{ person.name_full }} was on the panel, ordered by <a href="https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/">CiteGeist</a> relevance.</p>
                 <hr class="top">
