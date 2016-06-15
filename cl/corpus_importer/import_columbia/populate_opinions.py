@@ -221,17 +221,22 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
     panel = [x for x in panel if x is not None]
 
     opinions = []
-    for opinion_info in item['opinions']:
+    for i, opinion_info in enumerate(item['opinions']):
         if opinion_info['author'] is None:
             author = None
         else:
             author = find_person(opinion_info['author'], item['court_id'],
                                  case_date=panel_date)
         converted_text = convert_columbia_html(opinion_info['opinion'])
+        opinion_type = OPINION_TYPE_MAPPING[opinion_info['type']]
+        if opinion_type == '020lead' and i > 0:
+            opinion_type = '050addendum'
+
         opinion = Opinion(
             author=author,
             per_curiam=opinion_info['per_curiam'],
-            type=OPINION_TYPE_MAPPING[opinion_info['type']],
+            type=opinion_type,
+            # type=OPINION_TYPE_MAPPING[opinion_info['type']],
             html_columbia=converted_text,
             sha1=opinion_info['sha1'],
             local_path=opinion_info['local_path'],

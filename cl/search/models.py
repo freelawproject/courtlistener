@@ -880,6 +880,7 @@ class Opinion(models.Model):
         ('020lead', 'Lead Opinion'),
         ('030concurrence', 'Concurrence'),
         ('040dissent', 'Dissent'),
+        ('050addendum', 'Addendum'),
     )
     cluster = models.ForeignKey(
         OpinionCluster,
