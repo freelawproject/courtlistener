@@ -43,7 +43,6 @@ def parse_file(file_path, court_fallback=''):
     raw_info = get_text(file_path)
     info = {}
     # throughout the process, collect all info about judges and at the end use it to populate info['judges']
-    judge_info = []
     # get basic info
     info['unpublished'] = raw_info['unpublished']
     info['file'] = os.path.splitext(os.path.basename(file_path))[0]
