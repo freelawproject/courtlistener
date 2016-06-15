@@ -95,8 +95,11 @@ OPINION_TYPE_MAPPING = {
 
 
 def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
-    """Associates case data from `parse_opinions` with objects. Saves these objects.
-        min_date: if not none, will skip cases after min_date """
+    """Associates case data from `parse_opinions` with objects. Saves these
+    objects.
+
+    min_date: if not none, will skip cases after min_date
+    """
     date_filed = date_argued = date_reargued = date_reargument_denied = date_cert_granted = date_cert_denied = None
     unknown_date = None
     for date_cluster in item['dates']:
@@ -127,9 +130,8 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
             else:
                 unknown_date = date_info[1]
                 if date_info[0] not in UNKNOWN_TAGS:
-                    print
-                    print ("Found unknown date tag '%s' with date '%s'." % date_info)
-                    print
+                    print("\nFound unknown date tag '%s' with date '%s'.\n" %
+                          date_info)
 
     # the main date (used for date_filed in OpinionCluster) and panel dates
     # (used for finding judges) are ordered in terms of which type of dates
@@ -142,7 +144,8 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
     if min_dates is not None:
         if min_dates.get(item['court_id']) is not None:
             if main_date >= min_dates[item['court_id']]:
-                print(main_date,'after',min_dates[item['court_id']],' -- skipping.')
+                print(main_date, 'after', min_dates[item['court_id']],
+                      ' -- skipping.')
                 return
 
     docket = Docket(

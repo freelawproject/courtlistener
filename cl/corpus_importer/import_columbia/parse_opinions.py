@@ -18,9 +18,8 @@ CASE_NAME_TWEAKER = CaseNameTweaker()
 
 # tags for which content will be condensed into plain text
 SIMPLE_TAGS = [
-    "reporter_caption", "citation", "caption", "court", "docket", "posture"
-    ,"date", "hearing_date"
-    ,"panel", "attorneys"
+    "reporter_caption", "citation", "caption", "court", "docket", "posture",
+    "date", "hearing_date", "panel", "attorneys"
 ]
 
 # regex that will be applied when condensing SIMPLE_TAGS content
@@ -234,7 +233,7 @@ def get_xml_string(e):
     :param e: An XML element.
     """
     inner_string = re.sub(r'(^<%s\b.*?>|</%s\b.*?>$)' % (e.tag, e.tag), '', ET.tostring(e))
-    return  inner_string.decode('utf-8').strip()
+    return inner_string.decode('utf-8').strip()
 
 
 def parse_dates(raw_dates):
@@ -243,12 +242,15 @@ def parse_dates(raw_dates):
 
     :param raw_dates: A list of (probably) date-containing strings
     """
-    months = re.compile("january|february|march|april|may|june|july|august|september|october|november|december")
+    months = re.compile("january|february|march|april|may|june|july|august|"
+                        "september|october|november|december")
     dates = []
     for raw_date in raw_dates:
-        # there can be multiple years in a string, so we split on possible indicators
+        # there can be multiple years in a string, so we split on possible
+        # indicators
         raw_parts = re.split('(?<=[0-9][0-9][0-9][0-9])(\s|.)', raw_date)
-        #index over split line and add dates
+
+        # index over split line and add dates
         inner_dates = []
         for raw_part in raw_parts:
             # consider any string without either a month or year not a date
@@ -257,14 +259,17 @@ def parse_dates(raw_dates):
                 no_month = True
                 if re.search('[0-9][0-9][0-9][0-9]', raw_part) is None:
                     continue
-            # strip parenthesis from the raw string (this messes with the date parser)
+            # strip parenthesis from the raw string (this messes with the date
+            # parser)
             raw_part = raw_part.replace('(', '').replace(')', '')
             # try to grab a date from the string using an intelligent library
             try:
                 date = dparser.parse(raw_part, fuzzy=True).date()
             except:
                 continue
-            # split on either the month or the first number (e.g. for a 1/1/2016 date) to get the text before it
+
+            # split on either the month or the first number (e.g. for a
+            # 1/1/2016 date) to get the text before it
             if no_month:
                 text = re.compile('(\d+)').split(raw_part.lower())[0].strip()
             else:
@@ -282,7 +287,8 @@ def parse_dates(raw_dates):
 
 
 def format_case_name(n):
-    """Applies standard harmonization methods after normalizing with lowercase."""
+    """Applies standard harmonization methods after normalizing with
+    lowercase."""
     return titlecase(harmonize(n.lower()))
 
 
@@ -290,13 +296,15 @@ def get_court_object(raw_court, fallback=''):
     """Get the court object from a string. Searches through `state_pairs`.
 
     :param raw_court: A raw court string, parsed from an XML file.
-    :param fallback: If fail to find one, will apply the regexes associated to this key in `SPECIAL_REGEXES`.
+    :param fallback: If fail to find one, will apply the regexes associated to
+    this key in `SPECIAL_REGEXES`.
     """
     # this messes up for, e.g. 'St. Louis', but works for all others
     if '.' in raw_court and 'St.' not in raw_court:
         j = raw_court.find('.')
         raw_court = raw_court[:j]
-    # we need the comma to successfully match Superior Courts, the name of which comes after the comma
+    # we need the comma to successfully match Superior Courts, the name of which
+    # comes after the comma
     if ',' in raw_court and 'Superior Court' not in raw_court:
         j = raw_court.find(',')
         raw_court = raw_court[:j]
