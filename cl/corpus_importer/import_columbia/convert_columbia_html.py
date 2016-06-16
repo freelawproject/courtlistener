@@ -31,17 +31,27 @@ def convert_columbia_html(text):
     # footnotes
     foot_references = re.findall('<footnote_reference>.*?</footnote_reference>', text)
 
-    for ref in foot_references:
-        fnum = re.search('[\*\d]+', ref).group()
+    for ref in foot_references:        
+        try:
+            fnum = re.search('[\*\d]+', ref).group()
+        except:
+            i = ref.find('[fn'+3)
+            j = ref.find(']'+3)
+            fnum = ref[i:j]
         rep = '<sup id="ref-fn%s"><a href="#fn%s">%s</a></sup>' % (fnum, fnum, fnum)
         text = text.replace(ref, rep)
 
     foot_numbers = re.findall('<footnote_number>.*?</footnote_number>',text)
 
     for ref in foot_numbers:
-         fnum = re.search('[\*\d]+', ref).group()
-         rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (fnum, fnum, fnum)
-         text = text.replace(ref, rep)
+        try:
+            fnum = re.search('[\*\d]+', ref).group()
+        except:
+            i = ref.find('[fn'+3)
+            j = ref.find(']'+3)
+            fnum = ref[i:j]
+        rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (fnum, fnum, fnum)
+        text = text.replace(ref, rep)
 
     # Make nice paragraphs. This replaces double newlines with paragraphs, then
     # nests paragraphs inside blockquotes, rather than vice versa. The former

@@ -26,6 +26,8 @@ f = open('import_columbia_known_exceptions.log')
 
 cite_tab = Counter()
 
+courtid_tab = Counter()
+
 for line in f:
     if 'Failed to get a citation' in line:
         seg = line.split("'")[1]
@@ -33,6 +35,16 @@ for line in f:
         newseg = re.sub('\d','#',seg)
         #print(newseg)
         if 'Ct. Sup.' not in newseg:
-            cite_tab[newseg] += 1
+            if 'Ohio App.' not in newseg:
+                if 'Okla. Cr.' not in newseg:
+                    cite_tab[newseg] += 1
+    
+    if 'Failed to find a court ID' in line:
+        seg = line.split('"')[1]
         
-cite_tab.most_common()[:100]
+        courtid_tab[seg] += 1
+
+
+cite_tab.most_common()
+
+courtid_tab.most_common()
