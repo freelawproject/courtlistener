@@ -188,7 +188,7 @@ def get_text(file_path):
             raw_info.setdefault(child.tag, []).append(text)
             continue
         for opinion_type in OPINION_TYPES:
-            # if this child is a byline, note it down and use it later
+            #c if this child is a byline, note it down and use it later
             if child.tag == "%s_byline" % opinion_type:
                 current_byline['type'] = opinion_type
                 current_byline['name'] = get_xml_string(child)
@@ -237,6 +237,9 @@ for folder in folders:
                     optext = op['opinion']
                     tags = re.findall('<.*?>',optext)
                     html_tab.update(tags)
+                    if '<block_quote>' in tags:
+                        print(optext)
+                        exit()
                         
         except:
             pass

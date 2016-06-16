@@ -41,5 +41,10 @@ def convert_columbia_html(text):
          fnum = re.search('[\*\d]+',ref).group()           
          rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (fnum, fnum, fnum)               
          text = text.replace(ref,rep)
-        
+    
+    text = '<p>' + text + '</p>'
+    text = re.sub('\n\n', '</p>\n<p>', text)
+    text = re.sub('</blockquote>\s*<blockquote>', '</p>\n<p>', text)
+    text = re.sub('<p>\s*<blockquote>', '<blockquote><p>', text, re.M)
+    text = re.sub('</blockquote></p>', '</p></blockquote>', text, re.M)        
     return text
