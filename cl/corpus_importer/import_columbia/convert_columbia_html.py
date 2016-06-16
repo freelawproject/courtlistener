@@ -43,8 +43,13 @@ def convert_columbia_html(text):
          rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (fnum, fnum, fnum)
          text = text.replace(ref, rep)
 
-    # Make nice paragraphs
+    # Make nice paragraphs. This replaces double newlines with paragraphs, then
+    # nests paragraphs inside blockquotes, rather than vice versa. The former
+    # looks good. The latter is bad.
     text = '<p>' + text + '</p>'
+    text = re.sub('</blockquote>\s*<blockquote>', '\n\n', text)
     text = re.sub('\n\n', '</p>\n<p>', text)
+    text = re.sub('<p>\s*<blockquote>', '<blockquote><p>', text, re.M)
+    text = re.sub('</blockquote></p>', '</p></blockquote>', text, re.M)
 
     return text
