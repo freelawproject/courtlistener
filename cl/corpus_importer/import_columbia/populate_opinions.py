@@ -205,7 +205,7 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
     citations_map = map_citations_to_models(found_citations)
 
     cluster = OpinionCluster(
-        judges=item['judges'] or '',
+        judges=item.get('judges', '') or "",
         precedential_status=('Unpublished' if item['unpublished'] else 'Published'),
         date_filed=main_date,
         case_name_short=item['case_name_short'] or '',
@@ -221,17 +221,22 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
     panel = [x for x in panel if x is not None]
 
     opinions = []
-    for opinion_info in item['opinions']:
+    for i, opinion_info in enumerate(item['opinions']):
         if opinion_info['author'] is None:
             author = None
         else:
             author = find_person(opinion_info['author'], item['court_id'],
                                  case_date=panel_date)
         converted_text = convert_columbia_html(opinion_info['opinion'])
+        opinion_type = OPINION_TYPE_MAPPING[opinion_info['type']]
+        if opinion_type == '020lead' and i > 0:
+            opinion_type = '050addendum'
+
         opinion = Opinion(
             author=author,
             per_curiam=opinion_info['per_curiam'],
-            type=OPINION_TYPE_MAPPING[opinion_info['type']],
+            type=opinion_type,
+            # type=OPINION_TYPE_MAPPING[opinion_info['type']],
             html_columbia=converted_text,
             sha1=opinion_info['sha1'],
             local_path=opinion_info['local_path'],
@@ -262,7 +267,11 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
                 opinion.save()
                 for joiner in joined_by:
                     opinion.joined_by.add(joiner)
-            print("Created item at: https://courtlistener.com%s" % cluster.get_absolute_url())
+            if settings.DEBUG:
+                domain = "http://127.0.0.1:8000"
+            else:
+                domain = "https://www.courtlistener.com"
+            print("Created item at: %s%s" % (domain, cluster.get_absolute_url()))
         except:
             # if anything goes wrong, try to delete everything
             try:
