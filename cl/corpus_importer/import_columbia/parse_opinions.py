@@ -189,7 +189,9 @@ def get_text(file_path):
         # these seem to be erroneously swapped quite often -- try to fix the
         # misordered tags
         file_string = file_string.replace('</footnote_body></block_quote>',
-                                          '</block_quote></footnote_body>')
+                                          '</block_quote></footnote_body>')                                    
+        file_string = file_string.replace('</block_quote></center>',
+                                          '</center></block_quote>')
         root = ET.fromstring(file_string)
     for child in root.iter():
         # if this child is one of the ones identified by SIMPLE_TAGS, just grab
