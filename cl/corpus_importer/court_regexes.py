@@ -386,13 +386,20 @@ state_pairs = (
         (re.compile('Connecticut Superior Court', re.I), 'connsuperct'),
     (re.compile('Supreme Court of (the State of )?Delaware', re.I), 'del'),
         (re.compile('Delaware Supreme Court', re.I), 'del'),
+        (re.compile('High Court of Errors and Appeals of Delaware', re.I), 'del'),
+        (re.compile('Court of Errors and Appeals of Delaware', re.I), 'del'),
+
     (re.compile('Court of Chancery of (the State of )?Delaware', re.I), 'delch'),
         (re.compile('Chancery Court of Delaware', re.I), 'delch'),
     (re.compile('Superior Court of (the State of )?Delaware', re.I), 'delsuperct'),
         # These two merged into the Superior court of Delaware
-        (re.compile('Orphans\'? Court of Delaware', re.I), 'delsuperct'),
+        (re.compile('Orphans\'? Court( Court)? of Delaware', re.I), 'delsuperct'),
         (re.compile('Court of General Sessions', re.I), 'delsuperct'),
         (re.compile('Court of Oyer and Terminer of Delaware', re.I), 'delsuperct'),
+        (re.compile('Court of Common Pleas( Court)? of Delaware', re.I), 'delsuperct'),
+        (re.compile('Court of Quarter Sessions of Delaware', re.I), 'delsuperct'),
+        (re.compile('Courts of General Sessions and of Oyer and Terminer of Delaware', re.I), 'delsuperct'),
+
     (re.compile('Family Court of Delaware', re.I), 'delfamct'),
     (re.compile('Court on the Judiciary of Delaware', re.I), 'deljudct'),
         (re.compile('Delaware Court on the Judiciary', re.I), 'deljudct'),
@@ -522,13 +529,7 @@ state_pairs = (
         (re.compile('Wisconsin Court of Appeals', re.I), 'wisctapp'),
     (re.compile('Supreme Court (of )?Wyoming', re.I), 'wyo'),
 
-    # new codes by elliott
     (re.compile('Massachusetts Superior Court', re.I), 'masssuperct'),
-    (re.compile('High Court of Errors and Appeals of Delaware', re.I), 'del'),
-    (re.compile('Court of Errors and Appeals of Delaware', re.I), 'del'),
-    (re.compile('Court of Common Pleas( Court)? of Delaware', re.I), 'delctcompl'),
-    (re.compile('Court of Quarter Sessions of Delaware', re.I), 'delctcompl'),
-    (re.compile('Courts of General Sessions and of Oyer and Terminer of Delaware', re.I), 'delctcompl'),
     (re.compile('Hawaii Court of Appeals?', re.I), 'hawapp'),
     (re.compile('Hawaii Intermediate Court of Appeals?', re.I), 'hawapp'),    
     (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),    
