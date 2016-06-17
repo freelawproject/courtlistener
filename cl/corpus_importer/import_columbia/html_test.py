@@ -6,6 +6,7 @@ import traceback
 from glob import glob
 from random import shuffle
 import dateutil.parser as dparser
+from datetime import datetime
 
 import xml.etree.cElementTree as ET
 
@@ -68,16 +69,16 @@ def clean_string(s):
     #s = force_unicode(s, errors='ignore')
 
     # Get rid of HTML encoded chars
-    s = s.replace(u'&rsquo;', u'\'').replace(u'&rdquo;', u'\"')\
-        .replace(u'&ldquo;', u'\"').replace(u'&nbsp;', u' ')\
-        .replace(u'&amp;', u'&').replace(u'%20', u' ').replace(u'&#160;', u' ')
+    s = s.replace('&rsquo;', '\'').replace('&rdquo;', '\"')\
+        .replace('&ldquo;', '\"').replace('&nbsp;', ' ')\
+        .replace('&amp;', '&').replace('%20', ' ').replace('&#160;', ' ')
 
     # smart quotes
-    s = s.replace(u'’', u"'").replace(u'‘', u"'").replace(u'“', u'"')\
-        .replace(u'”', u'"')
+    s = s.replace('’', "'").replace('‘', "'").replace('“', '"')\
+        .replace('”', '"')
 
     # Get rid of weird punctuation
-    s = s.replace(u'*', u'').replace(u'#', u'').replace(u';', u'')
+    s = s.replace('*', '').replace('#', '').replace(';', '')
 
     # Strip bad stuff from the end of lines. Python's strip fails here because
     # we don't know the order of the various punctuation items to be stripped.
@@ -87,18 +88,269 @@ def clean_string(s):
     bad_endings = re.compile(r'%s$' % bad_punctuation)
     bad_beginnings = re.compile(r'^%s' % bad_punctuation)
 
-    s = s.split(u' v. ')
+    s = s.split(' v. ')
     cleaned_string = []
     for frag in s:
-        frag = re.sub(bad_endings, u'', frag)
-        frag = re.sub(bad_beginnings, u'', frag)
+        frag = re.sub(bad_endings, '', frag)
+        frag = re.sub(bad_beginnings, '', frag)
         cleaned_string.append(frag)
-    s = u' v. '.join(cleaned_string)
+    s = ' v. '.join(cleaned_string)
 
     # get rid of '\t\n\x0b\x0c\r ', and replace them with a single space.
-    s = u' '.join(s.split())
+    s = ' '.join(s.split())
 
     return s
+
+# For use in harmonize function
+# More details: http://www.law.cornell.edu/citation/4-300.htm
+US = 'USA|U\.S\.A\.|U\.S\.?|U\. S\.?|(The )?United States of America|The United States'
+UNITED_STATES = re.compile(r'^(%s)(,|\.)?$' % US, re.I)
+THE_STATE = re.compile(r'the state', re.I)
+ET_AL = re.compile(',?\set\.?\sal\.?', re.I)
+BW = 'appell(ee|ant)s?|claimants?|complainants?|defendants?|defendants?(--?|/)appell(ee|ant)s?' + \
+     '|devisee|executor|executrix|pet(\.|itioner)s?|petitioners?(--?|/)appell(ee|ant)s?' + \
+     '|petitioners?(--?|/)defendants?|plaintiffs?|plaintiffs?(--?|/)appell(ee|ant)s?|respond(e|a)nts?' + \
+     '|respond(e|a)nts?(--?|/)appell(ee|ant)s?|cross(--?|/)respondents?|crosss?(--?|/)petitioners?' + \
+     '|cross(--?|/)appell(ees|ant)s?|deceased'
+BAD_WORDS = re.compile(r'^(%s)(,|\.)?$' % BW, re.I)
+BIG = ('3D|AFL|AKA|A/K/A|BMG|CBS|CDC|CDT|CEO|CIO|CNMI|D/B/A|DOJ|DVA|EFF|FCC|'
+       'FTC|HSBC|IBM|II|III|IV|JJ|LLC|LLP|MCI|MJL|MSPB|ND|NLRB|PTO|SD|UPS|RSS|SEC|UMG|US|USA|USC|'
+       'USPS|WTO')
+SMALL = 'a|an|and|as|at|but|by|en|for|if|in|is|of|on|or|the|to|v\.?|via|vs\.?'
+NUMS = '0123456789'
+PUNCT = r"""!"#$¢%&'‘()*+,\-./:;?@[\\\]_—`{|}~"""
+WEIRD_CHARS = r'¼½¾§ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜßàáâãäåæçèéêëìíîïñòóôœõöøùúûüÿ'
+BIG_WORDS = re.compile(r'^(%s)[%s]?$' % (BIG, PUNCT), re.I)
+SMALL_WORDS = re.compile(r'^(%s)$' % SMALL, re.I)
+SMALL_WORD_INLINE = re.compile(r'(^|\s)(%s)(\s|$)' % SMALL, re.I)
+INLINE_PERIOD = re.compile(r'[a-z][.][a-z]', re.I)
+INLINE_SLASH = re.compile(r'[a-z][/][a-z]', re.I)
+INLINE_AMPERSAND = re.compile(r'([a-z][&][a-z])(.*)', re.I)
+UC_ELSEWHERE = re.compile(r'[%s]*?[a-zA-Z]+[A-Z]+?' % PUNCT)
+CAPFIRST = re.compile(r"^[%s]*?([A-Za-z])" % PUNCT)
+SMALL_FIRST = re.compile(r'^([%s]*)(%s)\b' % (PUNCT, SMALL), re.I)
+SMALL_LAST = re.compile(r'\b(%s)[%s]?$' % (SMALL, PUNCT), re.I)
+SUBPHRASE = re.compile(r'([:;?!][ ])(%s)' % SMALL)
+APOS_SECOND = re.compile(r"^[dol]{1}['‘]{1}[a-z]+$", re.I)
+ALL_CAPS = re.compile(r'^[A-Z\s%s%s%s]+$' % (PUNCT, WEIRD_CHARS, NUMS))
+UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+,?$")
+MAC_MC = re.compile(r'^([Mm]a?c)(\w+.*)')
+def titlecase(text, DEBUG=False):
+    """Titlecases input text
+
+    This filter changes all words to Title Caps, and attempts to be clever
+    about *un*capitalizing SMALL words like a/an/the in the input.
+
+    The list of "SMALL words" which are not capped comes from
+    the New York Times Manual of Style, plus 'vs' and 'v'.
+
+    This will fail if multiple sentences are provided as input and if the
+    first word of a sentence is a SMALL_WORD.
+
+    List of "BIG words" grows over time as entries are needed.
+    """
+    text_sans_small_words = re.sub(SMALL_WORD_INLINE, '', text)
+    if text_sans_small_words.isupper():
+        # if, after removing small words, the entire string is uppercase,
+        # we lowercase it
+        if DEBUG:
+            print ("Entire string is uppercase, thus lowercasing.")
+        text = text.lower()
+    elif not text_sans_small_words.isupper() and DEBUG:
+        print(("Entire string not upper case. Not lowercasing: %s" % text))
+
+    lines = re.split('[\r\n]+', text)
+    processed = []
+    for line in lines:
+        all_caps = ALL_CAPS.match(line)
+        words = re.split('[\t ]', line)
+        tc_line = []
+        for word in words:
+            if DEBUG:
+                print("Word: " + word)
+            if all_caps:
+                if UC_INITIALS.match(word):
+                    if DEBUG:
+                        print("  UC_INITIALS match for: " + word)
+                    tc_line.append(word)
+                    continue
+                else:
+                    if DEBUG:
+                        print("  Not initials. Lowercasing: " + word)
+                    word = word.lower()
+
+            if APOS_SECOND.match(word):
+                # O'Reiley, L'Oreal, D'Angelo
+                if DEBUG:
+                    print("  APOS_SECOND matched. Fixing it: " + word)
+                word = word[0:3].upper() + word[3:]
+                tc_line.append(word)
+                continue
+
+            if INLINE_PERIOD.search(word):
+                if DEBUG:
+                    print("  INLINE_PERIOD matched. Uppercasing if == 1 char: " + word)
+                parts = word.split('.')
+                new_parts = []
+                for part in parts:
+                    if len(part) == 1:
+                        # It's an initial like U.S.
+                        new_parts.append(part.upper())
+                    else:
+                        # It's something like '.com'
+                        new_parts.append(part)
+                word = '.'.join(new_parts)
+                tc_line.append(word)
+                continue
+
+            if INLINE_SLASH.search(word):
+                # This repeats INLINE_PERIOD. Could be more elegant.
+                if DEBUG:
+                    print("  INLINE_SLASH matched. Uppercasing if == 1 char: " + word)
+                parts = word.split('/')
+                new_parts = []
+                for part in parts:
+                    if len(part) == 1:
+                        # It's an initial like A/M
+                        new_parts.append(part.upper())
+                    else:
+                        # It's something like 'True/False'
+                        new_parts.append(part)
+                word = '/'.join(new_parts)
+                tc_line.append(word)
+                continue
+
+            amp_match = INLINE_AMPERSAND.match(word)
+            if amp_match:
+                if DEBUG:
+                    print("  INLINE_AMPERSAND matched. Uppercasing: " + word)
+                tc_line.append("%s%s" % (amp_match.group(1).upper(),
+                                         amp_match.group(2)))
+                continue
+
+            if UC_ELSEWHERE.match(word):
+                if DEBUG:
+                    print("  UC_ELSEWHERE matched. Leaving unchanged: " + word)
+                tc_line.append(word)
+                continue
+
+            if SMALL_WORDS.match(word):
+                if DEBUG:
+                    print("  SMALL_WORDS matched. Lowercasing: " + word)
+                tc_line.append(word.lower())
+                continue
+
+            if BIG_WORDS.match(word):
+                if DEBUG:
+                    print("  BIG_WORDS matched. Uppercasing: " + word)
+                tc_line.append(word.upper())
+                continue
+
+            match = MAC_MC.match(word)
+            if match and (word not in ['mack', 'machine']):
+                if DEBUG:
+                    print("  MAC_MAC matched. Capitlizing: " + word)
+                tc_line.append("%s%s" % (match.group(1).capitalize(),
+                                         match.group(2).capitalize()))
+                continue
+
+            hyphenated = []
+            for item in word.split('-'):
+                hyphenated.append(CAPFIRST.sub(lambda m: m.group(0).upper(), item))
+            tc_line.append("-".join(hyphenated))
+
+        result = " ".join(tc_line)
+
+        result = SMALL_FIRST.sub(lambda m: '%s%s' % (
+            m.group(1),
+            m.group(2).capitalize()), result)
+
+        result = SMALL_LAST.sub(lambda m: m.group(0).capitalize(), result)
+        result = SUBPHRASE.sub(lambda m: '%s%s' % (
+            m.group(1),
+            m.group(2).capitalize()), result)
+
+        processed.append(result)
+        text = "\n".join(processed)
+
+    # replace V. with v.
+    text = re.sub(re.compile(r'\WV\.\W'), ' v. ', text)
+
+    return text
+
+
+
+def harmonize(text):
+    """Fixes case names so they are cleaner.
+
+    Using a bunch of regex's, this function cleans up common data problems in
+    case names. The following are currently fixed:
+     - various forms of United States --> United States
+     - The State --> State
+     - vs. --> v.
+     - et al --> Removed.
+     - plaintiff, appellee, defendant and the like --> Removed.
+     - No. and Nos. removed from beginning
+
+    Lots of tests are in tests.py.
+    """
+
+    result = ''
+    # replace vs. with v.
+    text = re.sub(re.compile(r'\Wvs\.\W'), ' v. ', text)
+
+    # replace V. with v.
+    text = re.sub(re.compile(r'\WV\.\W'), ' v. ', text)
+
+    # replace v with v.
+    text = re.sub(re.compile(r' v '), ' v. ', text)
+
+    # and finally, vs with v.
+    text = re.sub(re.compile(r' vs '), ' v. ', text)
+
+    # Remove the BAD_WORDS.
+    text = text.split()
+    cleaned_text = []
+    for word in text:
+        word = re.sub(BAD_WORDS, '', word)
+        cleaned_text.append(word)
+    text = ' '.join(cleaned_text)
+
+    # split on all ' v. ' and then deal with United States variations.
+    text = text.split(' v. ')
+    i = 1
+    for frag in text:
+        frag = frag.strip()
+        if UNITED_STATES.match(frag):
+            result += 'United States'
+        elif THE_STATE.match(frag):
+            result += 'State'
+        else:
+            # needed here, because we can't put "US" as a case-insensitive
+            # word into the UNITED_STATES regex.
+            frag = re.sub(re.compile(r'^US$'), 'United States', frag)
+            # no match
+            result += frag
+
+        if i < len(text):
+            # More stuff coming; append v.
+            result += ' v. '
+        i += 1
+
+    # Remove the ET_AL words.
+    result = re.sub(ET_AL, '', result)
+
+    # Fix the No. and Nos.
+    if result.startswith('No.') or result.startswith('Nos.'):
+        result = re.sub(r'^Nos?\.\s+', '', result)
+
+    return clean_string(result)
+    
+def format_case_name(n):
+    """Applies standard harmonization methods after normalizing with
+    lowercase."""
+    return titlecase(harmonize(n.lower()))
+
 
 def parse_file(file_path, court_fallback=''):
     """Parses a file, turning it into a correctly formatted dictionary, ready to be used by a populate script.
@@ -123,8 +375,17 @@ def parse_file(file_path, court_fallback=''):
     #if panel_text:
     #    judge_info.append(('Panel\n-----', panel_text))
     # get dates
+    #print(raw_info.get('reporter_caption', []))
+    caseyear = None
+    if 'citation' in raw_info:
+        for x in raw_info['citation']:      
+            if x.endswith(')'):
+                caseyear = int(x[-5:-1]) # extract year from case_name_full
+                #print(caseyear)
+        if caseyear is None:
+            print(raw_info['citation'])
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
-    info['dates'] = parse_dates(dates)
+    info['dates'] = parse_dates(dates,caseyear)
 
     # get case names
     # figure out if this case was heard per curiam by checking the first chunk of text in fields in which this is
@@ -293,11 +554,14 @@ def parse_dates(raw_dates, caseyear):
                 date = dparser.parse(raw_part, fuzzy=True).date()
             except:
                 continue
-            if date.year > caseyear + 1 or date.year < caseyear - 2:
-                date.year = caseyear
-                print('Year problem:',)
-                
+#            if caseyear is not None:
+#                if date.year > caseyear + 1 or date.year < caseyear - 2:
+#                    print(('Year problem:',date.year,raw_date,caseyear))
+#                    date = datetime(caseyear, date.month, date.day)
 
+            if date.year < 1600 or date.year > 2020:
+                continue
+            
             # split on either the month or the first number (e.g. for a
             # 1/1/2016 date) to get the text before it
             if no_month:
@@ -329,6 +593,8 @@ def get_xml_string(e):
 
 #dir_path = '/home/elliott/freelawmachine/flp/columbia_data/opinions'
 #folders = glob(dir_path+'/*')
+os.chdir('/home/elliott/freelawmachine/flp/columbia_data/opinions')
+
 folders = glob('*')
 folders.sort()
 
@@ -336,7 +602,9 @@ from collections import Counter
 html_tab = Counter()
 
 for folder in folders:
-    #print(folder)
+    if '_' in folder:
+        continue
+    print(folder)
     for path in file_generator(folder):
         #f = open(path).read()
         #x = f.count('<date>')
@@ -355,11 +623,10 @@ for folder in folders:
             continue
             
         if len(parsed['dates'][0]) == 0:
-            #print
             print(path)
-            
-            print(open(path).read(), file=open('_failparse/'+newname,'wt'))
-            
+#            
+#            print(open(path).read(), file=open('_failparse/'+newname,'wt'))
+#            
         
 #        numops = len(parsed['opinions'])
 #        if numops > 0:

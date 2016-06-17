@@ -53,7 +53,7 @@ H.I.P.A.A. Enforcement Rule, 68 Fed. Reg. 18,895 (April 17, 2003) (to be codifie
 #Federal Register Citation (Proposed Rule):
 Department of Homeland Security Human Resources Management System, 69 Fed. Reg. 8,029 (proposed February 20, 2004) (to be codified at 5 C.F.R. pt. 9701).
 #Administrative Decisions:
-Albertson's, Inc., 332 N.L.R.B. 1132 (2000).
+Albertsons, Inc., 332 N.L.R.B. 1132 (2000).
 #Revenue Rulings:
 Rev. Rul. 95-55, 1995-2 C.B. 313.
 
