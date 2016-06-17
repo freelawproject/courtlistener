@@ -30,7 +30,7 @@ STRIP_REGEX = [r'</?citation.*>', r'</?page_number.*>']
 OPINION_TYPES = ['opinion', 'dissent', 'concurrence']
 
 
-def parse_file(file_path, court_fallback=''):
+def parse_file(file_path):
     """Parses a file, turning it into a correctly formatted dictionary, ready to
     be used by a populate script.
 
@@ -48,7 +48,7 @@ def parse_file(file_path, court_fallback=''):
     info['attorneys'] = ''.join(raw_info.get('attorneys', [])) or None
     info['posture'] = ''.join(raw_info.get('posture', [])) or None
     info['court_id'] = get_court_object(''.join(raw_info.get('court', [])),
-                                        court_fallback) or None
+                                        file_path) or None
     if not info['court_id']:
         raise Exception('Failed to find a court ID for "%s".' %
                         ''.join(raw_info.get('court', [])))
@@ -295,7 +295,7 @@ def format_case_name(n):
     return titlecase(harmonize(n.lower()))
 
 
-def get_court_object(raw_court, fallback=''):
+def get_court_object(raw_court, file_path):
     """Get the court object from a string. Searches through `state_pairs`.
 
     :param raw_court: A raw court string, parsed from an XML file.
@@ -314,12 +314,13 @@ def get_court_object(raw_court, fallback=''):
     for regex, value in state_pairs:
         if re.search(regex, raw_court):
             return value
-    if fallback in SPECIAL_REGEXES:
-        for regex, value in SPECIAL_REGEXES[fallback]:
+    folder = file_path.split('/documents')[0]
+    if folder in SPECIAL_REGEXES:
+        for regex, value in SPECIAL_REGEXES[folder]:
             if re.search(regex, raw_court):
                 return value
-    if fallback in FOLDER_DICT:
-        return FOLDER_DICT[fallback]
+    if folder in FOLDER_DICT:
+        return FOLDER_DICT[folder]
 
 
 if __name__ == '__main__':

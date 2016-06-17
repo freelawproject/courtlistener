@@ -351,6 +351,33 @@ def format_case_name(n):
     lowercase."""
     return titlecase(harmonize(n.lower()))
 
+def get_court_object(raw_court, fallback='', file_path):
+    """Get the court object from a string. Searches through `state_pairs`.
+
+    :param raw_court: A raw court string, parsed from an XML file.
+    :param fallback: If fail to find one, will apply the regexes associated to
+    this key in `SPECIAL_REGEXES`.
+    """
+    # this messes up for, e.g. 'St. Louis', but works for all others
+    if '.' in raw_court and 'St.' not in raw_court:
+        j = raw_court.find('.')
+        raw_court = raw_court[:j]
+    # we need the comma to successfully match Superior Courts, the name of which
+    # comes after the comma
+    if ',' in raw_court and 'Superior Court' not in raw_court:
+        j = raw_court.find(',')
+        raw_court = raw_court[:j]
+    for regex, value in state_pairs:
+        if re.search(regex, raw_court):
+            return value
+    if fallback in SPECIAL_REGEXES:
+        for regex, value in SPECIAL_REGEXES[fallback]:
+            if re.search(regex, raw_court):
+                return value
+    folder = file_path.split('/documents')[0]
+    if folder in FOLDER_DICT:
+        return FOLDER_DICT[fallback]
+
 
 def parse_file(file_path, court_fallback=''):
     """Parses a file, turning it into a correctly formatted dictionary, ready to be used by a populate script.
