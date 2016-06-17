@@ -58,13 +58,14 @@ def parse_file(file_path, court_fallback=''):
     #if panel_text:
     #    judge_info.append(('Panel\n-----', panel_text))
     info['panel'] = find_judge_names(panel_text) or []
-    # get dates
-    dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
-    info['dates'] = parse_dates(dates)
     # get case names
     info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
     info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
     info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or None
+    # get dates
+    caseyear = info['case_name_full'][-5:-1] # extract year from case_name_full
+    dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
+    info['dates'] = parse_dates(dates,caseyear)
 
     # figure out if this case was heard per curiam by checking the first chunk
     # of text in fields in which this is usually indicated
@@ -234,7 +235,7 @@ def get_xml_string(e):
     return inner_string.decode('utf-8').strip()
 
 
-def parse_dates(raw_dates):
+def parse_dates(raw_dates, caseyear):
     """Parses the dates from a list of string.
     Returns a list of lists of (string, datetime) tuples if there is a string before the date (or None).
 
@@ -265,6 +266,10 @@ def parse_dates(raw_dates):
                 date = dparser.parse(raw_part, fuzzy=True).date()
             except:
                 continue
+            if date.year > caseyear + 1 or date.year < caseyear - 2:
+                date.year = caseyear
+                print('Problem year:',raw_part,caseyear)
+
 
             # split on either the month or the first number (e.g. for a
             # 1/1/2016 date) to get the text before it

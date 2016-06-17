@@ -5,6 +5,7 @@ import re
 import traceback
 from glob import glob
 from random import shuffle
+import dateutil.parser as dparser
 
 import xml.etree.cElementTree as ET
 
@@ -53,6 +54,51 @@ STRIP_REGEX = [r'</?citation.*>', r'</?page_number.*>']
 # each may have a '_byline' and '_text' node
 OPINION_TYPES = ['opinion', 'dissent', 'concurrence']
 
+def clean_string(s):
+    """Clean up strings.
+
+    Accomplishes the following:
+     - replaces HTML encoded characters with ASCII versions.
+     - removes -, ' ', #, *, ; and ',' from the end of lines
+     - converts to unicode.
+     - removes weird white space and replaces with spaces.
+    """
+    # if not already unicode, make it unicode, dropping invalid characters
+    # if not isinstance(s, unicode):
+    #s = force_unicode(s, errors='ignore')
+
+    # Get rid of HTML encoded chars
+    s = s.replace(u'&rsquo;', u'\'').replace(u'&rdquo;', u'\"')\
+        .replace(u'&ldquo;', u'\"').replace(u'&nbsp;', u' ')\
+        .replace(u'&amp;', u'&').replace(u'%20', u' ').replace(u'&#160;', u' ')
+
+    # smart quotes
+    s = s.replace(u'’', u"'").replace(u'‘', u"'").replace(u'“', u'"')\
+        .replace(u'”', u'"')
+
+    # Get rid of weird punctuation
+    s = s.replace(u'*', u'').replace(u'#', u'').replace(u';', u'')
+
+    # Strip bad stuff from the end of lines. Python's strip fails here because
+    # we don't know the order of the various punctuation items to be stripped.
+    # We split on the v., and handle fixes at either end of plaintiff or
+    # appellant.
+    bad_punctuation = '(-|–|_|/|;|,|\s)*'
+    bad_endings = re.compile(r'%s$' % bad_punctuation)
+    bad_beginnings = re.compile(r'^%s' % bad_punctuation)
+
+    s = s.split(u' v. ')
+    cleaned_string = []
+    for frag in s:
+        frag = re.sub(bad_endings, u'', frag)
+        frag = re.sub(bad_beginnings, u'', frag)
+        cleaned_string.append(frag)
+    s = u' v. '.join(cleaned_string)
+
+    # get rid of '\t\n\x0b\x0c\r ', and replace them with a single space.
+    s = u' '.join(s.split())
+
+    return s
 
 def parse_file(file_path, court_fallback=''):
     """Parses a file, turning it into a correctly formatted dictionary, ready to be used by a populate script.
@@ -62,6 +108,8 @@ def parse_file(file_path, court_fallback=''):
         The regexes associated to its value in special_regexes will be used.
     """
     raw_info = get_text(file_path)
+    if raw_info is None:
+        return
     info = {}
     # throughout the process, collect all info about judges and at the end use it to populate info['judges']
     # get basic info
@@ -71,11 +119,13 @@ def parse_file(file_path, court_fallback=''):
     info['citations'] = raw_info.get('citation', [])
     info['attorneys'] = ''.join(raw_info.get('attorneys', [])) or None
     info['posture'] = ''.join(raw_info.get('posture', [])) or None
-    panel_text = ''.join(raw_info.get('panel', []))
+    #panel_text = ''.join(raw_info.get('panel', []))
     #if panel_text:
     #    judge_info.append(('Panel\n-----', panel_text))
     # get dates
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
+    info['dates'] = parse_dates(dates)
+
     # get case names
     # figure out if this case was heard per curiam by checking the first chunk of text in fields in which this is
     # usually indicated
@@ -174,10 +224,12 @@ def get_text(file_path):
         root = ET.fromstring(file_string)
     except ET.ParseError:
         # these seem to be erroneously swapped quite often -- try to fix the misordered tags
-        file_string = file_string.replace('</footnote_body></block_quote>', '</block_quote></footnote_body>')
-        root = ET.fromstring(file_string)
+        #file_string = file_string.replace('</footnote_body></block_quote>', '</block_quote></footnote_body>')
+        #root = ET.fromstring(file_string)
+        return
     for child in root.iter():
         # if this child is one of the ones identified by SIMPLE_TAGS, just grab its text
+        
         if child.tag in SIMPLE_TAGS:
             # strip unwanted tags and xml formatting
             text = get_xml_string(child)
@@ -185,6 +237,9 @@ def get_text(file_path):
                 text = re.sub(r, '', text)
             text = re.sub(r'<.*?>', ' ', text).strip()
             # put into a list associated with its tag
+            #if child.tag == 'date':
+                #print(text)
+                #raise
             raw_info.setdefault(child.tag, []).append(text)
             continue
         for opinion_type in OPINION_TYPES:
@@ -206,6 +261,61 @@ def get_text(file_path):
     return raw_info
 
 
+def parse_dates(raw_dates, caseyear):
+    """Parses the dates from a list of string.
+    Returns a list of lists of (string, datetime) tuples if there is a string before the date (or None).
+
+    :param raw_dates: A list of (probably) date-containing strings
+    :param caseyear: the year of the case (for checking)
+    """
+    months = re.compile("january|february|march|april|may|june|july|august|"
+                        "september|october|november|december")
+    dates = []
+    for raw_date in raw_dates:
+        # there can be multiple years in a string, so we split on possible
+        # indicators
+        raw_parts = re.split('(?<=[0-9][0-9][0-9][0-9])(\s|.)', raw_date)
+
+        # index over split line and add dates
+        inner_dates = []
+        for raw_part in raw_parts:
+            # consider any string without either a month or year not a date
+            no_month = False
+            if re.search(months, raw_part.lower()) is None:
+                no_month = True
+                if re.search('[0-9][0-9][0-9][0-9]', raw_part) is None:
+                    continue
+            # strip parenthesis from the raw string (this messes with the date
+            # parser)
+            raw_part = raw_part.replace('(', '').replace(')', '')
+            # try to grab a date from the string using an intelligent library
+            try:
+                date = dparser.parse(raw_part, fuzzy=True).date()
+            except:
+                continue
+            if date.year > caseyear + 1 or date.year < caseyear - 2:
+                date.year = caseyear
+                print('Year problem:',)
+                
+
+            # split on either the month or the first number (e.g. for a
+            # 1/1/2016 date) to get the text before it
+            if no_month:
+                text = re.compile('(\d+)').split(raw_part.lower())[0].strip()
+            else:
+                text = months.split(raw_part.lower())[0].strip()
+            # remove footnotes and non-alphanumeric characters
+            text = re.sub('(\[fn.?\])', '', text)
+            text = re.sub('[^A-Za-z ]', '', text).strip()
+            # if we ended up getting some text, add it, else ignore it
+            if text:
+                inner_dates.append((clean_string(text), date))
+            else:
+                inner_dates.append((None, date))
+        dates.append(inner_dates)
+    return dates
+
+
 def get_xml_string(e):
     """Returns a normalized string of the text in <element>.
 
@@ -217,29 +327,47 @@ def get_xml_string(e):
 
 
 
-dir_path = '/home/elliott/freelawmachine/flp/columbia_data/opinions'
-folders = glob(dir_path+'/*')
+#dir_path = '/home/elliott/freelawmachine/flp/columbia_data/opinions'
+#folders = glob(dir_path+'/*')
+folders = glob('*')
 folders.sort()
 
 from collections import Counter
 html_tab = Counter()
 
 for folder in folders:
-    print(folder)
+    #print(folder)
     for path in file_generator(folder):
+        #f = open(path).read()
+        #x = f.count('<date>')
+        #if x > 1:
+        #    print(path)
+            #break
 
-        try:
-            parsed = parse_file(path)
+        parsed = parse_file(path)
+        if parsed is None:
+            continue
+        #print(parsed['dates'])            
+        newname = path.replace('/','_')
+        if len(parsed['dates']) == 0:     
+            print(path)
+            print(open(path).read(), file=open('_nodate/'+newname,'wt'))
+            continue
             
-            numops = len(parsed['opinions'])
-            if numops > 0:
-                for op in parsed['opinions']:
-                    optext = op['opinion']
-                    tags = re.findall('<.*?>',optext)
-                    html_tab.update(tags)
-                    if '<block_quote>' in tags:
-                        print(optext)
-                        exit()
-                        
-        except:
-            pass
+        if len(parsed['dates'][0]) == 0:
+            #print
+            print(path)
+            
+            print(open(path).read(), file=open('_failparse/'+newname,'wt'))
+            
+        
+#        numops = len(parsed['opinions'])
+#        if numops > 0:
+#            for op in parsed['opinions']:
+#                optext = op['opinion']
+#                tags = re.findall('<.*?>',optext)
+#                html_tab.update(tags)
+#                #if '<block_quote>' in tags:
+#                #    print(optext)
+#                #    exit()
+#                
