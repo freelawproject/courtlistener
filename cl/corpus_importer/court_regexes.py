@@ -376,6 +376,7 @@ state_pairs = (
         (re.compile('Court of Appeals? of California', re.I), 'calctapp'),
     (re.compile('Appellate Division, Superior Court', re.I), 'calappdeptsuperct'),
     (re.compile('Supreme Court of Colorado', re.I), 'colo'),
+    (re.compile('Office of the Presiding Disciplinary Judge of the Supreme Court of  Colorado', re.I), 'colo'),
     (re.compile('Colorado Court of Appeals', re.I), 'coloctapp'),
         (re.compile('Court of Appeals? of Colorado', re.I), 'coloctapp'),
     (re.compile('Supreme Court of Connecticut', re.I), 'conn'),
@@ -468,6 +469,7 @@ state_pairs = (
     (re.compile('Family Court.*New York', re.I), 'nyfamct'),
     (re.compile('Surrogate\'s Court', re.I), 'nysurct'),
     (re.compile('Supreme Court of North Carolina', re.I), 'nc'),
+    (re.compile('Court of Conference', re.I), 'nc'),
     (re.compile('Court of Appeals? (of )?North Carolina', re.I), 'ncctapp'),
         (re.compile('North Carolina Court of Appeals', re.I), 'ncctapp'),
     (re.compile('Supreme Court of North Dakota', re.I), 'nd'),
@@ -499,11 +501,13 @@ state_pairs = (
         (re.compile('Tennessee Court of Appeals', re.I), 'tennctapp'),
     (re.compile('Court of Criminal Appeals? of Tennessee', re.I), 'tenncrimapp'),
     (re.compile('Supreme Court of Texas', re.I), 'tex'),
+    (re.compile('Commission of Appeals of Texas', re.I), 'tex'),
     (re.compile('Court of Appeals? of Texas', re.I), 'texapp'),
         # The Civil Appeals courts were renamed in 1985 to be the "Court of Appeals"
         (re.compile('Court of Civil Appeals,? of (Beaumont, )?Texas', re.I), 'texapp'),
     (re.compile('Court of Criminal Appeals? of Texas', re.I), 'texcrimapp'),
     (re.compile('Special Court of Review', re.I), 'texreview'),
+    (re.compile('Texas Judicial Panel on Multidistrict Litigation', re.I), 'texjpml'),
     (re.compile('Supreme Court of (the )?(state of )?Utah', re.I), 'utah'),
     (re.compile('Court of Appeals? (of )?Utah', re.I), 'utahctapp'),
     (re.compile('Utah Court of Appeals', re.I), 'utahctapp'),
@@ -522,7 +526,9 @@ state_pairs = (
     (re.compile('Massachusetts Superior Court', re.I), 'masssuperct'),
     (re.compile('High Court of Errors and Appeals of Delaware', re.I), 'del'),
     (re.compile('Court of Errors and Appeals of Delaware', re.I), 'del'),
-    (re.compile('Court of Common Pleas( Court )? of Delaware', re.I), 'delctcompl'),
+    (re.compile('Court of Common Pleas( Court)? of Delaware', re.I), 'delctcompl'),
+    (re.compile('Court of Quarter Sessions of Delaware', re.I), 'delctcompl'),
+    (re.compile('Courts of General Sessions and of Oyer and Terminer of Delaware', re.I), 'delctcompl'),
     (re.compile('Hawaii Court of Appeals?', re.I), 'hawapp'),
     (re.compile('Hawaii Intermediate Court of Appeals?', re.I), 'hawapp'),    
     (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),    
@@ -561,6 +567,9 @@ state_pairs = (
     (re.compile('Commonwealth of Massachusetts Department of Industrial Accidents', re.I), 'maworkcompcom'),
     (re.compile('North Carolina Industrial Commission', re.I), 'ncworkcompcom'),
     (re.compile('Arkansas Workers\' Compensation Commission', re.I), 'arkworkcompcom'),
+
+    # non-US courts
+    (re.compile("Court of King's Bench", re.I), 'kingsbench'),
 )
 
 

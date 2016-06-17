@@ -3,7 +3,9 @@ import re
 SPECIAL_REGEXES = {
     'tennessee/court_opinions': (
         (re.compile('Supreme Court of Errors and Appeals', re.I), 'tenn'),
+        (re.compile('Supreme Court', re.I), 'tenn'),
         (re.compile('Court of Errors and Appeals', re.I), 'tenn'),
+        (re.compile('Superior Court for Law and Equity', re.I), 'tennsuperct'),
     )
 }
 

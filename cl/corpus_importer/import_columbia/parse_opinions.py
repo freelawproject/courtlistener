@@ -302,6 +302,12 @@ def get_court_object(raw_court, file_path):
     :param fallback: If fail to find one, will apply the regexes associated to
     this key in `SPECIAL_REGEXES`.
     """
+    if '[' in raw_court and ']' in raw_court:
+        i = raw_court.find('[')
+        j = raw_court.find(']') + 1
+        
+        raw_court = (raw_court[:i] + raw_court[j:]).strip()
+        
     # this messes up for, e.g. 'St. Louis', but works for all others
     if '.' in raw_court and 'St.' not in raw_court:
         j = raw_court.find('.')
