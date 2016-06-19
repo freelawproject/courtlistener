@@ -7,6 +7,10 @@ SPECIAL_REGEXES = {
         (re.compile('Court of Errors and Appeals', re.I), 'tenn'),
         (re.compile('Superior Court for Law and Equity', re.I), 'tennsuperct'),
     )
+    'new_jersey/supreme_court_opinions': (
+        (re.compile('Court of Chancery', re.I), 'njch'),
+    )
+
 }
 
 FOLDER_DICT = {
