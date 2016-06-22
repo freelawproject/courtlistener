@@ -8,6 +8,7 @@ import xml.etree.cElementTree as ET
 
 import dateutil.parser as dparser
 from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
+from lxml import etree
 
 from cl.corpus_importer.court_regexes import state_pairs
 from parse_judges import find_judge_names
@@ -194,14 +195,31 @@ def get_text(file_path):
         raw_info['unpublished'] = True
 
     # turn the file into a readable tree
-    try:
-        root = ET.fromstring(file_string)
-    except ET.ParseError:
-        # these seem to be erroneously swapped quite often -- try to fix the
-        # misordered tags
-        file_string = file_string.replace('</footnote_body></block_quote>',
+    attempts = [
+        {'recover': False, 'replace': False},
+        {'recover': False, 'replace': True},
+        {'recover': True, 'replace': False},
+        {'recover': True, 'replace': True},
+    ]
+    replaced_string = file_string.replace('</footnote_body></block_quote>',
                                           '</block_quote></footnote_body>')
-        root = ET.fromstring(file_string)
+    for attempt in attempts:
+        try:
+            s = replaced_string if attempt['replace'] else file_string
+            if attempt['recover']:
+                # This recovery mechanism is sometimes crude, but it can be very
+                # effective in re-arranging mismatched tags.
+                parser = etree.XMLParser(recover=True)
+                root = etree.fromstring(s, parser=parser)
+            else:
+                # Normal case
+                root = ET.fromstring(s)
+            break
+        except ET.ParseError as e:
+            if attempt == attempts[-1]:
+                # Last attempt. Re-raise the exception.
+                raise e
+
     for child in root.iter():
         # if this child is one of the ones identified by SIMPLE_TAGS, just grab
         # its text
