@@ -62,9 +62,20 @@ def parse_file(file_path, court_fallback=''):
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates)
     # get case names
-    info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
-    info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
-    info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or None
+    info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or ''
+    case_name = format_case_name(''.join(raw_info.get('reporter_caption', []))) or ''
+    if case_name:
+        info['case_name'] = case_name
+    else:
+        if info['case_name_full']:
+            # Sometimes the <caption> node has values and the <reporter_caption>
+            # node does not. Fall back to <caption> in this case.
+            info['case_name'] = info['case_name_full']
+    if not info['case_name']:
+        raise Exception('Failed to find case_name, even after falling back to '
+                        'case_name_full value.')
+
+    info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or ''
 
     # figure out if this case was heard per curiam by checking the first chunk
     # of text in fields in which this is usually indicated
@@ -103,9 +114,9 @@ def parse_file(file_path, court_fallback=''):
                     'byline': opinion['byline'],
                 })
                 last_texts = []
-                if current_type == 'opinion': 
+                if current_type == 'opinion':
                     info['judges'] = opinion['byline']
-                    
+
         if last_texts:
             relevant_opinions = [o for o in info['opinions'] if o['type'] == current_type]
             if relevant_opinions:

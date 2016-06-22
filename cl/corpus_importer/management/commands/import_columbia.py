@@ -193,7 +193,8 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
                     known = [
                         'mismatched tag', 'Failed to get a citation',
                         'Failed to find a court ID',
-                        'null value in column "date_filed"', 'duplicate(s)'
+                        'null value in column "date_filed"', 'duplicate(s)',
+                        'Failed to find case_name',
                     ]
                     if any(k in str(e) for k in known):
                         print
