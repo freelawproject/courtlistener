@@ -1,0 +1,78 @@
+[
+  {
+    "fields": {
+      "end_date": "1809-12-31",
+      "short_name": "Tennessee Superior Court for Law and Equity",
+      "citation_string": "Tenn. Sup. Ct.",
+      "in_use": true,
+      "url": "https://familysearch.org/wiki/en/Tennessee_Court_Records",
+      "notes": "",
+      "jurisdiction": "SA",
+      "has_oral_argument_scraper": false,
+      "full_name": "Tennessee Superior Court for Law and Equity",
+      "position": 367.9,
+      "date_modified": "2016-06-18T20:01:59.649Z",
+      "has_opinion_scraper": false,
+      "start_date": "1796-01-01"
+    },
+    "model": "search.court",
+    "pk": "tennsuperct"
+  },
+  {
+    "fields": {
+      "end_date": "1947-12-31",
+      "short_name": "New Jersey Court of Chancery",
+      "citation_string": "N.J. Ct. of Ch.",
+      "in_use": true,
+      "url": "http://www.nj.gov/state/archives/catsjchance.html",
+      "notes": "Another good source of information is https://familysearch.org/wiki/en/New_Jersey_Court_Records",
+      "jurisdiction": "SA",
+      "has_oral_argument_scraper": false,
+      "full_name": "New Jersey Court of Chancery",
+      "position": 366.8,
+      "date_modified": "2016-06-18T20:01:59.649Z",
+      "has_opinion_scraper": false,
+      "start_date": "1684-01-01"
+    },
+    "model": "search.court",
+    "pk": "njch"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Texas Judicial Panel on Multidistrict Litigation",
+      "citation_string": "Tex. J.P.M.L.",
+      "in_use": true,
+      "url": "http://www.txcourts.gov/about-texas-courts/multi-district-litigation-panel.aspx",
+      "notes": "",
+      "jurisdiction": "SA",
+      "has_oral_argument_scraper": false,
+      "full_name": "Texas Judicial Panel on Multidistrict Litigation",
+      "position": 368.5,
+      "date_modified": "2016-06-18T20:01:59.649Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "texjpml"
+  },
+  {
+    "fields": {
+      "end_date": "1873-12-31",
+      "short_name": "Court of King's Bench",
+      "citation_string": "King's Bench",
+      "in_use": true,
+      "url": "https://en.wikipedia.org/wiki/Court_of_King%27s_Bench_(England)",
+      "notes": "This court was abolished by a total reorganization in Great Britain.",
+      "jurisdiction": "I",
+      "has_oral_argument_scraper": false,
+      "full_name": "Court of King's Bench",
+      "position": 501,
+      "date_modified": "2016-05-18T17:52:50.471Z",
+      "has_opinion_scraper": false,
+      "start_date": "1200-01-01"
+    },
+    "model": "search.court",
+    "pk": "kingsbench"
+  }
+]
