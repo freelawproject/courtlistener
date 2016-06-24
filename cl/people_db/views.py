@@ -23,7 +23,7 @@ def view_person(request, pk, slug):
     )
     title = person.name_full
     if locations:
-        title += " (%s)" % locations
+        title = "Judge %s (%s)" % (title, locations)
 
     # Regroup the positions by whether they're judgeships or other. This allows
     # us to use the {% ifchanged %} template tags to have two groups in the
