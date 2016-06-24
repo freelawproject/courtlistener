@@ -5,6 +5,8 @@ from urlparse import parse_qs
 from django.conf import settings
 from django.utils.timezone import now
 
+from cl.citations.find_citations import get_citations
+from cl.citations.match_citations import match_citation
 from cl.lib import sunburnt
 
 
@@ -36,6 +38,26 @@ def get_string_to_dict(get_string):
     for k, v in parse_qs(get_string).items():
         get_dict[k] = v[0]
     return get_dict
+
+
+def get_query_citation(cd):
+    """Extract citations from the query string and return them, or return
+    None
+    """
+    if not cd.get('q'):
+        return None
+    citations = get_citations(cd['q'])
+
+    matches = None
+    if len(citations) == 1:
+        # If it's not exactly one match, user doesn't get special help.
+        matches = match_citation(citations[0])
+        if len(matches) >= 1:
+            # Just return the first result if there is more than one. This
+            # should be rare, and they're ordered by relevance.
+            return matches.result.docs[0]
+
+    return matches
 
 
 def make_stats_variable(solr_facet_values, search_form):
