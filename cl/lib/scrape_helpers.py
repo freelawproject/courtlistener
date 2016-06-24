@@ -115,7 +115,8 @@ def get_binary_content(download_url, cookies, adapter, method='GET'):
                 download_url,
                 verify=False,  # WA has a certificate we don't understand
                 headers=headers,
-                cookies=cookies
+                cookies=cookies,
+                timeout=300,
             )
 
             # test for empty files (thank you CA1)
