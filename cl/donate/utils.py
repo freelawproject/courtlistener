@@ -30,7 +30,7 @@ def send_thank_you_email(donation):
     email = emails['donation_thanks']
     send_mail(
         email['subject'],
-        email['body'] % (user.first_name, donation.amount, settings.EIN),
+        email['body'] % (user.first_name, donation.amount, settings.EIN_SECRET),
         email['from'],
         [user.email]
     )
