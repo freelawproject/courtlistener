@@ -46,7 +46,7 @@ def get_query_citation(cd):
     """
     if not cd.get('q'):
         return None
-    citations = get_citations(cd['q'])
+    citations = get_citations(cd['q'], html=False)
 
     matches = None
     if len(citations) == 1:
