@@ -3,13 +3,13 @@
 import re
 import sys
 
+from django.utils.timezone import now
 from juriscraper.lib.html_utils import get_visible_text
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
-from django.utils.timezone import now
-from cl.citations import reporter_tokenizer
-from cl.search.models import Court
-from cl.lib.roman import isroman
 
+from cl.citations import reporter_tokenizer
+from cl.lib.roman import isroman
+from cl.search.models import Court
 
 FORWARD_SEEK = 20
 
@@ -144,7 +144,7 @@ class Citation(object):
 # Adapted from nltk Penn Treebank tokenizer
 def strip_punct(text):
     #starting quotes
-    text = re.sub(r'^\"', r'', text)
+    text = re.sub(r'^[\"\']', r'', text)
     text = re.sub(r'(``)', r'', text)
     text = re.sub(r'([ (\[{<])"', r'', text)
 
@@ -162,7 +162,7 @@ def strip_punct(text):
 
     #ending quotes
     text = re.sub(r'"', "", text)
-    text = re.sub(r'(\S)(\'\')', r'', text)
+    text = re.sub(r'(\S)(\'\'?)', r'', text)
 
     return text.strip()
 
