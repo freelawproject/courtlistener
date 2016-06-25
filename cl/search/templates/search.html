@@ -76,8 +76,12 @@
             {% if query_citation %}
                 <div class="alert alert-info" role="alert">
                     <div class="row">
-                        <div class="col-sm-12">
-                            <p><i class="fa fa-info-circle fa-lg"></i> It looks like you're trying to search for <a class="alert-link" href="{{ query_citation.absolute_url }}">{{ query_citation.caseName|safe }}</a>, with citations {{ query_citation.citation|safeseq|join:", " }}.</p>
+                        <div class="col-xs-9">
+                            <p><i class="fa fa-info-circle fa-lg"></i> It looks like you're trying to search for <a class="alert-link" href="{{ query_citation.absolute_url }}">{{ query_citation.caseName|safe }}</a>, from {{ query_citation.dateFiled.year }}.</p>
+                        </div>
+                        <div class="col-xs-3 text-right">
+                            <a class="btn btn-primary btn-sm"
+                               href="{{ query_citation.absolute_url }}">Go to This Case</a>
                         </div>
                     </div>
                 </div>
