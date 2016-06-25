@@ -5,15 +5,15 @@
 # URL: <http://nltk.sourceforge.net>
 
 import re
-from reporters_db import EDITIONS, VARIATIONS_ONLY
 
+from reporters_db import EDITIONS, VARIATIONS_ONLY
 
 # We need to build a REGEX that has all the variations and the reporters in
 # order from longest to shortest.
 REGEX_LIST = EDITIONS.keys() + VARIATIONS_ONLY.keys()
 REGEX_LIST.sort(key=len, reverse=True)
 REGEX_STR = '|'.join(map(re.escape, REGEX_LIST))
-REPORTER_RE = re.compile("(%s)" % REGEX_STR)
+REPORTER_RE = re.compile("\s(%s)\s" % REGEX_STR)
 
 
 def normalize_variation(string):
@@ -51,7 +51,8 @@ def tokenize(text):
        >>>tokenize('See Roe v. Wade, 410 U. S. 113 (1973)')
        ['See', 'Roe', 'v.', 'Wade,', '410', 'U.S.', '113', '(1973)']
     """
-    # if the text looks likes the corner-case 'digit-REPORTER-digit', splitting by spaces doesn't work
+    # if the text looks likes the corner-case 'digit-REPORTER-digit', splitting
+    # by spaces doesn't work
     if re.match('\d+\-[A-Z]+\-\d+', text):
         return text.split('-')
     # otherwise, we just split on spaces to find words
@@ -67,13 +68,13 @@ def tokenize(text):
 
 
 def _tokenize(text):
-    #add extra space to make things easier
+    # add extra space to make things easier
     text = " " + text + " "
 
-    #get rid of all the annoying underscores in text from pdfs
+    # get rid of all the annoying underscores in text from pdfs
     text = re.sub(r"__+", "", text)
 
-    #reduce excess whitespace
+    # reduce excess whitespace
     text = re.sub(" +", " ", text)
     text = text.strip()
 
