@@ -59,16 +59,12 @@ def parse_file(file_path):
     #if panel_text:
     #    judge_info.append(('Panel\n-----', panel_text))
     info['panel'] = find_judge_names(panel_text) or []
-    # get case names
-<<<<<<< HEAD
-    info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
-    info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
-    info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or None
     # get dates
     caseyear = info['case_name_full'][-5:-1] # extract year from case_name_full
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates,caseyear)
-=======
+
+    # get case names
     info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or ''
     case_name = format_case_name(''.join(raw_info.get('reporter_caption', []))) or ''
     if case_name:
@@ -83,7 +79,6 @@ def parse_file(file_path):
                         'case_name_full value.')
 
     info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or ''
->>>>>>> 9a873705d1880bace543ad2fcb8675f1917b933c
 
     # figure out if this case was heard per curiam by checking the first chunk
     # of text in fields in which this is usually indicated
@@ -202,18 +197,6 @@ def get_text(file_path):
         raw_info['unpublished'] = True
 
     # turn the file into a readable tree
-<<<<<<< HEAD
-    try:
-        root = ET.fromstring(file_string)
-    except ET.ParseError:
-        # these seem to be erroneously swapped quite often -- try to fix the
-        # misordered tags
-        file_string = file_string.replace('</footnote_body></block_quote>',
-                                          '</block_quote></footnote_body>')                                    
-        file_string = file_string.replace('</block_quote></center>',
-                                          '</center></block_quote>')
-        root = ET.fromstring(file_string)
-=======
     attempts = [
         {'recover': False, 'replace': False},
         {'recover': False, 'replace': True},
@@ -239,7 +222,6 @@ def get_text(file_path):
                 # Last attempt. Re-raise the exception.
                 raise e
 
->>>>>>> 9a873705d1880bace543ad2fcb8675f1917b933c
     for child in root.iter():
         # if this child is one of the ones identified by SIMPLE_TAGS, just grab
         # its text

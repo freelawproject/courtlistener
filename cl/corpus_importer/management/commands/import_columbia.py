@@ -174,7 +174,6 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
 
             # skip cases in 'misc*' folders -- they are relatively different
             # than the other cases, so we'll deal with them later
-<<<<<<< HEAD
             if 'miscellaneous_court_opinions' in path:
                 continue
             
@@ -198,42 +197,6 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
                     print "Known exception in file '%s':" % path
                     print str(e)
                     print
-=======
-            if 'miscellaneous_court_opinions' not in path:
-                # try to parse/save the case and print any exceptions with full
-                # tracebacks
-                try:
-                    parsed = parse_file(path, court_fallback=court_fallback)
-                    make_and_save(parsed, skipdupes, min_dates, debug)
-                except Exception as e:
-                    # log the file name
-                    if log:
-                        log.info(path)
-                    # print simple exception summaries for known problems
-                    known = [
-                        'mismatched tag', 'Failed to get a citation',
-                        'Failed to find a court ID',
-                        'null value in column "date_filed"', 'duplicate(s)',
-                        'Failed to find case_name',
-                    ]
-                    if any(k in str(e) for k in known):
-                        print
-                        print "Known exception in file '%s':" % path
-                        print str(e)
-                        print
-                    else:
-                        # otherwise, print generic traceback
-                        print
-                        print "Unknown exception in file '%s':" % path
-                        print traceback.format_exc()
-                        print
-            # status update
-            count += 1
-            if count % status_interval == 0:
-                print
-                if total:
-                    print "Finished %s out of %s files." % (count, total)
->>>>>>> 9a873705d1880bace543ad2fcb8675f1917b933c
                 else:
                     # otherwise, print generic traceback
                     print
