@@ -347,15 +347,21 @@ def get_court_object(raw_court, file_path):
     if '.' in raw_court and 'St.' not in raw_court:
         j = raw_court.find('.')
         raw_court = raw_court[:j]
+    
+    for regex, value in state_pairs:
+        if re.search(regex, raw_court):
+            return value
         
     # we need the comma to successfully match Superior Courts, the name of which
     # comes after the comma
     if ',' in raw_court and 'Superior Court' not in raw_court:
         j = raw_court.find(',')
         raw_court = raw_court[:j]
+        
     for regex, value in state_pairs:
         if re.search(regex, raw_court):
             return value
+            
     folder = file_path.split('/documents')[0]
     if folder in SPECIAL_REGEXES:
         for regex, value in SPECIAL_REGEXES[folder]:
