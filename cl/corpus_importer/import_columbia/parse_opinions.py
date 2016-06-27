@@ -59,10 +59,6 @@ def parse_file(file_path):
     #if panel_text:
     #    judge_info.append(('Panel\n-----', panel_text))
     info['panel'] = find_judge_names(panel_text) or []
-    # get dates
-    caseyear = info['case_name_full'][-5:-1] # extract year from case_name_full
-    dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
-    info['dates'] = parse_dates(dates,caseyear)
 
     # get case names
     info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or ''
@@ -77,8 +73,16 @@ def parse_file(file_path):
     if not info['case_name']:
         raise Exception('Failed to find case_name, even after falling back to '
                         'case_name_full value.')
-
     info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or ''
+
+    # get dates
+    try:
+        caseyear = int(info['case_name_full'][-5:-1])
+    except ValueError:
+        print("Unable to extract year from case name: %s" % info['case_name_full'])
+        caseyear = None
+    dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
+    info['dates'] = parse_dates(dates, caseyear)
 
     # figure out if this case was heard per curiam by checking the first chunk
     # of text in fields in which this is usually indicated
@@ -265,7 +269,9 @@ def get_xml_string(e):
 
 def parse_dates(raw_dates, caseyear):
     """Parses the dates from a list of string.
-    Returns a list of lists of (string, datetime) tuples if there is a string before the date (or None).
+
+    Returns a list of lists of (string, datetime) tuples if there is a string
+    before the date (or None).
 
     :param raw_dates: A list of (probably) date-containing strings
     """
@@ -291,13 +297,13 @@ def parse_dates(raw_dates, caseyear):
             raw_part = raw_part.replace('(', '').replace(')', '')
             # try to grab a date from the string using an intelligent library
             try:
-                date = dparser.parse(raw_part, fuzzy=True).date()
+                d = dparser.parse(raw_part, fuzzy=True).date()
             except:
                 continue
-            if date.year > caseyear + 1 or date.year < caseyear - 2:
-                date.year = caseyear
-                print('Problem year:',raw_part,caseyear)
-
+            if caseyear is not None and (d.year > caseyear + 1 or
+                                         d.year < caseyear - 2):
+                d = d.replace(year=caseyear)
+                print('Problem year:', raw_part, caseyear)
 
             # split on either the month or the first number (e.g. for a
             # 1/1/2016 date) to get the text before it
@@ -310,9 +316,9 @@ def parse_dates(raw_dates, caseyear):
             text = re.sub('[^A-Za-z ]', '', text).strip()
             # if we ended up getting some text, add it, else ignore it
             if text:
-                inner_dates.append((clean_string(text), date))
+                inner_dates.append((clean_string(text), d))
             else:
-                inner_dates.append((None, date))
+                inner_dates.append((None, d))
         dates.append(inner_dates)
     return dates
 
@@ -333,12 +339,12 @@ def get_court_object(raw_court, file_path):
     if '[' in raw_court and ']' in raw_court:
         i = raw_court.find('[')
         j = raw_court.find(']') + 1
-        
+
         raw_court = (raw_court[:i] + raw_court[j:]).strip()
 
     if raw_court.endswith('.'):
         raw_court = raw_court[:-1]
-        
+
     for regex, value in state_pairs:
         if re.search(regex, raw_court):
             return value
@@ -347,21 +353,21 @@ def get_court_object(raw_court, file_path):
     if '.' in raw_court and 'St.' not in raw_court:
         j = raw_court.find('.')
         raw_court = raw_court[:j]
-    
+
     for regex, value in state_pairs:
         if re.search(regex, raw_court):
             return value
-        
+
     # we need the comma to successfully match Superior Courts, the name of which
     # comes after the comma
     if ',' in raw_court and 'Superior Court' not in raw_court:
         j = raw_court.find(',')
         raw_court = raw_court[:j]
-        
+
     for regex, value in state_pairs:
         if re.search(regex, raw_court):
             return value
-            
+
     folder = file_path.split('/documents')[0]
     if folder in SPECIAL_REGEXES:
         for regex, value in SPECIAL_REGEXES[folder]:

@@ -43,7 +43,8 @@ REARGUE_DENIED_TAGS = [
     'petition for review denied', 'appeal dismissed', 'rehearing en banc denied',
     'rehearing and rehearing en banc denied', 'order denying petition for rehearing',
     'all petitions for review denied', 'petition for allowance of appeal denied',
-    'opinion modified and rehearing denied', 'as amended on denial of rehearing'
+    'opinion modified and rehearing denied',
+    'as amended on denial of rehearing', 'reh denied',
 ]
 REARGUE_TAGS = ['reargued', 'reheard', 'upon rehearing', 'on rehearing']
 CERT_GRANTED_TAGS = ['certiorari granted', 'petition and crosspetition for writ of certiorari granted']
@@ -144,7 +145,7 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
 
     if main_date is None:
         raise Exception("Failed to get a date for " + item['file'])
-                
+
     if min_dates is not None:
         if min_dates.get(item['court_id']) is not None:
             if main_date >= min_dates[item['court_id']]:

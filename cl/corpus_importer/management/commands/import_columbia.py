@@ -1,7 +1,6 @@
 import fnmatch
 import logging
 import os
-import re
 import traceback
 from glob import glob
 from random import shuffle
@@ -176,7 +175,7 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
             # than the other cases, so we'll deal with them later
             if 'miscellaneous_court_opinions' in path:
                 continue
-            
+
             # try to parse/save the case and print any exceptions with full
             # tracebacks
             try:
