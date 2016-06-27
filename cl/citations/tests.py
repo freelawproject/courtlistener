@@ -1,6 +1,12 @@
 # coding=utf-8
+from datetime import date
+
+from django.core.management import call_command
 from django.core.urlresolvers import reverse
+from django.test import TestCase, SimpleTestCase
+from lxml import etree
 from reporters_db import REPORTERS
+
 from cl.citations.find_citations import get_citations, is_date_in_reporter, \
     Citation
 from cl.citations.management.commands.cl_add_parallel_citations import \
@@ -9,11 +15,6 @@ from cl.citations.reporter_tokenizer import tokenize
 from cl.citations.tasks import update_document, create_cited_html
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
-
-from datetime import date
-from django.core.management import call_command
-from django.test import TestCase, SimpleTestCase
-from lxml import etree
 
 
 def remove_citations_from_imported_fixtures():
@@ -35,6 +36,12 @@ class CiteTest(TestCase):
         self.assertEqual(tokenize('Foo bar eats grue, 232 Vet. App. (2003)'),
                          ['Foo', 'bar', 'eats', 'grue,', '232', 'Vet. App.',
                           '(2003)'])
+        # Tests that the tokenizer handles whitespace well. In the past, the
+        # capital letter P in 5243-P matched the abbreviation for the Pacific
+        # reporter ("P"), and the tokenizing would be wrong.
+        self.assertEqual(tokenize('Failed to recognize 1993 Ct. Sup. 5243-P'),
+                         ['Failed', 'to', 'recognize', '1993', 'Ct. Sup.',
+                          '5243-P'])
 
     def test_find_citations(self):
         """Can we find and make Citation objects from strings?"""

@@ -31,7 +31,7 @@ SECRET_KEY = 'your-secret-key'
 
 
 # Payment secrets
-EIN = ''  # The business tax ID.
+EIN_SECRET = ''  # The business tax ID.
 if DEVELOPMENT:
     PAYMENT_TESTING_MODE = True
 else:

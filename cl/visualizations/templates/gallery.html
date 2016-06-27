@@ -2,6 +2,13 @@
 {% load humanize %}
 {% load markdown_deux_tags %}
 {% block title %}Visualization Gallery – CourtListener.com{% endblock %}
+{% block og_title %}Visualization Gallery – CourtListener.com{% endblock %}
+{% block description %}
+    A gallery of visualizations, showing citations between Supreme Court cases.
+{% endblock %}
+{% block og_description %}
+    A gallery of visualizations, showing citations between Supreme Court cases.
+{% endblock %}
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 
@@ -22,9 +29,18 @@
 
 {% block content %}
     <div class="col-xs-12" id="gallery">
+        <p class="float-right v-offset-above-1"><a href="{% url "new_visualization" %}"
+                                  class="btn btn-success btn-lg btn-block">
+            {% if user.is_authenticated %}
+                <i class="fa fa-plus"></i>&nbsp;Create&nbsp;New</a>
+            {% else %}
+                <i class="fa fa-plus"></i>&nbsp;Create&nbsp;Your&nbsp;Own</a>
+            {% endif %}
+        </p>
         <h2>Gallery of Recent Supreme Court Network Visualizations</h2>
+
         {% if results.paginator.count > 0 %}
-            <span class="small gray top">Ordered by date shared</span>
+            <span class="small gray top">Shows user-generated visualizations ordered by date shared.</span>
             <div class="v-offset-above-2">
             {% for viz in results.object_list %}
                 <article class="v-offset-below-3 row">

@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # encoding utf-8
 
+from datetime import date, datetime
+
+from django.conf import settings
 from reporters_db import REPORTERS
+
 from cl.citations.find_citations import strip_punct
 from cl.lib import sunburnt
-from datetime import date, datetime
-from django.conf import settings
 
 DEBUG = True
 
@@ -90,7 +92,7 @@ def get_years_from_reporter(citation):
     return start_year, end_year
 
 
-def match_citation(citation, citing_doc):
+def match_citation(citation, citing_doc=None):
     """For a citation object, try to match it to an item in the database using
     a variety of heuristics.
 
@@ -102,16 +104,18 @@ def match_citation(citation, citing_doc):
     main_params = {
         'fq': [
             'status:Precedential',  # Non-precedential documents aren't cited
-            '-id:%s' % citing_doc.pk  # Eliminate self-cites.
         ],
         'caller': 'citation.match_citations.match_citation',
     }
+    if citing_doc is not None:
+        # Eliminate self-cites.
+        main_params['fq'].append('-id:%s' % citing_doc.pk)
     # Set up filter parameters
     if citation.year:
         start_year = end_year = citation.year
     else:
         start_year, end_year = get_years_from_reporter(citation)
-        if citing_doc.cluster.date_filed:
+        if citing_doc is not None and citing_doc.cluster.date_filed:
             end_year = min(end_year, citing_doc.cluster.date_filed.year)
     main_params['fq'].append(
         'dateFiled:%s' % build_date_range(start_year, end_year)
@@ -128,7 +132,8 @@ def match_citation(citation, citing_doc):
     if len(results) == 1:
         return results
     if len(results) > 1:
-        if citation.defendant:  # Refine using defendant, if there is one
+        if citing_doc is not None and citation.defendant:
+            # Refine using defendant, if there is one
             results = case_name_query(conn, main_params, citation, citing_doc)
         return results
 

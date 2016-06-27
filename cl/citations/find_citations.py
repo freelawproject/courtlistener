@@ -3,13 +3,13 @@
 import re
 import sys
 
+from django.utils.timezone import now
 from juriscraper.lib.html_utils import get_visible_text
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
-from django.utils.timezone import now
-from cl.citations import reporter_tokenizer
-from cl.search.models import Court
-from cl.lib.roman import isroman
 
+from cl.citations import reporter_tokenizer
+from cl.lib.roman import isroman
+from cl.search.models import Court
 
 FORWARD_SEEK = 20
 
@@ -144,7 +144,7 @@ class Citation(object):
 # Adapted from nltk Penn Treebank tokenizer
 def strip_punct(text):
     #starting quotes
-    text = re.sub(r'^\"', r'', text)
+    text = re.sub(r'^[\"\']', r'', text)
     text = re.sub(r'(``)', r'', text)
     text = re.sub(r'([ (\[{<])"', r'', text)
 
@@ -162,7 +162,7 @@ def strip_punct(text):
 
     #ending quotes
     text = re.sub(r'"', "", text)
-    text = re.sub(r'(\S)(\'\')', r'', text)
+    text = re.sub(r'(\S)(\'\'?)', r'\1', text)
 
     return text.strip()
 
@@ -318,10 +318,17 @@ def extract_base_citation(words, reporter_index):
     if page.isdigit():
         # Most page numbers will be digits.
         page = int(page)
-    elif not isroman(page):
-        # Some places like Nebraska have Roman numerals, e.g. in '250 Neb. xxiv (1996)'
-        # If the page isn't a digit or a Roman numeral, it's not a valid citation.
-        return None
+    else:
+        if isroman(page):
+            # Some places like Nebraska have Roman numerals, e.g. in
+            # '250 Neb. xxiv (1996)'. No processing needed.
+            pass
+        elif re.match('\d{1,5}[-]?[a-zA-Z]{1,6}', page):
+            # Some places, like Connecticut, have pages like "13301-M"
+            pass
+        else:
+            # Not Roman, and not a weird connecticut page number.
+            return None
 
     reporter = words[reporter_index]
     return Citation(reporter, page, volume, reporter_found=reporter,

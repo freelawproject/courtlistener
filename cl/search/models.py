@@ -28,6 +28,7 @@ JURISDICTIONS = (
     ('SS',  'State Special'),
     ('SAG', 'State Attorney General'),
     ('C',   'Committee'),
+    ('I',   'International'),
     ('T',   'Testing'),
 )
 
