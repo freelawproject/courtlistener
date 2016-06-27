@@ -8,6 +8,7 @@ import xml.etree.cElementTree as ET
 
 import dateutil.parser as dparser
 from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, CaseNameTweaker
+from lxml import etree
 
 from cl.corpus_importer.court_regexes import state_pairs
 from parse_judges import find_judge_names
@@ -59,6 +60,7 @@ def parse_file(file_path):
     #    judge_info.append(('Panel\n-----', panel_text))
     info['panel'] = find_judge_names(panel_text) or []
     # get case names
+<<<<<<< HEAD
     info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or None
     info['case_name'] = format_case_name(''.join(raw_info.get('reporter_caption', []))) or None
     info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or None
@@ -66,6 +68,22 @@ def parse_file(file_path):
     caseyear = info['case_name_full'][-5:-1] # extract year from case_name_full
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
     info['dates'] = parse_dates(dates,caseyear)
+=======
+    info['case_name_full'] = format_case_name(''.join(raw_info.get('caption', []))) or ''
+    case_name = format_case_name(''.join(raw_info.get('reporter_caption', []))) or ''
+    if case_name:
+        info['case_name'] = case_name
+    else:
+        if info['case_name_full']:
+            # Sometimes the <caption> node has values and the <reporter_caption>
+            # node does not. Fall back to <caption> in this case.
+            info['case_name'] = info['case_name_full']
+    if not info['case_name']:
+        raise Exception('Failed to find case_name, even after falling back to '
+                        'case_name_full value.')
+
+    info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or ''
+>>>>>>> 9a873705d1880bace543ad2fcb8675f1917b933c
 
     # figure out if this case was heard per curiam by checking the first chunk
     # of text in fields in which this is usually indicated
@@ -104,9 +122,9 @@ def parse_file(file_path):
                     'byline': opinion['byline'],
                 })
                 last_texts = []
-                if current_type == 'opinion': 
+                if current_type == 'opinion':
                     info['judges'] = opinion['byline']
-                    
+
         if last_texts:
             relevant_opinions = [o for o in info['opinions'] if o['type'] == current_type]
             if relevant_opinions:
@@ -184,6 +202,7 @@ def get_text(file_path):
         raw_info['unpublished'] = True
 
     # turn the file into a readable tree
+<<<<<<< HEAD
     try:
         root = ET.fromstring(file_string)
     except ET.ParseError:
@@ -194,6 +213,33 @@ def get_text(file_path):
         file_string = file_string.replace('</block_quote></center>',
                                           '</center></block_quote>')
         root = ET.fromstring(file_string)
+=======
+    attempts = [
+        {'recover': False, 'replace': False},
+        {'recover': False, 'replace': True},
+        {'recover': True, 'replace': False},
+        {'recover': True, 'replace': True},
+    ]
+    replaced_string = file_string.replace('</footnote_body></block_quote>',
+                                          '</block_quote></footnote_body>')
+    for attempt in attempts:
+        try:
+            s = replaced_string if attempt['replace'] else file_string
+            if attempt['recover']:
+                # This recovery mechanism is sometimes crude, but it can be very
+                # effective in re-arranging mismatched tags.
+                parser = etree.XMLParser(recover=True)
+                root = etree.fromstring(s, parser=parser)
+            else:
+                # Normal case
+                root = ET.fromstring(s)
+            break
+        except ET.ParseError as e:
+            if attempt == attempts[-1]:
+                # Last attempt. Re-raise the exception.
+                raise e
+
+>>>>>>> 9a873705d1880bace543ad2fcb8675f1917b933c
     for child in root.iter():
         # if this child is one of the ones identified by SIMPLE_TAGS, just grab
         # its text
@@ -307,11 +353,19 @@ def get_court_object(raw_court, file_path):
         j = raw_court.find(']') + 1
         
         raw_court = (raw_court[:i] + raw_court[j:]).strip()
+
+    if raw_court.endswith('.'):
+        raw_court = raw_court[:-1]
         
+    for regex, value in state_pairs:
+        if re.search(regex, raw_court):
+            return value
+
     # this messes up for, e.g. 'St. Louis', but works for all others
     if '.' in raw_court and 'St.' not in raw_court:
         j = raw_court.find('.')
         raw_court = raw_court[:j]
+        
     # we need the comma to successfully match Superior Courts, the name of which
     # comes after the comma
     if ',' in raw_court and 'Superior Court' not in raw_court:

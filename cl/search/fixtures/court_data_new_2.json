@@ -20,6 +20,25 @@
   }, 
   {
     "fields": {
+      "end_date": "1947-12-31", 
+      "short_name": "New Jersey Court of Chancery", 
+      "citation_string": "", 
+      "in_use": false, 
+      "url": "https://familysearch.org/wiki/en/New_Jersey_Court_Records", 
+      "notes": "", 
+      "jurisdiction": "SA", 
+      "has_oral_argument_scraper": false, 
+      "full_name": "New Jersey Court of Chancery", 
+      "position": null, 
+      "date_modified": "2016-06-18T20:01:59.649Z", 
+      "has_opinion_scraper": false, 
+      "start_date": null
+    }, 
+    "model": "search.court", 
+    "pk": "njch"
+  }, 
+  {
+    "fields": {
       "end_date": null, 
       "short_name": "Texas Judicial Panel on Multidistrict Litigation", 
       "citation_string": "", 
@@ -35,25 +54,25 @@
       "start_date": null
     }, 
     "model": "search.court", 
-    "pk": "."
+    "pk": "texjpml"
   }, 
   {
     "fields": {
       "end_date": null, 
-      "short_name": ".", 
+      "short_name": "Court of King's Bench", 
       "citation_string": "", 
       "in_use": false, 
       "url": ".", 
       "notes": "", 
-      "jurisdiction": "SA", 
+      "jurisdiction": "", 
       "has_oral_argument_scraper": false, 
-      "full_name": ".", 
+      "full_name": "Court of King's Bench.", 
       "position": null, 
       "date_modified": "2016-05-18T17:52:50.471Z", 
       "has_opinion_scraper": false, 
       "start_date": null
     }, 
     "model": "search.court", 
-    "pk": "."
+    "pk": "kingsbench"
   }
 ]
