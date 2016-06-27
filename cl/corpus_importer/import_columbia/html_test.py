@@ -1,19 +1,24 @@
+# coding=utf-8
+from __future__ import print_function
+
 import fnmatch
-import logging
 import os
 import re
-import traceback
+import xml.etree.cElementTree as ET
 from glob import glob
 from random import shuffle
-import dateutil.parser as dparser
-from datetime import datetime
 
-import xml.etree.cElementTree as ET
+import dateutil.parser as dparser
+
+from cl.corpus_importer.court_regexes import state_pairs
+from cl.corpus_importer.import_columbia.regexes_columbia import (
+    SPECIAL_REGEXES, FOLDER_DICT,
+)
 
 
 def file_generator(dir_path, random_order=False, limit=None):
     """Generates full file paths to all xml files in `dir_path`.
-    
+
     :param dir_path: The path to get files from.
     :param random_order: If True, will generate file names randomly (possibly
      with repeats) and will never stop generating file names.
@@ -43,9 +48,8 @@ def file_generator(dir_path, random_order=False, limit=None):
 
 # tags for which content will be condensed into plain text
 SIMPLE_TAGS = [
-    "reporter_caption", "citation", "caption", "court", "docket", "posture"
-    ,"date", "hearing_date"
-    ,"panel", "attorneys"
+    "reporter_caption", "citation", "caption", "court", "docket", "posture",
+    "date", "hearing_date", "panel", "attorneys"
 ]
 
 # regex that will be applied when condensing SIMPLE_TAGS content
@@ -54,6 +58,7 @@ STRIP_REGEX = [r'</?citation.*>', r'</?page_number.*>']
 # types of opinions that will be parsed
 # each may have a '_byline' and '_text' node
 OPINION_TYPES = ['opinion', 'dissent', 'concurrence']
+
 
 def clean_string(s):
     """Clean up strings.
@@ -66,7 +71,7 @@ def clean_string(s):
     """
     # if not already unicode, make it unicode, dropping invalid characters
     # if not isinstance(s, unicode):
-    #s = force_unicode(s, errors='ignore')
+    # s = force_unicode(s, errors='ignore')
 
     # Get rid of HTML encoded chars
     s = s.replace('&rsquo;', '\'').replace('&rdquo;', '\"')\
@@ -279,7 +284,6 @@ def titlecase(text, DEBUG=False):
     return text
 
 
-
 def harmonize(text):
     """Fixes case names so they are cleaner.
 
@@ -345,13 +349,15 @@ def harmonize(text):
         result = re.sub(r'^Nos?\.\s+', '', result)
 
     return clean_string(result)
-    
+
+
 def format_case_name(n):
     """Applies standard harmonization methods after normalizing with
     lowercase."""
     return titlecase(harmonize(n.lower()))
 
-def get_court_object(raw_court, fallback='', file_path):
+
+def get_court_object(raw_court, file_path, fallback=''):
     """Get the court object from a string. Searches through `state_pairs`.
 
     :param raw_court: A raw court string, parsed from an XML file.
@@ -389,15 +395,16 @@ def parse_file(file_path, court_fallback=''):
     raw_info = get_text(file_path)
     if raw_info is None:
         return
-    info = {}
+    info = {
+        'unpublished': raw_info['unpublished'],
+        'file': os.path.splitext(os.path.basename(file_path))[0],
+        'docket': ''.join(raw_info.get('docket', [])) or None,
+        'citations': raw_info.get('citation', []),
+        'attorneys': ''.join(raw_info.get('attorneys', [])) or None,
+        'posture': ''.join(raw_info.get('posture', [])) or None
+    }
     # throughout the process, collect all info about judges and at the end use it to populate info['judges']
     # get basic info
-    info['unpublished'] = raw_info['unpublished']
-    info['file'] = os.path.splitext(os.path.basename(file_path))[0]
-    info['docket'] = ''.join(raw_info.get('docket', [])) or None
-    info['citations'] = raw_info.get('citation', [])
-    info['attorneys'] = ''.join(raw_info.get('attorneys', [])) or None
-    info['posture'] = ''.join(raw_info.get('posture', [])) or None
     #panel_text = ''.join(raw_info.get('panel', []))
     #if panel_text:
     #    judge_info.append(('Panel\n-----', panel_text))
@@ -405,7 +412,7 @@ def parse_file(file_path, court_fallback=''):
     #print(raw_info.get('reporter_caption', []))
     caseyear = None
     if 'citation' in raw_info:
-        for x in raw_info['citation']:      
+        for x in raw_info['citation']:
             if x.endswith(')'):
                 caseyear = int(x[-5:-1]) # extract year from case_name_full
                 #print(caseyear)
@@ -448,9 +455,9 @@ def parse_file(file_path, court_fallback=''):
                     ,'byline': opinion['byline']
                 })
                 last_texts = []
-                if current_type == 'opinion': 
+                if current_type == 'opinion':
                     info['judges'] = opinion['byline']
-                    
+
         # if there are remaining texts without bylines, either add them to the last opinion of this type, or if there
         # are none, make a new opinion without an author
         if last_texts:
@@ -517,7 +524,7 @@ def get_text(file_path):
         return
     for child in root.iter():
         # if this child is one of the ones identified by SIMPLE_TAGS, just grab its text
-        
+
         if child.tag in SIMPLE_TAGS:
             # strip unwanted tags and xml formatting
             text = get_xml_string(child)
@@ -588,7 +595,7 @@ def parse_dates(raw_dates, caseyear):
 
             if date.year < 1600 or date.year > 2020:
                 continue
-            
+
             # split on either the month or the first number (e.g. for a
             # 1/1/2016 date) to get the text before it
             if no_month:
@@ -642,19 +649,19 @@ for folder in folders:
         parsed = parse_file(path)
         if parsed is None:
             continue
-        #print(parsed['dates'])            
+        #print(parsed['dates'])
         newname = path.replace('/','_')
-        if len(parsed['dates']) == 0:     
+        if len(parsed['dates']) == 0:
             print(path)
-            print(open(path).read(), file=open('_nodate/'+newname,'wt'))
+            print(open(path).read(), file=open('_nodate/'+newname, 'wt'))
             continue
-            
+
         if len(parsed['dates'][0]) == 0:
             print(path)
-#            
+#
 #            print(open(path).read(), file=open('_failparse/'+newname,'wt'))
-#            
-        
+#
+
 #        numops = len(parsed['opinions'])
 #        if numops > 0:
 #            for op in parsed['opinions']:
@@ -664,4 +671,4 @@ for folder in folders:
 #                #if '<block_quote>' in tags:
 #                #    print(optext)
 #                #    exit()
-#                
+#
