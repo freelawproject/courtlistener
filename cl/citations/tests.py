@@ -123,6 +123,10 @@ class CiteTest(TestCase):
              [Citation(volume=2007, reporter='NMCERT', page=8,
                       canonical_reporter=u'NMCERT', lookup_index=0,
                       reporter_index=1, reporter_found='NMCERT')]),
+            ('2006-Ohio-2095',
+             [Citation(volume=2006, reporter='Ohio', page=2095,
+                       canonical_reporter=u'Ohio', lookup_index=0,
+                       reporter_index=1, reporter_found='Ohio')]),
         )
         for q, a in test_pairs:
             print "Testing citation extraction for %s..." % q,
