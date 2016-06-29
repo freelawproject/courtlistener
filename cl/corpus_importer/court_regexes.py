@@ -1,10 +1,20 @@
-execfile('/etc/courtlistener')
-from math import ceil
 import os
 import pickle
 import re
-import sys
+from math import ceil
 
+from django.conf import settings
+
+conn_counties = ')|('.join([
+    'Fairfield', 'Hartford', 'Litchfield', 'Middlesex', 'New Haven',
+    'New London', 'Tolland', 'Windham',
+])
+ny_counties = ')|('.join([
+    'Albany County', 'New York County', 'Kings County', 'Oneida County','Queens County',
+    'Schenectady County', 'Westchester County',
+])
+
+# noinspection PyPep8
 fd_pairs = (
     (re.compile('D(\.|:|,|(ist(\.|(rict))))?,? (court )?(of )?Colu(m|(in))bia', re.I), 'dcd'),
     # 1820-1824 --> ALD
@@ -180,18 +190,16 @@ fd_pairs = (
     (re.compile('Puerto Rico', re.I), 'prd'),
     (re.compile('Virgin Islands', re.I), 'vid'),
 
-
-
     (re.compile('U\. S\. Court of Customs Appeals', re.I), 'ccpa'),
     (re.compile(u'Commerce Court', re.I), 'com'),
     (re.compile(u'Court of Claims', re.I), 'cc'),
-    (re.compile(u'Supreme Court of the United States', re.I), 'scotus'),        
-     
+    (re.compile(u'Supreme Court of the United States', re.I), 'scotus'),
+
     (re.compile(u'U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
     (re.compile(u'U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Second Circuit', re.I), 'ca2'),
     (re.compile(u'U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Third Circuit', re.I), 'ca3'),
     (re.compile(u'U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Fourth Circuit', re.I), 'ca4'),
-    (re.compile(u'U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Fifth Circuit', re.I), 'ca5'),    
+    (re.compile(u'U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Fifth Circuit', re.I), 'ca5'),
     (re.compile(u'U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Sixth Circuit', re.I), 'ca6'),
     (re.compile(u'U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Seventh Circuit', re.I), 'ca7'),
     (re.compile(u'U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Eighth Circuit', re.I), 'ca8'),
@@ -204,9 +212,10 @@ fd_pairs = (
     (re.compile(u'U\. S\. Court of Customs and Patent Appeals', re.I), 'ccpa'),
     (re.compile(u'U\. S\. Court of International Trade', re.I), 'cit'),
     (re.compile(u'U\. S\. Customs Court', re.I), 'cusc'),
-    (re.compile(u'U\. S\. District Court for the District of Columbia', re.I), 'dcd'),  
+    (re.compile(u'U\. S\. District Court for the District of Columbia', re.I), 'dcd'),
 
-    # this was a special circuit court when california was first founded, it only had one judge
+    # this was a special circuit court when california was first founded, it
+    # only had one judge
     (re.compile(u'U\. S\. Circuit Court for the Districts of California', re.I), 'caca'),
 
     # this was a district court for the territory of orleans
@@ -223,15 +232,15 @@ fd_pairs = (
     (re.compile(u'District of Mississippi', re.I), 'missd'),
     (re.compile(u'District of Missouri', re.I), 'mod'),
     (re.compile(u'District of New York', re.I), 'nyd'),
-    (re.compile(u'District of North Carolina', re.I), 'ncd'),    
+    (re.compile(u'District of North Carolina', re.I), 'ncd'),
     (re.compile(u'District of Texas', re.I), 'texd'),
     (re.compile(u'District of Virginia', re.I), 'vad'),
     (re.compile(u'District of Washington', re.I), 'washd'),
     (re.compile(u'District of West Virginia', re.I), 'wvad'),
     (re.compile(u'District of Wisconsin', re.I), 'wisd'),
-
 )
 
+# noinspection PyPep8
 fb_pairs = (
     (re.compile('D(\.|(istrict)) of Columbia', re.I), 'dcb'),
     (re.compile('M(\.|(iddle))? ?D(\.|(istrict))? (of )?Alabama', re.I), 'almb'),
@@ -354,6 +363,7 @@ fb_pairs = (
     (re.compile('Virgin Islands', re.I), 'vib'),
 )
 
+# noinspection PyPep8
 state_pairs = (
     (re.compile('D((istrict)|\.) (of )?C((olumbia)|\.) Court of Appeals', re.I), 'dc'),
         (re.compile('D((istrict)|\.) (of )?C((olumbia)|\.) Municipal Court of Appeals', re.I), 'dc'),
@@ -371,23 +381,33 @@ state_pairs = (
     (re.compile('Tax Court of Arizona', re.I), 'ariztaxct'),
     (re.compile('Supreme Court of Arkansas', re.I), 'ark'),
     (re.compile('Court of Appeals? of Arkansas', re.I), 'arkctapp'),
+
     (re.compile('Supreme Court of California', re.I), 'cal'),
     (re.compile('California Court of Appeals', re.I), 'calctapp'),
         (re.compile('Court of Appeals? of California', re.I), 'calctapp'),
     (re.compile('Appellate Division, Superior Court', re.I), 'calappdeptsuperct'),
+        (re.compile('California Superior Court\.? +Appellate ((Division)|(Department))', re.I), 'calappdeptsuperct'),
+
     (re.compile('Supreme Court of Colorado', re.I), 'colo'),
     (re.compile('Office of the Presiding Disciplinary Judge of the Supreme Court of  Colorado', re.I), 'colo'),
     (re.compile('Colorado Court of Appeals', re.I), 'coloctapp'),
         (re.compile('Court of Appeals? of Colorado', re.I), 'coloctapp'),
+
     (re.compile('Supreme Court of Connecticut', re.I), 'conn'),
     (re.compile('Connecticut Appellate Court', re.I), 'connappct'),
         (re.compile('Appellate Court of Connecticut', re.I), 'connappct'),
-        (re.compile('Superior Court of Connecticut', re.I), 'connsuperct'),
+        # This court is terminated, succeeded by the appellate court of conn.
+        (re.compile('Appellate Session of the Superior Court', re.I), 'connappct'),
+    (re.compile('Superior Court of Connecticut', re.I), 'connsuperct'),
         (re.compile('Connecticut Superior Court', re.I), 'connsuperct'),
+        (re.compile('Review Division Of The Superior Court', re.I), 'connsuperct'),
+        # Merged with Superior Court on July 1, 1978
+        (re.compile('Court of Common Pleas, +((%s))' % conn_counties, re.I), 'connsuperct'),
+        (re.compile('Superior Court,? +((%s))' % conn_counties, re.I), 'connsuperct'),
+
     (re.compile('Supreme Court of (the State of )?Delaware', re.I), 'del'),
         (re.compile('Delaware Supreme Court', re.I), 'del'),
-        (re.compile('High Court of Errors and Appeals of Delaware', re.I), 'del'),
-        (re.compile('Court of Errors and Appeals of Delaware', re.I), 'del'),
+        (re.compile('(High )?Court of Errors and Appeals (Court )?of Delaware', re.I), 'del'),
 
     (re.compile('Court of Chancery of (the State of )?Delaware', re.I), 'delch'),
         (re.compile('Chancery Court of Delaware', re.I), 'delch'),
@@ -399,89 +419,127 @@ state_pairs = (
         (re.compile('Court of Common Pleas( Court)? of Delaware', re.I), 'delsuperct'),
         (re.compile('Court of Quarter Sessions of Delaware', re.I), 'delsuperct'),
         (re.compile('Courts of General Sessions and of Oyer and Terminer of Delaware', re.I), 'delsuperct'),
-
     (re.compile('Family Court of Delaware', re.I), 'delfamct'),
     (re.compile('Court on the Judiciary of Delaware', re.I), 'deljudct'),
         (re.compile('Delaware Court on the Judiciary', re.I), 'deljudct'),
+
     (re.compile('Supreme Court of Florida', re.I), 'fla'),
         (re.compile('Supreme Court.*Nassau County', re.I), 'fla'),
     (re.compile('District Courts? of Appeal (of )?Florida', re.I), 'fladistctapp'),
+
     (re.compile('Supreme Court of Georgia', re.I), 'ga'),
     (re.compile('Court of Appeals? of Georgia', re.I), 'gactapp'),
-    (re.compile('Supreme Court of Illinois', re.I), 'ill'),
+
     (re.compile('Supreme Court of Hawai', re.I), 'haw'),
     (re.compile('Intermediate Court (of )?Appeals? .*Hawai', re.I), 'hawapp'),
         (re.compile('Court of Appeals? of Hawai', re.I), 'hawapp'),
+        (re.compile('Hawaii Court of Appeals?', re.I), 'hawapp'),
+        (re.compile('Hawaii Intermediate Court of Appeals?', re.I), 'hawapp'),
+
     (re.compile('Supreme Court of (the state of )?Idaho', re.I), 'idaho'),
     (re.compile('Court of Appeals? of Idaho', re.I), 'idahoctapp'),
         (re.compile('Idaho Court of Appeals', re.I), 'idahoctapp'),
+
     (re.compile('Supreme Court of Illinois', re.I), 'ill'),
     (re.compile('Appellate Court of Illinois', re.I), 'illappct'),
         (re.compile('Illinois Appellate Court', re.I), 'illappct'),
+
     (re.compile('Supreme Court of Indiana', re.I), 'ind'),
     (re.compile('Court of Appeals? ((of)|(in)) Indiana', re.I), 'indctapp'),
         (re.compile('Appe((llate)|(als)) Court of Indiana', re.I), 'indctapp'),
         (re.compile('Indiana Court of Appeals', re.I), 'indctapp'),
     (re.compile('Tax Court of Indiana', re.I), 'indtc'),
         (re.compile('Indiana Tax Court', re.I), 'indtc'),
+
     (re.compile('Supreme Court of Iowa', re.I), 'iowa'),
     (re.compile('Court of Appeals? (of )?Iowa', re.I), 'iowactapp'),
         (re.compile('Iowa Court of Appeals', re.I), 'iowactapp'),
+
     (re.compile('Supreme Court of Kansas', re.I), 'kan'),
     (re.compile('Court of Appeals? of Kansas', re.I), 'kanctapp'),
+
     (re.compile('Supreme Court of Kentucky', re.I), 'ky'),
     (re.compile('Court of Appeals? of Kentucky', re.I), 'kyctapp'),
+
     (re.compile('Supreme Court of Louisiana', re.I), 'la'),
     (re.compile('Court of Appeals? of Louisiana', re.I), 'lactapp'),
     (re.compile('Louisiana Circuit Courts of Appeal', re.I), 'lactapp'),
+
     (re.compile('Supreme Judicial Court of Maine', re.I), 'me'),
+
     (re.compile('Court of Appeals? of Maryland', re.I), 'md'),
         (re.compile('Supreme Court of Maryland', re.I), 'md'),
     (re.compile('Court of Special Appeals? of Maryland', re.I), 'mdctspecapp'),
+
     (re.compile('Supreme (Judicial )?Court of Massachusetts', re.I), 'mass'),
     (re.compile('Appeals? Court of Massachusetts', re.I), 'massappct'),
+    (re.compile('Massachusetts Superior Court', re.I), 'masssuperct'),
+    (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),
+
     (re.compile('Supreme Court of Michigan', re.I), 'mich'),
     (re.compile('Michigan Court of Appeals', re.I), 'michctapp'),
         (re.compile('Court of Appeals? of Michigan', re.I), 'michctapp'),
+
     (re.compile('Supreme Court of Minnesota', re.I), 'minn'),
     (re.compile('Court of Appeals? of Minnesota', re.I), 'minnctapp'),
+        (re.compile('Minnesota Court of Appeals?', re.I), 'minnctapp'),
+
     (re.compile('Supreme Court of Mississippi', re.I), 'miss'),
+        # Historical name.
+        (re.compile('High Court of Errors and Appeals, Mississippi', re.I), 'miss'),
     (re.compile('Court of Appeals? of Mississippi', re.I), 'missctapp'),
+
     (re.compile('Supreme Court of Missouri', re.I), 'mo'),
     (re.compile('Missouri Court of Appeals', re.I), 'moctapp'),
         (re.compile('St\. Louis,? Court of Appeals', re.I), 'moctapp'),
         (re.compile('Kansas City.? Court of appeals', re.I), 'moctapp'),
         (re.compile('Springfield,? Court of appeals', re.I), 'moctapp'),
+
     (re.compile('Supreme Court of Montana', re.I), 'mont'),
+
     (re.compile('Supreme Court of Nebraska', re.I), 'neb'),
     (re.compile('Court of Appeals? of Nebraska', re.I), 'nebctapp'),
         (re.compile('Nebraska Court of Appeals', re.I), 'nebctapp'),
+
     (re.compile('Supreme Court of Nevada', re.I), 'nev'),
+
     (re.compile('Supreme Court of New Hampshire', re.I), 'nh'),
+
     (re.compile('Supreme Court of New Jersey', re.I), 'nj'),
     (re.compile('Superior Court of New Jersey', re.I), 'njsuperctappdiv'),
+        # Terminated as part of 1947 NJ constitution, and folded into sup.
+        (re.compile('Prerogative Court', re.I), 'njsuperctappdiv'),
     (re.compile('Tax Court of New Jersey', re.I), 'njtaxct'),
+
     (re.compile('Supreme Court of New Mexico', re.I), 'nm'),
     (re.compile('Court of Appeals? of New Mexico', re.I), 'nmctapp'),
         (re.compile('New Mexico Court of Appeals', re.I), 'nmctapp'),
+
     (re.compile('Court of Appeals? of (the State of )?New York', re.I), 'ny'),
-    (re.compile('Appellate Division of the Supreme Court of the State of New York', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court.*Albany County', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court.*New York County', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court.*Kings County', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court.*Oneida County', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court.*Queens County', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court.*Schenectady County', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court.*Westchester County', re.I), 'nyappdiv'),
+    (re.compile('Appellate Division of the Supreme Court of (the State of )?New York', re.I), 'nyappdiv'),
+        (re.compile('Supreme Court.*((%s))' % ny_counties, re.I), 'nyappdiv'),
+    (re.compile('Supreme Court of the State of New York', re.I), 'nysupct'),
     (re.compile('Family Court.*New York', re.I), 'nyfamct'),
     (re.compile('Surrogate\'s Court', re.I), 'nysurct'),
+    (re.compile('Criminal Court of the City of New York', re.I), 'nycrimct'),
+    (re.compile('Civil Court of the City of New York', re.I), 'nycivct'),
+    (re.compile('Appellate Term of the Supreme Court of New York', re.I), 'nyappterm'),
+
     (re.compile('Supreme Court of North Carolina', re.I), 'nc'),
-    (re.compile('Court of Conference', re.I), 'nc'),
+        (re.compile('Court of Conference', re.I), 'nc'),
     (re.compile('Court of Appeals? (of )?North Carolina', re.I), 'ncctapp'),
         (re.compile('North Carolina Court of Appeals', re.I), 'ncctapp'),
+    (re.compile('Superior Court of North Carolina', re.I), 'ncsuperct'),
+        (re.compile('In the General Court of Justice Superior Court Division', re.I), 'ncsuperct'),
+
     (re.compile('Supreme Court of North Dakota', re.I), 'nd'),
     (re.compile('Court of Appeals? of North Dakota', re.I), 'ndctapp'),
+
     (re.compile('Supreme Court of Ohio', re.I), 'ohio'),
+    (re.compile('Court of Appeals of Ohio', re.I), 'ohioctapp'),
+        (re.compile('Ohio Court of Appeals', re.I), 'ohioctapp'),
+    (re.compile('Court of Claims of Ohio', re.I), 'ohioctcl'),
+
     (re.compile('Supreme Court (of )?Oklahoma', re.I), 'okla'),
     (re.compile('Court of Criminal Appeals? (of )?Oklahoma', re.I), 'oklacrimapp'),
         (re.compile('Criminal Courts of Appeals? of Oklahoma', re.I), 'oklacrimapp'),
@@ -491,60 +549,61 @@ state_pairs = (
         (re.compile('Court of Appeals?,? (civil )?(of )?(State )?(of )?Oklahoma', re.I), 'oklacivapp'),
     (re.compile('Oklahoma Judicial Ethics Advisory Panel', re.I), 'oklajeap'),
     (re.compile('Court on the Judiciary of Oklahoma', re.I), 'oklacoj'),
+
     (re.compile('Supreme Court (((for)|(of)) the State )?of (the )?Oregon', re.I), 'or'),
         (re.compile('Oregon Supreme Court', re.I), 'or'),
     (re.compile('Court of Appeals? of (the )?(state of )?Oregon', re.I), 'orctapp'),
         (re.compile('oregon court of appeals', re.I), 'orctapp'),
+    (re.compile('Oregon Tax Court', re.I), 'ortc'),
+
     (re.compile('Supreme Court of Pennsylvania', re.I), 'pa'),
     (re.compile('Superior Court of Pennsylvania', re.I), 'pasuperct'),
     (re.compile('Commonwealth Court of Pennsylvania', re.I), 'pacommwct'),
     (re.compile('Court of Judicial Discipline of Pennsylvania', re.I), 'cjdpa'),
+
     (re.compile('Supreme Court,? of Rhode Island', re.I), 'ri'),
+    (re.compile('State of Rhode Island, Superior Court', re.I), 'risuperct'),
+
     (re.compile('Supreme Court of South Carolina', re.I), 'sc'),
     (re.compile('Court of Appeals? of South Carolina', re.I), 'scctapp'),
+
     (re.compile('Supreme Court of South Dakota', re.I), 'sd'),
+
     (re.compile('Supreme Court of Tennessee', re.I), 'tenn'),
+    (re.compile('(Supreme )?Court of Errors and Appeals, Nashville', re.I), 'tenn'),
     (re.compile('Court of Appeals? (of )?Tennessee', re.I), 'tennctapp'),
         (re.compile('Tennessee Court of Appeals', re.I), 'tennctapp'),
     (re.compile('Court of Criminal Appeals? of Tennessee', re.I), 'tenncrimapp'),
+
     (re.compile('Supreme Court of Texas', re.I), 'tex'),
     (re.compile('Commission of Appeals of Texas', re.I), 'tex'),
     (re.compile('Court of Appeals? of Texas', re.I), 'texapp'),
-        # The Civil Appeals courts were renamed in 1985 to be the "Court of Appeals"
+        # The Civil Appeals courts were renamed in 1985 to be the "Court of
+        # Appeals"
         (re.compile('Court of Civil Appeals,? of (Beaumont, )?Texas', re.I), 'texapp'),
     (re.compile('Court of Criminal Appeals? of Texas', re.I), 'texcrimapp'),
     (re.compile('Special Court of Review', re.I), 'texreview'),
     (re.compile('Texas Judicial Panel on Multidistrict Litigation', re.I), 'texjpml'),
+
     (re.compile('Supreme Court of (the )?(state of )?Utah', re.I), 'utah'),
     (re.compile('Court of Appeals? (of )?Utah', re.I), 'utahctapp'),
     (re.compile('Utah Court of Appeals', re.I), 'utahctapp'),
+
     (re.compile('Supreme Court of Vermont', re.I), 'vt'),
+
     (re.compile('Supreme Court of Virginia', re.I), 'va'),
     (re.compile('Court of Appeals? of Virginia', re.I), 'vactapp'),
+
     (re.compile('Supreme Court of Washington', re.I), 'wash'),
     (re.compile('Court of Appeals? of Washington', re.I), 'washctapp'),
+
     (re.compile('Supreme Court of( Appeals? of)?,? West Virginia', re.I), 'wva'),
+
     (re.compile('Supreme Court of Wisconsin', re.I), 'wis'),
     (re.compile('Court of Appeals? of (of )?Wisconsin', re.I), 'wisctapp'),
         (re.compile('Wisconsin Court of Appeals', re.I), 'wisctapp'),
-    (re.compile('Supreme Court (of )?Wyoming', re.I), 'wyo'),
 
-    (re.compile('Massachusetts Superior Court', re.I), 'masssuperct'),
-    (re.compile('Hawaii Court of Appeals?', re.I), 'hawapp'),
-    (re.compile('Hawaii Intermediate Court of Appeals?', re.I), 'hawapp'),    
-    (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),    
-    (re.compile('Minnesota Court of Appeals?', re.I), 'minnctapp'),
-    (re.compile('Appellate Division of the Supreme Court of New York', re.I), 'nyappdiv'),
-    (re.compile('Supreme Court of the State of New York', re.I), 'nysupct'),
-    (re.compile('Criminal Court of the City of New York', re.I), 'nycrimct'),
-    (re.compile('Civil Court of the City of New York', re.I), 'nycivct'),
-    (re.compile('Appellate Term of the Supreme Court of New York', re.I), 'nyappterm'),
-    (re.compile('Superior Court of North Carolina', re.I), 'ncsuperct'),    
-    (re.compile('Court of Appeals of Ohio', re.I), 'ohioctapp'),
-    (re.compile('Ohio Court of Appeals', re.I), 'ohioctapp'),
-    (re.compile('Court of Claims of Ohio', re.I), 'ohioctcl'),
-    (re.compile('Oregon Tax Court', re.I), 'ortc'),
-    (re.compile('State of Rhode Island, Superior Court', re.I), 'risuperct'),
+    (re.compile('Supreme Court (of )?Wyoming', re.I), 'wyo'),
 
     # attorneys general
     (re.compile('Attorney General of Arkansas', re.I), 'arkag'),
@@ -575,23 +634,25 @@ state_pairs = (
 
 
 ##########################################
-# This variable is used to do statistical work on Opinions whose jurisdiction is unclear. The problem is that
-# many Opinions, probably thousands of them, have a court like, "D. Wisconsin." Well, Wisconsin has an east and
-# west district, but no generic district, so this has to be resolved. When we hit such a case, we set it aside
-# for later processing, once we've processed all the easy cases. At that point, we will have the variable below,
-# judge stats, which will have all of the judges along with a count of their jurisdictions:
+# This variable is used to do statistical work on Opinions whose jurisdiction is
+# unclear. The problem is that many Opinions, probably thousands of them, have a
+# court like, "D. Wisconsin." Well, Wisconsin has an east and west district, but
+# no generic district, so this has to be resolved. When we hit such a case, we
+# set it aside for later processing, once we've processed all the easy cases. At
+# that point, we will have the variable below, judge stats, which will have all
+# of the judges along with a count of their jurisdictions:
 # judge_stats = {
 #     'McKensey': {
 #         'wied': 998,
 #         'wis': 2
 #     }
 # }
-# So in this case, you can see quite clearly that McKensey is a judge at wied, and we can classify the case as
-# such.
+# So in this case, you can see quite clearly that McKensey is a judge at wied,
+# and we can classify the case as such.
 ##########################################
 try:
-    with open(os.path.join(INSTALL_ROOT, 'alert', 'corpus_importer', 'lawbox',
-                           'judge_stats.pkl'), 'rb') as fix_file:
+    with open(os.path.join(settings.INSTALL_ROOT, 'alert', 'corpus_importer',
+                           'lawbox', 'judge_stats.pkl'), 'rb') as fix_file:
         judge_stats = pickle.load(fix_file)
 except (IOError, EOFError):
     pass
@@ -600,8 +661,10 @@ except (IOError, EOFError):
 
 
 def disambiguate_by_judge(judge, threshold=0.85):
-    """Using the judge found in the document and the judges found across the entire corpus, determine the court where
-    the judge works more than `threshold` percent of the time."""
+    """Using the judge found in the document and the judges found across the
+    entire corpus, determine the court where the judge works more than
+    `threshold` percent of the time.
+    """
     try:
         judge_dict = judge_stats[judge]
     except KeyError:

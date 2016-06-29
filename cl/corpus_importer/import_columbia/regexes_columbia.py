@@ -1,16 +1,23 @@
 import re
 
 SPECIAL_REGEXES = {
-    'tennessee/court_opinions': (
-        (re.compile('Supreme Court of Errors and Appeals', re.I), 'tenn'),
-        (re.compile('Supreme Court', re.I), 'tenn'),
-        (re.compile('Court of Errors and Appeals', re.I), 'tenn'),
-        (re.compile('Superior Court for Law and Equity', re.I), 'tennsuperct'),
+    'connecticut/superior_court_opinions': (
+        (re.compile('Appellate Division Of The Circuit Court', re.I), 'connappct'),
+    ),
+    'connecticut/workers_compensation_commission': (
+        (re.compile('worker\'s compensation commission', re.I), 'connworkcompcom'),
+        (re.compile('compensation review board', re.I), 'connworkcompcom'),
     ),
     'new_jersey/supreme_court_opinions': (
         (re.compile('Court of Chancery', re.I), 'njch'),
-    )
-
+        # Abolished in 1947, and folded into the Supreme Court.
+        (re.compile('Court of Errors and Appeals', re.I), 'nj')
+    ),
+    'tennessee/court_opinions': (
+        (re.compile('(Supreme )?Court of Errors and Appeals', re.I), 'tenn'),
+        (re.compile('Supreme Court', re.I), 'tenn'),
+        (re.compile('Superior Court for Law and Equity', re.I), 'tennsuperct'),
+    ),
 }
 
 FOLDER_DICT = {
