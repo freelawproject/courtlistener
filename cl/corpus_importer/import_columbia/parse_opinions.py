@@ -76,13 +76,8 @@ def parse_file(file_path):
     info['case_name_short'] = CASE_NAME_TWEAKER.make_case_name_short(info['case_name']) or ''
 
     # get dates
-    try:
-        caseyear = int(info['case_name_full'][-5:-1])
-    except ValueError:
-        print("Unable to extract year from case name: %s" % info['case_name_full'])
-        caseyear = None
     dates = raw_info.get('date', []) + raw_info.get('hearing_date', [])
-    info['dates'] = parse_dates(dates, caseyear)
+    info['dates'] = parse_dates(dates)
 
     # figure out if this case was heard per curiam by checking the first chunk
     # of text in fields in which this is usually indicated
@@ -267,7 +262,7 @@ def get_xml_string(e):
     return inner_string.decode('utf-8').strip()
 
 
-def parse_dates(raw_dates, caseyear):
+def parse_dates(raw_dates):
     """Parses the dates from a list of string.
 
     Returns a list of lists of (string, datetime) tuples if there is a string
@@ -300,10 +295,6 @@ def parse_dates(raw_dates, caseyear):
                 d = dparser.parse(raw_part, fuzzy=True).date()
             except:
                 continue
-            if caseyear is not None and (d.year > caseyear + 1 or
-                                         d.year < caseyear - 2):
-                d = d.replace(year=caseyear)
-                print('Problem year:', raw_part, caseyear)
 
             # split on either the month or the first number (e.g. for a
             # 1/1/2016 date) to get the text before it
