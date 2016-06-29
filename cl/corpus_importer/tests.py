@@ -281,6 +281,83 @@ class CourtMatchingTest(TestCase):
                 ),
                 'answer': 'connappct',
             },
+            {
+                'args': (
+                    'Superior Court for Law and Equity',
+                    'tennessee/court_opinions/documents/01236c757d1128fd.xml',
+                ),
+                'answer': 'tennsuperct',
+            },
+            {
+                'args': (
+                    'Courts of General Sessions and Oyer and Terminer of Delaware',
+                    'delaware/court_opinions/documents/108da18f9278da90.xml',
+                ),
+                'answer': 'delsuperct',
+            },
+            {
+                'args': (
+                    'Circuit Court of the United States of Delaware',
+                    'delaware/court_opinions/documents/108da18f9278da90.xml',
+                ),
+                'answer': 'circtdel',
+            },
+            {
+                'args': (
+                    'Circuit Court of Delaware',
+                    'delaware/court_opinions/documents/108da18f9278da90.xml',
+                ),
+                'answer': 'circtdel',
+            },
+            {
+                'args': (
+                    'Court of Quarter Sessions Court of Delaware,  Kent County.',
+                    'delaware/court_opinions/documents/f01f1724cc350bb9.xml',
+                ),
+                'answer': 'delsuperct',
+            },
+            {
+                'args': (
+                    "District Court of Appeal.",
+                    'florida/court_opinions/documents/25ce1e2a128df7ff.xml',
+                ),
+                'answer': 'fladistctapp',
+            },
+            {
+                'args': (
+                    'District Court of Appeal, Lakeland, Florida.',
+                    'florida/court_opinions/documents/25ce1e2a128df7ff.xml',
+                ),
+                'answer': 'fladistctapp',
+            },
+            {
+                'args': (
+                    'District Court of Appeal Florida.',
+                    'florida/court_opinions/documents/25ce1e2a128df7ff.xml',
+                ),
+                'answer': 'fladistctapp',
+            },
+            {
+                'args': (
+                    'District Court of Appeal, Florida.',
+                    'florida/court_opinions/documents/25ce1e2a128df7ff.xml',
+                ),
+                'answer': 'fladistctapp',
+            },
+            {
+                'args': (
+                    'U.S. Circuit Court',
+                    'north_carolina/court_opinions/documents/fa5b96d590ae8d48.xml',
+                ),
+                'answer': 'circtnc',
+            },
+            {
+                'args': (
+                    "United States Circuit Court,  Delaware District.",
+                    'delaware/court_opinions/documents/6abba852db7c12a1.xml',
+                ),
+                'answer': 'circtdel',
+            },
         )
         for d in pairs:
             got = get_court_object(*d['args'])

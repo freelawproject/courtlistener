@@ -408,7 +408,10 @@ state_pairs = (
     (re.compile('Supreme Court of (the State of )?Delaware', re.I), 'del'),
         (re.compile('Delaware Supreme Court', re.I), 'del'),
         (re.compile('(High )?Court of Errors and Appeals (Court )?of Delaware', re.I), 'del'),
-
+        # This is a guess, but there's only one case in this jurisdiction and
+        # it has to do with a governor that passed in office. Seems like Supreme
+        # court level stuff.
+        (re.compile('In vacation of Delaware', re.I), 'del'),
     (re.compile('Court of Chancery of (the State of )?Delaware', re.I), 'delch'),
         (re.compile('Chancery Court of Delaware', re.I), 'delch'),
     (re.compile('Superior Court of (the State of )?Delaware', re.I), 'delsuperct'),
@@ -416,16 +419,20 @@ state_pairs = (
         (re.compile('Orphans\'? Court( Court)? of Delaware', re.I), 'delsuperct'),
         (re.compile('Court of General Sessions', re.I), 'delsuperct'),
         (re.compile('Court of Oyer and Terminer of Delaware', re.I), 'delsuperct'),
-        (re.compile('Court of Common Pleas( Court)? of Delaware', re.I), 'delsuperct'),
-        (re.compile('Court of Quarter Sessions of Delaware', re.I), 'delsuperct'),
-        (re.compile('Courts of General Sessions and of Oyer and Terminer of Delaware', re.I), 'delsuperct'),
+        (re.compile('Court of Common Pleas,? (Court )?of Delaware', re.I), 'delsuperct'),
+        (re.compile('Court of Quarter Sessions,? (Court )?of Delaware', re.I), 'delsuperct'),
+        (re.compile('Courts of General Sessions and (of )?Oyer and Terminer of Delaware', re.I), 'delsuperct'),
+    (re.compile('Circuit Court of ((the )?United States of )?Delaware', re.I), 'circtdel'),
+        (re.compile('Circuit Court,  Delaware', re.I), 'circtdel'),
+        (re.compile('Circuit Court.*Dover', re.I), 'circtdel'),
     (re.compile('Family Court of Delaware', re.I), 'delfamct'),
     (re.compile('Court on the Judiciary of Delaware', re.I), 'deljudct'),
         (re.compile('Delaware Court on the Judiciary', re.I), 'deljudct'),
 
     (re.compile('Supreme Court of Florida', re.I), 'fla'),
         (re.compile('Supreme Court.*Nassau County', re.I), 'fla'),
-    (re.compile('District Courts? of Appeal (of )?Florida', re.I), 'fladistctapp'),
+        (re.compile('Court of Florida, Division B', re.I), 'fla'),
+    (re.compile('District Courts? of Appeal, ((Lakeland,)|(of) )?Florida', re.I), 'fladistctapp'),
 
     (re.compile('Supreme Court of Georgia', re.I), 'ga'),
     (re.compile('Court of Appeals? of Georgia', re.I), 'gactapp'),
@@ -487,15 +494,19 @@ state_pairs = (
     (re.compile('Supreme Court of Mississippi', re.I), 'miss'),
         # Historical name.
         (re.compile('High Court of Errors and Appeals, Mississippi', re.I), 'miss'),
+        # Only one case. Have it on authority from Miss. Supreme Court and
+        # Law Library that this is just another name for the Supreme Court.
+        (re.compile('Superior Court of Mississippi', re.I), 'miss'),
     (re.compile('Court of Appeals? of Mississippi', re.I), 'missctapp'),
 
     (re.compile('Supreme Court of Missouri', re.I), 'mo'),
     (re.compile('Missouri Court of Appeals', re.I), 'moctapp'),
         (re.compile('St\. Louis,? Court of Appeals', re.I), 'moctapp'),
-        (re.compile('Kansas City.? Court of appeals', re.I), 'moctapp'),
+        (re.compile('Kansas City.? (of )?Court of appeals', re.I), 'moctapp'),
         (re.compile('Springfield,? Court of appeals', re.I), 'moctapp'),
 
     (re.compile('Supreme Court of Montana', re.I), 'mont'),
+    (re.compile('Tax Appeal Board of the State of Montana', re.I), 'monttc'),
 
     (re.compile('Supreme Court of Nebraska', re.I), 'neb'),
     (re.compile('Court of Appeals? of Nebraska', re.I), 'nebctapp'),
@@ -527,6 +538,9 @@ state_pairs = (
 
     (re.compile('Supreme Court of North Carolina', re.I), 'nc'),
         (re.compile('Court of Conference', re.I), 'nc'),
+        # Only one case in here, and it's basically just a reference to a
+        # different case.
+        (re.compile('Conference at Raleigh', re.I), 'nc'),
     (re.compile('Court of Appeals? (of )?North Carolina', re.I), 'ncctapp'),
         (re.compile('North Carolina Court of Appeals', re.I), 'ncctapp'),
     (re.compile('Superior Court of North Carolina', re.I), 'ncsuperct'),

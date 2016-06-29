@@ -6,17 +6,29 @@ SPECIAL_REGEXES = {
     ),
     'connecticut/workers_compensation_commission': (
         (re.compile('worker\'s compensation commission', re.I), 'connworkcompcom'),
-        (re.compile('compensation review board', re.I), 'connworkcompcom'),
+            (re.compile('compensation review board', re.I), 'connworkcompcom'),
+    ),
+    'florida/court_opinions': (
+        (re.compile('District Courts? of Appeal', re.I), 'fladistctapp'),
     ),
     'new_jersey/supreme_court_opinions': (
         (re.compile('Court of Chancery', re.I), 'njch'),
         # Abolished in 1947, and folded into the Supreme Court.
-        (re.compile('Court of Errors and Appeals', re.I), 'nj')
+        (re.compile('Court of Errors and Appeals', re.I), 'nj'),
+    ),
+    'north_carolina/court_opinions': (
+        (re.compile('U\.S\. Circuit Court', re.I), 'circtnc'),
     ),
     'tennessee/court_opinions': (
         (re.compile('(Supreme )?Court of Errors and Appeals', re.I), 'tenn'),
-        (re.compile('Supreme Court', re.I), 'tenn'),
+            (re.compile('Supreme Court', re.I), 'tenn'),
+            (re.compile('Superior Court of Dernier Ress?ort', re.I), 'tenn'),
         (re.compile('Superior Court for Law and Equity', re.I), 'tennsuperct'),
+        (re.compile('Circuit Court', re.I), 'circttenn'),
+            (re.compile('Federal Court, Nashville', re.I), 'circttenn'),
+    ),
+    'texas/court_opinions': (
+        (re.compile('Review Tribunal', re.I), 'sttex'),
     ),
 }
 
