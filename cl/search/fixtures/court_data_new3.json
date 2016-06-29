@@ -75,25 +75,23 @@
     "model": "search.court",
     "pk": "circttenn"
   },
-  [
-    {
-      "fields": {
-        "jurisdiction": "C",
-        "end_date": null,
-        "short_name": "Special Tribunals of Texas",
-        "citation_string": "Spec. Trib. of Tex.",
-        "in_use": true,
-        "url": "",
-        "notes": "Columbia",
-        "date_modified": "2016-06-29T17:11:46.596Z",
-        "has_oral_argument_scraper": false,
-        "full_name": "United States Special Tribunal of Texas",
-        "position": 451.5,
-        "has_opinion_scraper": false,
-        "start_date": null
-      },
-      "model": "search.court",
-      "pk": "sttex"
-    }
-  ]
+  {
+    "fields": {
+      "jurisdiction": "C",
+      "end_date": null,
+      "short_name": "Special Tribunals of Texas",
+      "citation_string": "Spec. Trib. of Tex.",
+      "in_use": true,
+      "url": "",
+      "notes": "Columbia",
+      "date_modified": "2016-06-29T17:11:46.596Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "United States Special Tribunal of Texas",
+      "position": 451.5,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "sttex"
+  }
 ]
