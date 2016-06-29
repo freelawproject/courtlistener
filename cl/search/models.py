@@ -480,6 +480,7 @@ class Court(models.Model):
     url = models.URLField(
         help_text='the homepage for each court or the closest thing thereto',
         max_length=500,
+        blank=True,
     )
     start_date = models.DateField(
         help_text="the date the court was established, if known",
