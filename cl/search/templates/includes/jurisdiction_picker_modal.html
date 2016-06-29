@@ -63,7 +63,7 @@
                                data-toggle="tab"
                                tabindex="211">
                                 <span class="hidden-xs hidden-sm">Federal District</span>
-                                <span class="hidden-md hidden-lg">Fed Dist</span>
+                                <span class="hidden-md hidden-lg">Fed. Dist.</span>
                             </a>
                         </li>
                         <li>
@@ -71,7 +71,7 @@
                                data-toggle="tab"
                                tabindex="212">
                                 <span class="hidden-xs hidden-sm">Bankruptcy</span>
-                                <span class="hidden-md hidden-lg">Bankr</span>
+                                <span class="hidden-md hidden-lg">Bankr.</span>
                             </a>
                         </li>
                         <li>
@@ -153,9 +153,7 @@
                                                                 {% if court.checked %}checked="checked"{% endif %}
                                                                 type="checkbox"
                                                                 class="external-input court-checkbox">
-                                                        {{ court.short_name }}
-                                                        {% if court.end_date %}
-                                                            <span class="gray">({{ court.end_date.year }})</span>
+                                                        {{ court.short_name }}&nbsp;{% if court.end_date %}<span class="gray">({{ court.end_date.year }})</span>
                                                         {% endif %}
                                                     </label>
                                                 </div>
