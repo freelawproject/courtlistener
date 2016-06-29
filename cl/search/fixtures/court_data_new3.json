@@ -1,0 +1,99 @@
+[
+  {
+    "fields": {
+      "jurisdiction": "FD",
+      "end_date": "1912-01-01",
+      "short_name": "Circuit Court of Delaware",
+      "citation_string": "Cir. Ct. Del.",
+      "in_use": true,
+      "url": "http://www.fjc.gov/history/home.nsf/page/courts_circuit_de.html",
+      "notes": "",
+      "date_modified": "2016-06-29T17:11:46.596Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "U.S. Circuit Court for the District of Delaware",
+      "position": 208.2,
+      "has_opinion_scraper": false,
+      "start_date": "1789-09-24"
+    },
+    "model": "search.court",
+    "pk": "circtdel"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SS",
+      "end_date": null,
+      "short_name": "Montana Tax Appeal Board",
+      "citation_string": "Mont.T.A.B.",
+      "in_use": true,
+      "url": "http://mtab.mt.gov/",
+      "notes": "Columbia",
+      "date_modified": "2016-06-29T18:20:40.217Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "Montana Tax Appeal Board",
+      "position": 366.12,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "monttc"
+  },
+  {
+    "fields": {
+      "jurisdiction": "FD",
+      "end_date": "1912-01-01",
+      "short_name": "Circuit Court of North Carolina",
+      "citation_string": "Cir. Ct. N.C.",
+      "in_use": true,
+      "url": "http://www.fjc.gov/history/home.nsf/page/courts_circuit_nc.html",
+      "notes": "",
+      "date_modified": "2016-06-29T17:11:46.596Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "U.S. Circuit Court for the District of North Carolina",
+      "position": 245.25,
+      "has_opinion_scraper": false,
+      "start_date": "1790-06-04"
+    },
+    "model": "search.court",
+    "pk": "circtnc"
+  },
+  {
+    "fields": {
+      "jurisdiction": "FD",
+      "end_date": "1912-01-01",
+      "short_name": "Circuit Court of Tennessee",
+      "citation_string": "Cir. Ct. N.C.",
+      "in_use": true,
+      "url": "http://www.fjc.gov/history/home.nsf/page/courts_circuit_tn.html",
+      "notes": "",
+      "date_modified": "2016-06-29T17:11:46.596Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "U.S. Circuit Court for the District of Tennessee",
+      "position": 249.91,
+      "has_opinion_scraper": false,
+      "start_date": "1807-02-24"
+    },
+    "model": "search.court",
+    "pk": "circttenn"
+  },
+  [
+    {
+      "fields": {
+        "jurisdiction": "C",
+        "end_date": null,
+        "short_name": "Special Tribunals of Texas",
+        "citation_string": "Spec. Trib. of Tex.",
+        "in_use": true,
+        "url": "",
+        "notes": "Columbia",
+        "date_modified": "2016-06-29T17:11:46.596Z",
+        "has_oral_argument_scraper": false,
+        "full_name": "United States Special Tribunal of Texas",
+        "position": 451.5,
+        "has_opinion_scraper": false,
+        "start_date": null
+      },
+      "model": "search.court",
+      "pk": "sttex"
+    }
+  ]
+]
