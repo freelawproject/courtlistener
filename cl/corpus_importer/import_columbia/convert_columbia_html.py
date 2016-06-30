@@ -31,13 +31,11 @@ def convert_columbia_html(text):
     # footnotes
     foot_references = re.findall('<footnote_reference>.*?</footnote_reference>', text)
 
-    for ref in foot_references:        
+    for ref in foot_references:
         try:
             fnum = re.search('[\*\d]+', ref).group()
-        except:
-            i = ref.find('[fn'+3)
-            j = ref.find(']'+3)
-            fnum = ref[i:j]
+        except AttributeError:
+            fnum = re.search('\[fn(.+)\]', ref).group(1)
         rep = '<sup id="ref-fn%s"><a href="#fn%s">%s</a></sup>' % (fnum, fnum, fnum)
         text = text.replace(ref, rep)
 
