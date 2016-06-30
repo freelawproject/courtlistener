@@ -346,6 +346,20 @@ class CourtMatchingTest(TestCase):
             },
             {
                 'args': (
+                    'District Court of Appeal of Florida, Second District.',
+                    'florida/court_opinions/documents/25ce1e2a128df7ff.xml',
+                ),
+                'answer': 'fladistctapp',
+            },
+            {
+                'args': (
+                    'District Court of Appeal of Florida, Second District.',
+                    '/data/dumps/florida/court_opinions/documents/25ce1e2a128df7ff.xml',
+                ),
+                'answer': 'fladistctapp',
+            },
+            {
+                'args': (
                     'U.S. Circuit Court',
                     'north_carolina/court_opinions/documents/fa5b96d590ae8d48.xml',
                 ),
@@ -358,6 +372,13 @@ class CourtMatchingTest(TestCase):
                 ),
                 'answer': 'circtdel',
             },
+            {
+                'args': (
+                    'Court of Common Pleas  Hartford County',
+                    'asdf',
+                ),
+                'answer': 'connsuperct'
+            }
         )
         for d in pairs:
             got = get_court_object(*d['args'])

@@ -402,7 +402,7 @@ state_pairs = (
         (re.compile('Connecticut Superior Court', re.I), 'connsuperct'),
         (re.compile('Review Division Of The Superior Court', re.I), 'connsuperct'),
         # Merged with Superior Court on July 1, 1978
-        (re.compile('Court of Common Pleas, +((%s))' % conn_counties, re.I), 'connsuperct'),
+        (re.compile('Court of Common Pleas,? +((%s))' % conn_counties, re.I), 'connsuperct'),
         (re.compile('Superior Court,? +((%s))' % conn_counties, re.I), 'connsuperct'),
 
     (re.compile('Supreme Court of (the State of )?Delaware', re.I), 'del'),

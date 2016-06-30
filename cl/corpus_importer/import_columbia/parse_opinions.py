@@ -358,8 +358,10 @@ def get_court_object(raw_court, file_path):
         for regex, value in state_pairs:
             if re.search(regex, r):
                 return value
-
-    folder = file_path.split('/documents')[0]
+    # Reduce to: /data/.../alabama/court_opinions'
+    root_folder = file_path.split('/documents')[0]
+    # Get the last two dirs off the end, leaving: 'alabama/court_opinions'
+    folder = '/'.join(root_folder.split('/')[-2:])
     if folder in SPECIAL_REGEXES:
         for regex, value in SPECIAL_REGEXES[folder]:
             if re.search(regex, raw_court):

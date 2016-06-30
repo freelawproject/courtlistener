@@ -4,10 +4,6 @@ SPECIAL_REGEXES = {
     'connecticut/superior_court_opinions': (
         (re.compile('Appellate Division Of The Circuit Court', re.I), 'connappct'),
     ),
-    'connecticut/workers_compensation_commission': (
-        (re.compile('worker\'s compensation commission', re.I), 'connworkcompcom'),
-            (re.compile('compensation review board', re.I), 'connworkcompcom'),
-    ),
     'florida/court_opinions': (
         (re.compile('District Courts? of Appeal', re.I), 'fladistctapp'),
     ),
