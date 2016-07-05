@@ -263,12 +263,12 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
         try:
             docket.save()
             cluster.docket = docket
-            cluster.save()
+            cluster.save(index=False)
             for member in panel:
                 cluster.panel.add(member)
             for opinion, joined_by in opinions:
                 opinion.cluster = cluster
-                opinion.save()
+                opinion.save(index=False)
                 for joiner in joined_by:
                     opinion.joined_by.add(joiner)
             if settings.DEBUG:
