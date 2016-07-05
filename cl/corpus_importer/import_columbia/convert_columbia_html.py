@@ -45,9 +45,7 @@ def convert_columbia_html(text):
         try:
             fnum = re.search('[\*\d]+', ref).group()
         except:
-            i = ref.find('[fn'+3)
-            j = ref.find(']'+3)
-            fnum = ref[i:j]
+            fnum = re.search('\[fn(.+)\]', ref).group(1)
         rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (fnum, fnum, fnum)
         text = text.replace(ref, rep)
 
