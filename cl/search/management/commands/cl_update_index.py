@@ -1,17 +1,19 @@
 import ast
 import sys
+
+from celery.task.sets import TaskSet
+from django.core.management.base import BaseCommand
+
 from cl.audio.models import Audio
 from cl.lib import sunburnt
 from cl.lib.argparse_types import valid_date_time, valid_obj_type
 from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
-from cl.search.models import Opinion, Docket
 from cl.people_db.models import Person
+from cl.search.models import Opinion, Docket
 from cl.search.tasks import (delete_items, add_or_update_audio_files,
                              add_or_update_opinions, add_or_update_items,
                              add_or_update_people)
-from celery.task.sets import TaskSet
-from django.core.management.base import BaseCommand
 
 
 def proceed_with_deletion(out, count, noinput):
@@ -181,7 +183,7 @@ class Command(BaseCommand):
                               'index.\n')
             sys.exit(1)
 
-    def _chunk_queryset_into_tasks(self, items, count, chunksize=5000,
+    def _chunk_queryset_into_tasks(self, items, count, chunksize=50,
                                    bundle_size=250):
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
@@ -191,6 +193,7 @@ class Command(BaseCommand):
            instead, it should be fetching the next 1,000
         """
         processed_count = 0
+        commit_count = 0
         subtasks = []
         item_bundle = []
         for item in items:
@@ -215,13 +218,14 @@ class Command(BaseCommand):
 
             if (processed_count % 50000 == 0) or last_item:
                 # Do a commit every 50000 items, for good measure.
-                self.stdout.write("...running commit command...")
                 self.si.commit()
+                commit_count += 1
 
-            sys.stdout.write("\rProcessed {}/{} ({:.0%})".format(
+            sys.stdout.write("\rProcessed {}/{} ({:.0%}, {} commits)".format(
                 processed_count,
                 count,
                 processed_count * 1.0 / count,
+                commit_count,
             ))
             self.stdout.flush()
         self.stdout.write('\n')
