@@ -45,12 +45,14 @@ def do_search(request, rows=20, order_by=None, type=None):
         search_form = _clean_form(request, cd)
 
         try:
+            query_citation = None
             if cd['type'] == 'o':
                 conn = sunburnt.SolrInterface(
                     settings.SOLR_OPINION_URL, mode='r')
                 stat_facet_fields = search_utils.place_facet_queries(cd, conn)
                 status_facets = search_utils.make_stats_variable(
                     stat_facet_fields, search_form)
+                query_citation = search_utils.get_query_citation(cd)
             elif cd['type'] == 'oa':
                 conn = sunburnt.SolrInterface(
                     settings.SOLR_AUDIO_URL, mode='r')
@@ -97,12 +99,15 @@ def do_search(request, rows=20, order_by=None, type=None):
             print e
         return {'error': True}
 
-    return {'search_form': search_form,
-            'results': paged_results,
-            'courts': courts,
-            'court_count_human': court_count_human,
-            'court_count': court_count,
-            'status_facets': status_facets}
+    return {
+        'search_form': search_form,
+        'results': paged_results,
+        'courts': courts,
+        'court_count_human': court_count_human,
+        'court_count': court_count,
+        'status_facets': status_facets,
+        'query_citation': query_citation,
+    }
 
 
 @never_cache

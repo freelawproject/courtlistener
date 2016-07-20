@@ -467,10 +467,12 @@
                 <h3 id="authored-opinions">
                     <i class="fa-file-text-o fa gray"></i>
                     Opinions Authored by {{ person.name_last }} ({{ authored_opinions.result.numFound|intcomma }})
-                    <a href="/feed/search/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}">
-                        <i class="gray fa fa-rss"
-                           title="Subscribe to a feed of {{ person.name_last }}'s latest cases"></i>
-                    </a>
+                    {% if not person.date_dod and not person.dod_state and not person.dod_city %}
+                        <a href="/feed/search/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}">
+                            <i class="gray fa fa-rss"
+                               title="Subscribe to a feed of {{ person.name_last }}'s latest cases"></i>
+                        </a>
+                    {% endif %}
                 </h3>
                 <p class="gray">Includes opinions for which {{ person.name_full }} was on the panel, ordered by <a href="https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/">CiteGeist</a> relevance.</p>
                 <hr class="top">

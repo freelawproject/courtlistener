@@ -73,6 +73,20 @@
                     </div>
                 </div>
             {% endif %}
+            {% if query_citation %}
+                <div class="alert alert-info" role="alert">
+                    <div class="row">
+                        <div class="col-xs-9">
+                            <p><i class="fa fa-info-circle fa-lg"></i> It looks like you're trying to search for <a class="alert-link" href="{{ query_citation.absolute_url }}">{{ query_citation.caseName|safe }}</a>, from {{ query_citation.dateFiled.year }}.</p>
+                        </div>
+                        <div class="col-xs-3 text-right">
+                            <a class="btn btn-primary btn-sm"
+                               href="{{ query_citation.absolute_url }}">Go<span
+                                    class="hidden-xs"> to This Case</span></a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
         {% endif %}
 
         {% if results.paginator.count > 0 %}

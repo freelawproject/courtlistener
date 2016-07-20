@@ -8,10 +8,10 @@ Created on Thu Jun 16 14:31:21 2016
 import os
 from collections import defaultdict, Counter
 
-os.chdios.chid
+os.chdir('/home/elliott/freelawmachine/flp/columbia_data')
 
 file_lists = defaultdict(list)
-for line in open('import_columbia_unknown_exceptions.log'):
+for line in open('import_columbia_unknown_exceptions2.log'):
     if 'Unknown exception in file' in line:
         i = line.find('opinions/') + len('opinions/')
         j = line.rfind("'")
@@ -19,14 +19,15 @@ for line in open('import_columbia_unknown_exceptions.log'):
         
     if 'Error:' in line:
         file_lists[line].append(currfile)
+        #print(line)
         
 for k, v in file_lists.items():
-    print((k,v),end="", file=open(k[:100]+'.txt','wt'))
+    for x in v:
+        print((x+'\n'),end="", file=open(k[:5]+'.txt','at'))
 
 import re
     
-os.chdir('/home/elliott/freelawmachine/flp/columbia_data')
-f = open('import_columbia_known_exceptions.log')
+f = open('import_columbia_known_exceptions2.log')
 
 cite_tab = Counter()
 
@@ -45,10 +46,10 @@ for line in f:
         
         newseg = re.sub('\d','#',seg)
         #print(newseg)
-        if 'Ct. Sup.' not in newseg:
-            if 'Ohio App.' not in newseg:
-                if 'Okla. Cr.' not in newseg:
-                    cite_tab[newseg] += 1
+        #if 'Ct. Sup.' not in newseg:
+        #    if 'Ohio App.' not in newseg:
+        #        if 'Okla. Cr.' not in newseg:
+        cite_tab[newseg] += 1
     
     if 'Failed to find a court ID' in line:
         seg = line.split('"')[1]

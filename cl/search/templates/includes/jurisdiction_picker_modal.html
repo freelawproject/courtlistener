@@ -102,6 +102,9 @@
                                                         type="checkbox"
                                                         class="external-input court-checkbox">
                                                     {{ court.short_name }}
+                                                    {% if court.end_date %}
+                                                        <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
+                                                    {% endif %}
                                                 </label>
                                             </div>
                                         {% elif search_form.type.value == 'oa' and court.has_oral_argument_scraper %}
@@ -114,6 +117,9 @@
                                                         type="checkbox"
                                                         class="external-input court-checkbox">
                                                     {{ court.short_name }}
+                                                    {% if court.end_date %}
+                                                        <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
+                                                    {% endif %}
                                                 </label>
                                             </div>
                                         {% endif %}
@@ -148,6 +154,9 @@
                                                                 type="checkbox"
                                                                 class="external-input court-checkbox">
                                                         {{ court.short_name }}
+                                                        {% if court.end_date %}
+                                                            <span class="gray">({{ court.end_date.year }})</span>
+                                                        {% endif %}
                                                     </label>
                                                 </div>
                                             {% endfor %}
@@ -179,6 +188,9 @@
                                                             type="checkbox"
                                                             class="external-input court-checkbox">
                                                         {{ court.short_name }}
+                                                        {% if court.end_date %}
+                                                            <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
+                                                        {% endif %}
                                                     </label>
                                                 </div>
                                             {% endfor %}
@@ -193,7 +205,7 @@
                                     <div class="col-sm-4">
                                         {% for court_bundle in col_bundle %}
                                             {% for court in court_bundle %}
-                                                <div class="checkbox {% if court.jurisdiction == 'SA' or court.jurisdiction == 'SS' or court.jurisdiction == 'ST' %}appeals-court{% endif %}">
+                                                <div class="checkbox {% if court.jurisdiction == 'SA' or court.jurisdiction == 'SS' or court.jurisdiction == 'ST' or court.jurisdiction == 'SAG' %}appeals-court{% endif %}">
                                                     <label for="id_{{ court.pk }}">
                                                     <input
                                                             id="id_{{ court.pk }}"
@@ -202,6 +214,9 @@
                                                             type="checkbox"
                                                             class="external-input court-checkbox">
                                                         {{ court.short_name }}
+                                                        {% if court.end_date %}
+                                                            <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
+                                                        {% endif %}
                                                     </label>
                                                 </div>
                                             {% endfor %}
@@ -211,25 +226,40 @@
                             </div>
                         </div>
                         <div class="tab-pane" id="tab-special">
-                            <div class="row">
-                                {% for row in courts.special|rows:3 %}
-                                    <div class="col-sm-4">
-                                        {% for court in row %}
-                                            <div class="checkbox">
-                                                <label for="id_{{ court.pk }}">
-                                                <input
-                                                        id="id_{{ court.pk }}"
-                                                        name="{{ court.pk }}"
-                                                        {% if court.checked %}checked="checked"{% endif %}
-                                                        type="checkbox"
-                                                        class="external-input court-checkbox">
-                                                    {{ court.short_name }}
-                                                </label>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                {% endfor %}
-                            </div>
+                            {# Regroup into closed/open courts #}
+                            {% regroup  courts.special|dictsort:"is_terminated" by is_terminated as special_courts %}
+
+                            {% for group in special_courts %}
+                                <h3 class="bottom inline">
+                                    {% if group.grouper %}
+                                        Terminated Courts
+                                    {% else %}
+                                        Active Courts
+                                    {% endif %}
+                                </h3>
+                                <div class="row">
+                                    {% for row in group.list|rows:3 %}
+                                        <div class="col-sm-4">
+                                            {% for court in row %}
+                                                <div class="checkbox">
+                                                    <label for="id_{{ court.pk }}">
+                                                    <input
+                                                            id="id_{{ court.pk }}"
+                                                            name="{{ court.pk }}"
+                                                            {% if court.checked %}checked="checked"{% endif %}
+                                                            type="checkbox"
+                                                            class="external-input court-checkbox">
+                                                        {{ court.short_name }}
+                                                        {% if court.end_date %}
+                                                            <span class="gray">({{ court.end_date.year }})</span>
+                                                        {% endif %}
+                                                    </label>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
                         </div>
                     {% endif %}
                 </div>
