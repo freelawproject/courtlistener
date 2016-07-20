@@ -92,6 +92,14 @@ class Person(models.Model):
         unique=True,
         db_index=True
     )
+    ftm_id = models.CharField(
+        max_length=30,
+        help_text="The ID of a judge as assigned by the Follow the Money "
+                  "database.",
+        null=True,
+        blank=True,
+        unique=True,
+    )
     slug = models.SlugField(
         help_text="A generated path for this item as used in CourtListener "
                   "URLs",
