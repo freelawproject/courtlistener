@@ -92,14 +92,6 @@ class Person(models.Model):
         unique=True,
         db_index=True
     )
-    ftm_id = models.CharField(
-        max_length=30,
-        help_text="The ID of a judge as assigned by the Follow the Money "
-                  "database.",
-        null=True,
-        blank=True,
-        unique=True,
-    )
     slug = models.SlugField(
         help_text="A generated path for this item as used in CourtListener "
                   "URLs",
@@ -173,6 +165,21 @@ class Person(models.Model):
         help_text="The religion of a person",
         max_length=30,
         blank=True
+    )
+    ftm_total_received = models.FloatField(
+        help_text="The amount of money received by this person and logged by "
+                  "Follow the Money.",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    ftm_id = models.CharField(
+        max_length=30,
+        help_text="The ID of a judge as assigned by the Follow the Money "
+                  "database.",
+        null=True,
+        blank=True,
+        unique=True,
     )
     has_photo = models.BooleanField(
         help_text="Whether there is a photo corresponding to this person in "
