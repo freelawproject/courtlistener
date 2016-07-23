@@ -173,13 +173,12 @@ class Person(models.Model):
         null=True,
         db_index=True,
     )
-    ftm_id = models.CharField(
+    ftm_eid = models.CharField(
         max_length=30,
         help_text="The ID of a judge as assigned by the Follow the Money "
                   "database.",
         null=True,
         blank=True,
-        unique=True,
     )
     has_photo = models.BooleanField(
         help_text="Whether there is a photo corresponding to this person in "
