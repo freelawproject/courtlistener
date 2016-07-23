@@ -35,11 +35,11 @@
             <div class="col-xs-6 col-sm-4 col-md-4 col-lg-3">
                 {% if person.has_photo %}
                     <h2>
-                    {% with "judge_pics/"|add:person.name_last|add:"-"|add:person.name_first|lower|slugify as img_path %}
+                    {% with person.name_last|add:"-"|add:person.name_first|lower|slugify as img_path %}
                         {% if person.date_dob %}
-                            <img src="{% static img_path %}-{% granular_date person 'date_dob' default="" iso=True %}.jpeg"
+                            <img src="judge_pics/{% static img_path %}-{% granular_date person 'date_dob' default="" iso=True %}.jpeg"
                         {% else %}
-                            <img src="{% static img_path %}.jpeg"
+                            <img src="judge_pics/{% static img_path %}.jpeg"
                         {% endif %}
                          alt="Portrait of {{ person.name_full }}"
                          width="256"
