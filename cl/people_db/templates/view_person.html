@@ -37,9 +37,9 @@
                     <h2>
                     {% with person.name_last|add:"-"|add:person.name_first|lower|slugify as img_path %}
                         {% if person.date_dob %}
-                            <img src="judge_pics/{% static img_path %}-{% granular_date person 'date_dob' default="" iso=True %}.jpeg"
+                            <img src="{% static "judge_pics/"|add:img_path %}-{% granular_date person 'date_dob' default="" iso=True %}.jpeg"
                         {% else %}
-                            <img src="judge_pics/{% static img_path %}.jpeg"
+                            <img src="{% static "judge_pics/"|add:img_path %}.jpeg"
                         {% endif %}
                          alt="Portrait of {{ person.name_full }}"
                          width="256"
