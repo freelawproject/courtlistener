@@ -118,7 +118,7 @@ def update_judges_by_solr(candidate_id_map, debug):
     match_stats = defaultdict(int)
     # These IDs are ones that cannot be updated due to being identified as
     # problematic in FTM's data.
-    blacklisted_ids = defaultdict(list)
+    blacklisted_ids = defaultdict(set)
     for court_id, candidate_list in candidate_id_map.items():
         for candidate in candidate_list:
             # Look up the candidate in Solr.
@@ -153,11 +153,13 @@ def update_judges_by_solr(candidate_id_map, debug):
                 if p.ftm_eid:
                     print("  Found values in ftm database fields. This "
                           "indicates a duplicate in FTM.")
+
+                    blacklisted_ids[p.pk].add(candidate['eid'])
+                    blacklisted_ids[p.pk].add(p.ftm_eid)
                     p.ftm_eid = ""
                     p.ftm_total_received = None
                     if not debug:
                         p.save()
-                    blacklisted_ids[p.pk].append(candidate)
                 else:
                     # No major problems. Proceed.
                     p.ftm_eid = candidate['eid']
