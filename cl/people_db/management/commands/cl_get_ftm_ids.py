@@ -150,14 +150,20 @@ def update_judges_by_solr(candidate_id_map, debug):
                 if pk in blacklisted_ids:
                     continue
                 p = Person.objects.get(pk=pk)
-                if p.ftm_eid and p.ftm_eid != candidate['eid']:
-                    print("  Found values in ftm database fields. This "
-                          "indicates a duplicate in FTM.")
+                if p.ftm_eid:
+                    if p.ftm_eid != candidate['eid']:
+                        print("  Found values in ftm database fields. This "
+                              "indicates a duplicate in FTM.")
 
-                    blacklisted_ids[p.pk].add(candidate['eid'])
-                    blacklisted_ids[p.pk].add(p.ftm_eid)
-                    p.ftm_eid = ""
-                    p.ftm_total_received = None
+                        blacklisted_ids[p.pk].add(candidate['eid'])
+                        blacklisted_ids[p.pk].add(p.ftm_eid)
+                        p.ftm_eid = ""
+                        p.ftm_total_received = None
+                    else:
+                        print("  Found values with matching EID. Adding "
+                              "amounts, since this indicates multiple "
+                              "jurisdictions that the judge was in.")
+                        p.ftm_total_received += candidate['total']
                     if not debug:
                         p.save()
                 else:
