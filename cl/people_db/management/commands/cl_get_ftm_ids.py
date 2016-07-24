@@ -150,7 +150,7 @@ def update_judges_by_solr(candidate_id_map, debug):
                 if pk in blacklisted_ids:
                     continue
                 p = Person.objects.get(pk=pk)
-                if p.ftm_eid:
+                if p.ftm_eid and p.ftm_eid != candidate['eid']:
                     print("  Found values in ftm database fields. This "
                           "indicates a duplicate in FTM.")
 
