@@ -184,6 +184,29 @@
                     </div>
                     {% endif %}
                 </div>
+
+                <div class="row v-offset-below-3">
+                    {% if person.ftm_eid %}
+                    <div class="col-xs-12">
+                        <h3><i class="gray fa fa-usd"></i> Campaign Finance</h3>
+                        <hr class="top">
+                    </div>
+                    <div class="col-xs-12">
+                        <h4 class="text-uppercase top">{{ person.name_full }} <span class="alt text-lowercase">has received</span> ${{ person.ftm_total_received|floatformat:"0"|intcomma }}
+                            <span class="alt text-lowercase">in</span> campaign finance
+                            <span class="alt text-lowercase">for</span> Supreme
+                            Court positions
+                            <span class="alt text-lowercase">as of</span> {{ ftm_last_updated|date|nbsp }}.
+                        </h4>
+                        <p>
+                            <a href="http://beta.followthemoney.org/show-me?f-core=1&c-r-ot=J&c-t-eid={{ person.ftm_eid }}&mode=json#[{1|gro=s,y,d-id"
+                               class="btn btn-primary"
+                               target="_blank">View Details on Follow the Money <i
+                                    class="fa fa-external-link"></i></a>
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
 

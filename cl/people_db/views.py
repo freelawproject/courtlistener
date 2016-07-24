@@ -61,6 +61,7 @@ def view_person(request, pk, slug):
          'positions': positions,
          'educations': person.educations.all().order_by('-degree_year'),
          'authored_opinions': authored_opinions,
+         'ftm_last_updated': settings.FTM_LAST_UPDATED,
          'private': False},
         RequestContext(request),
     )
