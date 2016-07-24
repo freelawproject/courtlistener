@@ -87,6 +87,16 @@ def make_dict_of_ftm_eids(use_pickle=True):
     return candidate_eid_lists
 
 
+def clear_old_values(do_it, debug):
+    """Clear out the old values in the ftm fields. If debug or do_it is False,
+    don't clear the values.
+    """
+    if not do_it or debug:
+        return
+    print("Clearing out all old values in FTM fields.")
+    Person.objects.all().update(ftm_eid='', ftm_total_received=None)
+
+
 def print_stats(match_stats, candidate_eid_lists):
     """Print the stats."""
     print("\n#########")
@@ -160,6 +170,7 @@ def update_judges_by_solr(candidate_id_map, debug):
                 print("  Found more than one match: %s" % results)
 
     print_stats(match_stats, candidate_id_map)
+    print("Blacklisted IDs: %s" % blacklisted_ids)
 
 
 class Command(BaseCommand):
@@ -179,7 +190,14 @@ class Command(BaseCommand):
             default=True,
             help="Don't use a pickle file if one exists.",
         )
+        parser.add_argument(
+            '--clear-old-values',
+            action='store_true',
+            default=False,
+            help='Clear out the old values before beginning.',
+        )
 
     def handle(self, *args, **options):
         candidate_id_map = make_dict_of_ftm_eids(options['dont_use_pickle'])
+        clear_old_values(options['clear_old_values'], options['debug'])
         update_judges_by_solr(candidate_id_map, debug=options['debug'])
