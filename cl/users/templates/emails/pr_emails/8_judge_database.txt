@@ -1,76 +1,66 @@
-Free Law Project Newsletter - 22 April 2016
+Free Law Project Newsletter - 26 July 2016
 ===========================================
 
 As always, things have been busy at Free Law Project, and we're writing today with a few big announcements and a few little ones.
 
 
-The Launch of our Judicial Database
------------------------------------
-The biggest piece of news is that we launched a judicial database containing nearly 8,500 judges. This database was funded by the Knight Foundation and by an NSF grant, and was a collaboration between Free Law Project and scholars at Princeton and Columbia.
+Enhancements to our Judicial Data
+---------------------------------
+In our last newsletter, we talked about our new judicial database containing about 8,500 judges from a variety of jurisdictions. Since then, we've continued working on the database, and we have two big pieces of news that tie tightly together.
 
-You can read more about the database on our blog:
+First, we've linked judicial opinions with the judge profiles. This allows you to see what opinions a judge was involved in as an author or as a member of the panel. You can read more about this in our announcement:
 
- - https://free.law/2016/04/19/judicial-database-announcement/
+https://free.law/2016/06/29/judge-profiles-on-courtlistener-now-show-the-cases-authored-by-each-judge/
 
-And you can get started reading the documentation here:
+Second, we added the campaign finance information for State Supreme Court judges, allowing you to see where judges got money during elections:
 
- - https://www.courtlistener.com/api/rest-info/#judge-endpoint
+XXX Link Here.
 
-We believe this database is a first-of-its-kind resource that will be hugely valuable to researchers and legal practitioners. Give it a look, and if you have any ideas for making it better, let us know!
+Together, these enhancements let you see what a judge is doing -- their decisions -- and where they got their money -- their campaign finance information. Over the years judicial elections have been criticised in a variety of ways, and we hope that this data will help researchers and journalists to identify cases of judicial bias.
 
+In addition to these enhancements, we also wrote a blog post in response to feedback that we received about the judicial database. The post explains what the database is, what's not, and how it will improve in the coming years:
 
-Oral Argument Podcasts in Google Play
--------------------------------------
-We're happy to share that we've added our oral argument podcasts to Google Play Music and created a new page explaining how to use the podcasts:
-
- - https://www.courtlistener.com/podcasts/
-
-If you are interested in listening to oral arguments from any of the Circuit Courts that post them, you can now simply search for "Oral Arguments" and they'll right come up.
-
-As always, if you're interested in only oral arguments that trigger a certain search query, you can always make your own custom podcast. See the link above for instructions.
+ https://free.law/2016/05/12/more-information-about-our-judicial-database-and-some-responses-to-feedback/
 
 
-Free Law Project Data Services
-------------------------------
-Free Law Project has launched a data service offering to help people understand and work with the complex legal data that we have. You can read the announcement here:
+More Jurisdictions added to CourtListener
+-----------------------------------------
+In the last newsletter, we shared plans to add millions more opinions to CourtListener. We've begun that process and one of the first steps was to add any new jurisdictions that we needed. So far, we've identified 29 new jurisdictions. These are courts and opinion-writing bodies that we didn't previously have content for, so we're happy to be adding them now. You can see a list of the new jurisdictions on the blog:
 
- - https://free.law/2016/03/07/announcing-free-law-project-data-services/
+https://free.law/2016/06/23/twenty-nine-new-jurisdictions-and-an-improved-interface-coming-soon-to-courtlistener/
 
-And read more about the service here:
-
- - https://free.law/data-consulting/
-
-The idea of this service is that the legal data we have has grown increasingly complex, and we frequently find ourselves working with people to manipulate and analyze it. In the past we have done this for free, but this gives us a way to do that work in a more formal manner while maintaining our non-profit goals.
+We've also begun adding some of the new cases to CourtListener. So far, there are about 800,000 opinions that we didn't previously have and we expect to add more soon. Expect and update in the next newsletter!
 
 
-New PACER Lawsuit Filed
------------------------
-Yesterday a lawsuit was filed against the U.S. government by a trio of non-profits. The non-profits allege that PACER fees are too high and that the fees violate the legal limitations created by Congress in the E-Government Act. This lawsuit is one of several in the past year, and it looks like an interesting one to follow. You can read the original documents in this case in our RECAP archive:
+Free Law Project a Signatory against Bad Bill
+---------------------------------------------
+A bill that was being pushed in California would add copyright to all materials published by the state. It was a bad bill that was in reaction to the trademark brew-ha-ha in Yosemite, and Free Law Project was a signatory in a letter opposing it. The bill would allowing the State to prevent sharing of government information, a transparency disaster.
 
- - https://ia801505.us.archive.org/0/items/gov.uscourts.dcd.178502/gov.uscourts.dcd.178502.docket.html
-
-
-Developer News
---------------
-For our volunteer developers, we've launched a Vagrant box that they can use to get up to speed:
-
- - https://free.law/2016/03/01/its-easier-than-ever-to-contribute-to-courtlistener-and-free-law-project/
-
-This deprecates our old system of using a VM to do all our work and makes it really quite easy to get involved.
+For Free Law Project, the bill would have prevented us from hosting California judicial opinions, so we were happy to sign a letter opposing it and even more happy to share that it was withdrawn.
 
 
-What's Next?
-------------
-The next six months are exciting for Free Law Project. We're wrapping up a number of big projects and we're starting a bunch of new ones. In the next six months we plan to:
+More News
+---------
+1. We have published a new CSV containing all of the reporters of decisions in CourtListener. It currently has about 440 reporters:
 
- - Create a better search tool for PACER and RECAP
- - Add campaign finance data and financial disclosures to our new judge database
- - Add millions of new opinions to our database and link them to the existing opinions
- - Add a few more funded projects to our pipeline
+ - https://free.law/2016/05/25/new-csv-of-reporters-of-decisions/
 
-These are lofty goals and we hope you'll support them with your time as a volunteer or with your donations, if you can.
 
-Thanks for subscribing to the newsletter!
+2. I wrote a post sharing some of my sketches and design considerations of our SCOTUS Visualizations:
+
+ - https://free.law/2016/05/02/notes-and-sketches-from-making-scotus-network-visualizations/
+
+
+3. Colin Starger spoke at the CALI conference about the SCOTUS Visualizations. It's a good, solid explanation of how they work, how they were designed, and how they're useful:
+
+ - https://free.law/2016/06/20/colin-stargers-talk-about-citation-visualizations-at-cali-conference/
+
+
+4. We hit a new milestone on CourtListener with our oral argument audio. We now have more than a full year of continuous oral argument listening. This is like watching every episode of The Simpsons...40 times!
+
+ - https://free.law/2016/06/08/milestone-courtlistener-has-365-days-of-continuous-oral-argument-listening/
+
+Whew, it's been a busy couple months. Thanks for subscribing to the newsletter!
 
 
 Mike Lissner
