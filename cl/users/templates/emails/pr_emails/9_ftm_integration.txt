@@ -1,22 +1,22 @@
 Free Law Project Newsletter - 27 July 2016
 ===========================================
 
-As always, things have been busy at Free Law Project, and we're writing today with a few big announcements and a few little ones.
+As always, things have been busy at Free Law Project, and we're writing today with a variety of news.
 
 
 Enhancements to our Judicial Data
----------------------------------
+=================================
 In our last newsletter, we talked about our new judicial database containing about 8,500 judges from a variety of jurisdictions. Since then, we've continued working on the database, and we have two big pieces of news that tie tightly together.
 
-First, we've linked judicial opinions with the judge profiles. This allows you to see the opinions in which a judge was involved. You can read more about this in our announcement:
+First, we've linked judicial opinions with the judge profiles. This allows you to look at any judge in CourtListener and see which opinions they wrote. You can read more about this in our announcement:
 
  - https://free.law/2016/06/29/judge-profiles-on-courtlistener-now-show-the-cases-authored-by-each-judge/
 
-Second, we added the campaign finance information for State Supreme Court judges, allowing you to see where judges got money during elections:
+Second, we added the campaign finance information, allowing you to see where judges got money during elections:
 
  - https://free.law/2016/07/27/judge-profiles-on-courtlistener-now-have-campaign-finance-information-from-the-national-institute-on-money-in-state-politics/
 
-Together, these enhancements let you see what a judge is doing -- their decisions -- and where they got their money -- their campaign finance information.
+Together, these enhancements let you see what a judge is doing -- what they wrote -- and where they got their money -- their campaign finance information.
 
 Over the years judicial elections have been criticised in a variety of ways, and we hope that this data will help researchers and journalists to identify cases of judicial bias or other systemic trends.
 
@@ -25,30 +25,30 @@ In addition to these enhancements, we also wrote a blog post in response to feed
  - https://free.law/2016/05/12/more-information-about-our-judicial-database-and-some-responses-to-feedback/
 
 
-More Jurisdictions added to CourtListener
------------------------------------------
+More Jurisdictions and Opinions Added to CourtListener
+======================================================
 In the last newsletter, we shared plans to add millions more opinions to CourtListener. We've begun that process and one of the first steps was to add the new jurisdictions that we needed. So far, we've identified 29 new jurisdictions. These are courts and opinion-writing bodies that we didn't previously have content for, so we're happy to be adding them now. You can see a list of the new jurisdictions on the blog:
 
-https://free.law/2016/06/23/twenty-nine-new-jurisdictions-and-an-improved-interface-coming-soon-to-courtlistener/
+ - https://free.law/2016/06/23/twenty-nine-new-jurisdictions-and-an-improved-interface-coming-soon-to-courtlistener/
 
-We've also begun adding some of the new cases to CourtListener. So far, there are about 800,000 opinions that we didn't previously have and we expect to add more soon. Expect and update in the next newsletter!
+We've also begun adding some of the new cases to CourtListener. So far, there are about 800,000 opinions that we didn't previously have and we expect to add more soon. Expect an update in the next newsletter!
 
 
 Free Law Project a Signatory against Bad Bill
----------------------------------------------
-A bill that was being pushed in California would add copyright to all materials published by the state. It was a bad bill that was in reaction to the trademark brew-ha-ha in Yosemite, and Free Law Project was a signatory in a letter opposing it. The bill would allow the State to prevent sharing of government information -- a transparency disaster.
+=============================================
+A bill that was being pushed in California would add copyright to all materials published by the state. It was a bad bill that was in reaction to the trademark brew-ha-ha in Yosemite, and Free Law Project was a signatory in a letter opposing it. The bill would allow the state of California to prevent sharing of government information -- a transparency disaster.
 
 For Free Law Project, the bill would have prevented us from hosting California judicial opinions, so we were happy to sign a letter opposing it and even more happy when it was withdrawn.
 
 
 More News
----------
-1. We hit a new milestone on CourtListener with our oral argument audio. We now have more than a full year of continuous oral argument listening. This is like watching every episode of The Simpsons...40 times!
+=========
+1. We hit a new milestone on CourtListener with our oral argument audio. We now have more than a full year of continuous oral argument listening. This is like watching every episode of The Simpsons...40 times! It's over half a million minutes of oral argumentation.
 
  - https://free.law/2016/06/08/milestone-courtlistener-has-365-days-of-continuous-oral-argument-listening/
 
 
-2. Colin Starger spoke at the CALI conference about the SCOTUS Visualizations. It's a good, solid explanation of how they work, how they were designed, and how they're useful:
+2. Colin Starger spoke at the CALI conference about SCOTUS Visualizations. It's a good, solid explanation of how they work, how they were designed, and how they're useful:
 
  - https://free.law/2016/06/20/colin-stargers-talk-about-citation-visualizations-at-cali-conference/
 
@@ -58,7 +58,7 @@ More News
  - https://free.law/2016/05/02/notes-and-sketches-from-making-scotus-network-visualizations/
 
 
-4. We have published a new CSV containing all of the reporters of decisions in CourtListener. It currently has about 440 reporters:
+4. We have published a new CSV containing all of the reporters of decisions in CourtListener. It currently has about 440 reporters, and we're planning to add even more:
 
  - https://free.law/2016/05/25/new-csv-of-reporters-of-decisions/
 
@@ -67,6 +67,7 @@ Whew, it's been a busy couple months. Thanks for subscribing to the newsletter!
 
 Mike Lissner
 Executive Director, FLP
+Donate: https://www.courtlistener.com/donate/
 
 -----------
 If you wish to unsubscribe from these newsletters, just reply and we'll take you right off.
