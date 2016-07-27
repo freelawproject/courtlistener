@@ -116,7 +116,7 @@ class Command(BaseCommand):
                 sys.stdout.write("* SIMULATE MODE - NO EMAILS SENT *\n")
                 sys.stdout.write("**********************************\n")
             if not options['simulate']:
-                for chunk in chunks(recipients, CHUNK_SIZE):
+                for chunk in chunks(list(recipients), CHUNK_SIZE):
                     self.send_emails(chunk)
                     logger.info("Waiting 300s before sending another chunk of "
                                 "%s emails." % CHUNK_SIZE)
