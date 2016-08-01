@@ -367,11 +367,9 @@ def process_audio_file(pk):
     path_to_tmp_location = os.path.join('/tmp', str(time.time()) + '.mp3')
 
     # Convert original file to:
-    #  - mono (-ac 1)
     #  - sample rate (audio samples / s) of 22050Hz (-ar 22050)
     #  - constant bit rate (sample resolution) of 48kbps (-ab 48k)
     avconv_command = ['avconv', '-i', path_to_original,
-                      '-ac', '1',
                       '-ar', '22050',
                       '-ab', '48k',
                       path_to_tmp_location]
