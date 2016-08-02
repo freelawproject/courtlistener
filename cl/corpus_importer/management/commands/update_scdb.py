@@ -104,7 +104,8 @@ class Command(BaseCommand):
                 print "      '%s' field unchanged -- old and new values were " \
                       "the same." % attribute
 
-    def do_federal_citations(self, cluster, scdb_info):
+    @staticmethod
+    def do_federal_citations(cluster, scdb_info):
         """
         Handle the federal_cite fields differently, since they may have the
         values in any order. Start by figuring out which fields are free, and
@@ -136,7 +137,9 @@ class Command(BaseCommand):
         if len(new_values) > len(available_fields):
             print "       WARNING: More values were found than there were " \
                   "slots to put them in. Time to create federal_cite_four?"
-
+        if len(new_values) == 0:
+            print "       No federal_cite_N values updated out of %s possible " \
+                  "values." % len(scdb_values)
         for value, field in zip(new_values, available_fields):
             print("      Updating %s with %s." % (field, value))
             setattr(cluster, field, value)
@@ -162,7 +165,6 @@ class Command(BaseCommand):
             self.set_if_falsy(cluster, attr, scdb_info[lookup_key])
 
         self.set_if_falsy(cluster.docket, 'docket_number', scdb_info['docket'])
-
         self.do_federal_citations(cluster, scdb_info)
 
         if not self.debug:
