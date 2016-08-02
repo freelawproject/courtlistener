@@ -20,16 +20,15 @@ import csv
 import os
 
 from django.core.management import BaseCommand
+from django.db.models import Q
 
 from cl.search.models import OpinionCluster
 from datetime import date, datetime
 
 SCDB_FILENAME = os.path.join(
     '/var/www/courtlistener/cl/corpus_importer/scdb/data',
-    'SCDB_2015_01_caseCentered_Citation.csv'
+    'SCDB_2016_01_caseCentered_Citation.csv'
 )
-SCDB_BEGINS = date(1946, 11, 18)
-SCDB_ENDS = date(2014, 6, 19)
 
 # Relevant numbers:
 #  - 7907: After this point we don't seem to have any citations for items.
@@ -115,9 +114,6 @@ class Command(BaseCommand):
                 path=cluster.get_absolute_url(),
         ))
         attribute_pairs = [
-            ('federal_cite_one', 'usCite'),
-            ('federal_cite_two', 'sctCite'),
-            ('federal_cite_three', 'ledCite'),
             ('lexis_cite', 'lexisCite'),
             ('scdb_id', 'caseId'),
             ('scdb_votes_majority', 'majVotes'),
@@ -128,6 +124,31 @@ class Command(BaseCommand):
             self.set_if_falsy(cluster, attr, scdb_info[lookup_key])
 
         self.set_if_falsy(cluster.docket, 'docket_number', scdb_info['docket'])
+
+        # Handle the federal_cite fields differently, since they may have the
+        # values in any order. Start by figuring out which fields are free, and
+        # which values are already in the DB.
+        existing_values = set()
+        available_fields = []
+        for field in ['federal_cite_one', 'federal_cite_two',
+                      'federal_cite_three']:
+            value = getattr(cluster, field).strip()
+            if value:
+                existing_values.add(value)
+            else:
+                available_fields.append(field)
+
+        # Create a set of good citation values in SCDB.
+        scdb_values = set()
+        for field in ['usCite', 'sctCite', 'ledCite']:
+            value = scdb_info[field].strip()
+            if value:
+                scdb_values.add(value)
+
+        # Add new values to the DB in the open slots.
+        new_values = scdb_values - existing_values
+        for value, field in zip(new_values, available_fields):
+            setattr(cluster, field, value)
 
         if not self.debug:
             cluster.docket.save()
@@ -217,23 +238,12 @@ class Command(BaseCommand):
                     # Newer additions don't yet have citations.
                     if clusters.count() == 0:
                         # None found by scdb_id. Try by citation number
-                        print "  Checking by federal_cite_one..",
+                        print "  Checking by federal_cite_one, _two, or " \
+                              "_three...",
                         clusters = OpinionCluster.objects.filter(
-                            federal_cite_one=d['usCite'],
-                            scdb_id='',
-                        )
-                        print "%s matches found." % clusters.count()
-                    if clusters.count() == 0:
-                        print "  Checking by federal_cite_two...",
-                        clusters = OpinionCluster.objects.filter(
-                            federal_cite_two=d['usCite'],
-                            scdb_id='',
-                        )
-                        print "%s matches found." % clusters.count()
-                    if clusters.count() == 0:
-                        print "  Checking by federal_cite_three...",
-                        clusters = OpinionCluster.objects.filter(
-                            federal_cite_three=d['usCite'],
+                            Q(federal_cite_one=d['usCite']) |
+                            Q(federal_cite_two=d['usCite']) |
+                            Q(federal_cite_three=d['usCite']),
                             scdb_id='',
                         )
                         print "%s matches found." % clusters.count()
