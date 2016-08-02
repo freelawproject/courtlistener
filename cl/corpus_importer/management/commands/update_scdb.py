@@ -74,6 +74,7 @@ class Command(BaseCommand):
         new_value_not_blank = new_value.strip() != ''
         if all([does_not_currently_have_a_value, current_value_not_zero,
                 new_value_not_blank]):
+            print("      Updating %s with %s." % (attribute, new_value))
             setattr(obj, attribute, new_value)
         else:
             # Report if there's a difference -- that might spell trouble.
@@ -103,6 +104,43 @@ class Command(BaseCommand):
                 print "      '%s' field unchanged -- old and new values were " \
                       "the same." % attribute
 
+    def do_federal_citations(self, cluster, scdb_info):
+        """
+        Handle the federal_cite fields differently, since they may have the
+        values in any order. Start by figuring out which fields are free, and
+        which values are already in the DB.
+
+        :param cluster: The Cluster to be changed.
+        :param scdb_info: A dict with the SCDB information.
+        :return: None
+        """
+        existing_values = set()
+        available_fields = []
+        for field in ['federal_cite_one', 'federal_cite_two',
+                      'federal_cite_three']:
+            value = getattr(cluster, field).strip()
+            if value:
+                existing_values.add(value)
+            else:
+                available_fields.append(field)
+
+        # Create a set of good citation values in SCDB.
+        scdb_values = set()
+        for field in ['usCite', 'sctCite', 'ledCite']:
+            value = scdb_info[field].strip()
+            if value:
+                scdb_values.add(value)
+
+        # Add new values to the DB in the open slots.
+        new_values = scdb_values - existing_values
+        if len(new_values) > len(available_fields):
+            print "       WARNING: More values were found than there were " \
+                  "slots to put them in. Time to create federal_cite_four?"
+
+        for value, field in zip(new_values, available_fields):
+            print("      Updating %s with %s." % (field, value))
+            setattr(cluster, field, value)
+
     def enhance_item_with_scdb(self, cluster, scdb_info):
         """Good news: A single Cluster object was found for the SCDB record.
 
@@ -125,30 +163,7 @@ class Command(BaseCommand):
 
         self.set_if_falsy(cluster.docket, 'docket_number', scdb_info['docket'])
 
-        # Handle the federal_cite fields differently, since they may have the
-        # values in any order. Start by figuring out which fields are free, and
-        # which values are already in the DB.
-        existing_values = set()
-        available_fields = []
-        for field in ['federal_cite_one', 'federal_cite_two',
-                      'federal_cite_three']:
-            value = getattr(cluster, field).strip()
-            if value:
-                existing_values.add(value)
-            else:
-                available_fields.append(field)
-
-        # Create a set of good citation values in SCDB.
-        scdb_values = set()
-        for field in ['usCite', 'sctCite', 'ledCite']:
-            value = scdb_info[field].strip()
-            if value:
-                scdb_values.add(value)
-
-        # Add new values to the DB in the open slots.
-        new_values = scdb_values - existing_values
-        for value, field in zip(new_values, available_fields):
-            setattr(cluster, field, value)
+        self.do_federal_citations(cluster, scdb_info)
 
         if not self.debug:
             cluster.docket.save()
@@ -281,3 +296,4 @@ class Command(BaseCommand):
                     action_one(cluster, d)
                 else:
                     print '  OK. No changes will be made.'
+
