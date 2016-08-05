@@ -181,12 +181,12 @@ class Command(BaseCommand):
         save = self.do_federal_citations(cluster, scdb_info)
 
         if save:
-            print("Saving to database (or faking if debug=True)")
+            print("      Saving to database (or faking if debug=True)")
             if not self.debug:
                 cluster.docket.save()
                 cluster.save()
         else:
-            print("Item not saved due to collision or error. Please edit by "
+            print("      Item not saved due to collision or error. Please edit by "
                   "hand.")
 
     @staticmethod
@@ -260,7 +260,7 @@ class Command(BaseCommand):
                 # Iterate over every item, looking for matches in various ways.
                 if i < start_row:
                     continue
-                print "Row is: %s. ID is: %s" % (i, d['caseId'])
+                print "\nRow is: %s. ID is: %s" % (i, d['caseId'])
 
                 clusters = OpinionCluster.objects.none()
                 if len(clusters) == 0:
