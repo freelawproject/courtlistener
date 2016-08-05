@@ -104,45 +104,58 @@ class Command(BaseCommand):
                 print "      '%s' field unchanged -- old and new values were " \
                       "the same." % attribute
 
-    @staticmethod
-    def do_federal_citations(cluster, scdb_info):
+    def do_federal_citations(self, cluster, scdb_info):
         """
         Handle the federal_cite fields differently, since they may have the
-        values in any order. Start by figuring out which fields are free, and
-        which values are already in the DB.
+        values in any order.
 
         :param cluster: The Cluster to be changed.
         :param scdb_info: A dict with the SCDB information.
-        :return: None
+        :return: save: A boolean indicating whether the item should be saved.
         """
-        existing_values = set()
+        save = True
+        us_done, sct_done, led_done = False, False, False
         available_fields = []
         for field in ['federal_cite_one', 'federal_cite_two',
                       'federal_cite_three']:
             value = getattr(cluster, field).strip()
-            if value:
-                existing_values.add(value)
-            else:
+            if not value:
                 available_fields.append(field)
+                continue
 
-        # Create a set of good citation values in SCDB.
-        scdb_values = set()
-        for field in ['usCite', 'sctCite', 'ledCite']:
-            value = scdb_info[field].strip()
-            if value:
-                scdb_values.add(value)
+            if "U.S." in value:
+                self.set_if_falsy(cluster, field, scdb_info['usCite'])
+                us_done = True
+            elif "S. Ct." in value:
+                self.set_if_falsy(cluster, field, scdb_info['sctCite'])
+                sct_done = True
+            elif "L. Ed." in value:
+                self.set_if_falsy(cluster, field, scdb_info['ledCite'])
+                led_done = True
+            else:
+                print("      WARNING: Fell through search for citation.")
+                save = False
 
-        # Add new values to the DB in the open slots.
-        new_values = scdb_values - existing_values
-        if len(new_values) > len(available_fields):
+        num_undone_fields = sum([f for f in [us_done, sct_done, led_done] if
+                                 f is False])
+        if num_undone_fields > len(available_fields):
             print "       WARNING: More values were found than there were " \
                   "slots to put them in. Time to create federal_cite_four?"
-        if len(new_values) == 0:
-            print "       No federal_cite_N values updated out of %s possible " \
-                  "values." % len(scdb_values)
-        for value, field in zip(new_values, available_fields):
-            print("      Updating %s with %s." % (field, value))
-            setattr(cluster, field, value)
+            save = False
+        else:
+            # Save undone values into available fields.
+            for field in available_fields:
+                if not us_done:
+                    self.set_if_falsy(cluster, field, scdb_info['usCite'])
+                    us_done = True
+                elif not sct_done:
+                    self.set_if_falsy(cluster, field, scdb_info['sctCite'])
+                    sct_done = True
+                elif not led_done:
+                    self.set_if_falsy(cluster, field, scdb_info['ledCite'])
+                    led_done = True
+
+        return save
 
     def enhance_item_with_scdb(self, cluster, scdb_info):
         """Good news: A single Cluster object was found for the SCDB record.
@@ -165,11 +178,16 @@ class Command(BaseCommand):
             self.set_if_falsy(cluster, attr, scdb_info[lookup_key])
 
         self.set_if_falsy(cluster.docket, 'docket_number', scdb_info['docket'])
-        self.do_federal_citations(cluster, scdb_info)
+        save = self.do_federal_citations(cluster, scdb_info)
 
-        if not self.debug:
-            cluster.docket.save()
-            cluster.save()
+        if save:
+            print("Saving to database (or faking if debug=True)")
+            if not self.debug:
+                cluster.docket.save()
+                cluster.save()
+        else:
+            print("Item not saved due to collision or error. Please edit by "
+                  "hand.")
 
     @staticmethod
     def winnow_by_docket_number(clusters, d):
