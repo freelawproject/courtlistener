@@ -145,13 +145,13 @@ class Command(BaseCommand):
         else:
             # Save undone values into available fields.
             for field in available_fields:
-                if not us_done:
+                if not us_done and scdb_info['usCite']:
                     self.set_if_falsy(cluster, field, scdb_info['usCite'])
                     us_done = True
-                elif not sct_done:
+                elif not sct_done and scdb_info['sctCite']:
                     self.set_if_falsy(cluster, field, scdb_info['sctCite'])
                     sct_done = True
-                elif not led_done:
+                elif not led_done and scdb_info['ledCite']:
                     self.set_if_falsy(cluster, field, scdb_info['ledCite'])
                     led_done = True
 
