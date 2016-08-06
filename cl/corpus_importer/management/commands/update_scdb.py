@@ -110,10 +110,10 @@ class Command(BaseCommand):
                 values_differ = True
 
             if values_differ:
-                print ("      WARNING: Didn't set '{attr}' attribute on obj "
-                       "{obj_id} because it already had a value, but the new "
-                       "value ('{new}') differs from current value "
-                       "('{current}').".format(
+                print (u"      WARNING: Didn't set '{attr}' attribute on obj "
+                       u"{obj_id} because it already had a value, but the new "
+                       u"value ('{new}') differs from current value "
+                       u"('{current}').".format(
                         attr=attribute,
                         obj_id=obj.pk,
                         new=new_value,
@@ -121,8 +121,8 @@ class Command(BaseCommand):
                 ))
             else:
                 # The values were the same.
-                print "      '%s' field unchanged -- old and new values were " \
-                      "the same." % attribute
+                print u"      '%s' field unchanged -- old and new values were " \
+                      u"the same." % attribute
 
     def do_federal_citations(self, cluster, scdb_info):
         """
