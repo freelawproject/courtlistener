@@ -20,6 +20,7 @@ import csv
 import os
 
 from django.core.management import BaseCommand
+from django.core.management import CommandError
 from django.db.models import Q
 
 from cl.search.models import OpinionCluster
@@ -51,10 +52,21 @@ class Command(BaseCommand):
             required=True,
             help="The path to the SCDB Case Centered file you wish to input."
         )
+        parser.add_argument(
+            '--skip-human-review',
+            action='store_true',
+            default=False,
+            help="Don't seek human review. Instead report the number of cases "
+                 "needing human review at the end."
+        )
 
     def handle(self, *args, **options):
         self.debug = options['debug']
         self.file = options['file']
+        self.skip_human_review = options['skip_human_review']
+        if self.skip_human_review and not self.debug:
+            raise CommandError('Cannot skip review without --debug flag.')
+
         self.iterate_scdb_and_take_actions(
             action_zero=lambda *args, **kwargs: None,
             action_one=self.enhance_item_with_scdb,
@@ -220,8 +232,7 @@ class Command(BaseCommand):
         # Convert our list of IDs back into a QuerySet for consistency.
         return OpinionCluster.objects.filter(pk__in=good_cluster_ids)
 
-    @staticmethod
-    def get_human_review(clusters, d):
+    def get_human_review(self, clusters, d):
         for i, cluster in enumerate(clusters):
             print '    %s: Cluster %s:' % (i, cluster.pk)
             print '      https://www.courtlistener.com%s' % cluster.get_absolute_url()
@@ -230,15 +241,20 @@ class Command(BaseCommand):
         print '  SCDB info:'
         print '    %s' % d['caseName']
         print '    %s' % d['docket']
-        choice = raw_input('  Which item should we update? [0-%s] ' %
-                           (len(clusters) - 1))
 
-        try:
-            choice = int(choice)
-            cluster = clusters[choice]
-        except ValueError:
-            cluster = None
-        return cluster
+        if self.skip_human_review:
+            print('  Skipping human review and just returning the first item.')
+            return clusters[0]
+        else:
+            choice = raw_input('  Which item should we update? [0-%s] ' %
+                               (len(clusters) - 1))
+
+            try:
+                choice = int(choice)
+                cluster = clusters[choice]
+            except ValueError:
+                cluster = None
+            return cluster
 
     def iterate_scdb_and_take_actions(
             self,
