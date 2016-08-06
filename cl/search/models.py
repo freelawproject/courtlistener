@@ -597,16 +597,19 @@ class OpinionCluster(models.Model):
     )
     federal_cite_one = models.CharField(
         help_text="Primary federal citation",
+        db_index=True,
         max_length=50,
         blank=True,
     )
     federal_cite_two = models.CharField(
         help_text="Secondary federal citation",
+        db_index=True,
         max_length=50,
         blank=True,
     )
     federal_cite_three = models.CharField(
         help_text="Tertiary federal citation",
+        db_index=True,
         max_length=50,
         blank=True,
     )
