@@ -66,6 +66,8 @@ class Command(BaseCommand):
         self.skip_human_review = options['skip_human_review']
         if self.skip_human_review and not self.debug:
             raise CommandError('Cannot skip review without --debug flag.')
+        if self.skip_human_review:
+            self.skipped_count = 0
 
         self.iterate_scdb_and_take_actions(
             action_zero=lambda *args, **kwargs: None,
@@ -73,6 +75,10 @@ class Command(BaseCommand):
             action_many=self.get_human_review,
             start_row=options['start_at'],
         )
+
+        if self.skip_human_review:
+            print("\nSkipped %s items in SCDB which came up for human review." %
+                  self.skipped_count)
 
     @staticmethod
     def set_if_falsy(obj, attribute, new_value):
@@ -244,6 +250,7 @@ class Command(BaseCommand):
 
         if self.skip_human_review:
             print('  Skipping human review and just returning the first item.')
+            self.skipped_count += 1
             return clusters[0]
         else:
             choice = raw_input('  Which item should we update? [0-%s] ' %
