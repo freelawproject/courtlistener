@@ -25,11 +25,6 @@ from django.db.models import Q
 from cl.search.models import OpinionCluster
 from datetime import date, datetime
 
-SCDB_FILENAME = os.path.join(
-    '/var/www/courtlistener/cl/corpus_importer/scdb/data',
-    'SCDB_2016_01_caseCentered_Citation.csv'
-)
-
 # Relevant numbers:
 #  - 7907: After this point we don't seem to have any citations for items.
 
@@ -50,9 +45,16 @@ class Command(BaseCommand):
             default=0,
             help="The row number you wish to begin at in the SCDB CSV"
         )
+        parser.add_argument(
+            '--file',
+            type=str,
+            required=True,
+            help="The path to the SCDB Case Centered file you wish to input."
+        )
 
     def handle(self, *args, **options):
         self.debug = options['debug']
+        self.file = options['file']
         self.iterate_scdb_and_take_actions(
             action_zero=lambda *args, **kwargs: None,
             action_one=self.enhance_item_with_scdb,
@@ -145,15 +147,23 @@ class Command(BaseCommand):
         else:
             # Save undone values into available fields.
             for field in available_fields:
-                if not us_done and scdb_info['usCite']:
-                    self.set_if_falsy(cluster, field, scdb_info['usCite'])
+                if not us_done:
                     us_done = True
-                elif not sct_done and scdb_info['sctCite']:
-                    self.set_if_falsy(cluster, field, scdb_info['sctCite'])
+                    if scdb_info['usCite']:
+                        self.set_if_falsy(cluster, field, scdb_info['usCite'])
+                        # Continue if the value got set. Otherwise, fall let
+                        # the next value fill the available field.
+                        continue
+                if not sct_done:
                     sct_done = True
-                elif not led_done and scdb_info['ledCite']:
-                    self.set_if_falsy(cluster, field, scdb_info['ledCite'])
+                    if scdb_info['sctCite']:
+                        self.set_if_falsy(cluster, field, scdb_info['sctCite'])
+                        continue
+                if not led_done:
                     led_done = True
+                    if scdb_info['ledCite']:
+                        self.set_if_falsy(cluster, field, scdb_info['ledCite'])
+                        continue
 
         return save
 
@@ -252,7 +262,7 @@ class Command(BaseCommand):
 
         If action_zero or action_many return None, no action is taken.
         """
-        with open(SCDB_FILENAME) as f:
+        with open(self.file) as f:
             dialect = csv.Sniffer().sniff(f.read(1024))
             f.seek(0)
             reader = csv.DictReader(f, dialect=dialect)
