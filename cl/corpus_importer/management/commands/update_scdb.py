@@ -241,8 +241,8 @@ class Command(BaseCommand):
         for i, cluster in enumerate(clusters):
             print u'    %s: Cluster %s:' % (i, cluster.pk)
             print u'      https://www.courtlistener.com%s' % cluster.get_absolute_url()
-            print u'      %s' % cluster.case_name
-            print u'      %s' % cluster.docket.docket_number
+            print u'      %s' % cluster.case_name.encode('utf-8')
+            print u'      %s' % cluster.docket.docket_number.encode('utf-8')
         print u'  SCDB info:'
         print u'    %s' % d['caseName']
         print u'    %s' % d['docket']
