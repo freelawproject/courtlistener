@@ -239,13 +239,13 @@ class Command(BaseCommand):
 
     def get_human_review(self, clusters, d):
         for i, cluster in enumerate(clusters):
-            print u'    %s: Cluster %s:' % (i, cluster.pk)
-            print u'      https://www.courtlistener.com%s' % cluster.get_absolute_url()
-            print u'      %s' % cluster.case_name.encode('utf-8')
-            print u'      %s' % cluster.docket.docket_number.encode('utf-8')
-        print u'  SCDB info:'
-        print u'    %s' % d['caseName']
-        print u'    %s' % d['docket']
+            print '    %s: Cluster %s:' % (i, cluster.pk)
+            print '      https://www.courtlistener.com%s' % cluster.get_absolute_url()
+            print '      %s' % cluster.case_name.encode('utf-8')
+            print '      %s' % cluster.docket.docket_number.encode('utf-8')
+        print '  SCDB info:'
+        print '    %s' % d['caseName']
+        print '    %s' % d['docket']
 
         if self.skip_human_review:
             print(u'  Skipping human review and just returning the first item.')
