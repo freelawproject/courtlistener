@@ -91,6 +91,7 @@ class Command(BaseCommand):
         does_not_currently_have_a_value = not current_value
         current_value_not_zero = current_value != 0
         new_value_not_blank = new_value.strip() != ''
+        error = False
         if all([does_not_currently_have_a_value, current_value_not_zero,
                 new_value_not_blank]):
             print("      Updating %s with %s." % (attribute, new_value.encode('utf-8')))
@@ -113,15 +114,17 @@ class Command(BaseCommand):
                        "{obj_id} because it already had a value, but the new "
                        "value ('{new}') differs from current value "
                        "('{current}').".format(
-                        attr=attribute,
-                        obj_id=obj.pk,
-                        new=new_value,
-                        current=current_value.encode('utf-8'),
-                ))
+                            attr=attribute,
+                            obj_id=obj.pk,
+                            new=new_value,
+                            current=current_value.encode('utf-8'),
+                        ))
+                error = True
             else:
                 # The values were the same.
                 print "      '%s' field unchanged -- old and new values were " \
                       "the same." % attribute
+        return error
 
     def do_federal_citations(self, cluster, scdb_info):
         """
@@ -135,25 +138,30 @@ class Command(BaseCommand):
         save = True
         us_done, sct_done, led_done = False, False, False
         available_fields = []
+        error = False
         for field in ['federal_cite_one', 'federal_cite_two',
                       'federal_cite_three']:
+            # Update the value in place (ie, replace the U.S. citation with a
+            # U.S. citation. Identify available fields.
             value = getattr(cluster, field).strip()
             if not value:
                 available_fields.append(field)
                 continue
 
             if "U.S." in value:
-                self.set_if_falsy(cluster, field, scdb_info['usCite'])
+                error = self.set_if_falsy(cluster, field, scdb_info['usCite'])
                 us_done = True
             elif "S. Ct." in value:
-                self.set_if_falsy(cluster, field, scdb_info['sctCite'])
+                error = self.set_if_falsy(cluster, field, scdb_info['sctCite'])
                 sct_done = True
             elif "L. Ed." in value:
-                self.set_if_falsy(cluster, field, scdb_info['ledCite'])
+                error = self.set_if_falsy(cluster, field, scdb_info['ledCite'])
                 led_done = True
             else:
                 print("      WARNING: Fell through search for citation.")
                 save = False
+        if error:
+            save = False
 
         num_undone_fields = sum([f for f in [us_done, sct_done, led_done] if
                                  f is False])
@@ -162,7 +170,8 @@ class Command(BaseCommand):
                   "slots to put them in. Time to create federal_cite_four?"
             save = False
         else:
-            # Save undone values into available fields.
+            # Save undone values into available fields. Any value that wasn't
+            # updated above gets slotted into the fields that remain.
             for field in available_fields:
                 if not us_done:
                     us_done = True
