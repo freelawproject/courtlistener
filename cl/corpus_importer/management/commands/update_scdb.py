@@ -329,9 +329,13 @@ class Command(BaseCommand):
                         scdb_id='',
                     )
                     print "%s matches found." % clusters.count()
-                    print "    Winnowing by docket number...",
-                    clusters = self.winnow_by_docket_number(clusters, d)
-                    print "%s matches found." % clusters.count()
+                    if d['docket']:
+                        print "    Winnowing by docket number...",
+                        clusters = self.winnow_by_docket_number(clusters, d)
+                        print "%s matches found." % clusters.count()
+                    else:
+                        print "    Cannot winnow by docket number -- there " \
+                              "isn't one."
 
                 # Searching complete, run actions.
                 if clusters.count() == 0:
