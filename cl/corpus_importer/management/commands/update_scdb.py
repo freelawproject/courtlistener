@@ -23,8 +23,9 @@ from django.core.management import BaseCommand
 from django.core.management import CommandError
 from django.db.models import Q
 
+from cl.lib.string_diff import gen_diff_ratio
 from cl.search.models import OpinionCluster
-from datetime import date, datetime
+from datetime import datetime
 
 # Relevant numbers:
 #  - 7907: After this point we don't seem to have any citations for items.
@@ -281,7 +282,9 @@ class Command(BaseCommand):
 
     def get_human_review(self, clusters, d):
         for i, cluster in enumerate(clusters):
-            print '    %s: Cluster %s:' % (i, cluster.pk)
+            print '    %s: Cluster %s (%0.3f sim):' % (
+                i, cluster.pk, gen_diff_ratio(cluster.case_name, d['caseName']),
+            )
             print '      https://www.courtlistener.com%s' % cluster.get_absolute_url()
             print '      %s' % cluster.case_name.encode('utf-8')
             print '      %s' % cluster.docket.docket_number.encode('utf-8')
