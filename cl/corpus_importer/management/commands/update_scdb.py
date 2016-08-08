@@ -259,12 +259,14 @@ class Command(BaseCommand):
         result.
         """
         good_cluster_ids = []
-        bad_words = ['v.', 'versus']
+        bad_words = ['v', 'versus']
         exclude = set(string.punctuation)
-        scdb_case_name = ''.join(ch for ch in d['caseName'] if ch not in exclude)
+        scdb_case_name = ''.join(c for c in d['caseName'] if
+                                 c not in exclude)
         scdb_words = set(scdb_case_name.lower().split())
         for cluster in clusters:
-            case_name = ''.join(ch for ch in cluster.case_name if ch not in exclude)
+            case_name = ''.join(c for c in cluster.case_name if
+                                c not in exclude)
             case_name_words = case_name.lower().split()
             cluster_words = set([word for word in case_name_words if
                                  word not in bad_words])
