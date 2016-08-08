@@ -292,10 +292,14 @@ class Command(BaseCommand):
             )
             print '      https://www.courtlistener.com%s' % cluster.get_absolute_url()
             print '      %s' % cluster.case_name.encode('utf-8')
-            print '      %s' % cluster.docket.docket_number.encode('utf-8')
+            if cluster.docket.docket_number:
+                print '      %s' % cluster.docket.docket_number.encode('utf-8')
+            print '      %s' % cluster.date_filed
         print '  SCDB info:'
         print '    %s' % d['caseName']
-        print '    %s' % d['docket']
+        if d['docket']:
+            print '    %s' % d['docket']
+        print '    %s' % d['dateDecision']
 
         if self.skip_human_review:
             print('  Skipping human review and just returning the first item.')
