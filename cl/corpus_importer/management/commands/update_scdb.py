@@ -283,7 +283,12 @@ class Command(BaseCommand):
     def get_human_review(self, clusters, d):
         for i, cluster in enumerate(clusters):
             print '    %s: Cluster %s (%0.3f sim):' % (
-                i, cluster.pk, gen_diff_ratio(cluster.case_name, d['caseName']),
+                i,
+                cluster.pk,
+                gen_diff_ratio(
+                    cluster.case_name.lower(),
+                    d['caseName'].lower()
+                ),
             )
             print '      https://www.courtlistener.com%s' % cluster.get_absolute_url()
             print '      %s' % cluster.case_name.encode('utf-8')
