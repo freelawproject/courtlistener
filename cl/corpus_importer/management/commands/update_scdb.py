@@ -246,6 +246,33 @@ class Command(BaseCommand):
         # Convert our list of IDs back into a QuerySet for consistency.
         return OpinionCluster.objects.filter(pk__in=good_cluster_ids)
 
+    @staticmethod
+    def winnow_by_case_name(clusters, d):
+        """
+        Go through the clusters that are matched and see if one matches by
+        case name.
+
+        :param clusters: A QuerySet object of clusters.
+        :param d: The matching SCDB data
+        :return: A QuerySet object of clusters, hopefully winnowed to a single
+        result.
+        """
+        good_cluster_ids = []
+        bad_words = ['v.', 'versus']
+        scdb_words = set(d['caseName'].lower().split())
+        for cluster in clusters:
+            case_name = cluster.case_name.lower().split()
+            cluster_words = set([word for word in case_name if
+                                 word not in bad_words])
+            if scdb_words.issuperset(cluster_words):
+                good_cluster_ids.append(cluster.pk)
+
+        if len(good_cluster_ids) == 1:
+            return OpinionCluster.objects.filter(pk__in=good_cluster_ids)
+        else:
+            # Alas: No progress made.
+            return clusters
+
     def get_human_review(self, clusters, d):
         for i, cluster in enumerate(clusters):
             print '    %s: Cluster %s:' % (i, cluster.pk)
@@ -301,7 +328,8 @@ class Command(BaseCommand):
                 # Iterate over every item, looking for matches in various ways.
                 if i < start_row:
                     continue
-                print "\nRow is: %s. ID is: %s" % (i, d['caseId'])
+                print "\nRow is: %s. ID is: %s (%s)" % (i, d['caseId'],
+                                                        d['caseName'])
 
                 clusters = OpinionCluster.objects.none()
                 if len(clusters) == 0:
@@ -338,6 +366,8 @@ class Command(BaseCommand):
                         scdb_id='',
                     )
                     print "%s matches found." % clusters.count()
+
+                if clusters.count() > 1:
                     if d['docket']:
                         print "    Winnowing by docket number...",
                         clusters = self.winnow_by_docket_number(clusters, d)
@@ -345,6 +375,11 @@ class Command(BaseCommand):
                     else:
                         print "    Cannot winnow by docket number -- there " \
                               "isn't one."
+
+                if clusters.count() > 1:
+                    print "    Winnowing by case name...",
+                    clusters = self.winnow_by_case_name(clusters, d)
+                    print "%s matches found." % clusters.count()
 
                 # Searching complete, run actions.
                 if clusters.count() == 0:
