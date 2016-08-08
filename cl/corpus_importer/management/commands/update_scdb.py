@@ -17,6 +17,7 @@ Once located, we update items:
  - decision_direction
 """
 import csv
+import string
 
 from django.core.management import BaseCommand
 from django.core.management import CommandError
@@ -259,10 +260,13 @@ class Command(BaseCommand):
         """
         good_cluster_ids = []
         bad_words = ['v.', 'versus']
-        scdb_words = set(d['caseName'].lower().split())
+        exclude = set(string.punctuation)
+        scdb_case_name = ''.join(ch for ch in d['caseName'] if ch not in exclude)
+        scdb_words = set(scdb_case_name.lower().split())
         for cluster in clusters:
-            case_name = cluster.case_name.lower().split()
-            cluster_words = set([word for word in case_name if
+            case_name = ''.join(ch for ch in cluster.case_name if ch not in exclude)
+            case_name_words = case_name.lower().split()
+            cluster_words = set([word for word in case_name_words if
                                  word not in bad_words])
             if scdb_words.issuperset(cluster_words):
                 good_cluster_ids.append(cluster.pk)
