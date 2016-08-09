@@ -1,5 +1,5 @@
 $(document).ready(function () {
-    var dateFiledQ = '((dateFiled:[1945-01-01T00:00:00Z TO ' + last_year + 'Z] AND scdb_id:["" TO *]) OR (dateFiled:[' + last_year + 'Z TO *]))';
+    var dateFiledQ = '((dateFiled:[* TO ' + last_year + 'Z] AND scdb_id:["" TO *]) OR (dateFiled:[' + last_year + 'Z TO *]))';
     var cache = {};
     var setAuthorityIDs = function (id, cb) {
         $.ajax({
@@ -79,7 +79,7 @@ $(document).ready(function () {
     var getParamsForQuery = function (query) {
         // This query is anything with the case name typed in...
         // ...in the supreme court...
-        // ...between 1945 and a year ago that has an SCDB id... OR
+        // ...that has an SCDB id... OR
         // ...in the last year, with or without an SCDB id.
         var params = {
             court: 'scotus',
