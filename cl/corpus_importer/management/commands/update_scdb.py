@@ -18,6 +18,7 @@ Once located, we update items:
 """
 import csv
 import string
+from datetime import datetime
 
 from django.core.management import BaseCommand
 from django.core.management import CommandError
@@ -25,7 +26,7 @@ from django.db.models import Q
 
 from cl.lib.string_diff import gen_diff_ratio
 from cl.search.models import OpinionCluster
-from datetime import datetime
+
 
 # Relevant numbers:
 #  - 7907: After this point we don't seem to have any citations for items.
@@ -115,7 +116,7 @@ class Command(BaseCommand):
                 print ("      WARNING: Didn't set '{attr}' attribute on obj "
                        "{obj_id} because it already had a value, but the new "
                        "value ('{new}') differs from current value "
-                       "('{current}').".format(
+                       "('{current}')".format(
                             attr=attribute,
                             obj_id=obj.pk,
                             new=new_value,
@@ -125,7 +126,7 @@ class Command(BaseCommand):
             else:
                 # The values were the same.
                 print "      '%s' field unchanged -- old and new values were " \
-                      "the same." % attribute
+                      "the same: %s" % (attribute, new_value)
         return error
 
     def do_federal_citations(self, cluster, scdb_info):
@@ -206,8 +207,6 @@ class Command(BaseCommand):
                 path=cluster.get_absolute_url(),
         ))
         attribute_pairs = [
-            ('lexis_cite', 'lexisCite'),
-            ('scdb_id', 'caseId'),
             ('scdb_votes_majority', 'majVotes'),
             ('scdb_votes_minority', 'minVotes'),
             ('scdb_decision_direction', 'decisionDirection'),
@@ -216,9 +215,11 @@ class Command(BaseCommand):
             self.set_if_falsy(cluster, attr, scdb_info[lookup_key])
 
         self.set_if_falsy(cluster.docket, 'docket_number', scdb_info['docket'])
-        save = self.do_federal_citations(cluster, scdb_info)
+        federal_ok = self.do_federal_citations(cluster, scdb_info)
+        scdb_ok = self.set_if_falsy(cluster, 'scdb_id', 'caseId')
+        lexis_ok = self.set_if_falsy(cluster, 'lexis_cite', 'lexisCite')
 
-        if save:
+        if all([federal_ok, scdb_ok, lexis_ok]):
             print("      Saving to database (or faking if debug=True)")
             if not self.debug:
                 cluster.docket.save()
