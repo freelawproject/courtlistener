@@ -1237,8 +1237,8 @@ $(document).ready(function () {
 		var value = 'no data';
 
 		if (s !== '') {
-			value = '<a href="http://supremecourtdatabase.org/analysisCaseDetail.php?cid=' +
-				s + '" target="_blank">' + s + '</a>' +
+			value = '<a href="http://scdb.wustl.edu/analysisCaseDetail.php?cid=' +
+				s + '"-01 target="_blank">' + s + '</a>' +
 				'&nbsp;<i class="gray fa fa-external-link"></i>';
 		}
 		return value;
