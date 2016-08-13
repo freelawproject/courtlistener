@@ -30,6 +30,16 @@
           href="/podcast/court/all/">
 {% endblock %}
 
+{% block navbar-o %}
+    {% if search_form.type.value == "o" %}active{% else %}{{ block.super }}{% endif %}
+{% endblock %}
+{% block navbar-oa %}
+    {% if search_form.type.value == "oa" %}active{% else %}{{ block.super }}{% endif %}
+{% endblock %}
+{% block navbar-p %}
+    {% if search_form.type.value == "p" %}active{% else %}{{ block.super }}{% endif %}
+{% endblock %}
+
 
 {% block sidebar %}
 {% with type=search_form.type.value %}

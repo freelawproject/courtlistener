@@ -114,13 +114,12 @@
                         <span class="icon-bar"></span>
                     </button>
                     <a class="navbar-brand hidden-xs" href="/">
-                        {% block logo %}
-                            <img src="{{ STATIC_PREFIX }}png/logo.png"
-                                 alt="CourtListener Logo"
-                                 width="260"
-                                 height="29"
-                                 tabindex="1"/>
-                        {% endblock %}
+                        <img src="{{ STATIC_PREFIX }}png/logo-large.png"
+                             alt="CourtListener logo"
+                             width="364"
+                             height="40"
+                             tabindex="1"
+                        />
                     </a>
                     <a class="navbar-brand visible-xs-block" href="/">
                         <img src="{{ STATIC_PREFIX }}png/logo-initials-only.png"
@@ -133,30 +132,8 @@
                 <div class="navbar-collapse collapse">
                     {% block main-nav %}
                         {% if user.is_authenticated %}
-                            <ul class="nav navbar-nav">
+                            <ul class="nav navbar-nav navbar-right">
                                 <li><a href="{% url "about" %}" tabindex="300">About</a></li>
-                                <li class="dropdown">
-                                    <a href="#"
-                                       class="dropdown-toggle"
-                                       tabindex="301"
-                                       data-toggle="dropdown">Visualizations&nbsp;<span
-                                            class="caret"></span>
-                                    </a>
-                                    <ul class="dropdown-menu" role="menu">
-                                        <li>
-                                            <a href="{% url "viz_gallery" %}"
-                                               tabindex="301">Gallery</a>
-                                        </li>
-                                        <li>
-                                            <a href="{% url "mapper_homepage" %}"
-                                               tabindex="301">SCOTUS Networks</a>
-                                        </li>
-                                        <li>
-                                            <a href="{% url "new_visualization" %}"
-                                               tabindex="301">New Network</a>
-                                        </li>
-                                    </ul>
-                                </li>
                                 <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
                                 <li class="dropdown">
                                     <a href="#"
@@ -182,31 +159,8 @@
                                 </li>
                             </ul>
                         {% else %}
-                            <ul class="nav navbar-nav">
+                            <ul class="nav navbar-nav navbar-right">
                                 <li><a href="{% url "about" %}">About</a></li>
-                                <li class="dropdown">
-                                    <a href="#"
-                                       class="dropdown-toggle"
-                                       tabindex="301"
-                                       data-toggle="dropdown">Visualizations&nbsp;<span
-                                            class="caret"></span>
-                                    </a>
-                                    <ul class="dropdown-menu" role="menu">
-                                        <li>
-                                            <a href="{% url "viz_gallery" %}"
-                                               tabindex="301">Gallery</a>
-                                        </li>
-                                        <li>
-                                            <a href="{% url "mapper_homepage" %}"
-                                               tabindex="301">SCOTUS
-                                                Networks</a>
-                                        </li>
-                                        <li>
-                                            <a href="{% url "new_visualization" %}"
-                                               tabindex="301">New Network</a>
-                                        </li>
-                                    </ul>
-                                </li>
                                 <li><a href="{% url "faq" %}">FAQ</a></li>
                                 <li><a href="" class="tour-link">Tour</a></li>
                                 {% if request.path != "/sign-out/" %}
@@ -221,15 +175,51 @@
                             </ul>
                         {% endif %}
                     {% endblock %}
-                    <ul class="nav navbar-nav navbar-right">
-                        {% block search-form %}
-                            {% include "includes/main_query_box.html" with homepage=False %}
-                        {% endblock %}
-                        {% block sign-in %}{% endblock %}
-                    </ul>
                 </div><!--/.nav-collapse -->
             </div><!--/.container-fluid -->
         </div><!-- navbar -->
+        <div class="navbar navbar-default" role="navigation" id="subnav">
+            <div class="container-fluid">
+                <div class="collapse navbar-collapse">
+                    <ul class="nav navbar-nav">
+                        <li class="{% block navbar-o %}inactive{% endblock %}">
+                            <a href="/?type=o">Opinions</a>
+                        </li>
+                        <li class="{% block navbar-oa %}inactive{% endblock %}">
+                            <a href="/?type=oa">Oral Arguments</a>
+                        </li>
+                        <li class="{% block navbar-p %}inactive{% endblock %}">
+                            <a href="/?type=p">Judges</a>
+                        </li>
+                        <li class="dropdown {% block navbar-vis %}inactive{% endblock %}">
+                            <a href="#"
+                               class="dropdown-toggle"
+                               tabindex="301"
+                               data-toggle="dropdown">Visualizations&nbsp;<span
+                                    class="caret"></span>
+                            </a>
+                            <ul class="dropdown-menu" role="menu">
+                                <li>
+                                    <a href="{% url "viz_gallery" %}"
+                                       tabindex="301">Gallery</a>
+                                </li>
+                                <li>
+                                    <a href="{% url "mapper_homepage" %}"
+                                       tabindex="301">SCOTUS Networks</a>
+                                </li>
+                                <li>
+                                    <a href="{% url "new_visualization" %}"
+                                       tabindex="301">New Network</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="{% block navbar-donate %}inactive{% endblock %}">
+                            <a href="{% url "donate" %}?referrer=navbar">Donate</a>
+                        </li>
+                    </ul>
+                </div>
+            </div><!--/.container-fluid -->
+        </div>
     </header>
     {% endblock %}
 

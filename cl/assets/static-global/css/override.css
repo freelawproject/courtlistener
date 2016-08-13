@@ -5,7 +5,33 @@ Sets up all the overrides or additional CSS that the site uses.
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
 .navbar-brand {
-    padding: 16px 15px;
+    padding: 16px 15px 16px 40px;
+}
+
+header {
+    margin-bottom: 30px;
+}
+
+.navbar {
+    margin-bottom: 0;
+    border-bottom: 1px solid #e7e7e7;
+}
+
+.navbar-nav > li > a {
+    padding-top: 13px;
+    padding-bottom: 13px;
+}
+
+.navbar-default .navbar-nav > .active > a,
+.navbar-default .navbar-nav > .active > a:hover,
+.navbar-default .navbar-nav > .active > a:focus {
+    background-color: transparent;
+    border-bottom: 3px solid #AE0B0B;
+}
+#subnav {
+    min-height: 0;
+    background-color: transparent;
+    border-top: 0;
 }
 
 .alt {

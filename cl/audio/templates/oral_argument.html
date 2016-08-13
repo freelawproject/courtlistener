@@ -7,9 +7,7 @@
 {% block description %}Oral Argument for {{ title }}{% endblock %}
 {% block og_description %}Oral Argument for {{ title }}{% endblock %}
 
-{% block search-form %}
-    {% include "includes/main_query_box.html" with homepage=False type="oa" %}
-{% endblock %}
+{% block navbar-oa %}active{% endblock %}
 
 {% block head %}
     <meta property="og:audio:url"
