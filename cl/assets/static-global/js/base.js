@@ -107,10 +107,6 @@ $(document).ready(function() {
         document.location = makeSearchPath(false);
     });
 
-    $('.search-page #id_order_by').change(function () {
-        $('#search-form').submit();
-    });
-
     $('#homepage #court-picker-search-form').submit(function(e){
         e.preventDefault();
 
@@ -132,12 +128,6 @@ $(document).ready(function() {
     });
 
 
-    ///////////////////////////
-    // Result Type Switching //
-    ///////////////////////////
-    $('#type-switcher label:not(.selected) input[name=type]').click(function () {
-        document.location = '/?type=' + this.value;
-    });
 
 
     //////////////////

@@ -34,6 +34,10 @@ header {
     border-top: 0;
 }
 
+#search-results {
+    margin-top: 23px;
+}
+
 .alt {
   color: #666;
   font-family: "Warnock Pro", "Book Antiqua", Georgia, serif;
@@ -97,9 +101,6 @@ a.button:active{
     }
 }
 @media(min-width:768px){
-    #id_q {
-        width: 638px;
-    }
     #homepage #main-query-box #id_q {
         width: 400px;
     }
@@ -121,9 +122,6 @@ a.button:active{
 
 }
 @media(min-width:992px){
-    #id_q {
-        width: 860px;
-    }
     #homepage #main-query-box #id_q {
         width: 600px;
     }
@@ -135,9 +133,6 @@ a.button:active{
     }
 }
 @media(min-width:1200px){
-    #id_q {
-        width: 345px;
-    }
     #homepage #main-query-box #id_q {
         width: 800px;
     }
@@ -174,22 +169,6 @@ a.button:active{
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;
     transition: all 0.5s ease;
-}
-
-#type-switcher h3 {
-    margin-bottom: 2px;
-}
-#type-switcher label{
-    font-weight: normal;
-}
-#type-switcher .selected {
-    border-bottom: 3px solid #ae0b0b;
-    color: #111;
-}
-#type-switcher label {
-    color: gray;
-    text-decoration: none;
-    border-bottom: none;
 }
 
 .container > footer {
@@ -392,9 +371,6 @@ body {
     -o-transition: all 0.5s ease;
     transition: all 0.5s ease;
 }
-#searchform-navbar #search-container .input-group {
-    padding: 14px 0 0 0;
-}
 
 #advanced {
     color: black;
@@ -521,14 +497,7 @@ input.court-checkbox, input.status-checkbox {
 #new-search-chooser {
     float: right;
 }
-/*
-#result-count {
-    float: left;
-}
-*/
-.search-page #id_order_by {
-    float: right;
-}
+
 .nojs #sidebar-search-form {
     display: none;
 }

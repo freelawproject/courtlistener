@@ -50,6 +50,9 @@
         </div>
         {% include "includes/result_type_chooser.html" %}
         {% include "includes/sidebar_filters.html" %}
+        {% if type == 'o' or type == 'oa' %}
+            {% include "includes/alert_sidebar_section.html" %}
+        {% endif %}
     </div>
 {% endwith %}
 {% endblock %}
@@ -99,6 +102,34 @@
             {% endif %}
         {% endif %}
 
+        <div class="row">
+            <div class="col-sm-12">
+                <form action="/"
+                      method="get"
+                      id="search-form"
+                      role="form">
+                    <div id="search-container" class="v-offset-below-1">
+                        <label class="sr-only" for="id_q">Search</label>
+                        <div class="input-group input-group-lg">
+                            <input class="form-control"
+                                   value="{{ search_form.q.value|default:'' }}"
+                                   name="q"
+                                   id="id_q"
+                                   autocomplete="off"
+                                   type="text">
+                            <span class="input-group-btn">
+                                <button type="submit"
+                                        class="btn btn-primary"
+                                        name="search"
+                                        id="search-button"><i class="fa fa-search"></i>&nbsp;Search
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         {% if results.paginator.count > 0 %}
             <div class="row">
                 <div class="col-sm-6">
@@ -127,7 +158,7 @@
                 <div class="col-sm-6">
                     <div id="result-order-chooser-placeholder">
                         {% if results.paginator.count > 0 %}
-                            {% include "includes/order_by_dropdown.html" %}
+
                         {% endif %}
                     </div>
                 </div>

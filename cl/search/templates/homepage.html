@@ -49,7 +49,27 @@
     </div>
 
     <div class="row" id="main-query-box">
-        {% include "includes/main_query_box.html" with homepage=True %}
+        <form action="/" method="get" id="search-form" class="form-inline"
+              role="form">
+            <div id="search-container" class="text-center">
+                <label class="sr-only" for="id_q">Search</label>
+                <div class="input-group">
+                    <input class="form-control"
+                           value="{{ search_form.q.value|default:'' }}"
+                           name="q"
+                           id="id_q"
+                           autocomplete="off"
+                           type="text">
+                    <span class="input-group-btn">
+                        <button type="submit"
+                                class="btn btn-primary"
+                                name="search"
+                                id="search-button"><i class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </span>
+                </div>
+            </div>
+        </form>
     </div>
 
     <div id="advanced-search-inputs" class="hidden row">

@@ -20,6 +20,8 @@
                             Jurisdictions Selected</p>
                     </div>
 
+                    {% include "includes/order_by_dropdown.html" %}
+
                     {% if type == 'o' or type == 'oa' %}
                         <div class="form-group">
                             {{ search_form.case_name.label_tag }}
@@ -180,8 +182,4 @@
             </div>
         </form>
     </div>
-
-    {% if type == 'o' or type == 'oa' %}
-        {% include "includes/alert_sidebar_section.html" %}
-    {% endif %}
 {% endif %}
