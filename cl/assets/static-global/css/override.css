@@ -71,10 +71,8 @@ a.button:active{
 
 
 @media(max-width:767px){
-    #homepage #main-query-box #id_q {
-        width: 250px;
-    }
-    #homepage #main-query-box.wide #id_q {
+    #homepage #main-query-box #id_q,
+    #advanced-page #main-query-box #id_q {
         width: 250px;
     }
     #homepage #main-query-box .input-group {
@@ -101,19 +99,17 @@ a.button:active{
     }
 }
 @media(min-width:768px){
-    #homepage #main-query-box #id_q {
+    #homepage #main-query-box #id_q,
+    #advanced-page #main-query-box #id_q {
         width: 400px;
-    }
-    #homepage #main-query-box.wide #id_q {
-        width: 580px;
     }
     #homepage #above-main-query {
         margin-top: 6em;
     }
-    #homepage #advanced-search-starter {
+    #homepage #advanced-search {
         margin-bottom: 6em;
     }
-    #homepage #advanced-search-starter p:not(:first-child) {
+    #homepage #advanced-search p:not(:first-child) {
         margin-top: 0.75em;
     }
     #court-picker-tabs {
@@ -122,22 +118,18 @@ a.button:active{
 
 }
 @media(min-width:992px){
-    #homepage #main-query-box #id_q {
+    #homepage #main-query-box #id_q,
+    #advanced-page #main-query-box #id_q {
         width: 600px;
-    }
-    #homepage #main-query-box.wide #id_q {
-        width: 800px;
     }
     .lg-v-offset-below-3 {
         padding-bottom: 40px;
     }
 }
 @media(min-width:1200px){
-    #homepage #main-query-box #id_q {
+    #homepage #main-query-box #id_q,
+    #advanced-page #main-query-box #id_q {
         width: 800px;
-    }
-    #homepage #main-query-box.wide #id_q {
-        width: 1000px;
     }
 }
 

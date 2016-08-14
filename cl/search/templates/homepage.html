@@ -12,11 +12,6 @@
 
 {% block footer-scripts %}
     <script type="text/javascript">
-        $(document).ready(function () {
-            $('#id_q').focus();
-        });
-        // Initialize popovers (required because they're "opt-in for performance reasons")
-        $("[data-toggle='popover']").popover();
         var opinions = {
             {% for viz in visualizations %}
                 "{{ viz.id }}": {{ viz.json|safe }}{% if not forloop.last %},
@@ -54,7 +49,7 @@
             <div id="search-container" class="text-center">
                 <label class="sr-only" for="id_q">Search</label>
                 <div class="input-group">
-                    <input class="form-control"
+                    <input class="form-control input-lg"
                            value="{{ search_form.q.value|default:'' }}"
                            name="q"
                            id="id_q"
@@ -62,7 +57,7 @@
                            type="text">
                     <span class="input-group-btn">
                         <button type="submit"
-                                class="btn btn-primary"
+                                class="btn btn-primary btn-lg"
                                 name="search"
                                 id="search-button"><i class="fa fa-search"></i>&nbsp;Search
                         </button>
@@ -72,133 +67,10 @@
         </form>
     </div>
 
-    <div id="advanced-search-inputs" class="hidden row">
-        {#  Modal is at bottom of results, so it loads last. #}
-        <div id="extra-sidebar-fields" class="col-sm-9">
-            <div class="row">
-                <div class="col-sm-8">
-                    <div class="row">
-                        <div class="col-sm-6">
-                            <div class="pointer"
-                                 data-toggle="modal"
-                                 data-target="#court-picker">
-                                <label class="bottom pointer">
-                                    Select Jurisdictions <i class="gray fa fa-external-link"></i>
-                                </label>
-
-                                <p class="top"><span id="jurisdiction-count">{{ court_count }}</span>
-                                    jurisdictions selected</p>
-                            </div>
-                        </div>
-                        <div class="col-sm-6">
-                            <div class="form-group">
-                                {{ search_form.order_by.label_tag }}
-                                {{ search_form.order_by }}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-sm-6">
-                            <div class="form-group">
-                                {{ search_form.case_name.label_tag }}
-                                {{ search_form.case_name }}
-                            </div>
-                        </div>
-                        <div class="col-sm-6">
-                            <div class="form-group">
-                                {{ search_form.judge.label_tag }}
-                                {{ search_form.judge }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-sm-4">
-                    <label>Precedential Status</label>
-                    {% for status in status_facets %}
-                        {% if forloop.counter == 4 %}
-                            <a id="show-all-statuses"
-                               class="cursor">Show All Statuses&hellip;</a>
-                        {% endif %}
-                        <div class="sidebar-checkbox status-item{% if forloop.counter >= 4 %} hidden{% endif %}">
-                            <input
-                                    id="id_{{ status.1 }}"
-                                    type="checkbox"
-                                    name="{{ status.1 }}"
-                                    class="external-input status-checkbox left"
-                                    {% if status.3 %}checked="checked"{% endif %}
-                                    tabindex="{{ status.5 }}">
-                            <label
-                                    for="id_{{ status.1 }}"
-                                    class="pointer {% if status.2 == 0 %}gray{% endif %}">
-                                <div>{{ status.0 }}&nbsp;<span
-                                        class="gray small">({{ status.2|intcomma }})</span></div>
-                            </label>
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-sm-4">
-                    <div class="form-group">
-                        {{ search_form.filed_after.label_tag }}
-                        {{ search_form.filed_after }}
-                    </div>
-                </div>
-                <div class="col-sm-4">
-                    <div class="form-group">
-                        {{ search_form.filed_before.label_tag }}
-                        {{ search_form.filed_before }}
-                    </div>
-                </div>
-                <div class="col-sm-4">
-                    <div class="row">
-                        <div class="col-xs-6">
-                            <div class="form-group">
-                                {{ search_form.cited_gt.label_tag }}
-                                {{ search_form.cited_gt }}
-                            </div>
-                        </div>
-                        <div class="col-xs-6">
-                            <div class="form-group">
-                                {{ search_form.cited_lt.label_tag }}
-                                {{ search_form.cited_lt }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-sm-4">
-                    <div class="form-group">
-                        {{ search_form.citation.label_tag }}
-                        {{ search_form.citation }}
-                    </div>
-                </div>
-                <div class="col-sm-4">
-                    <div class="form-group">
-                        {{ search_form.neutral_cite.label_tag }}
-                        {{ search_form.neutral_cite }}
-                    </div>
-                </div>
-                <div class="col-sm-4">
-                    <div class="form-group">
-                        {{ search_form.docket_number.label_tag }}
-                        {{ search_form.docket_number }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-3">
-            {% include "includes/operators_quick_list.html" %}
-            <a class="text-right" href="{% url 'advanced_search' %}">More details&hellip;</a>
-        </div>
-    </div>
-    {# Jurisdiction modal is at the bottom so it loads last #}
-
-    <div id="advanced-search-starter" class="row">
+    <div id="advanced-search" class="row">
         <p class="text-center large alt gray top bottom">&ndash; or &ndash;</p>
         <p class="text-center large">
-            <a href="#" tabindex="200">Advanced Search</a>
+            <a href="{% url "advanced_o" %}">Advanced Search</a>
         </p>
     </div>
 
@@ -396,8 +268,5 @@
             </div>
         {% endcache %}
     </div>
-
-
-    {% include "includes/jurisdiction_picker_modal.html" %}
     </div>
 {% endblock %}

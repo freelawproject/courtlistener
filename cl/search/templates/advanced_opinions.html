@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Advanced Legal Opinion Search – CourtListener.com{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block navbar-o %}active{% endblock %}
+
+{% block footer-scripts %}
+    {% include "includes/footer-scripts.html" %}
+{% endblock %}
+
+{% block content %}
+    <div id="advanced-page" class="col-xs-12">
+        <div id="above-main-query" class="v-offset-below-4">
+            <h1 class="text-center">Advanced Opinion Search</h1>
+            <p class="text-center gray large">Search millions of opinions across hundreds of jurisdictions. Updated constantly.
+            </p>
+        </div>
+
+        <div class="row v-offset-below-4" id="main-query-box">
+            <form action="/" method="get" id="search-form" class="form-inline"
+                  role="form">
+                <div id="search-container" class="text-center">
+                    <label class="sr-only" for="id_q">Search</label>
+                    <div class="input-group">
+                        <input class="form-control input-lg"
+                               value="{{ search_form.q.value|default:'' }}"
+                               name="q"
+                               id="id_q"
+                               autocomplete="off"
+                               type="text">
+                        <span class="input-group-btn">
+                        <button type="submit"
+                                class="btn btn-primary btn-lg"
+                                name="search"
+                                id="search-button"><i class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </span>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="row">
+            {#  Modal is at bottom of results, so it loads last. #}
+            <div id="extra-sidebar-fields" class="col-sm-9">
+                <div class="row">
+                    <div class="col-sm-8">
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <div class="pointer"
+                                     data-toggle="modal"
+                                     data-target="#court-picker">
+                                    <label class="bottom pointer">
+                                        Select Jurisdictions <i
+                                            class="gray fa fa-external-link"></i>
+                                    </label>
+
+                                    <p class="top"><span
+                                            id="jurisdiction-count">{{ court_count }}</span>
+                                        jurisdictions selected</p>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                {% include "includes/order_by_dropdown.html" %}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <div class="form-group">
+                                    {{ search_form.case_name.label_tag }}
+                                    {{ search_form.case_name }}
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-group">
+                                    {{ search_form.judge.label_tag }}
+                                    {{ search_form.judge }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <label>Precedential Status</label>
+                        {% for status in status_facets %}
+                            {% if forloop.counter == 4 %}
+                                <a id="show-all-statuses"
+                                   class="cursor">Show All Statuses&hellip;</a>
+                            {% endif %}
+                            <div class="sidebar-checkbox status-item">
+                                <input
+                                        id="id_{{ status.1 }}"
+                                        type="checkbox"
+                                        name="{{ status.1 }}"
+                                        class="external-input status-checkbox left"
+                                        {% if status.3 %}checked="checked"{% endif %}
+                                        tabindex="{{ status.5 }}">
+                                <label
+                                        for="id_{{ status.1 }}"
+                                        class="pointer {% if status.2 == 0 %}gray{% endif %}">
+                                    <div>{{ status.0 }}&nbsp;<span
+                                            class="gray small">({{ status.2|intcomma }})</span>
+                                    </div>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.filed_after.label_tag }}
+                            {{ search_form.filed_after }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.filed_before.label_tag }}
+                            {{ search_form.filed_before }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="row">
+                            <div class="col-xs-6">
+                                <div class="form-group">
+                                    {{ search_form.cited_gt.label_tag }}
+                                    {{ search_form.cited_gt }}
+                                </div>
+                            </div>
+                            <div class="col-xs-6">
+                                <div class="form-group">
+                                    {{ search_form.cited_lt.label_tag }}
+                                    {{ search_form.cited_lt }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.citation.label_tag }}
+                            {{ search_form.citation }}
+                            <p><a href="{% url "citation_redirector" %}">Look
+                                up a specific citation</a>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.neutral_cite.label_tag }}
+                            {{ search_form.neutral_cite }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.docket_number.label_tag }}
+                            {{ search_form.docket_number }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                {% include "includes/operators_quick_list.html" %}
+                <a class="text-right" href="{% url 'advanced_search' %}">More
+                    details&hellip;</a>
+            </div>
+        </div>
+        {% include "includes/jurisdiction_picker_modal.html" %}
+
+
+        <div class="row" id="about-opinions">
+            <div class="col-xs-12">
+                <h2>About the CourtListener Corpus of Opinions</h2>
+            </div>
+            <div class="col-md-4">
+                <h3>Background</h3>
+                <p>The opinions in CourtListener have been collected since 2009 by <a href="https://free.law">Free Law Project</a>, a non-profit devoted to high-quality legal data. We have collected these opinions so that lawyers, researchers, journalists, organizations, and the public can have easy access to this information.
+                </p>
+                <p>We have collected this information from a variety of sources, including court websites, information donations, <a href="https://public.resource.org">Public.Resource.org</a>, and the <a href="http://scdb.wustl.edu/">Supreme Court Database</a>.
+                </p>
+                <p>This work has been possible thanks financial and volunteer support from many people and organizations. If this work is valuable to you, your research, or your organization, please seriously consider donating so that this service can continue.
+                </p>
+                <p>
+                    <a href="{% url "donate" %}?referrer=opinion-page"
+                       class="btn btn-danger">Donate Now</a>
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h3>Coverage</h3>
+                <p>Our collection of opinions combines the best data from many sources. On our <a href="{% url "coverage" %}">coverage page</a>, you can see court-by-court graphs of our content and can see which courts we get data from on an ongoing basis.
+                </p>
+                <p>We are particularly proud of our Supreme Court data, which we consider to be the best collection available. We have made thousands of corrections to the other publicly available data sets, and have enhanced it with data from the <a href="https://free.law/2011/05/25/updated-supreme-court-case-dates-and-the-first-release-of-early-scotus-data-in-machine-readable-form/">Library of Congress</a> and the <a href="https://free.law/2014/12/21/courtlistener-is-now-integrated-with-the-supreme-court-database/">Supreme Court Database</a>.
+                </p>
+                <p>
+                    <a class="btn btn-primary" href="https://free.law/supreme-court-data/">Learn About Our Supreme Court Data</a>
+                </p>
+
+                <h3>Alerts</h3>
+                <p>For the courts where we get content on an ongoing basis, you can set up alerts for any search query. This allows you to get an email whenever there is new content matching your query. We also offer <a href="{% url "feeds_info" %}">custom RSS feeds</a> for any search query. To get started, do a search, then save it as an alert from the sidebar of your list of results.
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h3>Even More Advanced Searching</h3>
+                <p>You can do even more advanced searches by using fielded searches and query operators.
+                </p>
+                <p>
+                    <a class="btn btn-primary"
+                       href="{% url 'advanced_search' %}">Search Help</a>
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h3>CiteGeist Relevancy Engine</h3>
+                <p>The CourtListener search engine has been optimized over the years to provide the most relevant and important cases at the top of your queries. The system we use for this is named CiteGeist, and it works by analyzing your query and combining that with information about the citations between cases.
+                </p>
+                <p>
+                    <a href="https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/" class="btn btn-primary">Read About CiteGeist</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}

@@ -11,6 +11,21 @@ urlpatterns = [
         'cl.search.views.show_results',
         name='show_results',
     ),
+    url(
+        r'^opinion/',
+        'cl.search.views.advanced_o',
+        name='advanced_o',
+    ),
+    url(
+        r'^audio/',
+        'cl.search.views.advanced_oa',
+        name='advanced_oa',
+    ),
+    url(
+        r'^person/',
+        'cl.search.views.advanced_p',
+        name='advanced_p',
+    ),
 
     # Feeds & Podcasts
     url(

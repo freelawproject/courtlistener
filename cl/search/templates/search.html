@@ -155,13 +155,6 @@
                     </h2>
                     <span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
                 </div>
-                <div class="col-sm-6">
-                    <div id="result-order-chooser-placeholder">
-                        {% if results.paginator.count > 0 %}
-
-                        {% endif %}
-                    </div>
-                </div>
             </div>
             {% include "includes/search_result.html" %}
         {% else %}

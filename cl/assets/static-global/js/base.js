@@ -71,24 +71,6 @@ $(document).ready(function() {
         return path;
     }
 
-    //////////////
-    // Homepage //
-    //////////////
-    function showAdvancedHomepage() {
-        $('#homepage #advanced-search-starter').hide();
-        $('#homepage #advanced-search-inputs').show('fast').removeClass('hidden');
-        $('#main-query-box').addClass('wide');
-        $('#id_q').focus();
-    }
-    $('#homepage #advanced-search-starter a').click(function (event) {
-        event.preventDefault();
-        showAdvancedHomepage();
-    });
-    $('#show-all-statuses').click(function (event) {
-        event.preventDefault();
-        $('.status-item').removeClass('hidden');
-        $('#show-all-statuses').addClass('hidden');
-    });
 
     ///////////////////////
     // Search submission //
@@ -107,14 +89,13 @@ $(document).ready(function() {
         document.location = makeSearchPath(false);
     });
 
-    $('#homepage #court-picker-search-form').submit(function(e){
+    $('#advanced-page #court-picker-search-form').submit(function(e){
         e.preventDefault();
 
         // Indicate the count of selected jurisdictions when switching to
         // advanced search page.
         $('#jurisdiction-count').text($(this).find('input:checked').length);
         $('#court-picker').modal('hide');
-        showAdvancedHomepage();
         $('#jurisdiction-count').css({
             'background-color': 'yellow',
             'font-weight': 'bold'

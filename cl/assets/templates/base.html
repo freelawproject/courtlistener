@@ -183,13 +183,13 @@
                 <div class="collapse navbar-collapse">
                     <ul class="nav navbar-nav">
                         <li class="{% block navbar-o %}inactive{% endblock %}">
-                            <a href="/?type=o">Opinions</a>
+                            <a href="{% url "advanced_o" %}">Opinions</a>
                         </li>
                         <li class="{% block navbar-oa %}inactive{% endblock %}">
-                            <a href="/?type=oa">Oral Arguments</a>
+                            <a href="{% url "advanced_oa" %}">Oral Arguments</a>
                         </li>
                         <li class="{% block navbar-p %}inactive{% endblock %}">
-                            <a href="/?type=p">Judges</a>
+                            <a href="{% url "advanced_p" %}">Judges</a>
                         </li>
                         <li class="dropdown {% block navbar-vis %}inactive{% endblock %}">
                             <a href="#"

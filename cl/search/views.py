@@ -310,3 +310,33 @@ def show_results(request):
                 render_dict,
                 RequestContext(request),
             )
+
+
+def advanced_o(request):
+    render_dict = {
+        'private': False,
+    }
+    render_dict.update(do_search(request, rows=1, order_by='dateFiled desc'))
+    # A fresh form to display.
+    render_dict['search_form'] = SearchForm()
+    return render_to_response(
+        'advanced_opinions.html',
+        render_dict,
+        RequestContext(request)
+    )
+
+
+def advanced_oa(request):
+    return render_to_response(
+        'advanced_oral_args.html',
+        {'private': False, 'search_form': SearchForm()},
+        RequestContext(request)
+    )
+
+
+def advanced_p(request):
+    return render_to_response(
+        'advanced_people.html',
+        {'private': False, 'search_form': SearchForm()},
+        RequestContext(request)
+    )
