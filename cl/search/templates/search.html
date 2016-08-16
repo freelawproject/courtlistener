@@ -48,7 +48,7 @@
             <a class="btn btn-default" href="#search-results">Jump to
                 Results</a>
         </div>
-        {% include "includes/result_type_chooser.html" %}
+        {% include "includes/result_type_chooser.html" with type=type %}
         {% include "includes/sidebar_filters.html" %}
         {% if type == 'o' or type == 'oa' %}
             {% include "includes/alert_sidebar_section.html" %}

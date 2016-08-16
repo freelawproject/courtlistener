@@ -45,6 +45,7 @@
         <div id="main-query-box">
             <form action="/" method="get" id="search-form" class="form-inline"
                   role="form">
+                {% include "includes/result_type_chooser.html" with type=type %}
                 <div id="search-container" class="text-center">
                     <label class="sr-only" for="id_q">Search</label>
                     <div class="input-group">
