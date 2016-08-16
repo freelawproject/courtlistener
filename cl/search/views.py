@@ -312,31 +312,23 @@ def show_results(request):
             )
 
 
-def advanced_o(request):
+def advanced(request):
     render_dict = {
         'private': False,
     }
-    render_dict.update(do_search(request, rows=1, order_by='dateFiled desc'))
-    # A fresh form to display.
+    if request.path == '/opinion/':
+        render_dict['type'] = 'o'
+        render_dict.update(do_search(request, rows=1, type='o'))
+    elif request.path == '/audio/':
+        render_dict['type'] = 'oa'
+        render_dict.update(do_search(request, rows=1, type='oa'))
+    elif request.path == '/person/':
+        render_dict['type'] = 'p'
+        render_dict.update(do_search(request, rows=1, type='p'))
+
     render_dict['search_form'] = SearchForm()
     return render_to_response(
-        'advanced_opinions.html',
+        'advanced.html',
         render_dict,
-        RequestContext(request)
-    )
-
-
-def advanced_oa(request):
-    return render_to_response(
-        'advanced_oral_args.html',
-        {'private': False, 'search_form': SearchForm()},
-        RequestContext(request)
-    )
-
-
-def advanced_p(request):
-    return render_to_response(
-        'advanced_people.html',
-        {'private': False, 'search_form': SearchForm()},
         RequestContext(request)
     )

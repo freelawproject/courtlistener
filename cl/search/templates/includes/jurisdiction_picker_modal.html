@@ -20,7 +20,7 @@
                                              class="btn btn-default"
                                              id="clear-all"
                                              tabindex="221">Clear All</button>
-                                    {% if search_form.type.value in 'op' or not request.GET.type %}
+                                    {% if search_form.type.value != 'oa' %}
                                         <button type="button"
                                                 class="btn btn-default"
                                                 id="check-current"
@@ -57,7 +57,7 @@
                             <span class="hidden-md hidden-lg">Fed App</span>
                         </a>
                     </li>
-                    {%  if search_form.type.value in 'op' or not request.GET.type %}
+                    {% if search_form.type.value != 'oa' %}
                         <li>
                             <a href="#tab-federal-district"
                                data-toggle="tab"
@@ -92,43 +92,26 @@
                             {% for row in courts.federal|rows:4 %}
                                 <div class="col-sm-3">
                                     {% for court in row %}
-                                        {% if search_form.type.value in 'op' or not request.GET.type %}
-                                            <div class="checkbox">
-                                                <label for="id_{{ court.pk }}">
-                                                    <input
-                                                        id="id_{{ court.pk }}"
-                                                        name="{{ court.pk }}"
-                                                        {% if court.checked %}checked="checked"{% endif %}
-                                                        type="checkbox"
-                                                        class="external-input court-checkbox">
-                                                    {{ court.short_name }}
-                                                    {% if court.end_date %}
-                                                        <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
-                                                    {% endif %}
-                                                </label>
-                                            </div>
-                                        {% elif search_form.type.value == 'oa' and court.has_oral_argument_scraper %}
-                                            <div class="checkbox">
-                                                <label for="id_{{ court.pk }}">
-                                                    <input
-                                                        id="id_{{ court.pk }}"
-                                                        name="{{ court.pk }}"
-                                                        {% if court.checked %}checked="checked"{% endif %}
-                                                        type="checkbox"
-                                                        class="external-input court-checkbox">
-                                                    {{ court.short_name }}
-                                                    {% if court.end_date %}
-                                                        <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
-                                                    {% endif %}
-                                                </label>
-                                            </div>
-                                        {% endif %}
+                                        <div class="checkbox">
+                                            <label for="id_{{ court.pk }}">
+                                                <input
+                                                    id="id_{{ court.pk }}"
+                                                    name="{{ court.pk }}"
+                                                    {% if court.checked %}checked="checked"{% endif %}
+                                                    type="checkbox"
+                                                    class="external-input court-checkbox">
+                                                {{ court.short_name }}
+                                                {% if court.end_date %}
+                                                    <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
+                                                {% endif %}
+                                            </label>
+                                        </div>
                                     {% endfor %}
                                 </div>
                             {% endfor %}
                         </div>
                     </div>
-                    {% if search_form.type.value in 'op' or not request.GET.type %}
+                    {% if search_form.type.value != 'oa' %}
                         <div class="tab-pane" id="tab-federal-district">
                             {# Regroup into closed/open courts #}
                             {% regroup  courts.district|dictsort:"is_terminated" by is_terminated as district_courts %}

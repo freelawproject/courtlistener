@@ -13,17 +13,17 @@ urlpatterns = [
     ),
     url(
         r'^opinion/',
-        'cl.search.views.advanced_o',
+        'cl.search.views.advanced',
         name='advanced_o',
     ),
     url(
         r'^audio/',
-        'cl.search.views.advanced_oa',
+        'cl.search.views.advanced',
         name='advanced_oa',
     ),
     url(
         r'^person/',
-        'cl.search.views.advanced_p',
+        'cl.search.views.advanced',
         name='advanced_p',
     ),
 
