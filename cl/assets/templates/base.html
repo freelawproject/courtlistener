@@ -162,7 +162,7 @@
                             <ul class="nav navbar-nav navbar-right">
                                 <li><a href="{% url "about" %}">About</a></li>
                                 <li><a href="{% url "faq" %}">FAQ</a></li>
-                                <li><a href="" class="tour-link">Tour</a></li>
+                                <li class="hidden-xs"><a href="" class="tour-link">Tour</a></li>
                                 <li class="visible-xs">
                                     <a href="{% url "donate" %}?referrer=navbar">Donate</a>
                                 </li>
@@ -187,7 +187,8 @@
             <div class="container-fluid">
                 <div>
                     <ul class="nav navbar-nav">
-                        <li class="{% block navbar-o %}inactive{% endblock %}">
+                        <li class="{% block navbar-o %}inactive{% endblock %}"
+                            id="tour-opinions">
                             <a href="{% url "advanced_o" %}">Opinions</a>
                         </li>
                         <li class="{% block navbar-oa %}inactive{% endblock %}">
@@ -260,7 +261,7 @@
                         <div class="footer-item">
                             <a href="{% url "faq" %}">FAQ</a>
                         </div>
-                        <div class="footer-item">
+                        <div class="footer-item hidden-xs">
                             <a href="" class="tour-link">Tour</a>
                         </div>
                         <div class="footer-item">
