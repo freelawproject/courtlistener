@@ -5,7 +5,7 @@ Sets up all the overrides or additional CSS that the site uses.
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
 .navbar-brand {
-    padding: 16px 15px 16px 40px;
+    padding: 16px 15px 16px 30px;
 }
 
 header {
@@ -33,6 +33,12 @@ header {
     background-color: transparent;
     border-top: 0;
 }
+#subnav .navbar-nav {
+    margin: 0;
+}
+#subnav .navbar-nav > li {
+    float: left;
+}
 
 #search-results {
     margin-top: 23px;
@@ -59,30 +65,32 @@ a.button:active{
   color:#fff;
 }
 
-#homepage #main-query-box {
+#main-query-box {
     /* margin: 0 auto; */
     -webkit-transition : all 0.5 s ease;
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;
     transition: all 0.5s ease;
-    margin-bottom: 2em;
-    margin-top: 2em;
+    margin-bottom: 4em;
+    margin-top: 4em;
 }
 
 
 @media(max-width:767px){
-    #homepage #main-query-box #id_q,
-    #advanced-page #main-query-box #id_q {
+    #homepage #main-query-box {
+        margin-bottom: 2em;
+    }
+    #main-query-box #id_q {
         width: 250px;
     }
-    #homepage #main-query-box .input-group {
+    #main-query-box .input-group {
         display: inline-table;
         vertical-align: middle;
     }
-    #homepage #main-query-box .input-group-btn {
+    #main-query-box .input-group-btn {
         width: auto;
     }
-    #homepage #main-query-box .form-group {
+    #main-query-box .form-group {
         display: inline-block;
         margin-bottom: 0;
         vertical-align: middle;
@@ -99,18 +107,17 @@ a.button:active{
     }
 }
 @media(min-width:768px){
-    #homepage #main-query-box #id_q,
-    #advanced-page #main-query-box #id_q {
+    #main-query-box #id_q {
         width: 400px;
     }
-    #homepage #above-main-query {
+    #above-main-query {
         margin-top: 6em;
     }
-    #homepage #advanced-search {
+    #advanced-search {
         margin-bottom: 6em;
     }
-    #homepage #advanced-search p:not(:first-child) {
-        margin-top: 0.75em;
+    #advanced-search p:not(:first-child) {
+        margin-top: 1.5em;
     }
     #court-picker-tabs {
         text-align: right;
@@ -118,8 +125,7 @@ a.button:active{
 
 }
 @media(min-width:992px){
-    #homepage #main-query-box #id_q,
-    #advanced-page #main-query-box #id_q {
+    #main-query-box #id_q {
         width: 600px;
     }
     .lg-v-offset-below-3 {
@@ -127,8 +133,7 @@ a.button:active{
     }
 }
 @media(min-width:1200px){
-    #homepage #main-query-box #id_q,
-    #advanced-page #main-query-box #id_q {
+    #main-query-box #id_q {
         width: 800px;
     }
 }
@@ -156,7 +161,7 @@ a.button:active{
     border-radius: 9px;
 }
 
-#homepage #jurisdiction-count {
+#jurisdiction-count {
     -webkit-transition: all 0.5s ease;
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;

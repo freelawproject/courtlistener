@@ -163,6 +163,9 @@
                                 <li><a href="{% url "about" %}">About</a></li>
                                 <li><a href="{% url "faq" %}">FAQ</a></li>
                                 <li><a href="" class="tour-link">Tour</a></li>
+                                <li class="visible-xs">
+                                    <a href="{% url "donate" %}?referrer=navbar">Donate</a>
+                                </li>
                                 {% if request.path != "/sign-out/" %}
                                     <li>
                                         <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}">
@@ -178,9 +181,11 @@
                 </div><!--/.nav-collapse -->
             </div><!--/.container-fluid -->
         </div><!-- navbar -->
+
+        <!--Secondary navbar -->
         <div class="navbar navbar-default" role="navigation" id="subnav">
             <div class="container-fluid">
-                <div class="collapse navbar-collapse">
+                <div>
                     <ul class="nav navbar-nav">
                         <li class="{% block navbar-o %}inactive{% endblock %}">
                             <a href="{% url "advanced_o" %}">Opinions</a>
@@ -213,7 +218,7 @@
                                 </li>
                             </ul>
                         </li>
-                        <li class="{% block navbar-donate %}inactive{% endblock %}">
+                        <li class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
                             <a href="{% url "donate" %}?referrer=navbar">Donate</a>
                         </li>
                     </ul>

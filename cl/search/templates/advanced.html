@@ -29,7 +29,7 @@
 
 {% block content %}
     <div id="advanced-page" class="col-xs-12">
-        <div id="above-main-query" class="v-offset-below-4">
+        <div id="above-main-query">
             {% if type == 'o' %}
                 <h1 class="text-center">Advanced Opinion Search</h1>
                 <p class="text-center gray large">Search millions of opinions across hundreds of jurisdictions. Updated constantly.
@@ -45,7 +45,7 @@
             {% endif %}
         </div>
 
-        <div class="row v-offset-below-4" id="main-query-box">
+        <div id="main-query-box">
             <form action="/" method="get" id="search-form" class="form-inline"
                   role="form">
                 <div id="search-container" class="text-center">

@@ -316,6 +316,7 @@ def advanced(request):
     render_dict = {
         'private': False,
     }
+    # I'm not thrilled about how this is repeating URLs in a view.
     if request.path == '/opinion/':
         render_dict['type'] = 'o'
         render_dict.update(do_search(request, rows=1, type='o'))
