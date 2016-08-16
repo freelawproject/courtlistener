@@ -99,8 +99,7 @@ def make_stats_variable(solr_facet_values, search_form):
             field.html_name,
             count,
             checked,
-            field.html_name.split('_')[1],
-            field.field.widget.attrs['tabindex']
+            field.html_name.split('_')[1]
         ]
         facets.append(facet)
     return facets

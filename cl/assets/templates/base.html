@@ -133,47 +133,51 @@
                     {% block main-nav %}
                         {% if user.is_authenticated %}
                             <ul class="nav navbar-nav navbar-right">
-                                <li><a href="{% url "about" %}" tabindex="300">About</a></li>
-                                <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
+                                <li><a href="{% url "about" %}" tabindex="200">About</a></li>
+                                <li><a href="{% url "faq" %}" tabindex="201">FAQ</a></li>
                                 <li class="dropdown">
                                     <a href="#"
                                        class="dropdown-toggle"
-                                       tabindex="303"
+                                       tabindex="202"
                                        data-toggle="dropdown">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
                                     <ul class="dropdown-menu" role="menu">
                                         <li><a href="{% url "profile_alerts" %}"
-                                               tabindex="304">Alerts</a></li>
+                                               tabindex="203">Alerts</a></li>
                                         <li>
                                             <a href="{% url "view_visualizations" %}"
-                                               tabindex="306">Visualizations</a>
+                                               tabindex="204">Visualizations</a>
                                         </li>
                                         <li><a href="{% url "profile_favorites" %}"
-                                               tabindex="305">Favorites</a></li>
+                                               tabindex="205">Favorites</a></li>
                                         <li><a href="/profile/donations/"
-                                               tabindex="307">Donations</a></li>
+                                               tabindex="206">Donations</a></li>
                                         <li><a href="{% url "view_settings" %}"
-                                               tabindex="308">Account</a></li>
+                                               tabindex="207">Account</a></li>
                                         <li><a href="/sign-out/"
-                                               tabindex="309">Sign out</a></li>
+                                               tabindex="208">Sign out</a></li>
                                     </ul>
                                 </li>
                             </ul>
                         {% else %}
                             <ul class="nav navbar-nav navbar-right">
-                                <li><a href="{% url "about" %}">About</a></li>
-                                <li><a href="{% url "faq" %}">FAQ</a></li>
-                                <li class="hidden-xs"><a href="" class="tour-link">Tour</a></li>
+                                <li><a href="{% url "about" %}" tabindex="200">About</a></li>
+                                <li><a href="{% url "faq" %}" tabindex="201">FAQ</a></li>
+                                <li class="hidden-xs"><a href="" class="tour-link"
+                                                         tabindex="202">Tour</a></li>
                                 <li class="visible-xs">
-                                    <a href="{% url "donate" %}?referrer=navbar">Donate</a>
+                                    <a href="{% url "donate" %}?referrer=navbar"
+                                       tabindex="203">Donate</a>
                                 </li>
                                 {% if request.path != "/sign-out/" %}
                                     <li>
-                                        <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}">
+                                        <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}"
+                                           tabindex="204">
                                             Sign in / Register
                                         </a>
                                     </li>
                                 {% else %}
-                                    <li><a href="{% url "sign-in" %}">Sign in / Register</a></li>
+                                    <li><a href="{% url "sign-in" %}"
+                                           tabindex="205">Sign in / Register</a></li>
                                 {% endif %}
                             </ul>
                         {% endif %}
@@ -189,38 +193,42 @@
                     <ul class="nav navbar-nav">
                         <li class="{% block navbar-o %}inactive{% endblock %}"
                             id="tour-opinions">
-                            <a href="{% url "advanced_o" %}">Opinions</a>
+                            <a href="{% url "advanced_o" %}"
+                               tabindex="100">Opinions</a>
                         </li>
                         <li class="{% block navbar-oa %}inactive{% endblock %}">
-                            <a href="{% url "advanced_oa" %}">Oral Arguments</a>
+                            <a href="{% url "advanced_oa" %}"
+                               tabindex="101">Oral Arguments</a>
                         </li>
                         <li class="{% block navbar-p %}inactive{% endblock %}">
-                            <a href="{% url "advanced_p" %}">Judges</a>
+                            <a href="{% url "advanced_p" %}"
+                               tabindex="102">Judges</a>
                         </li>
                         <li class="dropdown {% block navbar-vis %}inactive{% endblock %}">
                             <a href="#"
                                class="dropdown-toggle"
-                               tabindex="301"
+                               tabindex="103"
                                data-toggle="dropdown">Visualizations&nbsp;<span
                                     class="caret"></span>
                             </a>
                             <ul class="dropdown-menu" role="menu">
                                 <li>
                                     <a href="{% url "viz_gallery" %}"
-                                       tabindex="301">Gallery</a>
+                                       tabindex="104">Gallery</a>
                                 </li>
                                 <li>
                                     <a href="{% url "mapper_homepage" %}"
-                                       tabindex="301">SCOTUS Networks</a>
+                                       tabindex="105">SCOTUS Networks</a>
                                 </li>
                                 <li>
                                     <a href="{% url "new_visualization" %}"
-                                       tabindex="301">New Network</a>
+                                       tabindex="106">New Network</a>
                                 </li>
                             </ul>
                         </li>
                         <li class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
-                            <a href="{% url "donate" %}?referrer=navbar">Donate</a>
+                            <a href="{% url "donate" %}?referrer=navbar"
+                               tabindex="107">Donate</a>
                         </li>
                     </ul>
                 </div>
