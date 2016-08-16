@@ -157,12 +157,6 @@ $(document).ready(function() {
     });
 
 
-    ////////////////
-    // Auto Focus //
-    ////////////////
-    $('.auto-focus:first').focus();
-
-
     //////////
     // Tour //
     //////////
