@@ -89,6 +89,16 @@ $(document).ready(function() {
         document.location = makeSearchPath(false);
     });
 
+    // Make the enter key work in the search form
+    $('.external-input').bind('keypress', function (e) {
+        if (e.keyCode == 13) {
+            $('#search-form').submit();
+        }
+    });
+    $('#search-button-secondary').click(function(e){
+        $('#search-form').submit();
+    });
+
     $('#advanced-page #court-picker-search-form').submit(function(e){
         e.preventDefault();
 
@@ -176,7 +186,7 @@ $(document).ready(function() {
                     'citations, you name it.'
             },
             {//1
-                target: '#tour-opinions',
+                target: '#navbar-o',
                 placement: 'bottom',
                 arrowOffset: 'left',
                 multipage: true,
