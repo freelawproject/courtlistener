@@ -71,6 +71,12 @@ $(document).ready(function() {
         return path;
     }
 
+    // Statuses
+    $('#show-all-statuses').click(function (event) {
+        event.preventDefault();
+        $('.status-item').removeClass('hidden');
+        $('#show-all-statuses').addClass('hidden');
+    });
 
     ///////////////////////
     // Search submission //

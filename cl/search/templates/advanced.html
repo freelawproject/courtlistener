@@ -113,7 +113,7 @@
                                 <a id="show-all-statuses"
                                    class="cursor">Show All Statuses&hellip;</a>
                             {% endif %}
-                            <div class="sidebar-checkbox status-item">
+                            <div class="sidebar-checkbox status-item{% if forloop.counter >= 4 %} hidden{% endif %}">
                                 <input
                                         id="id_{{ status.1 }}"
                                         type="checkbox"
