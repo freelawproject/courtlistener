@@ -3,8 +3,9 @@
 Functional tests for the Visualization feature of CourtListener
 """
 from django.contrib.auth.models import User
-from cl.users.models import UserProfile
+
 from cl.tests.base import BaseSeleniumTest
+from cl.users.models import UserProfile
 
 
 class VisualizationCrudTests(BaseSeleniumTest):
@@ -62,7 +63,8 @@ class VisualizationCrudTests(BaseSeleniumTest):
         first_case = self.browser.find_element_by_id(
             'starting-cluster-typeahead'
         )
-        self.assertIn(suggestion_text, first_case.get_attribute('value'))
+        v = first_case.get_attribute('value')
+        self.assertIn(suggestion_text, v)
 
         # For the Second Case, she starts typing 'Cutter'
         second_case = self.browser.find_element_by_id(

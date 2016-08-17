@@ -140,15 +140,19 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.attempt_sign_in('admin', 'password')
 
         # She selects Oral Arguments to toggle the results to audio
-        self.browser \
-            .find_element_by_css_selector('label[for="id_type_1"]') \
-            .click()
+        self.browser.find_element_by_css_selector('#navbar-oa a').click()
+
+        # She lands on the advanced search screen for OA, and does a wildcard
+        # search.
+        searchbox = self.browser.find_element_by_id('id_q')
+        searchbox.send_keys('\n')
 
         # The SERP updates and she selects the one she knows is blocked
         blocked_argument = self.browser.find_element_by_link_text(
             'Blocked Oral Argument (Test 2015)'
         )
         blocked_argument.click()
+
 
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
@@ -161,9 +165,12 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.attempt_sign_in('pandora', 'password')
 
         # She selects Oral Arguments to toggle the results to audio
-        self.browser \
-            .find_element_by_css_selector('label[for="id_type_1"]') \
-            .click()
+        self.browser.find_element_by_css_selector('#navbar-oa a').click()
+
+        # She lands on the advanced search screen for OA, and does a wildcard
+        # search.
+        searchbox = self.browser.find_element_by_id('id_q')
+        searchbox.send_keys('\n')
 
         # The SERP updates and she selects the one she knows is blocked
         blocked_argument = self.browser.find_element_by_link_text(
@@ -182,9 +189,12 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.attempt_sign_in('admin', 'password')
 
         # She selects Oral Arguments to toggle the results to audio
-        self.browser \
-            .find_element_by_css_selector('label[for="id_type_1"]') \
-            .click()
+        self.browser.find_element_by_css_selector('#navbar-oa a').click()
+
+        # She lands on the advanced search screen for OA, and does a wildcard
+        # search.
+        searchbox = self.browser.find_element_by_id('id_q')
+        searchbox.send_keys('\n')
 
         # The SERP updates and she selects the one she knows is blocked
         blocked_argument = self.browser.find_element_by_link_text(
