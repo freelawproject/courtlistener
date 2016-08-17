@@ -340,7 +340,9 @@ class PacerXMLParser(object):
                 +---------------+---------+--------+
 
         """
-        if self.document_count <= 500 and self.court.is_bankruptcy:
+        bankruptcy_privacy_threshold = 500
+        small_case = self.document_count <= bankruptcy_privacy_threshold
+        if all([small_case, self.court.is_bankruptcy]):
             return True, date.today()
         return False, None
 
