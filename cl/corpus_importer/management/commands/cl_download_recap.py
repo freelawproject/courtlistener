@@ -1,12 +1,13 @@
 import logging
 import os
+
 import pandas as pd
 from celery.task import TaskSet
-from django.core.management import BaseCommand
 from django.conf import settings
+from django.core.management import BaseCommand
 
 from cl.corpus_importer.tasks import download_recap_item
-from cl.recap.utils import (
+from cl.lib.recap_utils import (
     get_docketxml_url, get_pdf_url, get_document_filename, get_docket_filename
 )
 

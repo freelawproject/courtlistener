@@ -10,8 +10,10 @@ from lxml import etree
 
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.lib.import_lib import find_person
-from cl.recap.utils import get_docketxml_url_from_path, \
-    get_ia_document_url_from_path, get_local_document_url_from_path
+from cl.lib.recap_utils import (
+    get_docketxml_url_from_path, get_ia_document_url_from_path,
+    get_local_document_url_from_path,
+)
 from cl.search.models import Court, Docket, RECAPDocument, DocketEntry
 
 logger = logging.getLogger(__name__)
