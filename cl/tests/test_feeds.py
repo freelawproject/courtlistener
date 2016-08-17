@@ -87,7 +87,6 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             self.browser.back()
             print "✓"
 
-
     def test_all_jurisdiction_opinion_rss_feeds_usable_in_rss_reader(self):
         """
         Can the RSS feed for ALL jurisdictions render properly in an RSS reader?

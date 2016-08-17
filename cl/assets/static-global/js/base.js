@@ -71,24 +71,6 @@ $(document).ready(function() {
         return path;
     }
 
-    //////////////
-    // Homepage //
-    //////////////
-    function showAdvancedHomepage() {
-        $('#homepage #advanced-search-starter').hide();
-        $('#homepage #advanced-search-inputs').show('fast').removeClass('hidden');
-        $('#main-query-box').addClass('wide');
-        $('#id_q').focus();
-    }
-    $('#homepage #advanced-search-starter a').click(function (event) {
-        event.preventDefault();
-        showAdvancedHomepage();
-    });
-    $('#show-all-statuses').click(function (event) {
-        event.preventDefault();
-        $('.status-item').removeClass('hidden');
-        $('#show-all-statuses').addClass('hidden');
-    });
 
     ///////////////////////
     // Search submission //
@@ -107,18 +89,23 @@ $(document).ready(function() {
         document.location = makeSearchPath(false);
     });
 
-    $('.search-page #id_order_by').change(function () {
+    // Make the enter key work in the search form
+    $('.external-input').bind('keypress', function (e) {
+        if (e.keyCode == 13) {
+            $('#search-form').submit();
+        }
+    });
+    $('#search-button-secondary').click(function(e){
         $('#search-form').submit();
     });
 
-    $('#homepage #court-picker-search-form').submit(function(e){
+    $('#advanced-page #court-picker-search-form').submit(function(e){
         e.preventDefault();
 
         // Indicate the count of selected jurisdictions when switching to
         // advanced search page.
         $('#jurisdiction-count').text($(this).find('input:checked').length);
         $('#court-picker').modal('hide');
-        showAdvancedHomepage();
         $('#jurisdiction-count').css({
             'background-color': 'yellow',
             'font-weight': 'bold'
@@ -132,12 +119,6 @@ $(document).ready(function() {
     });
 
 
-    ///////////////////////////
-    // Result Type Switching //
-    ///////////////////////////
-    $('#type-switcher label:not(.selected) input[name=type]').click(function () {
-        document.location = '/?type=' + this.value;
-    });
 
 
     //////////////////
@@ -186,12 +167,6 @@ $(document).ready(function() {
     });
 
 
-    ////////////////
-    // Auto Focus //
-    ////////////////
-    $('.auto-focus:first').focus();
-
-
     //////////
     // Tour //
     //////////
@@ -208,43 +183,38 @@ $(document).ready(function() {
                 content: 'Broad queries can be a great way to start a ' +
                     'research task. Our search box can understand ' +
                     'everything you might expect&hellip; terms, concepts, ' +
-                    'citations, you name it.',
-                // If the advanced page is already shown, we skip to step 2.
-                onNext: function(){
-                    if (!$('#advanced-search-starter').is(':visible')){
-                        hopscotch.showStep(2);
-                    }
-                }
+                    'citations, you name it.'
             },
             {//1
-                target: '#advanced-search-starter',
+                target: '#navbar-o',
                 placement: 'bottom',
-                xOffset: 'center',
-                arrowOffset: 'center',
+                arrowOffset: 'left',
+                multipage: true,
                 nextOnTargetClick: true,
                 title: 'More Power Please!',
                 content: 'If you are the kind of person that wants more ' +
-                    'power, you\'ll love the advanced search box. ' +
-                    'Click on \"Advanced Search\" to turn it on.',
+                    'power, you can do advanced searches of opinions, oral ' +
+                    'arguments or judges by clicking these buttons.' +
+                    'Click on \"Opinions\" to see the advanced search page.',
                 onNext: function(){
-                    showAdvancedHomepage();
+                    window.location = '/opinion/'
                 }
             },
             {//2
-                target: '#extra-sidebar-fields',
+                target: '#id_order_by',
                 placement: 'top',
-                arrowOffset: 'center',
                 zindex: 10,
+                arrowOffset: 'center',
+                multipage: true,
                 title: 'Sophisticated Search',
-                content: 'In the Advanced Search area, you can make ' +
+                content: 'On the Advanced Search page, you can make ' +
                     'sophisticated searches against a variety of fields. ' +
                     'Press \"Next\" and we\'ll make a query for you.',
-                multipage: true,
+
                 showPrevButton: false,
                 onNext: function(){
                     window.location = '/?q=roe+v.+wade&order_by=score+desc&stat_Precedential=on&court=scotus';
-                },
-                delay: 250 // let advanced search area get exposed.
+                }
             },
             {//3
                 // This step will be skipped if on a dev machine with no
@@ -252,6 +222,7 @@ $(document).ready(function() {
                 target: document.querySelector('.search-page article'),
                 placement: 'top',
                 arrowOffset: 'center',
+                zindex: 10,
                 title: 'Detailed Results',
                 content: 'Here you can see the results for the query "Roe ' +
                     'v. Wade" sorted by relevance and filtered to only one ' +
@@ -259,15 +230,6 @@ $(document).ready(function() {
                 showPrevButton: false
             },
             {//4
-                target: '#type-switcher',
-                placement: 'bottom',
-                arrowOffset: 'top',
-                title: 'What are you Looking For?',
-                content: 'By default you\'ll get opinion results, but use ' +
-                    'this to research and listen to oral arguments instead.',
-                showPrevButton: false
-            },
-            {//5
                 target: '#create-alert-header',
                 placement: 'top',
                 arrowOffset: 'center',
@@ -282,7 +244,7 @@ $(document).ready(function() {
                     window.location = '/opinion/108713/roe-v-wade/';
                 }
             },
-            {//6
+            {//5
                 target: '#cited-by',
                 placement: 'bottom',
                 arrowOffset: 'center',
@@ -292,7 +254,7 @@ $(document).ready(function() {
                     'it was issued in 1973. Looking at these citations can ' +
                     'be a good way to see related cases.'
             },
-            {//7
+            {//6
                 target: '#authorities',
                 placement: 'top',
                 arrowOffset: 'center',
@@ -305,7 +267,7 @@ $(document).ready(function() {
                     window.location = '/visualizations/scotus-mapper/'
                 }
             },
-            {//8
+            {//7
                 target: '#new-button a',
                 zindex: 2,
                 placement: 'bottom',
@@ -323,7 +285,7 @@ $(document).ready(function() {
                     window.location = '/visualizations/scotus-mapper/232/roberts-to-crawford/'
                 }
             },
-            {//9
+            {//8
                 target: "#chart",
                 placement: "top",
                 arrowOffset: 'center',
@@ -337,14 +299,14 @@ $(document).ready(function() {
                 'further to the left you go, the more heavily cited the cases ' +
                 'become.'
             },
-            {//10
+            {//9
                 target: "form",
                 placement: "top",
                 arrowOffset: "center",
                 xOffset: 'center',
                 title: "Different Views",
                 content: '<p>Networks can be adjusted to show several ' +
-                'different perspecives or Degrees of Separation (DoS). Read ' +
+                'different perspectives or Degrees of Separation (DoS). Read ' +
                 'the tips in the question marks for more details. There is ' +
                 'also more information in the tabs below or you can create ' +
                 'your own network to share with others via the button on ' +
@@ -370,8 +332,8 @@ $(document).ready(function() {
     });
     // Start it automatically for certain steps, if they were directed from
     // another page.
-    var autoStartIDs = ['feature-tour:0', 'feature-tour:3', 'feature-tour:6',
-                        'feature-tour:8', 'feature-tour:9'];
+    var autoStartIDs = ['feature-tour:0', 'feature-tour:2', 'feature-tour:3',
+        'feature-tour:5', 'feature-tour:7', 'feature-tour:8'];
     if ($.inArray(hopscotch.getState(), autoStartIDs) !== -1){
         hopscotch.startTour(tour);
     }

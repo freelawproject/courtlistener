@@ -1,25 +1,25 @@
 # coding=utf-8
 import os
+from datetime import timedelta
+
+from celery.task.sets import subtask
+from django.test import TestCase, override_settings
+from django.utils.timezone import now
 
 from cl import settings
 from cl.audio.models import Audio
 from cl.lib.scrape_helpers import get_extension
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.DupChecker import DupChecker
-from cl.scrapers.models import UrlHash, ErrorLog
 from cl.scrapers.management.commands import (
     cl_report_scrape_status, cl_scrape_opinions, cl_scrape_oral_arguments
 )
+from cl.scrapers.models import UrlHash, ErrorLog
 from cl.scrapers.tasks import (
     extract_from_txt, extract_doc_content, extract_by_ocr, process_audio_file
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.search.models import Court, Opinion
-
-from celery.task.sets import subtask
-from datetime import timedelta
-from django.test import TestCase, override_settings
-from django.utils.timezone import now
 
 
 class IngestionTest(IndexedSolrTestCase):
@@ -33,7 +33,9 @@ class IngestionTest(IndexedSolrTestCase):
         cl_scrape_opinions.Command().scrape_court(parsed_site, full_crawl=True)
 
         opinions = Opinion.objects.all()
-        self.assertTrue(opinions.count() == 6, 'Should have 6 test opinions.')
+        count = opinions.count()
+        self.assertTrue(opinions.count() == 6, 'Should have 6 test opinions, '
+                                               'not %s' % count)
 
     def test_ingest_oral_arguments(self):
         """Can we successfully ingest oral arguments at a high level?"""
@@ -319,4 +321,4 @@ class AudioFileTaskTest(TestCase):
 
         process_audio_file(pk=1)
         audio = Audio.objects.get(pk=1)
-        self.assertEqual(audio.duration, 15)
+        self.assertEqual(audio.duration, 12)

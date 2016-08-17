@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from django.forms.widgets import HiddenInput, TextInput, Select, CheckboxInput
+
 from cl.alerts.models import Alert
 
 
@@ -34,27 +35,16 @@ class CreateAlertForm(ModelForm):
             'always_send_email',
         )
         widgets = {
-            'query': HiddenInput(
-                attrs={
-                    'tabindex': '250'
-                }
-            ),
+            'query': HiddenInput(),
             'name': TextInput(
                 attrs={
                     'class': 'form-control',
-                    'tabindex': '251'
                 }
             ),
             'rate': Select(
                 attrs={
                     'class': 'form-control',
-                    'tabindex': '252',
                 }
             ),
-            'always_send_email': CheckboxInput(
-                attrs={
-                    'tabindex': '253',
-                }
-
-            ),
+            'always_send_email': CheckboxInput(),
         }

@@ -2,13 +2,11 @@
 
 {% block title %}Alerts – CourtListener.com{% endblock %}
 
-{% block search-form %}{% endblock %}
-
 {% block nav-alerts %}active{% endblock %}
 
 {% block content %}
-    <div class="col-xs-12">
-        {% if alerts %}
+    {% if alerts %}
+        <div class="col-xs-12">
             <div class="table-responsive">
                 <table class="table settings-table">
                     <thead>
@@ -70,15 +68,22 @@
                     </tbody>
                 </table>
             </div>
-        {% else %}
-            <div class="row">
-                <div class="col-sm-12">
-                    <h3>You have not made any alerts.</h3>
-                    <form action="/" method="get">
-                        <button type="submit" class="btn btn-primary">Make New Alert</button>
-                    </form>
-                </div>
-            </div>
-        {% endif %}
-    </div>
+        </div>
+    {% else %}
+        <div class="col-sm-3"></div>
+        <div class="col-xs-12 col-sm-6">
+            <h3>You have not made any alerts.</h3>
+            <p>CourtListener Alerts let you create search queries that will send you emails every time there's a opinion or oral argument that matches your query.
+            </p>
+            <p>Search for anything within the <a
+                    href="{% url "coverage" %}#scraped-jurisdictions">supported jurisdictions</a>, and you will get an email daily, weekly, monthly or even in real time as courts post new opinions and oral arguments.
+            </p>
+            <p class="v-offset-above-2">
+                <a href="/?type=o" class="btn btn-primary btn-lg">Make New Opinion Alert</a>
+                <a href="/?type=oa" class="btn btn-primary btn-lg">Make New Oral Argument Alert</a>
+            </p>
+        </div>
+        <div class="col-sm-3"></div>
+    {% endif %}
+
 {% endblock %}

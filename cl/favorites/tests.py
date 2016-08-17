@@ -1,8 +1,10 @@
 import time
+
 from django.test import Client, TestCase
-from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW
-from cl.favorites.models import Favorite
 from selenium import webdriver
+
+from cl.favorites.models import Favorite
+from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW
 
 
 class FavoriteTest(TestCase):
@@ -134,8 +136,6 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # She has used CL before and knows to click the star to favorite it
         self.assert_text_in_body('Back to Search Results')
-        detail_page_url = self.browser.current_url
-        title = self.browser.find_element_by_css_selector('article h2').text
         star = self.browser.find_element_by_id('favorites-star')
         self.assertEqual(
                 star.get_attribute('title').strip(),
@@ -149,7 +149,6 @@ class UserFavoritesTest(BaseSeleniumTest):
         # populated with the original title from the search and there's an
         # empty notes field for her to add whatever she wants. She adds a note
         # to help her remember what was interesting about this result.
-        modal = self.browser.find_element_by_id('modal-save-favorite')
         title = self.browser.find_element_by_id('save-favorite-title')
         self.assertIn('Save Favorite', title.text.strip())
 
@@ -163,7 +162,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.browser.find_element_by_id('saveFavorite').click()
 
         # She now sees the star is full on yellow implying it's a fave!
-        time.sleep(1)  # Selnium is sometimes faster than JS.
+        time.sleep(1)  # Selenium is sometimes faster than JS.
         star = self.browser.find_element_by_id('favorites-star')
         self.assertIn('gold', star.get_attribute('class'))
         self.assertNotIn('gray', star.get_attribute('class'))
@@ -185,7 +184,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         # TODO: Refactor. Same code used in
         #       test_basic_homepage_search_and_signin_and_signout
         profile_dropdown = self.browser. \
-            find_elements_by_css_selector('a.dropdown-toggle')[1]
+            find_elements_by_css_selector('a.dropdown-toggle')[0]
         self.assertEqual(profile_dropdown.text.strip(), u'Profile')
 
         dropdown_menu = self.browser. \
@@ -235,7 +234,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.attempt_sign_in('pandora', 'password')
 
         profile_dropdown = self.browser. \
-            find_elements_by_css_selector('a.dropdown-toggle')[1]
+            find_elements_by_css_selector('a.dropdown-toggle')[0]
         self.assertEqual(profile_dropdown.text.strip(), u'Profile')
 
         dropdown_menu = self.browser. \

@@ -5,7 +5,43 @@ Sets up all the overrides or additional CSS that the site uses.
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
 .navbar-brand {
-    padding: 16px 15px;
+    padding: 16px 15px 16px 30px;
+}
+
+header {
+    margin-bottom: 30px;
+}
+
+.navbar {
+    margin-bottom: 0;
+    border-bottom: 1px solid #e7e7e7;
+}
+
+.navbar-nav > li > a {
+    padding-top: 13px;
+    padding-bottom: 13px;
+}
+
+.navbar-default .navbar-nav > .active > a,
+.navbar-default .navbar-nav > .active > a:hover,
+.navbar-default .navbar-nav > .active > a:focus {
+    background-color: transparent;
+    border-bottom: 3px solid #AE0B0B;
+}
+#subnav {
+    min-height: 0;
+    background-color: transparent;
+    border-top: 0;
+}
+#subnav .navbar-nav {
+    margin: 0;
+}
+#subnav .navbar-nav > li {
+    float: left;
+}
+
+#search-results {
+    margin-top: 23px;
 }
 
 .alt {
@@ -29,32 +65,32 @@ a.button:active{
   color:#fff;
 }
 
-#homepage #main-query-box {
+#main-query-box {
     /* margin: 0 auto; */
     -webkit-transition : all 0.5 s ease;
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;
     transition: all 0.5s ease;
-    margin-bottom: 2em;
-    margin-top: 2em;
+    margin-bottom: 4em;
+    margin-top: 4em;
 }
 
 
 @media(max-width:767px){
-    #homepage #main-query-box #id_q {
+    #homepage #main-query-box {
+        margin-bottom: 2em;
+    }
+    #main-query-box #id_q {
         width: 250px;
     }
-    #homepage #main-query-box.wide #id_q {
-        width: 250px;
-    }
-    #homepage #main-query-box .input-group {
+    #main-query-box .input-group {
         display: inline-table;
         vertical-align: middle;
     }
-    #homepage #main-query-box .input-group-btn {
+    #main-query-box .input-group-btn {
         width: auto;
     }
-    #homepage #main-query-box .form-group {
+    #main-query-box .form-group {
         display: inline-block;
         margin-bottom: 0;
         vertical-align: middle;
@@ -71,23 +107,17 @@ a.button:active{
     }
 }
 @media(min-width:768px){
-    #id_q {
-        width: 638px;
-    }
-    #homepage #main-query-box #id_q {
+    #main-query-box #id_q {
         width: 400px;
     }
-    #homepage #main-query-box.wide #id_q {
-        width: 580px;
-    }
-    #homepage #above-main-query {
+    #above-main-query {
         margin-top: 6em;
     }
-    #homepage #advanced-search-starter {
+    #advanced-search {
         margin-bottom: 6em;
     }
-    #homepage #advanced-search-starter p:not(:first-child) {
-        margin-top: 0.75em;
+    #advanced-search p:not(:first-child) {
+        margin-top: 1.5em;
     }
     #court-picker-tabs {
         text-align: right;
@@ -95,28 +125,16 @@ a.button:active{
 
 }
 @media(min-width:992px){
-    #id_q {
-        width: 860px;
-    }
-    #homepage #main-query-box #id_q {
+    #main-query-box #id_q {
         width: 600px;
-    }
-    #homepage #main-query-box.wide #id_q {
-        width: 800px;
     }
     .lg-v-offset-below-3 {
         padding-bottom: 40px;
     }
 }
 @media(min-width:1200px){
-    #id_q {
-        width: 345px;
-    }
-    #homepage #main-query-box #id_q {
+    #main-query-box #id_q {
         width: 800px;
-    }
-    #homepage #main-query-box.wide #id_q {
-        width: 1000px;
     }
 }
 
@@ -143,27 +161,11 @@ a.button:active{
     border-radius: 9px;
 }
 
-#homepage #jurisdiction-count {
+#jurisdiction-count {
     -webkit-transition: all 0.5s ease;
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;
     transition: all 0.5s ease;
-}
-
-#type-switcher h3 {
-    margin-bottom: 2px;
-}
-#type-switcher label{
-    font-weight: normal;
-}
-#type-switcher .selected {
-    border-bottom: 3px solid #ae0b0b;
-    color: #111;
-}
-#type-switcher label {
-    color: gray;
-    text-decoration: none;
-    border-bottom: none;
 }
 
 .container > footer {
@@ -366,9 +368,6 @@ body {
     -o-transition: all 0.5s ease;
     transition: all 0.5s ease;
 }
-#searchform-navbar #search-container .input-group {
-    padding: 14px 0 0 0;
-}
 
 #advanced {
     color: black;
@@ -495,14 +494,7 @@ input.court-checkbox, input.status-checkbox {
 #new-search-chooser {
     float: right;
 }
-/*
-#result-count {
-    float: left;
-}
-*/
-.search-page #id_order_by {
-    float: right;
-}
+
 .nojs #sidebar-search-form {
     display: none;
 }
