@@ -1,6 +1,6 @@
 <div id="type-switcher" class="hidden">
     <label for="id_type_0"
-           class="pointer {% if type == 'o' %}selected{% endif %}">
+           class="{% if type == 'o' %}selected{% endif %}">
         <input {% if type == 'o' %}checked="checked"{% endif %}
             class="external-input hidden"
             id="id_type_0"
@@ -9,7 +9,7 @@
             type="radio">Opinions</label>
 
     <label for="id_type_1"
-           class="pointer {% if type == 'oa' %}selected{% endif %}">
+           class="{% if type == 'oa' %}selected{% endif %}">
         <input {% if type == 'oa' %}checked="checked"{% endif %}
             class="external-input hidden"
             id="id_type_1"
@@ -18,7 +18,7 @@
             type="radio">Oral Arguments</label>
 
     <label for="id_type_2"
-           class="pointer {% if type == 'p' %}selected{% endif %}">
+           class="{% if type == 'p' %}selected{% endif %}">
         <input {% if type == 'p' %}checked="checked"{% endif %}
             class="external-input hidden"
             id="id_type_2"
