@@ -184,6 +184,16 @@
                         </div>
                     </div>
                 </div>
+                <div class="row">
+                    <div class="col-xs-12">
+                        <button type="submit"
+                                class="btn btn-primary btn-lg float-right"
+                                name="search"
+                                id="search-button-secondary"><i
+                                class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="col-sm-3">
                 {% include "includes/operators_quick_list.html" %}
@@ -249,7 +259,18 @@
                         </div>
                     </div>
                 </div>
+                <div class="row">
+                    <div class="col-xs-12">
+                        <button type="submit"
+                                class="btn btn-primary btn-lg float-right"
+                                name="search"
+                                id="search-button-secondary"><i
+                                class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </div>
+                </div>
             </div>
+
             <div class="col-sm-3">
                 {% include "includes/operators_quick_list.html" %}
                 <a class="text-right" href="{% url 'advanced_search' %}">More
@@ -341,9 +362,17 @@
                 </div>
             </div>
         </div>
+        <div class="row">
+            <div class="col-xs-12">
+                <button type="submit"
+                        class="btn btn-primary btn-lg float-right"
+                        name="search"
+                        id="search-button-secondary"><i class="fa fa-search"></i>&nbsp;Search
+                </button>
+            </div>
+        </div>
         {% endif %}
 
-        {% include "includes/jurisdiction_picker_modal.html" %}
 
         {%  if type == 'o' %}
         <div class="row" id="about-opinions">
@@ -488,6 +517,8 @@
         </div>
 
         {% endif %}
+
+        {% include "includes/jurisdiction_picker_modal.html" %}
 
     </div>
 
