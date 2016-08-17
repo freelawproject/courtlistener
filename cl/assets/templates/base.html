@@ -192,19 +192,22 @@
                 <div>
                     <ul class="nav navbar-nav">
                         <li class="{% block navbar-o %}inactive{% endblock %}"
-                            id="tour-opinions">
+                            id="navbar-o">
                             <a href="{% url "advanced_o" %}"
                                tabindex="100">Opinions</a>
                         </li>
-                        <li class="{% block navbar-oa %}inactive{% endblock %}">
+                        <li class="{% block navbar-oa %}inactive{% endblock %}"
+                            id="navbar-oa">
                             <a href="{% url "advanced_oa" %}"
                                tabindex="101">Oral Arguments</a>
                         </li>
-                        <li class="{% block navbar-p %}inactive{% endblock %}">
+                        <li class="{% block navbar-p %}inactive{% endblock %}"
+                            id="navbar-p">
                             <a href="{% url "advanced_p" %}"
                                tabindex="102">Judges</a>
                         </li>
-                        <li class="dropdown {% block navbar-vis %}inactive{% endblock %}">
+                        <li class="dropdown {% block navbar-vis %}inactive{% endblock %}"
+                            id="navbar-vis">
                             <a href="#"
                                class="dropdown-toggle"
                                tabindex="103"
