@@ -216,7 +216,9 @@ class PacerXMLParser(object):
 
         recap_doc.date_upload = self.get_datetime_from_node(doc_node, 'upload_date')
         recap_doc.document_type = document_type or recap_doc.document_type
-        recap_doc.document_number = entry_number or recap_doc.document_number
+        if isinstance(entry_number, int):
+            recap_doc.document_number = entry_number
+
         # If we can't parse the availability node (it returns None), default it
         # to False.
         availability = self.get_bool_from_node(doc_node, 'available')
