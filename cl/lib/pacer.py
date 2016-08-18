@@ -295,11 +295,16 @@ class PacerXMLParser(object):
             print "  Couldn't get date from path: %s" % path
             return None
         else:
-            d = parser.parse(s)
-            d = d.replace(tzinfo=d.tzinfo or gettz('UTC'))  # Set it to UTC.
-            if cast_to_date is True:
-                return d.date()
-            return d
+            try:
+                d = parser.parse(s)
+            except ValueError:
+                print "  Couldn't parse date: %s" % s
+                return None
+            else:
+                d = d.replace(tzinfo=d.tzinfo or gettz('UTC'))  # Set it to UTC.
+                if cast_to_date is True:
+                    return d.date()
+                return d
 
     def get_judges(self, node):
         """Parse out the judge string and then look it up in the DB"""
