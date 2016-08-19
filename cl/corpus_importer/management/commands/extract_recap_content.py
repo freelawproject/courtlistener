@@ -3,8 +3,9 @@ import logging
 from celery.task import TaskSet
 from django.core.management import BaseCommand
 
+from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
-from scrapers.tasks import extract_recap_pdf
+
 
 logger = logging.getLogger(__name__)
 
