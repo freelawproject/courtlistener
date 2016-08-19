@@ -22,7 +22,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.string_utils import anonymize, trunc
 from cl.scrapers.models import ErrorLog
-from cl.search.models import Opinion
+from cl.search.models import Opinion, RECAPDocument
 
 DEVNULL = open('/dev/null', 'w')
 
@@ -39,7 +39,7 @@ def get_clean_body_content(content):
                "reading the original."
 
 
-def extract_from_doc(path, DEVNULL):
+def extract_from_doc(path):
     """Extract text from docs.
 
     We use antiword to pull the text out of MS Doc files.
@@ -65,7 +65,17 @@ def extract_from_html(path):
     return content, err
 
 
-def extract_from_pdf(doc, path, DEVNULL, callback=None):
+def make_pdftotext_process(path):
+    """Make a subprocess to hand to higher-level code."""
+    return subprocess.Popen(
+        ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=DEVNULL
+    )
+
+
+def extract_from_pdf(doc, path, callback=None):
     """ Extract text from pdfs.
 
     Here, we use pdftotext. If that fails, try to use tesseract under the
@@ -73,12 +83,7 @@ def extract_from_pdf(doc, path, DEVNULL, callback=None):
     letter e in our content. If it's not there, we try to fix the mojibake
     that ca9 sometimes creates.
     """
-    process = subprocess.Popen(
-        ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
-        shell=False,
-        stdout=subprocess.PIPE,
-        stderr=DEVNULL
-    )
+    process = make_pdftotext_process(path)
     content, err = process.communicate()
     if content.strip() == '' and callback:
         # probably an image PDF. Send it to OCR. N.B.: Do NOT use a subtask here
@@ -123,7 +128,7 @@ def extract_from_txt(path):
     return content, err
 
 
-def extract_from_wpd(opinion, path, DEVNULL):
+def extract_from_wpd(opinion, path):
     """Extract text from a Word Perfect file
 
     Yes, courts still use these, so we extract their text using wpd2html. Once
@@ -157,15 +162,15 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
 
     extension = path.split('.')[-1]
     if extension == 'doc':
-        content, err = extract_from_doc(path, DEVNULL)
+        content, err = extract_from_doc(path)
     elif extension == 'html':
         content, err = extract_from_html(path)
     elif extension == 'pdf':
-        opinion, content, err = extract_from_pdf(opinion, path, DEVNULL, callback)
+        opinion, content, err = extract_from_pdf(opinion, path, callback)
     elif extension == 'txt':
         content, err = extract_from_txt(path)
     elif extension == 'wpd':
-        opinion, content, err = extract_from_wpd(opinion, path, DEVNULL)
+        opinion, content, err = extract_from_wpd(opinion, path)
     else:
         print ('*****Unable to extract content due to unknown extension: %s '
                'on opinion: %s****' % (extension, opinion))
@@ -208,6 +213,27 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
     )
 
     return opinion
+
+
+@app.task
+def extract_recap_pdf(pk):
+    doc = RECAPDocument.objects.get(pk=pk)
+    path = doc.filepath_local.path
+    process = make_pdftotext_process(path)
+    content, err = process.communicate()
+    if content.strip() == '':
+        # probably an image PDF. Send it to OCR.
+        success, content = extract_by_ocr(path)
+        if success:
+            doc.ocr_status = RECAPDocument.OCR_COMPLETE
+        elif content == '' or not success:
+            content = 'Unable to extract document content.'
+            doc.ocr_status = RECAPDocument.OCR_FAILED
+    else:
+        doc.ocr_status = RECAPDocument.OCR_UNNECESSARY
+
+    doc.plain_text, _ = anonymize(content)
+    doc.save()
 
 
 def convert_to_pngs(path, tmp_file_prefix):

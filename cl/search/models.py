@@ -327,12 +327,19 @@ class RECAPDocument(models.Model):
     """
         The model for Docket Documents and Attachments.
     """
-
     PACER_DOCUMENT = 1
     ATTACHMENT = 2
     DOCUMENT_TYPES = (
         (PACER_DOCUMENT, "PACER Document"),
         (ATTACHMENT, "Attachment"),
+    )
+    OCR_COMPLETE = 1
+    OCR_UNNECESSARY = 2
+    OCR_FAILED = 3
+    OCR_STATUSES = (
+        (OCR_COMPLETE, "OCR Complete"),
+        (OCR_UNNECESSARY, "OCR Not Necessary"),
+        (OCR_FAILED, "OCR Failed"),
     )
     docket_entry = models.ForeignKey(
         DocketEntry,
@@ -404,6 +411,17 @@ class RECAPDocument(models.Model):
     description = models.TextField(
         help_text="The short description of the docket entry that appears on "
                   "the attachments page.",
+        blank=True,
+    )
+    plain_text = models.TextField(
+        help_text="Plain text of the document after extraction using "
+                  "pdftotext, wpd2txt, etc.",
+        blank=True,
+    )
+    ocr_status = models.SmallIntegerField(
+        help_text="The status of OCR processing on this item.",
+        choices=OCR_STATUSES,
+        null=True,
         blank=True,
     )
 
