@@ -369,7 +369,7 @@ class RECAPDocument(models.Model):
         db_index=True,
         choices=DOCUMENT_TYPES,
     )
-    document_number = models.PositiveIntegerField(
+    document_number = models.BigIntegerField(
         help_text="If the file is a document, the number is the "
                   "document_number in RECAP docket.",
     )
