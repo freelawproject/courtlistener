@@ -221,7 +221,7 @@ class Docket(models.Model):
     )
     nature_of_suit = models.CharField(
         help_text="The nature of suit code from PACER.",
-        max_length=100,
+        max_length=500,  # Was 100
         blank=True,
     )
     jury_demand = models.CharField(
