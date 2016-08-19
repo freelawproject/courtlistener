@@ -302,7 +302,7 @@ class DocketEntry(models.Model):
         null=True,
         blank=True,
     )
-    entry_number = models.PositiveIntegerField(
+    entry_number = models.BigIntegerField(
         help_text="# on the PACER docket page.",
     )
     description = models.TextField(
