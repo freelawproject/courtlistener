@@ -20,6 +20,7 @@ from cl.celery import app
 from cl.citations.tasks import update_document_by_id
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.mojibake import fix_mojibake
+from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
 from cl.scrapers.models import ErrorLog
 from cl.search.models import Opinion, RECAPDocument
@@ -221,7 +222,7 @@ def extract_recap_pdf(pk):
     path = doc.filepath_local.path
     process = make_pdftotext_process(path)
     content, err = process.communicate()
-    if content.strip() == '':
+    if needs_ocr(content):
         # probably an image PDF. Send it to OCR.
         success, content = extract_by_ocr(path)
         if success:

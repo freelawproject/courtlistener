@@ -72,3 +72,30 @@ def get_document_filename(court, casenum, docnum, subdocnum):
     return ".".join(["gov", "uscourts", unicode(court), unicode(casenum),
                      unicode(docnum), unicode(subdocnum), "pdf"])
 
+
+def needs_ocr(content):
+    """Determines if OCR is needed for a PACER PDF.
+
+    Every document in PACER (pretty much) has the case number written on the
+    top of every page. This is a great practice, but it means that to test if
+    OCR is needed, we need to remove this text and see if anything is left. The
+    line usually looks something like:
+
+    Case 2:06-cv-00376-SRW Document 1-2 Filed 04/25/2006 Page 1 of 1
+
+    This function removes these lines so that if no text remains, we can be sure
+    that the PDF needs OCR.
+
+    :param content: The content of a PDF.
+    :return: boolean indicating if OCR is needed.
+    """
+    for line in content.splitlines():
+        line = line.strip()
+        if line.startswith('Case'):
+            continue
+        elif line:
+            # We found a line with good content. No OCR needed.
+            return False
+
+    # We arrive here if no line was found containing good content.
+    return True
