@@ -216,7 +216,7 @@ class Docket(models.Model):
     )
     cause = models.CharField(
         help_text="The cause for the case.",
-        max_length=200,
+        max_length=500,  # Was 200
         blank=True,
     )
     nature_of_suit = models.CharField(
