@@ -21,8 +21,9 @@ logger = logging.getLogger(__name__)
 
 pacer_to_cl_ids = {
     # Maps PACER ids to their CL equivalents
-    'azb': 'arb',  # Arizona Bankruptcy Court
-    'cofc': 'uscfc',  # Court of Federal Claims
+    'azb': 'arb',         # Arizona Bankruptcy Court
+    'cofc': 'uscfc',      # Court of Federal Claims
+    'nysb-mega': 'nysb',  # Remove the mega thing
 }
 # Reverse dict of pacer_to_cl_ids
 cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items()}
