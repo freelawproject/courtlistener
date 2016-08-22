@@ -147,6 +147,7 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
     else:
         min_dates = None
 
+    # check if skipping first columbias cases
     if skip_newcases:
         skiplist = get_path_list()
     else:
@@ -181,16 +182,16 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
                         skipfile = False
                     else:
                         continue
-            print(path)
+
+            if path in skiplist:
+                continue
 
             # skip cases in 'misc*' folders -- they are relatively different
             # than the other cases, so we'll deal with them later
             if 'miscellaneous_court_opinions' in path:
                 continue
 
-            # skip cases that we've already imported.
-            if path in skiplist:
-                continue
+            print(path)
 
             # try to parse/save the case and print any exceptions with full
             # tracebacks
