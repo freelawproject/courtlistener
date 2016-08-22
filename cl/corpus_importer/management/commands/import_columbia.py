@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand
 
 from cl.corpus_importer.import_columbia.parse_opinions import parse_file
 from cl.corpus_importer.import_columbia.populate_opinions import make_and_save
-from cl.lib.import_lib import get_min_dates
+from cl.lib.import_lib import get_min_dates, skip_newcases
 
 
 class Command(BaseCommand):
@@ -65,6 +65,12 @@ class Command(BaseCommand):
             help='If set, will skip duplicates.'
         )
         parser.add_argument(
+            '--skipnewcases',
+            action='store_true',
+            default=False,
+            help='If set, will skip cases from initial columbia import.'
+        )
+        parser.add_argument(
             '--startfolder',
             type=str,
             default=None,
@@ -86,12 +92,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         do_many(options['dir'][0], options['limit'], options['random'],
                 options['status'], options['log'], options['newcases'],
-                options['skipdupes'], options['startfolder'],
+                options['skipdupes'], options['skipnewcases'], 
+                options['startfolder'],
                 options['startfile'], options['debug'])
 
 
 def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
-            skipdupes, startfolder, startfile, debug):
+            skipdupes, skip_newcases, startfolder, startfile, debug):
     """Runs through a directory of the form /data/[state]/[sub]/.../[folders]/[.xml documents].
     Parses each .xml document, instantiates the associated model object, and
     saves the object. Prints/logs status updates and tracebacks instead of
@@ -107,6 +114,7 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
     logged to this file.
     :param newcases: If true, skip court-years that already have data.
     :param skipdupes: If true, skip duplicates.
+    :param skip_newcases: If true, skip cases imported under newcases.
     :param startfolder: If not None, start on startfolder
     :param startfile: If not None, start on this file (for resuming)
     """
@@ -139,6 +147,12 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
         min_dates = get_min_dates()
     else:
         min_dates = None
+        
+    # check if skipping first columbias cases
+    if skip_first_columbia:
+        skiplist = get_skip_columbia()
+    else:
+        skiplist = set()
 
     # start/resume functionality
     if startfolder is not None:
@@ -169,6 +183,10 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
                         skipfile = False
                     else:
                         continue
+            
+            if path in skiplist:
+                continue
+            
             print(path)
 
             # skip cases in 'misc*' folders -- they are relatively different
