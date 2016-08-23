@@ -150,7 +150,7 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
         
     # check if skipping first columbias cases
     if skip_first_columbia:
-        skiplist = get_skip_columbia()
+        skiplist = get_skipnewcases()
     else:
         skiplist = set()
 
