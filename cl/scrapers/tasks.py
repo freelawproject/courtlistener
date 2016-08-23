@@ -240,7 +240,7 @@ def extract_recap_pdf(pk):
 def convert_to_pngs(path, tmp_file_prefix):
     image_magick_command = ['convert', '-depth', '4', '-density', '300',
                             '-background', 'white', '+matte', path,
-                            '%s.png' % tmp_file_prefix]
+                            '%s-%%03d.png' % tmp_file_prefix]
     magick_out = subprocess.check_output(image_magick_command,
                                          stderr=subprocess.STDOUT)
     return magick_out
@@ -248,7 +248,7 @@ def convert_to_pngs(path, tmp_file_prefix):
 
 def convert_to_txt(tmp_file_prefix):
     tess_out = ''
-    for png in sorted(glob.glob('%s*' % tmp_file_prefix)):
+    for png in sorted(glob.glob('%s*.png' % tmp_file_prefix)):
         tesseract_command = ['tesseract', png, png[:-4], '-l', 'eng']
         tess_out = subprocess.check_output(
             tesseract_command,
