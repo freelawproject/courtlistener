@@ -14,7 +14,6 @@
     501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete
     and comprehensive database of American judges.
 {% endblock %}
-{% block search-form %}{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -25,14 +24,14 @@
 {% block content %}
     <div class="col-sm-7">
         <h1 id="about">Bulk Data</h1>
-        <p>For hackers, legal analysts and anybody else that might want them, we provide bulk files containing all of our data. Several types of files are available as listed below, but in general the files that are available correspond to the major types of data we have in our database.
+        <p>For developers, legal researchers, journalists,  and anybody else that might be interested, we provide bulk files containing all of our data. Several types of files are available as listed below, but in general the files that are available correspond to the major types of data we have in our database, such as opinions, oral arguments, dockets, and judges.
         </p>
 
 
         <h2 id="bulk-data">Bulk Data Files</h2>
         <p>Bulk data is handled in one of two ways. For data types where it makes sense, JSON files are made for every object, and they are then placed in compressed tar.gz files by jurisdiction. These are then made available, and an additional file, all.tar, is produced containing all of the compressed jurisdictional files (note that this file is <em>not</em> directly compressed and is not a <code>gz</code> file because it contains only compressed files).
         </p>
-        <p>For some data types, jurisdictional archives don't make sense. So instead, we produce the JSON files and gather those up into a single all.tar.gz file.
+        <p>For some data types, jurisdictional archives don't make sense. So instead, we produce the JSON files and gather those up into a single all.tar.gz file. For example, we provide bulk data on courts themselves. If we gathered that data by jurisdiction each file would only contain one json file -- the court for that individual jurisdiction.
         </p>
         <p>You will also find <code>info.json</code> files tucked into the archives. These describe the last time the bulk data was created and how long it took to generate (in seconds).
         </p>
@@ -77,7 +76,7 @@
             <dd>
                 <blockquote>
                     <code>
-                        <a href="/api/bulk-data/courts/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>jurisdiction</strong>/<strong>all</strong>.tar</a>
+                        <a href="/api/bulk-data/courts/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>courts</strong>/<strong>all</strong>.tar.gz</a>
                     </code>
                 </blockquote>
             </dd>

@@ -216,12 +216,12 @@ class Docket(models.Model):
     )
     cause = models.CharField(
         help_text="The cause for the case.",
-        max_length=200,
+        max_length=2000,  # Was 200, 500, 1000
         blank=True,
     )
     nature_of_suit = models.CharField(
         help_text="The nature of suit code from PACER.",
-        max_length=100,
+        max_length=1000,  # Was 100, 500
         blank=True,
     )
     jury_demand = models.CharField(
@@ -302,7 +302,7 @@ class DocketEntry(models.Model):
         null=True,
         blank=True,
     )
-    entry_number = models.PositiveIntegerField(
+    entry_number = models.BigIntegerField(
         help_text="# on the PACER docket page.",
     )
     description = models.TextField(
@@ -327,12 +327,19 @@ class RECAPDocument(models.Model):
     """
         The model for Docket Documents and Attachments.
     """
-
     PACER_DOCUMENT = 1
     ATTACHMENT = 2
     DOCUMENT_TYPES = (
         (PACER_DOCUMENT, "PACER Document"),
         (ATTACHMENT, "Attachment"),
+    )
+    OCR_COMPLETE = 1
+    OCR_UNNECESSARY = 2
+    OCR_FAILED = 3
+    OCR_STATUSES = (
+        (OCR_COMPLETE, "OCR Complete"),
+        (OCR_UNNECESSARY, "OCR Not Necessary"),
+        (OCR_FAILED, "OCR Failed"),
     )
     docket_entry = models.ForeignKey(
         DocketEntry,
@@ -362,7 +369,7 @@ class RECAPDocument(models.Model):
         db_index=True,
         choices=DOCUMENT_TYPES,
     )
-    document_number = models.PositiveIntegerField(
+    document_number = models.BigIntegerField(
         help_text="If the file is a document, the number is the "
                   "document_number in RECAP docket.",
     )
@@ -404,6 +411,17 @@ class RECAPDocument(models.Model):
     description = models.TextField(
         help_text="The short description of the docket entry that appears on "
                   "the attachments page.",
+        blank=True,
+    )
+    plain_text = models.TextField(
+        help_text="Plain text of the document after extraction using "
+                  "pdftotext, wpd2txt, etc.",
+        blank=True,
+    )
+    ocr_status = models.SmallIntegerField(
+        help_text="The status of OCR processing on this item.",
+        choices=OCR_STATUSES,
+        null=True,
         blank=True,
     )
 
@@ -597,16 +615,19 @@ class OpinionCluster(models.Model):
     )
     federal_cite_one = models.CharField(
         help_text="Primary federal citation",
+        db_index=True,
         max_length=50,
         blank=True,
     )
     federal_cite_two = models.CharField(
         help_text="Secondary federal citation",
+        db_index=True,
         max_length=50,
         blank=True,
     )
     federal_cite_three = models.CharField(
         help_text="Tertiary federal citation",
+        db_index=True,
         max_length=50,
         blank=True,
     )

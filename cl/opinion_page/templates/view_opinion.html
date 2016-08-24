@@ -5,7 +5,8 @@
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
 {% block description %}Opinion for {{ title }}{% endblock %}
 {% block og_description %}Opinion for {{ title }}{% endblock %}
-{% block search-form %}{% endblock %}
+
+{% block navbar-o %}active{% endblock %}
 
 {% block head %}
     <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{cluster|best_case_name|truncatewords:10}}" href="/feed/search/?q=cites:({{ cluster.sub_opinions.all|OR_join }})">
@@ -208,7 +209,7 @@
             <span class="meta-data-header">Supreme Court Database ID:</span>
             <span class="meta-data-value">
                 {% if cluster.scdb_id %}
-                    <a href="http://supremecourtdatabase.org/analysisCaseDetail.php?cid={{ cluster.scdb_id }}" target="_blank">
+                    <a href="http://scdb.wustl.edu/analysisCaseDetail.php?cid={{ cluster.scdb_id }}-01" target="_blank">
                     {{ cluster.scdb_id }}
                     </a><i class="gray fa fa-external-link"></i>
                 {% else %}

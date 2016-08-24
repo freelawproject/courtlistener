@@ -141,7 +141,7 @@ class Command(BaseCommand):
                 completed += 1
 
                 max_items = self.options['max_items']
-                if completed >= max_items and max_items != -1:
+                if completed >= max_items != -1:
                     print "\n\nCompleted %s items. Aborting early." % max_items
                     break
 

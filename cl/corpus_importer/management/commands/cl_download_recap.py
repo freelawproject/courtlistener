@@ -1,26 +1,27 @@
 import logging
-import os
+
 import pandas as pd
 from celery.task import TaskSet
 from django.core.management import BaseCommand
-from django.conf import settings
 
 from cl.corpus_importer.tasks import download_recap_item
-from cl.recap.utils import (
+from cl.lib.recap_utils import (
     get_docketxml_url, get_pdf_url, get_document_filename, get_docket_filename
 )
 
-CSV_PATH = os.path.join(settings.BASE_DIR, 'cl', 'corpus_importer', 'recap',
-                        "document_table.csv")
 logger = logging.getLogger(__name__)
 
 
-def load_csv():
+def load_csv(csv_location):
     """Load the CSV data using pandas
 
     This CSV is generated with:
 
         mysql recap_prod -p -u recap < export.sql > out.csv
+
+        or
+
+        mysql recap_prod -p -u recap < export_latest.sql > out.csv
 
     export.sql contains:
 
@@ -35,14 +36,12 @@ def load_csv():
 
     The resulting file is tab separated, and pandas will handle that just fine.
     """
-    with open(CSV_PATH, 'r') as f:
-        line_count = sum(1 for line in f) - 1
-    data = pd.read_csv(CSV_PATH, delimiter='\t', dtype={
+    data = pd.read_csv(csv_location, delimiter='\t', dtype={
         'casenum': object,
         'docnum': object,
         'court': object,
     })
-    return data, line_count
+    return data, len(data.index)
 
 
 def make_download_tasks(data, line_count, start_line):
@@ -95,7 +94,13 @@ class Command(BaseCommand):
             default=0,
             help='The line in the file where you wish to start processing.'
         )
+        parser.add_argument(
+            '--download_csv',
+            required=True,
+            help="The absolute path to the CSV containing the list of items "
+                 "to download.",
+        )
 
     def handle(self, *args, **options):
-        data, line_count = load_csv()
+        data, line_count = load_csv(options['download_csv'])
         make_download_tasks(data, line_count, options['start_line'])

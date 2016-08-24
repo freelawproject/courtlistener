@@ -2,9 +2,10 @@
 """
 Tests for visual aspects of CourtListener's responsive design
 """
-from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW, MOBILE_WINDOW
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
+from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW, MOBILE_WINDOW
 
 
 class LayoutTest(BaseSeleniumTest):
@@ -22,39 +23,36 @@ class LayoutTest(BaseSeleniumTest):
         """
         self.browser.get(self.server_url)
 
-        # homepage = self.browser.find_element_by_id('homepage')
         rows = self.browser.find_elements_by_css_selector('#homepage > .row')
 
         # Order of collapsing should follow:
         # - Search box
         self.assertIn('Search', rows[0].text)
 
-        # rows[1] is a hidden row at the moment for the jurisdiction modal
-
         # - Advanced Search link
-        self.assertIn('Advanced Search', rows[2].text)
-        rows[2].find_element_by_link_text('Advanced Search')
+        self.assertIn('Advanced Search', rows[1].text)
+        rows[1].find_element_by_link_text('Advanced Search')
 
         # - About
         # -- About CourtListener
         # -- About Free Law Project
-        self.assertIn('About CourtListener', rows[3].text)
+        self.assertIn('About CourtListener', rows[2].text)
         self.assertIn(
             'CourtListener is a free legal research website',
-            rows[3].text
+            rows[2].text
         )
-        self.assertIn('About Free Law Project', rows[3].text)
+        self.assertIn('About Free Law Project', rows[2].text)
         self.assertIn(
             'Free Law Project seeks to provide free access to primary legal',
-            rows[3].text
+            rows[2].text
         )
-        rows[3].find_element_by_link_text('Free Law Project')
+        rows[2].find_element_by_link_text('Free Law Project')
 
         # - Latest
         # -- Latest Opinions
-        self.assertIn('Latest Opinions', rows[4].text)
+        self.assertIn('Latest Opinions', rows[3].text)
         # --- From 1 to 5 Opinions
-        opinions = rows[4].find_elements_by_css_selector('div.col-sm-6')[0]
+        opinions = rows[3].find_elements_by_css_selector('div.col-sm-6')[0]
         self.assertAlmostEqual(
             len(opinions.find_elements_by_tag_name('article')),
             3,
@@ -64,9 +62,9 @@ class LayoutTest(BaseSeleniumTest):
         opinions.find_element_by_link_text('See Recent Opinions')
 
         # -- Latest Oral Arguments
-        self.assertIn('Latest Oral Arguments', rows[4].text)
+        self.assertIn('Latest Oral Arguments', rows[3].text)
         # --- From 1 to 5 Arguments
-        oral_args = rows[4].find_elements_by_css_selector('div.col-sm-6')[1]
+        oral_args = rows[3].find_elements_by_css_selector('div.col-sm-6')[1]
         self.assertAlmostEqual(
             len(oral_args.find_elements_by_tag_name('article')),
             3,
@@ -76,7 +74,7 @@ class LayoutTest(BaseSeleniumTest):
         oral_args.find_element_by_link_text('See Recent Oral Arguments')
 
         # - The Numbers
-        self.assertIn('The Numbers', rows[5].text)
+        self.assertIn('The Numbers', rows[4].text)
 
 
 class DesktopLayoutTest(BaseSeleniumTest):
@@ -99,12 +97,8 @@ class DesktopLayoutTest(BaseSeleniumTest):
         # search box is centered and roughly 600px
         searchbox = self.browser.find_element_by_id('id_q')
         search_button = self.browser.find_element_by_id('search-button')
-        juri_select = self.browser.find_element_by_css_selector(
-            'div[data-content="Select Jurisdictions"]'
-        )
         search_width = (searchbox.size['width'] +
-                        search_button.size['width'] +
-                        juri_select.size['width'])
+                        search_button.size['width'])
         self.assertAlmostEqual(
             searchbox.location['x'] + search_width / 2,
             DESKTOP_WINDOW[0] / 2,
@@ -146,7 +140,7 @@ class MobileLayoutTest(BaseSeleniumTest):
         navbtn = navbar_header.find_element_by_tag_name('button')
         self.assertIn('collapsed', navbtn.get_attribute('class'))
         self.assertAlmostEqual(
-            navbtn.location['x'] + navbtn.size['width'] + 10,
+            navbtn.location['x'] + navbtn.size['width'] + 30,
             MOBILE_WINDOW[0],
             delta=10
         )
@@ -173,12 +167,8 @@ class MobileLayoutTest(BaseSeleniumTest):
         # search box should always be centered
         searchbox = self.browser.find_element_by_id('id_q')
         search_button = self.browser.find_element_by_id('search-button')
-        juri_select = self.browser.find_element_by_css_selector(
-            'div[data-content="Select Jurisdictions"]'
-        )
         search_width = (searchbox.size['width'] +
-                        search_button.size['width'] +
-                        juri_select.size['width'])
+                        search_button.size['width'])
 
         self.assertAlmostEqual(
             searchbox.location['x'] + search_width / 2,

@@ -17,19 +17,16 @@ Once located, we update items:
  - decision_direction
 """
 import csv
-import os
+import string
+from datetime import datetime
 
 from django.core.management import BaseCommand
+from django.core.management import CommandError
+from django.db.models import Q
 
+from cl.lib.string_diff import gen_diff_ratio
 from cl.search.models import OpinionCluster
-from datetime import date, datetime
 
-SCDB_FILENAME = os.path.join(
-    '/var/www/courtlistener/cl/corpus_importer/scdb/data',
-    'SCDB_2015_01_caseCentered_Citation.csv'
-)
-SCDB_BEGINS = date(1946, 11, 18)
-SCDB_ENDS = date(2014, 6, 19)
 
 # Relevant numbers:
 #  - 7907: After this point we don't seem to have any citations for items.
@@ -51,15 +48,39 @@ class Command(BaseCommand):
             default=0,
             help="The row number you wish to begin at in the SCDB CSV"
         )
+        parser.add_argument(
+            '--file',
+            type=str,
+            required=True,
+            help="The path to the SCDB Case Centered file you wish to input."
+        )
+        parser.add_argument(
+            '--skip-human-review',
+            action='store_true',
+            default=False,
+            help="Don't seek human review. Instead report the number of cases "
+                 "needing human review at the end."
+        )
 
     def handle(self, *args, **options):
         self.debug = options['debug']
+        self.file = options['file']
+        self.skip_human_review = options['skip_human_review']
+        if self.skip_human_review and not self.debug:
+            raise CommandError('Cannot skip review without --debug flag.')
+        if self.skip_human_review:
+            self.skipped_count = 0
+
         self.iterate_scdb_and_take_actions(
             action_zero=lambda *args, **kwargs: None,
             action_one=self.enhance_item_with_scdb,
             action_many=self.get_human_review,
             start_row=options['start_at'],
         )
+
+        if self.skip_human_review:
+            print("\nSkipped %s items in SCDB which came up for human review." %
+                  self.skipped_count)
 
     @staticmethod
     def set_if_falsy(obj, attribute, new_value):
@@ -73,8 +94,10 @@ class Command(BaseCommand):
         does_not_currently_have_a_value = not current_value
         current_value_not_zero = current_value != 0
         new_value_not_blank = new_value.strip() != ''
+        error = False
         if all([does_not_currently_have_a_value, current_value_not_zero,
                 new_value_not_blank]):
+            print("      Updating %s with %s." % (attribute, new_value.encode('utf-8')))
             setattr(obj, attribute, new_value)
         else:
             # Report if there's a difference -- that might spell trouble.
@@ -93,16 +116,85 @@ class Command(BaseCommand):
                 print ("      WARNING: Didn't set '{attr}' attribute on obj "
                        "{obj_id} because it already had a value, but the new "
                        "value ('{new}') differs from current value "
-                       "('{current}').".format(
-                        attr=attribute,
-                        obj_id=obj.pk,
-                        new=new_value,
-                        current=current_value,
-                ))
+                       "('{current}')".format(
+                            attr=attribute,
+                            obj_id=obj.pk,
+                            new=new_value,
+                            current=current_value.encode('utf-8'),
+                        ))
+                error = True
             else:
                 # The values were the same.
                 print "      '%s' field unchanged -- old and new values were " \
-                      "the same." % attribute
+                      "the same: %s" % (attribute, new_value)
+        return error
+
+    def do_federal_citations(self, cluster, scdb_info):
+        """
+        Handle the federal_cite fields differently, since they may have the
+        values in any order.
+
+        :param cluster: The Cluster to be changed.
+        :param scdb_info: A dict with the SCDB information.
+        :return: save: A boolean indicating whether the item should be saved.
+        """
+        save = True
+        us_done, sct_done, led_done = False, False, False
+        available_fields = []
+        error = False
+        for field in ['federal_cite_one', 'federal_cite_two',
+                      'federal_cite_three']:
+            # Update the value in place (ie, replace the U.S. citation with a
+            # U.S. citation. Identify available fields.
+            value = getattr(cluster, field).strip()
+            if not value:
+                available_fields.append(field)
+                continue
+
+            if "U.S." in value:
+                error = self.set_if_falsy(cluster, field, scdb_info['usCite'])
+                us_done = True
+            elif "S. Ct." in value:
+                error = self.set_if_falsy(cluster, field, scdb_info['sctCite'])
+                sct_done = True
+            elif "L. Ed." in value:
+                error = self.set_if_falsy(cluster, field, scdb_info['ledCite'])
+                led_done = True
+            else:
+                print("      WARNING: Fell through search for citation.")
+                save = False
+        if error:
+            save = False
+
+        num_undone_fields = sum([f for f in [us_done, sct_done, led_done] if
+                                 f is False])
+        if num_undone_fields > len(available_fields):
+            print "       WARNING: More values were found than there were " \
+                  "slots to put them in. Time to create federal_cite_four?"
+            save = False
+        else:
+            # Save undone values into available fields. Any value that wasn't
+            # updated above gets slotted into the fields that remain.
+            for field in available_fields:
+                if not us_done:
+                    us_done = True
+                    if scdb_info['usCite']:
+                        self.set_if_falsy(cluster, field, scdb_info['usCite'])
+                        # Continue if the value got set. Otherwise, fall let
+                        # the next value fill the available field.
+                        continue
+                if not sct_done:
+                    sct_done = True
+                    if scdb_info['sctCite']:
+                        self.set_if_falsy(cluster, field, scdb_info['sctCite'])
+                        continue
+                if not led_done:
+                    led_done = True
+                    if scdb_info['ledCite']:
+                        self.set_if_falsy(cluster, field, scdb_info['ledCite'])
+                        continue
+
+        return save
 
     def enhance_item_with_scdb(self, cluster, scdb_info):
         """Good news: A single Cluster object was found for the SCDB record.
@@ -115,11 +207,6 @@ class Command(BaseCommand):
                 path=cluster.get_absolute_url(),
         ))
         attribute_pairs = [
-            ('federal_cite_one', 'usCite'),
-            ('federal_cite_two', 'sctCite'),
-            ('federal_cite_three', 'ledCite'),
-            ('lexis_cite', 'lexisCite'),
-            ('scdb_id', 'caseId'),
             ('scdb_votes_majority', 'majVotes'),
             ('scdb_votes_minority', 'minVotes'),
             ('scdb_decision_direction', 'decisionDirection'),
@@ -128,10 +215,18 @@ class Command(BaseCommand):
             self.set_if_falsy(cluster, attr, scdb_info[lookup_key])
 
         self.set_if_falsy(cluster.docket, 'docket_number', scdb_info['docket'])
+        federal_ok = self.do_federal_citations(cluster, scdb_info)
+        scdb_ok = self.set_if_falsy(cluster, 'scdb_id', 'caseId')
+        lexis_ok = self.set_if_falsy(cluster, 'lexis_cite', 'lexisCite')
 
-        if not self.debug:
-            cluster.docket.save()
-            cluster.save()
+        if all([federal_ok, scdb_ok, lexis_ok]):
+            print("      Saving to database (or faking if debug=True)")
+            if not self.debug:
+                cluster.docket.save()
+                cluster.save()
+        else:
+            print("      Item not saved due to collision or error. Please "
+                  "edit by hand.")
 
     @staticmethod
     def winnow_by_docket_number(clusters, d):
@@ -155,24 +250,72 @@ class Command(BaseCommand):
         return OpinionCluster.objects.filter(pk__in=good_cluster_ids)
 
     @staticmethod
-    def get_human_review(clusters, d):
+    def winnow_by_case_name(clusters, d):
+        """
+        Go through the clusters that are matched and see if one matches by
+        case name.
+
+        :param clusters: A QuerySet object of clusters.
+        :param d: The matching SCDB data
+        :return: A QuerySet object of clusters, hopefully winnowed to a single
+        result.
+        """
+        good_cluster_ids = []
+        bad_words = ['v', 'versus']
+        exclude = set(string.punctuation)
+        scdb_case_name = ''.join(c for c in d['caseName'] if
+                                 c not in exclude)
+        scdb_words = set(scdb_case_name.lower().split())
+        for cluster in clusters:
+            case_name = ''.join(c for c in cluster.case_name if
+                                c not in exclude)
+            case_name_words = case_name.lower().split()
+            cluster_words = set([word for word in case_name_words if
+                                 word not in bad_words])
+            if scdb_words.issuperset(cluster_words):
+                good_cluster_ids.append(cluster.pk)
+
+        if len(good_cluster_ids) == 1:
+            return OpinionCluster.objects.filter(pk__in=good_cluster_ids)
+        else:
+            # Alas: No progress made.
+            return clusters
+
+    def get_human_review(self, clusters, d):
         for i, cluster in enumerate(clusters):
-            print '    %s: Cluster %s:' % (i, cluster.pk)
+            print '    %s: Cluster %s (%0.3f sim):' % (
+                i,
+                cluster.pk,
+                gen_diff_ratio(
+                    cluster.case_name.lower(),
+                    d['caseName'].lower()
+                ),
+            )
             print '      https://www.courtlistener.com%s' % cluster.get_absolute_url()
-            print '      %s' % cluster.case_name
-            print '      %s' % cluster.docket.docket_number
+            print '      %s' % cluster.case_name.encode('utf-8')
+            if cluster.docket.docket_number:
+                print '      %s' % cluster.docket.docket_number.encode('utf-8')
+            print '      %s' % cluster.date_filed
         print '  SCDB info:'
         print '    %s' % d['caseName']
-        print '    %s' % d['docket']
-        choice = raw_input('  Which item should we update? [0-%s] ' %
-                           (len(clusters) - 1))
+        if d['docket']:
+            print '    %s' % d['docket']
+        print '    %s' % d['dateDecision']
 
-        try:
-            choice = int(choice)
-            cluster = clusters[choice]
-        except ValueError:
-            cluster = None
-        return cluster
+        if self.skip_human_review:
+            print('  Skipping human review and just returning the first item.')
+            self.skipped_count += 1
+            return clusters[0]
+        else:
+            choice = raw_input('  Which item should we update? [0-%s] ' %
+                               (len(clusters) - 1))
+
+            try:
+                choice = int(choice)
+                cluster = clusters[choice]
+            except ValueError:
+                cluster = None
+            return cluster
 
     def iterate_scdb_and_take_actions(
             self,
@@ -196,7 +339,7 @@ class Command(BaseCommand):
 
         If action_zero or action_many return None, no action is taken.
         """
-        with open(SCDB_FILENAME) as f:
+        with open(self.file) as f:
             dialect = csv.Sniffer().sniff(f.read(1024))
             f.seek(0)
             reader = csv.DictReader(f, dialect=dialect)
@@ -204,7 +347,8 @@ class Command(BaseCommand):
                 # Iterate over every item, looking for matches in various ways.
                 if i < start_row:
                     continue
-                print "Row is: %s. ID is: %s" % (i, d['caseId'])
+                print "\nRow is: %s. ID is: %s (%s)" % (i, d['caseId'],
+                                                        d['caseName'])
 
                 clusters = OpinionCluster.objects.none()
                 if len(clusters) == 0:
@@ -217,23 +361,12 @@ class Command(BaseCommand):
                     # Newer additions don't yet have citations.
                     if clusters.count() == 0:
                         # None found by scdb_id. Try by citation number
-                        print "  Checking by federal_cite_one..",
+                        print "  Checking by federal_cite_one, _two, or " \
+                              "_three...",
                         clusters = OpinionCluster.objects.filter(
-                            federal_cite_one=d['usCite'],
-                            scdb_id='',
-                        )
-                        print "%s matches found." % clusters.count()
-                    if clusters.count() == 0:
-                        print "  Checking by federal_cite_two...",
-                        clusters = OpinionCluster.objects.filter(
-                            federal_cite_two=d['usCite'],
-                            scdb_id='',
-                        )
-                        print "%s matches found." % clusters.count()
-                    if clusters.count() == 0:
-                        print "  Checking by federal_cite_three...",
-                        clusters = OpinionCluster.objects.filter(
-                            federal_cite_three=d['usCite'],
+                            Q(federal_cite_one=d['usCite']) |
+                            Q(federal_cite_two=d['usCite']) |
+                            Q(federal_cite_three=d['usCite']),
                             scdb_id='',
                         )
                         print "%s matches found." % clusters.count()
@@ -252,8 +385,19 @@ class Command(BaseCommand):
                         scdb_id='',
                     )
                     print "%s matches found." % clusters.count()
-                    print "    Winnowing by docket number...",
-                    clusters = self.winnow_by_docket_number(clusters, d)
+
+                if clusters.count() > 1:
+                    if d['docket']:
+                        print "    Winnowing by docket number...",
+                        clusters = self.winnow_by_docket_number(clusters, d)
+                        print "%s matches found." % clusters.count()
+                    else:
+                        print "    Cannot winnow by docket number -- there " \
+                              "isn't one."
+
+                if clusters.count() > 1:
+                    print "    Winnowing by case name...",
+                    clusters = self.winnow_by_case_name(clusters, d)
                     print "%s matches found." % clusters.count()
 
                 # Searching complete, run actions.
@@ -271,3 +415,4 @@ class Command(BaseCommand):
                     action_one(cluster, d)
                 else:
                     print '  OK. No changes will be made.'
+

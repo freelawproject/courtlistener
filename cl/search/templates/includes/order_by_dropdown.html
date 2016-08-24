@@ -4,59 +4,66 @@
     2. Hide the options that don't apply to different tabs.
 {% endcomment %}
 
-<select class="external-input v-offset-above-2" id="id_order_by" name="order_by">
-    {% if request.GET.type == 'o' or not request.GET.type %}
-        <option value="score desc"
-                {% if search_form.order_by.value == "score desc" %}
-                selected="selected"
-                {% endif %}>Relevance
-        </option>
-        <option value="dateFiled desc"
-                {% if search_form.order_by.value == "dateFiled desc" %}
+<div class="form-group">
+    <label for="id_order_by">Search Results Order:</label>
+    <select class="external-input form-control" id="id_order_by" name="order_by">
+        {% if request.GET.type == 'oa' or type == 'oa' %}
+            <option value="score desc"
+                    {% if search_form.order_by.value == "score desc" %}
                     selected="selected"
-                {% endif %}>Newest First</option>
-        <option value="dateFiled asc"
-                {% if search_form.order_by.value == "dateFiled asc" %}
+                    {% endif %}>Relevance
+            </option>
+            <option value="dateArgued desc"
+                    {% if search_form.order_by.value == "dateArgued desc" %}
+                        selected="selected"
+                    {% endif %}>Newest First</option>
+            <option value="dateArgued asc"
+                    {% if search_form.order_by.value == "dateArgued asc" %}
+                        selected="selected"
+                    {% endif %}>Oldest First</option>
+        {% elif request.GET.type == 'p' or type == 'p' %}
+            <option value="name_reverse asc"
+                    {% if search_form.order_by.value == "name_reverse asc" %}
+                        selected="selected"
+                    {% endif %}>Last Name</option>
+            <option value="dob desc,name_reverse asc"
+                    {% if search_form.order_by.value == "dob desc,name_reverse asc" %}
+                        selected="selected"
+                    {% endif %}>Most Recently Born</option>
+            <option value="dob asc,name_reverse asc"
+                    {% if search_form.order_by.value == "dob asc,name_reverse asc" %}
+                        selected="selected"
+                    {% endif %}>Least Recently Born</option>
+            <option value="dod desc,name_reverse asc"
+                    {% if search_form.order_by.value == "dod desc,name_reverse asc" %}
+                        selected="selected"
+                    {% endif %}>Most Recently Deceased</option>
+        {% elif request.GET.type == 'o' or type == 'o' or not request.GET.type %}
+            <option value="score desc"
+                    {% if search_form.order_by.value == "score desc" %}
                     selected="selected"
-                {% endif %}>Oldest First</option>
-        <option value="citeCount desc"
-                {% if search_form.order_by.value == "citeCount desc" %}
+                    {% endif %}>Relevance
+            </option>
+            <option value="dateFiled desc"
+                    {% if search_form.order_by.value == "dateFiled desc" %}
                     selected="selected"
-                {% endif %}>Most Cited First</option>
-        <option value="citeCount asc"
-                {% if search_form.order_by.value == "citeCount asc" %}
+                    {% endif %}>Newest First
+            </option>
+            <option value="dateFiled asc"
+                    {% if search_form.order_by.value == "dateFiled asc" %}
                     selected="selected"
-                {% endif %}>Least Cited First</option>
-    {% elif request.GET.type == 'oa' %}
-        <option value="score desc"
-                {% if search_form.order_by.value == "score desc" %}
-                selected="selected"
-                {% endif %}>Relevance
-        </option>
-        <option value="dateArgued desc"
-                {% if search_form.order_by.value == "dateArgued desc" %}
+                    {% endif %}>Oldest First
+            </option>
+            <option value="citeCount desc"
+                    {% if search_form.order_by.value == "citeCount desc" %}
                     selected="selected"
-                {% endif %}>Newest First</option>
-        <option value="dateArgued asc"
-                {% if search_form.order_by.value == "dateArgued asc" %}
+                    {% endif %}>Most Cited First
+            </option>
+            <option value="citeCount asc"
+                    {% if search_form.order_by.value == "citeCount asc" %}
                     selected="selected"
-                {% endif %}>Oldest First</option>
-    {% elif request.GET.type == 'p' %}
-        <option value="name_reverse asc"
-                {% if search_form.order_by.value == "name_reverse asc" %}
-                    selected="selected"
-                {% endif %}>Last Name</option>
-        <option value="dob desc,name_reverse asc"
-                {% if search_form.order_by.value == "dob desc,name_reverse asc" %}
-                    selected="selected"
-                {% endif %}>Most Recently Born</option>
-        <option value="dob asc,name_reverse asc"
-                {% if search_form.order_by.value == "dob asc,name_reverse asc" %}
-                    selected="selected"
-                {% endif %}>Least Recently Born</option>
-        <option value="dod desc,name_reverse asc"
-                {% if search_form.order_by.value == "dod desc,name_reverse asc" %}
-                    selected="selected"
-                {% endif %}>Most Recently Deceased</option>
-    {% endif %}
-</select>
+                    {% endif %}>Least Cited First
+            </option>
+        {% endif %}
+    </select>
+</div>

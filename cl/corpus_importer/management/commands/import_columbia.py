@@ -9,7 +9,8 @@ from django.core.management.base import BaseCommand
 
 from cl.corpus_importer.import_columbia.parse_opinions import parse_file
 from cl.corpus_importer.import_columbia.populate_opinions import make_and_save
-from cl.lib.import_lib import get_min_dates, skip_newcases
+from cl.lib.import_lib import get_min_dates, get_path_list, get scrape_dates
+
 
 
 class Command(BaseCommand):
@@ -92,9 +93,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         do_many(options['dir'][0], options['limit'], options['random'],
                 options['status'], options['log'], options['newcases'],
-                options['skipdupes'], options['skipnewcases'], 
-                options['startfolder'],
-                options['startfile'], options['debug'])
+                options['skipdupes'], options['skipnewcases'],
+                options['startfolder'], options['startfile'], options['debug'])
 
 
 def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
@@ -147,10 +147,11 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
         min_dates = get_min_dates()
     else:
         min_dates = None
-        
+
     # check if skipping first columbias cases
-    if skip_first_columbia:
-        skiplist = get_skipnewcases()
+
+    if skip_newcases:
+        skiplist = get_path_list()
     else:
         skiplist = set()
 
@@ -183,16 +184,16 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
                         skipfile = False
                     else:
                         continue
-            
+
             if path in skiplist:
                 continue
-            
-            print(path)
 
             # skip cases in 'misc*' folders -- they are relatively different
             # than the other cases, so we'll deal with them later
             if 'miscellaneous_court_opinions' in path:
                 continue
+
+            print(path)
 
             # try to parse/save the case and print any exceptions with full
             # tracebacks

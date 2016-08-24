@@ -4,11 +4,7 @@
 
 {% block title %}Non-Profit Free Legal Search Engine and Alert System – CourtListener.com{% endblock %}
 
-{% block search-form %}{% endblock %}
-
 {% block sidebar %}{% endblock %}
-
-{% block main-nav %}{% endblock %}
 
 {% block head %}
     <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
@@ -16,11 +12,6 @@
 
 {% block footer-scripts %}
     <script type="text/javascript">
-        $(document).ready(function () {
-            $('#id_q').focus();
-        });
-        // Initialize popovers (required because they're "opt-in for performance reasons")
-        $("[data-toggle='popover']").popover();
         var opinions = {
             {% for viz in visualizations %}
                 "{{ viz.id }}": {{ viz.json|safe }}{% if not forloop.last %},
@@ -43,103 +34,6 @@
     {% include "includes/footer-scripts.html" %}
 {% endblock %}
 
-{% block logo %}
-    <img src="{{ STATIC_PREFIX }}png/logo-large.png"
-         alt="CourtListener logo"
-         width="364"
-         height="40"/>
-{% endblock %}
-
-{% block sign-in %}
-    {% if user.is_authenticated %}
-        <div class="navbar-right">
-            <ul class="nav navbar-nav">
-                <li><a href="{% url "about" %}" tabindex="300">About</a></li>
-                <li class="dropdown">
-                    <a href="#"
-                       class="dropdown-toggle"
-                       tabindex="301"
-                       data-toggle="dropdown">Visualizations&nbsp;<span
-                            class="caret"></span>
-                    </a>
-                    <ul class="dropdown-menu" role="menu">
-                        <li>
-                            <a href="{% url "viz_gallery" %}"
-                               tabindex="301">Gallery</a>
-                        </li>
-                        <li>
-                            <a href="{% url "mapper_homepage" %}"
-                               tabindex="301">SCOTUS Networks</a>
-                        </li>
-                        <li>
-                            <a href="{% url "new_visualization" %}"
-                               tabindex="301">New Network</a></li>
-                        <li>
-                    </ul>
-                </li>
-                <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
-                <li class="dropdown">
-                    <a href="#"
-                       class="dropdown-toggle"
-                       data-toggle="dropdown"
-                       tabindex="303">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
-                    <ul class="dropdown-menu" role="menu">
-                        <li><a href="{% url "profile_alerts" %}"
-                               tabindex="304">Alerts</a></li>
-                        <li><a href="{% url "view_visualizations" %}"
-                               tabindex="306">Visualizations</a>
-                        </li>
-                        <li><a href="{% url "profile_favorites" %}"
-                               tabindex="305">Favorites</a></li>
-                        <li><a href="/profile/donations/"
-                               tabindex="306">Donations</a></li>
-                        <li><a href="{% url "view_settings" %}"
-                               tabindex="307">Account</a></li>
-                        <li><a href="/sign-out/"
-                               tabindex="308">Sign out</a></li>
-                    </ul>
-                </li>
-            </ul>
-        </div>
-    {% else %}
-        <ul class="nav navbar-nav">
-            <li><a href="{% url "about" %}">About</a></li>
-            <li class="dropdown">
-                <a href="#"
-                   class="dropdown-toggle"
-                   tabindex="301"
-                   data-toggle="dropdown">Visualizations&nbsp;<span
-                        class="caret"></span>
-                </a>
-                <ul class="dropdown-menu" role="menu">
-                    <li>
-                        <a href="{% url "viz_gallery" %}"
-                           tabindex="301">Gallery</a>
-                    </li>
-                    <li>
-                        <a href="{% url "mapper_homepage" %}"
-                           tabindex="301">SCOTUS Networks</a>
-                    </li>
-                    <li>
-                        <a href="{% url "new_visualization" %}"
-                           tabindex="301">New Network</a></li>
-                    <li>
-                </ul>
-            </li>
-            <li><a href="{% url "faq" %}">FAQ</a></li>
-            <li><a href="" class="tour-link">Tour</a></li>
-        {% if request.path != "/sign-out/" %}
-            <li>
-                <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}{% if results %}page={{ results.number }}{% endif %}">
-                    Sign in / Register
-                </a>
-            </li>
-        {% else %}
-            <li><a href="{% url "sign-in" %}">Sign in / Register</a></li>
-        {% endif %}
-        </ul>
-    {% endif %}
-{% endblock %}
 
 {% block content %}
     <div id="homepage" class="col-xs-12">
@@ -150,136 +44,33 @@
     </div>
 
     <div class="row" id="main-query-box">
-        {% include "includes/main_query_box.html" with homepage=True %}
+        <form action="/" method="get" id="search-form" class="form-inline"
+              role="form">
+            <div id="search-container" class="text-center">
+                <label class="sr-only" for="id_q">Search</label>
+                <div class="input-group">
+                    <input class="form-control input-lg"
+                           value="{{ search_form.q.value|default:'' }}"
+                           name="q"
+                           id="id_q"
+                           autocomplete="off"
+                           type="text">
+                    <span class="input-group-btn">
+                        <button type="submit"
+                                class="btn btn-primary btn-lg"
+                                name="search"
+                                id="search-button"><i class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </span>
+                </div>
+            </div>
+        </form>
     </div>
 
-    <div id="advanced-search-inputs" class="hidden row">
-        {#  Modal is at bottom of results, so it loads last. #}
-        <div id="extra-sidebar-fields" class="col-sm-9">
-            <div class="row">
-                <div class="col-sm-8">
-                    <div class="row">
-                        <div class="col-sm-6">
-                            <div class="pointer"
-                                 data-toggle="modal"
-                                 data-target="#court-picker">
-                                <label class="bottom pointer">
-                                    Select Jurisdictions <i class="gray fa fa-external-link"></i>
-                                </label>
-
-                                <p class="top"><span id="jurisdiction-count">{{ court_count }}</span>
-                                    jurisdictions selected</p>
-                            </div>
-                        </div>
-                        <div class="col-sm-6">
-                            <div class="form-group">
-                                {{ search_form.order_by.label_tag }}
-                                {{ search_form.order_by }}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-sm-6">
-                            <div class="form-group">
-                                {{ search_form.case_name.label_tag }}
-                                {{ search_form.case_name }}
-                            </div>
-                        </div>
-                        <div class="col-sm-6">
-                            <div class="form-group">
-                                {{ search_form.judge.label_tag }}
-                                {{ search_form.judge }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-sm-4">
-                    <label>Precedential Status</label>
-                    {% for status in status_facets %}
-                        {% if forloop.counter == 4 %}
-                            <a id="show-all-statuses"
-                               class="cursor">Show All Statuses&hellip;</a>
-                        {% endif %}
-                        <div class="sidebar-checkbox status-item{% if forloop.counter >= 4 %} hidden{% endif %}">
-                            <input
-                                    id="id_{{ status.1 }}"
-                                    type="checkbox"
-                                    name="{{ status.1 }}"
-                                    class="external-input status-checkbox left"
-                                    {% if status.3 %}checked="checked"{% endif %}
-                                    tabindex="{{ status.5 }}">
-                            <label
-                                    for="id_{{ status.1 }}"
-                                    class="pointer {% if status.2 == 0 %}gray{% endif %}">
-                                <div>{{ status.0 }}&nbsp;<span
-                                        class="gray small">({{ status.2|intcomma }})</span></div>
-                            </label>
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-sm-4">
-                    <div class="form-group">
-                        {{ search_form.filed_after.label_tag }}
-                        {{ search_form.filed_after }}
-                    </div>
-                </div>
-                <div class="col-sm-4">
-                    <div class="form-group">
-                        {{ search_form.filed_before.label_tag }}
-                        {{ search_form.filed_before }}
-                    </div>
-                </div>
-                <div class="col-sm-4">
-                    <div class="row">
-                        <div class="col-xs-6">
-                            <div class="form-group">
-                                {{ search_form.cited_gt.label_tag }}
-                                {{ search_form.cited_gt }}
-                            </div>
-                        </div>
-                        <div class="col-xs-6">
-                            <div class="form-group">
-                                {{ search_form.cited_lt.label_tag }}
-                                {{ search_form.cited_lt }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-sm-4">
-                    <div class="form-group">
-                        {{ search_form.citation.label_tag }}
-                        {{ search_form.citation }}
-                    </div>
-                </div>
-                <div class="col-sm-4">
-                    <div class="form-group">
-                        {{ search_form.neutral_cite.label_tag }}
-                        {{ search_form.neutral_cite }}
-                    </div>
-                </div>
-                <div class="col-sm-4">
-                    <div class="form-group">
-                        {{ search_form.docket_number.label_tag }}
-                        {{ search_form.docket_number }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-3">
-            {% include "includes/operators_quick_list.html" %}
-            <a class="text-right" href="{% url 'advanced_search' %}">More details&hellip;</a>
-        </div>
-    </div>
-    {# Jurisdiction modal is at the bottom so it loads last #}
-
-    <div id="advanced-search-starter" class="row">
+    <div id="advanced-search" class="row">
         <p class="text-center large alt gray top bottom">&ndash; or &ndash;</p>
         <p class="text-center large">
-            <a href="#" tabindex="200">Advanced Search</a>
+            <a href="{% url "advanced_o" %}">Advanced Search</a>
         </p>
     </div>
 
@@ -477,8 +268,5 @@
             </div>
         {% endcache %}
     </div>
-
-
-    {% include "includes/jurisdiction_picker_modal.html" %}
     </div>
 {% endblock %}

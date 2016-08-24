@@ -14,21 +14,17 @@
                                 <div class="btn-group btn-group-xs">
                                      <button type="button"
                                              class="btn btn-default"
-                                             id="check-all"
-                                             tabindex="220">Check All</button>
+                                             id="check-all">Check All</button>
                                      <button type="button"
                                              class="btn btn-default"
-                                             id="clear-all"
-                                             tabindex="221">Clear All</button>
-                                    {% if search_form.type.value in 'op' or not request.GET.type %}
+                                             id="clear-all">Clear All</button>
+                                    {% if search_form.type.value != 'oa' %}
                                         <button type="button"
                                                 class="btn btn-default"
-                                                id="check-current"
-                                                tabindex="222">Check Current Tab</button>
+                                                id="check-current">Check Current Tab</button>
                                         <button type="button"
                                                 class="btn btn-default"
-                                                id="clear-current"
-                                                tabindex="223">Clear Current Tab</button>
+                                                id="clear-current">Clear Current Tab</button>
                                     {% endif %}
                                 </div>
                             </div>
@@ -46,43 +42,37 @@
                        type="text"
                        placeholder="Select Jurisdictions by Typing"
                        autocomplete="off"
-                       class="hidden-xs"
-                       tabindex="200"/>
+                       class="hidden-xs"/>
                 <ul class="nav nav-tabs" id="court-picker-tabs">
                     <li class="active">
                         <a href="#tab-federal-appellate"
-                           data-toggle="tab"
-                           tabindex="210">
+                           data-toggle="tab">
                             <span class="hidden-xs hidden-sm">Federal Appellate</span>
-                            <span class="hidden-md hidden-lg">Fed App</span>
+                            <span class="hidden-md hidden-lg">Fed. App.</span>
                         </a>
                     </li>
-                    {%  if search_form.type.value in 'op' or not request.GET.type %}
+                    {% if search_form.type.value != 'oa' %}
                         <li>
                             <a href="#tab-federal-district"
-                               data-toggle="tab"
-                               tabindex="211">
+                               data-toggle="tab">
                                 <span class="hidden-xs hidden-sm">Federal District</span>
                                 <span class="hidden-md hidden-lg">Fed. Dist.</span>
                             </a>
                         </li>
                         <li>
                             <a href="#tab-bankruptcy"
-                               data-toggle="tab"
-                               tabindex="212">
+                               data-toggle="tab">
                                 <span class="hidden-xs hidden-sm">Bankruptcy</span>
                                 <span class="hidden-md hidden-lg">Bankr.</span>
                             </a>
                         </li>
                         <li>
                             <a href="#tab-state"
-                               data-toggle="tab"
-                               tabindex="213">State</a>
+                               data-toggle="tab">State</a>
                         </li>
                         <li>
                             <a href="#tab-special"
-                               data-toggle="tab"
-                               tabindex="214">Special</a>
+                               data-toggle="tab">Special</a>
                         </li>
                     {% endif %}
                 </ul>
@@ -92,43 +82,26 @@
                             {% for row in courts.federal|rows:4 %}
                                 <div class="col-sm-3">
                                     {% for court in row %}
-                                        {% if search_form.type.value in 'op' or not request.GET.type %}
-                                            <div class="checkbox">
-                                                <label for="id_{{ court.pk }}">
-                                                    <input
-                                                        id="id_{{ court.pk }}"
-                                                        name="{{ court.pk }}"
-                                                        {% if court.checked %}checked="checked"{% endif %}
-                                                        type="checkbox"
-                                                        class="external-input court-checkbox">
-                                                    {{ court.short_name }}
-                                                    {% if court.end_date %}
-                                                        <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
-                                                    {% endif %}
-                                                </label>
-                                            </div>
-                                        {% elif search_form.type.value == 'oa' and court.has_oral_argument_scraper %}
-                                            <div class="checkbox">
-                                                <label for="id_{{ court.pk }}">
-                                                    <input
-                                                        id="id_{{ court.pk }}"
-                                                        name="{{ court.pk }}"
-                                                        {% if court.checked %}checked="checked"{% endif %}
-                                                        type="checkbox"
-                                                        class="external-input court-checkbox">
-                                                    {{ court.short_name }}
-                                                    {% if court.end_date %}
-                                                        <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
-                                                    {% endif %}
-                                                </label>
-                                            </div>
-                                        {% endif %}
+                                        <div class="checkbox">
+                                            <label for="id_{{ court.pk }}">
+                                                <input
+                                                    id="id_{{ court.pk }}"
+                                                    name="{{ court.pk }}"
+                                                    {% if court.checked %}checked="checked"{% endif %}
+                                                    type="checkbox"
+                                                    class="external-input court-checkbox">
+                                                {{ court.short_name }}
+                                                {% if court.end_date %}
+                                                    <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
+                                                {% endif %}
+                                            </label>
+                                        </div>
                                     {% endfor %}
                                 </div>
                             {% endfor %}
                         </div>
                     </div>
-                    {% if search_form.type.value in 'op' or not request.GET.type %}
+                    {% if search_form.type.value != 'oa' %}
                         <div class="tab-pane" id="tab-federal-district">
                             {# Regroup into closed/open courts #}
                             {% regroup  courts.district|dictsort:"is_terminated" by is_terminated as district_courts %}

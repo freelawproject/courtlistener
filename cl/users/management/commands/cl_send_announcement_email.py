@@ -1,15 +1,20 @@
 import ast
 import logging
 import sys
-from cl import settings
-from cl.lib.argparse_types import csv_list
-from cl.stats import tally_stat
-from cl.users.models import UserProfile
+import time
+
 from django.core.mail import send_mass_mail
 from django.core.management.base import BaseCommand
 from django.template import loader
 
+from cl import settings
+from cl.lib.argparse_types import csv_list
+from cl.lib.utils import chunks
+from cl.stats import tally_stat
+from cl.users.models import UserProfile
+
 logger = logging.getLogger(__name__)
+CHUNK_SIZE = 50
 
 
 class Command(BaseCommand):
@@ -110,7 +115,14 @@ class Command(BaseCommand):
                 sys.stdout.write("**********************************\n")
                 sys.stdout.write("* SIMULATE MODE - NO EMAILS SENT *\n")
                 sys.stdout.write("**********************************\n")
-            self.send_emails(recipients)
+            if not options['simulate']:
+                for chunk in chunks(list(recipients), CHUNK_SIZE):
+                    self.send_emails(chunk)
+                    logger.info("Waiting 300s before sending another chunk of "
+                                "%s emails." % CHUNK_SIZE)
+                    time.sleep(300)
+            else:
+                self.send_emails(recipients)
         else:
             sys.stderr.write("No recipients defined. Aborting.\n")
             exit(1)

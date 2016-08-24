@@ -9,7 +9,6 @@
     Free legal APIs and Bulk Data from Free Law Project, a 501(c)(3)
     nonprofit.
 {% endblock %}
-{% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 
 {% block content %}
@@ -33,13 +32,13 @@
         </div>
 
         <div class="row v-offset-below-3">
-            <div class="col-sm-4 text-center v-offset-above-3">
+            <div class="col-md-4 text-center v-offset-above-3">
                 <a href="{% url "bulk_data_index" %}" class="btn btn-xl btn-primary">Check out the Bulk Data API</a>
             </div>
-            <div class="col-sm-4 text-center v-offset-above-3">
+            <div class="col-md-4 text-center v-offset-above-3">
                 <a href="{% url "rest_docs" %}" class="btn btn-xl btn-primary">Check out the REST APIs</a>
             </div>
-            <div class="col-sm-4 text-center v-offset-above-3">
+            <div class="col-md-4 text-center v-offset-above-3">
                 <a href="https://free.law/data-consulting/" class="btn btn-xl btn-success">Learn About Data Services</a>
             </div>
         </div>

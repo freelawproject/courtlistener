@@ -82,7 +82,6 @@ INSTALLED_APPS = [
     'cl.people_db',
     'cl.lib',
     'cl.opinion_page',
-    'cl.recap',
     'cl.scrapers',
     'cl.search',
     'cl.simple_pages',
@@ -334,7 +333,7 @@ MARKDOWN_DEUX_STYLES = {
 # SCDB #
 ########
 # SCOTUS cases after this date aren't expected to have SCDB data.
-SCDB_LATEST_CASE = datetime.datetime(2015, 10, 4)
+SCDB_LATEST_CASE = datetime.datetime(2016, 6, 27)
 
 
 ######################

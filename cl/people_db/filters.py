@@ -182,7 +182,7 @@ class PersonFilter(filters.FilterSet):
             'name_suffix': BASIC_TEXT_LOOKUPS,
             'is_alias_of': ['exact'],
             'fjc_id': ['exact'],
-            'ftm_id': ['exact'],
+            'ftm_eid': ['exact'],
             'dob_city': BASIC_TEXT_LOOKUPS,
             'dob_state': BASIC_TEXT_LOOKUPS,
             'dod_city': BASIC_TEXT_LOOKUPS,

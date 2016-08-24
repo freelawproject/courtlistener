@@ -3,7 +3,7 @@ from django.db.models import Min, Q
 from reporters_db import REPORTERS
 
 from cl.people_db.models import Person
-from cl.search.models import Court
+from cl.search.models import Court, Opinion
 
 
 def map_citations_to_models(citations):
@@ -128,9 +128,20 @@ def get_min_dates():
     """returns a dictionary with key-value (courtid, minimum date)"""
     min_dates = {}
     courts = (Court.objects
-                .exclude(dockets__clusters__source__contains="Z")
-                .annotate(earliest_date=Min('dockets__clusters__date_filed')))
+              .exclude(dockets__clusters__source__contains="Z")
+              .annotate(earliest_date=Min('dockets__clusters__date_filed')))
     for court in courts:
         min_dates[court.pk] = court.earliest_date
     return min_dates
 
+
+def get_path_list():
+    """Returns a set of all the local_path values so we can avoid them in
+    later imports.
+
+    This way, when we run a second, third, fourth import, we can be sure not
+    to import a previous item.
+    """
+    return set((Opinion.objects
+                .exclude(local_path='')
+                .values_list('local_path', flat=True)))

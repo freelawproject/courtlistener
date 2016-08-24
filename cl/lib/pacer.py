@@ -10,8 +10,10 @@ from lxml import etree
 
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.lib.import_lib import find_person
-from cl.recap.utils import get_docketxml_url_from_path, \
-    get_ia_document_url_from_path, get_local_document_url_from_path
+from cl.lib.recap_utils import (
+    get_docketxml_url_from_path, get_ia_document_url_from_path,
+    get_local_document_url_from_path,
+)
 from cl.search.models import Court, Docket, RECAPDocument, DocketEntry
 
 logger = logging.getLogger(__name__)
@@ -19,8 +21,9 @@ logger = logging.getLogger(__name__)
 
 pacer_to_cl_ids = {
     # Maps PACER ids to their CL equivalents
-    'azb': 'arb',  # Arizona Bankruptcy Court
-    'cofc': 'uscfc',  # Court of Federal Claims
+    'azb': 'arb',         # Arizona Bankruptcy Court
+    'cofc': 'uscfc',      # Court of Federal Claims
+    'nysb-mega': 'nysb',  # Remove the mega thing
 }
 # Reverse dict of pacer_to_cl_ids
 cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items()}
@@ -214,7 +217,9 @@ class PacerXMLParser(object):
 
         recap_doc.date_upload = self.get_datetime_from_node(doc_node, 'upload_date')
         recap_doc.document_type = document_type or recap_doc.document_type
-        recap_doc.document_number = entry_number or recap_doc.document_number
+        if isinstance(entry_number, int):
+            recap_doc.document_number = entry_number
+
         # If we can't parse the availability node (it returns None), default it
         # to False.
         availability = self.get_bool_from_node(doc_node, 'available')
@@ -291,11 +296,16 @@ class PacerXMLParser(object):
             print "  Couldn't get date from path: %s" % path
             return None
         else:
-            d = parser.parse(s)
-            d = d.replace(tzinfo=d.tzinfo or gettz('UTC'))  # Set it to UTC.
-            if cast_to_date is True:
-                return d.date()
-            return d
+            try:
+                d = parser.parse(s)
+            except ValueError:
+                print "  Couldn't parse date: %s" % s
+                return None
+            else:
+                d = d.replace(tzinfo=d.tzinfo or gettz('UTC'))  # Set it to UTC.
+                if cast_to_date is True:
+                    return d.date()
+                return d
 
     def get_judges(self, node):
         """Parse out the judge string and then look it up in the DB"""
@@ -338,7 +348,9 @@ class PacerXMLParser(object):
                 +---------------+---------+--------+
 
         """
-        if self.document_count <= 500 and self.court.is_bankruptcy:
+        bankruptcy_privacy_threshold = 500
+        small_case = self.document_count <= bankruptcy_privacy_threshold
+        if all([small_case, self.court.is_bankruptcy]):
             return True, date.today()
         return False, None
 

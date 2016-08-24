@@ -95,8 +95,7 @@ class SearchForm(forms.Form):
         label='Result Ordering',
         initial='score desc',
         widget=forms.Select(
-            attrs={'class': 'external-input form-control',
-                   'tabindex': '201'}
+            attrs={'class': 'external-input form-control'}
         )
     )
 
@@ -109,8 +108,7 @@ class SearchForm(forms.Form):
         initial='',
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off',
-                   'tabindex': '202'}
+                   'autocomplete': 'off'}
         )
     )
     judge = forms.CharField(
@@ -118,8 +116,7 @@ class SearchForm(forms.Form):
         initial='',
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off',
-                   'tabindex': '203'}
+                   'autocomplete': 'off'}
         )
     )
     docket_number = forms.CharField(
@@ -127,8 +124,7 @@ class SearchForm(forms.Form):
         label='Docket Number',
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off',
-                   'tabindex': '226'}
+                   'autocomplete': 'off'}
         )
     )
 
@@ -163,8 +159,7 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
                    'class': 'external-input form-control',
-                   'autocomplete': 'off',
-                   'tabindex': '220'}
+                   'autocomplete': 'off'}
         )
     )
     filed_before = CeilingDateField(
@@ -173,16 +168,14 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
                    'class': 'external-input form-control',
-                   'autocomplete': 'off',
-                   'tabindex': '221'}
+                   'autocomplete': 'off'}
         )
     )
     citation = forms.CharField(
         required=False,
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off',
-                   'tabindex': '224'}
+                   'autocomplete': 'off'}
         )
     )
     neutral_cite = forms.CharField(
@@ -190,8 +183,7 @@ class SearchForm(forms.Form):
         label='Neutral Citation',
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off',
-                   'tabindex': '225'}
+                   'autocomplete': 'off'}
         )
     )
     cited_gt = forms.CharField(
@@ -200,8 +192,7 @@ class SearchForm(forms.Form):
         initial=0,
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off',
-                   'tabindex': '222'}
+                   'autocomplete': 'off'}
         )
     )
     cited_lt = forms.CharField(
@@ -210,8 +201,7 @@ class SearchForm(forms.Form):
         initial=60000,
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off',
-                   'tabindex': '223'}
+                   'autocomplete': 'off'}
         )
     )
 
@@ -313,9 +303,8 @@ class SearchForm(forms.Form):
                 widget=forms.CheckboxInput(attrs={'checked': 'checked'})
             )
 
-        tabindex_i = 204
         for status in DOCUMENT_STATUSES:
-            attrs = {'tabindex': str(tabindex_i)}
+            attrs = {}
             if status[1] == 'Precedential':
                 initial = True
                 attrs.update({'checked': 'checked'})
@@ -327,7 +316,6 @@ class SearchForm(forms.Form):
                 initial=initial,
                 widget=forms.CheckboxInput(attrs=attrs)
             )
-            tabindex_i += 1
 
     # This is a particularly nasty area of the code due to several factors:
     #  1. Django doesn't have a good method of setting default values for

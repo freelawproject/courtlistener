@@ -20,6 +20,8 @@
                             Jurisdictions Selected</p>
                     </div>
 
+                    {% include "includes/order_by_dropdown.html" %}
+
                     {% if type == 'o' or type == 'oa' %}
                         <div class="form-group">
                             {{ search_form.case_name.label_tag }}
@@ -42,8 +44,7 @@
                                             type="checkbox"
                                             name="{{ status.1 }}"
                                             class="external-input status-checkbox left"
-                                            {% if status.3 %}checked="checked"{% endif %}
-                                            tabindex="{{ status.5 }}">
+                                            {% if status.3 %}checked="checked"{% endif %}>
                                     <label
                                             for="id_{{ status.1 }}"
                                             class="pointer {% if status.2 == 0 %}gray{% endif %}">
@@ -73,9 +74,7 @@
                         <div class="form-group">
                             {{ search_form.citation.label_tag }}
                             {{ search_form.citation }}
-                            <p class="gray"><a
-                                    href="{% url "citation_redirector" %}">Look
-                                up a specific citation</a>.
+                            <p><a href="{% url "citation_redirector" %}">Look up a specific citation</a>
                             </p>
                         </div>
 
@@ -173,15 +172,10 @@
 
                     <button type="submit"
                             class="btn btn-primary title"
-                            name="search"
-                            tabindex="227"><i class="fa fa-search"></i>&nbsp;Search
+                            name="search"><i class="fa fa-search"></i>&nbsp;Search
                     </button>
                 </div>
             </div>
         </form>
     </div>
-
-    {% if type == 'o' or type == 'oa' %}
-        {% include "includes/alert_sidebar_section.html" %}
-    {% endif %}
 {% endif %}

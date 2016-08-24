@@ -624,22 +624,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.assertTrue(self.extract_result_count_from_serp() > 0)
         label = (self.browser
                  .find_element_by_css_selector('label[for="id_type_0"]'))
-        self.assertEqual('Opinions', label.text.strip())
         self.assertIn('selected', label.get_attribute('class'))
         self.assert_text_in_body('Date Filed')
         self.assert_text_not_in_body('Date Argued')
 
         # She clicks on Oral Arguments
-        self.browser \
-            .find_element_by_css_selector('label[for="id_type_1"]') \
-            .click()
-
-        # And notices her result set is now different
-        oa_label = self.browser. \
-            find_element_by_css_selector('label[for="id_type_1"]')
-        self.assertIn('selected', oa_label.get_attribute('class'))
-        self.assert_text_in_body('Date Argued')
-        self.assert_text_not_in_body('Date Filed')
+        self.browser.find_element_by_id('navbar-oa').click()
 
     def test_search_and_facet_docket_numbers(self):
         # Dora goes to CL and performs an initial wildcard Search
@@ -876,7 +866,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # will log out. She notices a Profile link dropdown in the top of the
         # page, clicks it, and selects Sign out
         profile_dropdown = (self.browser
-                            .find_elements_by_css_selector('a.dropdown-toggle')[1])
+                            .find_elements_by_css_selector('a.dropdown-toggle')[0])
         self.assertEqual(profile_dropdown.text.strip(), u'Profile')
 
         dropdown_menu = (self.browser

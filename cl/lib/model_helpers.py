@@ -3,9 +3,12 @@ from django.utils.text import get_valid_filename
 
 
 def make_recap_path(instance, filename):
-    """Make a path to a good location on the local system for RECAP files."""
-    raise NotImplementedError("Need to do research based on the files that are "
-                              "returned to establish a sane practice here.")
+    """Make a path to a good location on the local system for RECAP files.
+
+    This dumps them all into the same directory, which seems to be OK, at least
+    so far.
+    """
+    return "recap/%s" % get_valid_filename(filename)
 
 
 def make_upload_path(instance, filename):

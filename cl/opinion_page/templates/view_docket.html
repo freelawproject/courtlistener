@@ -206,7 +206,7 @@
                                 data-target="#actions-picker">
                                 <td>{{ entry.date_filed|date:"DATE_FORMAT"|nbsp|default:"Unknown" }}</td>
                                 <td class="text-center">{{ entry.entry_number }}</td>
-                                <td>{{ entry.description|safe|default:"Description Unknown" }}</td>
+                                <td>{{ entry.description|safe|default:"Unknown Description" }}</td>
                                 {% if perms.search.change_docketentry %}
                                     <td>
                                     <a href="{% url 'admin:search_docketentry_change' entry.pk %}"

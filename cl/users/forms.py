@@ -1,4 +1,3 @@
-from cl.users.models import UserProfile
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm, \
     PasswordResetForm, SetPasswordForm
@@ -6,6 +5,9 @@ from django.contrib.auth.models import User
 from django.forms import ModelForm
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
+
+from cl.users.models import UserProfile
+
 
 # Many forms in here use unusual autocomplete attributes. These conform with
 # https://html.spec.whatwg.org/multipage/forms.html#autofill, and enables them
@@ -120,7 +122,7 @@ class UserCreationFormExtended(UserCreationForm):
             field.widget.attrs.update({'class': 'form-control'})
 
         self.fields['username'].widget.attrs.update({
-            'class': 'auto-focus form-control',
+            'class': 'form-control',
             'autocomplete': 'username',
         })
         self.fields['email'].required = True
@@ -199,7 +201,7 @@ class CustomPasswordResetForm(PasswordResetForm):
 
         self.fields['email'].widget.attrs.update(
             {
-                'class': 'auto-focus form-control input-lg',
+                'class': 'form-control input-lg',
                 'placeholder': 'Your Email Address',
                 'autocomplete': 'email',
             }

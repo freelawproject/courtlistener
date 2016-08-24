@@ -1,3 +1,5 @@
+from datetime import date
+
 ##################
 # Debug settings #
 ##################
@@ -50,6 +52,10 @@ else:
     PAYPAL_SECRET_KEY = ''
     STRIPE_SECRET_KEY = ''
     STRIPE_PUBLIC_KEY = ''
+
+# Key for Follow the Money API
+FTM_KEY = ''
+FTM_LAST_UPDATED = date()
 
 
 # Local time zone for this installation. Choices can be found here:
