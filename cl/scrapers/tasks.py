@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import glob
 import os
 import subprocess
 import time
@@ -14,6 +13,8 @@ from eyed3 import id3
 from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
 from seal_rookery import seals_data, seals_root
+from wand.color import Color
+from wand.image import Image
 
 from cl.audio.models import Audio
 from cl.celery import app
@@ -246,64 +247,52 @@ def convert_to_pngs(path, tmp_file_prefix):
     return magick_out
 
 
-def convert_to_txt(tmp_file_prefix):
-    tess_out = ''
-    for png in sorted(glob.glob('%s*.png' % tmp_file_prefix)):
-        tesseract_command = ['tesseract', png, png[:-4], '-l', 'eng']
-        tess_out = subprocess.check_output(
-            tesseract_command,
-            stderr=subprocess.STDOUT
-        )
-    return tess_out
+def convert_blob_to_txt(blob):
+    """Do Tesseract work, but use a blob as input instead of a file."""
+    tesseract_command = ['tesseract', 'stdin', 'stdout', '-l', 'eng']
+    p = subprocess.Popen(
+        tesseract_command,
+        stdout=subprocess.PIPE,
+        stdin=subprocess.PIPE,
+        stderr=subprocess.STDOUT
+    )
+    return p.communicate(input=blob)[0]
 
 
 @app.task
 def extract_by_ocr(path):
-    """Extract the contents of a PDF using OCR
+    """Extract the contents of a PDF using OCR.
 
-    Convert the PDF to a collection of png's, then perform OCR using Tesseract.
-    Take the contents and the exit code and return them to the caller.
+    This function is the fruit of the research completed in:
+
+        https://github.com/mlissner/tesseract-performance-testing/
+
+    In there, we concluded that the best way to process PDFs is to split them
+    into images, then process each of those sequentially using the stdin
+    function of Tesseract.
+
+    This avoids touching the disk aside from pulling the item from it.
     """
-    content = ''
-    success = False
-    try:
-        tmp_file_prefix = os.path.join('/tmp', str(time.time()))
-        fail_msg = ("Unable to extract the content from this file. Please try "
-                    "reading the original.")
+    fail_msg = (u"Unable to extract the content from this file. Please try "
+                u"reading the original.")
+    txt = ""
+    all_pages = Image(filename=path, resolution=300)
+    for i, img in enumerate(all_pages.sequence):
+        with Image(img) as img_out:
+            img_out.format = 'png'
+            img_out.depth = 4
+            img_out.background_color = Color('white')
+            img_out.alpha_channel = 'remove'
+            img_out.type = "grayscale"
+            # img_out.save(filename='%s-%03d.png' % (path[:-4], i))
+            img_bin = img_out.make_blob('png')
+
         try:
-            convert_to_pngs(path, tmp_file_prefix)
+            txt += convert_blob_to_txt(img_bin)
         except subprocess.CalledProcessError:
-            content = fail_msg
-            success = False
+            return False, fail_msg
 
-        try:
-            convert_to_txt(tmp_file_prefix)
-        except subprocess.CalledProcessError:
-            # All is lost.
-            content = fail_msg
-            success = False
-
-        try:
-            for txt_file in sorted(glob.glob('%s*' % tmp_file_prefix)):
-                if 'txt' in txt_file:
-                    content += open(txt_file).read()
-            success = True
-        except IOError:
-            print ("OCR was unable to finish due to not having a txt file "
-                   "created. This usually happens when Tesseract cannot "
-                   "ingest the file created for the pdf at: %s" % path)
-            content = fail_msg
-            success = False
-
-    finally:
-        # Remove tmp_file and the text file
-        for f in glob.glob('%s*' % tmp_file_prefix):
-            try:
-                os.remove(f)
-            except OSError:
-                pass
-
-    return success, content
+    return True, txt.decode('utf-8')
 
 
 def set_mp3_meta_data(audio_obj, mp3_path):

@@ -63,6 +63,7 @@ simplejson
 six==1.9.0
 sqlparse==0.1.15
 stripe==1.22.3
+wand
 wsgiref==0.1.2
 xlrd
 unidecode
