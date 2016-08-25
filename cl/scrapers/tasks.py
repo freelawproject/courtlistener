@@ -276,21 +276,21 @@ def extract_by_ocr(path):
     fail_msg = (u"Unable to extract the content from this file. Please try "
                 u"reading the original.")
     txt = ""
-    all_pages = Image(filename=path, resolution=300)
-    for i, img in enumerate(all_pages.sequence):
-        with Image(img) as img_out:
-            img_out.format = 'png'
-            img_out.depth = 4
-            img_out.background_color = Color('white')
-            img_out.alpha_channel = 'remove'
-            img_out.type = "grayscale"
-            # img_out.save(filename='%s-%03d.png' % (path[:-4], i))
-            img_bin = img_out.make_blob('png')
+    with Image(filename=path, resolution=300) as all_pages:
+        for i, img in enumerate(all_pages.sequence):
+            with Image(img) as img_out:
+                img_out.format = 'png'
+                img_out.depth = 4
+                img_out.background_color = Color('white')
+                img_out.alpha_channel = 'remove'
+                img_out.type = "grayscale"
+                # img_out.save(filename='%s-%03d.png' % (path[:-4], i))
+                img_bin = img_out.make_blob('png')
 
-        try:
-            txt += convert_blob_to_txt(img_bin)
-        except subprocess.CalledProcessError:
-            return False, fail_msg
+            try:
+                txt += convert_blob_to_txt(img_bin)
+            except subprocess.CalledProcessError:
+                return False, fail_msg
 
     return True, txt.decode('utf-8')
 
