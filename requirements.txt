@@ -44,6 +44,7 @@ ndg-httpsclient==0.4.0
 networkx==1.10
 nose
 pandas
+pillow
 psycopg2==2.6.1
 pyOpenSSL==16.0.0
 pyasn1==0.1.9
