@@ -238,15 +238,6 @@ def extract_recap_pdf(pk):
     doc.save()
 
 
-def convert_to_pngs(path, tmp_file_prefix):
-    image_magick_command = ['convert', '-depth', '4', '-density', '300',
-                            '-background', 'white', '+matte', path,
-                            '%s-%%03d.png' % tmp_file_prefix]
-    magick_out = subprocess.check_output(image_magick_command,
-                                         stderr=subprocess.STDOUT)
-    return magick_out
-
-
 def convert_blob_to_txt(blob):
     """Do Tesseract work, but use a blob as input instead of a file."""
     tesseract_command = ['tesseract', 'stdin', 'stdout', '-l', 'eng']
