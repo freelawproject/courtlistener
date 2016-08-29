@@ -14,6 +14,7 @@ from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
 from seal_rookery import seals_data, seals_root
 from wand.color import Color
+from wand.exceptions import WandError
 from wand.image import Image
 
 from cl.audio.models import Audio
@@ -225,7 +226,10 @@ def extract_recap_pdf(pk):
     content, err = process.communicate()
     if needs_ocr(content):
         # probably an image PDF. Send it to OCR.
-        success, content = extract_by_ocr(path)
+        try:
+            success, content = extract_by_ocr(path)
+        except WandError as e:
+            return u"%s\n%s" % (path.decode('utf-8'), str(e))
         if success:
             doc.ocr_status = RECAPDocument.OCR_COMPLETE
         elif content == '' or not success:
@@ -236,6 +240,8 @@ def extract_recap_pdf(pk):
 
     doc.plain_text, _ = anonymize(content)
     doc.save()
+
+    return path
 
 
 def convert_blob_to_txt(blob):
