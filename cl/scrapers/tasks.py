@@ -160,10 +160,11 @@ def get_page_count(path, extension):
     :return: The number of pages if possible, else return None
     """
     if extension == 'pdf':
-        reader = PdfFileReader(path)
         try:
+            reader = PdfFileReader(path)
             return reader.getNumPages()
-        except PdfReadError:
+        except (PdfReadError, IOError):
+            # File doesn't exist or otherwise went wrong.
             pass
     elif extension == 'wpd':
         # Best solution appears to be to dig into the binary format
