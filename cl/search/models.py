@@ -396,6 +396,11 @@ class RECAPDocument(models.Model):
         max_length=40,  # As in RECAP
         blank=True,
     )
+    page_count = models.IntegerField(
+        help_text="The number of pages in the document, if known",
+        blank=True,
+        null=True,
+    )
     filepath_local = models.FileField(
         help_text="The path of the file in the local storage area.",
         upload_to=make_recap_path,
@@ -956,6 +961,11 @@ class Opinion(models.Model):
                   "binary file or text data",
         max_length=40,
         db_index=True,
+    )
+    page_count = models.IntegerField(
+        help_text="The number of pages in the document, if known",
+        blank=True,
+        null=True,
     )
     download_url = models.URLField(
         help_text="The URL on the court website where the document was "

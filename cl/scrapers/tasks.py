@@ -5,6 +5,8 @@ import time
 import traceback
 
 import eyed3
+from PyPDF2 import PdfFileReader
+from PyPDF2.utils import PdfReadError
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
@@ -150,6 +152,29 @@ def extract_from_wpd(opinion, path):
     return opinion, content, err
 
 
+def get_page_count(path, extension):
+    """Get the number of pages, if appropriate mimetype.
+
+    :param path: A path to a binary (pdf, wpd, doc, txt, html, etc.)
+    :param extension: The extension of the binary.
+    :return: The number of pages if possible, else return None
+    """
+    if extension == 'pdf':
+        reader = PdfFileReader(path)
+        try:
+            return reader.getNumPages()
+        except PdfReadError:
+            pass
+    elif extension == 'wpd':
+        # Best solution appears to be to dig into the binary format
+        pass
+    elif extension == 'doc':
+        # Best solution appears to be to dig into the XML of the file
+        # itself: http://stackoverflow.com/a/12972502/64911
+        pass
+    return None
+
+
 @app.task
 def extract_doc_content(pk, callback=None, citation_countdown=0):
     """
@@ -179,11 +204,14 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
                'on opinion: %s****' % (extension, opinion))
         return 2
 
+    # Do page count, if possible
+    opinion.page_count = get_page_count(path, extension)
+
+    # Do blocked status
     if extension in ['html', 'wpd']:
         opinion.html, blocked = anonymize(content)
     else:
         opinion.plain_text, blocked = anonymize(content)
-
     if blocked:
         opinion.cluster.blocked = True
         opinion.cluster.date_blocked = now()
@@ -193,6 +221,7 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
                (extension, opinion))
         return opinion
 
+    # Save item, and index Solr if needed.
     try:
         if citation_countdown == 0:
             # No waiting around. Save to the database now, but don't bother
@@ -204,7 +233,7 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
             # according to schedule
             opinion.cluster.save(index=False)
             opinion.save(index=True)
-    except Exception, e:
+    except Exception:
         print "****Error saving text to the db for: %s****" % opinion
         print traceback.format_exc()
         return opinion
