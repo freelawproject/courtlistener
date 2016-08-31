@@ -163,9 +163,10 @@ def get_page_count(path, extension):
         try:
             reader = PdfFileReader(path)
             return int(reader.getNumPages())
-        except (IOError, ValueError, PdfReadError):
+        except (IOError, ValueError, TypeError, PdfReadError):
             # IOError: File doesn't exist. My bad.
             # ValueError: Didn't get an int for the page count. Their bad.
+            # TypeError: NumberObject has no attribute '__getitem__'
             # PdfReadError: Something else. PDFs are horrible.
             pass
     elif extension == 'wpd':
