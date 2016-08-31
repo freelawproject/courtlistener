@@ -33,8 +33,9 @@ class Command(BaseCommand):
 
             # Every n items, send the subtasks to Celery. The larger this
             # number, the less frequently you must wait while Celery processes a
-            # massive PDF.
-            enqueue_length = 5000
+            # massive PDF. But beware: OCR can clog the queue blocking other
+            # tasks.
+            enqueue_length = 100
             if (len(subtasks) >= enqueue_length) or last_item:
                 msg = ("Sent %s subtasks to celery. We have sent %s "
                        "items so far." % (len(subtasks), completed + 1))
