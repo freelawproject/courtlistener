@@ -1,22 +1,21 @@
 import hashlib
 import random
 import traceback
+from datetime import date
 
+from django.core.files.base import ContentFile
 from django.utils.encoding import force_bytes
+from juriscraper.AbstractSite import logger
 
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
+from cl.lib.scrape_helpers import get_extension, get_binary_content
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
-from cl.lib.scrape_helpers import get_extension, get_binary_content
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import process_audio_file
 from cl.search.models import Court, Docket
-from juriscraper.AbstractSite import logger
-
-from datetime import date
-from django.core.files.base import ContentFile
 
 
 class Command(cl_scrape_opinions.Command):
@@ -58,7 +57,7 @@ class Command(cl_scrape_opinions.Command):
             cf = ContentFile(content)
             extension = get_extension(content)
             if extension not in ['.mp3', '.wma']:
-                extension = '.' + item['download_urls'].rsplit('.', 1)[1]
+                extension = '.' + item['download_urls'].lower().rsplit('.', 1)[1]
             # See bitbucket issue #215 for why this must be
             # lower-cased.
             file_name = trunc(item['case_names'].lower(), 75) + extension

@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-import glob
 import os
 import subprocess
 import time
 import traceback
 
 import eyed3
+from PyPDF2 import PdfFileReader
+from PyPDF2.utils import PdfReadError
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
@@ -14,6 +15,9 @@ from eyed3 import id3
 from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
 from seal_rookery import seals_data, seals_root
+from wand.color import Color
+from wand.exceptions import DelegateError
+from wand.image import Image
 
 from cl.audio.models import Audio
 from cl.celery import app
@@ -148,6 +152,35 @@ def extract_from_wpd(opinion, path):
     return opinion, content, err
 
 
+def get_page_count(path, extension):
+    """Get the number of pages, if appropriate mimetype.
+
+    :param path: A path to a binary (pdf, wpd, doc, txt, html, etc.)
+    :param extension: The extension of the binary.
+    :return: The number of pages if possible, else return None
+    """
+    if extension == 'pdf':
+        try:
+            reader = PdfFileReader(path)
+            return int(reader.getNumPages())
+        except (IOError, ValueError, TypeError, KeyError, AssertionError,
+                PdfReadError):
+            # IOError: File doesn't exist. My bad.
+            # ValueError: Didn't get an int for the page count. Their bad.
+            # TypeError: NumberObject has no attribute '__getitem__'. Ugh.
+            # KeyError, AssertionError: assert xrefstream["/Type"] == "/XRef". WTF?
+            # PdfReadError: Something else. I have no words.
+            pass
+    elif extension == 'wpd':
+        # Best solution appears to be to dig into the binary format
+        pass
+    elif extension == 'doc':
+        # Best solution appears to be to dig into the XML of the file
+        # itself: http://stackoverflow.com/a/12972502/64911
+        pass
+    return None
+
+
 @app.task
 def extract_doc_content(pk, callback=None, citation_countdown=0):
     """
@@ -177,11 +210,14 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
                'on opinion: %s****' % (extension, opinion))
         return 2
 
+    # Do page count, if possible
+    opinion.page_count = get_page_count(path, extension)
+
+    # Do blocked status
     if extension in ['html', 'wpd']:
         opinion.html, blocked = anonymize(content)
     else:
         opinion.plain_text, blocked = anonymize(content)
-
     if blocked:
         opinion.cluster.blocked = True
         opinion.cluster.date_blocked = now()
@@ -191,6 +227,7 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
                (extension, opinion))
         return opinion
 
+    # Save item, and index Solr if needed.
     try:
         if citation_countdown == 0:
             # No waiting around. Save to the database now, but don't bother
@@ -202,7 +239,7 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
             # according to schedule
             opinion.cluster.save(index=False)
             opinion.save(index=True)
-    except Exception, e:
+    except Exception:
         print "****Error saving text to the db for: %s****" % opinion
         print traceback.format_exc()
         return opinion
@@ -224,7 +261,10 @@ def extract_recap_pdf(pk):
     content, err = process.communicate()
     if needs_ocr(content):
         # probably an image PDF. Send it to OCR.
-        success, content = extract_by_ocr(path)
+        try:
+            success, content = extract_by_ocr(path)
+        except DelegateError:
+            success = False
         if success:
             doc.ocr_status = RECAPDocument.OCR_COMPLETE
         elif content == '' or not success:
@@ -236,74 +276,55 @@ def extract_recap_pdf(pk):
     doc.plain_text, _ = anonymize(content)
     doc.save()
 
-
-def convert_to_pngs(path, tmp_file_prefix):
-    image_magick_command = ['convert', '-depth', '4', '-density', '300',
-                            '-background', 'white', '+matte', path,
-                            '%s.png' % tmp_file_prefix]
-    magick_out = subprocess.check_output(image_magick_command,
-                                         stderr=subprocess.STDOUT)
-    return magick_out
+    return path
 
 
-def convert_to_txt(tmp_file_prefix):
-    tess_out = ''
-    for png in sorted(glob.glob('%s*' % tmp_file_prefix)):
-        tesseract_command = ['tesseract', png, png[:-4], '-l', 'eng']
-        tess_out = subprocess.check_output(
-            tesseract_command,
-            stderr=subprocess.STDOUT
-        )
-    return tess_out
+def convert_blob_to_txt(blob):
+    """Do Tesseract work, but use a blob as input instead of a file."""
+    tesseract_command = ['tesseract', 'stdin', 'stdout', '-l', 'eng']
+    p = subprocess.Popen(
+        tesseract_command,
+        stdout=subprocess.PIPE,
+        stdin=subprocess.PIPE,
+        stderr=subprocess.STDOUT
+    )
+    return p.communicate(input=blob)[0]
 
 
 @app.task
 def extract_by_ocr(path):
-    """Extract the contents of a PDF using OCR
+    """Extract the contents of a PDF using OCR.
 
-    Convert the PDF to a collection of png's, then perform OCR using Tesseract.
-    Take the contents and the exit code and return them to the caller.
+    This function is the fruit of the research completed in:
+
+        https://github.com/mlissner/tesseract-performance-testing/
+
+    In there, we concluded that the best way to process PDFs is to split them
+    into images, then process each of those sequentially using the stdin
+    function of Tesseract.
+
+    This avoids touching the disk aside from pulling the item from it.
     """
-    content = ''
-    success = False
-    try:
-        tmp_file_prefix = os.path.join('/tmp', str(time.time()))
-        fail_msg = ("Unable to extract the content from this file. Please try "
-                    "reading the original.")
-        try:
-            convert_to_pngs(path, tmp_file_prefix)
-        except subprocess.CalledProcessError:
-            content = fail_msg
-            success = False
+    fail_msg = (u"Unable to extract the content from this file. Please try "
+                u"reading the original.")
+    txt = ""
+    with Image(filename=path, resolution=300) as all_pages:
+        for i, img in enumerate(all_pages.sequence):
+            with Image(img) as img_out:
+                img_out.format = 'png'
+                img_out.depth = 4
+                img_out.background_color = Color('white')
+                img_out.alpha_channel = 'remove'
+                img_out.type = "grayscale"
+                # img_out.save(filename='%s-%03d.png' % (path[:-4], i))
+                img_bin = img_out.make_blob('png')
 
-        try:
-            convert_to_txt(tmp_file_prefix)
-        except subprocess.CalledProcessError:
-            # All is lost.
-            content = fail_msg
-            success = False
-
-        try:
-            for txt_file in sorted(glob.glob('%s*' % tmp_file_prefix)):
-                if 'txt' in txt_file:
-                    content += open(txt_file).read()
-            success = True
-        except IOError:
-            print ("OCR was unable to finish due to not having a txt file "
-                   "created. This usually happens when Tesseract cannot "
-                   "ingest the file created for the pdf at: %s" % path)
-            content = fail_msg
-            success = False
-
-    finally:
-        # Remove tmp_file and the text file
-        for f in glob.glob('%s*' % tmp_file_prefix):
             try:
-                os.remove(f)
-            except OSError:
-                pass
+                txt += convert_blob_to_txt(img_bin)
+            except subprocess.CalledProcessError:
+                return False, fail_msg
 
-    return success, content
+    return True, txt.decode('utf-8')
 
 
 def set_mp3_meta_data(audio_obj, mp3_path):

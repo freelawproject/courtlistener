@@ -31,9 +31,13 @@ class Command(BaseCommand):
             last_item = (count == completed)
             subtasks.append(extract_recap_pdf.subtask((pk,)))
 
-            # Every n items, send the subtasks to Celery
-            if (len(subtasks) >= 50) or last_item:
-                msg = ("Sent %s subtasks to celery. We have processed %s "
+            # Every n items, send the subtasks to Celery. The larger this
+            # number, the less frequently you must wait while Celery processes a
+            # massive PDF. But beware: OCR can clog the queue blocking other
+            # tasks.
+            enqueue_length = 100
+            if (len(subtasks) >= enqueue_length) or last_item:
+                msg = ("Sent %s subtasks to celery. We have sent %s "
                        "items so far." % (len(subtasks), completed + 1))
                 logger.info(msg)
                 print(msg)

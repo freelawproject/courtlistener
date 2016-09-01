@@ -55,7 +55,7 @@ else:
 
 # Key for Follow the Money API
 FTM_KEY = ''
-FTM_LAST_UPDATED = date()
+FTM_LAST_UPDATED = date.today()
 
 
 # Local time zone for this installation. Choices can be found here:
