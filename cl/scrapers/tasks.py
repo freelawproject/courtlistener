@@ -3,6 +3,7 @@ import os
 import subprocess
 import time
 import traceback
+from tempfile import NamedTemporaryFile
 
 import eyed3
 from PyPDF2 import PdfFileReader
@@ -15,9 +16,6 @@ from eyed3 import id3
 from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
 from seal_rookery import seals_data, seals_root
-from wand.color import Color
-from wand.exceptions import DelegateError
-from wand.image import Image
 
 from cl.audio.models import Audio
 from cl.celery import app
@@ -152,6 +150,16 @@ def extract_from_wpd(opinion, path):
     return opinion, content, err
 
 
+def convert_file_to_txt(path):
+    tesseract_command = ['tesseract', path, 'stdout', '-l', 'eng']
+    p = subprocess.Popen(
+        tesseract_command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    return p.communicate()[0].decode('utf-8')
+
+
 def get_page_count(path, extension):
     """Get the number of pages, if appropriate mimetype.
 
@@ -261,10 +269,7 @@ def extract_recap_pdf(pk):
     content, err = process.communicate()
     if needs_ocr(content):
         # probably an image PDF. Send it to OCR.
-        try:
-            success, content = extract_by_ocr(path)
-        except DelegateError:
-            success = False
+        success, content = extract_by_ocr(path)
         if success:
             doc.ocr_status = RECAPDocument.OCR_COMPLETE
         elif content == '' or not success:
@@ -279,52 +284,64 @@ def extract_recap_pdf(pk):
     return path
 
 
-def convert_blob_to_txt(blob):
-    """Do Tesseract work, but use a blob as input instead of a file."""
-    tesseract_command = ['tesseract', 'stdin', 'stdout', '-l', 'eng']
-    p = subprocess.Popen(
-        tesseract_command,
-        stdout=subprocess.PIPE,
-        stdin=subprocess.PIPE,
-        stderr=subprocess.STDOUT
+def rasterize_pdf(path, destination):
+    """Convert the PDF into a multipage Tiff file.
+
+    This function uses ghostscript for processing and borrows heavily from:
+
+        https://github.com/jbarlow83/OCRmyPDF/blob/636d1903b35fed6b07a01af53769fea81f388b82/ocrmypdf/ghostscript.py#L11
+
+    """
+    # Details, see: http://ghostscript.com/doc/7.07/Use.htm
+    # Devices, see: http://ghostscript.com/doc/current/Devices.htm
+    gs = [
+        'gs',
+        '-dQUIET',
+        '-dSAFER',
+        '-dBATCH',
+        '-dNOPAUSE',
+        '-sDEVICE=tiffgray',
+        '-r300x300',
+        '-o', destination,
+        path,
+    ]
+    p = subprocess.Popen(gs, close_fds=True, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, universal_newlines=True)
+    stdout, stderr = p.communicate()
+    return stdout, stderr, p.returncode
+
+
+def cleanup_ocr_text(txt):
+    """Do some basic cleanup to make OCR text better.
+
+    Err on the side of safety. Don't make fixes that could cause other issues.
+
+    :param txt: The txt output from the OCR engine.
+    :return: Txt output, cleaned up.
+    """
+    simple_replacements = (
+        (u'Fi|ed', u'Filed'),
+        (u' Il ', u' II '),
     )
-    return p.communicate(input=blob)[0]
+    for replacement in simple_replacements:
+        txt = txt.replace(replacement[0], replacement[1])
+    return txt
 
 
 @app.task
 def extract_by_ocr(path):
-    """Extract the contents of a PDF using OCR.
-
-    This function is the fruit of the research completed in:
-
-        https://github.com/mlissner/tesseract-performance-testing/
-
-    In there, we concluded that the best way to process PDFs is to split them
-    into images, then process each of those sequentially using the stdin
-    function of Tesseract.
-
-    This avoids touching the disk aside from pulling the item from it.
-    """
+    """Extract the contents of a PDF using OCR."""
     fail_msg = (u"Unable to extract the content from this file. Please try "
                 u"reading the original.")
-    txt = ""
-    with Image(filename=path, resolution=300) as all_pages:
-        for i, img in enumerate(all_pages.sequence):
-            with Image(img) as img_out:
-                img_out.format = 'png'
-                img_out.depth = 4
-                img_out.background_color = Color('white')
-                img_out.alpha_channel = 'remove'
-                img_out.type = "grayscale"
-                # img_out.save(filename='%s-%03d.png' % (path[:-4], i))
-                img_bin = img_out.make_blob('png')
+    with NamedTemporaryFile(prefix='ocr_', suffix=".tiff") as tmp:
+        out, err, returncode = rasterize_pdf(path, tmp.name)
+        if returncode != 0:
+            return False, fail_msg
 
-            try:
-                txt += convert_blob_to_txt(img_bin)
-            except subprocess.CalledProcessError:
-                return False, fail_msg
+        txt = convert_file_to_txt(tmp.name)
+        txt = cleanup_ocr_text(txt)
 
-    return True, txt.decode('utf-8')
+    return True, txt
 
 
 def set_mp3_meta_data(audio_obj, mp3_path):
