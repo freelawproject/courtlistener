@@ -29,7 +29,7 @@ class Command(BaseCommand):
             # Try to extract the contents the easy way, but if that fails,
             # use OCR.
             last_item = (count == completed)
-            subtasks.append(extract_recap_pdf.subtask((pk,)))
+            subtasks.append(extract_recap_pdf.subtask((pk,), priority=5))
 
             # Every n items, send the subtasks to Celery. The larger this
             # number, the less frequently you must wait while Celery processes a
