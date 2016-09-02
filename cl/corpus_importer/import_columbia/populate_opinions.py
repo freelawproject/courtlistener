@@ -251,7 +251,7 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
 
     if min_dates is None:
         # check to see if this is a duplicate
-        dups = find_dups(docket, cluster, panel, opinions)
+        dups = find_dups(docket, cluster)
         if dups:
             if skipdupes:
                 print('Duplicate. skipping.')
@@ -285,14 +285,11 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
             raise
 
 
-def find_dups(docket, cluster, panel, opinions):
+def find_dups(docket, cluster):
     """Finds the duplicate cases associated to a collection of objects.
 
     :param docket: A `Docket` instance.
     :param cluster: An `OpinionCluster` instance.
-    :param panel: A list of `Person` instances that is the panel for `cluster`.
-    :param opinions: A list of `(Opinion, joined_by)` tuples in which `joined_by` is a list of `Person` instances that
-        are the judges joining `Opinion.author` in that `Opinion` instance.
     """
     cites = [c for c in cluster.citation_list if c]
     if not cites:
@@ -301,7 +298,8 @@ def find_dups(docket, cluster, panel, opinions):
     params = {
         'fq': [
             'court_id:%s' % docket.court_id,
-            'citation:(%s)' % ' OR '.join('"%s"~5' % c for c in cluster.citation_list if c)
+            'citation:(%s)' % ' OR '.join('"%s"~5' % c for c in
+                                          cluster.citation_list if c)
         ],
         'rows': 100,
         'caller': 'corpus_importer.import_columbia.populate_opinions'
@@ -335,8 +333,8 @@ def get_case_name_words(case_name):
     all_words = case_name.split()
     if ' v. ' in case_name:
         v_index = all_words.index('v.')
-        # The first word of the defendant and the last word in the plaintiff that's
-        # not a bad word.
+        # The first word of the defendant and the last word in the plaintiff
+        # that's not a bad word.
         plaintiff_a = get_good_words(all_words[:v_index])
         defendant_a = get_good_words(all_words[v_index + 1:])
         if plaintiff_a:

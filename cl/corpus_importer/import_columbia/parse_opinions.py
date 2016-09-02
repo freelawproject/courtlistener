@@ -214,9 +214,9 @@ def get_text(file_path):
                 root = etree.fromstring(s, parser=parser)
             else:
                 # Normal case
-                root = ET.fromstring(s)
+                root = etree.fromstring(s)
             break
-        except ET.ParseError as e:
+        except etree.ParseError as e:
             if attempt == attempts[-1]:
                 # Last attempt. Re-raise the exception.
                 raise e
@@ -233,6 +233,12 @@ def get_text(file_path):
             # put into a list associated with its tag
             raw_info.setdefault(child.tag, []).append(text)
             continue
+
+        # Set aside any text in the root of the file. Sometimes this is the only
+        # text we get.
+        if child.tag == "opinion":
+            direct_descendant_text = ' '.join(child.xpath('./text()'))
+
         for opinion_type in OPINION_TYPES:
             # if this child is a byline, note it down and use it later
             if child.tag == "%s_byline" % opinion_type:
@@ -250,6 +256,15 @@ def get_text(file_path):
                 })
                 current_byline['type'] = current_byline['name'] = None
                 break
+
+    # Some opinions do not have an opinion node. Create an empty node here. This
+    # will at least ensure that an opinion object is created.
+    if raw_info.get('opinions') is None:
+        raw_info['opinions'] = [{
+            'type': 'opinion',
+            'byline': None,
+            'opinion': direct_descendant_text or '',
+        }]
     return raw_info
 
 
