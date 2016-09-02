@@ -145,3 +145,11 @@ def get_path_list():
     return set((Opinion.objects
                 .exclude(local_path='')
                 .values_list('local_path', flat=True)))
+
+def get_courtdates():
+    """returns a dictionary with key-value (courtid, founding date)"""
+    start_dates = {}
+    courts = Court.objects
+    for court in courts:
+        start_dates[court.pk] = court.start_date
+    return start_dates

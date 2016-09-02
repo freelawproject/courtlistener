@@ -96,7 +96,7 @@ OPINION_TYPE_MAPPING = {
 }
 
 
-def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
+def make_and_save(item, skipdupes=False, min_dates=None, start_dates=None, testing=True):
     """Associates case data from `parse_opinions` with objects. Saves these
     objects.
 
@@ -152,7 +152,13 @@ def make_and_save(item, skipdupes=False, min_dates=None, testing=True):
                 print(main_date, 'after', min_dates[item['court_id']],
                       ' -- skipping.')
                 return
-
+    if start_dates is not None:
+        if start_dates.get(item['court_id']) is not None:
+            if main_date <= start_dates[item['court_id']]:
+                print(main_date, 'before court founding:', start_dates[item['court_id']],
+                      ' -- skipping.')
+                return
+        
     docket = Docket(
         source=Docket.COLUMBIA,
         date_argued=date_argued,
