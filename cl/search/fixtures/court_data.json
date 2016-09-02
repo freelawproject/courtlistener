@@ -108,7 +108,7 @@
     "full_name": "Court of Civil Appeals of Alabama",
     "position": 311.0,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1969-01-01"
   },
   "model": "search.court",
   "pk": "alacivapp"
@@ -127,7 +127,7 @@
     "full_name": "Court of Criminal Appeals of Alabama",
     "position": 310.0,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1969-01-01"
   },
   "model": "search.court",
   "pk": "alacrimapp"
@@ -146,7 +146,7 @@
     "full_name": "Alabama Court of Appeals",
     "position": 306.0,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1911-01-01"
   },
   "model": "search.court",
   "pk": "alactapp"
@@ -184,7 +184,7 @@
     "full_name": "Court of Appeals of Alaska",
     "position": 321.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1980-07-01"
   },
   "model": "search.court",
   "pk": "alaskactapp"
@@ -412,7 +412,7 @@
     "full_name": "Court of Appeals of Arizona",
     "position": 322.2,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1965-01-01"
   },
   "model": "search.court",
   "pk": "arizctapp"
@@ -488,7 +488,7 @@
     "full_name": "Court of Appeals of Arkansas",
     "position": 331.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1979-08-08"
   },
   "model": "search.court",
   "pk": "arkctapp"
@@ -1191,7 +1191,7 @@
     "full_name": "California Court of Appeal",
     "position": 350.1,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1905-04-10"
   },
   "model": "search.court",
   "pk": "calctapp"
@@ -1552,7 +1552,7 @@
     "full_name": "Colorado Court of Appeals",
     "position": 351.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1970-01-01"
   },
   "model": "search.court",
   "pk": "coloctapp"
@@ -1628,7 +1628,7 @@
     "full_name": "Connecticut Appellate Court",
     "position": 351.6,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1983-10-04"
   },
   "model": "search.court",
   "pk": "connappct"
@@ -2046,7 +2046,7 @@
     "full_name": "District Court of Appeal of Florida",
     "position": 355.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1957-01-01"
   },
   "model": "search.court",
   "pk": "fladistctapp"
@@ -2217,7 +2217,7 @@
     "full_name": "Court of Appeals of Georgia",
     "position": 356.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1906-11-06"
   },
   "model": "search.court",
   "pk": "gactapp"
@@ -2426,7 +2426,7 @@
     "full_name": "Hawaii Intermediate Court of Appeals",
     "position": 359.1,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1979-11-06"
   },
   "model": "search.court",
   "pk": "hawapp"
@@ -2597,7 +2597,7 @@
     "full_name": "Idaho Court of Appeals",
     "position": 359.25,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1982-01-04"
   },
   "model": "search.court",
   "pk": "idahoctapp"
@@ -2711,7 +2711,7 @@
     "full_name": "Appellate Court of Illinois",
     "position": 359.6,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1877-01-01"
   },
   "model": "search.court",
   "pk": "illappct"
@@ -2863,7 +2863,7 @@
     "full_name": "Indiana Court of Appeals",
     "position": 360.1,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1972-01-01"
   },
   "model": "search.court",
   "pk": "indctapp"
@@ -3015,7 +3015,7 @@
     "full_name": "Court of Appeals of Iowa",
     "position": 361.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1976-07-01"
   },
   "model": "search.court",
   "pk": "iowactapp"
@@ -3091,7 +3091,7 @@
     "full_name": "Court of Appeals of Kansas",
     "position": 362.2,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1977-01-10"
   },
   "model": "search.court",
   "pk": "kanctapp"
@@ -3186,7 +3186,7 @@
     "full_name": "Court of Appeals of Kentucky",
     "position": 362.3,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1976-01-01"
   },
   "model": "search.court",
   "pk": "kyctapp"
@@ -3338,7 +3338,7 @@
     "full_name": "Louisiana Court of Appeal",
     "position": 362.51,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1879-01-01"
   },
   "model": "search.court",
   "pk": "lactapp"
@@ -3547,7 +3547,7 @@
     "full_name": "Massachusetts Appeals Court",
     "position": 363.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1972-10-06"
   },
   "model": "search.court",
   "pk": "massappct"
@@ -3699,7 +3699,7 @@
     "full_name": "Court of Special Appeals of Maryland",
     "position": 362.61,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1967-01-01"
   },
   "model": "search.court",
   "pk": "mdctspecapp"
@@ -3813,7 +3813,7 @@
     "full_name": "Michigan Court of Appeals",
     "position": 365.1,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1964-01-01"
   },
   "model": "search.court",
   "pk": "michctapp"
@@ -3908,7 +3908,7 @@
     "full_name": "Court of Appeals of Minnesota",
     "position": 365.3,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1984-01-01"
   },
   "model": "search.court",
   "pk": "minnctapp"
@@ -3946,7 +3946,7 @@
     "full_name": "Court of Appeals of Mississippi",
     "position": 366.01,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1995-01-01"
   },
   "model": "search.court",
   "pk": "missctapp"
@@ -4117,7 +4117,7 @@
     "full_name": "Missouri Court of Appeals",
     "position": 366.05,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1820-01-01"
   },
   "model": "search.court",
   "pk": "moctapp"
@@ -4459,7 +4459,7 @@
     "full_name": "Court of Appeals of North Carolina",
     "position": 366.98,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1968-01-01"
   },
   "model": "search.court",
   "pk": "ncctapp"
@@ -4687,7 +4687,7 @@
     "full_name": "North Dakota Court of Appeals",
     "position": 366.991,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1987-09-01"
   },
   "model": "search.court",
   "pk": "ndctapp"
@@ -4763,7 +4763,7 @@
     "full_name": "Nebraska Court of Appeals",
     "position": 366.25,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1991-11-06"
   },
   "model": "search.court",
   "pk": "nebctapp"
@@ -5067,7 +5067,7 @@
     "full_name": "New Mexico Court of Appeals",
     "position": 366.95,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1966-04-01"
   },
   "model": "search.court",
   "pk": "nmctapp"
@@ -5219,7 +5219,7 @@
     "full_name": "Appellate Division of the Supreme Court of the State of New York",
     "position": 366.965,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1896-01-01"
   },
   "model": "search.court",
   "pk": "nyappdiv"
@@ -5238,7 +5238,7 @@
     "full_name": "Appellate Terms of the Supreme Court of New York",
     "position": 366.9651,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1896-01-01"
   },
   "model": "search.court",
   "pk": "nyappterm"
@@ -5352,7 +5352,7 @@
     "full_name": "New York Family Court",
     "position": 366.966,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1962-09-01"
   },
   "model": "search.court",
   "pk": "nyfamct"
@@ -5447,7 +5447,7 @@
     "full_name": "New York Supreme Court",
     "position": 366.9652,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1896-01-01"
   },
   "model": "search.court",
   "pk": "nysupct"
@@ -5466,7 +5466,7 @@
     "full_name": "New York Surrogate's Court",
     "position": 366.9665,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1896-01-01"
   },
   "model": "search.court",
   "pk": "nysurct"
@@ -5542,7 +5542,7 @@
     "full_name": "Ohio Court of Appeals",
     "position": 366.996,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1912-01-01"
   },
   "model": "search.court",
   "pk": "ohioctapp"
@@ -5751,7 +5751,7 @@
     "full_name": "Court of Civil Appeals of Oklahoma",
     "position": 366.9995,
     "has_opinion_scraper": true,
-    "start_date": "1908-01-01"
+    "start_date": "1968-01-01"
   },
   "model": "search.court",
   "pk": "oklacivapp"
@@ -5941,7 +5941,7 @@
     "full_name": "Court of Appeals of Oregon",
     "position": 367.1,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1969-07-01",
   },
   "model": "search.court",
   "pk": "orctapp"
@@ -6036,7 +6036,7 @@
     "full_name": "Commonwealth Court of Pennsylvania",
     "position": 367.25,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1968-01-01"
   },
   "model": "search.court",
   "pk": "pacommwct"
@@ -6131,7 +6131,7 @@
     "full_name": "Superior Court of Pennsylvania",
     "position": 367.2,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1895-01-01"
   },
   "model": "search.court",
   "pk": "pasuperct"
@@ -6397,7 +6397,7 @@
     "full_name": "Court of Appeals of South Carolina",
     "position": 367.41,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1983-01-01"
   },
   "model": "search.court",
   "pk": "scctapp"
@@ -6644,7 +6644,7 @@
     "full_name": "Court of Criminal Appeals of Tennessee",
     "position": 367.8,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1925-01-01"
   },
   "model": "search.court",
   "pk": "tenncrimapp"
@@ -6663,7 +6663,7 @@
     "full_name": "Court of Appeals of Tennessee",
     "position": 367.7,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1925-01-01"
   },
   "model": "search.court",
   "pk": "tennctapp"
@@ -6796,7 +6796,7 @@
     "full_name": "Court of Appeals of Texas",
     "position": 368.2,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1891-01-01"
   },
   "model": "search.court",
   "pk": "texapp"
@@ -7214,7 +7214,7 @@
     "full_name": "Court of Appeals of Utah",
     "position": 369.1,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1987-01-17"
   },
   "model": "search.court",
   "pk": "utahctapp"
@@ -7290,7 +7290,7 @@
     "full_name": "Court of Appeals of Virginia",
     "position": 369.5,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1985-01-01"
   },
   "model": "search.court",
   "pk": "vactapp"
@@ -7575,7 +7575,7 @@
     "full_name": "Court of Appeals of Washington",
     "position": 385.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1969-01-01"
   },
   "model": "search.court",
   "pk": "washctapp"
@@ -7727,7 +7727,7 @@
     "full_name": "Court of Appeals of Wisconsin",
     "position": 387.0,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1978-08-01"
   },
   "model": "search.court",
   "pk": "wisctapp"

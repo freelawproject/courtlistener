@@ -9,8 +9,7 @@ from django.core.management.base import BaseCommand
 
 from cl.corpus_importer.import_columbia.parse_opinions import parse_file
 from cl.corpus_importer.import_columbia.populate_opinions import make_and_save
-from cl.lib.import_lib import get_min_dates, get_path_list
-
+from cl.lib.import_lib import get_min_dates, get_path_list, get_min_nocite, get_courtdates
 
 class Command(BaseCommand):
     help = ('Parses the xml files in the specified directory into opinion '
@@ -71,6 +70,18 @@ class Command(BaseCommand):
             help='If set, will skip cases from initial columbia import.'
         )
         parser.add_argument(
+            '--avoid_nocites',
+            action='store_true',
+            default=False,
+            help='If set, will not import dates after the earliest case without a citation.'
+        )
+        parser.add_argument(
+            '--courtdates',
+            action='store_true',
+            default=False,
+            help='If set, will throw exception for cases before court was founded.'
+        )
+        parser.add_argument(
             '--startfolder',
             type=str,
             default=None,
@@ -91,13 +102,15 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         do_many(options['dir'][0], options['limit'], options['random'],
-                options['status'], options['log'], options['newcases'],
-                options['skipdupes'], options['skipnewcases'],
+                options['status'], options['log'], 
+                options['newcases'], options['skipdupes'], options['skipnewcases'], options['avoid_nocites'],
+                options['courtdates'],
                 options['startfolder'], options['startfile'], options['debug'])
 
 
-def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
-            skipdupes, skip_newcases, startfolder, startfile, debug):
+def do_many(dir_path, limit, random_order, status_interval, log_file, 
+            newcases, skipdupes, skip_newcases, avoid_nocites, courtdates,
+            startfolder, startfile, debug):
     """Runs through a directory of the form /data/[state]/[sub]/.../[folders]/[.xml documents].
     Parses each .xml document, instantiates the associated model object, and
     saves the object. Prints/logs status updates and tracebacks instead of
@@ -112,8 +125,10 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
     :param log_file: If not None, file paths that raise Exceptions will be
     logged to this file.
     :param newcases: If true, skip court-years that already have data.
-    :param skipdupes: If true, skip duplicates.
+    :param skipdupes: If true, skip duplicates.    
     :param skip_newcases: If true, skip cases imported under newcases.
+    :param avoid_nocites: If true, skip cases from dates after any case with no cite.
+    :param courtdates: If true, skip cases with dates before court established.
     :param startfolder: If not None, start on startfolder
     :param startfile: If not None, start on this file (for resuming)
     """
@@ -146,8 +161,20 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
         min_dates = get_min_dates()
     else:
         min_dates = None
+        
+    if avoid_nocites:
+        if newcases:
+            raise Exception("Cannot use both avoid_nocites and newcases options.")
+        print('Avoiding no cites: getting earliest dates by court with no citation.')
+        min_dates = get_min_nocite()
+        
+    if courtdates:
+        start_dates = get_courtdates()
+    else:
+        start_dates = None
 
     # check if skipping first columbias cases
+
     if skip_newcases:
         skiplist = get_path_list()
     else:
@@ -197,7 +224,7 @@ def do_many(dir_path, limit, random_order, status_interval, log_file, newcases,
             # tracebacks
             try:
                 parsed = parse_file(path)
-                make_and_save(parsed, skipdupes, min_dates, debug)
+                make_and_save(parsed, skipdupes, min_dates, start_dates, debug)
             except Exception as e:
                 # log the file name
                 if log:

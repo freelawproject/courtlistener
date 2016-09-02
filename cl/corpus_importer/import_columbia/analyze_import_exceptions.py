@@ -12,37 +12,34 @@ Created on Thu Jun 16 14:31:21 2016
 import os
 from collections import defaultdict, Counter
 
-os.chdir('/home/elliott/freelawmachine/flp/columbia_data')
-
-file_lists = defaultdict(list)
-for line in open('import_columbia_unknown_exceptions2.log'):
-    if 'Unknown exception in file' in line:
-        i = line.find('opinions/') + len('opinions/')
-        j = line.rfind("'")
-        currfile = line[i:j]
-
-    if 'Error:' in line:
-        file_lists[line].append(currfile)
-        # print(line)
-
-for k, v in file_lists.items():
-    for x in v:
-        print((x + '\n'), end="", file=open(k[:5] + '.txt', 'at'))
-
-
-f = open('import_columbia_known_exceptions2.log')
-
-cite_tab = Counter()
-
-courtid_tab = Counter()
-
+os.chdir('/home/elliott/freelawmachine/flp/columbia_data/logs/2')
 currfile = ''
-for line in f:
+courtid_tab = Counter()
+cite_tab = Counter()
+court_cite_tab = Counter()
+printline = False
+file_lists = defaultdict(list)
+for line in open('import_columbia_output_stage_2.log'):
     if 'exception in file' in line:
         i = line.find('opinions/') + len('opinions/')
         j = line.rfind("'")
         currfile = line[i:j]
         court = currfile.split('/documents')[0]
+
+    if 'Exception:' in line:
+        if 'date' not in line:
+            print(line)
+        print((line + '\n'), end="", file=open('unknown.txt', 'at'))
+        #file_lists[line].append(currfile)
+        #print(line)
+        
+    if printline:
+        print(line)
+        printline = False
+        
+    if 'Known exception in file' in line:
+        printline = True
+
 
     if 'Failed to get a citation' in line:
         seg = line.split("'")[1]
@@ -53,6 +50,7 @@ for line in f:
         #    if 'Ohio App.' not in newseg:
         #        if 'Okla. Cr.' not in newseg:
         cite_tab[newseg] += 1
+        court_cite_tab[court,newseg] += 1
 
     if 'Failed to find a court ID' in line:
         seg = line.split('"')[1]
