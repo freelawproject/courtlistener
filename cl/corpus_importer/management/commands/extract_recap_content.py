@@ -35,7 +35,7 @@ class Command(BaseCommand):
             # number, the less frequently you must wait while Celery processes a
             # massive PDF. But beware: OCR can clog the queue blocking other
             # tasks.
-            enqueue_length = 100
+            enqueue_length = 500
             if (len(subtasks) >= enqueue_length) or last_item:
                 msg = ("Sent %s subtasks to celery. We have sent %s "
                        "items so far." % (len(subtasks), completed + 1))
