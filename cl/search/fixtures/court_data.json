@@ -89,7 +89,7 @@
     "full_name": "Supreme Court of Alabama",
     "position": 305.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1819-01-01"
   },
   "model": "search.court",
   "pk": "ala"
@@ -165,7 +165,7 @@
     "full_name": "Alaska Supreme Court",
     "position": 320.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1959-01-03"
   },
   "model": "search.court",
   "pk": "alaska"
@@ -393,7 +393,7 @@
     "full_name": "Arizona Supreme Court",
     "position": 322.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1912-01-01"
   },
   "model": "search.court",
   "pk": "ariz"
@@ -450,7 +450,7 @@
     "full_name": "Supreme Court of Arkansas",
     "position": 330.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "ark"
@@ -1134,7 +1134,7 @@
     "full_name": "California Supreme Court",
     "position": 350.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1849-01-01"
   },
   "model": "search.court",
   "pk": "cal"
@@ -1514,7 +1514,7 @@
     "full_name": "Supreme Court of Colorado",
     "position": 350.9,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1876-08-01"
   },
   "model": "search.court",
   "pk": "colo"
@@ -1609,7 +1609,7 @@
     "full_name": "Supreme Court of Connecticut",
     "position": 351.5,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1784-01-01"
   },
   "model": "search.court",
   "pk": "conn"
@@ -1837,7 +1837,7 @@
     "full_name": "Supreme Court of Delaware",
     "position": 352.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "del"
@@ -2008,7 +2008,7 @@
     "full_name": "Supreme Court of Florida",
     "position": 354.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1845-01-01"
   },
   "model": "search.court",
   "pk": "fla"
@@ -2198,7 +2198,7 @@
     "full_name": "Supreme Court of Georgia",
     "position": 355.5,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"    
   },
   "model": "search.court",
   "pk": "ga"
@@ -2407,7 +2407,7 @@
     "full_name": "Hawaii Supreme Court",
     "position": 359.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1840-10-08"
   },
   "model": "search.court",
   "pk": "haw"
@@ -2578,7 +2578,7 @@
     "full_name": "Idaho Supreme Court",
     "position": 359.2,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1863-01-01"
   },
   "model": "search.court",
   "pk": "idaho"
@@ -2692,7 +2692,8 @@
     "full_name": "Illinois Supreme Court",
     "position": 359.5,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"
+    
   },
   "model": "search.court",
   "pk": "ill"
@@ -2844,7 +2845,7 @@
     "full_name": "Indiana Supreme Court",
     "position": 360.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1816-01-01"
   },
   "model": "search.court",
   "pk": "ind"
@@ -2996,7 +2997,7 @@
     "full_name": "Supreme Court of Iowa",
     "position": 360.9,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "iowa"
@@ -3053,7 +3054,7 @@
     "full_name": "Supreme Court of Kansas",
     "position": 362.1,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1854-01-01"
   },
   "model": "search.court",
   "pk": "kan"
@@ -3154,42 +3155,61 @@
   "pk": "ksd"
 },
 {
-  "fields": {
-    "jurisdiction": "S",
-    "end_date": null,
-    "short_name": "Kentucky Supreme Court",
-    "citation_string": "Ky.",
-    "in_use": true,
-    "url": "http://courts.ky.gov/courts/supreme/\u200e",
-    "notes": "Lawbox",
-    "date_modified": "2014-08-08T17:26:58.771Z",
-    "has_oral_argument_scraper": false,
-    "full_name": "Kentucky Supreme Court",
-    "position": 362.25,
-    "has_opinion_scraper": true,
-    "start_date": null
-  },
-  "model": "search.court",
-  "pk": "ky"
+ "fields": {
+   "jurisdiction": "S",
+   "end_date": null,
+   "short_name": "Kentucky Supreme Court",
+   "citation_string": "Ky.",
+   "in_use": true,
+   "url": "http://courts.ky.gov/courts/supreme/\u200e",
+   "notes": "Lawbox",
+   "date_modified": "2014-08-08T17:26:58.771Z",
+   "has_oral_argument_scraper": false,
+   "full_name": "Kentucky Supreme Court",
+   "position": 362.25,
+   "has_opinion_scraper": true,
+   "start_date": "1976-01-01"
+ },
+ "model": "search.court",
+ "pk": "ky"
 },
 {
-  "fields": {
-    "jurisdiction": "SA",
-    "end_date": null,
-    "short_name": "Court of Appeals of Kentucky",
-    "citation_string": "Ky. Ct. App.",
-    "in_use": true,
-    "url": "http://courts.ky.gov/courts/coa/Pages/coa.aspx",
-    "notes": "Lawbox",
-    "date_modified": "2013-09-09T16:45:42Z",
-    "has_oral_argument_scraper": false,
-    "full_name": "Court of Appeals of Kentucky",
-    "position": 362.3,
-    "has_opinion_scraper": false,
-    "start_date": "1976-01-01"
-  },
-  "model": "search.court",
-  "pk": "kyctapp"
+ "fields": {
+   "jurisdiction": "SA",
+   "end_date": null,
+   "short_name": "Court of Appeals of Kentucky",
+   "citation_string": "Ky. Ct. App.",
+   "in_use": true,
+   "url": "http://courts.ky.gov/courts/coa/Pages/coa.aspx",
+   "notes": "Lawbox",
+   "date_modified": "2013-09-09T16:45:42Z",
+   "has_oral_argument_scraper": false,
+   "full_name": "Court of Appeals of Kentucky",
+   "position": 362.3,
+   "has_opinion_scraper": false,
+   "start_date": "1976-01-01"
+ },
+ "model": "search.court",
+ "pk": "kyctapp"
+},
+{
+ "fields": {
+   "jurisdiction": "S",
+   "end_date": "1975-12-31",
+   "short_name": "Court of Appeals of Kentucky (pre-1976)",
+   "citation_string": "Ky. Ct. App.",
+   "in_use": true,
+   "url": "http://courts.ky.gov/courts/coa/Pages/coa.aspx",
+   "notes": "Columbia",
+   "date_modified": "2013-09-09T16:45:42Z",
+   "has_oral_argument_scraper": false,
+   "full_name": "Court of Appeals of Kentucky (pre-1976)",
+   "position": 362.3,
+   "has_opinion_scraper": false,
+   "start_date": "1792-01-01"
+ },
+ "model": "search.court",
+ "pk": "kyctapphigh"
 },
 {
   "fields": {
@@ -3300,7 +3320,7 @@
     "full_name": "Supreme Court of Louisiana",
     "position": 362.5,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1813-01-01"
   },
   "model": "search.court",
   "pk": "la"
@@ -3528,7 +3548,7 @@
     "full_name": "Massachusetts Supreme Judicial Court",
     "position": 362.99,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1692-01-01"
   },
   "model": "search.court",
   "pk": "mass"
@@ -3642,7 +3662,7 @@
     "full_name": "Court of Appeals of Maryland",
     "position": 362.6,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "md"
@@ -3737,7 +3757,7 @@
     "full_name": "Supreme Judicial Court of Maine",
     "position": 362.55,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1830-01-01"
   },
   "model": "search.court",
   "pk": "me"
@@ -3794,7 +3814,7 @@
     "full_name": "Michigan Supreme Court",
     "position": 365.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1837-01-01"
   },
   "model": "search.court",
   "pk": "mich"
@@ -3889,7 +3909,7 @@
     "full_name": "Supreme Court of Minnesota",
     "position": 365.2,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1858-05-24"
   },
   "model": "search.court",
   "pk": "minn"
@@ -3927,7 +3947,7 @@
     "full_name": "Mississippi Supreme Court",
     "position": 366.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "miss"
@@ -4060,7 +4080,7 @@
     "full_name": "Supreme Court of Missouri",
     "position": 366.04,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1821-01-01"
   },
   "model": "search.court",
   "pk": "mo"
@@ -4193,7 +4213,7 @@
     "full_name": "Montana Supreme Court",
     "position": 366.1,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1864-01-01"
   },
   "model": "search.court",
   "pk": "mont"
@@ -4440,7 +4460,7 @@
     "full_name": "Supreme Court of North Carolina",
     "position": 366.97,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1818-01-01"
   },
   "model": "search.court",
   "pk": "nc"
@@ -4649,7 +4669,7 @@
     "full_name": "North Dakota Supreme Court",
     "position": 366.99,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1861-01-01"
   },
   "model": "search.court",
   "pk": "nd"
@@ -4725,7 +4745,7 @@
     "full_name": "Nebraska Supreme Court",
     "position": 366.2,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1854-01-01"
   },
   "model": "search.court",
   "pk": "neb"
@@ -4820,7 +4840,7 @@
     "full_name": "Nevada Supreme Court",
     "position": 366.5,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1864-01-01"
   },
   "model": "search.court",
   "pk": "nev"
@@ -4839,7 +4859,7 @@
     "full_name": "Supreme Court of New Hampshire",
     "position": 366.52,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1776-01-01"
   },
   "model": "search.court",
   "pk": "nh"
@@ -4896,7 +4916,7 @@
     "full_name": "Supreme Court of New Jersey",
     "position": 366.55,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1776-01-01"
   },
   "model": "search.court",
   "pk": "nj"
@@ -5010,7 +5030,7 @@
     "full_name": "New Mexico Supreme Court",
     "position": 366.9,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "nm"
@@ -5181,7 +5201,7 @@
     "full_name": "New York Court of Appeals",
     "position": 366.96,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1777-01-01"
   },
   "model": "search.court",
   "pk": "ny"
@@ -5523,7 +5543,7 @@
     "full_name": "Ohio Supreme Court",
     "position": 366.995,
     "has_opinion_scraper": false,
-    "start_date": null
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "ohio"
@@ -5713,7 +5733,7 @@
     "full_name": "Supreme Court of Oklahoma",
     "position": 366.999,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1907-01-01"
   },
   "model": "search.court",
   "pk": "okla"
@@ -5903,7 +5923,7 @@
     "full_name": "Oregon Supreme Court",
     "position": 367.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "or"
@@ -6017,7 +6037,7 @@
     "full_name": "Supreme Court of Pennsylvania",
     "position": 367.15,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1722-05-22"
   },
   "model": "search.court",
   "pk": "pa"
@@ -6283,7 +6303,7 @@
     "full_name": "Supreme Court of Rhode Island",
     "position": 367.3,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1747-01-01"
   },
   "model": "search.court",
   "pk": "ri"
@@ -6359,7 +6379,7 @@
     "full_name": "Supreme Court of South Carolina",
     "position": 367.4,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "sc"
@@ -6454,7 +6474,7 @@
     "full_name": "South Dakota Supreme Court",
     "position": 367.5,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1889-01-01"
   },
   "model": "search.court",
   "pk": "sd"
@@ -6625,7 +6645,7 @@
     "full_name": "Tennessee Supreme Court",
     "position": 367.6,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "tenn"
@@ -6758,7 +6778,7 @@
     "full_name": "Texas Supreme Court",
     "position": 368.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1840-01-01"
   },
   "model": "search.court",
   "pk": "tex"
@@ -7195,7 +7215,7 @@
     "full_name": "Utah Supreme Court",
     "position": 369.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1850-01-01"
   },
   "model": "search.court",
   "pk": "utah"
@@ -7271,7 +7291,7 @@
     "full_name": "Supreme Court of Virginia",
     "position": 369.4,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1779-01-01"
   },
   "model": "search.court",
   "pk": "va"
@@ -7442,7 +7462,7 @@
     "full_name": "Supreme Court of Vermont",
     "position": 369.2,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1778-01-01"
   },
   "model": "search.court",
   "pk": "vt"
@@ -7537,7 +7557,7 @@
     "full_name": "Washington Supreme Court",
     "position": 370.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1889-01-01"
   },
   "model": "search.court",
   "pk": "wash"
@@ -7689,7 +7709,7 @@
     "full_name": "Wisconsin Supreme Court",
     "position": 386.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1836-01-01"
   },
   "model": "search.court",
   "pk": "wis"
@@ -7803,7 +7823,7 @@
     "full_name": "West Virginia Supreme Court",
     "position": 385.1,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1863-01-01"
   },
   "model": "search.court",
   "pk": "wva"
@@ -7955,7 +7975,7 @@
     "full_name": "Wyoming Supreme Court",
     "position": 390.0,
     "has_opinion_scraper": true,
-    "start_date": null
+    "start_date": "1921-01-01"
   },
   "model": "search.court",
   "pk": "wyo"
