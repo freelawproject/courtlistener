@@ -4,6 +4,7 @@ import calendar
 import re
 import string
 from collections import OrderedDict
+from datetime import date
 
 from django.conf import settings
 
@@ -13,6 +14,7 @@ from cl.lib.import_lib import map_citations_to_models, find_person
 from cl.lib.solr_core_admin import get_term_frequency
 from cl.search.models import Docket, Opinion, OpinionCluster
 from convert_columbia_html import convert_columbia_html
+
 
 # only make a solr connection onece
 SOLR_CONN = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
@@ -145,6 +147,10 @@ def make_and_save(item, skipdupes=False, min_dates=None, start_dates=None, testi
 
     if main_date is None:
         raise Exception("Failed to get a date for " + item['file'])
+
+    # special rule for Kentucky
+    if item['court_id'] == 'kycourtapp' and main_date <= date(1975,12,31):
+        item['court_id'] = 'kycourtapphigh'
 
     if min_dates is not None:
         if min_dates.get(item['court_id']) is not None:
