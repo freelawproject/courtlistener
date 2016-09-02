@@ -3155,42 +3155,61 @@
   "pk": "ksd"
 },
 {
-  "fields": {
-    "jurisdiction": "S",
-    "end_date": null,
-    "short_name": "Kentucky Supreme Court",
-    "citation_string": "Ky.",
-    "in_use": true,
-    "url": "http://courts.ky.gov/courts/supreme/\u200e",
-    "notes": "Lawbox",
-    "date_modified": "2014-08-08T17:26:58.771Z",
-    "has_oral_argument_scraper": false,
-    "full_name": "Kentucky Supreme Court",
-    "position": 362.25,
-    "has_opinion_scraper": true,
-    "start_date": "1792-01-01"
-  },
-  "model": "search.court",
-  "pk": "ky"
+ "fields": {
+   "jurisdiction": "S",
+   "end_date": null,
+   "short_name": "Kentucky Supreme Court",
+   "citation_string": "Ky.",
+   "in_use": true,
+   "url": "http://courts.ky.gov/courts/supreme/\u200e",
+   "notes": "Lawbox",
+   "date_modified": "2014-08-08T17:26:58.771Z",
+   "has_oral_argument_scraper": false,
+   "full_name": "Kentucky Supreme Court",
+   "position": 362.25,
+   "has_opinion_scraper": true,
+   "start_date": "1976-01-01"
+ },
+ "model": "search.court",
+ "pk": "ky"
 },
 {
-  "fields": {
-    "jurisdiction": "SA",
-    "end_date": null,
-    "short_name": "Court of Appeals of Kentucky",
-    "citation_string": "Ky. Ct. App.",
-    "in_use": true,
-    "url": "http://courts.ky.gov/courts/coa/Pages/coa.aspx",
-    "notes": "Lawbox",
-    "date_modified": "2013-09-09T16:45:42Z",
-    "has_oral_argument_scraper": false,
-    "full_name": "Court of Appeals of Kentucky",
-    "position": 362.3,
-    "has_opinion_scraper": false,
-    "start_date": "1976-01-01"
-  },
-  "model": "search.court",
-  "pk": "kyctapp"
+ "fields": {
+   "jurisdiction": "SA",
+   "end_date": null,
+   "short_name": "Court of Appeals of Kentucky",
+   "citation_string": "Ky. Ct. App.",
+   "in_use": true,
+   "url": "http://courts.ky.gov/courts/coa/Pages/coa.aspx",
+   "notes": "Lawbox",
+   "date_modified": "2013-09-09T16:45:42Z",
+   "has_oral_argument_scraper": false,
+   "full_name": "Court of Appeals of Kentucky",
+   "position": 362.3,
+   "has_opinion_scraper": false,
+   "start_date": "1976-01-01"
+ },
+ "model": "search.court",
+ "pk": "kyctapp"
+},
+{
+ "fields": {
+   "jurisdiction": "S",
+   "end_date": "1975-12-31",
+   "short_name": "Court of Appeals of Kentucky (pre-1976)",
+   "citation_string": "Ky. Ct. App.",
+   "in_use": true,
+   "url": "http://courts.ky.gov/courts/coa/Pages/coa.aspx",
+   "notes": "Columbia",
+   "date_modified": "2013-09-09T16:45:42Z",
+   "has_oral_argument_scraper": false,
+   "full_name": "Court of Appeals of Kentucky (pre-1976)",
+   "position": 362.3,
+   "has_opinion_scraper": false,
+   "start_date": "1792-01-01"
+ },
+ "model": "search.court",
+ "pk": "kyctapphigh"
 },
 {
   "fields": {
