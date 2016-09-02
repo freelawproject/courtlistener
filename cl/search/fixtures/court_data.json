@@ -2198,7 +2198,7 @@
     "full_name": "Supreme Court of Georgia",
     "position": 355.5,
     "has_opinion_scraper": true,
-    "start_date": "1841-01-01"    
+    "start_date": "1841-01-01"
   },
   "model": "search.court",
   "pk": "ga"
@@ -2693,7 +2693,7 @@
     "position": 359.5,
     "has_opinion_scraper": true,
     "start_date": "1841-01-01"
-    
+
   },
   "model": "search.court",
   "pk": "ill"
@@ -5961,7 +5961,7 @@
     "full_name": "Court of Appeals of Oregon",
     "position": 367.1,
     "has_opinion_scraper": false,
-    "start_date": "1969-07-01",
+    "start_date": "1969-07-01"
   },
   "model": "search.court",
   "pk": "orctapp"
