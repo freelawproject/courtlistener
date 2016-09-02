@@ -224,7 +224,7 @@ def do_many(dir_path, limit, random_order, status_interval, log_file,
             # tracebacks
             try:
                 parsed = parse_file(path)
-                make_and_save(parsed, skipdupes, min_dates, debug)
+                make_and_save(parsed, skipdupes, min_dates, start_dates, debug)
             except Exception as e:
                 # log the file name
                 if log:
