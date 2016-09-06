@@ -262,19 +262,24 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
 
 
 @app.task
-def extract_recap_pdf(pk):
+def extract_recap_pdf(pk, skip_ocr=False):
     doc = RECAPDocument.objects.get(pk=pk)
     path = doc.filepath_local.path
     process = make_pdftotext_process(path)
     content, err = process.communicate()
+
     if needs_ocr(content):
-        # probably an image PDF. Send it to OCR.
-        success, content = extract_by_ocr(path)
-        if success:
-            doc.ocr_status = RECAPDocument.OCR_COMPLETE
-        elif content == '' or not success:
-            content = 'Unable to extract document content.'
-            doc.ocr_status = RECAPDocument.OCR_FAILED
+        if not skip_ocr:
+            # probably an image PDF. Send it to OCR.
+            success, content = extract_by_ocr(path)
+            if success:
+                doc.ocr_status = RECAPDocument.OCR_COMPLETE
+            elif content == u'' or not success:
+                content = u'Unable to extract document content.'
+                doc.ocr_status = RECAPDocument.OCR_FAILED
+        else:
+            content = u''
+            doc.ocr_status = RECAPDocument.OCR_NEEDED
     else:
         doc.ocr_status = RECAPDocument.OCR_UNNECESSARY
 

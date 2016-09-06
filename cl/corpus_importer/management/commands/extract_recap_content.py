@@ -1,4 +1,3 @@
-import argparse
 import logging
 
 from celery.task import TaskSet
@@ -19,42 +18,60 @@ class Command(BaseCommand):
         parser.add_argument(
             '--order',
             type=str,
-            required=True,
             help="The order that you wish to enqueue items, either "
                  "'small-first' or 'big-first'"
-            )
+        )
+        parser.add_argument(
+            '--skip-ocr',
+            type=bool,
+            store_true=True,
+            help="Should we run OCR, or just label items that need it?",
+        )
+        parser.add_argument(
+            '--queue',
+            type=str,
+            default='celery',
+            help="Which queue should the items be sent to? (default: 'celery')",
+        )
+        parser.add_argument(
+            '--queue-length',
+            type=int,
+            default=100,
+            help="How many items should be enqueued at a time? (default: 100)",
+        )
 
     def handle(self, *args, **options):
-        docs = RECAPDocument.objects.filter(
-            ocr_status=None
-        ).exclude(
-            filepath_local='',
-        )
+        docs = RECAPDocument.objects.exclude(filepath_local='')
+
+        if options['skip_ocr']:
+            # Focus on the items that we don't know if they need OCR.
+            docs.filter(ocr_status=None)
+        else:
+            # We're doing OCR. Only work with those items that require it.
+            docs.filter(ocr_status=RECAPDocument.OCR_NEEDED)
+
         count = docs.count()
         print("There are %s documents to process." % count)
 
-        if options['order'] == 'small-first':
-            docs.order_by('page_count')
-            enqueue_length = 100
-            queue = 'celery'  # default queue
-        elif options['order'] == 'big-first':
-            docs.order_by('-page_count')
-            enqueue_length = 1000
-            queue = 'big-ocr'
-        else:
-            raise argparse.ArgumentTypeError("Invalid argument for 'order'")
+        if options.get('order') is not None:
+            if options['order'] == 'small-first':
+                docs.order_by('page_count')
+            elif options['order'] == 'big-first':
+                docs.order_by('-page_count')
 
         subtasks = []
         completed = 0
         for pk in docs.values_list('pk', flat=True):
-            # Try to extract the contents the easy way, but if that fails,
-            # use OCR.
+            # Send the items off for processing.
             last_item = (count == completed)
-            subtasks.append(extract_recap_pdf.subtask((pk,), priority=5,
-                                                      queue=queue))
+            subtasks.append(extract_recap_pdf.subtask(
+                (pk, options['skip_ocr']),
+                priority=5,
+                queue=options['queue']
+            ))
 
-            # Every n items, send the subtasks to Celery.
-            if (len(subtasks) >= enqueue_length) or last_item:
+            # Every enqueue_length items, send the subtasks to Celery.
+            if (len(subtasks) >= options['enqueue_length']) or last_item:
                 msg = ("Sent %s subtasks to celery. We have sent %s "
                        "items so far." % (len(subtasks), completed + 1))
                 logger.info(msg)
