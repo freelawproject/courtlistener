@@ -336,10 +336,12 @@ class RECAPDocument(models.Model):
     OCR_COMPLETE = 1
     OCR_UNNECESSARY = 2
     OCR_FAILED = 3
+    OCR_NEEDED = 4
     OCR_STATUSES = (
         (OCR_COMPLETE, "OCR Complete"),
         (OCR_UNNECESSARY, "OCR Not Necessary"),
         (OCR_FAILED, "OCR Failed"),
+        (OCR_NEEDED, "OCR Needed"),
     )
     docket_entry = models.ForeignKey(
         DocketEntry,
