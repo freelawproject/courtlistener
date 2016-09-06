@@ -15,6 +15,7 @@ def blacklisted_url(url):
     blacklist = [
         'content_mobile.php',  # Mobile version of starger's site
         'https://www.courtlistener.com',  # Self-embeds.
+        'localhost',
         'translate.google',  # Google translate
     ]
     if len([b for b in blacklist if b in url]) > 0:
