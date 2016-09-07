@@ -23,7 +23,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--skip-ocr',
-            type=bool,
+            default=False,
             action='store_true',
             help="Should we run OCR, or just label items that need it?",
         )
