@@ -71,7 +71,7 @@ class Command(BaseCommand):
             ))
 
             # Every enqueue_length items, send the subtasks to Celery.
-            if (len(subtasks) >= options['enqueue_length']) or last_item:
+            if (len(subtasks) >= options['queue_length']) or last_item:
                 msg = ("Sent %s subtasks to celery. We have sent %s "
                        "items so far." % (len(subtasks), completed + 1))
                 logger.info(msg)
