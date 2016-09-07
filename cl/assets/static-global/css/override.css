@@ -44,6 +44,11 @@ header {
     margin-top: 23px;
 }
 
+/* Make anchor targets in tables have a special color. */
+.table-hover > tbody > tr:target {
+    background-color: #f5f5f5;
+}
+
 .alt {
   color: #666;
   font-family: "Warnock Pro", "Book Antiqua", Georgia, serif;

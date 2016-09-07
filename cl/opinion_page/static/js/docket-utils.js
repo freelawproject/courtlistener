@@ -1,6 +1,7 @@
 var picker = $("#actions-picker"),
     table_body = $('#document-table tbody');
 
+// Do AJAX when modal is shown.
 picker.on('show.bs.modal', function (event) {
     var row = $(event.relatedTarget);
     var pk = row.data('docket-entry');
@@ -40,7 +41,7 @@ picker.on('show.bs.modal', function (event) {
 });
 
 picker.on('hide.bs.modal', function (event) {
-    // Prepare for a different entry to be opened.
+    // Prepare for a different entry to be opened, by emptying the modal.
     table_body.empty();
 });
 
@@ -87,4 +88,9 @@ var makeRow = function (item, type) {
     row.find('[data-toggle="tooltip"]').tooltip();
 };
 
-
+// Allow links in the docket to be clicked without triggering the modal.
+$('.docket-entry a').on('click', function (ev) {
+    ev.stopPropagation();
+});
+// Initialize tooltips on profile pages.
+$('[data-toggle="tooltip"]').tooltip();

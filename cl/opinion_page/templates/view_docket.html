@@ -191,9 +191,9 @@
                     <table class="table table-responsive table-hover">
                         <thead>
                             <tr>
-                                <th>Date&nbsp;Filed</th>
                                 <th class="text-center">Document Number</th>
-                                <th>Description</th>
+                                <th>Date&nbsp;Filed</th>
+                                <th colspan="2">Description</th>
                                 {% if perms.search.change_docketentry %}
                                     <th class="text-center">Admin</th>
                                 {% endif %}
@@ -201,12 +201,19 @@
                         </thead>
                         <tbody>
                             {% for entry in docket.docket_entries.all %}
-                            <tr class="cursor" data-toggle="modal"
+                            <tr class="cursor docket-entry" data-toggle="modal"
                                 data-docket-entry="{{ entry.pk }}"
-                                data-target="#actions-picker">
-                                <td>{{ entry.date_filed|date:"DATE_FORMAT"|nbsp|default:"Unknown" }}</td>
+                                data-target="#actions-picker"
+                                id="entry-{{ entry.entry_number }}">
                                 <td class="text-center">{{ entry.entry_number }}</td>
+                                <td>{{ entry.date_filed|date:"DATE_FORMAT"|nbsp|default:"Unknown" }}</td>
                                 <td>{{ entry.description|safe|default:"Unknown Description" }}</td>
+                                <td>
+                                    <a href="#entry-{{ entry.entry_number }}"
+                                       data-toggle="tooltip"
+                                       data-placement="left"
+                                       title="Get direct link to this row"><i class="fa fa-share-alt gray"></i></a>
+                                </td>
                                 {% if perms.search.change_docketentry %}
                                     <td>
                                     <a href="{% url 'admin:search_docketentry_change' entry.pk %}"
