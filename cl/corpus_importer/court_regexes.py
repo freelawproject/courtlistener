@@ -556,7 +556,7 @@ state_pairs = (
 
     (re.compile('Supreme Court (of )?Oklahoma', re.I), 'okla'),
     (re.compile('Court of Criminal Appeals? (of )?Oklahoma', re.I), 'oklacrimapp'),
-        (re.compile('Criminal Courts of Appeals? of Oklahoma', re.I), 'oklacrimapp'),
+        (re.compile('Criminal Courts? of Appeals? of Oklahoma', re.I), 'oklacrimapp'),
     (re.compile('Court of Civils? Appeals? of Oklahoma', re.I), 'oklacivapp'),
     (re.compile('Oklahoma Court of Civil Appeals?', re.I), 'oklacivapp'),
         # When they refer to simply the "Court of Appeals" they mean the the civil court
