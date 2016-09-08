@@ -41,6 +41,11 @@ class OpinionAdmin(admin.ModelAdmin):
         'date_modified',
     )
 
+    def save_model(self, request, obj, form, change):
+        obj.save()
+        from cl.search.tasks import add_or_update_opinions
+        add_or_update_opinions.delay([obj.pk], force_commit=False)
+
 
 class OpinionClusterAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['case_name']}
@@ -95,6 +100,11 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'date_modified',
         'date_created',
     )
+
+    def save_model(self, request, obj, form, change):
+        obj.save()
+        from cl.search.tasks import add_or_update_cluster
+        add_or_update_cluster.delay(obj.pk, force_commit=False)
 
 
 class CourtAdmin(admin.ModelAdmin):
