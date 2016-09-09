@@ -45,19 +45,19 @@ class Command(BaseCommand):
 
         if options['skip_ocr']:
             # Focus on the items that we don't know if they need OCR.
-            docs.filter(ocr_status=None)
+            docs = docs.filter(ocr_status=None)
         else:
             # We're doing OCR. Only work with those items that require it.
-            docs.filter(ocr_status=RECAPDocument.OCR_NEEDED)
+            docs = docs.filter(ocr_status=RECAPDocument.OCR_NEEDED)
 
         count = docs.count()
         print("There are %s documents to process." % count)
 
         if options.get('order') is not None:
             if options['order'] == 'small-first':
-                docs.order_by('page_count')
+                docs = docs.order_by('page_count')
             elif options['order'] == 'big-first':
-                docs.order_by('-page_count')
+                docs = docs.order_by('-page_count')
 
         subtasks = []
         completed = 0
