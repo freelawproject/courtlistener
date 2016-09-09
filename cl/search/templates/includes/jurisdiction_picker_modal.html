@@ -18,7 +18,7 @@
                                      <button type="button"
                                              class="btn btn-default"
                                              id="clear-all">Clear All</button>
-                                    {% if search_form.type.value != 'oa' %}
+                                    {% if search_form.type.value != 'oa' and type != 'oa' %}
                                         <button type="button"
                                                 class="btn btn-default"
                                                 id="check-current">Check Current Tab</button>
@@ -51,7 +51,7 @@
                             <span class="hidden-md hidden-lg">Fed. App.</span>
                         </a>
                     </li>
-                    {% if search_form.type.value != 'oa' %}
+                    {% if search_form.type.value != 'oa' and type != 'oa' %}
                         <li>
                             <a href="#tab-federal-district"
                                data-toggle="tab">
@@ -101,7 +101,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                    {% if search_form.type.value != 'oa' %}
+                    {% if search_form.type.value != 'oa' and type != 'oa' %}
                         <div class="tab-pane" id="tab-federal-district">
                             {# Regroup into closed/open courts #}
                             {% regroup  courts.district|dictsort:"is_terminated" by is_terminated as district_courts %}
