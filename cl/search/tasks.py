@@ -1,18 +1,17 @@
 import socket
 
+from django.conf import settings
+
 from cl.audio.models import Audio
 from cl.celery import app
-from cl.lib.sunburnt import SolrError
 from cl.lib import sunburnt
+from cl.lib.sunburnt import SolrError
 from cl.people_db.models import Person
 from cl.search.models import Opinion, OpinionCluster, Docket
 from cl.search.search_indexes import (
     InvalidDocumentError, SearchAudioFile, SearchDocument, SearchPerson,
     SearchDocketFile,
 )
-
-
-from django.conf import settings
 
 
 @app.task
@@ -89,11 +88,16 @@ def add_or_update_people(item_pks, force_commit=True):
     except SolrError, exc:
         add_or_update_people.retry(exc=exc, countdown=30)
 
+
 @app.task
-def delete_items(items, solr_url):
+def delete_items(items, solr_url, force_commit=False):
     si = sunburnt.SolrInterface(solr_url, mode='w')
-    si.delete(list(items))
-    si.commit()
+    try:
+        si.delete(list(items))
+        if force_commit:
+            si.commit()
+    except SolrError, exc:
+        delete_items.retry(exc=exc, countdown=30)
 
 
 @app.task

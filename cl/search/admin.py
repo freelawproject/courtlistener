@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 
 from cl.search.models import (
@@ -45,6 +46,11 @@ class OpinionAdmin(admin.ModelAdmin):
         obj.save()
         from cl.search.tasks import add_or_update_opinions
         add_or_update_opinions.delay([obj.pk], force_commit=False)
+
+    def delete_model(self, request, obj):
+        obj.delete()
+        from cl.search.tasks import delete_items
+        delete_items.delay([obj.pk], settings.SOLR_OPINION_URL)
 
 
 class OpinionClusterAdmin(admin.ModelAdmin):
