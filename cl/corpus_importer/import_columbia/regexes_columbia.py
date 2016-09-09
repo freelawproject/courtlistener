@@ -2,7 +2,7 @@ import re
 
 SPECIAL_REGEXES = {
     'connecticut/superior_court_opinions': (
-        (re.compile('Appellate Division Of The Circuit Court', re.I), 'connappct'),
+        (re.compile('Appellate Division Of The Circuit Court', re.I), 'connsuperct'),
     ),
     'florida/court_opinions': (
         (re.compile('District Courts? of Appeal', re.I), 'fladistctapp'),

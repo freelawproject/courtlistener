@@ -397,7 +397,7 @@ state_pairs = (
     (re.compile('Connecticut Appellate Court', re.I), 'connappct'),
         (re.compile('Appellate Court of Connecticut', re.I), 'connappct'),
         # This court is terminated, succeeded by the appellate court of conn.
-        (re.compile('Appellate Session of the Superior Court', re.I), 'connappct'),
+        (re.compile('Appellate Session of the Superior Court', re.I), 'connsuperct'),
     (re.compile('Superior Court of Connecticut', re.I), 'connsuperct'),
         (re.compile('Connecticut Superior Court', re.I), 'connsuperct'),
         (re.compile('Review Division Of The Superior Court', re.I), 'connsuperct'),
@@ -606,6 +606,7 @@ state_pairs = (
     (re.compile('Supreme Court of Vermont', re.I), 'vt'),
 
     (re.compile('Supreme Court of Virginia', re.I), 'va'),
+    (re.compile('Supreme Court of Appeals? of Virginia', re.I), 'va'),
     (re.compile('Court of Appeals? of Virginia', re.I), 'vactapp'),
 
     (re.compile('Supreme Court of Washington', re.I), 'wash'),
