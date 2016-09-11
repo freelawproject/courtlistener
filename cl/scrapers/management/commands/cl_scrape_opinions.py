@@ -19,14 +19,13 @@ from cl.lib.scrape_helpers import (
     get_extension, get_binary_content, signal_handler
 )
 from cl.lib.string_utils import trunc
-from cl.scrapers.models import ErrorLog
 from cl.scrapers.DupChecker import DupChecker
+from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content, extract_by_ocr
-from cl.search.models import Docket
 from cl.search.models import Court
+from cl.search.models import Docket
 from cl.search.models import Opinion
 from cl.search.models import OpinionCluster
-
 
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
@@ -83,7 +82,7 @@ class Command(BaseCommand):
         Returns the created objects.
         """
         blocked = item['blocked_statuses']
-        if blocked is not None:
+        if blocked:
             date_blocked = date.today()
         else:
             date_blocked = None

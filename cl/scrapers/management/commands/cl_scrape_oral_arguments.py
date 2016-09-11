@@ -22,7 +22,7 @@ class Command(cl_scrape_opinions.Command):
 
     def make_objects(self, item, court, sha1_hash, content):
         blocked = item['blocked_statuses']
-        if blocked is not None:
+        if blocked:
             date_blocked = date.today()
         else:
             date_blocked = None
