@@ -2,18 +2,18 @@ import datetime
 import logging
 import traceback
 
-from cl.alerts.models import FREQUENCY, RealTimeQueue, ITEM_TYPES
-from cl.lib import search_utils
-from cl.lib import sunburnt
-from cl.search.forms import SearchForm
-from cl.stats import tally_stat
-
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
 from django.template import loader
 from django.utils.timezone import now
+
+from cl.alerts.models import FREQUENCY, RealTimeQueue, ITEM_TYPES
+from cl.lib import search_utils
+from cl.lib import sunburnt
+from cl.search.forms import SearchForm
+from cl.stats import tally_stat
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +240,7 @@ class Command(BaseCommand):
             ids = RealTimeQueue.objects.filter(item_type=item_type)
             if ids:
                 main_params = {
-                    'q': '*:*',  # Vital!
+                    'q': '*',  # Vital!
                     'caller': 'cl_send_alerts',
                     'rows': 1000,
                     'fl': 'id',

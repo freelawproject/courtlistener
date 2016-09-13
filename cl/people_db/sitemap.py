@@ -12,7 +12,7 @@ def people_sitemap_maker(request):
     page = int(request.GET.get("p", 1))
     start = (page - 1) * items_per_sitemap
     params = {
-        'q': '*:*',
+        'q': '*',
         'rows': items_per_sitemap,
         'start': start,
         'fl': ','.join([

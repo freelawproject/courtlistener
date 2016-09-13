@@ -134,7 +134,7 @@ def update_judges_by_solr(candidate_id_map, debug):
                     # positions. 1980 is arbitrary, based on testing.
                     'date_start:[1980-12-31T23:59:59Z TO *]',
                 ],
-                'q': "*:*",
+                'q': "*",
             }).execute()
 
             if len(results) == 0:

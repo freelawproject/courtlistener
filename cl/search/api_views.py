@@ -68,7 +68,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             if cd['q'] == '':
-                cd['q'] = '*:*'  # Get everything
+                cd['q'] = '*'  # Get everything
 
             paginator = pagination.PageNumberPagination()
             sl = api_utils.get_object_list(request, cd=cd, paginator=paginator)

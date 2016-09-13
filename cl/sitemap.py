@@ -3,12 +3,12 @@ from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 from django.template import loader
 from django.views.decorators.cache import never_cache
-from cl.lib import sunburnt
 
+from cl.lib import sunburnt
 
 items_per_sitemap = 250
 opinion_solr_params = {
-    'q': '*:*',
+    'q': '*',
     'rows': items_per_sitemap,
     'start': 0,
     'fl': ','.join([
@@ -22,7 +22,7 @@ opinion_solr_params = {
     'caller': 'opinion_sitemap_maker',
 }
 index_solr_params = {
-    'q': '*:*',
+    'q': '*',
     'rows': '0',  # just need the count
     'start': '0',
     'caller': 'sitemap_index',

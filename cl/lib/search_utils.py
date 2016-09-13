@@ -493,7 +493,7 @@ def add_fq(main_params, cd):
 
 def build_main_query(cd, highlight='all', order_by=''):
     main_params = {
-        'q': cd['q'] or '*:*',
+        'q': cd['q'] or '*',
         'sort': cd.get('order_by', order_by),
         'caller': 'build_main_query',
     }
@@ -521,7 +521,7 @@ def place_facet_queries(cd, conn=sunburnt.SolrInterface(settings.SOLR_OPINION_UR
         'facet': 'true',
         'facet.mincount': 0,
         'facet.field': '{!ex=dt}status_exact',
-        'q': cd['q'] or '*:*',
+        'q': cd['q'] or '*',
         'caller': 'facet_parameters',
     }
     fq = []
@@ -565,7 +565,7 @@ def get_court_start_year(conn, court):
     active, but does not yet have any results, return the current year.
     """
     if court.lower() == 'all':
-        params = {'sort': 'dateFiled asc', 'rows': 1, 'q': '*:*'}
+        params = {'sort': 'dateFiled asc', 'rows': 1, 'q': '*'}
     else:
         params = {'fq': ['court_exact:%s' % court], 'sort': 'dateFiled asc', 'rows': 1}
     params['caller'] = 'search_utils'
@@ -587,7 +587,7 @@ def build_coverage_query(court, start_year, q):
         'facet.range.end': 'NOW/DAY',
         'facet.range.gap': '+1YEAR',
         'rows': 0,
-        'q': q or '*:*',  # Without this, results will be omitted.
+        'q': q or '*',  # Without this, results will be omitted.
         'caller': 'build_coverage_query',
     }
     if court.lower() != 'all':
@@ -611,7 +611,7 @@ def build_total_count_query():
     """Build a query that returns the total result count as quickly as possible."""
     params = {
         'rows': 0,
-        'q': '*:*',
+        'q': '*',
         'caller': 'build_total_count_query',
     }
     return params

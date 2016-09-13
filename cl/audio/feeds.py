@@ -27,7 +27,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         """
         conn = sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='r')
         params = {
-            'q': '*:*',
+            'q': '*',
             'fq': 'court_exact:%s' % obj.pk,
             'sort': 'dateArgued desc',
             'rows': '20',
@@ -85,7 +85,7 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
     def items(self, obj):
         conn = sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='r')
         params = {
-            'q': '*:*',
+            'q': '*',
             'sort': 'dateArgued desc',
             'rows': '20',
             'start': '0',

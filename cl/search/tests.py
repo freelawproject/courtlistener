@@ -51,7 +51,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             '--do-commit',
         ])
         call_command('cl_update_index', *args)
-        results = self.si_opinion.raw_query(**{'q': '*:*'}).execute()
+        results = self.si_opinion.raw_query(**{'q': '*'}).execute()
         actual_count = self._get_result_count(results)
         self.assertEqual(
             actual_count,
@@ -87,7 +87,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             '--do-commit',
         ])
         call_command('cl_update_index', *args)
-        results = self.si_opinion.raw_query(**{'q': '*:*'}).execute()
+        results = self.si_opinion.raw_query(**{'q': '*'}).execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 0
         self.assertEqual(
@@ -110,7 +110,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             '--do-commit',
         ])
         call_command('cl_update_index', *args)
-        results = self.si_opinion.raw_query(**{'q': '*:*'}).execute()
+        results = self.si_opinion.raw_query(**{'q': '*'}).execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 3
         self.assertEqual(
@@ -160,7 +160,7 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_a_case_name_query(self):
         """Does querying by case name work?"""
-        r = self.client.get('/', {'q': '*:*', 'case_name': 'honda'})
+        r = self.client.get('/', {'q': '*', 'case_name': 'honda'})
         self.assertIn('Honda', r.content)
 
     def test_a_query_with_white_space_only(self):
@@ -173,7 +173,7 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_a_query_with_a_date(self):
         """Does querying by date work?"""
-        response = self.client.get('/', {'q': '*:*',
+        response = self.client.get('/', {'q': '*',
                                          'filed_after': '1795-06',
                                          'filed_before': '1796-01'})
         self.assertIn('Honda', response.content)
@@ -182,15 +182,15 @@ class SearchTest(IndexedSolrTestCase):
         """Does querying in a given court return the document? Does querying
         the wrong facets exclude it?
         """
-        r = self.client.get('/', {'q': '*:*', 'court_test': 'on'})
+        r = self.client.get('/', {'q': '*', 'court_test': 'on'})
         self.assertIn('Honda', r.content)
-        r = self.client.get('/', {'q': '*:*', 'stat_Errata': 'on'})
+        r = self.client.get('/', {'q': '*', 'stat_Errata': 'on'})
         self.assertNotIn('Honda', r.content)
         self.assertIn("Debbas", r.content)
 
     def test_a_docket_number_query(self):
         """Can we query by docket number?"""
-        r = self.client.get('/', {'q': '*:*', 'docket_number': '2'})
+        r = self.client.get('/', {'q': '*', 'docket_number': '2'})
         self.assertIn(
             'Honda',
             r.content,
@@ -199,7 +199,7 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_a_west_citation_query(self):
         """Can we query by citation number?"""
-        get_dicts = [{'q': '*:*', 'citation': '33'},
+        get_dicts = [{'q': '*', 'citation': '33'},
                      {'q': 'citation:33'}]
         for get_dict in get_dicts:
             r = self.client.get('/', get_dict)
@@ -207,18 +207,18 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_a_neutral_citation_query(self):
         """Can we query by neutral citation numbers?"""
-        r = self.client.get('/', {'q': '*:*', 'neutral_cite': '22'})
+        r = self.client.get('/', {'q': '*', 'neutral_cite': '22'})
         self.assertIn('Honda', r.content)
 
     def test_a_query_with_a_old_date(self):
         """Do we have any recurrent issues with old dates and strftime (issue
         220)?"""
-        r = self.client.get('/', {'q': '*:*', 'filed_after': '1890'})
+        r = self.client.get('/', {'q': '*', 'filed_after': '1890'})
         self.assertEqual(200, r.status_code)
 
     def test_a_judge_query(self):
         """Can we query by judge name?"""
-        r = self.client.get('/', {'q': '*:*', 'judge': 'david'})
+        r = self.client.get('/', {'q': '*', 'judge': 'david'})
         self.assertIn('Honda', r.content)
         r = self.client.get('/', {'q': 'judge:david'})
         self.assertIn('Honda', r.content)
@@ -230,13 +230,13 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_citation_filtering(self):
         """Can we find Documents by citation filtering?"""
-        r = self.client.get('/', {'q': '*:*', 'cited_lt': 7, 'cited_gt': 5})
+        r = self.client.get('/', {'q': '*', 'cited_lt': 7, 'cited_gt': 5})
         self.assertIn(
             'Honda',
             r.content,
             msg=u'Did not get case back when filtering by citation count.'
         )
-        r = self.client.get('/', {'q': '*:*', 'cited_lt': 100, 'cited_gt': 80})
+        r = self.client.get('/', {'q': '*', 'cited_lt': 100, 'cited_gt': 80})
         self.assertIn(
             "had no results",
             r.content,
@@ -245,7 +245,7 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_citation_ordering(self):
         """Can the results be re-ordered by citation count?"""
-        r = self.client.get('/', {'q': '*:*', 'order_by': 'citeCount desc'})
+        r = self.client.get('/', {'q': '*', 'order_by': 'citeCount desc'})
         most_cited_name = 'case name cluster 3'
         less_cited_name = 'Howard v. Honda'
         self.assertTrue(
@@ -253,7 +253,7 @@ class SearchTest(IndexedSolrTestCase):
             msg="'%s' should come BEFORE '%s' when ordered by descending "
                 "citeCount." % (most_cited_name, less_cited_name))
 
-        r = self.client.get('/', {'q': '*:*', 'order_by': 'citeCount asc'})
+        r = self.client.get('/', {'q': '*', 'order_by': 'citeCount asc'})
         self.assertTrue(
             r.content.index(most_cited_name) > r.content.index(less_cited_name),
             msg="'%s' should come AFTER '%s' when ordered by ascending "
