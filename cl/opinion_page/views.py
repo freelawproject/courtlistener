@@ -187,7 +187,7 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
             )
     else:
         if all(_ is None for _ in (reporter, volume, page)):
-            # Show the most basic page
+            # No parameters. Show the standard page.
             form = CitationRedirectorForm()
             return render_to_response(
                 'citation_redirect_info_page.html',
@@ -200,7 +200,8 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
             )
 
         else:
-            # Look up the citation, redirect the user or show disambiguation.
+            # We have a citation. Look it up, redirect the user or show
+            # disambiguation.
             citation_str = " ".join([volume, reporter, page])
             try:
                 citation = get_citations(citation_str)[0]
