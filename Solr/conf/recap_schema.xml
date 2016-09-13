@@ -103,25 +103,89 @@
              stored="true"
              required="true"
              multiValued="false"/>
+      <field name="docket_entry_id"
+             type="int"
+             indexed="true"
+             stored="true"
+             required="true"
+             multiValued="false"/>
+      <field name="docket_id"
+             type="int"
+             indexed="true"
+             stored="true"
+             required="true"
+             multiValued="false"/>
       <field name="court_id"
              type="string"
              indexed="true"
              stored="true"
              required="true"
              multiValued="false"/>
+      <field name="assigned_to_id"
+             type="int"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
+      <field name="referred_to_id"
+             type="int"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
+
+      <!-- RECAPDocument -->
+      <field name="document_type"
+             type="string"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
+      <field name="document_number"
+             type="long"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
+      <field name="attachment_number"
+             type="int"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
+      <field name="is_available"
+             type="boolean"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
+      <field name="page_count"
+             type="int"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
+      <field name="filepath_local"
+             type="string"
+             indexed="false"
+             stored="true"
+             multiValued="false"/>
+
+      <!--Docket Entry-->
+      <field name="description"
+             type="text_en_splitting_cl"
+             indexed="true"
+             stored="true"
+             multiValued="false"
+             termOffsets="true"
+             termPositions="true"
+             termVectors="true"/>
+      <field name="entry_number"
+             type="long"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
+      <field name="entry_date_filed"
+             type="date"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
 
       <!-- Docket -->
       <field name="dateArgued"
-             type="date"
-             indexed="true"
-             stored="true"
-             multiValued="false"/>
-      <field name="dateReargued"
-             type="date"
-             indexed="true"
-             stored="true"
-             multiValued="false"/>
-      <field name="dateReargumentDenied"
              type="date"
              indexed="true"
              stored="true"
@@ -132,12 +196,19 @@
              stored="true"
              multiValued="false"
              docValues="true"/>
+      <field name="dateTerminated"
+             type="date"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
       <field name="docketNumber"
-             type="string"
+             type="text_en_splitting_cl"
              indexed="true"
              stored="true"
              multiValued="false"
-             termVectors="true"/>
+             termVectors="true"
+             termPositions="true"
+             termOffsets="true"/>
       <field name="caseName"
              type="text_en_splitting_cl"
              indexed="true"
@@ -146,13 +217,8 @@
              termVectors="true"
              termPositions="true"
              termOffsets="true"/>
-      <field name="pacerCaseId"
-             type="int"
-             indexed="true"
-             stored="true"
-             multiValued="false"/>
       <field name="natureOfSuit"
-             type="string"
+             type="text_en_splitting_cl"
              indexed="true"
              stored="true"
              multiValued="false"/>
@@ -171,7 +237,11 @@
              indexed="true"
              stored="true"
              multiValued="false"/>
-
+      <field name="absolute_url"
+             type="string"
+             indexed="false"
+             stored="true"
+             multiValued="false"/>
 
       <!--Judge-->
       <field name="assignedTo"
@@ -179,25 +249,29 @@
              indexed="true"
              stored="true"
              multiValued="false"/>
+      <field name="referredTo"
+             type="text_en_splitting_cl"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
 
       <!--Court-->
       <field name="court"
+             type="text_en_splitting_cl"
+             indexed="true"
+             stored="true"
+             multiValued="false"/>
+
+      <!--Faceting-->
+      <field name="court_exact"
              type="string"
              indexed="true"
              stored="true"
              multiValued="false"/>
 
-      <field name="courtJurisdiction"
-             type="string"
-             indexed="true"
-             stored="true"
-             multiValued="false"/>
-
-      <!--special fields-->
-      <field name="_version_" type="long" indexed="true" stored="true"/>
-
-      <!--DocketEntries with all other searchable tags-->
-      <field name="text" type="text_en_splitting_cl"
+      <!--TEXT-->
+      <field name="text"
+             type="text_en_splitting_cl"
              indexed="true"
              stored="true"
              multiValued="false"
@@ -205,6 +279,8 @@
              termPositions="true"
              termOffsets="true"/>
 
+      <!--special fields-->
+      <field name="_version_" type="long" indexed="true" stored="true"/>
 
 
     <!-- mlr
