@@ -1,13 +1,12 @@
 from __future__ import absolute_import
 
-import datetime
 import math
 import operator
 import uuid
 import warnings
 
-from lxml.builder import E
 import lxml.etree
+from lxml.builder import E
 
 from .dates import datetime_from_w3_datestring
 from .strings import RawString, SolrString, WildcardString
@@ -423,17 +422,17 @@ class SolrSchema(object):
             raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
 
         field_type_classes = {}
-        for field_type_node in schemadoc.xpath("/schema/types/fieldType|/schema/types/fieldtype"):
+        for field_type_node in schemadoc.xpath("/schema/fieldType|/schema/fieldtype"):
             name, field_type_class = self.field_type_factory(field_type_node)
             field_type_classes[name] = field_type_class
 
         field_classes = {}
-        for field_node in schemadoc.xpath("/schema/fields/field"):
+        for field_node in schemadoc.xpath("/schema/field"):
             name, field_class = self.field_factory(field_node, field_type_classes, dynamic=False)
             field_classes[name] = field_class
 
         dynamic_field_classes = []
-        for field_node in schemadoc.xpath("/schema/fields/dynamicField"):
+        for field_node in schemadoc.xpath("/schema/dynamicField"):
             _, field_class = self.field_factory(field_node, field_type_classes, dynamic=True)
             dynamic_field_classes.append(field_class)
 
