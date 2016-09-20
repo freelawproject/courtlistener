@@ -1,27 +1,50 @@
-{# Getting the Docket Entries one by one with filed date #}
+{# DocketEntry #}
+{% with entry=item.docket_entry %}
+    {{ entry.description }}
+    {{ entry.date_filed|date:"j F Y" }}
+{% endwith %}
 
-{{ item.court.pk }}  {{ item.court.full_name }}
-{# Court Jurisdiction #}
-{{ item.court.jurisdiction }}
 
-{{ item.docket_number }}
-{{ item.case_name }}
-{{ item.pacer_case_id }}
+{# RECAPDocument #}
+{{ item.get_document_type_display }}
+{{ item.plain_text }}
 
-{% if item.nature_of_suit %}
-    {{ item.nature_of_suit }}
-{% endif %}
-{% if item.cause %}
-    {{ item.cause }}
-{% endif %}
-{% if item.jurisdiction_type %}
-    {{ item.jurisdiction_type }}
-{% endif %}
-{% if item.assigned_to %}
-    {{ item.assigned_to }}
-{% endif %}
 
-{% for docket_entry in docket_entries_seq %}
-    {{ docket_entry.date_filed|date:"Y-m-d" }}  {{ docket_entry.entry_number }}
-    {{ docket_entry.description }}
-{% endfor %}
+{# Docket #}
+{% with docket=item.docket_entry.docket %}
+    {% if docket.case_name_full %}
+        {{ docket.case_name_full }}
+    {% elif docket.case_name %}
+        {{ docket.case_name }}
+    {% else %}
+        {{ docket.case_name_short }}
+    {% endif %}
+    {{ docket.date_argued|date:"j F Y" }}
+    {{ docket.date_filed|date:"j F Y" }}
+    {{ docket.date_terminated|date:"j F Y" }}
+    {{ docket.docket_number }}
+    {{ docket.nature_of_suit }}
+    {{ docket.case }}
+    {{ docket.jury_demand }}
+{% endwith %}
+
+
+{# Court #}
+{% with court=item.docket_entry.docket.court %}
+    {{ court.full_name }}
+    {{ court.citation_string }}
+    {{ court.pk }}
+{% endwith %}
+
+
+{# Judges #}
+{% with assignee=item.docket_entry.docket.assigned_to %}
+    {% if assignee %}
+        {{ assignee.name_full }}
+    {% endif %}
+{% endwith %}
+{% with referee=item.docket_entry.docket.referee %}
+    {% if referr %}
+        {{ referee.name_full }}
+    {% endif %}
+{% endwith %}
