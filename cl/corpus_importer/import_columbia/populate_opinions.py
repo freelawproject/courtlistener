@@ -15,7 +15,6 @@ from cl.lib.solr_core_admin import get_term_frequency
 from cl.search.models import Docket, Opinion, OpinionCluster
 from convert_columbia_html import convert_columbia_html
 
-
 # only make a solr connection onece
 SOLR_CONN = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
 
@@ -164,7 +163,7 @@ def make_and_save(item, skipdupes=False, min_dates=None, start_dates=None, testi
                 print(main_date, 'before court founding:', start_dates[item['court_id']],
                       ' -- skipping.')
                 return
-        
+
     docket = Docket(
         source=Docket.COLUMBIA,
         date_argued=date_argued,

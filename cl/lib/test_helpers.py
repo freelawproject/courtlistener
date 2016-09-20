@@ -1,13 +1,14 @@
 import os
-from cl.lib import sunburnt
-from cl.lib.solr_core_admin import create_solr_core, delete_solr_core, \
-    create_default_cores
-from cl.search.models import Court
+
 from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase
 from django.test.utils import override_settings
 from lxml import etree
+
+from cl.lib import sunburnt
+from cl.lib.solr_core_admin import create_solr_core, delete_solr_core
+from cl.search.models import Court
 
 
 @override_settings(
