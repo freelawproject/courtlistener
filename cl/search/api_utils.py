@@ -26,7 +26,7 @@ def get_object_list(request=None, **kwargs):
                 type=kwargs['cd']['type'],
         )
     except KeyError:
-        sf = forms.SearchForm({'q': '*:*'})
+        sf = forms.SearchForm({'q': '*'})
         if sf.is_valid():
             main_query.update(search_utils.build_main_query(
                     sf.cleaned_data,
@@ -62,9 +62,9 @@ class SolrList(object):
                 settings.SOLR_AUDIO_URL,
                 mode='r',
             )
-        elif self.type == 'd':
+        elif self.type == 'r':
             self.conn = sunburnt.SolrInterface(
-                settings.SOLR_RECAP_DOCKET_URL,
+                settings.SOLR_RECAP_URL,
                 mode='r',
             )
         elif self.type == 'p':
