@@ -6,7 +6,7 @@ After=syslog.target network.target remote-fs.target nss-lookup.target
 Type=simple
 EnvironmentFile=/etc/courtlistener
 WorkingDirectory=/usr/local/solr/example
-ExecStart=/usr/bin/java -jar -server -Xmx${CL_SOLR_XMX} start.jar -DINSTALL_ROOT=${INSTALL_ROOT}
+ExecStart=/usr/bin/java -jar -server -Xmx${CL_SOLR_XMX} start.jar
 Restart=on-failure
 LimitNOFILE=10000
 

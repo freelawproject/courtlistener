@@ -27,7 +27,7 @@ start () {
     fi
 
     # start daemon
-    daemon --chdir='/usr/local/solr/example' --command "java -jar -server -Xmx$CL_SOLR_XMX start.jar -DINSTALL_ROOT=$INSTALL_ROOT" --respawn --output=/var/log/solr/solr.log --name=solr --verbose
+    daemon --chdir='/usr/local/solr/example' --command "java -jar -server -Xmx$CL_SOLR_XMX start.jar" --respawn --output=/var/log/solr/solr.log --name=solr --verbose
 
     RETVAL=$?
     if [ $RETVAL = 0 ]
