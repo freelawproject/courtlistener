@@ -1952,7 +1952,7 @@
 
   <!-- Legacy config for the admin interface -->
   <admin>
-    <defaultQuery>*:*</defaultQuery>
+    <defaultQuery>*</defaultQuery>
   </admin>
 
 </config>

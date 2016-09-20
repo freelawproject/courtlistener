@@ -73,6 +73,33 @@
     - collection1
     - person
 
+# Solr doesn't like to load things from outside of its instance directory. So,
+# in they go via symlinks.
+- name: tweak synonym, protwords, and stopwords files to be symlinks
+  become: yes
+  become_user: root
+  file:
+    src="{{ INSTALL_ROOT.stdout }}/Solr/conf/lang/{{ item[1] }}.txt"
+    path="/usr/local/solr-4.10.4/example/solr/{{ item[0] }}/conf/lang/{{ item[1] }}.txt"
+    state=link
+    force=yes
+  with_nested:
+    - ['audio', 'collection1', 'person']
+    - ['synonyms_en', 'stopwords_en', 'protwords_en']
+
+# The example solr config crashes unless you stub out this file. See:
+# http://stackoverflow.com/a/10896359/64911
+- name: replace the default elevate file
+  become: yes
+  become_user: root
+  template:
+    src="templates/elevate.xml"
+    dest="/usr/local/solr-4.10.4/example/solr/{{ item }}/conf/elevate.xml"
+  with_items:
+    - audio
+    - collection1
+    - person
+
 
 # Stop Solr, swap out the old, and swap in the new.
 - name: stop solr
