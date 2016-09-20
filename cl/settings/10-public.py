@@ -115,18 +115,29 @@ MESSAGE_TAGS = {
 SOLR_OPINION_URL = 'http://127.0.0.1:8983/solr/collection1'
 SOLR_AUDIO_URL = 'http://127.0.0.1:8983/solr/audio'
 SOLR_PEOPLE_URL = 'http://127.0.0.1:8983/solr/person'
-SOLR_RECAP_DOCKET_URL = 'http://127.0.0.1:8983/solr/dockets'
+SOLR_RECAP_URL = 'http://127.0.0.1:8983/solr/recap'
+SOLR_URLS = {
+    'opinions': SOLR_OPINION_URL,
+    'audio': SOLR_AUDIO_URL,
+    'person': SOLR_PEOPLE_URL,
+    'recap': SOLR_RECAP_URL,
+}
 
 SOLR_OPINION_TEST_CORE_NAME = 'opinion_test'
 SOLR_AUDIO_TEST_CORE_NAME = 'audio_test'
 SOLR_PEOPLE_TEST_CORE_NAME = 'person_test'
-SOLR_RECAP_TEST_CORE_NAME = 'dockets_test'
+SOLR_RECAP_TEST_CORE_NAME = 'recap_test'
 
 SOLR_OPINION_TEST_URL = 'http://127.0.0.1:8983/solr/opinion_test'
 SOLR_AUDIO_TEST_URL = 'http://127.0.0.1:8983/solr/audio_test'
 SOLR_PEOPLE_TEST_URL = 'http://127.0.0.1:8983/solr/person_test'
-SOLR_DOCKETS_TEST_URL = 'http://127.0.0.1:8983/solr/dockets_test'
-
+SOLR_RECAP_TEST_URL = 'http://127.0.0.1:8983/solr/recap_test'
+SOLR_TEST_URLS = {
+    'opinion': SOLR_OPINION_TEST_URL,
+    'audio': SOLR_AUDIO_TEST_URL,
+    'person': SOLR_PEOPLE_TEST_URL,
+    'recap': SOLR_RECAP_TEST_URL,
+}
 
 #########
 # Redis #
