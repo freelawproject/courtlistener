@@ -338,10 +338,6 @@
        for SolrCloud
     -->
     <field name="_version_" type="long" indexed="true" stored="true"/>
-    <field name="django_ct" type="string" indexed="true" stored="true"
-           multiValued="false"/>
-    <field name="django_id" type="string" indexed="true" stored="true"
-           multiValued="false"/>
 
     <!--TEXT!-->
     <field name="text" type="text_en_splitting_cl" indexed="true"
@@ -1227,10 +1223,10 @@
     <!-- Thai -->
     <fieldType name="text_th" class="solr.TextField" positionIncrementGap="100">
         <analyzer>
-            <tokenizer class="solr.StandardTokenizerFactory"/>
+            <tokenizer class="solr.ThaiTokenizerFactory"/>
             <filter class="solr.LowerCaseFilterFactory"/>
-            <filter class="solr.ThaiWordFilterFactory"/>
-            <filter class="solr.StopFilterFactory" ignoreCase="true" words="lang/stopwords_th.txt" enablePositionIncrements="true"/>
+            <filter class="solr.StopFilterFactory" ignoreCase="true"
+                    words="lang/stopwords_th.txt"/>
         </analyzer>
     </fieldType>
 
