@@ -1,11 +1,18 @@
-from cl.people_db.models import Person
-from cl.lib.model_helpers import make_upload_path
-from cl.lib.storage import IncrementingFileSystemStorage
-from cl.search.models import Docket, SOURCES
+from datetime import datetime
+from datetime import time
 
 from django.conf import settings
-from django.core.urlresolvers import reverse
+from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
+from django.template import loader
+
+from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.model_helpers import make_upload_path
+from cl.lib.search_index_utils import InvalidDocumentError, null_map
+from cl.lib.storage import IncrementingFileSystemStorage
+from cl.lib.utils import deepgetattr
+from cl.people_db.models import Person
+from cl.search.models import Docket, SOURCES
 
 
 class Audio(models.Model):
@@ -145,3 +152,63 @@ class Audio(models.Model):
         super(Audio, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
         delete_items.delay([id_cache], settings.SOLR_AUDIO_URL)
+
+    def as_search_dict(self):
+        """Create a dict that can be ingested by Solr"""
+        # IDs
+        out = {
+            'id': self.pk,
+            'docket_id': self.docket_id,
+            'court_id': self.docket.court_id,
+        }
+
+        # Docket
+        docket = {'docketNumber': self.docket.docket_number}
+        if self.docket.date_argued is not None:
+            docket['dateArgued'] = datetime.combine(
+                self.docket.date_argued,
+                time()
+            )
+        if self.docket.date_reargued is not None:
+            docket['dateReargued'] = datetime.combine(
+                self.docket.date_reargued,
+                time()
+            )
+        if self.docket.date_reargument_denied is not None:
+            docket['dateReargumentDenied'] = datetime.combine(
+                self.docket.date_reargument_denied,
+                time()
+            )
+        out.update(docket)
+
+        # Court
+        out.update({
+            'court': self.docket.court.full_name,
+            'court_citation_string': self.docket.court.citation_string,
+            'court_exact': self.docket.court_id,  # For faceting
+        })
+
+        # Audio File
+        out.update({
+            'caseName': best_case_name(self),
+            'panel_ids': [judge.pk for judge in self.panel.all()],
+            'judge': self.judges,
+            'file_size_mp3': deepgetattr(self, 'local_path_mp3.size', None),
+            'duration': self.duration,
+            'source': self.source,
+            'download_url': self.download_url,
+            'local_path': unicode(getattr(self, 'local_path_mp3', None))
+        })
+        try:
+            out['absolute_url'] = self.get_absolute_url()
+        except NoReverseMatch:
+            raise InvalidDocumentError(
+                "Unable to save to index due to missing absolute_url: %s"
+                % self.pk
+            )
+
+        text_template = loader.get_template('indexes/audio_text.txt')
+        out['text'] = text_template.render({'item': self}).translate(null_map)
+
+        return out
+

@@ -1,21 +1,23 @@
 # coding=utf-8
 import re
+from datetime import datetime, time
 
 from django.core.exceptions import ValidationError
-from django.core.urlresolvers import reverse
+from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
+from django.template import loader
 from django.utils.encoding import smart_unicode
 from django.utils.text import slugify
 
 from cl import settings
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.model_helpers import make_upload_path, make_recap_path
+from cl.lib.search_index_utils import InvalidDocumentError, null_map
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
 
 # changes here need to be mirrored in the coverage page view and Solr configs
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
-
 JURISDICTIONS = (
     ('F',   'Federal Appellate'),
     ('FD',  'Federal District'),
@@ -450,6 +452,97 @@ class RECAPDocument(models.Model):
                                       'attachment.')
 
         super(RECAPDocument, self).save(*args, **kwargs)
+
+    def as_search_dict(self):
+        """Create a dict that can be ingested by Solr.
+
+        Search results are presented as Dockets, but they're indexed as
+        RECAPDocument's, which are then grouped back together in search results
+        to form Dockets.
+        """
+        # IDs
+        out = {
+            'id': self.pk,
+            'docket_entry_id': self.docket_entry.pk,
+            'court_id': self.docket_entry.docket.court.pk,
+            'assigned_to_id': getattr(
+                self.docket_entry.docket.assigned_to, 'pk', None),
+            'referred_to_id': getattr(
+                self.docket_entry.docket.referred_to, 'pk', None)
+        }
+
+        # RECAPDocument
+        out.update({
+            'document_type': self.get_document_type_display(),
+            'document_number': self.document_number,
+            'attachment_number': self.attachment_number,
+            'is_available': self.is_available,
+            'page_count': self.page_count,
+            'filepath_local': self.filepath_local.file,
+        })
+
+        # Docket Entry
+        out['description'] = self.docket_entry.description
+        if self.docket_entry.entry_number is not None:
+            out['entry_number'] = self.docket_entry.entry_number
+        if self.docket_entry.date_filed is not None:
+            out['entry_date_filed'] = datetime.combine(
+                self.docket_entry.date_filed,
+                time()
+            )
+
+        # Docket
+        out.update({
+            'docketNumber': self.docket_entry.docket.docket_number,
+            'caseName': best_case_name(self.docket_entry.docket),
+            'natureOfSuit': self.docket_entry.docket.nature_of_suit,
+            'cause': self.docket_entry.docket.cause,
+            'juryDemand': self.docket_entry.docket.jury_demand,
+            'jurisdictionType': self.docket_entry.docket.jurisdiction_type,
+        })
+        if self.docket_entry.docket.date_argued is not None:
+            out['dateArgued'] = datetime.combine(
+                self.docket_entry.docket.date_argued,
+                time()
+            )
+        if self.docket_entry.docket.date_filed is not None:
+            out['dateFiled'] = datetime.combine(
+                self.docket_entry.docket.date_filed,
+                time()
+            )
+        if self.docket_entry.docket.date_terminated is not None:
+            out['dateTerminated'] = datetime.combine(
+                self.docket_entry.docket.date_terminated,
+                time()
+            )
+        try:
+            out['absolute_url'] = self.docket_entry.docket.get_absolute_url()
+        except NoReverseMatch:
+            raise InvalidDocumentError(
+                "Unable to save to index due to missing absolute_url: %s"
+                % self.pk
+            )
+
+        # Judges
+        if self.docket_entry.docket.assigned_to is not None:
+            out['assignedTo'] = self.docket_entry.docket.assigned_to.name_full
+        elif self.docket_entry.docket.assigned_to_str is not None:
+            out['assignedTo'] = self.docket_entry.docket.assigned_to_str
+        if self.docket_entry.docket.referred_to is not None:
+            out['referredTo'] = self.docket_entry.docket.referred_to.name_full
+        elif self.docket_entry.docket.referred_to_str is not None:
+            out['referredTo'] = self.docket_entry.docket.referred_to_str
+
+        # Court
+        out.update({
+            'court': self.docket_entry.docket.court.full_name,
+            'court_exact': self.docket_entry.docket.court_id,  # For faceting
+        })
+
+        text_template = loader.get_template('indexes/dockets_text.txt')
+        out['text'] = text_template.render({'item': self}).translate(null_map)
+
+        return out
 
 
 class Court(models.Model):
@@ -1044,6 +1137,99 @@ class Opinion(models.Model):
 
             add_or_update_opinions.delay([self.pk], force_commit)
 
+    def as_search_dict(self):
+        """Create a dict that can be ingested by Solr."""
+        # IDs
+        out = {
+            'id': self.pk,
+            'docket_id': self.cluster.docket.pk,
+            'cluster_id': self.cluster.pk,
+            'court_id': self.cluster.docket.court.pk
+        }
+
+        # Opinion
+        out.update({
+            'cites': [opinion.pk for opinion in self.opinions_cited.all()],
+            'author_id': getattr(self.author, 'pk', None),
+            # 'per_curiam': self.per_curiam,
+            'joined_by_ids': [judge.pk for judge in self.joined_by.all()],
+            'type': self.type,
+            'download_url': self.download_url or None,
+            'local_path': unicode(self.local_path),
+        })
+
+        # Cluster
+        out.update({
+            'caseName': best_case_name(self.cluster),
+            'caseNameShort': self.cluster.case_name_short,
+            'sibling_ids': [sibling.pk for sibling in self.siblings.all()],
+            'panel_ids': [judge.pk for judge in self.cluster.panel.all()],
+            'non_participating_judge_ids': [
+                judge.pk for judge in
+                    self.cluster.non_participating_judges.all()
+            ],
+            'judge': self.cluster.judges,
+            'lexisCite': self.cluster.lexis_cite,
+            'citation': [
+                cite for cite in
+                    self.cluster.citation_list if cite],  # Nuke '' and None
+            'neutralCite': self.cluster.neutral_cite,
+            'scdb_id': self.cluster.scdb_id,
+            'source': self.cluster.source,
+            'attorney': self.cluster.attorneys,
+            'suitNature': self.cluster.nature_of_suit,
+            'citeCount': self.cluster.citation_count,
+            'status': self.cluster.get_precedential_status_display(),
+            'status_exact': self.cluster.get_precedential_status_display(),
+        })
+        if self.cluster.date_filed is not None:
+            out['dateFiled'] = datetime.combine(
+                self.cluster.date_filed,
+                time()
+            )  # Midnight, PST
+        try:
+            out['absolute_url'] = self.cluster.get_absolute_url()
+        except NoReverseMatch:
+            raise InvalidDocumentError(
+                "Unable to save to index due to missing absolute_url "
+                "(court_id: %s, item.pk: %s). Might the court have in_use set "
+                "to False?" % (self.cluster.docket.court_id, self.pk)
+            )
+
+        # Docket
+        docket = {'docketNumber': self.cluster.docket.docket_number}
+        if self.cluster.docket.date_argued is not None:
+            docket['dateArgued'] = datetime.combine(
+                self.cluster.docket.date_argued,
+                time(),
+            )
+        if self.cluster.docket.date_reargued is not None:
+            docket['dateReargued'] = datetime.combine(
+                self.cluster.docket.date_reargued,
+                time(),
+            )
+        if self.cluster.docket.date_reargument_denied is not None:
+            docket['dateReargumentDenied'] = datetime.combine(
+                self.cluster.docket.date_reargument_denied,
+                time(),
+            )
+        out.update(docket)
+
+        court = {
+            'court': self.cluster.docket.court.full_name,
+            'court_citation_string': self.cluster.docket.court.citation_string,
+            'court_exact': self.cluster.docket.court_id,  # For faceting
+        }
+        out.update(court)
+
+        # Load the document text using a template for cleanup and concatenation
+        text_template = loader.get_template('indexes/opinion_text.txt')
+        out['text'] = text_template.render({
+            'item': self,
+            'citation_string': self.cluster.citation_string
+        }).translate(null_map)
+
+        return out
 
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
