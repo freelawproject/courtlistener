@@ -7,7 +7,6 @@ from django.utils.timezone import now
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
-from cl.lib import sunburnt
 
 
 def make_get_string(request, nuke_fields=None):
@@ -510,7 +509,7 @@ def build_main_query(cd, highlight='all', order_by=''):
     return main_params
 
 
-def place_facet_queries(cd, conn=sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')):
+def place_facet_queries(cd, conn):
     """Get facet values for the status filters
 
     Using the search form, query Solr and get the values for the status filters.
