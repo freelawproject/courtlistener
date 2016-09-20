@@ -77,7 +77,7 @@ class JurisdictionFeed(Feed):
         """Do a Solr query here. Return the first 20 results"""
         conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
         params = {
-            'q': '*:*',
+            'q': '*',
             'fq': 'court_exact:%s' % obj.pk,
             'sort': 'dateFiled desc',
             'rows': '20',
@@ -143,7 +143,7 @@ class AllJurisdictionsFeed(JurisdictionFeed):
         """Do a Solr query here. Return the first 20 results"""
         conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
         params = {
-            'q': '*:*',
+            'q': '*',
             'sort': 'dateFiled desc',
             'rows': '20',
             'start': '0',
