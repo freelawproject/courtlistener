@@ -136,3 +136,11 @@
     name=celeryd
     state=started
   when: celeryd_status.stat.exists
+
+
+# Optimize a second time, with new configs and versions.
+- name: optimize all solr cores
+  django_manage:
+    app_path={{ INSTALL_ROOT.stdout }}
+    command="cl_update_index --optimize-everything"
+    virtualenv={{ VIRTUALENV_ROOT.stdout }}
