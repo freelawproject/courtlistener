@@ -10,7 +10,7 @@ from django.test.utils import override_settings
 from selenium import webdriver
 
 from cl.audio.models import Audio
-from cl.lib.solr_core_admin import create_solr_core, delete_solr_core
+from cl.lib.solr_core_admin import create_temp_solr_core, delete_solr_core
 from cl.search.models import Opinion
 from cl.search.tasks import add_or_update_opinions, add_or_update_audio_files
 
@@ -93,14 +93,14 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     @staticmethod
     def _initialize_test_solr():
         """ Try to initialize a pair of Solr cores for testing purposes """
-
-        # data_dir, if left blank, ends up bing put in /tmp/solr/...
-        create_solr_core(settings.SOLR_OPINION_TEST_CORE_NAME)
-        create_solr_core(
+        root = settings.INSTALL_ROOT
+        create_temp_solr_core(
+            settings.SOLR_OPINION_TEST_CORE_NAME,
+            os.path.join(root, 'Solr', 'conf', 'schema.xml'),
+        )
+        create_temp_solr_core(
             settings.SOLR_AUDIO_TEST_CORE_NAME,
-            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                                'audio_schema.xml'),
-            instance_dir='/usr/local/solr/example/solr/audio',
+            os.path.join(root, 'Solr', 'conf', 'audio_schema.xml'),
         )
 
     @staticmethod

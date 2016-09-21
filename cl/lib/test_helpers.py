@@ -7,7 +7,7 @@ from django.test.utils import override_settings
 from lxml import etree
 
 from cl.lib import sunburnt
-from cl.lib.solr_core_admin import create_solr_core, delete_solr_core
+from cl.lib.solr_core_admin import delete_solr_core, create_temp_solr_core
 from cl.search.models import Court
 
 
@@ -28,18 +28,18 @@ class EmptySolrTestCase(TestCase):
         self.core_name_opinion = settings.SOLR_OPINION_TEST_CORE_NAME
         self.core_name_audio = settings.SOLR_AUDIO_TEST_CORE_NAME
         self.core_name_people = settings.SOLR_PEOPLE_TEST_CORE_NAME
-        create_solr_core(self.core_name_opinion)
-        create_solr_core(
-            self.core_name_audio,
-            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                                'audio_schema.xml'),
-            instance_dir='/usr/local/solr/example/solr/audio',
+        root = settings.INSTALL_ROOT
+        create_temp_solr_core(
+            self.core_name_opinion,
+            os.path.join(root, 'Solr', 'conf', 'schema.xml'),
         )
-        create_solr_core(
+        create_temp_solr_core(
+            self.core_name_audio,
+            os.path.join(root, 'Solr', 'conf', 'audio_schema.xml'),
+        )
+        create_temp_solr_core(
             self.core_name_people,
-            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                                'person_schema.xml'),
-            instance_dir='/usr/local/solr/example/solr/person',
+            os.path.join(root, 'Solr', 'conf', 'person_schema.xml'),
         )
         self.si_opinion = sunburnt.SolrInterface(
             settings.SOLR_OPINION_URL, mode='rw')

@@ -1,76 +1,54 @@
 import StringIO
 import json
 import os
-import time
+import shutil
 
 import lxml
 import requests
 
-from cl import settings
 from cl.lib.sunburnt import SolrError
 
 
-def create_solr_core(
-        core_name,
-        data_dir='/tmp/solr/data',
-        schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                            'schema.xml'),
-        instance_dir='/usr/local/solr/example/solr/collection1',
-        config=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                            'solrconfig.xml')):
-    """ Create a new core for use in testing."""
-    if data_dir == '/tmp/solr/data':
-        # If the user doesn't specify a data directory, we give them one with
-        # a unique location. This way, it's very unlikely that anything will
-        # interfere with stuff it shouldn't.
-        data_dir += '/tmp/solr/data-%s' % time.time()
+def create_temp_solr_core(core_name, schema_path):
+        # schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+        #                     'schema.xml'),
+        # instance_dir='/usr/local/solr/example/solr/collection1',
+        # config=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+        #                     'solrconfig.xml')):
+    """ Create a new core by copying collection1 and updating it """
+    core_path = os.path.join(os.sep, 'tmp', 'solr', core_name)
+    # Copy collection1 directory to core_name directory
+    shutil.copytree(
+        os.path.join(os.sep, 'usr', 'local', 'solr', 'example', 'solr', 'collection1'),
+        core_path,
+        symlinks=True,
+    )
 
+    # Delete the properties file. It'll get created by the GET request.
+    os.unlink(os.path.join(core_path, 'core.properties'))
+
+    # Update the symlinks for the schema.xml file (the other symlinks, like
+    # those for the synonyms and protwords files will already be copied).
+    schema_destination = os.path.join(core_path, 'conf', 'schema.xml')
+    os.unlink(schema_destination)
+    os.symlink(
+        schema_path,
+        schema_destination,
+    )
+
+    # Inform Solr of the core.
     params = {
         'wt': 'json',
         'action': 'CREATE',
         'name': core_name,
-        'dataDir': data_dir,
-        'instanceDir': instance_dir,
-        'config': config,
-        'schema': schema,
-        'persist': 'true',
+        'instanceDir': core_path,
+        # This is supposedly optional, but didn't work without it:
+        'dataDir': 'data',
     }
     r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
     if r.status_code != 200:
         print "Problem creating core. Got status_code of %s. Check the Solr " \
               "logs for details." % r.status_code
-
-
-def create_default_cores():
-    """Helper utility to create the default cores."""
-    create_solr_core(
-        core_name='collection1',
-        data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data'),
-        schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                            'schema.xml'),
-        instance_dir='/usr/local/solr/example/solr/collection1',
-    )
-    create_solr_core(
-        core_name='audio',
-        data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_audio'),
-        schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                            'audio_schema.xml'),
-        instance_dir='/usr/local/solr/example/solr/audio',
-    )
-    create_solr_core(
-        core_name='person',
-        data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_person'),
-        schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                            'person_schema.xml'),
-        instance_dir='/usr/local/solr/example/solr/person',
-    )
-    create_solr_core(
-        core_name='recap',
-        data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_recap'),
-        schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                            'recap_schema.xml'),
-        instance_dir='/usr/local/solr/example/solr/recap',
-    )
 
 
 def delete_solr_core(core_name, delete_index=True, delete_data_dir=False):
