@@ -2,18 +2,19 @@ import ast
 import sys
 
 from celery.task.sets import TaskSet
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from cl.audio.models import Audio
-from cl.lib import sunburnt
 from cl.lib.argparse_types import valid_date_time, valid_obj_type
 from cl.lib.db_tools import queryset_generator
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timer import print_timing
 from cl.people_db.models import Person
-from cl.search.models import Opinion, Docket
+from cl.search.models import Opinion, RECAPDocument
 from cl.search.tasks import (delete_items, add_or_update_audio_files,
                              add_or_update_opinions, add_or_update_items,
-                             add_or_update_people)
+                             add_or_update_people, add_or_update_recap_document)
 
 
 def proceed_with_deletion(out, count, noinput):
@@ -60,15 +61,13 @@ class Command(BaseCommand):
         parser.add_argument(
             '--type',
             type=valid_obj_type,
-            required=True,
             help='Because the Solr indexes are loosely bound to the database, '
                  'commands require that the correct model is provided in this '
                  'argument. Current choices are "audio", "opinions", "people", '
-                 'and "dockets".'
+                 'and "recap".'
         )
         parser.add_argument(
             '--solr-url',
-            required=True,
             type=str,
             help='When swapping cores, it can be valuable to use a temporary '
                  'Solr URL, overriding the default value that\'s in the '
@@ -106,6 +105,12 @@ class Command(BaseCommand):
                  'any updates or deletions are completed.'
         )
         parser.add_argument(
+            '--optimize-everything',
+            action='store_true',
+            default=False,
+            help='Optimize all indexes that are registered with Solr.'
+        )
+        parser.add_argument(
             '--do-commit',
             action='store_true',
             default=False,
@@ -140,11 +145,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
-        self.solr_url = options['solr_url']
-        self.si = sunburnt.SolrInterface(self.solr_url, mode='rw')
         self.options = options
-        self.type = options['type']
         self.noinput = options['noinput']
+        if not self.options['optimize_everything']:
+            self.solr_url = options['solr_url']
+            self.si = ExtraSolrInterface(self.solr_url, mode='rw')
+            self.type = options['type']
 
         if options['update']:
             if self.verbosity >= 1:
@@ -172,10 +178,13 @@ class Command(BaseCommand):
                 self.delete(*options['items'])
 
         elif options.get('do_commit'):
-            self.commit()
+            self.si.commit()
 
         elif options.get('optimize'):
             self.optimize()
+
+        elif options.get('optimize_everything'):
+            self.optimize_everything()
 
         else:
             self.stderr.write('Error: You must specify whether you wish to '
@@ -242,8 +251,7 @@ class Command(BaseCommand):
         """
         Deletes all items from the database.
         """
-        count = self.si.raw_query(
-            **{'q': '*:*', 'caller': 'cl_update_index:delete_all', }).count()
+        count = self.si.query('*').add_extra(caller='cl_update_index').count()
 
         if proceed_with_deletion(self.stdout, count, self.noinput):
             self.stdout.write('Removing all items from your index because '
@@ -301,6 +309,8 @@ class Command(BaseCommand):
             add_or_update_audio_files.delay(items)
         elif self.type == Person:
             add_or_update_people.delay(items)
+        elif self.type == RECAPDocument:
+            add_or_update_recap_document.delay(items)
 
     @print_timing
     def add_or_update_by_datetime(self, dt):
@@ -340,8 +350,50 @@ class Command(BaseCommand):
             # Filter out non-judges -- they don't get searched.
             q = [item for item in q if item.is_judge]
             count = len(q)
-        elif self.type == Docket:
-            q = self.type.objects.filter(source=Docket.RECAP)
+        elif self.type == RECAPDocument:
+            q = self.type.objects.all().prefetch_related(
+                # IDs
+                'docket_entry__pk',
+                'docket_entry__docket__pk',
+                'docket_entry__docket__court__pk',
+                'docket_entry__docket__assigned_to__pk',
+                'docket_entry__docket__referred_to__pk',
+
+                # Docket Entry
+                'docket_entry__description',
+                'docket_entry__entry_number',
+                'docket_entry__date_filed',
+
+                # Docket
+                'docket_entry__docket__date_argued',
+                'docket_entry__docket__date_filed',
+                'docket_entry__docket__date_terminated',
+                'docket_entry__docket__docket_number',
+                'docket_entry__docket__case_name_short',
+                'docket_entry__docket__case_name',
+                'docket_entry__docket__case_name_full',
+                'docket_entry__docket__nature_of_suit',
+                'docket_entry__docket__cause',
+                'docket_entry__docket__jury_demand',
+                'docket_entry__docket__jurisdiction_type',
+                'docket_entry__docket__slug',
+
+                # Judges
+                'docket_entry__docket__assigned_to__name_first',
+                'docket_entry__docket__assigned_to__name_middle',
+                'docket_entry__docket__assigned_to__name_last',
+                'docket_entry__docket__assigned_to__name_suffix',
+                'docket_entry__docket__assigned_to_str',
+                'docket_entry__docket__referred_to__name_first',
+                'docket_entry__docket__referred_to__name_middle',
+                'docket_entry__docket__referred_to__name_last',
+                'docket_entry__docket__referred_to__name_suffix',
+                'docket_entry__docket__referred_to_str',
+
+                # Court
+                'docket_entry__docket__court__full_name',
+                'docket_entry__docket__court__citation_string',
+            )
             count = q.count()
             q = queryset_generator(
                 q,
@@ -366,7 +418,17 @@ class Command(BaseCommand):
         self.si.optimize()
         self.stdout.write('done.\n')
 
-    def commit(self):
-        """Runs a simple commit command.
-        """
-        self.si.commit()
+    @print_timing
+    def optimize_everything(self):
+        """Run the optimize command on all indexes."""
+        urls = settings.SOLR_URLS.values()
+        self.stdout.write("Found %s indexes. Optimizing...\n" % len(urls))
+        for url in urls:
+            self.stdout.write(" - {url}\n".format(url=url))
+            try:
+                si = ExtraSolrInterface(url)
+            except EnvironmentError:
+                self.stderr.write("   Couldn't load schema!")
+                continue
+            si.optimize()
+        self.stdout.write('Done.\n')
