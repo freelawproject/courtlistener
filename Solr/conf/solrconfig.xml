@@ -1671,6 +1671,12 @@
     </arr>
   </requestHandler>
 
+
+  <!-- Cache Reloading. This is used by PageRank file field. -->
+  <requestHandler name="/reloadCache"
+                  class="org.apache.solr.search.function.FileFloatSource$ReloadCacheRequestHandler"/>
+
+
   <!-- Highlighting Component
 
        http://wiki.apache.org/solr/HighlightingParameters

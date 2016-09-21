@@ -161,5 +161,5 @@ def reload_pagerank_external_file_cache():
     """
     r = requests.get('http://localhost:8983/solr/reloadCache')
     if r.status_code != 200:
-        print "Problem reloading cache. Got status_code of %s. Check the Solr " \
-              "logs for details." % r.status_code
+        raise Exception("Problem reloading pagerank cache. Got status_code of "
+                        "%s. Check the Solr logs for details." % r.status_code)
