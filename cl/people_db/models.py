@@ -320,24 +320,24 @@ class Person(models.Model):
                     positions, 'date_granularity_termination',
                 ),
                 'judicial_committee_action': [
-                    p.get_judicial_committee_action_display() for p in positions if
-                    p.judicial_committee_action
+                    p.get_judicial_committee_action_display() for p in
+                    positions if p.judicial_committee_action
                 ],
                 'nomination_process': [
-                    p.get_nomination_process_display() for p in positions if
-                    p.nomination_process
+                    p.get_nomination_process_display() for p in
+                    positions if p.nomination_process
                 ],
                 'selection_method': [
-                    p.get_how_selected_display() for p in positions if
-                    p.how_selected
+                    p.get_how_selected_display() for p in
+                    positions if p.how_selected
                 ],
                 'selection_method_id': [
-                    p.how_selected for p in positions if
-                    p.how_selected
+                    p.how_selected for p in
+                    positions if p.how_selected
                 ],
                 'termination_reason': [
-                    p.get_termination_reason_display() for p in positions if
-                    p.termination_reason
+                    p.get_termination_reason_display() for p in
+                    positions if p.termination_reason
                 ],
             }
             out.update(p_out)
@@ -346,6 +346,7 @@ class Person(models.Model):
         out['text'] = text_template.render({'item': self}).translate(null_map)
 
         return out
+
 
 class School(models.Model):
     is_alias_of = models.ForeignKey(
