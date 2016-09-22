@@ -8,6 +8,54 @@ from django.utils.timezone import now
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
 
+boosts = {
+    'qf': {
+        'o': {
+            'text': 1,
+            'caseName': 4,
+            'docketNumber': 2,
+        },
+        'oa': {
+            'text': 1,
+            'caseName': 4,
+            'docketNumber': 2,
+        },
+        'r': {
+            'text': 1,
+            'caseName': 4,
+            'docketNumber': 3,
+            'description': 2,
+        },
+        'p': {
+            'text': 1,
+            'name': 4,
+            # Suppress these fields b/c a match on them returns the wrong
+            # person.
+            'appointer': 0.3,
+            'supervisor': 0.3,
+            'predecessor': 0.3,
+        },
+    },
+    # Phrase-based boosts.
+    'pf': {
+        'o': {
+            'text': 3,
+            'caseName': 3,
+        },
+        'oa': {
+            'caseName': 3,
+        },
+        'r': {
+            'text': 3,
+            'caseName': 3,
+            'description': 3,
+        },
+        'p': {
+            # None here. Phrases don't make much sense for people.
+        },
+    },
+}
+
 
 def make_get_string(request, nuke_fields=None):
     """Makes a get string from the request object. If necessary, it removes
@@ -303,21 +351,10 @@ def get_selected_field_string(cd, prefix):
     selected_field_string = ' OR '.join(selected_fields)
     return selected_field_string
 
-qf = {
-    'text': 1.0,
-    'dateFiled': 1.0,
-    'court': 1.0,
-    'caseName': 3,
-    'docketNumber': 1.0,
-    'neutralCite': 1.0,
-    'lexisCite': 1.0,
-    'status': 1.25,
-}
 
-
-def make_qf_string(qf):
+def make_boost_string(fields):
     qf_array = []
-    for k, v in qf.items():
+    for k, v in fields.items():
         qf_array.append('%s^%s' % (k, v))
     return ' '.join(qf_array)
 
@@ -327,7 +364,11 @@ def add_boosts(main_params, cd):
     if cd['type'] == 'o' and main_params['sort'].startswith('score'):
         main_params['boost'] = 'pagerank'
 
-    if cd['type'] in ['oa', 'o', 'd']:
+    # Apply standard qf parameters
+    qf = boosts['qf'][cd['type']].copy()
+    main_params['qf'] = make_boost_string(qf)
+
+    if cd['type'] in ['oa', 'o', 'r']:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         vs_query = any([' v ' in main_params['q'],
@@ -338,7 +379,12 @@ def add_boosts(main_params, cd):
         ex_parte_query = main_params['q'].lower().startswith('ex parte ')
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
             qf.update({'caseName': 50})
-            main_params['qf'] = make_qf_string(qf)
+            main_params['qf'] = make_boost_string(qf)
+
+    # Apply phrase-based boosts
+    if cd['type'] in ['o', 'oa', 'r']:
+        main_params['pf'] = make_boost_string(boosts['pf'][cd['type']])
+        main_params['ps'] = 5
 
     return main_params
 
@@ -387,7 +433,7 @@ def add_highlighting(main_params, cd, highlight):
               'aba_rating', 'school', 'appointer', 'supervisor', 'predecessor',
               'selection_method', 'court']
         hlfl = ['name', 'dob_city', 'dob_state', 'name_reverse']
-    elif cd['type'] == 'd':
+    elif cd['type'] == 'r':
         fl = ['id', 'court_id', 'dateFiled', 'docketNumber','caseName'
               'natureOfSuit', 'court', 'courtJurisdiction', 'assignedTo']
         hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
@@ -439,7 +485,7 @@ def add_fq(main_params, cd):
         main_fq.append(make_date_query('dateArgued', cd['argued_before'],
                                        cd['argued_after']))
 
-    elif cd['type'] == 'd':
+    elif cd['type'] == 'r':
         if cd['case_name']:
             main_fq.append(make_fq(cd, 'caseName', 'case_name'))
         if cd['judge']:
