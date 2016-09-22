@@ -102,6 +102,7 @@ def match_citation(citation, citing_doc=None):
     # TODO: Create shared solr connection for all queries
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     main_params = {
+        'q': '*',
         'fq': [
             'status:Precedential',  # Non-precedential documents aren't cited
         ],
