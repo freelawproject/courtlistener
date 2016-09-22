@@ -1,5 +1,6 @@
 import time
 
+from django.core.urlresolvers import reverse
 from django.test import Client, TestCase
 from selenium import webdriver
 
@@ -30,7 +31,7 @@ class FavoriteTest(TestCase):
         self.client.login(username='pandora', password='password')
         for params in [self.fave_cluster_params, self.fave_audio_params]:
             r = self.client.post(
-                '/favorite/create-or-update/',
+                reverse('save_or_update_favorite'),
                 params,
                 follow=True,
                 HTTP_X_REQUESTED_WITH='XMLHttpRequest',
@@ -41,7 +42,7 @@ class FavoriteTest(TestCase):
         # And can we delete them?
         for params in [self.fave_cluster_params, self.fave_audio_params]:
             r = self.client.post(
-                '/favorite/delete/',
+                reverse('delete_favorite'),
                 params,
                 follow=True,
                 HTTP_X_REQUESTED_WITH='XMLHttpRequest',
