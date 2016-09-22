@@ -223,7 +223,7 @@ class CourtMatchingTest(TestCase):
                     "Appellate Session of the Superior Court",
                     'connecticut/appellate_court_opinions/documents/0412a06c60a7c2a2.xml',
                 ),
-                'answer': 'connappct'
+                'answer': 'connsuperct'
             },
             {
                 'args': (
@@ -251,7 +251,7 @@ class CourtMatchingTest(TestCase):
                     'Appellate Session of the Superior Court',
                     'connecticut/appellate_court_opinions/documents/00ea30ce0e26a5fd.xml'
                 ),
-                'answer': 'connappct',
+                'answer': 'connsuperct',
             },
             {
                 'args': (
@@ -279,7 +279,7 @@ class CourtMatchingTest(TestCase):
                     'Appellate Division Of The Circuit Court',
                     'connecticut/superior_court_opinions/documents/03dd9ec415bf5bf4.xml',
                 ),
-                'answer': 'connappct',
+                'answer': 'connsuperct',
             },
             {
                 'args': (
