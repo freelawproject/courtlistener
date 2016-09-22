@@ -47,22 +47,24 @@ def create_temp_solr_core(core_name, schema_path):
     }
     r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
     if r.status_code != 200:
-        print "Problem creating core. Got status_code of %s. Check the Solr " \
+        raise "Problem creating core. Got status_code of %s. Check the Solr " \
               "logs for details." % r.status_code
 
 
-def delete_solr_core(core_name, delete_index=True, delete_data_dir=False):
+def delete_solr_core(core_name, delete_index=True, delete_data=True,
+                     delete_instance=True):
     """ Delete a solr core by name."""
     params = {
         'wt': 'json',
         'action': 'UNLOAD',
         'core': core_name,
         'deleteIndex': str(delete_index).lower(),
-        'deleteDataDir': str(delete_data_dir).lower(),
+        'deleteDataDir': str(delete_data).lower(),
+        'deleteInstanceDir': str(delete_instance).lower(),
     }
     r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
     if r.status_code != 200:
-        print "Problem deleting core. Got status_code of %s. Check the Solr " \
+        raise "Problem deleting core. Got status_code of %s. Check the Solr " \
               "logs for details." % r.status_code
 
 

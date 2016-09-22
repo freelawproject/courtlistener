@@ -116,7 +116,5 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     @staticmethod
     def _teardown_test_solr():
         """ Try to clean up and remove the test Solr cores """
-        delete_solr_core(settings.SOLR_OPINION_TEST_CORE_NAME,
-                         delete_data_dir=True)
-        delete_solr_core(settings.SOLR_AUDIO_TEST_CORE_NAME,
-                         delete_data_dir=True)
+        delete_solr_core(settings.SOLR_OPINION_TEST_CORE_NAME)
+        delete_solr_core(settings.SOLR_AUDIO_TEST_CORE_NAME)

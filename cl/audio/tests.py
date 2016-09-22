@@ -62,7 +62,7 @@ class AudioSitemapTest(SitemapTest):
         # We expect 2X the number of items in the fixture b/c there are nodes
         # for the mp3 file and for the page on CourtListener.
         self.expected_item_count = 6
-        self.sitemap_url = '/sitemap-oral-arguments.xml'
+        self.sitemap_url = reverse('oral_argument_sitemap')
 
     def test_does_the_sitemap_have_content(self):
         super(AudioSitemapTest, self).does_the_sitemap_have_content()

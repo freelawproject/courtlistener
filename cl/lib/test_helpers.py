@@ -76,12 +76,12 @@ class IndexedSolrTestCase(SolrTestCase):
 
     def setUp(self):
         super(IndexedSolrTestCase, self).setUp()
-
-        for obj_type, core_name in {
+        cores = {
             'audio': self.core_name_audio,
             'opinions': self.core_name_opinion,
             'people': self.core_name_people,
-        }.items():
+        }
+        for obj_type, core_name in cores.items():
             args = [
                 '--type', obj_type,
                 '--solr-url', 'http://127.0.0.1:8983/solr/%s' % core_name,
