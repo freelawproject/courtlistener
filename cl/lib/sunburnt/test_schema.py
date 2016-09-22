@@ -78,16 +78,13 @@ def test_solr_date_from_strings():
 good_schema = \
 """
 <schema name="timetric" version="1.1">
-  <types>
     <fieldType name="sint" class="solr.SortableIntField" sortMissingLast="true" omitNorms="true"/>
     <fieldType name="string" class="solr.StrField" sortMissingLast="true" omitNorms="true"/>
     <fieldType name="boolean" class="solr.BoolField" sortMissingLast="true" omitNorms="true"/>
-  </types>
-  <fields>
+
     <field name="int_field" required="true" type="sint"/>
     <field name="text_field" required="true" type="string" multiValued="true"/>
     <field name="boolean_field" required="false" type="boolean"/>
-  </fields>
   <defaultSearchField>text_field</defaultSearchField>
   <uniqueKey>int_field</uniqueKey>
  </schema>

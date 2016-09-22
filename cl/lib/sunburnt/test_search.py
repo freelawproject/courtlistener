@@ -28,7 +28,6 @@ debug = False
 
 schema_string = \
 """<schema name="timetric" version="1.1">
-  <types>
     <fieldType name="string" class="solr.StrField" sortMissingLast="true" omitNorms="true"/>
     <fieldType name="text" class="solr.TextField" sortMissingLast="true" omitNorms="true"/>
     <fieldType name="boolean" class="solr.BoolField" sortMissingLast="true" omitNorms="true"/>
@@ -41,8 +40,7 @@ schema_string = \
     <fieldType name="double" class="solr.DoubleField" sortMissingLast="true" omitNorms="true"/>
     <fieldType name="sdouble" class="solr.SortableDoubleField" sortMissingLast="true" omitNorms="true"/>
     <fieldType name="date" class="solr.DateField" sortMissingLast="true" omitNorms="true"/>
-  </types>
-  <fields>
+
     <field name="string_field" required="true" type="string" multiValued="true"/>
     <field name="text_field" required="true" type="text"/>
     <field name="boolean_field" required="false" type="boolean"/>
@@ -57,7 +55,7 @@ schema_string = \
     <field name="double_field" type="double"/>
     <field name="sdouble_field" type="sdouble"/>
     <field name="date_field" type="date"/>
-  </fields>
+
   <defaultSearchField>text_field</defaultSearchField>
   <uniqueKey>int_field</uniqueKey>
 </schema>"""
