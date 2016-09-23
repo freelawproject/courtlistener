@@ -7,7 +7,7 @@
   - include: set_vars.yml
   - name: git pull
     git:
-      repo=https://github.com:freelawproject/courtlistener.git
+      repo=https://github.com/freelawproject/courtlistener.git
       dest={{ INSTALL_ROOT.stdout }}
       clone=no
   - name: update python dependencies
