@@ -19,7 +19,7 @@ from cl.lib.model_helpers import (
     validate_at_most_n,
     validate_supervisor,
 )
-from cl.lib.search_index_utils import solr_list, null_map
+from cl.lib.search_index_utils import solr_list, null_map, nuke_nones
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -345,7 +345,7 @@ class Person(models.Model):
         text_template = loader.get_template('indexes/person_text.txt')
         out['text'] = text_template.render({'item': self}).translate(null_map)
 
-        return out
+        return nuke_nones(out)
 
 
 class School(models.Model):

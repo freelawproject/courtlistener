@@ -12,7 +12,7 @@ from django.utils.text import slugify
 from cl import settings
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.model_helpers import make_upload_path, make_recap_path
-from cl.lib.search_index_utils import InvalidDocumentError, null_map
+from cl.lib.search_index_utils import InvalidDocumentError, null_map, nuke_nones
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
 
@@ -542,7 +542,7 @@ class RECAPDocument(models.Model):
         text_template = loader.get_template('indexes/dockets_text.txt')
         out['text'] = text_template.render({'item': self}).translate(null_map)
 
-        return out
+        return nuke_nones(out)
 
 
 class Court(models.Model):
@@ -1229,7 +1229,7 @@ class Opinion(models.Model):
             'citation_string': self.cluster.citation_string
         }).translate(null_map)
 
-        return out
+        return nuke_nones(out)
 
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
