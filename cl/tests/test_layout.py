@@ -4,6 +4,7 @@ Tests for visual aspects of CourtListener's responsive design
 """
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from timeout_decorator import timeout_decorator
 
 from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW, MOBILE_WINDOW
 
@@ -15,6 +16,7 @@ class LayoutTest(BaseSeleniumTest):
                 'judge_judy.json', 'test_objects_search.json',
                 'functest_opinions.json', 'test_objects_audio.json']
 
+    @timeout_decorator.timeout(45)
     def test_general_homepage_layout(self):
         """
         Tests the general layout of things like the ordering of the Search,
@@ -86,6 +88,7 @@ class DesktopLayoutTest(BaseSeleniumTest):
         super(DesktopLayoutTest, self).setUp()
         self.browser.set_window_size(DESKTOP_WINDOW[0], DESKTOP_WINDOW[1])
 
+    @timeout_decorator.timeout(45)
     def test_desktop_home_page_aesthetics(self):
         self.browser.get(self.server_url)
 
@@ -125,6 +128,7 @@ class MobileLayoutTest(BaseSeleniumTest):
         super(MobileLayoutTest, self).setUp()
         self.browser.set_window_size(MOBILE_WINDOW[0], MOBILE_WINDOW[1])
 
+    @timeout_decorator.timeout(45)
     def test_mobile_home_page_aesthetics(self):
         self.browser.get(self.server_url)
 
@@ -142,7 +146,7 @@ class MobileLayoutTest(BaseSeleniumTest):
         self.assertAlmostEqual(
             navbtn.location['x'] + navbtn.size['width'] + 30,
             MOBILE_WINDOW[0],
-            delta=10
+            delta=15
         )
 
         # clicking the button displays and then hides the menu

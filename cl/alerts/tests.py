@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from django.test import Client, TestCase
+from timeout_decorator import timeout_decorator
 
 from cl.alerts.models import Alert
 from cl.tests.base import BaseSeleniumTest
@@ -52,6 +53,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
         }
         super(AlertSeleniumTest, self).setUp()
 
+    @timeout_decorator.timeout(45)
     def test_edit_alert(self):
         """Can we edit the alert and see the message about it being edited?"""
         user = User.objects.get(username='pandora')
