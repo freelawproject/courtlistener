@@ -56,13 +56,15 @@ The first thing you should do is:
     
 This says to run the tasks in the playbook called `upgrade.yml` on the hosts described in `ansible/hosts` (which is localhost). Get the sudo password, since it may be needed to start/stop services. Pretty simple. 
 
-If you're using Vagrant, you also need to be sure to run any new playbooks that were pulled from git in the command above. These will appear in the `ansible` directory for the version of Free Law Machine that you have installed, and represent all the changes that have been made to it since it was created. So, for example, the first time you start up your Vagrant machine, you should do (assuming version 1.6.0):
+If you're using Vagrant, you also need to be sure to run any new playbooks that were pulled from git in the command above. These will appear in the `ansible` directory for the version of Free Law Machine that you have installed, and represent all the changes that have been made to it since it was created. So, for example, the first time you start up your Vagrant machine, you should run all of the playbooks in the 1.6.0 directory (assuming that's the version you're running):
 
-    ansible-playbook ansible/1.6.0/upgrade.yml -i ansible/hosts --ask-become-pass
-    
-That will run any additional ansible playbooks that are in that directory. And any time you see a new playbook come in you should run that file too in the same way, substituting its name instead of `upgrade.yml`.
+    ansible-playbook ansible/1.6.0/0001_update_solr.yml -i ansible/hosts --ask-become-pass
+    ansible-playbook ansible/1.6.0/0002_create_recap_core.yml -i ansible/hosts --ask-become-pass
+    # etc.
 
-If you installed from the Wiki, the instructions are the same. You'll need to regularly run the standard `upgrade.yml` script and if any new playbooks land when you pull code, you'll need to run those too.
+Any time you see a new playbook come in when you pull code, you should run it in the same way.
+
+If you installed from the Wiki, you should watch for upgrades coming into these folders as well, and should apply them as you see them arrive.
 
 
 ## Upgrading Production

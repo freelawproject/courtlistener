@@ -1,6 +1,0 @@
----
-
-- hosts: solr
-  tasks:
-#    - include: update_solr.yml
-    - include: create_recap_core.yml

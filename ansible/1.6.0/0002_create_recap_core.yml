@@ -1,0 +1,32 @@
+---
+
+# Create new solr core for RECAP.
+- hosts: solr
+- tasks:
+  - include: ../set_vars.yml
+  - name: copy collection1 directory to recap
+    become: yes
+    become_user: root
+    synchronize:
+      src="/usr/local/solr/example/solr/collection1/"
+      dest="/usr/local/solr/example/solr/recap/"
+      recursive=yes
+    delegate_to: "{{ inventory_hostname }}"
+  - name: set up properties file
+    become: yes
+    become_user: root
+    template:
+      src="templates/recap.properties.j2"
+      dest="/usr/local/solr/example/solr/recap/core.properties"
+  - name: update symlinks
+    become: yes
+    become_user: root
+    file:
+      src="{{ INSTALL_ROOT.stdout }}/Solr/conf/recap_schema.xml"
+      dest="/usr/local/solr/example/solr/recap/conf/schema.xml"
+      state=link
+      force=yes
+  - name: restart solr
+    service:
+      name=solr
+      state=restarted

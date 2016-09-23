@@ -5,54 +5,45 @@
 - hosts: all
   tasks:
   - include: set_vars.yml
-
   - name: git pull
     git:
       repo=git@github.com:freelawproject/courtlistener.git
       dest={{ INSTALL_ROOT.stdout }}
       clone=no
-    tags:
-     - prod
-     - dev
-
-  - name: collectstatic
-    django_manage:
-      app_path={{ INSTALL_ROOT.stdout }}
-      command=collectstatic
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
-    tags:
-     - prod
-
   - name: update python dependencies
     pip:
       virtualenv={{ VIRTUALENV_ROOT.stdout }}
       requirements={{ INSTALL_ROOT.stdout }}/requirements.txt
     tags:
      - dependencies
-     - prod
-     - dev
 
+  - name: update seals
+    command: "{{ VIRTUALENV_ROOT.stdout }}/bin/update-seals"
+
+- hosts: web
+  tasks:
+  - include: set_vars.yml
+  - name: collectstatic
+    django_manage:
+      app_path={{ INSTALL_ROOT.stdout }}
+      command=collectstatic
+      virtualenv={{ VIRTUALENV_ROOT.stdout }}
+  - name: touch apache
+    file:
+      path=apache/django.wsgi
+      state=touch
+
+- hosts: db, dev
+- tasks:
+  - include: set_vars.yml
   - name: migrate database
     django_manage:
       app_path={{ INSTALL_ROOT.stdout }}
       command=migrate
       virtualenv={{ VIRTUALENV_ROOT.stdout }}
-    tags:
-     - prod
-     - dev
 
-  - name: touch apache
-    file:
-      path=apache/django.wsgi
-      state=touch
-    tags:
-     - prod
-
-  - name: update seals
-    command: "{{ VIRTUALENV_ROOT.stdout }}/bin/update-seals"
-    tags:
-     - prod
-
+- hosts: celery
+- tasks:
   - name: restart celery
     service:
       name=celeryd
