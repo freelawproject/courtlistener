@@ -2,7 +2,7 @@
 
 # Create new solr core for RECAP.
 - hosts: solr
-- tasks:
+  tasks:
   - include: ../set_vars.yml
   - name: copy collection1 directory to recap
     become: yes

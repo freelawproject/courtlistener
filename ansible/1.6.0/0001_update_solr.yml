@@ -12,7 +12,7 @@
     when: celeryd_status.stat.exists
 
 - hosts: solr
-- tasks:
+  tasks:
   - include: ../set_vars.yml
   - name: optimize all solr cores
     django_manage:
@@ -124,7 +124,7 @@
       state=started
 
 - hosts: celery
-- tasks:
+  tasks:
   - name: start celery
     service:
       name=celeryd
@@ -133,7 +133,7 @@
 
 # Optimize a second time, with new configs and versions.
 - hosts: solr
-- tasks:
+  tasks:
   - name: optimize all solr cores
     django_manage:
       app_path={{ INSTALL_ROOT.stdout }}
