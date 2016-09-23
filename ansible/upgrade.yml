@@ -16,7 +16,6 @@
       requirements={{ INSTALL_ROOT.stdout }}/requirements.txt
     tags:
      - dependencies
-
   - name: update seals
     command: "{{ VIRTUALENV_ROOT.stdout }}/bin/update-seals"
 
@@ -34,7 +33,7 @@
       state=touch
 
 - hosts: db, dev
-- tasks:
+  tasks:
   - include: set_vars.yml
   - name: migrate database
     django_manage:
@@ -43,7 +42,7 @@
       virtualenv={{ VIRTUALENV_ROOT.stdout }}
 
 - hosts: celery
-- tasks:
+  tasks:
   - name: restart celery
     service:
       name=celeryd
