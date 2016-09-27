@@ -62,7 +62,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             # it's ok we forgive you http://stackoverflow.com/a/610923
             pass
         finally:
-            self.browser = self.driverClass(service_log_path=log_path)
+            self.browser = self.driverClass(service_log_path=self.log_path)
         self.browser.implicitly_wait(3)
         self.browser.set_window_size(*DESKTOP_WINDOW)
 
