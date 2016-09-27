@@ -3,43 +3,48 @@
 # Run this whenever you want the latest code pulled and loaded.
 
 - hosts: all
+  vars_files:
+  - defaults.yml
   tasks:
-  - include: set_vars.yml
   - name: git pull
     git:
       repo=https://github.com/freelawproject/courtlistener.git
-      dest={{ INSTALL_ROOT.stdout }}
+      dest={{ INSTALL_ROOT }}
       clone=no
   - name: update python dependencies
     pip:
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
-      requirements={{ INSTALL_ROOT.stdout }}/requirements.txt
+      virtualenv={{ VIRTUALENV_ROOT }}
+      requirements={{ INSTALL_ROOT }}/requirements.txt
     tags:
      - dependencies
   - name: update seals
-    command: "{{ VIRTUALENV_ROOT.stdout }}/bin/update-seals"
+    command: "{{ VIRTUALENV_ROOT }}/bin/update-seals"
 
 - hosts: web
+  vars_files:
+  - defaults.yml
   tasks:
   - include: set_vars.yml
   - name: collectstatic
     django_manage:
-      app_path={{ INSTALL_ROOT.stdout }}
+      app_path={{ INSTALL_ROOT }}
       command=collectstatic
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
+      virtualenv={{ VIRTUALENV_ROOT }}
   - name: touch apache
     file:
       path=apache/django.wsgi
       state=touch
 
 - hosts: db, dev
+  vars_files:
+  - defaults.yml
   tasks:
   - include: set_vars.yml
   - name: migrate database
     django_manage:
-      app_path={{ INSTALL_ROOT.stdout }}
+      app_path={{ INSTALL_ROOT }}
       command=migrate
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
+      virtualenv={{ VIRTUALENV_ROOT }}
 
 - hosts: celery
   tasks:
