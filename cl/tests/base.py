@@ -31,6 +31,10 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         Also sets window size to default of 1024x768.
     """
 
+    driverClass = webdriver.PhantomJS
+    #driverClass = webdriver.Firefox
+    log_path = '/var/log/courtlistener/django.log'
+
     @classmethod
     def setUpClass(cls):
         cls.screenshot = False
@@ -47,15 +51,16 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             super(BaseSeleniumTest, cls).tearDownClass()
 
     def setUp(self):
-        self.browser = webdriver.PhantomJS(
-            executable_path='/usr/local/phantomjs/phantomjs',
-            service_log_path='/var/log/courtlistener/django.log',
-        )
-        #self.browser = webdriver.Firefox()
-        self.browser.implicitly_wait(3)
-        self.browser.set_window_size(*DESKTOP_WINDOW)
+        resetBrowser()
         self._initialize_test_solr()
         self._update_index()
+
+    def resetBrowser(self):
+        if self.browser:
+            self.browser.quit()
+        self.browser = self.driverClass(service_log_path=log_path)
+        self.browser.implicitly_wait(3)
+        self.browser.set_window_size(*DESKTOP_WINDOW)
 
     def tearDown(self):
         if self.screenshot:
