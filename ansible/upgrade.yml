@@ -44,6 +44,7 @@
 - hosts: celery
   tasks:
   - name: restart celery
+    become: true
     service:
       name=celeryd
       state=restarted
