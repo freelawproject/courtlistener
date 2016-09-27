@@ -51,7 +51,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             super(BaseSeleniumTest, cls).tearDownClass()
 
     def setUp(self):
-        resetBrowser()
+        self.resetBrowser()
         self._initialize_test_solr()
         self._update_index()
 
