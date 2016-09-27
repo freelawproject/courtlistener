@@ -96,7 +96,6 @@ class LiveUserTest(LiveServerTestCase):
     @classmethod
     def setUpClass(cls):
         cls.selenium = webdriver.PhantomJS(
-            executable_path='/usr/local/phantomjs/phantomjs',
             service_log_path='/var/log/courtlistener/django.log',
         )
         super(LiveUserTest, cls).setUpClass()
