@@ -1,0 +1,3 @@
+INSTALL_ROOT: '/var/www/courtlistener'
+CL_SOLR_XMX: '20G'
+VIRTUALENV_ROOT: '/var/www/.virtualenvs/courtlistener'

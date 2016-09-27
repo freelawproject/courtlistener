@@ -4,7 +4,9 @@
 # https://github.com/freelawproject/courtlistener/issues/567
 - hosts: celery
   tasks:
-  - include: ../set_vars.yml
+  - name: check if celery exists (or this is a dev machine)
+    stat: path=/etc/init.d/celeryd
+    register: celeryd_status
   - name: stop celery (this stops data going to Solr)
     service:
       name=celeryd
@@ -12,13 +14,14 @@
     when: celeryd_status.stat.exists
 
 - hosts: solr
+  vars_files:
+  - defaults.yml
   tasks:
-  - include: ../set_vars.yml
   - name: optimize all solr cores
     django_manage:
-      app_path={{ INSTALL_ROOT.stdout }}
+      app_path={{ INSTALL_ROOT }}
       command="cl_update_index --optimize-everything"
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
+      virtualenv={{ VIRTUALENV_ROOT }}
     async: 10000
     poll: 0
     register: solr_sleeper
@@ -62,7 +65,7 @@
     become: yes
     become_user: root
     template:
-      src="templates/{{ item }}.properties.j2"
+      src="1.6.0/templates/{{ item }}.properties.j2"
       dest="/usr/local/solr-4.10.4/example/solr/{{ item }}/core.properties"
     with_items:
       - audio
@@ -75,7 +78,7 @@
     become: yes
     become_user: root
     file:
-      src="{{ INSTALL_ROOT.stdout }}/Solr/conf/lang/{{ item[1] }}.txt"
+      src="{{ INSTALL_ROOT }}/Solr/conf/lang/{{ item[1] }}.txt"
       path="/usr/local/solr-4.10.4/example/solr/{{ item[0] }}/conf/lang/{{ item[1] }}.txt"
       state=link
       force=yes
@@ -89,7 +92,7 @@
     become: yes
     become_user: root
     template:
-      src="templates/elevate.xml"
+      src="1.6.0/templates/elevate.xml"
       dest="/usr/local/solr-4.10.4/example/solr/{{ item }}/conf/elevate.xml"
     with_items:
       - audio
@@ -133,9 +136,11 @@
 
 # Optimize a second time, with new configs and versions.
 - hosts: solr
+  vars_files:
+  - defaults.yml
   tasks:
   - name: optimize all solr cores
     django_manage:
-      app_path={{ INSTALL_ROOT.stdout }}
+      app_path={{ INSTALL_ROOT }}
       command="cl_update_index --optimize-everything"
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
+      virtualenv={{ VIRTUALENV_ROOT }}
