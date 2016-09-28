@@ -9,14 +9,13 @@ import requests
 from cl.lib.sunburnt import SolrError
 
 
-def create_temp_solr_core(core_name, schema_path):
-        # schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-        #                     'schema.xml'),
-        # instance_dir='/usr/local/solr/example/solr/collection1',
-        # config=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-        #                     'solrconfig.xml')):
+def create_temp_solr_core(core_name, schema_path, delete_if_present=True):
     """ Create a new core by copying collection1 and updating it """
     core_path = os.path.join(os.sep, 'tmp', 'solr', core_name)
+    if delete_if_present and os.path.exists(core_path):
+        print(u"Core at %s already exists! Deleting it." % core_path)
+        delete_solr_core(core_name)
+
     # Copy collection1 directory to core_name directory
     shutil.copytree(
         os.path.join(os.sep, 'usr', 'local', 'solr', 'example', 'solr', 'collection1'),
