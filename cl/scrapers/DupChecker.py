@@ -129,8 +129,8 @@ class DupChecker(dict):
                     self.emulate_break = True
                     return False
             else:
-                # Not the fifth duplicate. Continue onwards, but don't
-                # emulate a break statement.
-                return True
+                # This is a full crawl. Do not emulate a break, BUT be sure to
+                # say that we shouldn't press on, since the item already exists.
+                return False
         else:
             return True
