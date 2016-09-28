@@ -2,7 +2,6 @@ import time
 
 from django.core.urlresolvers import reverse
 from django.test import Client, TestCase
-from selenium import webdriver
 from timeout_decorator import timeout_decorator
 
 from cl.favorites.models import Favorite
@@ -173,11 +172,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # She closes her browser and goes to the gym for a bit since it's
         # always leg day amiright
-        self.browser.quit()
-        self.browser = webdriver.PhantomJS(
-                executable_path='/usr/local/phantomjs/phantomjs',
-                service_log_path='/var/log/courtlistener/django.log',
-        )
+        self.resetBrowser()
         self.browser.set_window_size(*DESKTOP_WINDOW)
 
         # When she returns, she signs back into CL and wants to pull up

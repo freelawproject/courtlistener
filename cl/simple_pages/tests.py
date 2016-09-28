@@ -12,7 +12,7 @@ from lxml.html import fromstring
 
 from cl.audio.models import Audio
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
-from cl.simple_pages.views import serve_static_file, show_maintenance_warning
+from cl.simple_pages.views import serve_static_file
 
 
 class ContactTest(TestCase):
@@ -128,17 +128,6 @@ class SimplePagesTest(TestCase):
             is_html = ('text/html' in r['content-type'])
             if r['content-type'] and is_html:
                 self.check_for_title(r.content)
-
-    def test_maintenance_page(self):
-        """Does the maintenance page load?
-
-        This gets its own test because in normal configuration it's disabled in
-        urls.py.
-        """
-        request = RequestFactory().get(path='/asdf-anything/')
-        response = show_maintenance_warning(request)
-        self.assertEqual(response.status_code, 503)
-        self.assertIn("undergoing maintenance", ' '.join(response.content.split()))
 
 
 @override_settings(
