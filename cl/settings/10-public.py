@@ -9,6 +9,15 @@ from judge_pics import judge_root
 # Loads the variable INSTALL_ROOT
 execfile('/etc/courtlistener')
 
+MAINTENANCE_MODE_ENABLED = False
+MAINTENANCE_MODE_ALLOW_STAFF = True
+MAINTENANCE_MODE_ALLOWED_IPS = []
+MAINTENANCE_MODE = {
+    'enabled': MAINTENANCE_MODE_ENABLED,
+    'allow_staff': MAINTENANCE_MODE_ALLOW_STAFF,
+    'allowed_ips': MAINTENANCE_MODE_ALLOWED_IPS,
+}
+
 ################
 # Misc. Django #
 ################
@@ -48,6 +57,7 @@ MIDDLEWARE_CLASSES = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'cl.lib.middleware.MaintenanceModeMiddleware',
 ]
 
 ROOT_URLCONF = 'cl.urls'

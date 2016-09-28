@@ -10,7 +10,7 @@ from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
 from django.template import loader
-from django.views.decorators.cache import cache_page, never_cache
+from django.views.decorators.cache import cache_page
 
 from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
@@ -243,21 +243,6 @@ def latest_terms(request):
             'private': False
         },
         RequestContext(request),
-    )
-
-
-@never_cache
-def show_maintenance_warning(request):
-    """Blocks access to a URL, and instead loads a maintenance warning.
-
-    Uses a 503 status code, which preserves SEO. See:
-    https://plus.google.com/115984868678744352358/posts/Gas8vjZ5fmB
-    """
-    return render_to_response(
-        'maintenance.html',
-        {'private': True},
-        RequestContext(request),
-        status=503,  # Temporarily Unavailable
     )
 
 

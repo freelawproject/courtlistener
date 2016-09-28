@@ -3,7 +3,12 @@
 Unit tests for lib
 """
 import datetime
+
+from django.core.urlresolvers import reverse
 from django.test import TestCase
+from django.test import override_settings
+from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
+
 from cl.lib.string_utils import trunc
 from cl.lib.search_utils import make_fq
 from cl.lib.mime_types import lookup_mime_type
@@ -72,6 +77,7 @@ class TestMakeFQ(TestCase):
                 '%s:(%s)' % (field, test[1])
             )
 
+
 class TestModelHelpers(TestCase):
     """Test the model_utils helper functions"""
     fixtures = ['test_court.json']
@@ -119,3 +125,34 @@ class TestMimeLookup(TestCase):
         }
         for test_path in tests.keys():
             self.assertEqual(tests.get(test_path), lookup_mime_type(test_path))
+
+
+@override_settings(MAINTENANCE_MODE_ENABLED=True)
+class TestMaintenanceMiddleware(TestCase):
+    """ Test the maintenance middleware """
+    fixtures = ['authtest_data.json']
+
+    def test_middleware_works_when_enabled(self):
+        """ Does the middleware block users when enabled? """
+        r = self.client.get(reverse('show_results'))
+        self.assertEqual(
+            r.status_code,
+            HTTP_503_SERVICE_UNAVAILABLE,
+            'Did not get correct status code. Got: %s instead of %s' % (
+                r.status_code,
+                HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        )
+
+    def test_staff_can_get_through(self):
+        """ Can staff get through when the middleware is enabled? """
+        self.client.login(username='admin', password='password')
+        r = self.client.get(reverse('show_results'))
+        self.assertEqual(
+            r.status_code,
+            HTTP_200_OK,
+            'Staff did not get through, but should have. Staff got status code '
+            'of: %s instead of %s' % (r.status_code, HTTP_200_OK)
+        )
+
+
