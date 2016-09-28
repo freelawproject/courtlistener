@@ -259,9 +259,15 @@ class DupcheckerWithFixturesTest(TestCase):
                 lookup_by='sha1'
             )
             if dup_checker.full_crawl:
-                self.assertTrue(
+                self.assertFalse(
                     onwards,
-                    'DupChecker returned %s during a full crawl.' % onwards
+                    'DupChecker returned True during a full crawl, but there '
+                    'should be duplicates in the database.'
+                )
+                self.assertFalse(
+                    dup_checker.emulate_break,
+                    'DupChecker said to emulate a break during a full crawl. '
+                    'Nothing should stop a full crawl!'
                 )
 
             elif dup_checker.full_crawl is False:
@@ -287,9 +293,16 @@ class DupcheckerWithFixturesTest(TestCase):
                 lookup_by='sha1'
             )
             if dup_checker.full_crawl:
-                self.assertTrue(
+                self.assertFalse(
                     onwards,
-                    'DupChecker says to %s during a full crawl.' % onwards)
+                    'DupChecker returned True during a full crawl, but there '
+                    'should be duplicates in the database.'
+                )
+                self.assertFalse(
+                    dup_checker.emulate_break,
+                    'DupChecker said to emulate a break during a full crawl. '
+                    'Nothing should stop a full crawl!'
+                )
             else:
                 self.assertFalse(
                     onwards,
