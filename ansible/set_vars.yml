@@ -5,19 +5,19 @@
 # it wants, and this processes the request and spits it back.
 
 - name: register INSTALL_ROOT from /etc/courtlistener
-  shell: "{{playbook_dir}}/get_vars.sh INSTALL_ROOT"
+  script: get_vars.sh INSTALL_ROOT
   register: INSTALL_ROOT
   changed_when: False
   tags: setup, testing, dependencies
 
 - name: register CL_SOLR_XMX from /etc/courtlistener
-  shell:  "{{playbook_dir}}/get_vars.sh CL_SOLR_XMX"
+  script: get_vars.sh CL_SOLR_XMX
   register: CL_SOLR_XMX
   changed_when: False
   tags: setup, testing, dependencies
 
 - name: register VIRTUALENV_ROOT from /etc/courtlistener
-  shell: "{{playbook_dir}}/get_vars.sh VIRTUALENV_ROOT"
+  script: get_vars.sh VIRTUALENV_ROOT
   register: VIRTUALENV_ROOT
   changed_when: False
   tags: setup, testing, dependencies
