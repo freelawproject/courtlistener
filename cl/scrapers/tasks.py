@@ -297,8 +297,13 @@ def rasterize_pdf(path, destination):
         https://github.com/jbarlow83/OCRmyPDF/blob/636d1903b35fed6b07a01af53769fea81f388b82/ocrmypdf/ghostscript.py#L11
 
     """
-    # Details, see: http://ghostscript.com/doc/7.07/Use.htm
-    # Devices, see: http://ghostscript.com/doc/current/Devices.htm
+    # gs docs, see: http://ghostscript.com/doc/7.07/Use.htm
+    # gs devices, see: http://ghostscript.com/doc/current/Devices.htm
+    #
+    # Compression is a trade off. It takes twice as long to convert PDFs, but
+    # they're about 1-2% the size of the uncompressed version. They take about
+    # 30% of the RAM when Tesseract processes them. See:
+    # https://github.com/tesseract-ocr/tesseract/issues/431#issuecomment-250549208
     gs = [
         'gs',
         '-dQUIET',
@@ -306,6 +311,7 @@ def rasterize_pdf(path, destination):
         '-dBATCH',
         '-dNOPAUSE',
         '-sDEVICE=tiffgray',
+        '-sCompression=lzw',
         '-r300x300',
         '-o', destination,
         path,
