@@ -4,21 +4,22 @@
 # https://github.com/freelawproject/courtlistener/issues/567
 - hosts: celery
   tasks:
-  - include: ../set_vars.yml
+  - include_vars: ../defaults.yml
   - name: stop celery (this stops data going to Solr)
+    become: yes
+    become_user: root
     service:
       name=celeryd
       state=stopped
-    when: celeryd_status.stat.exists
 
 - hosts: solr
   tasks:
-  - include: ../set_vars.yml
+  - include_vars: ../defaults.yml
   - name: optimize all solr cores
     django_manage:
-      app_path={{ INSTALL_ROOT.stdout }}
+      app_path={{ install_root }}
       command="cl_update_index --optimize-everything"
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
+      virtualenv={{ virtualenv_root }}
     async: 10000
     poll: 0
     register: solr_sleeper
@@ -34,7 +35,7 @@
     become: yes
     become_user: root
     unarchive:
-      remote_src=yes
+      copy=no
       src=/tmp/solr-4.10.4.tgz
       dest=/usr/local
       creates=/usr/local/solr-4.10.4
@@ -75,7 +76,7 @@
     become: yes
     become_user: root
     file:
-      src="{{ INSTALL_ROOT.stdout }}/Solr/conf/lang/{{ item[1] }}.txt"
+      src="{{ install_root }}/Solr/conf/lang/{{ item[1] }}.txt"
       path="/usr/local/solr-4.10.4/example/solr/{{ item[0] }}/conf/lang/{{ item[1] }}.txt"
       state=link
       force=yes
@@ -119,6 +120,8 @@
 
   # Start things up again.
   - name: restart solr
+    become: yes
+    become_user: root
     service:
       name=solr
       state=started
@@ -126,16 +129,18 @@
 - hosts: celery
   tasks:
   - name: start celery
+    become: yes
+    become_user: root
     service:
       name=celeryd
       state=started
-    when: celeryd_status.stat.exists
 
 # Optimize a second time, with new configs and versions.
 - hosts: solr
   tasks:
+  - include_vars: ../defaults.yml
   - name: optimize all solr cores
     django_manage:
-      app_path={{ INSTALL_ROOT.stdout }}
+      app_path={{ install_root }}
       command="cl_update_index --optimize-everything"
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
+      virtualenv={{ virtualenv_root }}

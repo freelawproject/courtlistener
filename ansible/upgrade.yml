@@ -4,47 +4,58 @@
 
 - hosts: all
   tasks:
-  - include: set_vars.yml
+  - include_vars: defaults.yml
   - name: git pull
+    become: yes
+    become_user: www-data
     git:
       repo=https://github.com/freelawproject/courtlistener.git
-      dest={{ INSTALL_ROOT.stdout }}
+      dest={{ install_root }}
       clone=no
   - name: update python dependencies
+    become: yes
+    become_user: root
     pip:
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
-      requirements={{ INSTALL_ROOT.stdout }}/requirements.txt
+      virtualenv={{ virtualenv_root }}
+      requirements={{ install_root }}/requirements.txt
     tags:
      - dependencies
   - name: update seals
-    command: "{{ VIRTUALENV_ROOT.stdout }}/bin/update-seals"
+    become: yes
+    become_user: "{{ web_user }}"
+    command: "{{ virtualenv_root }}/bin/update-seals"
 
 - hosts: web
   tasks:
-  - include: set_vars.yml
+  - include_vars: defaults.yml
   - name: collectstatic
+    become: yes
+    become_user: "{{ web_user }}"
     django_manage:
-      app_path={{ INSTALL_ROOT.stdout }}
+      app_path={{ install_root }}
       command=collectstatic
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
+      virtualenv={{ virtualenv_root }}
   - name: touch apache
+    become: yes
+    become_user: "{{ web_user }}"
     file:
-      path=apache/django.wsgi
+      path={{ install_root }}/apache/django.wsgi
       state=touch
 
 - hosts: db, dev
   tasks:
-  - include: set_vars.yml
+  - include_vars: defaults.yml
   - name: migrate database
     django_manage:
-      app_path={{ INSTALL_ROOT.stdout }}
+      app_path={{ install_root }}
       command=migrate
-      virtualenv={{ VIRTUALENV_ROOT.stdout }}
+      virtualenv={{ virtualenv_root }}
 
 - hosts: celery
   tasks:
-  - name: restart celery
-    become: true
+  - name: restart celeryd
+    become: yes
+    become_user: root
     service:
       name=celeryd
       state=restarted

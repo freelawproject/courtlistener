@@ -3,7 +3,7 @@
 # Create new solr core for RECAP.
 - hosts: solr
   tasks:
-  - include: ../set_vars.yml
+  - include_vars: ../defaults.yml
   - name: copy collection1 directory to recap
     become: yes
     become_user: root
@@ -22,11 +22,13 @@
     become: yes
     become_user: root
     file:
-      src="{{ INSTALL_ROOT.stdout }}/Solr/conf/recap_schema.xml"
+      src="{{ install_root }}/Solr/conf/recap_schema.xml"
       dest="/usr/local/solr/example/solr/recap/conf/schema.xml"
       state=link
       force=yes
   - name: restart solr
+    become: yes
+    become_user: root
     service:
       name=solr
       state=restarted

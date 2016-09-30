@@ -71,7 +71,7 @@ If you installed from the Wiki, you should watch for upgrades coming into these 
 
 This has gotten easy:
 
-    ansible-playbook -l live ansible/upgrade.yml -t prod --ask-become-pass
+    ansible-playbook ansible/upgrade.yml --ask-become-pass
 
 And also run any special ones in any version of Vagrant, just like for Wiki installations.
 
