@@ -46,8 +46,8 @@ def create_temp_solr_core(core_name, schema_path, delete_if_present=True):
     }
     r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
     if r.status_code != 200:
-        raise "Problem creating core. Got status_code of %s. Check the Solr " \
-              "logs for details." % r.status_code
+        raise Exception("Problem creating core. Got status_code of %s. Check "
+                        "the Solr logs for details." % r.status_code)
 
 
 def delete_solr_core(core_name, delete_index=True, delete_data=True,
@@ -63,8 +63,8 @@ def delete_solr_core(core_name, delete_index=True, delete_data=True,
     }
     r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
     if r.status_code != 200:
-        raise "Problem deleting core. Got status_code of %s. Check the Solr " \
-              "logs for details." % r.status_code
+        raise Exception("Problem deleting core. Got status_code of %s. Check "
+                        "the Solr logs for details." % r.status_code)
 
 
 def swap_solr_core(current_core, desired_core):

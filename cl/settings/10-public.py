@@ -6,7 +6,10 @@ import sys
 from django.contrib.messages import constants as message_constants
 from judge_pics import judge_root
 
-INSTALL_ROOT = os.path.join(os.path.realpath(__file__), '..', '..')
+INSTALL_ROOT = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    '..',
+)
 
 MAINTENANCE_MODE_ENABLED = False
 MAINTENANCE_MODE_ALLOW_STAFF = True
