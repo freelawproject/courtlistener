@@ -7,11 +7,9 @@
   - name: copy collection1 directory to recap
     become: yes
     become_user: root
-    synchronize:
-      src="/usr/local/solr/example/solr/collection1/"
-      dest="/usr/local/solr/example/solr/recap/"
-      recursive=yes
-    delegate_to: "{{ inventory_hostname }}"
+    command: cp -R "/usr/local/solr/example/solr/collection1/" "/usr/local/solr/example/solr/recap/"
+    args:
+      creates: "/usr/local/solr/example/solr/recap"
   - name: set up properties file
     become: yes
     become_user: root

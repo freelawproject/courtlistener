@@ -50,15 +50,15 @@
   - name: copy old core configs to new Solr
     become: yes
     become_user: root
-    synchronize:
-      src="/usr/local/solr/example/solr/{{ item }}/"
-      dest="/usr/local/solr-4.10.4/example/solr/{{ item }}"
-      recursive=yes
-    delegate_to: "{{ inventory_hostname }}"
+    command: cp -R "/usr/local/solr/example/solr/{{ item }}/" "/usr/local/solr-4.10.4/example/solr/{{ item }}"
+    args:
+      creates: "/usr/local/solr-4.10.4/example/solr/{{ item }}"
     with_items:
       - audio
       - collection1
       - person
+
+
   - name: set up new solr properties files
     become: yes
     become_user: root
