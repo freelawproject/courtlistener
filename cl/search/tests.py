@@ -170,7 +170,7 @@ class SearchTest(IndexedSolrTestCase):
                                   'judge': ' ',
                                   'case_name': ' '})
         self.assertIn('Honda', r.content)
-        self.assertNotIn('deadly', r.content)
+        self.assertNotIn('an error', r.content)
 
     def test_a_query_with_a_date(self):
         """Does querying by date work?"""
@@ -302,9 +302,9 @@ class SearchTest(IndexedSolrTestCase):
     def test_oa_date_argued_filtering(self):
         r = self.client.get('/', {'type': 'oa', 'argued_after': '2014-10-01'})
         self.assertNotIn(
-            "deadly",
+            "an error",
             r.content,
-            msg="Got a deadly error when doing a Date Argued filter."
+            msg="Got an error when doing a Date Argued filter."
         )
 
     def test_oa_search_api(self):
@@ -330,8 +330,8 @@ class SearchTest(IndexedSolrTestCase):
         """Do we fail gracefully when an invalid search is created?"""
         response = self.client.get('/?neutral_cite=-')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('deadly', response.content,
-                      msg="Invalid search did not result in \"deadly\" error.")
+        self.assertIn('an error', response.content,
+                      msg="Invalid search did not result in an error.")
 
 
 class JudgeSearchTest(IndexedSolrTestCase):
@@ -342,9 +342,9 @@ class JudgeSearchTest(IndexedSolrTestCase):
         for sort_field in sort_fields:
             r = self.client.get('/', {'type': 'p', 'ordered_by': sort_field})
             self.assertNotIn(
-                'deadly',
+                'an error',
                 r.content.lower(),
-                msg="Got a deadly error when doing a judge search ordered "
+                msg="Got an error when doing a judge search ordered "
                     "by %s" % sort_field
             )
 
