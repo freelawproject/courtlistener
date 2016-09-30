@@ -77,7 +77,7 @@
                     publication, making this a particularly thorny problem.
                 </p>
             {% elif too_many %}
-                <h2 class="v-offset-below-2">Found More than One Result for "{{ citation_str }}"</h2>
+                <h2 class="v-offset-below-2">Found More than One Result for "{{ citation_str|nbsp }}"</h2>
                 <ul>
                     {% for cluster in clusters %}
                         <li>
