@@ -5,10 +5,11 @@
         <div class="row">
             <div class="col-xs-2 col-sm-3">
                 {% if results.has_previous %}
-                    <div class="large text-left">
+                    <div class="text-left">
                         <a href="?{{ get_string }}page={{ results.previous_page_number }}"
-                           rel="prev">
-                            <i class="gray fa fa-caret-left no-underline"></i>
+                           rel="prev"
+                           class="btn btn-default">
+                            <i class="fa fa-caret-left no-underline"></i>
                             <span class="hidden-xs hidden-sm">Previous</span>
                             <span class="hidden-xs hidden-md hidden-lg">Prev.</span>
                         </a>
@@ -22,11 +23,12 @@
             </div>
             <div class="col-xs-2 col-sm-3">
                 {% if results.has_next %}
-                    <div class="large text-right">
+                    <div class="text-right">
                         <a href="?{{ get_string }}page={{ results.next_page_number }}"
-                           rel="next">
+                           rel="next"
+                           class="btn btn-default">
                             <span class="hidden-xs">Next</span>
-                            <i class="gray fa fa-caret-right no-underline"></i>
+                            <i class="fa fa-caret-right no-underline"></i>
                         </a>
                     </div>
                 {% endif %}
