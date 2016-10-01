@@ -15,16 +15,16 @@ boosts = {
             'caseName': 4,
             'docketNumber': 2,
         },
-        'oa': {
-            'text': 1,
-            'caseName': 4,
-            'docketNumber': 2,
-        },
         'r': {
             'text': 1,
             'caseName': 4,
             'docketNumber': 3,
             'description': 2,
+        },
+        'oa': {
+            'text': 1,
+            'caseName': 4,
+            'docketNumber': 2,
         },
         'p': {
             'text': 1,
@@ -42,13 +42,13 @@ boosts = {
             'text': 3,
             'caseName': 3,
         },
-        'oa': {
-            'caseName': 3,
-        },
         'r': {
             'text': 3,
             'caseName': 3,
             'description': 3,
+        },
+        'oa': {
+            'caseName': 3,
         },
         'p': {
             # None here. Phrases don't make much sense for people.
@@ -368,7 +368,7 @@ def add_boosts(main_params, cd):
     qf = boosts['qf'][cd['type']].copy()
     main_params['qf'] = make_boost_string(qf)
 
-    if cd['type'] in ['oa', 'o', 'r']:
+    if cd['type'] in ['o', 'r', 'oa']:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         vs_query = any([' v ' in main_params['q'],
@@ -382,7 +382,7 @@ def add_boosts(main_params, cd):
             main_params['qf'] = make_boost_string(qf)
 
     # Apply phrase-based boosts
-    if cd['type'] in ['o', 'oa', 'r']:
+    if cd['type'] in ['o', 'r', 'oa']:
         main_params['pf'] = make_boost_string(boosts['pf'][cd['type']])
         main_params['ps'] = 5
 
@@ -422,6 +422,11 @@ def add_highlighting(main_params, cd, highlight):
         hlfl = ['text', 'caseName', 'judge', 'docketNumber',
                 'court_citation_string', 'suitNature', 'citation',
                 'neutralCite', 'lexisCite']
+    elif cd['type'] == 'r':
+        fl = ['id', 'court_id', 'dateFiled', 'docketNumber', 'caseName',
+              'natureOfSuit', 'court', 'courtJurisdiction', 'assignedTo']
+        hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
+                'docketNumber', 'natureOfSuit']
     elif cd['type'] == 'oa':
         fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
               'download_url', 'docket_id', 'dateArgued', 'duration']
@@ -433,11 +438,6 @@ def add_highlighting(main_params, cd, highlight):
               'aba_rating', 'school', 'appointer', 'supervisor', 'predecessor',
               'selection_method', 'court']
         hlfl = ['name', 'dob_city', 'dob_state', 'name_reverse']
-    elif cd['type'] == 'r':
-        fl = ['id', 'court_id', 'dateFiled', 'docketNumber','caseName'
-              'natureOfSuit', 'court', 'courtJurisdiction', 'assignedTo']
-        hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
-                'docketNumber', 'natureOfSuit']
 
     main_params.update({
         'fl': ','.join(fl),
@@ -475,16 +475,6 @@ def add_fq(main_params, cd):
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
 
-    elif cd['type'] == 'oa':
-        if cd['case_name']:
-            main_fq.append(make_fq(cd, 'caseName', 'case_name'))
-        if cd['judge']:
-            main_fq.append(make_fq(cd, 'judge', 'judge'))
-        if cd['docket_number']:
-            main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
-        main_fq.append(make_date_query('dateArgued', cd['argued_before'],
-                                       cd['argued_after']))
-
     elif cd['type'] == 'r':
         if cd['case_name']:
             main_fq.append(make_fq(cd, 'caseName', 'case_name'))
@@ -494,6 +484,16 @@ def add_fq(main_params, cd):
             main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
         main_fq.append(make_date_query('dateFiled', cd['filed_before'],
                                        cd['filed_after']))
+
+    elif cd['type'] == 'oa':
+        if cd['case_name']:
+            main_fq.append(make_fq(cd, 'caseName', 'case_name'))
+        if cd['judge']:
+            main_fq.append(make_fq(cd, 'judge', 'judge'))
+        if cd['docket_number']:
+            main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
+        main_fq.append(make_date_query('dateArgued', cd['argued_before'],
+                                       cd['argued_after']))
 
     elif cd['type'] == 'p':
         if cd['name']:
@@ -522,7 +522,7 @@ def add_fq(main_params, cd):
                 '{!tag=dt}status_exact:(%s)' % selected_stats_string,
                 '{!tag=dt}court_exact:(%s)' % selected_courts_string
             ])
-    elif cd['type'] in ['oa', 'p']:
+    elif cd['type'] in ['oa', 'p', 'r']:
         if len(selected_courts_string) > 0:
             main_fq.extend([
                 '{!tag=dt}court_exact:(%s)' % selected_courts_string

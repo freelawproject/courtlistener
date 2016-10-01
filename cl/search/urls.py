@@ -26,6 +26,11 @@ urlpatterns = [
         'cl.search.views.advanced',
         name='advanced_p',
     ),
+    url(
+        r'^recap/$',
+        'cl.search.views.advanced',
+        name='advanced_r',
+    ),
 
     # Feeds & Podcasts
     url(

@@ -20,20 +20,22 @@ from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
-from cl.lib import search_utils
 from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot
+from cl.lib.search_utils import build_main_query, get_query_citation, \
+    place_facet_queries, make_stats_variable, merge_form_with_courts, \
+    make_get_string
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
 from cl.stats import tally_stat, Stat
 from cl.visualizations.models import SCOTUSMap
+from cl.lib.scorched_utils import ExtraSolrInterface
 
 logger = logging.getLogger(__name__)
 
 
 def do_search(request, rows=20, order_by=None, type=None):
 
-    # Bind the search form.
     search_form = SearchForm(request.GET)
     if search_form.is_valid():
         cd = search_form.cleaned_data
@@ -49,23 +51,31 @@ def do_search(request, rows=20, order_by=None, type=None):
             if cd['type'] == 'o':
                 conn = sunburnt.SolrInterface(
                     settings.SOLR_OPINION_URL, mode='r')
-                stat_facet_fields = search_utils.place_facet_queries(cd, conn)
-                status_facets = search_utils.make_stats_variable(
+                stat_facet_fields = place_facet_queries(cd, conn)
+                status_facets = make_stats_variable(
                     stat_facet_fields, search_form)
-                query_citation = search_utils.get_query_citation(cd)
+                query_citation = get_query_citation(cd)
+                results_si = conn.raw_query(**build_main_query(cd))
+            elif cd['type'] == 'r':
+                conn = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
+                status_facets = None
+                results_si = conn.query('*').add_extra(**build_main_query(cd))
             elif cd['type'] == 'oa':
                 conn = sunburnt.SolrInterface(
                     settings.SOLR_AUDIO_URL, mode='r')
                 status_facets = None
+                results_si = conn.raw_query(**build_main_query(cd))
             elif cd['type'] == 'p':
                 conn = sunburnt.SolrInterface(
                     settings.SOLR_PEOPLE_URL, mode='r')
                 status_facets = None
-            results_si = conn.raw_query(**search_utils.build_main_query(cd))
+                results_si = conn.raw_query(**build_main_query(cd))
 
             courts = Court.objects.filter(in_use=True)
-            courts, court_count_human, court_count = search_utils\
-                .merge_form_with_courts(courts, search_form)
+            courts, court_count_human, court_count = merge_form_with_courts(
+                courts,
+                search_form
+            )
 
         except Exception as e:
             if settings.DEBUG is True:
@@ -129,8 +139,8 @@ def show_results(request):
     All of these paths have tests.
     """
     # Create a search string that does not contain the page numbers
-    get_string = search_utils.make_get_string(request)
-    get_string_sans_alert = search_utils.make_get_string(request, ['page', 'edit_alert'])
+    get_string = make_get_string(request)
+    get_string_sans_alert = make_get_string(request, ['page', 'edit_alert'])
     render_dict = {
         'private': True,
         'get_string': get_string,
@@ -317,17 +327,17 @@ def advanced(request):
         'private': False,
     }
     # I'm not thrilled about how this is repeating URLs in a view.
-    if request.path == '/opinion/':
-        render_dict['type'] = 'o'
-        render_dict.update(do_search(request, rows=1, type='o'))
-    elif request.path == '/audio/':
-        render_dict['type'] = 'oa'
-        render_dict.update(do_search(request, rows=1, type='oa'))
-    elif request.path == '/person/':
-        render_dict['type'] = 'p'
-        render_dict.update(do_search(request, rows=1, type='p'))
+    if request.path == reverse('advanced_o'):
+        obj_type = 'o'
+    elif request.path == reverse('advanced_r'):
+        obj_type = 'r'
+    elif request.path == reverse('advanced_oa'):
+        obj_type = 'oa'
+    elif request.path == reverse('advanced_p'):
+        obj_type = 'p'
 
-    render_dict['search_form'] = SearchForm()
+    render_dict.update(do_search(request, rows=1, type=obj_type))
+    render_dict['search_form'] = SearchForm({'type': obj_type})
     return render_to_response(
         'advanced.html',
         render_dict,

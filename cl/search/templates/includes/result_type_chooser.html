@@ -1,7 +1,7 @@
 <div id="type-switcher" class="hidden">
     <label for="id_type_0"
-           class="{% if type == 'o' %}selected{% endif %}">
-        <input {% if type == 'o' %}checked="checked"{% endif %}
+           class="{% if search_form.type.value == 'o' %}selected{% endif %}">
+        <input {% if search_form.type.value == 'o' %}checked="checked"{% endif %}
             class="external-input hidden"
             id="id_type_0"
             name="type"
@@ -9,8 +9,8 @@
             type="radio">Opinions</label>
 
     <label for="id_type_1"
-           class="{% if type == 'oa' %}selected{% endif %}">
-        <input {% if type == 'oa' %}checked="checked"{% endif %}
+           class="{% if search_form.type.value == 'oa' %}selected{% endif %}">
+        <input {% if search_form.type.value == 'oa' %}checked="checked"{% endif %}
             class="external-input hidden"
             id="id_type_1"
             name="type"
@@ -18,11 +18,20 @@
             type="radio">Oral Arguments</label>
 
     <label for="id_type_2"
-           class="{% if type == 'p' %}selected{% endif %}">
-        <input {% if type == 'p' %}checked="checked"{% endif %}
+           class="{% if search_form.type.value == 'p' %}selected{% endif %}">
+        <input {% if search_form.type.value == 'p' %}checked="checked"{% endif %}
             class="external-input hidden"
             id="id_type_2"
             name="type"
             value="p"
             type="radio">Judges</label>
+
+    <label for="id_type_3"
+           class="{% if search_form.type.value == 'r' %}selected{% endif %}">
+        <input {% if search_form.type.value == 'r' %}checked="checked"{% endif %}
+               class="external-input hidden"
+               id="id_type_3"
+               name="type"
+               value="r"
+               type="radio">RECAP</label>
 </div>
