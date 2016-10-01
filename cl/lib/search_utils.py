@@ -478,10 +478,21 @@ def add_fq(main_params, cd):
     elif cd['type'] == 'r':
         if cd['case_name']:
             main_fq.append(make_fq(cd, 'caseName', 'case_name'))
-        if cd['judge']:
-            main_fq.append(make_fq(cd, 'judge', 'judge'))
+        if cd['description']:
+            main_fq.append(make_fq(cd, 'description', 'description'))
         if cd['docket_number']:
             main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
+        if cd['nature_of_suit']:
+            main_fq.append(make_fq(cd, 'natureOfSuit', 'nature_of_suit'))
+        if cd['document_number']:
+            main_fq.append(make_fq(cd, 'document_number', 'document_number'))
+        if cd['attachment_number']:
+            main_fq.append(make_fq(cd, 'attachment_number', 'attachment_number'))
+        if cd['assigned_to']:
+            main_fq.append(make_fq(cd, 'assignedTo', 'assigned_to'))
+        if cd['referred_to']:
+            main_fq.append(make_fq(cd, 'referredTo', 'referred_to'))
+
         main_fq.append(make_date_query('dateFiled', cd['filed_before'],
                                        cd['filed_after']))
 
