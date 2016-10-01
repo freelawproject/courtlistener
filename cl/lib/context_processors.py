@@ -13,7 +13,7 @@ def inject_settings(request):
 
 info_tips = (
     # Other Projects
-    '<a href="http://www.recapthelaw.org" target="_blank">RECAP</a> is our browser extension that saves you money whenever you use PACER.',
+    '<a href="https://free.law/recap/" target="_blank">RECAP</a> is our browser extension that saves you money whenever you use PACER.',
     'Using the <a href="http://www.recapthelaw.org">RECAP project</a> means never paying for the same PACER document twice.',
     'CourtListener is powered by <a href="https://github.com/freelawproject/juriscraper" target="_blank">more than 200 screen scrapers</a>.',
     'We are collecting <a href="https://github.com/freelawproject/seal-rookery" target="_blank">all of the court seals in the U.S.</a> You can help contribute seals.',
@@ -46,10 +46,18 @@ info_tips = (
     'There is an <a href="/feeds/">RSS feed</a> for every query so you can easily stay up to date.',
     'A podcast is created for every oral argument query that you make.',
     'CourtListener has an <a href="%s">API</a> so anybody can easily use our data.' % reverse("api_index"),
-    'Oral Arguments are available in <a href="https://free.law/2014/11/09/more-oral-argument-news/">Stitcher Radio</a>.',
-    'Search Relevancy on CourtListener is <a href="https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/" target="_blank">powered by the citation network between cases.</a>',
-    'You can make sophisticated queries using a number of <a href="/search/advanced-techniques/">advanced search features</a>.',
+    'Oral Arguments <a href="%s">are available in variety of apps</a> like Stitcher Radio and Google Music.' % reverse('podcasts'),
+    'Search Relevancy on CourtListener is <a href="https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/" target="_blank">highly tuned and is powered by the citation network between cases</a>.',
+    'You can make sophisticated queries using a number of <a href="%s">advanced search features</a>.' % reverse('advanced_search'),
     'You can get an alert whenever an opinion is cited by <a href="https://free.law/2016/01/30/citation-searching-on-courtlistener/">using a Citation Search</a>.',
+    'We <a href="https://free.law/2016/02/22/our-newest-launch-a-scotus-data-viz-tool/" target="_blank">partnered with University of Baltimore</a> to make a system of visualizing Supreme Court Cases.',
+    'Information from the Supreme Court Database <a href="https://free.law/2016/09/06/courtlisteners-scotus-data-gets-even-better-with-legacy-data-from-the-supreme-court-database/" target="_blank">is available for nearly every SCOTUS case</a>, making it easy to get in-depth analysis.',
+
+    # RECAP
+    'PACER was created by Congress and makes around $130,000,000 selling public domain legal documents.',
+    'With an estimated 1 billion documents, PACER is likely the largest paywall in the world.',
+    'The average PACER document is <a href="https://twitter.com/RECAPtheLaw/status/771585725875691520" target="_blank">about 9.1 pages long</a>. The longest we\'ve seen is over 4,000 pages.',
+    'We extract text from every PACER document so that it is searchable. <a href="https://free.law/2016/09/26/extracting-text-from-our-collection-of-pacer-documents/" target="_blank">This takes months</a>!',
 )
 def inject_random_tip(request):
     return {'TIP': random.choice(info_tips)}
