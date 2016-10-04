@@ -20,7 +20,6 @@ from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
-from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     place_facet_queries, make_stats_variable, merge_form_with_courts, \
@@ -48,28 +47,23 @@ def do_search(request, rows=20, order_by=None, type=None):
 
         try:
             query_citation = None
+            status_facets = None
             if cd['type'] == 'o':
-                conn = sunburnt.SolrInterface(
-                    settings.SOLR_OPINION_URL, mode='r')
+                conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
                 stat_facet_fields = place_facet_queries(cd, conn)
-                status_facets = make_stats_variable(
-                    stat_facet_fields, search_form)
+                status_facets = make_stats_variable(stat_facet_fields,
+                                                    search_form)
                 query_citation = get_query_citation(cd)
-                results_si = conn.raw_query(**build_main_query(cd))
+                results_si = conn.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'r':
                 conn = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-                status_facets = None
-                results_si = conn.query('*').add_extra(**build_main_query(cd))
+                results_si = conn.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'oa':
-                conn = sunburnt.SolrInterface(
-                    settings.SOLR_AUDIO_URL, mode='r')
-                status_facets = None
-                results_si = conn.raw_query(**build_main_query(cd))
+                conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
+                results_si = conn.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'p':
-                conn = sunburnt.SolrInterface(
-                    settings.SOLR_PEOPLE_URL, mode='r')
-                status_facets = None
-                results_si = conn.raw_query(**build_main_query(cd))
+                conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
+                results_si = conn.query().add_extra(**build_main_query(cd))
 
             courts = Court.objects.filter(in_use=True)
             courts, court_count_human, court_count = merge_form_with_courts(
@@ -117,6 +111,82 @@ def do_search(request, rows=20, order_by=None, type=None):
         'court_count': court_count,
         'status_facets': status_facets,
         'query_citation': query_citation,
+    }
+
+
+def get_homepage_stats():
+    """Get any stats that are displayed on the homepage and return them as a
+    dict
+    """
+    ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
+    alerts_in_last_ten = Stat.objects.filter(
+        name__contains='alerts.sent',
+        date_logged__gte=ten_days_ago
+    ).aggregate(Sum('count'))['count__sum']
+    queries_in_last_ten = Stat.objects.filter(
+        name='search.results',
+        date_logged__gte=ten_days_ago
+    ).aggregate(Sum('count'))['count__sum']
+    bulk_in_last_ten = Stat.objects.filter(
+        name__contains='bulk_data',
+        date_logged__gte=ten_days_ago
+    ).aggregate(Sum('count'))['count__sum']
+    r = redis.StrictRedis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        db=settings.REDIS_DATABASES['STATS'],
+    )
+    last_ten_days = ['api:v3.d:%s.count' %
+                     (date.today() - timedelta(days=x)).isoformat()
+                     for x in range(0, 10)]
+    api_in_last_ten = sum(
+        [int(result) for result in
+         r.mget(*last_ten_days) if result is not None]
+    )
+    users_in_last_ten = User.objects.filter(
+        date_joined__gte=ten_days_ago
+    ).count()
+    opinions_in_last_ten = Opinion.objects.filter(
+        date_created__gte=ten_days_ago
+    ).count()
+    oral_arguments_in_last_ten = Audio.objects.filter(
+        date_created__gte=ten_days_ago
+    ).count()
+    days_of_oa = naturalduration(
+        Audio.objects.aggregate(
+            Sum('duration')
+        )['duration__sum'],
+        as_dict=True,
+    )['d']
+    viz_in_last_ten = SCOTUSMap.objects.filter(
+        date_published__gte=ten_days_ago,
+        published=True,
+    ).count()
+    visualizations = SCOTUSMap.objects.filter(
+        published=True,
+        deleted=False,
+    ).annotate(
+        Count('clusters'),
+    ).filter(
+        # Ensures that we only show good stuff on homepage
+        clusters__count__gt=10,
+    ).order_by(
+        '-date_published',
+        '-date_modified',
+        '-date_created',
+    )[:1]
+    return {
+        'alerts_in_last_ten': alerts_in_last_ten,
+        'queries_in_last_ten': queries_in_last_ten,
+        'opinions_in_last_ten': opinions_in_last_ten,
+        'oral_arguments_in_last_ten': oral_arguments_in_last_ten,
+        'bulk_in_last_ten': bulk_in_last_ten,
+        'api_in_last_ten': api_in_last_ten,
+        'users_in_last_ten': users_in_last_ten,
+        'days_of_oa': days_of_oa,
+        'viz_in_last_ten': viz_in_last_ten,
+        'visualizations': visualizations,
+        'private': False,  # VERY IMPORTANT!
     }
 
 
@@ -205,76 +275,10 @@ def show_results(request):
             render_dict.update({'results_oa': oa_dict['results']})
             # But give it a fresh form for the advanced search section
             render_dict.update({'search_form': SearchForm(request.GET)})
-            ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
-            alerts_in_last_ten = Stat.objects.filter(
-                    name__contains='alerts.sent',
-                    date_logged__gte=ten_days_ago
-                ).aggregate(Sum('count'))['count__sum']
-            queries_in_last_ten = Stat.objects.filter(
-                    name='search.results',
-                    date_logged__gte=ten_days_ago
-                ).aggregate(Sum('count'))['count__sum']
-            bulk_in_last_ten = Stat.objects.filter(
-                    name__contains='bulk_data',
-                    date_logged__gte=ten_days_ago
-                ).aggregate(Sum('count'))['count__sum']
-            r = redis.StrictRedis(
-                host=settings.REDIS_HOST,
-                port=settings.REDIS_PORT,
-                db=settings.REDIS_DATABASES['STATS'],
-            )
-            last_ten_days = ['api:v3.d:%s.count' %
-                             (date.today() - timedelta(days=x)).isoformat()
-                             for x in range(0, 10)]
-            api_in_last_ten = sum(
-                [int(result) for result in
-                 r.mget(*last_ten_days) if result is not None]
-            )
-            users_in_last_ten = User.objects.filter(
-                    date_joined__gte=ten_days_ago
-                ).count()
-            opinions_in_last_ten = Opinion.objects.filter(
-                    date_created__gte=ten_days_ago
-                ).count()
-            oral_arguments_in_last_ten = Audio.objects.filter(
-                    date_created__gte=ten_days_ago
-                ).count()
-            days_of_oa = naturalduration(
-                    Audio.objects.aggregate(
-                        Sum('duration')
-                    )['duration__sum'],
-                    as_dict=True,
-                )['d']
-            viz_in_last_ten = SCOTUSMap.objects.filter(
-                    date_published__gte=ten_days_ago,
-                    published=True,
-                ).count()
-            visualizations = SCOTUSMap.objects.filter(
-                published=True,
-                deleted=False,
-            ).annotate(
-                Count('clusters'),
-            ).filter(
-                # Ensures that we only show good stuff on homepage
-                clusters__count__gt=10,
-            ).order_by(
-                '-date_published',
-                '-date_modified',
-                '-date_created',
-            )[:1]
-            render_dict.update({
-                'alerts_in_last_ten': alerts_in_last_ten,
-                'queries_in_last_ten': queries_in_last_ten,
-                'opinions_in_last_ten': opinions_in_last_ten,
-                'oral_arguments_in_last_ten': oral_arguments_in_last_ten,
-                'bulk_in_last_ten': bulk_in_last_ten,
-                'api_in_last_ten': api_in_last_ten,
-                'users_in_last_ten': users_in_last_ten,
-                'days_of_oa': days_of_oa,
-                'viz_in_last_ten': viz_in_last_ten,
-                'visualizations': visualizations,
-                'private': False,  # VERY IMPORTANT!
-            })
+
+            # Get a bunch of stats.
+            render_dict.update(get_homepage_stats())
+
             return render_to_response(
                 'homepage.html',
                 render_dict,
