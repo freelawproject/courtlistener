@@ -52,7 +52,7 @@
     </div>
     {% include "includes/result_type_chooser.html" %}
     {% include "includes/sidebar_filters.html" %}
-    {% if type == 'o' or type == 'oa' %}
+    {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
         {% include "includes/alert_sidebar_section.html" %}
     {% endif %}
 </div>
