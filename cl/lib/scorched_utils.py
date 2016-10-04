@@ -41,8 +41,19 @@ class ExtraSolrSearch(SolrSearch):
         newself.extra.update(kwargs)
         return newself
 
+    _count = None
     def count(self):
-        return self.add_extra(rows=0).execute().result.numFound
+        if self._count is None:
+            # We haven't gotten the count yet. Get it.
+            if self.paginator.rows is not None:
+                total_results = self.paginator.rows
+            else:
+                r = self.paginate(rows=0).execute()
+                total_results = r.result.numFound
+                if self.paginator.start is not None:
+                    total_results -= self.paginator.start
+            self._count = total_results
+        return self._count
 
 
 class ExtraOptions(Options):
