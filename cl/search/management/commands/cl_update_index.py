@@ -177,16 +177,18 @@ class Command(BaseCommand):
             elif options.get('items'):
                 self.delete(*options['items'])
 
-        elif options.get('do_commit'):
+        if options.get('do_commit'):
             self.si.commit()
 
-        elif options.get('optimize'):
+        if options.get('optimize'):
             self.optimize()
 
-        elif options.get('optimize_everything'):
+        if options.get('optimize_everything'):
             self.optimize_everything()
 
-        else:
+        if not any([options['update'], options.get('delete'),
+                    options.get('do_commit'), options.get('optimize'),
+                    options.get('optimize_everything')]):
             self.stderr.write('Error: You must specify whether you wish to '
                               'update, delete, commit, or optimize your '
                               'index.\n')
@@ -202,7 +204,6 @@ class Command(BaseCommand):
            instead, it should be fetching the next 1,000
         """
         processed_count = 0
-        commit_count = 0
         subtasks = []
         item_bundle = []
         for item in items:
@@ -225,11 +226,10 @@ class Command(BaseCommand):
                 job.apply_async().join()
                 subtasks = []
 
-            sys.stdout.write("\rProcessed {}/{} ({:.0%}, {} commits)".format(
+            sys.stdout.write("\rProcessed {}/{} ({:.0%})".format(
                 processed_count,
                 count,
                 processed_count * 1.0 / count,
-                commit_count,
             ))
             self.stdout.flush()
         self.stdout.write('\n')
