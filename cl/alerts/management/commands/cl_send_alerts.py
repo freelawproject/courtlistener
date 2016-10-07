@@ -210,19 +210,25 @@ class Command(BaseCommand):
             logger.info("Sent %s %s email alerts." %
                         (alerts_sent_count, rate))
 
-    def clean_rt_queue(self, rate):
+    def clean_rt_queue(self):
         """Clean out any items in the RealTime queue once they've been run or
         if they are stale.
         """
-        if rate == 'rt' and not self.options['simulate']:
+        if not self.options['simulate']:
             for item_type, ids in self.valid_ids.items():
                 RealTimeQueue.objects.filter(
                     item_type=item_type,
                     item_pk__in=ids,
                 ).delete()
 
+    def remove_stale_rt_items(self):
+        """Remove anything old from the RTQ.
+
+        This helps avoid issues with solr hitting the maxboolean clause errors.
+        """
+        if not self.options['simulate']:
             RealTimeQueue.objects.filter(
-                date_modified__lt=now() - datetime.timedelta(days=7),
+                date_modified__lt=now() - datetime.timedelta(days=2),
             ).delete()
 
     def get_new_ids(self):
@@ -259,6 +265,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.options = options
         if options['rate'] == 'rt':
+            self.remove_stale_rt_items()
             self.valid_ids = self.get_new_ids()
 
         if options['simulate']:
@@ -267,4 +274,5 @@ class Command(BaseCommand):
                         "******************************************\n")
 
         self.send_emails(options['rate'])
-        self.clean_rt_queue(options['rate'])
+        if options['rate'] == 'rt':
+            self.clean_rt_queue()
