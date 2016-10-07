@@ -225,11 +225,6 @@ class Command(BaseCommand):
                 job.apply_async().join()
                 subtasks = []
 
-            if (processed_count % 50000 == 0) or last_item:
-                # Do a commit every 50000 items, for good measure.
-                self.si.commit()
-                commit_count += 1
-
             sys.stdout.write("\rProcessed {}/{} ({:.0%}, {} commits)".format(
                 processed_count,
                 count,

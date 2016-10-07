@@ -45,7 +45,7 @@ class OpinionAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         obj.save()
         from cl.search.tasks import add_or_update_opinions
-        add_or_update_opinions.delay([obj.pk], force_commit=False)
+        add_or_update_opinions.delay([obj.pk])
 
     def delete_model(self, request, obj):
         obj.delete()
@@ -110,7 +110,7 @@ class OpinionClusterAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         obj.save()
         from cl.search.tasks import add_or_update_cluster
-        add_or_update_cluster.delay(obj.pk, force_commit=False)
+        add_or_update_cluster.delay(obj.pk)
 
 
 class CourtAdmin(admin.ModelAdmin):
@@ -177,8 +177,7 @@ class OpinionsCitedAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         obj.save()
         from cl.search.tasks import add_or_update_opinions
-        add_or_update_opinions.delay([obj.citing_opinion_id],
-                                     force_commit=False)
+        add_or_update_opinions.delay([obj.citing_opinion_id])
 
 admin.site.register(Opinion, OpinionAdmin)
 admin.site.register(Court, CourtAdmin)

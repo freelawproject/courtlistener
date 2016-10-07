@@ -54,7 +54,7 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
 
 
 @app.task
-def add_or_update_opinions(item_pks, force_commit=True):
+def add_or_update_opinions(item_pks, force_commit=False):
     si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
     try:
         si.add([item.as_search_dict() for item in
@@ -66,7 +66,7 @@ def add_or_update_opinions(item_pks, force_commit=True):
 
 
 @app.task
-def add_or_update_audio_files(item_pks, force_commit=True):
+def add_or_update_audio_files(item_pks, force_commit=False):
     si = scorched.SolrInterface(settings.SOLR_AUDIO_URL, mode='w')
     try:
         si.add([item.as_search_dict() for item in
@@ -78,7 +78,7 @@ def add_or_update_audio_files(item_pks, force_commit=True):
 
 
 @app.task
-def add_or_update_people(item_pks, force_commit=True):
+def add_or_update_people(item_pks, force_commit=False):
     si = scorched.SolrInterface(settings.SOLR_PEOPLE_URL, mode='w')
     try:
         si.add([item.as_search_dict() for item in
@@ -90,7 +90,7 @@ def add_or_update_people(item_pks, force_commit=True):
 
 
 @app.task
-def add_or_update_recap_document(item_pks, force_commit=True):
+def add_or_update_recap_document(item_pks, force_commit=False):
     si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode='w')
     try:
         si.add([item.as_search_dict() for item in
@@ -113,7 +113,7 @@ def delete_items(items, solr_url, force_commit=False):
 
 
 @app.task
-def add_or_update_cluster(pk, force_commit=True):
+def add_or_update_cluster(pk, force_commit=False):
     si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
     try:
         si.add([item.as_search_dict() for item in

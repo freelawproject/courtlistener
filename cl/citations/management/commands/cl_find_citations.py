@@ -147,12 +147,6 @@ class Command(BaseCommand):
                 # The jobs finished - clean things up for the next round
                 subtasks = []
 
-            if index_during_subtask:
-                # No need for commits if not indexing concurrently.
-                if processed_count % 10000 == 0 or last_document:
-                    # Send the commit every 10000 times.
-                    self.si.commit()
-
         if self.index == 'all_at_end':
             call_command(
                 'cl_update_index',

@@ -118,9 +118,9 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         # objects, we'll avoid using the cl_update_index command and do
         # this the hard way using tasks
         opinion_keys = Opinion.objects.values_list('pk', flat=True)
-        add_or_update_opinions(opinion_keys)
+        add_or_update_opinions(opinion_keys, force_commit=True)
         audio_keys = Audio.objects.values_list('pk', flat=True)
-        add_or_update_audio_files(audio_keys)
+        add_or_update_audio_files(audio_keys, force_commit=True)
 
     @staticmethod
     def _teardown_test_solr():

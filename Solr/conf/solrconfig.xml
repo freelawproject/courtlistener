@@ -393,22 +393,28 @@
          If the updateLog is enabled, then it's highly recommended to
          have some sort of hard autoCommit to limit the log size.
       -->
-     <!-- mlr: CL sends the commit signal manually but leaving this here is a
-               reasonable safeguard, and it's the default. -->
-     <autoCommit>
-       <maxTime>${solr.autoCommit.maxTime:15000}</maxTime>
-       <openSearcher>false</openSearcher>
-     </autoCommit>
+    <!--
+      mlr: Send a hard commit every 60 minutes. This persists our data beyond
+      the Tx log. We do soft commits much more regularly to get fast updates.
+    -->
+    <autoCommit>
+      <maxTime>${solr.autoCommit.maxTime:3600000}</maxTime>
+      <maxDocs>50000</maxDocs>
+      <openSearcher>false</openSearcher>
+    </autoCommit>
 
     <!-- softAutoCommit is like autoCommit except it causes a
          'soft' commit which only ensures that changes are visible
          but does not ensure that data is synced to disk.  This is
          faster and more near-realtime friendly than a hard commit.
       -->
-
-       <autoSoftCommit>
-       <maxTime>${solr.autoSoftCommit.maxTime:-1}</maxTime>
-       </autoSoftCommit>
+    <!--
+      mlr: Do soft commits every 30 seconds. This will make results live.
+      See: https://github.com/freelawproject/courtlistener/issues/581
+    -->
+    <autoSoftCommit>
+      <maxTime>${solr.autoSoftCommit.maxTime:30000}</maxTime>
+    </autoSoftCommit>
 
     <!-- Update Related Event Listeners
 

@@ -47,7 +47,7 @@ def process_citations(data, debug):
 
     print("\nUpdating Solr...")
     if not debug:
-        add_or_update_opinions(updated_ids, force_commit=True)
+        add_or_update_opinions(updated_ids)
     print("Done.")
 
 
