@@ -72,16 +72,16 @@ class Command(cl_scrape_opinions.Command):
 
         return docket, audio_file, error
 
-    @staticmethod
-    def save_everything(items, index=False):
+    def save_everything(self, items, index=False, backscrape=False):
         docket, audio_file = items['docket'], items['audio_file']
         docket.save()
         audio_file.docket = docket
         audio_file.save(index=index)
-        RealTimeQueue.objects.create(
-            item_type='oa',
-            item_pk=audio_file.pk,
-        )
+        if not backscrape:
+            RealTimeQueue.objects.create(
+                item_type='oa',
+                item_pk=audio_file.pk,
+            )
 
     def scrape_court(self, site, full_crawl=False):
         download_error = False

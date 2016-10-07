@@ -136,8 +136,7 @@ class Command(BaseCommand):
 
         return docket, opinion, cluster, error
 
-    @staticmethod
-    def save_everything(items, index=False):
+    def save_everything(self, items, index=False, backscrape=False):
         """Saves all the sub items and associates them as appropriate.
         """
         docket, cluster, opinion = items['docket'], items['cluster'], items['opinion']
@@ -146,10 +145,11 @@ class Command(BaseCommand):
         cluster.save(index=False)  # Index only when the opinion is associated.
         opinion.cluster = cluster
         opinion.save(index=index)
-        RealTimeQueue.objects.create(
-            item_type='o',
-            item_pk=opinion.pk,
-        )
+        if not backscrape:
+            RealTimeQueue.objects.create(
+                item_type='o',
+                item_pk=opinion.pk,
+            )
 
     def scrape_court(self, site, full_crawl=False):
         download_error = False
