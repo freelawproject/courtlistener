@@ -1134,7 +1134,6 @@ class Opinion(models.Model):
         super(Opinion, self).save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_or_update_opinions
-
             add_or_update_opinions.delay([self.pk], force_commit)
 
     def as_search_dict(self):

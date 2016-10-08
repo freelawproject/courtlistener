@@ -394,8 +394,9 @@
          have some sort of hard autoCommit to limit the log size.
       -->
     <!--
-      mlr: Send a hard commit every 60 minutes. This persists our data beyond
-      the Tx log. We do soft commits much more regularly to get fast updates.
+      mlr: Send a hard commit every 60 minutes or every 50000 docs. This
+      persists our data beyond the Tx log. We do soft commits much more
+      regularly to get fast updates.
     -->
     <autoCommit>
       <maxTime>${solr.autoCommit.maxTime:3600000}</maxTime>
@@ -409,11 +410,11 @@
          faster and more near-realtime friendly than a hard commit.
       -->
     <!--
-      mlr: Do soft commits every 30 seconds. This will make results live.
+      mlr: Do soft commits every 120 seconds. This will make results live.
       See: https://github.com/freelawproject/courtlistener/issues/581
     -->
     <autoSoftCommit>
-      <maxTime>${solr.autoSoftCommit.maxTime:30000}</maxTime>
+      <maxTime>${solr.autoSoftCommit.maxTime:120000}</maxTime>
     </autoSoftCommit>
 
     <!-- Update Related Event Listeners
@@ -541,10 +542,11 @@
            autowarmCount - the number of entries to prepopulate from
                and old cache.
       -->
+    <!-- See: https://github.com/freelawproject/courtlistener/issues/581#issuecomment-252443419 -->
     <filterCache class="solr.FastLRUCache"
                  size="512"
                  initialSize="512"
-                 autowarmCount="0"/>
+                 autowarmCount="16"/>
 
     <!-- Query Result Cache
 
@@ -554,7 +556,7 @@
     <queryResultCache class="solr.LRUCache"
                      size="512"
                      initialSize="512"
-                     autowarmCount="0"/>
+                     autowarmCount="16"/>
 
     <!-- Document Cache
 
@@ -675,10 +677,10 @@
       -->
     <listener event="newSearcher" class="solr.QuerySenderListener">
       <arr name="queries">
-        <!--
-           <lst><str name="q">solr</str><str name="sort">price asc</str></lst>
-           <lst><str name="q">rocks</str><str name="sort">weight asc</str></lst>
-          -->
+          <!-- See: https://github.com/freelawproject/courtlistener/issues/581#issuecomment-252443419-->
+          <lst>
+              <str name="q">*</str><str name="sort">score desc</str>
+          </lst>
       </arr>
     </listener>
     <listener event="firstSearcher" class="solr.QuerySenderListener">
