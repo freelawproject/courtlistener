@@ -394,12 +394,12 @@
          have some sort of hard autoCommit to limit the log size.
       -->
     <!--
-      mlr: Send a hard commit every 60 minutes or every 50000 docs. This
+      mlr: Send a hard commit every 10 minutes or every 50000 docs. This
       persists our data beyond the Tx log. We do soft commits much more
       regularly to get fast updates.
     -->
     <autoCommit>
-      <maxTime>${solr.autoCommit.maxTime:3600000}</maxTime>
+      <maxTime>${solr.autoCommit.maxTime:600000}</maxTime>
       <maxDocs>50000</maxDocs>
       <openSearcher>false</openSearcher>
     </autoCommit>
