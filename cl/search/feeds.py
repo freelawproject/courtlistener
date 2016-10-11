@@ -6,10 +6,16 @@ from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed
 
-from cl.lib import search_utils, sunburnt
+from cl.lib import search_utils
 from cl.lib.mime_types import lookup_mime_type
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.forms import SearchForm
 from cl.search.models import Court
+
+
+def doc0(item):
+    """Return the first item from a grouped result."""
+    return item['doclist']['docs'][0]
 
 
 class SearchFeed(Feed):
@@ -32,7 +38,7 @@ class SearchFeed(Feed):
         search_form = SearchForm(obj.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+            solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
             main_params = search_utils.build_main_query(cd, highlight=False)
             main_params.update({
                 'sort': 'dateFiled desc',
@@ -40,21 +46,21 @@ class SearchFeed(Feed):
                 'start': '0',
                 'caller': 'SearchFeed',
             })
-            return conn.raw_query(**main_params).execute()
+            return solr.query().add_extra(**main_params).execute()
         else:
             return []
 
     def item_link(self, item):
-        return item['absolute_url']
+        return doc0(item)['absolute_url']
 
     def item_author_name(self, item):
-        return item['court']
+        return doc0(item)['court']
 
     def item_pubdate(self, item):
-        return datetime.datetime.combine(item['dateFiled'], datetime.time())
+        return datetime.datetime.combine(doc0(item)['dateFiled'], datetime.time())
 
     def item_title(self, item):
-        return item['caseName']
+        return doc0(item)['caseName']
 
 
 class JurisdictionFeed(Feed):
@@ -75,7 +81,7 @@ class JurisdictionFeed(Feed):
 
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
-        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
         params = {
             'q': '*',
             'fq': 'court_exact:%s' % obj.pk,
@@ -84,26 +90,26 @@ class JurisdictionFeed(Feed):
             'start': '0',
             'caller': 'JurisdictionFeed',
         }
-        return conn.raw_query(**params).execute()
+        return solr.query().add_extra(**params).execute()
 
     def item_link(self, item):
-        return item['absolute_url']
+        return doc0(item)['absolute_url']
 
     def item_author_name(self, item):
-        return item['court']
+        return doc0(item)['court']
 
     def item_pubdate(self, item):
-        return datetime.datetime.combine(item['dateFiled'], datetime.time())
+        return datetime.datetime.combine(doc0(item)['dateFiled'], datetime.time())
 
     def item_title(self, item):
-        return item['caseName']
+        return doc0(item)['caseName']
 
     def item_categories(self, item):
-        return [item['status'], ]
+        return [doc0(item)['status']]
 
     def item_enclosure_url(self, item):
         try:
-            path = item['local_path']
+            path = doc0(item)['local_path']
             if not path.startswith('/'):
                 return '/%s' % (path,)
             return path
@@ -114,7 +120,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                item['local_path'].encode('utf-8')
+                doc0(item)['local_path'].encode('utf-8')
             )
             return os.path.getsize(file_loc)
         except:
@@ -124,7 +130,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                item['local_path'].encode('utf-8')
+                doc0(item)['local_path'].encode('utf-8')
             )
             return lookup_mime_type(file_loc)
         except:
@@ -141,7 +147,7 @@ class AllJurisdictionsFeed(JurisdictionFeed):
 
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
-        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
         params = {
             'q': '*',
             'sort': 'dateFiled desc',
@@ -149,4 +155,4 @@ class AllJurisdictionsFeed(JurisdictionFeed):
             'start': '0',
             'caller': 'AllJurisdictionsFeed',
         }
-        return conn.raw_query(**params).execute()
+        return solr.query().add_extra(**params).execute()
