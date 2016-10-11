@@ -1,7 +1,7 @@
 from django.conf import settings
 
 from cl.lib import search_utils
-from cl.lib.sunburnt import sunburnt
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search import forms
 
 
@@ -53,22 +53,22 @@ class SolrList(object):
         self.type = type
         self._item_cache = []
         if self.type == 'o':
-            self.conn = sunburnt.SolrInterface(
+            self.conn = ExtraSolrInterface(
                 settings.SOLR_OPINION_URL,
                 mode='r',
             )
         elif self.type == 'oa':
-            self.conn = sunburnt.SolrInterface(
+            self.conn = ExtraSolrInterface(
                 settings.SOLR_AUDIO_URL,
                 mode='r',
             )
         elif self.type == 'r':
-            self.conn = sunburnt.SolrInterface(
+            self.conn = ExtraSolrInterface(
                 settings.SOLR_RECAP_URL,
                 mode='r',
             )
         elif self.type == 'p':
-            self.conn = sunburnt.SolrInterface(
+            self.conn = ExtraSolrInterface(
                 settings.SOLR_PEOPLE_URL,
                 mode='r',
             )
@@ -77,10 +77,9 @@ class SolrList(object):
     def __len__(self):
         if self._length is None:
             mq = self.main_query.copy()  # local copy for manipulation
-            mq['rows'] = 0  # For performance, we just want the count
             mq['caller'] = 'api_search_count'
-            r = self.conn.raw_query(**mq).execute()
-            self._length = r.result.numFound
+            count = self.conn.query().add_extra(**mq).count()
+            self._length = count
         return self._length
 
     def __iter__(self):
@@ -92,16 +91,26 @@ class SolrList(object):
 
     def __getitem__(self, item):
         self.main_query['start'] = self.offset
-        results_si = self.conn.raw_query(**self.main_query).execute()
+        r = self.conn.query().add_extra(**self.main_query).execute()
 
-        # Pull the text snippet up a level
-        for result in results_si.result.docs:
-            result['snippet'] = '&hellip;'.join(
-                    result['solr_highlights']['text'])
+        if r.group_field is None:
+            # Pull the text snippet up a level
+            for result in r.result.docs:
+                result['snippet'] = '&hellip;'.join(
+                        result['solr_highlights']['text'])
+                self._item_cache.append(SolrObject(initial=result))
+        else:
+            # Grouped results
+            for group in getattr(r.groups, r.group_field)['groups']:
+                snippets = []
+                for doc in group['doclist']['docs']:
+                    for snippet in doc['solr_highlights']['text']:
+                        if snippet not in snippets:
+                            snippets.append(snippet)
 
-        # Return the results as objects, not dicts.
-        for result in results_si.result.docs:
-            self._item_cache.append(SolrObject(initial=result))
+                doc0 = group['doclist']['docs'][0]
+                doc0['snippet'] = '&hellip;'.join(snippets)
+                self._item_cache.append(SolrObject(initial=doc0))
 
         # Now, assuming our _item_cache is all set, we just get the item.
         if isinstance(item, slice):

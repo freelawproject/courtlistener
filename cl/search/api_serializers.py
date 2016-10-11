@@ -3,8 +3,6 @@ from collections import OrderedDict
 from rest_framework import serializers
 
 from cl.api.utils import DynamicFieldsModelSerializer
-from cl.lib.sunburnt import schema
-from cl.lib.sunburnt.schema import SolrSchema
 from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
     OpinionsCited
 
@@ -127,23 +125,22 @@ class SearchResultSerializer(serializers.Serializer):
         raise NotImplementedError
 
     solr_field_mappings = {
-        schema.SolrBooleanField: serializers.BooleanField,
-        schema.SolrUnicodeField: serializers.CharField,
-        schema.SolrUUIDField: serializers.CharField,
-        schema.SolrDateField: serializers.DateTimeField,
+        u'boolean': serializers.BooleanField,
+        u'string': serializers.CharField,
+        u'text_en_splitting_cl': serializers.CharField,
+        u'text_no_word_parts': serializers.CharField,
+        u'date': serializers.DateTimeField,
 
         # Numbers
-        schema.SolrNumericalField: serializers.IntegerField,
-        schema.SolrShortField: serializers.IntegerField,
-        schema.SolrIntField: serializers.IntegerField,
-        schema.SolrLongField: serializers.IntegerField,
-        schema.SolrFloatField: serializers.FloatField,
-        schema.SolrDoubleField: serializers.IntegerField,
+        u'int': serializers.IntegerField,
+        u'tint': serializers.IntegerField,
+        u'long': serializers.IntegerField,
+        # schema.SolrFloatField: serializers.FloatField,
+        # schema.SolrDoubleField: serializers.IntegerField,
+
+        # Other
+        u'pagerank': serializers.CharField,
     }
-    solr_data_types = SolrSchema.solr_data_types
-    solr_data_types.update({
-        'solr.ExternalFileField': schema.SolrUnicodeField
-    })
     skipped_fields = ['_version_', 'django_ct', 'django_id', 'text']
 
     def get_fields(self):
@@ -154,28 +151,15 @@ class SearchResultSerializer(serializers.Serializer):
             'snippet': serializers.CharField(read_only=True),
         }
         # Map each field in the Solr schema to a DRF field
-        for field_name, field_obj in self._context['schema'].fields.items():
-            drf_field = self._get_drf_field(field_obj)
-            fields[field_name] = drf_field(read_only=True)
+        for field in self._context['schema']['fields']:
+            if field.get('multiValued'):
+                drf_field = serializers.ListField
+            else:
+                drf_field = self.solr_field_mappings[field[u'type']]
+            fields[field[u'name']] = drf_field(read_only=True)
 
         for field in self.skipped_fields:
             if field in fields:
                 fields.pop(field)
         fields = OrderedDict(sorted(fields.items()))  # Sort by key
         return fields
-
-    def _get_drf_field(self, field_obj):
-        """Gets a string representing the Solr type, such as 'solr.TextField',
-        then looks it up in solr_data_types to get back a sunburnt schema
-        object, then maps that to a DRF serialization format.
-
-        Still, this is better than having all fields explicitly laid out.
-        """
-        if field_obj.multi_valued:
-            return serializers.ListField
-        else:
-            return self.solr_field_mappings[
-                self.solr_data_types[
-                    getattr(field_obj, 'class')
-                ]
-            ]

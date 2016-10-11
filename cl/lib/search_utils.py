@@ -386,8 +386,6 @@ def add_boosts(main_params, cd):
         main_params['pf'] = make_boost_string(boosts['pf'][cd['type']])
         main_params['ps'] = 5
 
-    return main_params
-
 
 def add_highlighting(main_params, cd, highlight):
     """Add any parameters relating to highlighting."""
@@ -424,7 +422,7 @@ def add_highlighting(main_params, cd, highlight):
                 'neutralCite', 'lexisCite']
     elif cd['type'] == 'r':
         fl = ['id', 'court_id', 'dateFiled', 'docketNumber', 'caseName',
-              'natureOfSuit', 'court', 'courtJurisdiction', 'assignedTo']
+              'natureOfSuit', 'court', 'assignedTo']
         hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
                 'docketNumber', 'natureOfSuit']
     elif cd['type'] == 'oa':
@@ -448,8 +446,6 @@ def add_highlighting(main_params, cd, highlight):
             continue
         main_params['f.%s.hl.fragListBuilder' % field] = 'single'
         main_params['f.%s.hl.alternateField' % field] = field
-
-    return main_params
 
 
 def add_fq(main_params, cd):
@@ -531,12 +527,12 @@ def add_fq(main_params, cd):
         if len(selected_courts_string) + len(selected_stats_string) > 0:
             main_fq.extend([
                 '{!tag=dt}status_exact:(%s)' % selected_stats_string,
-                '{!tag=dt}court_exact:(%s)' % selected_courts_string
+                'court_exact:(%s)' % selected_courts_string
             ])
     elif cd['type'] in ['oa', 'p', 'r']:
         if len(selected_courts_string) > 0:
             main_fq.extend([
-                '{!tag=dt}court_exact:(%s)' % selected_courts_string
+                'court_exact:(%s)' % selected_courts_string
             ])
 
     # If a param has been added to the fq variables, then we add them to the
@@ -544,7 +540,38 @@ def add_fq(main_params, cd):
     if len(main_fq) > 0:
         main_params['fq'] = main_fq
 
-    return main_params
+
+def add_grouping(main_params, cd):
+    """Add any grouping parameters."""
+    if cd['type'] == 'o':
+        main_params['group'] = 'true'              # Do grouping
+        main_params['group.ngroups'] = 'true'      # Include number of groups
+        main_params['group.limit'] = 5             # Cap the group size at N
+        main_params['group.field'] = 'cluster_id'  # Group on this field
+        main_params['group.sort'] = 'type asc'     # Sort by type
+
+
+def regroup_snippets(paged_results):
+    """Regroup the snippets in a grouped result.
+
+    Grouped results will have snippets for each of the group members. Some of
+    the snippets will be the same because they're the same across all items in
+    the group. For example, every opinion in the opinion index contains the
+    name of the attorneys. So, if we have a match on the attorney name, that'll
+    generate a snippet for both the lead opinion and a dissent.
+
+    In this function, we identify these kinds of duplicates and pull them out.
+    We also flatten the paged_results so that snippets are easier to get.
+    """
+    group_field = paged_results.object_list.group_field
+    if group_field is not None:
+        for group in getattr(paged_results.object_list.groups, group_field)['groups']:
+            snippets = []
+            for doc in group['doclist']['docs']:
+                for snippet in doc['solr_highlights']['text']:
+                    if snippet not in snippets:
+                        snippets.append(snippet)
+            group['snippets'] = snippets
 
 
 def build_main_query(cd, highlight='all', order_by=''):
@@ -554,9 +581,10 @@ def build_main_query(cd, highlight='all', order_by=''):
         'caller': 'build_main_query',
     }
 
-    main_params = add_boosts(main_params, cd)
-    main_params = add_highlighting(main_params, cd, highlight)
-    main_params = add_fq(main_params, cd)
+    add_boosts(main_params, cd)
+    add_highlighting(main_params, cd, highlight)
+    add_fq(main_params, cd)
+    add_grouping(main_params, cd)
 
     if settings.DEBUG:
         print "Params sent to search are:\n%s" % ' &\n'.join(
@@ -611,7 +639,7 @@ def place_facet_queries(cd, conn):
     if len(fq) > 0:
         facet_params['fq'] = fq
 
-    stat_facet_fields = conn.raw_query(**facet_params).execute().facet_counts.facet_fields
+    stat_facet_fields = conn.query().add_extra(**facet_params).execute().facet_counts.facet_fields
 
     return stat_facet_fields
 

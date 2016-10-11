@@ -23,7 +23,7 @@ from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     place_facet_queries, make_stats_variable, merge_form_with_courts, \
-    make_get_string
+    make_get_string, regroup_snippets
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
 from cl.stats import tally_stat, Stat
@@ -49,21 +49,21 @@ def do_search(request, rows=20, order_by=None, type=None):
             query_citation = None
             status_facets = None
             if cd['type'] == 'o':
-                conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
-                stat_facet_fields = place_facet_queries(cd, conn)
+                si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+                stat_facet_fields = place_facet_queries(cd, si)
                 status_facets = make_stats_variable(stat_facet_fields,
                                                     search_form)
                 query_citation = get_query_citation(cd)
-                results_si = conn.query().add_extra(**build_main_query(cd))
+                results = si.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'r':
-                conn = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-                results_si = conn.query().add_extra(**build_main_query(cd))
+                si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
+                results = si.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'oa':
-                conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
-                results_si = conn.query().add_extra(**build_main_query(cd))
+                si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
+                results = si.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'p':
-                conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
-                results_si = conn.query().add_extra(**build_main_query(cd))
+                si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
+                results = si.query().add_extra(**build_main_query(cd))
 
             courts = Court.objects.filter(in_use=True)
             courts, court_count_human, court_count = merge_form_with_courts(
@@ -85,7 +85,7 @@ def do_search(request, rows=20, order_by=None, type=None):
 
     # Set up pagination
     try:
-        paginator = Paginator(results_si, rows)
+        paginator = Paginator(results, rows)
         page = request.GET.get('page', 1)
         try:
             paged_results = paginator.page(page)
@@ -100,8 +100,10 @@ def do_search(request, rows=20, order_by=None, type=None):
         logger.warning("Error loading pagination on search page with request: %s" % request.GET)
         logger.warning("Error was: %s" % e)
         if settings.DEBUG is True:
-            print e
+            traceback.print_exc()
         return {'error': True}
+
+    regroup_snippets(paged_results)
 
     return {
         'search_form': search_form,

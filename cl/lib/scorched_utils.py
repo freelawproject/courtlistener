@@ -48,8 +48,8 @@ class ExtraSolrSearch(SolrSearch):
         if self._count is None:
             # We haven't gotten the count yet. Get it. Clone self for this
             # query or else we'll set rows=0 for remainder.
-            newself = self.clone().add_extra(rows=0)
-            r = newself.execute()
+            newself = self.clone()
+            r = newself.add_extra(rows=0).execute()
             if r.groups:
                 total = getattr(r.groups, r.group_field)['ngroups']
             else:

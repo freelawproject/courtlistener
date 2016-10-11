@@ -93,23 +93,23 @@ class JurisdictionFeed(Feed):
         return solr.query().add_extra(**params).execute()
 
     def item_link(self, item):
-        return doc0(item)['absolute_url']
+        return item['absolute_url']
 
     def item_author_name(self, item):
-        return doc0(item)['court']
+        return item['court']
 
     def item_pubdate(self, item):
-        return datetime.datetime.combine(doc0(item)['dateFiled'], datetime.time())
+        return datetime.datetime.combine(item['dateFiled'], datetime.time())
 
     def item_title(self, item):
-        return doc0(item)['caseName']
+        return item['caseName']
 
     def item_categories(self, item):
-        return [doc0(item)['status']]
+        return [item['status']]
 
     def item_enclosure_url(self, item):
         try:
-            path = doc0(item)['local_path']
+            path = item['local_path']
             if not path.startswith('/'):
                 return '/%s' % (path,)
             return path
@@ -120,7 +120,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                doc0(item)['local_path'].encode('utf-8')
+                item['local_path'].encode('utf-8')
             )
             return os.path.getsize(file_loc)
         except:
@@ -130,7 +130,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                doc0(item)['local_path'].encode('utf-8')
+                item['local_path'].encode('utf-8')
             )
             return lookup_mime_type(file_loc)
         except:
