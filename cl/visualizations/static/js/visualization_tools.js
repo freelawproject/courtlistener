@@ -68,7 +68,6 @@ $(document).ready(function () {
         });
     });
     $(function () {
-        // Initialize tooltips on profile pages.
         $('[data-toggle="tooltip"]').tooltip()
     });
 
