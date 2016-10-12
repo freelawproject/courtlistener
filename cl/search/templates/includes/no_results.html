@@ -9,14 +9,6 @@
         <li>Check your spelling</li>
         <li>Try fewer filters</li>
         <li>Remove quotes if you used them</li>
-        <li>Try searching
-            {% if type == 'o' %}
-                oral arguments
-            {% elif type == 'oa' %}
-                opinions
-            {% endif %}
-            instead
-        </li>
     </ul>
     <p>Our <a href="{% url "coverage" %}">coverage page</a> details which cases
         we

@@ -1,36 +1,168 @@
 {% load extras %}
 {% load text_filters %}
+{% load mathfilters %}
 {% load humanize %}
 
 {% for result in results.object_list %}
 <article>
+    {% with doc0=result.doclist.docs.0 type=search_form.type.value %}
     <h3 class="bottom serif">
-        <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
-            {% if search_form.type.value == 'p' or type_override == 'p' %}
+            {% if type == 'p' or type_override == 'p' %}
+                <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
+                   class="visitable">
                 {{ result.solr_highlights.name_reverse.0|safe }}
                 {% if result.court %}
                     ({{ result.court|uniq|safeseq|join:", " }})
                 {% endif %}
-            {% else %}
+                </a>
+
+            {% elif type == 'o' or type_override == 'o' or type == 'r' or type_override == 'r' %}
+                <a href="{{ doc0.absolute_url }}?{{ request.META.QUERY_STRING }}"
+                   class="visitable">
+                {{ doc0.solr_highlights.caseName.0|safe }}
+                ({% if doc0.court_id != 'scotus' %}{{ doc0.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ doc0.dateFiled|date:"Y" }})
+                </a>
+            {% elif type == 'oa' or type_override == 'oa' %}
+                <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
+                   class="visitable">
                 {{ result.solr_highlights.caseName.0|safe }}
-                ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if search_form.type.value == 'o' or type_override == 'o'%}{{ result.dateFiled|date:"Y" }}{% elif search_form.type.value == 'oa' or type_override == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
+                ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ result.dateArgued|date:"Y" }})
+                </a>
             {% endif %}
-        </a>
     </h3>
 
+    {% if type == 'r' or type_override == 'r' %}
     <div class="bottom">
-        {% if search_form.type.value == 'o' or type_override == 'o' %}
+        {% if doc0.solr_highlights.docketNumber.0 %}
+            <div class="inline nowrap">
+                <span class="meta-data-header">Docket Number:</span>
+                <span class="meta-data-value">{{ doc0.solr_highlights.docketNumber.0|safe }}</span>
+            </div>
+        {% endif %}
+        <div class="inline nowrap">
+            <span class="meta-data-header">Date Filed:</span>
+            <time class="meta-data-value" datetime="{{ doc0.dateFiled|date:"Y-m-d" }}">
+                {% if doc0.dateFiled %}
+                    {{ doc0.dateFiled|date:"F jS, Y" }}
+                {% else %}
+                    Unknown Date
+                {% endif %}
+            </time>
+        </div>
+        {% if doc0.dateArgued %}
+            <div class="inline nowrap">
+                <span class="meta-data-header">Date Argued:</span>
+                <time class="meta-data-value"
+                      datetime="{{ doc0.dateArgued|date:'Y-m-d' }}">
+                    {{ doc0.dateArgued|date:"F jS, Y" }}
+                </time>
+            </div>
+        {% endif %}
+        {% if doc0.dateTerminated %}
+            <div class="inline nowrap">
+                <span class="meta-data-header">Date Terminated:</span>
+                <time class="meta-data-value"
+                      datetime="{{ doc0.dateTerminated|date:'Y-m-d' }}">
+                    {{ doc0.dateTerminated|date:"F jS, Y" }}
+                </time>
+            </div>
+        {% endif %}
+        {% if doc0.solr_highlights.suitNature.0 %}
+            <div class="inline nowrap">
+                <span class="meta-data-header">Nature of Suit:</span>
+                <span class="meta-data-value">
+                    <a href="?type=r&q=suitNature:{{ doc0.solr_highlights.suitNature.0|safe }}">
+                        {{ doc0.solr_highlights.suitNature.0|safe }}
+                    </a>
+                </span>
+            </div>
+        {% endif %}
+        {% if doc0.solr_highlights.cause.0 %}
+            <div class="inline nowrap">
+                <span class="meta-data-header">Cause:</span>
+                <span class="meta-data-value">
+                    {{ doc0.solr_highlights.cause.0|safe }}
+                </span>
+            </div>
+        {% endif %}
+        {% if doc0.solr_highlights.juryDemand.0 %}
+            <div class="inline nowrap">
+                <span class="meta-data-header">Jury Demand:</span>
+                <span class="meta-data-value">
+                    <a href="?type=r&q=juryDemand:{{ doc0.solr_highlights.juryDemand.0|safe }}">
+                        {{ doc0.solr_highlights.juryDemand.0|safe }}
+                    </a>
+                </span>
+            </div>
+        {% endif %}
+        {% if doc0.solr_highlights.assignedTo.0 %}
+            <div class="inline nowrap">
+                <span class="meta-data-header">Assigned To:</span>
+                <span class="meta-data-value">
+                    <a href="?type=r&q=assigned_to_id:{{ doc0.assigned_to_id }}">
+                        {{ doc0.solr_highlights.assignedTo.0|safe }}
+                    </a>
+                </span>
+            </div>
+        {% endif %}
+        {% if doc0.solr_highlights.referredTo.0 %}
+            <div class="inline nowrap">
+                <span class="meta-data-header">Referred To:</span>
+                <span class="meta-data-value">
+                    <a href="?type=r&q=referred_to_id:{{ doc0.referred_to_id }}">
+                        {{ doc0.solr_highlights.referredTo.0|safe }}
+                    </a>
+                </span>
+            </div>
+        {% endif %}
+
+        {% for doc in result.doclist.docs %}
+        <div class="col-md-offset-half">
+            <h4>
+                <a href="{{ doc.absolute_url }}#entry-{{ doc.document_number }}">Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
+                </a>
+                {% if not doc.is_available %}
+                    <i class="fa fa-ban gray"
+                       data-toggle="tooltip"
+                       data-placement="right"
+                       title="Item not yet in RECAP archive."></i>
+                {% endif %}
+            </h4>
+            <p>
+                {% if request.GET.q %}&hellip;{% endif %}
+                {% for frag in doc.solr_highlights.text %}
+                    {{ frag|safe|underscore_to_space }}&hellip;
+                {% endfor %}
+            </p>
+        </div>
+        {% endfor %}
+        <div class="col-md-offset-half">
+            {% with limit=results.object_list.params|get:"group.limit" %}
+            {% with remaining=result.doclist.numFound|sub:limit %}
+            {% if remaining > 0 %}
+            <a href="{% url "show_results" %}?type=r&q=docket_id:{{ doc0.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
+                this Case</a>
+            {% endif %}
+            {% endwith %}
+            {% endwith %}
+        </div>
+    </div>
+
+    {% endif %}
+
+    <div class="bottom">
+        {% if type == 'o' or type_override == 'o' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Date Filed:</span>
-                <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d' }}">
-                    {% if result.dateFiled %}
-                        {{ result.dateFiled|date:"F jS, Y" }}
+                <time class="meta-data-value" datetime="{{ doc0.dateFiled|date:'Y-m-d' }}">
+                    {% if doc0.dateFiled %}
+                        {{ doc0.dateFiled|date:"F jS, Y" }}
                     {% else %}
                         Unknown Date
                     {% endif %}
                 </time>
             </div>
-        {% elif search_form.type.value == 'oa' or type_override == 'oa' %}
+        {% elif type == 'oa' or type_override == 'oa' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Date Argued:</span>
                 <time class="meta-data-value"
@@ -42,7 +174,7 @@
                     {% endif %}
                 </time>
             </div>
-        {% elif search_form.type.value == 'p' or type_override == 'p' %}
+        {% elif type == 'p' or type_override == 'p' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Born:</span>
                 <span class="meta-data-value"
@@ -110,25 +242,27 @@
             {% endif %}
         {% endif %}
 
-        {% if search_form.type.value == 'o' or type_override == 'o' %}
+        {% if type == 'o' or type_override == 'o' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Status:</span>
-                <span class="meta-data-value">{{ result.status }}</span>
+                <span class="meta-data-value">{{ doc0.status }}</span>
             </div>
-            {% if result.solr_highlights.citation.0 %}
+            {% if doc0.solr_highlights.citation.0 %}
                 <div class="inline nowrap">
                     <span class="meta-data-header">Citations: </span>
-                    <span class="meta-data-value">{{ result.solr_highlights.citation|safeseq|join:", " }}</span>
+                    <span class="meta-data-value">{{ doc0.solr_highlights.citation|safeseq|join:", " }}</span>
                 </div>
             {% endif %}
         {% endif %}
-        {% if result.solr_highlights.docketNumber.0 %}
-            <div class="inline nowrap">
-                <span class="meta-data-header">Docket Number:</span>
-                <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
-            </div>
+        {% if type == 'o' or type_override == 'o' or type == 'oa' or type_override == 'oa' %}
+            {% if doc0.solr_highlights.docketNumber.0 %}
+                <div class="inline nowrap">
+                    <span class="meta-data-header">Docket Number:</span>
+                    <span class="meta-data-value">{{ doc0.solr_highlights.docketNumber.0|safe }}</span>
+                </div>
+            {% endif %}
         {% endif %}
-        {% if search_form.type.value == 'oa' or type_override == 'oa' %}
+        {% if type == 'oa' or type_override == 'oa' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Duration:</span>
                 <span class="meta-data-value">{{ result.duration|naturalduration }}</span>
@@ -136,24 +270,26 @@
         {% endif %}
     </div>
     <div class="bottom">
-        {% if result.solr_highlights.judge.0 %}
-            <div class="inline nowrap">
-                <span class="meta-data-header">Judge:</span>
-                <span class="meta-data-value">{{ result.solr_highlights.judge.0|safe }}</span>
-            </div>
-        {% endif %}
-        {% if search_form.type.value == 'o' or type_override == 'o' %}
-            {% if result.solr_highlights.suitNature.0 %}
+        {% if type == 'oa' or type_override == 'oa' %}
+            {% if result.solr_highlights.judge.0 %}
                 <div class="inline nowrap">
-                    <span class="meta-data-header">Nature of suit:</span>
+                    <span class="meta-data-header">Judge:</span>
+                    <span class="meta-data-value">{{ result.solr_highlights.judge.0|safe }}</span>
+                </div>
+            {% endif %}
+        {% endif %}
+        {% if type == 'o' or type_override == 'o' %}
+            {% if doc0.solr_highlights.suitNature.0 %}
+                <div class="inline nowrap">
+                    <span class="meta-data-header">Nature of Suit:</span>
                     <span class="meta-data-value">
-                        <a href="?q=suitNature:{{ result.solr_highlights.suitNature.0|safe }}">
-                            {{ result.solr_highlights.suitNature.0|safe }}
+                        <a href="?q=suitNature:{{ doc0.solr_highlights.suitNature.0|safe }}">
+                            {{ doc0.solr_highlights.suitNature.0|safe }}
                         </a>
                     </span>
                 </div>
             {% endif %}
-        {% elif search_form.type.value == 'p' or type_override == 'p' %}
+        {% elif type == 'p' or type_override == 'p' %}
             {% if result.school %}
                 <div class="inline">
                     <span class="meta-data-header">Schools:</span>
@@ -162,23 +298,24 @@
             {% endif %}
         {% endif %}
     </div>
-    {% if search_form.type.value == 'o' or type_override == 'o' %}
-        {% if result.citeCount > 0 %}
+    {% if type == 'o' or type_override == 'o' %}
+        {% if doc0.citeCount > 0 %}
             <div class="bottom" class="inline nowrap">
                 <span class="meta-data-value">
-                    <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})">
-                        Cited {{ result.citeCount|intcomma }} time{{ result.citeCount|pluralize }}
+                    <a href="/?q=cites%3A({{ doc0.sibling_ids|join:" OR " }})">
+                        Cited {{ doc0.citeCount|intcomma }} time{{ doc0.citeCount|pluralize }}
                     </a>
                 </span>
             </div>
         {% endif %}
     {% endif %}
-    {% if search_form.type.value == 'o' and simple != True %}
+    {% if type == 'o' and simple != True %}
         <p>
-            {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.solr_highlights.text %}
+            {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.snippets %}
                 {{ frag|safe|underscore_to_space }}&hellip;
             {% endfor %}
         </p>
     {% endif %}
+    {% endwith %}
 </article>
 {% endfor %}

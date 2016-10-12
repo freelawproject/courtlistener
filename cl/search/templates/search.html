@@ -30,8 +30,17 @@
           href="/podcast/court/all/">
 {% endblock %}
 
+{% block footer-scripts %}
+    <script type="text/javascript">
+        $(function () {$('[data-toggle="tooltip"]').tooltip()});
+    </script>
+{% endblock %}
+
 {% block navbar-o %}
     {% if search_form.type.value == "o" %}active{% else %}{{ block.super }}{% endif %}
+{% endblock %}
+{% block navbar-r %}
+    {% if search_form.type.value == 'r' %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-oa %}
     {% if search_form.type.value == "oa" %}active{% else %}{{ block.super }}{% endif %}
@@ -42,25 +51,52 @@
 
 
 {% block sidebar %}
-{% with type=search_form.type.value %}
-    <div class="col-sm-3 search-page" id="sidebar">
-        <div class="sidebar-section visible-xs">
-            <a class="btn btn-default" href="#search-results">Jump to
-                Results</a>
-        </div>
-        {% include "includes/result_type_chooser.html" with type=type %}
-        {% include "includes/sidebar_filters.html" %}
-        {% if type == 'o' or type == 'oa' %}
-            {% include "includes/alert_sidebar_section.html" %}
-        {% endif %}
+<div class="col-sm-3 search-page" id="sidebar">
+    <div class="sidebar-section visible-xs">
+        <a class="btn btn-default" href="#search-results">Jump to
+            Results</a>
     </div>
-{% endwith %}
+    {% include "includes/result_type_chooser.html" %}
+    {% include "includes/sidebar_filters.html" %}
+    {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
+        {% include "includes/alert_sidebar_section.html" %}
+    {% endif %}
+</div>
 {% endblock %}
 
 
 {% block content %}
 {% with type=search_form.type.value %}
     <div id="search-results" class="col-lg-7 col-sm-9 search-page">
+        <div class="row">
+            <div class="col-sm-12">
+                <form action="/"
+                      method="get"
+                      id="search-form"
+                      role="form">
+                    <div id="search-container" class="v-offset-below-1">
+                        <label class="sr-only" for="id_q">Search</label>
+                        <div class="input-group input-group-lg">
+                            <input class="form-control"
+                                   value="{{ search_form.q.value|default:'' }}"
+                                   name="q"
+                                   id="id_q"
+                                   autocomplete="off"
+                                   type="text">
+                            <span class="input-group-btn">
+                                <button type="submit"
+                                        class="btn btn-primary"
+                                        name="search"
+                                        id="search-button"><i
+                                        class="fa fa-search"></i>&nbsp;Search
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         {% include "includes/messages.html" %}
         {% if type == 'o' or type == 'oa' %}
             {% if alert_form.errors %}
@@ -102,46 +138,20 @@
             {% endif %}
         {% endif %}
 
-        <div class="row">
-            <div class="col-sm-12">
-                <form action="/"
-                      method="get"
-                      id="search-form"
-                      role="form">
-                    <div id="search-container" class="v-offset-below-1">
-                        <label class="sr-only" for="id_q">Search</label>
-                        <div class="input-group input-group-lg">
-                            <input class="form-control"
-                                   value="{{ search_form.q.value|default:'' }}"
-                                   name="q"
-                                   id="id_q"
-                                   autocomplete="off"
-                                   type="text">
-                            <span class="input-group-btn">
-                                <button type="submit"
-                                        class="btn btn-primary"
-                                        name="search"
-                                        id="search-button"><i class="fa fa-search"></i>&nbsp;Search
-                                </button>
-                            </span>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         {% if results.paginator.count > 0 %}
             <div class="row">
                 <div class="col-sm-6">
                     <h2 id="result-count" class="bottom">
                         {% if type == 'o' %}
                             {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
+                        {% elif type == 'r' %}
+                            {{ results.paginator.count|intcomma }} Case{{ results.paginator.count|pluralize }}
                         {% elif type == 'oa' %}
                             {{ results.paginator.count|intcomma }} Oral Argument{{ results.paginator.count|pluralize }}
                         {% elif type == 'p' %}
                             {{ results.paginator.count|intcomma }} Judge{{ results.paginator.count|pluralize }}
                         {% endif %}
-                        {% if type == 'o' %}
+                        {% if type == 'o' or type == 'r' %}
                             <a href="/feed/search/?{{ get_string }}">
                                 <i class="gray fa fa-rss"
                                    title="Subscribe to a feed of these results"></i>

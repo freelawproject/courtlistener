@@ -464,6 +464,7 @@ class RECAPDocument(models.Model):
         out = {
             'id': self.pk,
             'docket_entry_id': self.docket_entry.pk,
+            'docket_id': self.docket_entry.docket.pk,
             'court_id': self.docket_entry.docket.court.pk,
             'assigned_to_id': getattr(
                 self.docket_entry.docket.assigned_to, 'pk', None),
@@ -478,8 +479,10 @@ class RECAPDocument(models.Model):
             'attachment_number': self.attachment_number,
             'is_available': self.is_available,
             'page_count': self.page_count,
-            'filepath_local': self.filepath_local.file,
         })
+        if hasattr(self.filepath_local, 'path'):
+            out['filepath_local'] = self.filepath_local.path
+
 
         # Docket Entry
         out['description'] = self.docket_entry.description
@@ -495,7 +498,7 @@ class RECAPDocument(models.Model):
         out.update({
             'docketNumber': self.docket_entry.docket.docket_number,
             'caseName': best_case_name(self.docket_entry.docket),
-            'natureOfSuit': self.docket_entry.docket.nature_of_suit,
+            'suitNature': self.docket_entry.docket.nature_of_suit,
             'cause': self.docket_entry.docket.cause,
             'juryDemand': self.docket_entry.docket.jury_demand,
             'jurisdictionType': self.docket_entry.docket.jurisdiction_type,
@@ -537,6 +540,7 @@ class RECAPDocument(models.Model):
         out.update({
             'court': self.docket_entry.docket.court.full_name,
             'court_exact': self.docket_entry.docket.court_id,  # For faceting
+            'court_citation_string': self.docket_entry.docket.court.citation_string
         })
 
         text_template = loader.get_template('indexes/dockets_text.txt')

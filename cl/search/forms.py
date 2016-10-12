@@ -28,7 +28,7 @@ TYPE_CHOICES = (
     ('o', 'Opinions'),
     ('oa', 'Oral Arguments'),
     ('p', 'People'),
-    ('d', 'Docket')
+    ('r', 'RECAP'),
 )
 
 
@@ -122,6 +122,58 @@ class SearchForm(forms.Form):
     docket_number = forms.CharField(
         required=False,
         label='Docket Number',
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+
+    #
+    # RECAP fields
+    #
+    description = forms.CharField(
+        required=False,
+        label="Document Description",
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    nature_of_suit = forms.CharField(
+        required=False,
+        label="Nature of Suit",
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    assigned_to = forms.CharField(
+        required=False,
+        label="Assigned To Judge",
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    referred_to = forms.CharField(
+        required=False,
+        label="Referred To Judge",
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    document_number = forms.CharField(
+        required=False,
+        label="Document #",
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    attachment_number = forms.CharField(
+        required=False,
+        label="Attachment #",
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
                    'autocomplete': 'off'}

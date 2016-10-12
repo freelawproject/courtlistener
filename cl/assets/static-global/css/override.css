@@ -43,6 +43,9 @@ header {
 #search-results {
     margin-top: 23px;
 }
+#search-results article {
+    padding-top: 10px;
+}
 
 /* Make anchor targets in tables have a special color. */
 .table-hover > tbody > tr:target {
@@ -135,6 +138,9 @@ a.button:active{
     }
     .lg-v-offset-below-3 {
         padding-bottom: 40px;
+    }
+    .col-md-offset-half {
+        margin-left: 4.166666666%;
     }
 }
 @media(min-width:1200px){

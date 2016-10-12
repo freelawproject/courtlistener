@@ -86,3 +86,10 @@ def granular_date(obj, field_name, granularity=None, iso=False,
         u"validation rules? Is full_clean() getting called in your save() "
         u"method?"
     )
+
+
+@register.filter
+def get(mapping, key):
+    """Emulates the dictionary get. Useful when keys have spaces or other
+    punctuation."""
+    return mapping.get(key, '')

@@ -28,9 +28,11 @@ class ExtraSolrInterface(SolrInterface):
 class ExtraSolrSearch(SolrSearch):
     """Base class for common search options management"""
     option_modules = ('query_obj', 'filter_obj', 'paginator',
-                      'more_like_this', 'highlighter', 'faceter',
-                      'sorter', 'facet_querier', 'field_limiter',
-                      'extra')
+                      'more_like_this', 'highlighter', 'postings_highlighter',
+                      'faceter', 'grouper', 'sorter', 'facet_querier',
+                      'debugger', 'spellchecker', 'requesthandler',
+                      'field_limiter', 'parser', 'pivoter', 'facet_ranger',
+                      'term_vectors', 'stat', 'extra')
 
     def _init_common_modules(self):
         super(ExtraSolrSearch, self)._init_common_modules()
@@ -41,8 +43,21 @@ class ExtraSolrSearch(SolrSearch):
         newself.extra.update(kwargs)
         return newself
 
+    _count = None
     def count(self):
-        return self.add_extra(rows=0).execute().result.numFound
+        if self._count is None:
+            # We haven't gotten the count yet. Get it. Clone self for this
+            # query or else we'll set rows=0 for remainder.
+            newself = self.clone()
+            r = newself.add_extra(rows=0).execute()
+            if r.groups:
+                total = getattr(r.groups, r.group_field)['ngroups']
+            else:
+                total = r.result.numFound
+
+            # Set the cache
+            self._count = total
+        return self._count
 
 
 class ExtraOptions(Options):

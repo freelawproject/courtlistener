@@ -15,16 +15,16 @@ boosts = {
             'caseName': 4,
             'docketNumber': 2,
         },
-        'oa': {
-            'text': 1,
-            'caseName': 4,
-            'docketNumber': 2,
-        },
         'r': {
             'text': 1,
             'caseName': 4,
             'docketNumber': 3,
             'description': 2,
+        },
+        'oa': {
+            'text': 1,
+            'caseName': 4,
+            'docketNumber': 2,
         },
         'p': {
             'text': 1,
@@ -42,13 +42,13 @@ boosts = {
             'text': 3,
             'caseName': 3,
         },
-        'oa': {
-            'caseName': 3,
-        },
         'r': {
             'text': 3,
             'caseName': 3,
             'description': 3,
+        },
+        'oa': {
+            'caseName': 3,
         },
         'p': {
             # None here. Phrases don't make much sense for people.
@@ -368,7 +368,7 @@ def add_boosts(main_params, cd):
     qf = boosts['qf'][cd['type']].copy()
     main_params['qf'] = make_boost_string(qf)
 
-    if cd['type'] in ['oa', 'o', 'r']:
+    if cd['type'] in ['o', 'r', 'oa']:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         vs_query = any([' v ' in main_params['q'],
@@ -382,11 +382,9 @@ def add_boosts(main_params, cd):
             main_params['qf'] = make_boost_string(qf)
 
     # Apply phrase-based boosts
-    if cd['type'] in ['o', 'oa', 'r']:
+    if cd['type'] in ['o', 'r', 'oa']:
         main_params['pf'] = make_boost_string(boosts['pf'][cd['type']])
         main_params['ps'] = 5
-
-    return main_params
 
 
 def add_highlighting(main_params, cd, highlight):
@@ -422,6 +420,15 @@ def add_highlighting(main_params, cd, highlight):
         hlfl = ['text', 'caseName', 'judge', 'docketNumber',
                 'court_citation_string', 'suitNature', 'citation',
                 'neutralCite', 'lexisCite']
+    elif cd['type'] == 'r':
+        fl = ['id', 'absolute_url', 'court_id', 'dateFiled', 'docketNumber',
+              'caseName', 'suitNature', 'court', 'assigned_to_id',
+              'referred_to_id', 'dateArgued', 'dateTerminated',
+              'document_number', 'attachment_number', 'docket_id',
+              'is_available']
+        hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
+                'court_citation_string', 'docketNumber', 'suitNature', 'cause',
+                'juryDemand', 'assignedTo', 'referredTo',]
     elif cd['type'] == 'oa':
         fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
               'download_url', 'docket_id', 'dateArgued', 'duration']
@@ -433,11 +440,6 @@ def add_highlighting(main_params, cd, highlight):
               'aba_rating', 'school', 'appointer', 'supervisor', 'predecessor',
               'selection_method', 'court']
         hlfl = ['name', 'dob_city', 'dob_state', 'name_reverse']
-    elif cd['type'] == 'r':
-        fl = ['id', 'court_id', 'dateFiled', 'docketNumber','caseName'
-              'natureOfSuit', 'court', 'courtJurisdiction', 'assignedTo']
-        hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
-                'docketNumber', 'natureOfSuit']
 
     main_params.update({
         'fl': ','.join(fl),
@@ -448,8 +450,6 @@ def add_highlighting(main_params, cd, highlight):
             continue
         main_params['f.%s.hl.fragListBuilder' % field] = 'single'
         main_params['f.%s.hl.alternateField' % field] = field
-
-    return main_params
 
 
 def add_fq(main_params, cd):
@@ -475,6 +475,27 @@ def add_fq(main_params, cd):
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
 
+    elif cd['type'] == 'r':
+        if cd['case_name']:
+            main_fq.append(make_fq(cd, 'caseName', 'case_name'))
+        if cd['description']:
+            main_fq.append(make_fq(cd, 'description', 'description'))
+        if cd['docket_number']:
+            main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
+        if cd['nature_of_suit']:
+            main_fq.append(make_fq(cd, 'suitNature', 'nature_of_suit'))
+        if cd['document_number']:
+            main_fq.append(make_fq(cd, 'document_number', 'document_number'))
+        if cd['attachment_number']:
+            main_fq.append(make_fq(cd, 'attachment_number', 'attachment_number'))
+        if cd['assigned_to']:
+            main_fq.append(make_fq(cd, 'assignedTo', 'assigned_to'))
+        if cd['referred_to']:
+            main_fq.append(make_fq(cd, 'referredTo', 'referred_to'))
+
+        main_fq.append(make_date_query('dateFiled', cd['filed_before'],
+                                       cd['filed_after']))
+
     elif cd['type'] == 'oa':
         if cd['case_name']:
             main_fq.append(make_fq(cd, 'caseName', 'case_name'))
@@ -484,16 +505,6 @@ def add_fq(main_params, cd):
             main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
         main_fq.append(make_date_query('dateArgued', cd['argued_before'],
                                        cd['argued_after']))
-
-    elif cd['type'] == 'r':
-        if cd['case_name']:
-            main_fq.append(make_fq(cd, 'caseName', 'case_name'))
-        if cd['judge']:
-            main_fq.append(make_fq(cd, 'judge', 'judge'))
-        if cd['docket_number']:
-            main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
-        main_fq.append(make_date_query('dateFiled', cd['filed_before'],
-                                       cd['filed_after']))
 
     elif cd['type'] == 'p':
         if cd['name']:
@@ -520,12 +531,12 @@ def add_fq(main_params, cd):
         if len(selected_courts_string) + len(selected_stats_string) > 0:
             main_fq.extend([
                 '{!tag=dt}status_exact:(%s)' % selected_stats_string,
-                '{!tag=dt}court_exact:(%s)' % selected_courts_string
+                'court_exact:(%s)' % selected_courts_string
             ])
-    elif cd['type'] in ['oa', 'p']:
+    elif cd['type'] in ['oa', 'p', 'r']:
         if len(selected_courts_string) > 0:
             main_fq.extend([
-                '{!tag=dt}court_exact:(%s)' % selected_courts_string
+                'court_exact:(%s)' % selected_courts_string
             ])
 
     # If a param has been added to the fq variables, then we add them to the
@@ -533,7 +544,52 @@ def add_fq(main_params, cd):
     if len(main_fq) > 0:
         main_params['fq'] = main_fq
 
-    return main_params
+
+def add_grouping(main_params, cd):
+    """Add any grouping parameters."""
+    group_params = {}
+    if cd['type'] == 'o':
+        group_params = {
+            'group': 'true',              # Do grouping
+            'group.ngroups': 'true',      # Include number of groups
+            'group.limit': 5,             # Cap the group size at N
+            'group.field': 'cluster_id',  # Group on this field
+            'group.sort': 'type asc',     # Sort by type
+        }
+    elif cd['type'] == 'r':
+        docket_query = re.match('docket_id:\d+', cd['q'])
+        group_params = {
+            'group': 'true',
+            'group.ngroups': 'true',
+            'group.limit': 5 if not docket_query else 100,
+            'group.field': 'docket_id',
+            'group.sort': 'score desc',
+        }
+
+    main_params.update(group_params)
+
+
+def regroup_snippets(paged_results):
+    """Regroup the snippets in a grouped result.
+
+    Grouped results will have snippets for each of the group members. Some of
+    the snippets will be the same because they're the same across all items in
+    the group. For example, every opinion in the opinion index contains the
+    name of the attorneys. So, if we have a match on the attorney name, that'll
+    generate a snippet for both the lead opinion and a dissent.
+
+    In this function, we identify these kinds of duplicates and pull them out.
+    We also flatten the paged_results so that snippets are easier to get.
+    """
+    group_field = paged_results.object_list.group_field
+    if group_field is not None:
+        for group in getattr(paged_results.object_list.groups, group_field)['groups']:
+            snippets = []
+            for doc in group['doclist']['docs']:
+                for snippet in doc['solr_highlights']['text']:
+                    if snippet not in snippets:
+                        snippets.append(snippet)
+            group['snippets'] = snippets
 
 
 def build_main_query(cd, highlight='all', order_by=''):
@@ -543,9 +599,10 @@ def build_main_query(cd, highlight='all', order_by=''):
         'caller': 'build_main_query',
     }
 
-    main_params = add_boosts(main_params, cd)
-    main_params = add_highlighting(main_params, cd, highlight)
-    main_params = add_fq(main_params, cd)
+    add_boosts(main_params, cd)
+    add_highlighting(main_params, cd, highlight)
+    add_fq(main_params, cd)
+    add_grouping(main_params, cd)
 
     if settings.DEBUG:
         print "Params sent to search are:\n%s" % ' &\n'.join(
@@ -600,7 +657,7 @@ def place_facet_queries(cd, conn):
     if len(fq) > 0:
         facet_params['fq'] = fq
 
-    stat_facet_fields = conn.raw_query(**facet_params).execute().facet_counts.facet_fields
+    stat_facet_fields = conn.query().add_extra(**facet_params).execute().facet_counts.facet_fields
 
     return stat_facet_fields
 

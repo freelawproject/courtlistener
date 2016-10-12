@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'markdown_deux',
+    'mathfilters',
     'rest_framework',
     'rest_framework.authtoken',
     'crispy_forms',  # For DRF HTML site.

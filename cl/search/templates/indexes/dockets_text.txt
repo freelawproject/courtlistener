@@ -1,6 +1,6 @@
 {# DocketEntry #}
 {% with entry=item.docket_entry %}
-    {{ entry.description }}
+    {{ entry.description|safe }}
     {{ entry.date_filed|date:"j F Y" }}
 {% endwith %}
 
@@ -38,13 +38,13 @@
 
 
 {# Judges #}
-{% with assignee=item.docket_entry.docket.assigned_to %}
-    {% if assignee %}
-        {{ assignee.name_full }}
+{% with assigned_to=item.docket_entry.docket.assigned_to %}
+    {% if assigned_to %}
+        {{ assigned_to.name_full }}
     {% endif %}
 {% endwith %}
-{% with referee=item.docket_entry.docket.referee %}
-    {% if referr %}
-        {{ referee.name_full }}
+{% with referred_to=item.docket_entry.docket.referred_to %}
+    {% if referred_to %}
+        {{ referred_to.name_full }}
     {% endif %}
 {% endwith %}

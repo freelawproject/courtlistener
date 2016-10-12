@@ -1,3 +1,5 @@
-<pre>{{obj.text|safe|linebreaksbr|truncatewords:"500"|stringformat:"s"}}</pre><br>
+{% with doc0=obj.doclist.docs.0 %}
+<p>{{ doc0.text|safe|truncatewords:"500" }}</p><br>
 
-<a href="{{obj.absolute_url}}">Original document</a>
+<a href="{{doc0.absolute_url}}">Original document</a>
+{% endwith %}

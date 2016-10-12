@@ -43,7 +43,20 @@
                        placeholder="Select Jurisdictions by Typing"
                        autocomplete="off"
                        class="hidden-xs"/>
+                {% with search_form.type.value as v %}
                 <ul class="nav nav-tabs" id="court-picker-tabs">
+                    {% comment %}
+                                       Which Types Get Which Tabs?
+                              ┌──────┬───────┬───────┬───────┬─────────┐
+                              │ App. │ Dist. │ Bank. │ State │ Special │
+                              ├──────┼───────┼───────┼───────┼─────────┤
+                     opinions │   X  │   X   │   X   │   X   │    X    │
+                        recap │   X  │   X   │   X   │       │         │
+                    oral args │   X  │       │       │       │         │
+                       people │   X  │   X   │       │   X   │    X    │
+                              └──────┴───────┴───────┴───────┴─────────┘
+
+                    {% endcomment %}
                     <li class="active">
                         <a href="#tab-federal-appellate"
                            data-toggle="tab">
@@ -51,7 +64,7 @@
                             <span class="hidden-md hidden-lg">Fed. App.</span>
                         </a>
                     </li>
-                    {% if search_form.type.value != 'oa' and type != 'oa' %}
+                    {% if v != 'oa' %}
                         <li>
                             <a href="#tab-federal-district"
                                data-toggle="tab">
@@ -59,6 +72,8 @@
                                 <span class="hidden-md hidden-lg">Fed. Dist.</span>
                             </a>
                         </li>
+                    {% endif %}
+                    {% if v == 'o' or v == 'r' %}
                         <li>
                             <a href="#tab-bankruptcy"
                                data-toggle="tab">
@@ -66,6 +81,8 @@
                                 <span class="hidden-md hidden-lg">Bankr.</span>
                             </a>
                         </li>
+                    {% endif %}
+                    {% if v == 'o' or v == 'p' %}
                         <li>
                             <a href="#tab-state"
                                data-toggle="tab">State</a>
@@ -101,7 +118,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                    {% if search_form.type.value != 'oa' and type != 'oa' %}
+                    {% if search_form.type.value != 'oa' %}
                         <div class="tab-pane" id="tab-federal-district">
                             {# Regroup into closed/open courts #}
                             {% regroup  courts.district|dictsort:"is_terminated" by is_terminated as district_courts %}
@@ -136,7 +153,9 @@
                                 </div>
                             {% endfor %}
                         </div>
+                    {% endif %}
 
+                    {% if v == 'o' or v == 'r' %}
                         <div class="tab-pane" id="tab-bankruptcy">
                             {% for bank_bundle in courts.bankruptcy %}
                                 <h3 class="bottom inline">
@@ -170,6 +189,9 @@
                                 </div>
                             {% endfor %}
                         </div>
+                    {% endif %}
+
+                    {% if v == 'o' or v == 'p' %}
                         <div class="tab-pane" id="tab-state">
                             <div class="row">
                                 {% for col_bundle in courts.state %}
@@ -234,6 +256,7 @@
                         </div>
                     {% endif %}
                 </div>
+                {% endwith %}
                 <div class="text-right">
                     <button type="submit" class="btn btn-primary">Apply</button>
                 </div>

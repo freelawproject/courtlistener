@@ -64,14 +64,13 @@ class Command(BaseCommand):
         )
 
         for up in unconfirmed_ups:
-            user = up.user.username
             if self.options['verbose']:
-                print "User %s deleted" % user
+                print "User %s deleted" % up.user.username
             if not self.options['simulate']:
                 # Gather their foreign keys, delete those
-                up.alerts.all().delete()
-                up.donations.all().delete()
-                up.favorites.all().delete()
+                up.user.alerts.all().delete()
+                up.user.donations.all().delete()
+                up.user.favorites.all().delete()
 
                 # delete the user then the profile.
                 up.user.delete()

@@ -226,7 +226,7 @@
            termVectors="true"
            termPositions="true"
            termOffsets="true"/>
-    <field name="natureOfSuit"
+    <field name="suitNature"
            type="text_en_splitting_cl"
            indexed="true"
            stored="true"
@@ -270,6 +270,14 @@
            indexed="true"
            stored="true"
            multiValued="false"/>
+    <field name="court_citation_string"
+           type="string"
+           indexed="true"
+           stored="true"
+           multiValued="false"
+           termVectors="true"
+           termPositions="true"
+           termOffsets="true"/>
 
     <!--Faceting-->
     <field name="court_exact"

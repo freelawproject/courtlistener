@@ -8,16 +8,19 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest
+from django.test import RequestFactory
 from django.test import TestCase, override_settings
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from timeout_decorator import timeout_decorator
 
 from cl.lib.solr_core_admin import get_data_dir
-from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase
+from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase, \
+    EmptySolrTestCase
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
+from cl.search.views import do_search
 from cl.tests.base import BaseSeleniumTest
 
 
@@ -332,6 +335,38 @@ class SearchTest(IndexedSolrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('an error', response.content,
                       msg="Invalid search did not result in an error.")
+
+
+class GroupedSearchTest(EmptySolrTestCase):
+    fixtures = ['opinions-issue-550.json']
+
+    def setUp(self):
+        # Set up some handy variables
+        super(GroupedSearchTest, self).setUp()
+        args = [
+            '--type', 'opinions',
+            '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '--update',
+            '--everything',
+            '--do-commit',
+            '--noinput',
+        ]
+        call_command('cl_update_index', *args)
+        self.factory = RequestFactory()
+
+    def test_grouped_queries(self):
+        """When we have a cluster with multiple opinions, do results get grouped?"""
+        request = self.factory.get(reverse('show_results'), {'q': 'Voutila'})
+        response = do_search(request)
+        groups = response['results'].object_list.groups
+        self.assertEqual(
+            groups.cluster_id['ngroups'],
+            1,
+        )
+        self.assertEqual(
+            groups.cluster_id['matches'],
+            2,
+        )
 
 
 class JudgeSearchTest(IndexedSolrTestCase):

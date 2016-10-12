@@ -2,11 +2,13 @@
 {% load humanize %}
 
 {% block title %}
-    {% if type == 'o' %}
+    {% if search_form.type.value == 'o' %}
         Advanced Legal Opinion Search – CourtListener.com
-    {% elif type == 'oa' %}
+    {% elif search_form.type.value == 'r' %}
+        Advanced RECAP Search – CourtListener.com
+    {% elif search_form.type.value == 'oa' %}
         Advanced Oral Argument Search – CourtListener.com
-    {% elif type == 'p' %}
+    {% elif search_form.type.value == 'p' %}
         Advanced Judge Search – CourtListener.com
     {% endif %}
 {% endblock %}
@@ -14,28 +16,37 @@
 {% block sidebar %}{% endblock %}
 
 {% block navbar-o %}
-    {% if type == "o" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == "o" %}active{% else %}{{ block.super }}{% endif %}
+{% endblock %}
+{% block navbar-r %}
+    {% if search_form.type.value == "r" %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-oa %}
-    {% if type == "oa" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == "oa" %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-p %}
-    {% if type == "p" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == "p" %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
+
 
 
 {% block content %}
     <div id="advanced-page" class="col-xs-12">
         <div id="above-main-query">
-            {% if type == 'o' %}
+            {% if search_form.type.value == 'o' %}
                 <h1 class="text-center">Advanced Opinion Search</h1>
                 <p class="text-center gray large">Search millions of opinions across hundreds of jurisdictions. Updated constantly.
                 </p>
-            {% elif type == 'oa' %}
+            {% elif search_form.type.value == 'r' %}
+                <h1 class="text-center">Advanced RECAP Search</h1>
+                <p class="text-center gray large">Search our database of
+                    millions of PACER documents and dockets.
+                </p>
+            {% elif search_form.type.value == 'oa' %}
                 <h1 class="text-center">Advanced Oral Argument Search</h1>
                 <p class="text-center gray large">Search the biggest collection of oral argument audio on the Internet. Updated constantly.
                 </p>
-            {% elif type == 'p' %}
+            {% elif search_form.type.value == 'p' %}
                 <h1 class="text-center">Advanced Judge Search</h1>
                 <p class="text-center gray large">Search our database of thousands of State and Federal judges.
                 </p>
@@ -45,7 +56,7 @@
         <div id="main-query-box">
             <form action="/" method="get" id="search-form" class="form-inline"
                   role="form">
-                {% include "includes/result_type_chooser.html" with type=type %}
+                {% include "includes/result_type_chooser.html" %}
                 <div id="search-container" class="text-center">
                     <label class="sr-only" for="id_q">Search</label>
                     <div class="input-group">
@@ -66,7 +77,7 @@
                 </div>
             </form>
         </div>
-        {% if type == 'o' %}
+        {% if search_form.type.value == 'o' %}
         <div class="row">
             {#  Modal is at bottom of results, so it loads last. #}
             <div id="extra-sidebar-fields" class="col-sm-9">
@@ -88,7 +99,7 @@
                                 </div>
                             </div>
                             <div class="col-sm-6">
-                                {% include "includes/order_by_dropdown.html" with type=type %}
+                                {% include "includes/order_by_dropdown.html" %}
                             </div>
                         </div>
                         <div class="row">
@@ -202,7 +213,115 @@
             </div>
         </div>
 
-        {% elif type == 'oa' %}
+        {% elif search_form.type.value == 'r' %}
+        <div class="row">
+            {# Modal is at bottom of results, so it loads last #}
+            <div id="extra-sidebar-fields" class="col-sm-9">
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="pointer"
+                             data-toggle="modal"
+                             data-target="#court-picker">
+                            <label class="bottom pointer">
+                                Select Jurisdictions <i
+                                    class="gray fa fa-external-link"></i>
+                            </label>
+
+                            <p class="top"><span
+                                    id="jurisdiction-count">{{ court_count_human }}</span>
+                                jurisdictions selected</p>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        {% include "includes/order_by_dropdown.html" %}
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.docket_number.label_tag }}
+                            {{ search_form.docket_number }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            {{ search_form.description.label_tag }}
+                            {{ search_form.description }}
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            {{ search_form.case_name.label_tag }}
+                            {{ search_form.case_name }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.filed_after.label_tag }}
+                            {{ search_form.filed_after }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.filed_before.label_tag }}
+                            {{ search_form.filed_before }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.document_number.label_tag }}
+                            {{ search_form.document_number }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.attachment_number.label_tag }}
+                            {{ search_form.attachment_number }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.assigned_to.label_tag }}
+                            {{ search_form.assigned_to }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.referred_to.label_tag }}
+                            {{ search_form.referred_to }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.nature_of_suit.label_tag }}
+                            {{ search_form.nature_of_suit }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-12">
+                        <button type="submit"
+                                class="btn btn-primary btn-lg float-right"
+                                name="search"
+                                id="search-button-secondary"><i
+                                class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                {% include "includes/operators_quick_list.html" %}
+                <a class="text-right" href="{% url 'advanced_search' %}">More
+                    details&hellip;</a>
+            </div>
+        </div>
+
+
+        {% elif search_form.type.value == 'oa' %}
         <div class="row">
             {#  Modal is at bottom of results, so it loads last. #}
             <div id="extra-sidebar-fields" class="col-sm-9">
@@ -222,7 +341,7 @@
                         </div>
                     </div>
                     <div class="col-sm-4">
-                        {% include "includes/order_by_dropdown.html" with type=type %}
+                        {% include "includes/order_by_dropdown.html" %}
                     </div>
                     <div class="col-sm-4">
                         <div class="form-group">
@@ -279,7 +398,7 @@
         </div>
 
 
-        {% elif type == 'p' %}
+        {% elif search_form.type.value == 'p' %}
         <div class="row">
             {#  Modal is at bottom of results, so it loads last. #}
             <div id="extra-sidebar-fields" class="col-sm-12">
@@ -299,7 +418,7 @@
                         </div>
                     </div>
                     <div class="col-sm-3">
-                        {% include "includes/order_by_dropdown.html" with type=type %}
+                        {% include "includes/order_by_dropdown.html" %}
                     </div>
                     <div class="col-sm-6">
                         <div class="form-group">
@@ -374,7 +493,7 @@
         {% endif %}
 
 
-        {%  if type == 'o' %}
+        {%  if search_form.type.value == 'o' %}
         <div class="row" id="about-opinions">
             <div class="col-xs-12">
                 <h2>About the CourtListener Corpus of Opinions</h2>
@@ -430,7 +549,7 @@
             </div>
         </div>
 
-        {% elif type == 'oa' %}
+        {% elif search_form.type.value == 'oa' %}
         <div class="row" id="about-oral-arguments">
             <div class="col-xs-12">
                 <h2>About the CourtListener Oral Argument Archive</h2>
@@ -476,7 +595,7 @@
             </div>
         </div>
 
-        {% elif type == 'p' %}
+        {% elif search_form.type.value == 'p' %}
         <div class="row v-offset-above-2" id="about-judges">
             <div class="col-xs-12">
                 <h2>About the CourtListener Judicial Database</h2>

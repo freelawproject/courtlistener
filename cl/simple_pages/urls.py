@@ -26,7 +26,7 @@ urlpatterns = [
     url(r'^help/markdown/$', markdown_help, name="markdown_help"),
 
     # Serve a static file
-    url(r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
+    url(r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.+)$',
         serve_static_file),
 
     # Advanced search page

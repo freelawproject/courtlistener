@@ -1,6 +1,7 @@
 {% load humanize %}
 
 {% if not error %}
+    {% with type=search_form.type.value %}
     <div class="sidebar-section">
         <h3><span>Refine Your Query</span></h3>
         <form action="/" method="get" id="sidebar-search-form">
@@ -21,20 +22,15 @@
                     </div>
 
                     {% include "includes/order_by_dropdown.html" %}
-
-                    {% if type == 'o' or type == 'oa' %}
+                    {% if type == 'o' %}
                         <div class="form-group">
                             {{ search_form.case_name.label_tag }}
                             {{ search_form.case_name }}
                         </div>
-
                         <div class="form-group">
                             {{ search_form.judge.label_tag }}
                             {{ search_form.judge }}
                         </div>
-                    {% endif %}
-
-                    {% if type == 'o' %}
                         <div class="v-offset-below-2">
                             <label>Precedential Status</label>
                             {% for status in status_facets %}
@@ -55,7 +51,6 @@
                                 </div>
                             {% endfor %}
                         </div>
-
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
@@ -70,44 +65,21 @@
                                 </div>
                             </div>
                         </div>
-
                         <div class="form-group">
                             {{ search_form.citation.label_tag }}
                             {{ search_form.citation }}
-                            <p><a href="{% url "citation_redirector" %}">Look up a specific citation</a>
+                            <p><a href="{% url "citation_redirector" %}">Look up
+                                a specific citation</a>
                             </p>
                         </div>
-
                         <div class="form-group">
                             {{ search_form.neutral_cite.label_tag }}
                             {{ search_form.neutral_cite }}
                         </div>
-
-                    {% elif type == 'oa' %}
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.argued_after.label_tag }}
-                                    {{ search_form.argued_after }}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.argued_before.label_tag }}
-                                    {{ search_form.argued_before }}
-                                </div>
-                            </div>
-                        </div>
-                    {% endif %}
-
-                    {% if type == 'o' or type == 'oa' %}
                         <div class="form-group">
                             {{ search_form.docket_number.label_tag }}
                             {{ search_form.docket_number }}
                         </div>
-                    {% endif %}
-
-                    {% if type == 'o' %}
                         <div class="row">
                             <div class="col-xs-6">
                                 <div class="form-group">
@@ -122,9 +94,95 @@
                                 </div>
                             </div>
                         </div>
-                    {% endif %}
 
-                    {% if type == 'p' %}
+
+                    {% elif type == 'r' %}
+                        <div class="form-group">
+                            {{ search_form.case_name.label_tag }}
+                            {{ search_form.case_name }}
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.description.label_tag }}
+                            {{ search_form.description }}
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.docket_number.label_tag }}
+                            {{ search_form.docket_number }}
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.nature_of_suit.label_tag }}
+                            {{ search_form.nature_of_suit }}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.filed_after.label_tag }}
+                                    {{ search_form.filed_after }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.filed_before.label_tag }}
+                                    {{ search_form.filed_before }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.document_number.label_tag }}
+                                    {{ search_form.document_number }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.attachment_number.label_tag }}
+                                    {{ search_form.attachment_number }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.assigned_to.label_tag }}
+                            {{ search_form.assigned_to }}
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.referred_to.label_tag }}
+                            {{ search_form.referred_to }}
+                        </div>
+
+
+                    {% elif type == 'oa' %}
+                        <div class="form-group">
+                            {{ search_form.case_name.label_tag }}
+                            {{ search_form.case_name }}
+                        </div>
+
+                        <div class="form-group">
+                            {{ search_form.judge.label_tag }}
+                            {{ search_form.judge }}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.argued_after.label_tag }}
+                                    {{ search_form.argued_after }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ search_form.argued_before.label_tag }}
+                                    {{ search_form.argued_before }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            {{ search_form.docket_number.label_tag }}
+                            {{ search_form.docket_number }}
+                        </div>
+
+
+                    {% elif type == 'p' %}
                         <div class="form-group">
                             {{ search_form.name.label_tag }}
                             {{ search_form.name }}
@@ -167,7 +225,6 @@
                             {{ search_form.political_affiliation.label_tag }}
                             {{ search_form.political_affiliation }}
                         </div>
-
                     {% endif %}
 
                     <button type="submit"
@@ -178,4 +235,5 @@
             </div>
         </form>
     </div>
+    {% endwith %}
 {% endif %}

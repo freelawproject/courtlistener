@@ -20,20 +20,21 @@ from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
-from cl.lib import search_utils
-from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot
+from cl.lib.search_utils import build_main_query, get_query_citation, \
+    place_facet_queries, make_stats_variable, merge_form_with_courts, \
+    make_get_string, regroup_snippets
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
 from cl.stats import tally_stat, Stat
 from cl.visualizations.models import SCOTUSMap
+from cl.lib.scorched_utils import ExtraSolrInterface
 
 logger = logging.getLogger(__name__)
 
 
 def do_search(request, rows=20, order_by=None, type=None):
 
-    # Bind the search form.
     search_form = SearchForm(request.GET)
     if search_form.is_valid():
         cd = search_form.cleaned_data
@@ -46,26 +47,29 @@ def do_search(request, rows=20, order_by=None, type=None):
 
         try:
             query_citation = None
+            status_facets = None
             if cd['type'] == 'o':
-                conn = sunburnt.SolrInterface(
-                    settings.SOLR_OPINION_URL, mode='r')
-                stat_facet_fields = search_utils.place_facet_queries(cd, conn)
-                status_facets = search_utils.make_stats_variable(
-                    stat_facet_fields, search_form)
-                query_citation = search_utils.get_query_citation(cd)
+                si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+                stat_facet_fields = place_facet_queries(cd, si)
+                status_facets = make_stats_variable(stat_facet_fields,
+                                                    search_form)
+                query_citation = get_query_citation(cd)
+                results = si.query().add_extra(**build_main_query(cd))
+            elif cd['type'] == 'r':
+                si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
+                results = si.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'oa':
-                conn = sunburnt.SolrInterface(
-                    settings.SOLR_AUDIO_URL, mode='r')
-                status_facets = None
+                si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
+                results = si.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'p':
-                conn = sunburnt.SolrInterface(
-                    settings.SOLR_PEOPLE_URL, mode='r')
-                status_facets = None
-            results_si = conn.raw_query(**search_utils.build_main_query(cd))
+                si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
+                results = si.query().add_extra(**build_main_query(cd))
 
             courts = Court.objects.filter(in_use=True)
-            courts, court_count_human, court_count = search_utils\
-                .merge_form_with_courts(courts, search_form)
+            courts, court_count_human, court_count = merge_form_with_courts(
+                courts,
+                search_form
+            )
 
         except Exception as e:
             if settings.DEBUG is True:
@@ -81,7 +85,7 @@ def do_search(request, rows=20, order_by=None, type=None):
 
     # Set up pagination
     try:
-        paginator = Paginator(results_si, rows)
+        paginator = Paginator(results, rows)
         page = request.GET.get('page', 1)
         try:
             paged_results = paginator.page(page)
@@ -96,8 +100,10 @@ def do_search(request, rows=20, order_by=None, type=None):
         logger.warning("Error loading pagination on search page with request: %s" % request.GET)
         logger.warning("Error was: %s" % e)
         if settings.DEBUG is True:
-            print e
+            traceback.print_exc()
         return {'error': True}
+
+    regroup_snippets(paged_results)
 
     return {
         'search_form': search_form,
@@ -107,6 +113,82 @@ def do_search(request, rows=20, order_by=None, type=None):
         'court_count': court_count,
         'status_facets': status_facets,
         'query_citation': query_citation,
+    }
+
+
+def get_homepage_stats():
+    """Get any stats that are displayed on the homepage and return them as a
+    dict
+    """
+    ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
+    alerts_in_last_ten = Stat.objects.filter(
+        name__contains='alerts.sent',
+        date_logged__gte=ten_days_ago
+    ).aggregate(Sum('count'))['count__sum']
+    queries_in_last_ten = Stat.objects.filter(
+        name='search.results',
+        date_logged__gte=ten_days_ago
+    ).aggregate(Sum('count'))['count__sum']
+    bulk_in_last_ten = Stat.objects.filter(
+        name__contains='bulk_data',
+        date_logged__gte=ten_days_ago
+    ).aggregate(Sum('count'))['count__sum']
+    r = redis.StrictRedis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        db=settings.REDIS_DATABASES['STATS'],
+    )
+    last_ten_days = ['api:v3.d:%s.count' %
+                     (date.today() - timedelta(days=x)).isoformat()
+                     for x in range(0, 10)]
+    api_in_last_ten = sum(
+        [int(result) for result in
+         r.mget(*last_ten_days) if result is not None]
+    )
+    users_in_last_ten = User.objects.filter(
+        date_joined__gte=ten_days_ago
+    ).count()
+    opinions_in_last_ten = Opinion.objects.filter(
+        date_created__gte=ten_days_ago
+    ).count()
+    oral_arguments_in_last_ten = Audio.objects.filter(
+        date_created__gte=ten_days_ago
+    ).count()
+    days_of_oa = naturalduration(
+        Audio.objects.aggregate(
+            Sum('duration')
+        )['duration__sum'],
+        as_dict=True,
+    )['d']
+    viz_in_last_ten = SCOTUSMap.objects.filter(
+        date_published__gte=ten_days_ago,
+        published=True,
+    ).count()
+    visualizations = SCOTUSMap.objects.filter(
+        published=True,
+        deleted=False,
+    ).annotate(
+        Count('clusters'),
+    ).filter(
+        # Ensures that we only show good stuff on homepage
+        clusters__count__gt=10,
+    ).order_by(
+        '-date_published',
+        '-date_modified',
+        '-date_created',
+    )[:1]
+    return {
+        'alerts_in_last_ten': alerts_in_last_ten,
+        'queries_in_last_ten': queries_in_last_ten,
+        'opinions_in_last_ten': opinions_in_last_ten,
+        'oral_arguments_in_last_ten': oral_arguments_in_last_ten,
+        'bulk_in_last_ten': bulk_in_last_ten,
+        'api_in_last_ten': api_in_last_ten,
+        'users_in_last_ten': users_in_last_ten,
+        'days_of_oa': days_of_oa,
+        'viz_in_last_ten': viz_in_last_ten,
+        'visualizations': visualizations,
+        'private': False,  # VERY IMPORTANT!
     }
 
 
@@ -129,8 +211,8 @@ def show_results(request):
     All of these paths have tests.
     """
     # Create a search string that does not contain the page numbers
-    get_string = search_utils.make_get_string(request)
-    get_string_sans_alert = search_utils.make_get_string(request, ['page', 'edit_alert'])
+    get_string = make_get_string(request)
+    get_string_sans_alert = make_get_string(request, ['page', 'edit_alert'])
     render_dict = {
         'private': True,
         'get_string': get_string,
@@ -195,76 +277,10 @@ def show_results(request):
             render_dict.update({'results_oa': oa_dict['results']})
             # But give it a fresh form for the advanced search section
             render_dict.update({'search_form': SearchForm(request.GET)})
-            ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
-            alerts_in_last_ten = Stat.objects.filter(
-                    name__contains='alerts.sent',
-                    date_logged__gte=ten_days_ago
-                ).aggregate(Sum('count'))['count__sum']
-            queries_in_last_ten = Stat.objects.filter(
-                    name='search.results',
-                    date_logged__gte=ten_days_ago
-                ).aggregate(Sum('count'))['count__sum']
-            bulk_in_last_ten = Stat.objects.filter(
-                    name__contains='bulk_data',
-                    date_logged__gte=ten_days_ago
-                ).aggregate(Sum('count'))['count__sum']
-            r = redis.StrictRedis(
-                host=settings.REDIS_HOST,
-                port=settings.REDIS_PORT,
-                db=settings.REDIS_DATABASES['STATS'],
-            )
-            last_ten_days = ['api:v3.d:%s.count' %
-                             (date.today() - timedelta(days=x)).isoformat()
-                             for x in range(0, 10)]
-            api_in_last_ten = sum(
-                [int(result) for result in
-                 r.mget(*last_ten_days) if result is not None]
-            )
-            users_in_last_ten = User.objects.filter(
-                    date_joined__gte=ten_days_ago
-                ).count()
-            opinions_in_last_ten = Opinion.objects.filter(
-                    date_created__gte=ten_days_ago
-                ).count()
-            oral_arguments_in_last_ten = Audio.objects.filter(
-                    date_created__gte=ten_days_ago
-                ).count()
-            days_of_oa = naturalduration(
-                    Audio.objects.aggregate(
-                        Sum('duration')
-                    )['duration__sum'],
-                    as_dict=True,
-                )['d']
-            viz_in_last_ten = SCOTUSMap.objects.filter(
-                    date_published__gte=ten_days_ago,
-                    published=True,
-                ).count()
-            visualizations = SCOTUSMap.objects.filter(
-                published=True,
-                deleted=False,
-            ).annotate(
-                Count('clusters'),
-            ).filter(
-                # Ensures that we only show good stuff on homepage
-                clusters__count__gt=10,
-            ).order_by(
-                '-date_published',
-                '-date_modified',
-                '-date_created',
-            )[:1]
-            render_dict.update({
-                'alerts_in_last_ten': alerts_in_last_ten,
-                'queries_in_last_ten': queries_in_last_ten,
-                'opinions_in_last_ten': opinions_in_last_ten,
-                'oral_arguments_in_last_ten': oral_arguments_in_last_ten,
-                'bulk_in_last_ten': bulk_in_last_ten,
-                'api_in_last_ten': api_in_last_ten,
-                'users_in_last_ten': users_in_last_ten,
-                'days_of_oa': days_of_oa,
-                'viz_in_last_ten': viz_in_last_ten,
-                'visualizations': visualizations,
-                'private': False,  # VERY IMPORTANT!
-            })
+
+            # Get a bunch of stats.
+            render_dict.update(get_homepage_stats())
+
             return render_to_response(
                 'homepage.html',
                 render_dict,
@@ -317,17 +333,17 @@ def advanced(request):
         'private': False,
     }
     # I'm not thrilled about how this is repeating URLs in a view.
-    if request.path == '/opinion/':
-        render_dict['type'] = 'o'
-        render_dict.update(do_search(request, rows=1, type='o'))
-    elif request.path == '/audio/':
-        render_dict['type'] = 'oa'
-        render_dict.update(do_search(request, rows=1, type='oa'))
-    elif request.path == '/person/':
-        render_dict['type'] = 'p'
-        render_dict.update(do_search(request, rows=1, type='p'))
+    if request.path == reverse('advanced_o'):
+        obj_type = 'o'
+    elif request.path == reverse('advanced_r'):
+        obj_type = 'r'
+    elif request.path == reverse('advanced_oa'):
+        obj_type = 'oa'
+    elif request.path == reverse('advanced_p'):
+        obj_type = 'p'
 
-    render_dict['search_form'] = SearchForm()
+    render_dict.update(do_search(request, rows=1, type=obj_type))
+    render_dict['search_form'] = SearchForm({'type': obj_type})
     return render_to_response(
         'advanced.html',
         render_dict,
