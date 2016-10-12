@@ -230,7 +230,7 @@ class Command(BaseCommand):
                 self.si.commit()
                 commit_count += 1
 
-            sys.stdout.write("\rProcessed {}/{} ({:.0%}, {} commits)".format(
+            sys.stdout.write("\rProcessed {}/{} ({:.0%}, {} hard commits)".format(
                 processed_count,
                 count,
                 processed_count * 1.0 / count,
