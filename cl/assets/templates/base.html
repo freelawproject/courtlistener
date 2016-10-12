@@ -196,11 +196,13 @@
                             <a href="{% url "advanced_o" %}"
                                tabindex="100">Opinions</a>
                         </li>
+                        {% if user.is_superuser %}
                         <li class="{% block navbar-r %}inactive{% endblock %}"
                             id="navbar-r">
                             <a href="{% url "advanced_r" %}"
                                tabindex="101">RECAP</a>
                         </li>
+                        {% endif %}
                         <li class="{% block navbar-oa %}inactive{% endblock %}"
                             id="navbar-oa">
                             <a href="{% url "advanced_oa" %}"
