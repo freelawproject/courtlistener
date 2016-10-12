@@ -34,10 +34,7 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
             elif type(item) == Opinion:
                 search_item_list.append(item.as_search_dict())
             elif type(item) == RECAPDocument:
-                try:
-                    search_item_list.append(item.as_search_dict())
-                except IOError as e:
-                    print e
+                search_item_list.append(item.as_search_dict())
             elif type(item) == Person:
                 search_item_list.append(item.as_search_dict())
         except AttributeError as e:
