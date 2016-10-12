@@ -71,7 +71,7 @@
             <div class="inline nowrap">
                 <span class="meta-data-header">Nature of Suit:</span>
                 <span class="meta-data-value">
-                    <a href="?type=r&q=suitNature:{{ doc0.solr_highlights.suitNature.0|safe }}">
+                    <a href="?type=r&amp;q=suitNature:{{ doc0.solr_highlights.suitNature.0|safe }}">
                         {{ doc0.solr_highlights.suitNature.0|safe }}
                     </a>
                 </span>
@@ -89,7 +89,7 @@
             <div class="inline nowrap">
                 <span class="meta-data-header">Jury Demand:</span>
                 <span class="meta-data-value">
-                    <a href="?type=r&q=juryDemand:{{ doc0.solr_highlights.juryDemand.0|safe }}">
+                    <a href="?type=r&amp;q=juryDemand:{{ doc0.solr_highlights.juryDemand.0|safe }}">
                         {{ doc0.solr_highlights.juryDemand.0|safe }}
                     </a>
                 </span>
@@ -99,7 +99,7 @@
             <div class="inline nowrap">
                 <span class="meta-data-header">Assigned To:</span>
                 <span class="meta-data-value">
-                    <a href="?type=r&q=assigned_to_id:{{ doc0.assigned_to_id }}">
+                    <a href="?type=r&amp;q=assigned_to_id:{{ doc0.assigned_to_id }}">
                         {{ doc0.solr_highlights.assignedTo.0|safe }}
                     </a>
                 </span>
@@ -109,7 +109,7 @@
             <div class="inline nowrap">
                 <span class="meta-data-header">Referred To:</span>
                 <span class="meta-data-value">
-                    <a href="?type=r&q=referred_to_id:{{ doc0.referred_to_id }}">
+                    <a href="?type=r&amp;q=referred_to_id:{{ doc0.referred_to_id }}">
                         {{ doc0.solr_highlights.referredTo.0|safe }}
                     </a>
                 </span>
@@ -140,7 +140,7 @@
             {% with limit=results.object_list.params|get:"group.limit" %}
             {% with remaining=result.doclist.numFound|sub:limit %}
             {% if remaining > 0 %}
-            <a href="{% url "show_results" %}?type=r&q=docket_id:{{ doc0.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
+            <a href="{% url "show_results" %}?type=r&amp;q=docket_id:{{ doc0.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
                 this Case</a>
             {% endif %}
             {% endwith %}
