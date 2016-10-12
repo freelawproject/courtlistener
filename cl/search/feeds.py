@@ -38,7 +38,10 @@ class SearchFeed(Feed):
         search_form = SearchForm(obj.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+            if cd['type'] == 'o':
+                solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+            elif cd['type'] == 'r':
+                solr = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
             main_params = search_utils.build_main_query(cd, highlight=False)
             main_params.update({
                 'sort': 'dateFiled desc',
