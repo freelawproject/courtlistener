@@ -421,10 +421,13 @@ def add_highlighting(main_params, cd, highlight):
                 'court_citation_string', 'suitNature', 'citation',
                 'neutralCite', 'lexisCite']
     elif cd['type'] == 'r':
-        fl = ['id', 'court_id', 'dateFiled', 'docketNumber', 'caseName',
-              'natureOfSuit', 'court', 'assignedTo']
+        fl = ['id', 'absolute_url', 'court_id', 'dateFiled', 'docketNumber',
+              'caseName', 'suitNature', 'court', 'assigned_to_id',
+              'referred_to_id', 'dateArgued', 'dateTerminated',
+              'document_number', 'attachment_number', 'docket_id']
         hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
-                'docketNumber', 'natureOfSuit']
+                'court_citation_string', 'docketNumber', 'suitNature', 'cause',
+                'juryDemand', 'assignedTo', 'referredTo',]
     elif cd['type'] == 'oa':
         fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
               'download_url', 'docket_id', 'dateArgued', 'duration']
@@ -479,7 +482,7 @@ def add_fq(main_params, cd):
         if cd['docket_number']:
             main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
         if cd['nature_of_suit']:
-            main_fq.append(make_fq(cd, 'natureOfSuit', 'nature_of_suit'))
+            main_fq.append(make_fq(cd, 'suitNature', 'nature_of_suit'))
         if cd['document_number']:
             main_fq.append(make_fq(cd, 'document_number', 'document_number'))
         if cd['attachment_number']:
@@ -543,12 +546,26 @@ def add_fq(main_params, cd):
 
 def add_grouping(main_params, cd):
     """Add any grouping parameters."""
+    group_params = {}
     if cd['type'] == 'o':
-        main_params['group'] = 'true'              # Do grouping
-        main_params['group.ngroups'] = 'true'      # Include number of groups
-        main_params['group.limit'] = 5             # Cap the group size at N
-        main_params['group.field'] = 'cluster_id'  # Group on this field
-        main_params['group.sort'] = 'type asc'     # Sort by type
+        group_params = {
+            'group': 'true',              # Do grouping
+            'group.ngroups': 'true',      # Include number of groups
+            'group.limit': 5,             # Cap the group size at N
+            'group.field': 'cluster_id',  # Group on this field
+            'group.sort': 'type asc',     # Sort by type
+        }
+    elif cd['type'] == 'r':
+        docket_query = re.match('docket_id:\d+', cd['q'])
+        group_params = {
+            'group': 'true',
+            'group.ngroups': 'true',
+            'group.limit': 5 if not docket_query else 100,
+            'group.field': 'docket_id',
+            'group.sort': 'score desc',
+        }
+
+    main_params.update(group_params)
 
 
 def regroup_snippets(paged_results):
