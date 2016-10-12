@@ -121,6 +121,12 @@
             <h4>
                 <a href="{{ doc.absolute_url }}#entry-{{ doc.document_number }}">Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
                 </a>
+                {% if not doc.is_available %}
+                    <i class="fa fa-ban gray"
+                       data-toggle="tooltip"
+                       data-placement="right"
+                       title="Item not yet in RECAP archive."></i>
+                {% endif %}
             </h4>
             <p>
                 {% if request.GET.q %}&hellip;{% endif %}

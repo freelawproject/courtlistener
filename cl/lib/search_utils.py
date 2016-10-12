@@ -424,7 +424,8 @@ def add_highlighting(main_params, cd, highlight):
         fl = ['id', 'absolute_url', 'court_id', 'dateFiled', 'docketNumber',
               'caseName', 'suitNature', 'court', 'assigned_to_id',
               'referred_to_id', 'dateArgued', 'dateTerminated',
-              'document_number', 'attachment_number', 'docket_id']
+              'document_number', 'attachment_number', 'docket_id',
+              'is_available']
         hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
                 'court_citation_string', 'docketNumber', 'suitNature', 'cause',
                 'juryDemand', 'assignedTo', 'referredTo',]
