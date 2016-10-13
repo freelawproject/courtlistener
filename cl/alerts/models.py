@@ -50,10 +50,6 @@ class Alert(models.Model):
         choices=FREQUENCY,
         max_length=10
     )
-    always_send_email = models.BooleanField(
-        verbose_name='Always send an alert?',
-        default=False
-    )
 
     def __unicode__(self):
         return u'Alert %s: %s' % (self.pk, self.name)

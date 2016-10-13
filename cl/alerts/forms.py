@@ -32,7 +32,6 @@ class CreateAlertForm(ModelForm):
             'name',
             'query',
             'rate',
-            'always_send_email',
         )
         widgets = {
             'query': HiddenInput(),
@@ -46,5 +45,4 @@ class CreateAlertForm(ModelForm):
                     'class': 'form-control',
                 }
             ),
-            'always_send_email': CheckboxInput(),
         }

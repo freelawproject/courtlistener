@@ -5,13 +5,11 @@ from cl.alerts.models import Alert, RealTimeQueue
 class AlertAdmin(admin.ModelAdmin):
     list_filter = (
         'rate',
-        'always_send_email',
     )
     list_display = (
         'name',
         'id',
         'rate',
-        'always_send_email',
         'date_last_hit',
     )
     raw_id_fields = (

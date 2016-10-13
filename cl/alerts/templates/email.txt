@@ -17,11 +17,7 @@ Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }
  - View on our site: https://www.courtlistener.com{{result.absolute_url}}
  - Download original from the court: {{result.download_url}}
  - Download the original from our backup: https://www.courtlistener.com/{{ result.local_path }}
-{% if type == 'o' %}...{% for frag in result.solr_highlights.text %}{{ frag|safe|striptags|underscore_to_space|compress_whitespace }}...{% endfor %}{% endif %}
-{% empty %}{% if alert.always_send_email %}{# it's a negative alert with no hits. #}Your {{ alert.get_rate_display|lower}} alert -- {{alert.name}} -- had 0 hits.
--------------------------------------------------------
-Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/
-{% endif %}{% endfor %}
+{% if type == 'o' %}...{% for frag in result.solr_highlights.text %}{{ frag|safe|striptags|underscore_to_space|compress_whitespace }}...{% endfor %}{% endif %}{% endfor %}
 
 {% endfor %}
 ************************
