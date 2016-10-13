@@ -555,6 +555,7 @@ def add_grouping(main_params, cd):
             'group.limit': 5,             # Cap the group size at N
             'group.field': 'cluster_id',  # Group on this field
             'group.sort': 'type asc',     # Sort by type
+            'group.facet': 'true',        # Tally the facets
         }
     elif cd['type'] == 'r':
         docket_query = re.match('docket_id:\d+', cd['q'])
@@ -592,27 +593,31 @@ def regroup_snippets(paged_results):
             group['snippets'] = snippets
 
 
+def print_params(params):
+    if settings.DEBUG:
+        print "Params sent to search are:\n%s" % ' &\n'.join(
+            ['  %s = %s' % (k, v) for k, v in params.items()]
+        )
+        # print results_si.execute()
+
+
 def build_main_query(cd, highlight='all', order_by=''):
     main_params = {
         'q': cd['q'] or '*',
         'sort': cd.get('order_by', order_by),
         'caller': 'build_main_query',
     }
-
+    add_faceting(main_params, cd)
     add_boosts(main_params, cd)
     add_highlighting(main_params, cd, highlight)
     add_fq(main_params, cd)
     add_grouping(main_params, cd)
 
-    if settings.DEBUG:
-        print "Params sent to search are:\n%s" % ' &\n'.join(
-                ['  %s = %s' % (k, v) for k, v in main_params.items()]
-        )
-        #print results_si.execute()
+    print_params(main_params)
     return main_params
 
 
-def place_facet_queries(cd, conn):
+def build_facet_query(cd):
     """Get facet values for the status filters
 
     Using the search form, query Solr and get the values for the status filters.
@@ -626,40 +631,11 @@ def place_facet_queries(cd, conn):
         'q': cd['q'] or '*',
         'caller': 'facet_parameters',
     }
-    fq = []
+    add_fq(facet_params, cd)
+    add_grouping(facet_params, cd)
 
-    # Case Name and judges
-    if cd['case_name']:
-        fq.append(make_fq(cd, 'caseName', 'case_name'))
-    if cd['judge']:
-        fq.append(make_fq(cd, 'judge', 'judge'))
-
-    # Citations
-    if cd['citation']:
-        fq.append(make_fq_proximity_query(cd, 'citation', 'citation'))
-    if cd['docket_number']:
-        fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
-    if cd['neutral_cite']:
-        fq.append(make_fq(cd, 'neutralCite', 'neutral_cite'))
-
-    fq.append(make_date_query('dateFiled', cd['filed_before'], cd['filed_after']))
-    fq.append(make_cite_count_query(cd))
-
-    # Faceting
-    selected_courts_string = get_selected_field_string(cd, 'court_')  # Status facets depend on court checkboxes
-    selected_stats_string = get_selected_field_string(cd, 'stat_')
-    if len(selected_stats_string) > 0:
-        fq.extend(['{!tag=dt}status_exact:(%s)' % selected_stats_string,
-                   'court_exact:(%s)' % selected_courts_string])
-
-    # If a param has been added to the fq variables, then we add them to the
-    # main_params var. Otherwise, we don't, as doing so throws an error.
-    if len(fq) > 0:
-        facet_params['fq'] = fq
-
-    stat_facet_fields = conn.query().add_extra(**facet_params).execute().facet_counts.facet_fields
-
-    return stat_facet_fields
+    print_params(facet_params)
+    return facet_params
 
 
 def get_court_start_year(conn, court):

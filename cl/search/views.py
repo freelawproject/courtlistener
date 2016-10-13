@@ -22,8 +22,8 @@ from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.search_utils import build_main_query, get_query_citation, \
-    place_facet_queries, make_stats_variable, merge_form_with_courts, \
-    make_get_string, regroup_snippets
+    make_stats_variable, merge_form_with_courts,  make_get_string, \
+    regroup_snippets, build_facet_query
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
 from cl.stats import tally_stat, Stat
@@ -50,9 +50,12 @@ def do_search(request, rows=20, order_by=None, type=None):
             status_facets = None
             if cd['type'] == 'o':
                 si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
-                stat_facet_fields = place_facet_queries(cd, si)
-                status_facets = make_stats_variable(stat_facet_fields,
-                                                    search_form)
+                facet_query = build_facet_query(cd)
+                facet_results = si.query().add_extra(**facet_query).execute()
+                status_facets = make_stats_variable(
+                    facet_results.facet_counts.facet_fields,
+                    search_form,
+                )
                 query_citation = get_query_citation(cd)
                 results = si.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'r':
