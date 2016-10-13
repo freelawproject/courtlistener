@@ -137,7 +137,7 @@
         </div>
         {% endfor %}
         <div class="col-md-offset-half">
-            {% with limit=results.object_list.params|get:"group.limit" %}
+            {% with limit=results.paginator.object_list.params|get:"group.limit" %}
             {% with remaining=result.doclist.numFound|sub:limit %}
             {% if remaining > 0 %}
             <a href="{% url "show_results" %}?type=r&amp;q=docket_id:{{ doc0.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for

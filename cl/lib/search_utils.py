@@ -387,6 +387,18 @@ def add_boosts(main_params, cd):
         main_params['ps'] = 5
 
 
+def add_faceting(main_params, cd):
+    """Add any faceting filters to the query."""
+    facet_params = {}
+    if cd['type'] == 'o':
+        facet_params = {
+            'facet': 'true',
+            'facet.mincount': 0,
+            'facet.field': '{!ex=dt}status_exact',
+        }
+    main_params.update(facet_params)
+
+
 def add_highlighting(main_params, cd, highlight):
     """Add any parameters relating to highlighting."""
 
@@ -582,9 +594,9 @@ def regroup_snippets(paged_results):
     In this function, we identify these kinds of duplicates and pull them out.
     We also flatten the paged_results so that snippets are easier to get.
     """
-    group_field = paged_results.object_list.group_field
+    group_field = paged_results.paginator.object_list.group_field
     if group_field is not None:
-        for group in getattr(paged_results.object_list.groups, group_field)['groups']:
+        for group in paged_results.object_list:
             snippets = []
             for doc in group['doclist']['docs']:
                 for snippet in doc['solr_highlights']['text']:
@@ -615,27 +627,6 @@ def build_main_query(cd, highlight='all', order_by=''):
 
     print_params(main_params)
     return main_params
-
-
-def build_facet_query(cd):
-    """Get facet values for the status filters
-
-    Using the search form, query Solr and get the values for the status filters.
-    """
-    # Build up all the queries needed
-    facet_params = {
-        'rows': '0',
-        'facet': 'true',
-        'facet.mincount': 0,
-        'facet.field': '{!ex=dt}status_exact',
-        'q': cd['q'] or '*',
-        'caller': 'facet_parameters',
-    }
-    add_fq(facet_params, cd)
-    add_grouping(facet_params, cd)
-
-    print_params(facet_params)
-    return facet_params
 
 
 def get_court_start_year(conn, court):

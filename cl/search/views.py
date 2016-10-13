@@ -23,7 +23,7 @@ from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     make_stats_variable, merge_form_with_courts,  make_get_string, \
-    regroup_snippets, build_facet_query
+    regroup_snippets
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
 from cl.stats import tally_stat, Stat
@@ -50,23 +50,21 @@ def do_search(request, rows=20, order_by=None, type=None):
             status_facets = None
             if cd['type'] == 'o':
                 si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
-                facet_query = build_facet_query(cd)
-                facet_results = si.query().add_extra(**facet_query).execute()
+                query_citation = get_query_citation(cd)
+                results = si.query().add_extra(**build_main_query(cd)).execute()
                 status_facets = make_stats_variable(
-                    facet_results.facet_counts.facet_fields,
+                    results.facet_counts.facet_fields,
                     search_form,
                 )
-                query_citation = get_query_citation(cd)
-                results = si.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'r':
                 si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd))
+                results = si.query().add_extra(**build_main_query(cd)).execute()
             elif cd['type'] == 'oa':
                 si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd))
+                results = si.query().add_extra(**build_main_query(cd)).execute()
             elif cd['type'] == 'p':
                 si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd))
+                results = si.query().add_extra(**build_main_query(cd)).execute()
 
             courts = Court.objects.filter(in_use=True)
             courts, court_count_human, court_count = merge_form_with_courts(
