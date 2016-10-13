@@ -129,6 +129,8 @@ class Command(BaseCommand):
                     'hl.tag.post': '</strong></em>',
                     'caller': 'cl_send_alerts',
                 })
+                del main_params['group']  # Temporary (?) hack until upgrade to scorched.
+
                 if rate == 'rt':
                     main_params['fq'].append(
                         'id:(%s)' % ' OR '.join(
