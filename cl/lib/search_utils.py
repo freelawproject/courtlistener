@@ -598,11 +598,14 @@ def regroup_snippets(results):
     """
     if hasattr(results, 'paginator'):
         group_field = results.object_list.group_field
-        groups = getattr(results.object_list.groups, group_field)['groups']
     else:
         group_field = results.group_field
-        groups = results
     if group_field is not None:
+        if hasattr(results, 'paginator'):
+            groups = getattr(results.object_list.groups, group_field)['groups']
+        else:
+            groups = results
+
         for group in groups:
             snippets = []
             for doc in group['doclist']['docs']:
