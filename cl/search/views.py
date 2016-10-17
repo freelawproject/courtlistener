@@ -51,20 +51,16 @@ def do_search(request, rows=20, order_by=None, type=None):
             if cd['type'] == 'o':
                 si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
                 query_citation = get_query_citation(cd)
-                results = si.query().add_extra(**build_main_query(cd)).execute()
-                status_facets = make_stats_variable(
-                    results.facet_counts.facet_fields,
-                    search_form,
-                )
+                results = si.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'r':
                 si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd)).execute()
+                results = si.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'oa':
                 si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd)).execute()
+                results = si.query().add_extra(**build_main_query(cd))
             elif cd['type'] == 'p':
                 si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd)).execute()
+                results = si.query().add_extra(**build_main_query(cd))
 
             courts = Court.objects.filter(in_use=True)
             courts, court_count_human, court_count = merge_form_with_courts(
@@ -79,42 +75,52 @@ def do_search(request, rows=20, order_by=None, type=None):
             logger.warning("Error was %s" % e)
             return {'error': True}
 
+        # Set up pagination
+        try:
+            if cd['type'] == 'r':
+                rows = 10
+            paginator = Paginator(results, rows)
+            page = request.GET.get('page', 1)
+            try:
+                paged_results = paginator.page(page)
+            except PageNotAnInteger:
+                # If page is not an integer, deliver first page.
+                paged_results = paginator.page(1)
+            except EmptyPage:
+                # Page is out of range (e.g. 9999), deliver last page.
+                paged_results = paginator.page(paginator.num_pages)
+        except Exception, e:
+            # Catches any Solr errors, and aborts.
+            logger.warning("Error loading pagination on search page with "
+                           "request: %s" % request.GET)
+            logger.warning("Error was: %s" % e)
+            if settings.DEBUG is True:
+                traceback.print_exc()
+            return {'error': True}
+
+        # Post processing of the results
+        if cd['type'] == 'o':
+            status_facets = make_stats_variable(
+                paged_results.object_list.facet_counts.facet_fields,
+                search_form,
+            )
+        regroup_snippets(paged_results)
+
+        return {
+            'search_form': search_form,
+            'results': paged_results,
+            'courts': courts,
+            'court_count_human': court_count_human,
+            'court_count': court_count,
+            'status_facets': status_facets,
+            'query_citation': query_citation,
+        }
+
     else:
         # Invalid form, send it back
-        logger.warning("Invalid form when loading search page with request: %s" % request.GET)
+        logger.warning("Invalid form when loading search page with "
+                       "request: %s" % request.GET)
         return {'error': True}
-
-    # Set up pagination
-    try:
-        paginator = Paginator(results, rows)
-        page = request.GET.get('page', 1)
-        try:
-            paged_results = paginator.page(page)
-        except PageNotAnInteger:
-            # If page is not an integer, deliver first page.
-            paged_results = paginator.page(1)
-        except EmptyPage:
-            # If page is out of range (e.g. 9999), deliver last page of results.
-            paged_results = paginator.page(paginator.num_pages)
-    except Exception, e:
-        # Catches any Solr errors, and aborts.
-        logger.warning("Error loading pagination on search page with request: %s" % request.GET)
-        logger.warning("Error was: %s" % e)
-        if settings.DEBUG is True:
-            traceback.print_exc()
-        return {'error': True}
-
-    regroup_snippets(paged_results)
-
-    return {
-        'search_form': search_form,
-        'results': paged_results,
-        'courts': courts,
-        'court_count_human': court_count_human,
-        'court_count': court_count,
-        'status_facets': status_facets,
-        'query_citation': query_citation,
-    }
 
 
 def get_homepage_stats():

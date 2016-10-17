@@ -582,7 +582,7 @@ def add_grouping(main_params, cd):
     main_params.update(group_params)
 
 
-def regroup_snippets(paged_results):
+def regroup_snippets(results):
     """Regroup the snippets in a grouped result.
 
     Grouped results will have snippets for each of the group members. Some of
@@ -592,11 +592,18 @@ def regroup_snippets(paged_results):
     generate a snippet for both the lead opinion and a dissent.
 
     In this function, we identify these kinds of duplicates and pull them out.
-    We also flatten the paged_results so that snippets are easier to get.
+    We also flatten the results so that snippets are easier to get.
+
+    This also supports results that have been paginated and ones that have not.
     """
-    group_field = paged_results.paginator.object_list.group_field
+    if hasattr(results, 'paginator'):
+        group_field = results.object_list.group_field
+        groups = getattr(results.object_list.groups, group_field)['groups']
+    else:
+        group_field = results.group_field
+        groups = results
     if group_field is not None:
-        for group in paged_results.object_list:
+        for group in groups:
             snippets = []
             for doc in group['doclist']['docs']:
                 for snippet in doc['solr_highlights']['text']:

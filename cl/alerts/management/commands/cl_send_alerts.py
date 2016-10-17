@@ -11,7 +11,8 @@ from django.utils.timezone import now
 
 from cl.alerts.models import FREQUENCY, RealTimeQueue, ITEM_TYPES
 from cl.lib import search_utils
-from cl.lib import sunburnt
+from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.search_utils import regroup_snippets
 from cl.search.forms import SearchForm
 from cl.stats import tally_stat
 
@@ -71,8 +72,8 @@ class Command(BaseCommand):
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
         self.connections = {
-            'o': sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r'),
-            'oa': sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='r'),
+            'o': ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r'),
+            'oa': ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r'),
         }
         self.options = {}
         self.valid_ids = {}
@@ -129,19 +130,18 @@ class Command(BaseCommand):
                     'hl.tag.post': '</strong></em>',
                     'caller': 'cl_send_alerts',
                 })
-                del main_params['group']  # Temporary (?) hack until upgrade to scorched.
 
                 if rate == 'rt':
-                    main_params['fq'].append(
-                        'id:(%s)' % ' OR '.join(
-                            [str(i) for i in self.valid_ids[cd['type']]]
-                        ),
-                    )
+                    main_params['fq'].append('id:(%s)' % ' OR '.join(
+                        [str(i) for i in self.valid_ids[cd['type']]]
+                    ))
                 results = self.connections[
                     cd['type']
-                ].raw_query(
+                ].query().add_extra(
                     **main_params
                 ).execute()
+                regroup_snippets(results)
+
             else:
                 logger.info("  Query for alert %s was invalid\n"
                             "  Errors from the SearchForm: %s\n" %
@@ -192,10 +192,6 @@ class Command(BaseCommand):
                         hits.append([alert, alert_type, results])
                         alert.date_last_hit = now()
                         alert.save()
-                    # elif len(results) == 0 and alert.always_send_email:
-                    #     hits.append([alert, alert_type, None])
-                    #     logger.info("  Sending results for negative alert "
-                    #                 "'%s'\n" % alert.name)
                 except Exception, e:
                     traceback.print_exc()
                     logger.info("  Search failed on this alert: %s\n%s\n" %
