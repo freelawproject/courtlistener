@@ -568,6 +568,7 @@ def add_grouping(main_params, cd):
             'group.field': 'cluster_id',  # Group on this field
             'group.sort': 'type asc',     # Sort by type
             'group.facet': 'true',        # Tally the facets
+            'group.truncate': 'true',     # Facet counts use 1st item in group
         }
     elif cd['type'] == 'r':
         docket_query = re.match('docket_id:\d+', cd['q'])
@@ -577,6 +578,7 @@ def add_grouping(main_params, cd):
             'group.limit': 5 if not docket_query else 100,
             'group.field': 'docket_id',
             'group.sort': 'score desc',
+            'group.truncate': 'true',
         }
 
     main_params.update(group_params)
