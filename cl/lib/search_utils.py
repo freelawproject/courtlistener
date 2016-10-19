@@ -574,8 +574,8 @@ def add_grouping(main_params, cd, facet):
         }
         if facet:
             group_params.update({
-                'group.facet': 'true',     # Tally the facets as groups
-                'group.truncate': 'true',  # Facet counts use 1st item in group
+                #'group.facet': 'true',     # Tally the facets as groups
+                #'group.truncate': 'true',  # Facet counts use 1st item in group
             })
     elif cd['type'] == 'r':
         docket_query = re.match('docket_id:\d+', cd['q'])
