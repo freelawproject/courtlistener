@@ -252,7 +252,7 @@ class Command(BaseCommand):
                         [str(i.item_pk) for i in ids]
                     )],
                 }
-                results = self.connections[item_type].raw_query(
+                results = self.connections[item_type].query().add_extra(
                     **main_params).execute()
                 valid_ids[item_type] = [int(r['id']) for r in
                                         results.result.docs]
