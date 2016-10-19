@@ -122,7 +122,7 @@ class Command(BaseCommand):
                     cd['filed_after'] = cut_off_date
                 elif cd['type'] == 'oa':
                     cd['argued_after'] = cut_off_date
-                main_params = search_utils.build_main_query(cd)
+                main_params = search_utils.build_main_query(cd, facet=False)
                 main_params.update({
                     'rows': '20',
                     'start': '0',

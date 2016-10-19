@@ -105,7 +105,8 @@ class SearchPodcast(JurisdictionPodcast):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             conn = sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='r')
-            main_params = search_utils.build_main_query(cd, highlight=False)
+            main_params = search_utils.build_main_query(cd, highlight=False,
+                                                        facet=False)
             main_params.update({
                 'sort': 'dateArgued desc',
                 'rows': '20',

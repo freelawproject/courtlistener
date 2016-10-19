@@ -16,8 +16,9 @@ def get_object_list(request=None, **kwargs):
     main_query = {'caller': 'api_search'}
     try:
         main_query.update(search_utils.build_main_query(
-                kwargs['cd'],
-                highlight='text'
+            kwargs['cd'],
+            highlight='text',
+            facet=False,
         ))
         sl = SolrList(
                 main_query=main_query,
@@ -29,8 +30,9 @@ def get_object_list(request=None, **kwargs):
         sf = forms.SearchForm({'q': '*'})
         if sf.is_valid():
             main_query.update(search_utils.build_main_query(
-                    sf.cleaned_data,
-                    highlight='text',
+                sf.cleaned_data,
+                highlight='text',
+                facet=False,
             ))
         sl = SolrList(
                 main_query=main_query,

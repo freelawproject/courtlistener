@@ -42,7 +42,8 @@ class SearchFeed(Feed):
                 solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
             elif cd['type'] == 'r':
                 solr = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-            main_params = search_utils.build_main_query(cd, highlight=False)
+            main_params = search_utils.build_main_query(cd, highlight=False,
+                                                        facet=False)
             main_params.update({
                 'sort': 'dateFiled desc',
                 'rows': '20',

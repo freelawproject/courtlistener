@@ -33,7 +33,7 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 logger = logging.getLogger(__name__)
 
 
-def do_search(request, rows=20, order_by=None, type=None):
+def do_search(request, rows=20, order_by=None, type=None, facet=True):
 
     search_form = SearchForm(request.GET)
     if search_form.is_valid():
@@ -51,16 +51,16 @@ def do_search(request, rows=20, order_by=None, type=None):
             if cd['type'] == 'o':
                 si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
                 query_citation = get_query_citation(cd)
-                results = si.query().add_extra(**build_main_query(cd))
+                results = si.query().add_extra(**build_main_query(cd, facet=facet))
             elif cd['type'] == 'r':
                 si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd))
+                results = si.query().add_extra(**build_main_query(cd, facet=facet))
             elif cd['type'] == 'oa':
                 si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd))
+                results = si.query().add_extra(**build_main_query(cd, facet=facet))
             elif cd['type'] == 'p':
                 si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd))
+                results = si.query().add_extra(**build_main_query(cd, facet=facet))
 
             courts = Court.objects.filter(in_use=True)
             courts, court_count_human, court_count = merge_form_with_courts(
@@ -99,7 +99,7 @@ def do_search(request, rows=20, order_by=None, type=None):
             return {'error': True}
 
         # Post processing of the results
-        if cd['type'] == 'o':
+        if cd['type'] == 'o' and facet is True:
             status_facets = make_stats_variable(
                 paged_results.object_list.facet_counts.facet_fields,
                 search_form,
@@ -277,10 +277,11 @@ def show_results(request):
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
             render_dict.update(do_search(request, rows=5,
-                                         order_by='dateFiled desc'))
+                                         order_by='dateFiled desc',
+                                         facet=False))
             # Get the results from the oral arguments as well
             oa_dict = do_search(request, rows=5, order_by='dateArgued desc',
-                                type='oa')
+                                type='oa', facet=False)
             render_dict.update({'results_oa': oa_dict['results']})
             # But give it a fresh form for the advanced search section
             render_dict.update({'search_form': SearchForm(request.GET)})
@@ -349,7 +350,7 @@ def advanced(request):
     elif request.path == reverse('advanced_p'):
         obj_type = 'p'
 
-    render_dict.update(do_search(request, rows=1, type=obj_type))
+    render_dict.update(do_search(request, rows=1, type=obj_type, facet=False))
     render_dict['search_form'] = SearchForm({'type': obj_type})
     return render_to_response(
         'advanced.html',

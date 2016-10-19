@@ -387,8 +387,12 @@ def add_boosts(main_params, cd):
         main_params['ps'] = 5
 
 
-def add_faceting(main_params, cd):
+def add_faceting(main_params, cd, facet):
     """Add any faceting filters to the query."""
+    if not facet:
+        # Faceting is off. Do nothing.
+        return
+
     facet_params = {}
     if cd['type'] == 'o':
         facet_params = {
@@ -406,7 +410,7 @@ def add_highlighting(main_params, cd, highlight):
         # highlighting is off, therefore we get the default fl parameter,
         # which gives us all fields. We could set it manually, but there's
         # no need.
-        return main_params
+        return
 
     # Common highlighting params up here.
     main_params.update({
@@ -418,7 +422,7 @@ def add_highlighting(main_params, cd, highlight):
 
     if highlight == 'text':
         main_params['hl.fl'] = 'text'
-        return main_params
+        return
 
     assert highlight == 'all', "Got unexpected highlighting value."
     # Requested fields for the main query. We only need the fields
@@ -557,7 +561,7 @@ def add_fq(main_params, cd):
         main_params['fq'] = main_fq
 
 
-def add_grouping(main_params, cd):
+def add_grouping(main_params, cd, facet):
     """Add any grouping parameters."""
     group_params = {}
     if cd['type'] == 'o':
@@ -567,9 +571,12 @@ def add_grouping(main_params, cd):
             'group.limit': 5,             # Cap the group size at N
             'group.field': 'cluster_id',  # Group on this field
             'group.sort': 'type asc',     # Sort by type
-            'group.facet': 'true',        # Tally the facets
-            'group.truncate': 'true',     # Facet counts use 1st item in group
         }
+        if facet:
+            group_params.update({
+                'group.facet': 'true',     # Tally the facets as groups
+                'group.truncate': 'true',  # Facet counts use 1st item in group
+            })
     elif cd['type'] == 'r':
         docket_query = re.match('docket_id:\d+', cd['q'])
         group_params = {
@@ -578,7 +585,6 @@ def add_grouping(main_params, cd):
             'group.limit': 5 if not docket_query else 100,
             'group.field': 'docket_id',
             'group.sort': 'score desc',
-            'group.truncate': 'true',
         }
 
     main_params.update(group_params)
@@ -625,17 +631,17 @@ def print_params(params):
         # print results_si.execute()
 
 
-def build_main_query(cd, highlight='all', order_by=''):
+def build_main_query(cd, highlight='all', order_by='', facet=True):
     main_params = {
         'q': cd['q'] or '*',
         'sort': cd.get('order_by', order_by),
         'caller': 'build_main_query',
     }
-    add_faceting(main_params, cd)
+    add_faceting(main_params, cd, facet)
     add_boosts(main_params, cd)
     add_highlighting(main_params, cd, highlight)
     add_fq(main_params, cd)
-    add_grouping(main_params, cd)
+    add_grouping(main_params, cd, facet)
 
     print_params(main_params)
     return main_params
