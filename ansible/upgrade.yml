@@ -18,6 +18,7 @@
     pip:
       virtualenv={{ virtualenv_root }}
       requirements={{ install_root }}/requirements.txt
+      extra_args='--upgrade'
     tags:
      - dependencies
   - name: update seals
