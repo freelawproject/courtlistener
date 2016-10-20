@@ -130,6 +130,7 @@
            stored="true"
            required="true"
            multiValued="false"
+           termVectors="true"
            termPositions="true"
            termOffsets="true"/>
     <field name="assigned_to_id"
@@ -233,6 +234,7 @@
            indexed="true"
            stored="true"
            multiValued="false"
+           termVectors="true"
            termPositions="true"
            termOffsets="true"/>
     <field name="cause"
@@ -240,6 +242,7 @@
            indexed="true"
            stored="true"
            multiValued="false"
+           termVectors="true"
            termPositions="true"
            termOffsets="true"/>
     <field name="juryDemand"
@@ -247,6 +250,7 @@
            indexed="true"
            stored="true"
            multiValued="false"
+           termVectors="true"
            termPositions="true"
            termOffsets="true"/>
     <field name="jurisdictionType"
@@ -266,6 +270,7 @@
            indexed="true"
            stored="true"
            multiValued="false"
+           termVectors="true"
            termPositions="true"
            termOffsets="true"/>
     <field name="referredTo"
@@ -273,6 +278,7 @@
            indexed="true"
            stored="true"
            multiValued="false"
+           termVectors="true"
            termPositions="true"
            termOffsets="true"/>
 
@@ -282,6 +288,7 @@
            indexed="true"
            stored="true"
            multiValued="false"
+           termVectors="true"
            termPositions="true"
            termOffsets="true"/>
     <field name="court_citation_string"
