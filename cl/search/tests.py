@@ -355,17 +355,18 @@ class GroupedSearchTest(EmptySolrTestCase):
         self.factory = RequestFactory()
 
     def test_grouped_queries(self):
-        """When we have a cluster with multiple opinions, do results get grouped?"""
+        """When we have a cluster with multiple opinions, do results get
+        grouped?
+        """
         request = self.factory.get(reverse('show_results'), {'q': 'Voutila'})
         response = do_search(request)
-        groups = response['results'].object_list.groups
+        result_count = response['results'].object_list.result.numFound
+        num_expected = 1
         self.assertEqual(
-            groups.cluster_id['ngroups'],
-            1,
-        )
-        self.assertEqual(
-            groups.cluster_id['matches'],
-            2,
+            result_count,
+            num_expected,
+            msg="Found %s items, but should have found %s if the items were "
+                "grouped properly." % (result_count, num_expected),
         )
 
 

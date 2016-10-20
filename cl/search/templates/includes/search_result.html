@@ -16,17 +16,18 @@
                 {% endif %}
                 </a>
 
-            {% elif type == 'o' or type_override == 'o' or type == 'r' or type_override == 'r' %}
+            {% elif type == 'r' or type_override == 'r' %}
                 <a href="{{ doc0.absolute_url }}?{{ request.META.QUERY_STRING }}"
                    class="visitable">
                 {{ doc0.solr_highlights.caseName.0|safe }}
                 ({% if doc0.court_id != 'scotus' %}{{ doc0.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ doc0.dateFiled|date:"Y" }})
                 </a>
-            {% elif type == 'oa' or type_override == 'oa' %}
+
+            {% elif type == 'oa' or type_override == 'oa' or type == 'o' or type_override == 'o' %}
                 <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
                    class="visitable">
                 {{ result.solr_highlights.caseName.0|safe }}
-                ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ result.dateArgued|date:"Y" }})
+                ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if type == 'o' or type_override == 'o' %}{{ result.dateFiled|date:"Y" }}{% else %}{{ result.dateArgued|date:"Y" }}{% endif %})
                 </a>
             {% endif %}
     </h3>
@@ -154,9 +155,9 @@
         {% if type == 'o' or type_override == 'o' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Date Filed:</span>
-                <time class="meta-data-value" datetime="{{ doc0.dateFiled|date:'Y-m-d' }}">
-                    {% if doc0.dateFiled %}
-                        {{ doc0.dateFiled|date:"F jS, Y" }}
+                <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d' }}">
+                    {% if result.dateFiled %}
+                        {{ result.dateFiled|date:"F jS, Y" }}
                     {% else %}
                         Unknown Date
                     {% endif %}
@@ -245,20 +246,21 @@
         {% if type == 'o' or type_override == 'o' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Status:</span>
-                <span class="meta-data-value">{{ doc0.status }}</span>
+                <span class="meta-data-value">{{ result.status }}</span>
             </div>
-            {% if doc0.solr_highlights.citation.0 %}
+            {% if result.solr_highlights.citation.0 %}
                 <div class="inline nowrap">
                     <span class="meta-data-header">Citations: </span>
-                    <span class="meta-data-value">{{ doc0.solr_highlights.citation|safeseq|join:", " }}</span>
+                    <span class="meta-data-value">{{ result.solr_highlights.citation|safeseq|join:", " }}</span>
                 </div>
             {% endif %}
         {% endif %}
         {% if type == 'o' or type_override == 'o' or type == 'oa' or type_override == 'oa' %}
-            {% if doc0.solr_highlights.docketNumber.0 %}
+            {% comment %}This won't work{% endcomment %}
+            {% if result.solr_highlights.docketNumber.0 %}
                 <div class="inline nowrap">
                     <span class="meta-data-header">Docket Number:</span>
-                    <span class="meta-data-value">{{ doc0.solr_highlights.docketNumber.0|safe }}</span>
+                    <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
                 </div>
             {% endif %}
         {% endif %}
@@ -279,12 +281,12 @@
             {% endif %}
         {% endif %}
         {% if type == 'o' or type_override == 'o' %}
-            {% if doc0.solr_highlights.suitNature.0 %}
+            {% if result.solr_highlights.suitNature.0 %}
                 <div class="inline nowrap">
                     <span class="meta-data-header">Nature of Suit:</span>
                     <span class="meta-data-value">
-                        <a href="?q=suitNature:{{ doc0.solr_highlights.suitNature.0|safe }}">
-                            {{ doc0.solr_highlights.suitNature.0|safe }}
+                        <a href="?q=suitNature:{{ result.solr_highlights.suitNature.0|safe }}">
+                            {{ result.solr_highlights.suitNature.0|safe }}
                         </a>
                     </span>
                 </div>
@@ -299,11 +301,11 @@
         {% endif %}
     </div>
     {% if type == 'o' or type_override == 'o' %}
-        {% if doc0.citeCount > 0 %}
+        {% if result.citeCount > 0 %}
             <div class="bottom" class="inline nowrap">
                 <span class="meta-data-value">
-                    <a href="/?q=cites%3A({{ doc0.sibling_ids|join:" OR " }})">
-                        Cited {{ doc0.citeCount|intcomma }} time{{ doc0.citeCount|pluralize }}
+                    <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})">
+                        Cited {{ result.citeCount|intcomma }} time{{ result.citeCount|pluralize }}
                     </a>
                 </span>
             </div>
@@ -311,7 +313,7 @@
     {% endif %}
     {% if type == 'o' and simple != True %}
         <p>
-            {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.snippets %}
+            {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.solr_highlights.text %}
                 {{ frag|safe|underscore_to_space }}&hellip;
             {% endfor %}
         </p>

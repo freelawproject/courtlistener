@@ -558,25 +558,24 @@ def add_fq(main_params, cd):
     # If a param has been added to the fq variables, then we add them to the
     # main_params var. Otherwise, we don't, as doing so throws an error.
     if len(main_fq) > 0:
-        main_params['fq'] = main_fq
+        if 'fq' in main_params:
+            main_params['fq'].append(main_fq)
+        else:
+            main_params['fq'] = main_fq
 
 
-def add_grouping(main_params, cd, facet):
+def add_grouping(main_params, cd):
     """Add any grouping parameters."""
-    group_params = {}
     if cd['type'] == 'o':
-        group_params = {
-            'group': 'true',              # Do grouping
-            'group.ngroups': 'true',      # Include number of groups
-            'group.limit': 5,             # Cap the group size at N
-            'group.field': 'cluster_id',  # Group on this field
-            'group.sort': 'type asc',     # Sort by type
-        }
-        if facet:
-            group_params.update({
-                #'group.facet': 'true',     # Tally the facets as groups
-                #'group.truncate': 'true',  # Facet counts use 1st item in group
-            })
+        # Because this uses faceting, we use the collapse query parser here
+        # instead of the usual result grouping. Faceting with grouping has
+        # terrible performance.
+        group_fq = "{!collapse field=cluster_id sort='type asc'}"
+        if 'fq' in main_params:
+            main_params['fq'].append(group_fq)
+        else:
+            main_params['fq'] = group_fq
+
     elif cd['type'] == 'r':
         docket_query = re.match('docket_id:\d+', cd['q'])
         group_params = {
@@ -586,8 +585,7 @@ def add_grouping(main_params, cd, facet):
             'group.field': 'docket_id',
             'group.sort': 'score desc',
         }
-
-    main_params.update(group_params)
+        main_params.update(group_params)
 
 
 def regroup_snippets(results):
@@ -641,7 +639,7 @@ def build_main_query(cd, highlight='all', order_by='', facet=True):
     add_boosts(main_params, cd)
     add_highlighting(main_params, cd, highlight)
     add_fq(main_params, cd)
-    add_grouping(main_params, cd, facet)
+    add_grouping(main_params, cd)
 
     print_params(main_params)
     return main_params

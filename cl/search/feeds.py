@@ -13,9 +13,12 @@ from cl.search.forms import SearchForm
 from cl.search.models import Court
 
 
-def doc0(item):
-    """Return the first item from a grouped result."""
-    return item['doclist']['docs'][0]
+def get_item(item):
+    """Normalize grouped and non-grouped results to return the item itself."""
+    if 'doclist' in item:
+        return item['doclist']['docs'][0]
+    else:
+        return item
 
 
 class SearchFeed(Feed):
@@ -55,16 +58,16 @@ class SearchFeed(Feed):
             return []
 
     def item_link(self, item):
-        return doc0(item)['absolute_url']
+        return get_item(item)['absolute_url']
 
     def item_author_name(self, item):
-        return doc0(item)['court']
+        return get_item(item)['court']
 
     def item_pubdate(self, item):
-        return datetime.datetime.combine(doc0(item)['dateFiled'], datetime.time())
+        return datetime.datetime.combine(get_item(item)['dateFiled'], datetime.time())
 
     def item_title(self, item):
-        return doc0(item)['caseName']
+        return get_item(item)['caseName']
 
 
 class JurisdictionFeed(Feed):

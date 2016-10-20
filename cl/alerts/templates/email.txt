@@ -10,17 +10,14 @@ CourtListener.com
 We have news regarding your alerts at CourtListener.com
 -------------------------------------------------------
 
-{% for alert, type, results in hits %}{% for result in results %}{% with doc0=result.doclist.docs.0 %}{% if forloop.first %}Your {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% endif %} alert -- {{alert.name}} -- had {{results|length}} hit{{results|pluralize}}:
+{% for alert, type, results in hits %}{% for result in results %}{% if forloop.first %}Your {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% endif %} alert -- {{alert.name}} -- had {{results|length}} hit{{results|pluralize}}:
 -------------------------------------------------------
 Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/{% endif %}
-{{forloop.counter}}. {% if type == 'o' %}{{ doc0.solr_highlights.caseName.0|safe|striptags }}{% elif type == 'oa' %}{{ result.solr_highlights.caseName.0|safe|striptags }}{% endif %} ({% if type == 'o' %}{% if doc0.court_id != 'scotus' %}{{ doc0.solr_highlights.court_citation_string.0|safe|striptags }} {% endif %}{{ doc0.dateFiled|date:"Y" }}{% elif type == 'oa' %}{% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|safe|striptags }} {% endif %}{{ result.dateArgued|date:"Y" }}{% endif %})
- - View on our site: https://www.courtlistener.com{% if type == 'o' %}{{ doc0.absolute_url }}{% elif type == 'oa' %}{{ result.absolute_url }}{% endif %}
- - Download original from the court: {% if type == 'o' %}{{ doc0.download_url }}{% elif type == 'oa' %}{{ result.download_url }}{% endif %}
- - Download the original from our backup: https://www.courtlistener.com/{% if type == 'o' %}{{ doc0.local_path }}{% elif type == 'oa' %}{{ result.local_path }}{% endif %}
-
-Matched Text:
-{% if type == 'o' %}{% for frag in result.snippets %}...{{ frag|safe|striptags|underscore_to_space|compress_whitespace }}...
-{% endfor %}{% endif %}{% endwith %}{% endfor %}
+{{forloop.counter}}. {{ result.solr_highlights.caseName.0|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
+ - View on our site: https://www.courtlistener.com{{result.absolute_url}}
+ - Download original from the court: {{result.download_url}}
+ - Download the original from our backup: https://www.courtlistener.com/{{ result.local_path }}
+{% if type == 'o' %}...{% for frag in result.solr_highlights.text %}{{ frag|safe|striptags|underscore_to_space|compress_whitespace }}...{% endfor %}{% endif %}{% endfor %}
 
 {% endfor %}
 ************************
