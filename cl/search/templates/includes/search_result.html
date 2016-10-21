@@ -127,6 +127,10 @@
                        data-toggle="tooltip"
                        data-placement="right"
                        title="Item not yet in RECAP archive."></i>
+                {% else %}
+                    {% if doc.page_count %}
+                    <span class="small gray">({{ doc.page_count }} page{{ doc.page_count|pluralize }})</span>
+                    {% endif %}
                 {% endif %}
             </h4>
             <p>
