@@ -35,12 +35,12 @@
     {% if type == 'r' or type_override == 'r' %}
     <div class="bottom">
         {% if doc0.solr_highlights.docketNumber.0 %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Docket Number:</span>
                 <span class="meta-data-value">{{ doc0.solr_highlights.docketNumber.0|safe }}</span>
             </div>
         {% endif %}
-        <div class="inline nowrap">
+        <div class="inline-block">
             <span class="meta-data-header">Date Filed:</span>
             <time class="meta-data-value" datetime="{{ doc0.dateFiled|date:"Y-m-d" }}">
                 {% if doc0.dateFiled %}
@@ -51,7 +51,7 @@
             </time>
         </div>
         {% if doc0.dateArgued %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Date Argued:</span>
                 <time class="meta-data-value"
                       datetime="{{ doc0.dateArgued|date:'Y-m-d' }}">
@@ -60,7 +60,7 @@
             </div>
         {% endif %}
         {% if doc0.dateTerminated %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Date Terminated:</span>
                 <time class="meta-data-value"
                       datetime="{{ doc0.dateTerminated|date:'Y-m-d' }}">
@@ -69,7 +69,7 @@
             </div>
         {% endif %}
         {% if doc0.solr_highlights.suitNature.0 %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Nature of Suit:</span>
                 <span class="meta-data-value">
                     <a href="?type=r&amp;q=suitNature:&quot;{{ doc0.solr_highlights.suitNature.0|striptags }}&quot;">
@@ -79,7 +79,7 @@
             </div>
         {% endif %}
         {% if doc0.solr_highlights.cause.0 %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Cause:</span>
                 <span class="meta-data-value">
                     {{ doc0.solr_highlights.cause.0|safe }}
@@ -87,7 +87,7 @@
             </div>
         {% endif %}
         {% if doc0.solr_highlights.juryDemand.0 %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Jury Demand:</span>
                 <span class="meta-data-value">
                     <a href="?type=r&amp;q=juryDemand:&quot;{{ doc0.solr_highlights.juryDemand.0|striptags }}&quot;">
@@ -97,7 +97,7 @@
             </div>
         {% endif %}
         {% if doc0.solr_highlights.assignedTo.0 %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Assigned To:</span>
                 <span class="meta-data-value">
                     <a href="?type=r&amp;q=assigned_to_id:{{ doc0.assigned_to_id }}">
@@ -107,7 +107,7 @@
             </div>
         {% endif %}
         {% if doc0.solr_highlights.referredTo.0 %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Referred To:</span>
                 <span class="meta-data-value">
                     <a href="?type=r&amp;q=referred_to_id:{{ doc0.referred_to_id }}">
@@ -157,7 +157,7 @@
 
     <div class="bottom">
         {% if type == 'o' or type_override == 'o' %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Date Filed:</span>
                 <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d' }}">
                     {% if result.dateFiled %}
@@ -168,7 +168,7 @@
                 </time>
             </div>
         {% elif type == 'oa' or type_override == 'oa' %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Date Argued:</span>
                 <time class="meta-data-value"
                       datetime="{{ result.dateArgued|date:'Y-m-d' }}">
@@ -180,7 +180,7 @@
                 </time>
             </div>
         {% elif type == 'p' or type_override == 'p' %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Born:</span>
                 <span class="meta-data-value"
                       datetime="{% granular_date result 'dob' granularity=result.date_granularity_dob iso=True %}">
@@ -201,7 +201,7 @@
                 </span>
             </div>
             {% if result.dod %}
-                <div class="inline nowrap">
+                <div class="inline-block">
                     <span class="meta-data-header">Deceased:</span>
                     <time class="meta-data-value"
                           datetime="{% granular_date result 'dod' granularity=result.date_granularity_dod iso=True %}">
@@ -210,37 +210,37 @@
                 </div>
             {% endif %}
             {% if result.political_affiliation %}
-                <div class="inline nowrap">
+                <div class="inline-block">
                     <span class="meta-data-header">Political Affiliations:</span>
                     <span class="meta-data-value">{{ result.political_affiliation|uniq|safeseq|join:", " }}</span>
                 </div>
             {% endif %}
             {% if result.selection_method %}
-                <div class="inline nowrap">
+                <div class="inline-block">
                     <span class="meta-data-header">Selection Methods:</span>
                     <span class="meta-data-value">{{ result.selection_method|uniq|safeseq|join:", " }}</span>
                 </div>
             {% endif %}
             {% if result.aba_rating %}
-                <div class="inline nowrap">
+                <div class="inline-block">
                     <span class="meta-data-header"><abbr title="American Bar Association">ABA</abbr> Ratings:</span>
                     <span class="meta-data-value">{{ result.aba_rating|uniq|safeseq|join:", " }}</span>
                 </div>
             {% endif %}
             {% if result.appointer %}
-                <div class="inline">
+                <div class="inline-block">
                     <span class="meta-data-header">Appointers:</span>
                     <span class="meta-data-value">{{ result.appointer|uniq|safeseq|join:", " }}</span>
                 </div>
             {% endif %}
             {% if result.supervisor %}
-                <div class="inline">
+                <div class="inline-block">
                     <span class="meta-data-header">Supervisors:</span>
                     <span class="meta-data-value">{{ result.supervisor|uniq|safeseq|join:", " }}</span>
                 </div>
             {% endif %}
             {% if result.predecessor %}
-                <div class="inline">
+                <div class="inline-block">
                     <span class="meta-data-header">Predecessors:</span>
                     <span class="meta-data-value">{{ result.predecessor|uniq|safeseq|join:", " }}</span>
                 </div>
@@ -248,12 +248,12 @@
         {% endif %}
 
         {% if type == 'o' or type_override == 'o' %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Status:</span>
                 <span class="meta-data-value">{{ result.status }}</span>
             </div>
             {% if result.solr_highlights.citation.0 %}
-                <div class="inline nowrap">
+                <div class="inline-block">
                     <span class="meta-data-header">Citations: </span>
                     <span class="meta-data-value">{{ result.solr_highlights.citation|safeseq|join:", " }}</span>
                 </div>
@@ -262,14 +262,14 @@
         {% if type == 'o' or type_override == 'o' or type == 'oa' or type_override == 'oa' %}
             {% comment %}This won't work{% endcomment %}
             {% if result.solr_highlights.docketNumber.0 %}
-                <div class="inline nowrap">
+                <div class="inline-block">
                     <span class="meta-data-header">Docket Number:</span>
                     <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
                 </div>
             {% endif %}
         {% endif %}
         {% if type == 'oa' or type_override == 'oa' %}
-            <div class="inline nowrap">
+            <div class="inline-block">
                 <span class="meta-data-header">Duration:</span>
                 <span class="meta-data-value">{{ result.duration|naturalduration }}</span>
             </div>
@@ -278,7 +278,7 @@
     <div class="bottom">
         {% if type == 'oa' or type_override == 'oa' %}
             {% if result.solr_highlights.judge.0 %}
-                <div class="inline nowrap">
+                <div class="inline-block">
                     <span class="meta-data-header">Judge:</span>
                     <span class="meta-data-value">{{ result.solr_highlights.judge.0|safe }}</span>
                 </div>
@@ -286,7 +286,7 @@
         {% endif %}
         {% if type == 'o' or type_override == 'o' %}
             {% if result.solr_highlights.suitNature.0 %}
-                <div class="inline nowrap">
+                <div class="inline-block">
                     <span class="meta-data-header">Nature of Suit:</span>
                     <span class="meta-data-value">
                         <a href="?q=suitNature:{{ result.solr_highlights.suitNature.0|striptags }}">
@@ -297,7 +297,7 @@
             {% endif %}
         {% elif type == 'p' or type_override == 'p' %}
             {% if result.school %}
-                <div class="inline">
+                <div class="inline-block">
                     <span class="meta-data-header">Schools:</span>
                     <span class="meta-data-value">{{ result.school|uniq|safeseq|join:", " }}</span>
                 </div>
@@ -306,7 +306,7 @@
     </div>
     {% if type == 'o' or type_override == 'o' %}
         {% if result.citeCount > 0 %}
-            <div class="bottom" class="inline nowrap">
+            <div class="bottom" class="inline-block">
                 <span class="meta-data-value">
                     <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})">
                         Cited {{ result.citeCount|intcomma }} time{{ result.citeCount|pluralize }}

@@ -250,6 +250,9 @@ div.hopscotch-bubble .hopscotch-bubble-close {
 .inline {
     display: inline;
 }
+.inline-block {
+    display: inline-block;
+}
 
 .bold {
     font-weight: bold;
