@@ -312,6 +312,10 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     cursor: pointer;
     cursor: hand;
 }
+label {
+    cursor: pointer;
+    cursor: hand;
+}
 
 .cursor-help {
     cursor: help;
