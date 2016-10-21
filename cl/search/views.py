@@ -21,6 +21,7 @@ from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     make_stats_variable, merge_form_with_courts,  make_get_string, \
     regroup_snippets
@@ -28,7 +29,6 @@ from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
 from cl.stats import tally_stat, Stat
 from cl.visualizations.models import SCOTUSMap
-from cl.lib.scorched_utils import ExtraSolrInterface
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +50,8 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
             status_facets = None
             if cd['type'] == 'o':
                 si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
-                query_citation = get_query_citation(cd)
                 results = si.query().add_extra(**build_main_query(cd, facet=facet))
+                query_citation = get_query_citation(cd)
             elif cd['type'] == 'r':
                 si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
                 results = si.query().add_extra(**build_main_query(cd, facet=facet))
@@ -350,7 +350,7 @@ def advanced(request):
     elif request.path == reverse('advanced_p'):
         obj_type = 'p'
 
-    render_dict.update(do_search(request, rows=1, type=obj_type, facet=False))
+    render_dict.update(do_search(request, rows=1, type=obj_type, facet=True))
     render_dict['search_form'] = SearchForm({'type': obj_type})
     return render_to_response(
         'advanced.html',
