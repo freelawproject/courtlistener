@@ -140,12 +140,15 @@
 
         {% if results.paginator.count > 0 %}
             <div class="row">
-                <div class="col-sm-6">
+                <div class="col-sm-12">
                     <h2 id="result-count" class="bottom">
                         {% if type == 'o' %}
                             {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
                         {% elif type == 'r' %}
-                            {{ results.paginator.count|intcomma }} Case{{ results.paginator.count|pluralize }}
+                            {% with matches=results.object_list.groups.docket_id.matches count=results.paginator.count %}
+                            {{ count|intcomma }} Case{{ count|pluralize }} <span class="gray">&mdash;</span>
+                            {{ matches|intcomma }} Document{{ matches|pluralize }}
+                            {% endwith %}
                         {% elif type == 'oa' %}
                             {{ results.paginator.count|intcomma }} Oral Argument{{ results.paginator.count|pluralize }}
                         {% elif type == 'p' %}

@@ -287,6 +287,10 @@ def make_fq(cd, field, key):
     return fq
 
 
+def make_boolean_fq(cd, field, key):
+    return '%s:%s' % (field, str(cd[key]).lower())
+
+
 def make_fq_proximity_query(cd, field, key):
     """Make an fq proximity query, attempting to normalize and user input.
 
@@ -468,7 +472,7 @@ def add_highlighting(main_params, cd, highlight):
         main_params['f.%s.hl.alternateField' % field] = field
 
 
-def add_fq(main_params, cd):
+def add_filter_queries(main_params, cd):
     """Add the fq params"""
     # Changes here are usually mirrored in place_facet_queries, below.
     main_fq = []
@@ -508,6 +512,8 @@ def add_fq(main_params, cd):
             main_fq.append(make_fq(cd, 'assignedTo', 'assigned_to'))
         if cd['referred_to']:
             main_fq.append(make_fq(cd, 'referredTo', 'referred_to'))
+        if cd['available_only']:
+            main_fq.append(make_boolean_fq(cd, 'is_available', 'available_only'))
 
         main_fq.append(make_date_query('dateFiled', cd['filed_before'],
                                        cd['filed_after']))
@@ -638,7 +644,7 @@ def build_main_query(cd, highlight='all', order_by='', facet=True):
     add_faceting(main_params, cd, facet)
     add_boosts(main_params, cd)
     add_highlighting(main_params, cd, highlight)
-    add_fq(main_params, cd)
+    add_filter_queries(main_params, cd)
     add_grouping(main_params, cd)
 
     print_params(main_params)

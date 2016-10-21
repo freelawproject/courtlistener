@@ -125,7 +125,7 @@ class SearchForm(forms.Form):
     # RECAP fields
     #
     available_only = forms.BooleanField(
-        label="Only show items with archived PDFs",
+        label="Exclude items not in RECAP",
         label_suffix='',
         required=False,
         widget=forms.CheckboxInput(attrs={
