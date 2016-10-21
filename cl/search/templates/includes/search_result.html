@@ -72,7 +72,7 @@
             <div class="inline nowrap">
                 <span class="meta-data-header">Nature of Suit:</span>
                 <span class="meta-data-value">
-                    <a href="?type=r&amp;q=suitNature:{{ doc0.solr_highlights.suitNature.0|safe }}">
+                    <a href="?type=r&amp;q=suitNature:&quot;{{ doc0.solr_highlights.suitNature.0|striptags }}&quot;">
                         {{ doc0.solr_highlights.suitNature.0|safe }}
                     </a>
                 </span>
@@ -90,7 +90,7 @@
             <div class="inline nowrap">
                 <span class="meta-data-header">Jury Demand:</span>
                 <span class="meta-data-value">
-                    <a href="?type=r&amp;q=juryDemand:{{ doc0.solr_highlights.juryDemand.0|safe }}">
+                    <a href="?type=r&amp;q=juryDemand:&quot;{{ doc0.solr_highlights.juryDemand.0|striptags }}&quot;">
                         {{ doc0.solr_highlights.juryDemand.0|safe }}
                     </a>
                 </span>
@@ -285,7 +285,7 @@
                 <div class="inline nowrap">
                     <span class="meta-data-header">Nature of Suit:</span>
                     <span class="meta-data-value">
-                        <a href="?q=suitNature:{{ result.solr_highlights.suitNature.0|safe }}">
+                        <a href="?q=suitNature:{{ result.solr_highlights.suitNature.0|striptags }}">
                             {{ result.solr_highlights.suitNature.0|safe }}
                         </a>
                     </span>
