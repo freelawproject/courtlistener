@@ -1,3 +1,6 @@
+### 2016-10-21
+First index of RECAP content. Completed in 516 minutes with 9094520 items.
+
 ### 2016-02-02
 Ran an update against entire db on new server. Completed in 366 minutes with
 almost exactly 3M docs.
