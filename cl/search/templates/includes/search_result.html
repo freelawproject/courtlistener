@@ -117,7 +117,7 @@
             </div>
         {% endif %}
 
-        {% for doc in result.doclist.docs %}
+        {% for doc in result.doclist.docs|dictsort:"document_number" %}
         <div class="col-md-offset-half">
             <h4>
                 <a href="{{ doc.absolute_url }}#entry-{{ doc.document_number }}">Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
