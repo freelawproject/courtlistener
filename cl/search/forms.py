@@ -1,6 +1,7 @@
 import re
 
 from django import forms
+from django.forms import DateField
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.people_db.models import Position, PoliticalAffiliation
@@ -36,38 +37,30 @@ def _clean_form(request, cd):
     """Returns cleaned up values as a Form object.
     """
     # Make a copy of request.GET so it is mutable
-    mutable_get = request.GET.copy()
+    mutable_GET = request.GET.copy()
 
     # Send the user the cleaned up query
-    mutable_get['q'] = cd['q']
-    if mutable_get.get('filed_before') and cd.get('filed_before') is not None:
-        # Don't use strftime since it won't work prior to 1900.
-        before = cd['filed_before']
-        mutable_get['filed_before'] = '%s-%02d-%02d' % \
-                                      (before.year, before.month, before.day)
-    if mutable_get.get('filed_after') and cd.get('filed_after') is not None:
-        after = cd['filed_after']
-        mutable_get['filed_after'] = '%s-%02d-%02d' % \
-                                     (after.year, after.month, after.day)
-    if mutable_get.get('born_before') and cd.get('born_before') is not None:
-        # Don't use strftime since it won't work prior to 1900.
-        before = cd['born_before']
-        mutable_get['born_before'] = '%s-%02d-%02d' % \
-                                     (before.year, before.month, before.day)
-    if mutable_get.get('born_after') and cd.get('born_after') is not None:
-        after = cd['born_after']
-        mutable_get['born_after'] = '%s-%02d-%02d' % \
-                                    (after.year, after.month, after.day)
+    mutable_GET['q'] = cd['q']
 
-    mutable_get['order_by'] = cd['order_by']
-    mutable_get['type'] = cd['type']
+    # Clean up the date formats
+    for date_field in SearchForm().get_date_field_names():
+        for time in ('before', 'after'):
+            field = "%s_%s" % (date_field, time)
+            if mutable_GET.get(field) and cd.get(field) is not None:
+                # Don't use strftime. It'll fail before 1900
+                before = cd[field]
+                mutable_GET[field] = '%s-%02d-%02d' % \
+                                     (before.year, before.month, before.day)
+
+    mutable_GET['order_by'] = cd['order_by']
+    mutable_GET['type'] = cd['type']
 
     courts = Court.objects.filter(in_use=True).values(
         'pk', 'short_name', 'jurisdiction', 'has_oral_argument_scraper')
     for court in courts:
-        mutable_get['court_%s' % court['pk']] = cd['court_%s' % court['pk']]
+        mutable_GET['court_%s' % court['pk']] = cd['court_%s' % court['pk']]
 
-    return SearchForm(mutable_get)
+    return SearchForm(mutable_GET)
 
 
 class SearchForm(forms.Form):
@@ -131,6 +124,14 @@ class SearchForm(forms.Form):
     #
     # RECAP fields
     #
+    available_only = forms.BooleanField(
+        label="Only show items with archived PDFs",
+        label_suffix='',
+        required=False,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'external-input form-control left',
+        }),
+    )
     description = forms.CharField(
         required=False,
         label="Document Description",
@@ -337,6 +338,10 @@ class SearchForm(forms.Form):
         )
     )
 
+    def get_date_field_names(self):
+        return {f_name.split('_')[0] for f_name, f in self.fields.items()
+                if isinstance(f, DateField)}
+
     def __init__(self, *args, **kwargs):
         super(SearchForm, self).__init__(*args, **kwargs)
         """
@@ -399,13 +404,28 @@ class SearchForm(forms.Form):
 
         # Fix fields to work in all lowercase
         sub_pairs = (
+            # Blended
             ('casename', 'caseName'),
-            ('lexiscite', 'lexisCite'),
             ('docketnumber', 'docketNumber'),
+            ('datefiled', 'dateFiled'),
+            ('suitnature', 'suitNature'),
+
+            # Opinions
+            ('lexiscite', 'lexisCite'),
             ('neutralcite', 'neutralCite'),
             ('citecount', 'citeCount'),
-            ('datefiled', 'dateFiled'),
+
+            # Oral Args
             ('dateargued', 'dateArgued'),
+            ('datereargued', 'dateReargued'),
+
+            # People
+            ('DOD', 'dod'),
+            ('DOB', 'dob'),
+
+            # RECAP
+            ('dateterminated', 'dateTerminated'),
+            ('jurydemand', 'juryDemand'),
         )
         for bad, good in sub_pairs:
             q = re.sub(bad, good, q)
@@ -417,8 +437,7 @@ class SearchForm(forms.Form):
 
     def clean_order_by(self):
         """Sets the default order_by value if one isn't provided by the user."""
-        if self.cleaned_data['type'] == 'o' or not \
-                self.cleaned_data['type']:
+        if self.cleaned_data['type'] == 'o' or not self.cleaned_data['type']:
             if not self.cleaned_data['order_by']:
                 return self.fields['order_by'].initial
         elif self.cleaned_data['type'] == 'oa':
@@ -442,25 +461,14 @@ class SearchForm(forms.Form):
         cleaned_data = self.cleaned_data
 
         # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
-        before = cleaned_data.get('filed_before')
-        after = cleaned_data.get('filed_after')
-        if before and after:
-            # Only do something if both fields are valid so far.
-            if before < after:
+        for field_name in self.get_date_field_names():
+            before = cleaned_data.get('%s_before' % field_name)
+            after = cleaned_data.get('%s_after' % field_name)
+            if before and after and (before < after):
                 # The user is requesting dates like this: <--b  a-->. Switch
                 # the dates so their query is like this: a-->   <--b
-                cleaned_data['filed_before'] = after
-                cleaned_data['filed_after'] = before
-
-        before = cleaned_data.get('born_before')
-        after = cleaned_data.get('born_after')
-        if before and after:
-            # Only do something if both fields are valid so far.
-            if before < after:
-                # The user is requesting dates like this: <--b  a-->. Switch
-                # the dates so their query is like this: a-->   <--b
-                cleaned_data['born_before'] = after
-                cleaned_data['born_after'] = before
+                cleaned_data['%s_before' % field_name] = after
+                cleaned_data['%s_after' % field_name] = before
 
         # 2. Convert the value in the court field to the various court_* fields
         court_str = cleaned_data.get('court')

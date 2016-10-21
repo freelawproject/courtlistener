@@ -52,6 +52,8 @@ $(document).ready(function() {
             gathered = gathered.add($('.status-checkbox:checked'));
         }
 
+        gathered = gathered.add($('#id_available_only:checked'));
+
         // Add the hidden input used to indicate that we're editing an existing
         // alert
         gathered = gathered.add($('input[name=edit_alert]'));
