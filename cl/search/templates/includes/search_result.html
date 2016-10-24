@@ -122,7 +122,7 @@
                             {{ doc0.solr_highlights.referredTo.0|safe }}
                         </a>
                     {% else %}
-                        <a href="?type=r&amp;referredTo=&quot;{{ doc0.solr_highlights.referredTo.0|striptags }}&quot;">
+                        <a href="?type=r&amp;referred_to=&quot;{{ doc0.solr_highlights.referredTo.0|striptags }}&quot;">
                             {{ doc0.solr_highlights.referredTo.0|safe }}
                         </a>
                     {% endif %}
