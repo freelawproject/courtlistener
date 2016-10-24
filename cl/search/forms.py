@@ -149,6 +149,14 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    cause = forms.CharField(
+        required=False,
+        label="Cause",
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
     assigned_to = forms.CharField(
         required=False,
         label="Assigned To Judge",

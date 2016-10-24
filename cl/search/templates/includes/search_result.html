@@ -72,7 +72,7 @@
             <div class="inline-block">
                 <span class="meta-data-header">Nature of Suit:</span>
                 <span class="meta-data-value">
-                    <a href="?type=r&amp;q=suitNature:&quot;{{ doc0.solr_highlights.suitNature.0|striptags }}&quot;">
+                    <a href="?type=r&amp;nature_of_suit=&quot;{{ doc0.solr_highlights.suitNature.0|striptags }}&quot;">
                         {{ doc0.solr_highlights.suitNature.0|safe }}
                     </a>
                 </span>
@@ -82,7 +82,8 @@
             <div class="inline-block">
                 <span class="meta-data-header">Cause:</span>
                 <span class="meta-data-value">
-                    {{ doc0.solr_highlights.cause.0|safe }}
+                    <a href="?type=r&amp;cause=&quot;{{ doc0.solr_highlights.cause.0|striptags }}&quot;">{{ doc0.solr_highlights.cause.0|safe }}
+                    </a>
                 </span>
             </div>
         {% endif %}
@@ -100,9 +101,15 @@
             <div class="inline-block">
                 <span class="meta-data-header">Assigned To:</span>
                 <span class="meta-data-value">
-                    <a href="?type=r&amp;q=assigned_to_id:{{ doc0.assigned_to_id }}">
-                        {{ doc0.solr_highlights.assignedTo.0|safe }}
-                    </a>
+                    {% if doc0.assigned_to_id %}
+                        <a href="?type=r&amp;q=assigned_to_id:{{ doc0.assigned_to_id }}">
+                            {{ doc0.solr_highlights.assignedTo.0|safe }}
+                        </a>
+                    {% else %}
+                        <a href="?type=r&amp;assigned_to=&quot;{{ doc0.solr_highlights.assignedTo.0|striptags }}&quot;">
+                            {{ doc0.solr_highlights.assignedTo.0|safe }}
+                        </a>
+                    {% endif %}
                 </span>
             </div>
         {% endif %}
@@ -110,9 +117,15 @@
             <div class="inline-block">
                 <span class="meta-data-header">Referred To:</span>
                 <span class="meta-data-value">
-                    <a href="?type=r&amp;q=referred_to_id:{{ doc0.referred_to_id }}">
-                        {{ doc0.solr_highlights.referredTo.0|safe }}
-                    </a>
+                    {% if doc0.referred_to_id %}
+                        <a href="?type=r&amp;q=referred_to_id:{{ doc0.referred_to_id }}">
+                            {{ doc0.solr_highlights.referredTo.0|safe }}
+                        </a>
+                    {% else %}
+                        <a href="?type=r&amp;referredTo=&quot;{{ doc0.solr_highlights.referredTo.0|striptags }}&quot;">
+                            {{ doc0.solr_highlights.referredTo.0|safe }}
+                        </a>
+                    {% endif %}
                 </span>
             </div>
         {% endif %}

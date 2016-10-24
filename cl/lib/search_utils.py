@@ -503,6 +503,8 @@ def add_filter_queries(main_params, cd):
             main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
         if cd['nature_of_suit']:
             main_fq.append(make_fq(cd, 'suitNature', 'nature_of_suit'))
+        if cd['cause']:
+            main_fq.append(make_fq(cd, 'cause', 'cause'))
         if cd['document_number']:
             main_fq.append(make_fq(cd, 'document_number', 'document_number'))
         if cd['attachment_number']:
