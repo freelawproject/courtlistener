@@ -136,6 +136,13 @@
                         <span class="meta-data-value">{{ docket.nature_of_suit }}</span>
                     </p>
                 {% endif %}
+
+                {% if docket.jury_demand %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Jury Demand:</span>
+                        <span class="meta-data-value">{{ docket.jury_demand }}</span>
+                    </p>
+                {% endif %}
             </div>
 
 

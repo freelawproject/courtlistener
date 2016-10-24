@@ -33,7 +33,7 @@ TYPE_CHOICES = (
 )
 
 
-def _clean_form(request, cd):
+def _clean_form(request, cd, courts):
     """Returns cleaned up values as a Form object.
     """
     # Make a copy of request.GET so it is mutable
@@ -55,10 +55,11 @@ def _clean_form(request, cd):
     mutable_GET['order_by'] = cd['order_by']
     mutable_GET['type'] = cd['type']
 
-    courts = Court.objects.filter(in_use=True).values(
-        'pk', 'short_name', 'jurisdiction', 'has_oral_argument_scraper')
     for court in courts:
-        mutable_GET['court_%s' % court['pk']] = cd['court_%s' % court['pk']]
+        mutable_GET['court_%s' % court.pk] = cd['court_%s' % court.pk]
+
+    for status in DOCUMENT_STATUSES:
+        mutable_GET['stat_%s' % status[1]] = cd['stat_%s' % status[1]]
 
     return SearchForm(mutable_GET)
 
@@ -164,7 +165,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
-    document_number = forms.CharField(
+    document_number = forms.IntegerField(
         required=False,
         label="Document #",
         widget=forms.TextInput(
@@ -172,7 +173,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
-    attachment_number = forms.CharField(
+    attachment_number = forms.IntegerField(
         required=False,
         label="Attachment #",
         widget=forms.TextInput(
@@ -350,11 +351,10 @@ class SearchForm(forms.Form):
         names coming from the database, we need to interact directly with the
         fields dict.
         """
-        courts = Court.objects.filter(in_use=True).values(
-            'pk', 'short_name', 'jurisdiction', 'has_oral_argument_scraper')
+        courts = Court.objects.filter(in_use=True)
         for court in courts:
-            self.fields['court_' + court['pk']] = forms.BooleanField(
-                label=court['short_name'],
+            self.fields['court_' + court.pk] = forms.BooleanField(
+                label=court.short_name,
                 required=False,
                 initial=True,
                 widget=forms.CheckboxInput(attrs={'checked': 'checked'})
@@ -493,12 +493,6 @@ class SearchForm(forms.Form):
                 if key.startswith('court_'):
                     cleaned_data[key] = True
 
-        # 4. Strip any whitespace, otherwise it crashes Solr.
-        for k, v in cleaned_data.items():
-            if isinstance(v, basestring):
-                cleaned_data[k] = v.strip()
-
-        # Here we reset the defaults.
         stat_bools = [v for k, v in cleaned_data.items()
                       if k.startswith('stat_')]
         if not any(stat_bools):
@@ -508,5 +502,10 @@ class SearchForm(forms.Form):
                     cleaned_data[key] = False
             # ...except precedential
             cleaned_data['stat_Precedential'] = True
+
+        # 4. Strip any whitespace, otherwise it crashes Solr.
+        for k, v in cleaned_data.items():
+            if isinstance(v, basestring):
+                cleaned_data[k] = v.strip()
 
         return cleaned_data

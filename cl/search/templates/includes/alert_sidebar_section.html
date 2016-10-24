@@ -1,3 +1,4 @@
+{% if not error %}
 <div class="sidebar-section">
     <h3 id="create-alert-header">
         {% if request.GET.edit_alert %}
@@ -92,3 +93,4 @@
             as a new user.</p>
     {% endif %}
 </div>
+{% endif %}

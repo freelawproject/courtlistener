@@ -35,7 +35,12 @@ logger = logging.getLogger(__name__)
 
 def do_search(request, rows=20, order_by=None, type=None, facet=True):
 
+    query_citation = None
+    error = False
+    paged_results = None
     search_form = SearchForm(request.GET)
+    courts = Court.objects.filter(in_use=True)
+
     if search_form.is_valid():
         cd = search_form.cleaned_data
         # Allows an override by calling methods.
@@ -43,37 +48,21 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
             cd['order_by'] = order_by
         if type is not None:
             cd['type'] = type
-        search_form = _clean_form(request, cd)
+        search_form = _clean_form(request, cd, courts)
 
-        try:
-            query_citation = None
-            status_facets = None
-            if cd['type'] == 'o':
-                si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd, facet=facet))
-                query_citation = get_query_citation(cd)
-            elif cd['type'] == 'r':
-                si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd, facet=facet))
-            elif cd['type'] == 'oa':
-                si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd, facet=facet))
-            elif cd['type'] == 'p':
-                si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
-                results = si.query().add_extra(**build_main_query(cd, facet=facet))
-
-            courts = Court.objects.filter(in_use=True)
-            courts, court_count_human, court_count = merge_form_with_courts(
-                courts,
-                search_form
-            )
-
-        except Exception as e:
-            if settings.DEBUG is True:
-                traceback.print_exc()
-            logger.warning("Error loading search with request: %s" % request.GET)
-            logger.warning("Error was %s" % e)
-            return {'error': True}
+        if cd['type'] == 'o':
+            si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+            results = si.query().add_extra(**build_main_query(cd, facet=facet))
+            query_citation = get_query_citation(cd)
+        elif cd['type'] == 'r':
+            si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
+            results = si.query().add_extra(**build_main_query(cd, facet=facet))
+        elif cd['type'] == 'oa':
+            si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
+            results = si.query().add_extra(**build_main_query(cd, facet=facet))
+        elif cd['type'] == 'p':
+            si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
+            results = si.query().add_extra(**build_main_query(cd, facet=facet))
 
         # Set up pagination
         try:
@@ -84,7 +73,6 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
             try:
                 paged_results = paginator.page(page)
             except PageNotAnInteger:
-                # If page is not an integer, deliver first page.
                 paged_results = paginator.page(1)
             except EmptyPage:
                 # Page is out of range (e.g. 9999), deliver last page.
@@ -96,31 +84,26 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
             logger.warning("Error was: %s" % e)
             if settings.DEBUG is True:
                 traceback.print_exc()
-            return {'error': True}
+            error = True
 
         # Post processing of the results
-        if cd['type'] == 'o' and facet is True:
-            status_facets = make_stats_variable(
-                paged_results.object_list.facet_counts.facet_fields,
-                search_form,
-            )
         regroup_snippets(paged_results)
 
-        return {
-            'search_form': search_form,
-            'results': paged_results,
-            'courts': courts,
-            'court_count_human': court_count_human,
-            'court_count': court_count,
-            'status_facets': status_facets,
-            'query_citation': query_citation,
-        }
-
     else:
-        # Invalid form, send it back
-        logger.warning("Invalid form when loading search page with "
-                       "request: %s" % request.GET)
-        return {'error': True}
+        error = True
+
+    courts, court_count_human, court_count = merge_form_with_courts(courts,
+                                                                    search_form)
+    return {
+        'results': paged_results,
+        'search_form': search_form,
+        'courts': courts,
+        'court_count_human': court_count_human,
+        'court_count': court_count,
+        'query_citation': query_citation,
+        'facet_fields': make_stats_variable(search_form, paged_results),
+        'error': error,
+    }
 
 
 def get_homepage_stats():

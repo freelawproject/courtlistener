@@ -9,10 +9,10 @@ from django.test import TestCase
 from django.test import override_settings
 from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 
-from cl.lib.string_utils import trunc
-from cl.lib.search_utils import make_fq
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_upload_path
+from cl.lib.search_utils import make_fq
+from cl.lib.string_utils import trunc
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
 
 
@@ -68,6 +68,7 @@ class TestMakeFQ(TestCase):
             ('"1 2"', '"1 2"'),
             ('1 OR 2', '1 OR 2'),
             ('1 NOT 2', '1 NOT 2'),
+            ('cause:sympathy', 'cause AND sympathy')
         )
         for test in test_pairs:
             field = 'f'

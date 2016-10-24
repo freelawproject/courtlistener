@@ -1,246 +1,244 @@
 {% load humanize %}
 
-{% if not error %}
-    {% with type=search_form.type.value %}
-    <div class="sidebar-section">
-        <h3><span>Refine Your Query</span></h3>
-        <form action="/" method="get" id="sidebar-search-form">
-            <div id="sidebar-facet-placeholder">
-                <div id="extra-search-fields">
-                    {#  Modal is at bottom of results, so it loads last. #}
-                    <div class="cursor v-offset-below-2"
-                         data-toggle="modal"
-                         data-target="#court-picker">
-                        <label class="bottom cursor">
-                            Select Jurisdictions <i
-                                class="gray fa fa-external-link"></i>
-                        </label>
+{% with type=search_form.type.value %}
+<div class="sidebar-section">
+    <h3><span>Refine Your Query</span></h3>
+    <form action="/" method="get" id="sidebar-search-form">
+        <div id="sidebar-facet-placeholder">
+            <div id="extra-search-fields">
+                {#  Modal is at bottom of results, so it loads last. #}
+                <div class="cursor v-offset-below-2"
+                     data-toggle="modal"
+                     data-target="#court-picker">
+                    <label class="bottom cursor">
+                        Select Jurisdictions <i
+                            class="gray fa fa-external-link"></i>
+                    </label>
 
-                        <p class="top"><span
-                                id="jurisdiction-count">{{ court_count_human }}</span>
-                            Jurisdictions Selected</p>
+                    <p class="top"><span
+                            id="jurisdiction-count">{{ court_count_human }}</span>
+                        Jurisdictions Selected</p>
+                </div>
+
+                {% include "includes/order_by_dropdown.html" %}
+                {% if type == 'o' %}
+                    <div class="form-group">
+                        {{ search_form.case_name.label_tag }}
+                        {{ search_form.case_name }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.judge.label_tag }}
+                        {{ search_form.judge }}
+                    </div>
+                    <div class="v-offset-below-2">
+                        <label>Precedential Status</label>
+                        {% for facet_field in facet_fields %}
+                            <div class="sidebar-checkbox">
+                                <input
+                                        id="id_{{ facet_field.html_name }}"
+                                        type="checkbox"
+                                        name="{{ facet_field.html_name }}"
+                                        class="external-input status-checkbox left"
+                                        {% if facet_field.value %}checked="checked"{% endif %}>
+                                <label
+                                        for="id_{{ facet_field.html_name }}"
+                                        class="pointer {% if facet_field.count == 0 %}gray{% endif %}">
+                                    <div>{{ facet_field.label }}&nbsp;{% if facet_field.count != None %}<span
+                                            class="gray small">({{ facet_field.count|intcomma }}){% endif %}</span>
+                                    </div>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ search_form.filed_after.label_tag }}
+                                {{ search_form.filed_after }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ search_form.filed_before.label_tag }}
+                                {{ search_form.filed_before }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.citation.label_tag }}
+                        {{ search_form.citation }}
+                        <p><a href="{% url "citation_redirector" %}">Look up
+                            a specific citation</a>
+                        </p>
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.neutral_cite.label_tag }}
+                        {{ search_form.neutral_cite }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.docket_number.label_tag }}
+                        {{ search_form.docket_number }}
+                    </div>
+                    <div class="row">
+                        <div class="col-xs-6">
+                            <div class="form-group">
+                                {{ search_form.cited_gt.label_tag }}
+                                {{ search_form.cited_gt }}
+                            </div>
+                        </div>
+                        <div class="col-xs-6">
+                            <div class="form-group">
+                                {{ search_form.cited_lt.label_tag }}
+                                {{ search_form.cited_lt }}
+                            </div>
+                        </div>
                     </div>
 
-                    {% include "includes/order_by_dropdown.html" %}
-                    {% if type == 'o' %}
-                        <div class="form-group">
-                            {{ search_form.case_name.label_tag }}
-                            {{ search_form.case_name }}
+
+                {% elif type == 'r' %}
+                    <div class="form-group">
+                        <div class="sidebar-checkbox">
+                            {{ search_form.available_only }}
+                            {{ search_form.available_only.label_tag }}
                         </div>
-                        <div class="form-group">
-                            {{ search_form.judge.label_tag }}
-                            {{ search_form.judge }}
-                        </div>
-                        <div class="v-offset-below-2">
-                            <label>Precedential Status</label>
-                            {% for status in status_facets %}
-                                <div class="sidebar-checkbox">
-                                    <input
-                                            id="id_{{ status.1 }}"
-                                            type="checkbox"
-                                            name="{{ status.1 }}"
-                                            class="external-input status-checkbox left"
-                                            {% if status.3 %}checked="checked"{% endif %}>
-                                    <label
-                                            for="id_{{ status.1 }}"
-                                            class="pointer {% if status.2 == 0 %}gray{% endif %}">
-                                        <div>{{ status.0 }}&nbsp;<span
-                                                class="gray small">({{ status.2|intcomma }})</span>
-                                        </div>
-                                    </label>
-                                </div>
-                            {% endfor %}
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.filed_after.label_tag }}
-                                    {{ search_form.filed_after }}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.filed_before.label_tag }}
-                                    {{ search_form.filed_before }}
-                                </div>
+                    </div>
+
+                    <div class="form-group">
+                        {{ search_form.case_name.label_tag }}
+                        {{ search_form.case_name }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.description.label_tag }}
+                        {{ search_form.description }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.docket_number.label_tag }}
+                        {{ search_form.docket_number }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.nature_of_suit.label_tag }}
+                        {{ search_form.nature_of_suit }}
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ search_form.filed_after.label_tag }}
+                                {{ search_form.filed_after }}
                             </div>
                         </div>
-                        <div class="form-group">
-                            {{ search_form.citation.label_tag }}
-                            {{ search_form.citation }}
-                            <p><a href="{% url "citation_redirector" %}">Look up
-                                a specific citation</a>
-                            </p>
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.neutral_cite.label_tag }}
-                            {{ search_form.neutral_cite }}
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.docket_number.label_tag }}
-                            {{ search_form.docket_number }}
-                        </div>
-                        <div class="row">
-                            <div class="col-xs-6">
-                                <div class="form-group">
-                                    {{ search_form.cited_gt.label_tag }}
-                                    {{ search_form.cited_gt }}
-                                </div>
-                            </div>
-                            <div class="col-xs-6">
-                                <div class="form-group">
-                                    {{ search_form.cited_lt.label_tag }}
-                                    {{ search_form.cited_lt }}
-                                </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ search_form.filed_before.label_tag }}
+                                {{ search_form.filed_before }}
                             </div>
                         </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ search_form.document_number.label_tag }}
+                                {{ search_form.document_number }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ search_form.attachment_number.label_tag }}
+                                {{ search_form.attachment_number }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.assigned_to.label_tag }}
+                        {{ search_form.assigned_to }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.referred_to.label_tag }}
+                        {{ search_form.referred_to }}
+                    </div>
 
 
-                    {% elif type == 'r' %}
-                        <div class="form-group">
-                            <div class="sidebar-checkbox">
-                                {{ search_form.available_only }}
-                                {{ search_form.available_only.label_tag }}
-                            </div>
-                        </div>
+                {% elif type == 'oa' %}
+                    <div class="form-group">
+                        {{ search_form.case_name.label_tag }}
+                        {{ search_form.case_name }}
+                    </div>
 
-                        <div class="form-group">
-                            {{ search_form.case_name.label_tag }}
-                            {{ search_form.case_name }}
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.description.label_tag }}
-                            {{ search_form.description }}
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.docket_number.label_tag }}
-                            {{ search_form.docket_number }}
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.nature_of_suit.label_tag }}
-                            {{ search_form.nature_of_suit }}
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.filed_after.label_tag }}
-                                    {{ search_form.filed_after }}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.filed_before.label_tag }}
-                                    {{ search_form.filed_before }}
-                                </div>
+                    <div class="form-group">
+                        {{ search_form.judge.label_tag }}
+                        {{ search_form.judge }}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ search_form.argued_after.label_tag }}
+                                {{ search_form.argued_after }}
                             </div>
                         </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.document_number.label_tag }}
-                                    {{ search_form.document_number }}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.attachment_number.label_tag }}
-                                    {{ search_form.attachment_number }}
-                                </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ search_form.argued_before.label_tag }}
+                                {{ search_form.argued_before }}
                             </div>
                         </div>
-                        <div class="form-group">
-                            {{ search_form.assigned_to.label_tag }}
-                            {{ search_form.assigned_to }}
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.referred_to.label_tag }}
-                            {{ search_form.referred_to }}
-                        </div>
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.docket_number.label_tag }}
+                        {{ search_form.docket_number }}
+                    </div>
 
 
-                    {% elif type == 'oa' %}
-                        <div class="form-group">
-                            {{ search_form.case_name.label_tag }}
-                            {{ search_form.case_name }}
-                        </div>
-
-                        <div class="form-group">
-                            {{ search_form.judge.label_tag }}
-                            {{ search_form.judge }}
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.argued_after.label_tag }}
-                                    {{ search_form.argued_after }}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.argued_before.label_tag }}
-                                    {{ search_form.argued_before }}
-                                </div>
+                {% elif type == 'p' %}
+                    <div class="form-group">
+                        {{ search_form.name.label_tag }}
+                        {{ search_form.name }}
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ search_form.born_after.label_tag }}
+                                {{ search_form.born_after }}
                             </div>
                         </div>
-                        <div class="form-group">
-                            {{ search_form.docket_number.label_tag }}
-                            {{ search_form.docket_number }}
-                        </div>
-
-
-                    {% elif type == 'p' %}
-                        <div class="form-group">
-                            {{ search_form.name.label_tag }}
-                            {{ search_form.name }}
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.born_after.label_tag }}
-                                    {{ search_form.born_after }}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    {{ search_form.born_before.label_tag }}
-                                    {{ search_form.born_before }}
-                                </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ search_form.born_before.label_tag }}
+                                {{ search_form.born_before }}
                             </div>
                         </div>
-                        <div class="form-group">
-                            {{ search_form.dob_city.label_tag }}
-                            {{ search_form.dob_city }}
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.dob_state.label_tag }}
-                            {{ search_form.dob_state }}
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.school.label_tag }}
-                            {{ search_form.school }}
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.appointer.label_tag }}
-                            {{ search_form.appointer }}
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.selection_method.label_tag }}
-                            {{ search_form.selection_method }}
-                        </div>
-                        <div class="form-group">
-                            {{ search_form.political_affiliation.label_tag }}
-                            {{ search_form.political_affiliation }}
-                        </div>
-                    {% endif %}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.dob_city.label_tag }}
+                        {{ search_form.dob_city }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.dob_state.label_tag }}
+                        {{ search_form.dob_state }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.school.label_tag }}
+                        {{ search_form.school }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.appointer.label_tag }}
+                        {{ search_form.appointer }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.selection_method.label_tag }}
+                        {{ search_form.selection_method }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.political_affiliation.label_tag }}
+                        {{ search_form.political_affiliation }}
+                    </div>
+                {% endif %}
 
-                    <button type="submit"
-                            class="btn btn-primary title"
-                            name="search"><i class="fa fa-search"></i>&nbsp;Search
-                    </button>
-                </div>
+                <button type="submit"
+                        class="btn btn-primary title"
+                        name="search"><i class="fa fa-search"></i>&nbsp;Search
+                </button>
             </div>
-        </form>
-    </div>
-    {% endwith %}
-{% endif %}
+        </div>
+    </form>
+</div>
+{% endwith %}

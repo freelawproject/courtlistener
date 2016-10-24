@@ -107,49 +107,45 @@ def get_query_citation(cd):
     return matches
 
 
-def make_stats_variable(solr_facet_values, search_form):
+def make_stats_variable(search_form, paged_results):
     """Create a useful facet variable for use in a template
 
-    This function merges the fields in the form with the facet values from
+    This function merges the fields in the form with the facet counts from
     Solr, creating useful variables for the front end.
+
     We need to handle two cases:
-      1. The initial load of the page. For this we use the checked attr that
-         is set on the form if there isn't a sort order in the request.
-      2. The load after form submission. For this, we use the field.value().
+      1. Page loads where we don't have facet values. This can happen when the
+         search was invalid (bad date formatting, for example), or when the
+         search itself crashed (bad Solr syntax, for example).
+      2. A regular page load, where everything worked properly.
+
+    In either case, the count value is associated with the form fields as an
+    attribute named "count". If the search didn't work, the value will be None.
+    If it did, the value will be an int.
     """
-    facets = []
-    solr_facet_values = dict(solr_facet_values['status_exact'])
-    # Are any of the checkboxes checked?
-    no_facets_selected = not any([field.value() for field in search_form
-                                  if field.html_name.startswith('stat_')])
+    facet_fields = []
+    try:
+        solr_facet_values = dict(paged_results.object_list.facet_counts
+                                 .facet_fields['status_exact'])
+    except (AttributeError, KeyError):
+        # AttributeError: Query failed.
+        # KeyError: Faceting not enabled on field.
+        solr_facet_values = {}
+
     for field in search_form:
+        if not field.html_name.startswith('stat_'):
+            continue
+
         try:
             count = solr_facet_values[field.html_name.replace('stat_', '')]
         except KeyError:
             # Happens when a field is iterated on that doesn't exist in the
             # facets variable
-            continue
+            count = None
 
-        if no_facets_selected:
-            if field.html_name == 'stat_Precedential':
-                checked = True
-            else:
-                checked = False
-        else:
-            if field.value() is True:
-                checked = True
-            else:
-                checked = False
-
-        facet = [
-            field.label,
-            field.html_name,
-            count,
-            checked,
-            field.html_name.split('_')[1]
-        ]
-        facets.append(facet)
-    return facets
+        field.count = count
+        facet_fields.append(field)
+    return facet_fields
 
 
 def merge_form_with_courts(courts, search_form):
@@ -264,26 +260,29 @@ def make_fq(cd, field, key):
     method, in some cases Solr decides OR is a better approach. So, to work
     around this bug, we do some minimal query parsing ourselves.
     """
-    if '"' in cd[key]:
+    q = cd[key]
+    q = q.replace(':', ' ')
+
+    if q.startswith('"') and q.endswith('"'):
         # User used quotes. Just pass it through.
-        fq = '%s:(%s)' % (field, cd[key])
-    else:
-        # Iterate over the query word by word. If the word is a conjunction
-        # word, detect that and use the user's request. Else, make sure there's
-        # an AND everywhere there should be.
-        words = cd[key].split()
-        q = [words[0]]
-        needs_default_conjunction = True
-        for word in words[1:]:
-            if word.lower() in ['and', 'or', 'not']:
-                q.append(word.upper())
-                needs_default_conjunction = False
-            else:
-                if needs_default_conjunction:
-                    q.append('AND')
-                q.append(word)
-                needs_default_conjunction = True
-        fq = '%s:(%s)' % (field, ' '.join(q))
+        return '%s:(%s)' % (field, q)
+
+    # Iterate over the query word by word. If the word is a conjunction
+    # word, detect that and use the user's request. Else, make sure there's
+    # an AND everywhere there should be.
+    words = q.split()
+    clean_q = [words[0]]
+    needs_default_conjunction = True
+    for word in words[1:]:
+        if word.lower() in ['and', 'or', 'not']:
+            clean_q.append(word.upper())
+            needs_default_conjunction = False
+        else:
+            if needs_default_conjunction:
+                clean_q.append('AND')
+            clean_q.append(word)
+            needs_default_conjunction = True
+    fq = '%s:(%s)' % (field, ' '.join(clean_q))
     return fq
 
 
@@ -608,6 +607,9 @@ def regroup_snippets(results):
 
     This also supports results that have been paginated and ones that have not.
     """
+    if results is None:
+        return
+
     if hasattr(results, 'paginator'):
         group_field = results.object_list.group_field
     else:
