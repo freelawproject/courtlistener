@@ -27,7 +27,7 @@ class SearchFeed(Feed):
     """
     feed_type = Atom1Feed
     title = "CourtListener.com Custom Search Feed"
-    link = "https://www.courtlistener.com"
+    link = "https://www.courtlistener.com/"
     author_name = "Free Law Project"
     author_email = "feeds@courtlistener.com"
     description_template = 'feeds/solr_desc_template.html'
@@ -64,7 +64,8 @@ class SearchFeed(Feed):
         return get_item(item)['court']
 
     def item_pubdate(self, item):
-        return datetime.datetime.combine(get_item(item)['dateFiled'], datetime.time())
+        return datetime.datetime.combine(get_item(item)['dateFiled'],
+                                         datetime.time())
 
     def item_title(self, item):
         return get_item(item)['caseName']
@@ -75,10 +76,11 @@ class JurisdictionFeed(Feed):
     places, so changes here may have unintended consequences.
     """
     feed_type = Atom1Feed
-    link = 'https://www.courtlistener.com'
+    link = 'https://www.courtlistener.com/'
     author_name = "Free Law Project"
     author_email = "feeds@courtlistener.com"
     feed_copyright = "Created for the public domain by Free Law Project"
+    description_template = 'feeds/solr_desc_template.html'
 
     def title(self, obj):
         return "CourtListener.com: All opinions for the " + obj.full_name
@@ -100,23 +102,24 @@ class JurisdictionFeed(Feed):
         return solr.query().add_extra(**params).execute()
 
     def item_link(self, item):
-        return item['absolute_url']
+        return get_item(item)['absolute_url']
 
     def item_author_name(self, item):
-        return item['court']
+        return get_item(item)['court']
 
     def item_pubdate(self, item):
-        return datetime.datetime.combine(item['dateFiled'], datetime.time())
+        return datetime.datetime.combine(get_item(item)['dateFiled'],
+                                         datetime.time())
 
     def item_title(self, item):
-        return item['caseName']
+        return get_item(item)['caseName']
 
     def item_categories(self, item):
-        return [item['status']]
+        return [get_item(item)['status']]
 
     def item_enclosure_url(self, item):
         try:
-            path = item['local_path']
+            path = get_item(item)['local_path']
             if not path.startswith('/'):
                 return '/%s' % (path,)
             return path
@@ -127,7 +130,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                item['local_path'].encode('utf-8')
+                get_item(item)['local_path'].encode('utf-8')
             )
             return os.path.getsize(file_loc)
         except:
@@ -137,13 +140,11 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                item['local_path'].encode('utf-8')
+                get_item(item)['local_path'].encode('utf-8')
             )
             return lookup_mime_type(file_loc)
         except:
             return None
-
-    description_template = 'feeds/solr_desc_template.html'
 
 
 class AllJurisdictionsFeed(JurisdictionFeed):
