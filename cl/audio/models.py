@@ -120,6 +120,14 @@ class Audio(models.Model):
         db_index=True,
         default=False,
     )
+    stt_complete = models.BooleanField(
+        help_text="Is the Speech to Text complete for this item?",
+        default=False,
+    )
+    stt_google_response = models.TextField(
+        help_text="The JSON response object returned by Google Speech.",
+        blank=True,
+    )
 
     class Meta:
         ordering = ["-date_created"]
