@@ -19,6 +19,14 @@ class Audio(models.Model):
     """A class representing oral arguments and their associated metadata
 
     """
+    STT_NEEDED = 0
+    STT_COMPLETE = 1
+    STT_FAILED = 2
+    STT_STATUSES = (
+        (STT_NEEDED, 'Speech to Text Needed'),
+        (STT_COMPLETE, 'Speech to Text Complete'),
+        (STT_FAILED, 'Speech to Text Failed'),
+    )
     docket = models.ForeignKey(
         Docket,
         help_text="The docket that the oral argument is a part of",
@@ -120,9 +128,10 @@ class Audio(models.Model):
         db_index=True,
         default=False,
     )
-    stt_complete = models.BooleanField(
-        help_text="Is the Speech to Text complete for this item?",
-        default=False,
+    stt_status = models.SmallIntegerField(
+        help_text="The status of the Speech to Text for this item?",
+        choices=STT_STATUSES,
+        default=STT_NEEDED,
     )
     stt_google_response = models.TextField(
         help_text="The JSON response object returned by Google Speech.",
