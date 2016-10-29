@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from datetime import time
 
@@ -137,6 +138,22 @@ class Audio(models.Model):
         help_text="The JSON response object returned by Google Speech.",
         blank=True,
     )
+
+    @property
+    def transcript(self):
+        j = json.loads(self.stt_google_response)
+        # Find the alternative with the highest confidence for every utterance
+        # in the results.
+        best_utterances = []
+        for utterance in j['results']:
+            best_confidence = 0
+            for alt in utterance['alternatives']:
+                current_confidence = alt.get('confidence', 0)
+                if current_confidence > best_confidence:
+                    best_transcript = alt['transcript']
+                    best_confidence = current_confidence
+            best_utterances.append(best_transcript)
+        return ' '.join(best_utterances)
 
     class Meta:
         ordering = ["-date_created"]
