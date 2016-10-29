@@ -31,6 +31,8 @@ enum34==1.1.2
 eyeD3==0.7.8
 feedparser==5.2.1
 geonamescache==0.20
+google-cloud
+google-api-python-client
 hiredis==0.2.0
 httplib2==0.9.1
 idna==2.1

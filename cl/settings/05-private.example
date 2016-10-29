@@ -57,6 +57,10 @@ else:
 FTM_KEY = ''
 FTM_LAST_UPDATED = date.today()
 
+GOOGLE_AUTH = {
+    'PATH': os.path.join(here, 'google_auth.json'),
+    'PROJECT': 'courtlistener-development',
+}
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
