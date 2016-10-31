@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import re
+from HTMLParser import HTMLParser
+
+from django.utils.html import strip_tags
+
+h = HTMLParser()
 
 # list of words that aren't judge names
 NOT_JUDGE = [
@@ -16,13 +21,13 @@ NOT_JUDGE = [
     'consisted', 'consists', 'constituting', 'consultation', 'continue',
     'court', 'curiam', 'decided', 'decision', 'delivered', 'denial', 'denials', 'designation', 'did',
     'died', 'disqualified', 'dissent', 'dissented', 'dissenting', 'dissents',
-    'district', 'division', 'editor', 'emeritus', 'even', 'facts', 'fellows', 'final', 'filed',
+    'district', 'division', 'editor', 'emeritus', 'even', 'facts', 'fellows', 'final', 'filed', 'following',
     'footnote', 'for', 'full', 'foregoing', 'four', 'furth', 'further', 'general', 'his', 'heard', 'ii', 'iii',
     'indiana', 'indicated', 'initial', 'industrial', 'issuance', 'issuing', 'italic', 'iv', 'joined', 'joins', 'judge',
     'judgement', 'judges', 'judgment', 'judicial', 'justice', 'justices', 'join',
-    'magistrate', 'majority', 'making', 'maryland', 'may', 'member',
+    'jus', 'magistrate', 'majority', 'making', 'maryland', 'may', 'member',
     'memorandum', 'not', 'note', 'number', 'october', 'one', 'opinion', 'oral', 'order',
-    'page', 'pair', 'panel', 'part', 'participate', 'participated', 
+    'page', 'pair', 'panel', 'part', 'participate', 'participated',
     'participating', 'participation', 'petition', 'per', 'prepared', 'preparation', 'present',
     'president', 'presiding', 'prior',
     'pro', 'qualified', 'recusal', 'recuse', 'recused', 'reference', 'rehearing', 'report',
@@ -32,11 +37,11 @@ NOT_JUDGE = [
     'statement', 'states', 'stating',
     'submitted', 'surrogate', 'superior', 'supernumerary', 'taking', 'tem',
     'term', 'territorial', 'texas', 'the',
-    'this', 'though', 'three', 'time', 'transfer', 'two', 
+    'this', 'though', 'three', 'time', 'transfer', 'two',
     'unanimous', 'unpublished', 'underline', 'united',
-    'vacancy', 'vice', 'votes', 
+    'vacancy', 'vice', 'votes',
     'warden', 'was', 'which', 'while', 'with', 'without', 'written',
-    'january', 'february', 'march', 'april', 'june', 'july', 'august', 
+    'january', 'february', 'march', 'april', 'june', 'july', 'august',
     'september', 'october', 'november', 'december'
 ]
 
@@ -44,15 +49,18 @@ NOT_JUDGE = [
 NAME_CUTOFF = 3
 
 # for judges with small names, need an override
-IS_JUDGE = {'wu', 're', 'du'}
+IS_JUDGE = {'wu', 're', 'du', 'de'}
 
 
 def find_judge_names(text, first_names=False):
-    """Returns a list of last names of judges in `text`.
+    """Find judge names in a string of text.
 
+    :param text: The text you wish to extract names from.
     :param first_names: If True, will return a list of `(first, last)` tuples,
     in which `first` will usually be None unless a judge's first name is
     identified.
+
+    :return: a of last names of judges in `text`.
     """
     text = text.lower() or ''
     # just use the first nonempty line (there's sometimes a useless second line)
@@ -63,6 +71,11 @@ def find_judge_names(text, first_names=False):
             if l:
                 line = l
             break
+
+    # Strip HTML elements and unescape HTML entities.
+    line = strip_tags(line)
+    line = h.unescape(line)
+
     # normalize text and get candidate judge names
     line = ''.join([c if c.isalpha() else ' ' for c in line.lower()])
     names = []
