@@ -685,8 +685,14 @@ class OpinionCluster(models.Model):
         db_index=True,
     )
     date_filed = models.DateField(
-        help_text="The date filed by the court",
+        help_text="The date the cluster of opinions was filed by the court",
         db_index=True
+    )
+    date_filed_is_approximate = models.BooleanField(
+        help_text="For a variety of opinions getting the correct date filed is"
+                  "very difficult. For these, we have used heuristics to "
+                  "approximate the date.",
+        default=False,
     )
     slug = models.SlugField(
         help_text="URL that the document should map to (the slug)",
@@ -1022,10 +1028,16 @@ class Opinion(models.Model):
     )
     author = models.ForeignKey(
         'people_db.Person',
-        help_text="The primary author of this opinion",
+        help_text="The primary author of this opinion as a normalized field",
         related_name='opinions_written',
         blank=True,
         null=True,
+    )
+    author_str = models.TextField(
+        help_text="The primary author of this opinion, as a simple text "
+                  "string. This field is used when normalized judges cannot "
+                  "be placed into the author field.",
+        blank=True,
     )
     per_curiam = models.BooleanField(
         help_text="Is this opinion per curiam, without a single author?",

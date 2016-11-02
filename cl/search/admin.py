@@ -11,6 +11,7 @@ class OpinionAdmin(admin.ModelAdmin):
     fields = (
         'cluster',
         'author',
+        'author_str',
         'per_curiam',
         'joined_by',
         'type',
@@ -61,6 +62,7 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'non_participating_judges',
         'judges',
         'date_filed',
+        'date_filed_is_approximate',
         'slug',
         'citation_id',
         'case_name_short',
@@ -90,8 +92,8 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'syllabus',
         'citation_count',
         'precedential_status',
-        'blocked',
         'date_blocked',
+        'blocked',
     )
     raw_id_fields = (
         'docket',
@@ -100,6 +102,7 @@ class OpinionClusterAdmin(admin.ModelAdmin):
     )
     list_filter = (
         'source',
+        'blocked',
     )
     readonly_fields = (
         'citation_count',
