@@ -19,8 +19,7 @@ from cl.celery import app
 TRANSCRIPTS_BUCKET_NAME = 'freelawproject-transcripts'
 
 
-def make_transcription_chain(path, phrases, af_id, storage_client=None,
-                             stt_service=None):
+def make_transcription_chain(path, phrases, af_id):
     """Make a celery chain that combines the whole transcription workflow.
 
     The way this works is that the return values from each task are appended as
@@ -33,18 +32,11 @@ def make_transcription_chain(path, phrases, af_id, storage_client=None,
     audio. Typically, this will be proper nouns like the case name, for example.
     :type af_id: int
     :param af_id: The ID of the Audio item that will be updated in the end.
-    :type storage_client: :class: `google.cloud.storage.client`, None
-    :param storage_client: If None, a storage client will be created for you.
-    For best performance of bulk processes, minimize the creation of storage
-    clients.
-    :type stt_service: :class: `googleapiclient.discovery.Resource`, None
-    :param stt_service: If None, a stt service will be generated for you on
-    every request.
     """
     return chain(
-        upload_item_as_raw_file.s(path, storage_client),
-        do_speech_to_text.s(phrases, service=stt_service),
-        poll_for_result_and_save.s(af_id, service=stt_service),
+        upload_item_as_raw_file.s(path),
+        do_speech_to_text.s(phrases),
+        poll_for_result_and_save.s(af_id),
         delete_blob_from_google.s(),
     )
 
@@ -137,11 +129,11 @@ def upload_item_as_raw_file(path, client=None):
         blob = Blob(file_name, b)
         blob.upload_from_file(tmp, rewind=True)
 
-    return blob
+    return {'blob_name': blob.name, 'bucket_name': blob.bucket.name}
 
 
 @app.task
-def do_speech_to_text(blob, phrases, service=None):
+def do_speech_to_text(returned_info, phrases, service=None):
     """Convert the file to text
 
     This creates an operation on Google's servers to convert the item to text.
@@ -170,16 +162,18 @@ def do_speech_to_text(blob, phrases, service=None):
                 'speechContext': {'phrases': default_phrases},
             },
             'audio': {
-                'uri': 'gs://%s/%s' % (blob.bucket.name, blob.name),
+                'uri': 'gs://%s/%s' % (returned_info['bucket_name'],
+                                       returned_info['blob_name']),
             }
         }).execute()
 
     # Use a dict to send all values to the next task as a single var
-    return {'name': response['name'], 'blob': blob}
+    returned_info.update({'operation_name': response['name']})
+    return returned_info
 
 
 @app.task(bind=True, max_retries=6)
-def poll_for_result_and_save(self, operation_info, af_id, service=None):
+def poll_for_result_and_save(self, returned_info, af_id, service=None):
     """Poll Google for the completed STT and save it to the DB.
 
     Using an exponential backoff, ask google for the completed operation. If
@@ -192,19 +186,19 @@ def poll_for_result_and_save(self, operation_info, af_id, service=None):
     af = Audio.objects.get(pk=af_id)
 
     polling_response = (service.operations()
-                        .get(name=operation_info['name'])
+                        .get(name=returned_info['operation_name'])
                         .execute())
     if 'done' in polling_response and polling_response['done']:
         af.stt_google_response = json.dumps(polling_response, indent=2)
         af.stt_status = af.STT_COMPLETE
         af.save()
-        return operation_info['blob']
+        return returned_info
     else:
         last_try = (self.request.retries == self.max_retries)
         if last_try:
             af.stt_status = af.STT_FAILED
             af.save(index=False)  # Skip indexing if we have no new content.
-            return operation_info['blob']
+            return returned_info
         else:
             try:
                 raise Exception("STT not yet complete.")
@@ -213,10 +207,14 @@ def poll_for_result_and_save(self, operation_info, af_id, service=None):
 
 
 @app.task
-def delete_blob_from_google(blob):
+def delete_blob_from_google(returned_info, client=None):
     """Delete the blob from Google Storage.
 
     If the bucket is set up properly, the lifecycle rules will automatically
     delete items, however, the sooner we do so the better.
     """
+    if client is None:
+        client = get_storage_client()
+    b = client.get_bucket(returned_info['bucket_name'])
+    blob = b.get_blob(returned_info['blob_name'])
     blob.delete()

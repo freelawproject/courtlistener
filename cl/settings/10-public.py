@@ -171,7 +171,7 @@ REDIS_PORT = 6379
 ##########
 if DEVELOPMENT:
     # In a development machine, these setting make sense
-    CELERY_ALWAYS_EAGER = True
+    CELERY_ALWAYS_EAGER = True  # Do all tasks immediately, no async.
     CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
     CELERYD_CONCURRENCY = 2
 else:

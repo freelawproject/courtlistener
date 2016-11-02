@@ -145,7 +145,7 @@ class Audio(models.Model):
         # Find the alternative with the highest confidence for every utterance
         # in the results.
         best_utterances = []
-        for utterance in j['results']:
+        for utterance in j['response']['results']:
             best_confidence = 0
             for alt in utterance['alternatives']:
                 current_confidence = alt.get('confidence', 0)
