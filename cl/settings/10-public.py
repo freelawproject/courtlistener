@@ -187,7 +187,7 @@ else:
         # worker. This value *must* be greater than the largest ETA/countdown
         # that a task may be assigned with, or else it will be run over and over
         # in a loop. Our countdowns never tend to exceed one hour.
-        'visibility_timeout': 7200,  # two hours
+        'visibility_timeout': 21600,  # six hours
     }
 
 # Rate limits aren't ever used, so disable them across the board for better
