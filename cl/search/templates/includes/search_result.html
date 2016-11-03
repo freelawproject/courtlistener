@@ -273,7 +273,6 @@
             {% endif %}
         {% endif %}
         {% if type == 'o' or type_override == 'o' or type == 'oa' or type_override == 'oa' %}
-            {% comment %}This won't work{% endcomment %}
             {% if result.solr_highlights.docketNumber.0 %}
                 <div class="inline-block">
                     <span class="meta-data-header">Docket Number:</span>
@@ -328,12 +327,14 @@
             </div>
         {% endif %}
     {% endif %}
-    {% if type == 'o' and simple != True %}
-        <p>
-            {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.solr_highlights.text %}
-                {{ frag|safe|underscore_to_space }}&hellip;
-            {% endfor %}
-        </p>
+    {% if simple != True %}
+        {% if type == 'o' or type_override == 'o' or type == 'oa' or type_override == 'oa' %}
+            <p>
+                {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.solr_highlights.text %}
+                    {{ frag|safe|underscore_to_space }}&hellip;
+                {% endfor %}
+            </p>
+        {% endif %}
     {% endif %}
     {% endwith %}
 </article>

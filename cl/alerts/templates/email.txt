@@ -15,7 +15,7 @@ We have news regarding your alerts at CourtListener.com
 Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/{% endif %}
 
 {{forloop.counter}}. {{ result.solr_highlights.caseName.0|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|striptags }} {% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
-{% if type == 'o' %}{% for frag in result.solr_highlights.text %}...{{ frag|safe|striptags|underscore_to_space|compress_whitespace }}...
+{% if type == 'o' or type == 'oa' %}{% for frag in result.solr_highlights.text %}...{{ frag|safe|striptags|underscore_to_space|compress_whitespace }}...
 {% endfor %}{% endif %}{% endfor %}
 ~-~-~
  - View this item on our site: https://www.courtlistener.com{{result.absolute_url}}
