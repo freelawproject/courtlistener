@@ -13,6 +13,18 @@
     {% endif %}
 {% endblock %}
 
+{% block footer-scripts %}
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('#start-scroll').click(function () {
+                $('html, body').animate({
+                    scrollTop: $(".learn-more").offset().top
+                }, 500);
+            });
+        });
+    </script>
+{% endblock %}
+
 {% block sidebar %}{% endblock %}
 
 {% block navbar-o %}
@@ -51,6 +63,7 @@
                 <p class="text-center gray large">Search our database of thousands of State and Federal judges.
                 </p>
             {% endif %}
+            <p class="text-center"><a class="btn btn-default" id="start-scroll">Learn More Below</a></p>
         </div>
 
         <div id="main-query-box">
@@ -504,7 +517,7 @@
 
 
         {%  if search_form.type.value == 'o' %}
-        <div class="row" id="about-opinions">
+        <div class="row learn-more" id="about-opinions">
             <div class="col-xs-12">
                 <h2>About the CourtListener Corpus of Opinions</h2>
             </div>
@@ -559,8 +572,82 @@
             </div>
         </div>
 
+        {% elif search_form.type.value == 'r' %}
+        <div class="row learn-more" id="about-recap">
+            <div class="col-xs-12">
+                <h2>About CourtListener's RECAP Archive</h2>
+            </div>
+            <div class="col-md-4">
+                <h3>Background</h3>
+                <p>The RECAP Archive is a searchable collection of millions of PACER documents and dockets that were gathered using our <a href="https://free.law/recap/">RECAP Extensions for Firefox and Chrome</a>. This unique archive was created to partially address what we see as the <a href="https://free.law/2015/03/20/what-is-the-pacer-problem/">PACER Problem</a>.
+                </p>
+                <p>Using this archive, you can finally search and download millions of PACER documents, including those that were originally scanned PDFs, <a href="https://free.law/2016/09/26/extracting-text-from-our-collection-of-pacer-documents/">which we laboriously convert to text</a>.
+                </p>
+                <p>This work was made possible thanks to a partnership with <a href="https://citp.princeton.edu/">The Center for Information Technology Policy at Princeton</a>, the generous data contributions of thousands of RECAP users, and a ton of <a href="https://free.law/thanks/">volunteer support</a>.
+                </p>
+                <p>If you find this work valuable, or if it saves you money on your PACER bill, please donate.
+                </p>
+                <p>
+                    <a href="{% url "donate" %}?referrer=recap-adv-search"
+                       class="btn btn-danger">Donate Now</a>
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h3>Learn More About PACER</h3>
+                <p>We've written many articles about PACER:</p>
+                <ul>
+                    <li>
+                        <a href="https://free.law/2015/03/20/what-is-the-pacer-problem/">What
+                            is the PACER Problem?</a></li>
+                    <li>
+                        <a href="https://free.law/2015/03/24/what-should-be-done-about-the-pacer-problem/">What
+                            Should be Done About the PACER Problem?</a></li>
+                    <li>
+                        <a href="https://free.law/2016/10/17/what-is-a-page-of-pacer-content/">What
+                            is a Page of PACER Content?</a></li>
+                    <li>
+                        <a href="https://free.law/2016/10/10/the-cost-of-pacer-data-around-one-billion-dollars/">The
+                            Cost of PACER Data? Around One Billion Dollars.</a>
+                    </li>
+                    <li>
+                        <a href="https://free.law/2015/03/23/why-should-congress-care-about-pacer/">Why
+                            Should Congress Care about PACER?</a></li>
+                    <li>
+                        <a href="https://free.law/2014/08/26/using-pacer-what-could-possibly-go-wrong/">Using
+                            PACER &mdash; What Could Possibly Go Wrong?</a></li>
+                    <li>
+                        <a href="https://free.law/2010/08/17/assessing-pacers-access-barriers/">Assessing
+                            PACER's Access Barriers</a></li>
+                </ul>
+                <p>You can read more of our <a
+                        href="https://free.law/tag/pacer.html">PACER</a> and <a
+                        href="https://free.law/tag/recap.html">RECAP</a>
+                    articles on the Free Law Project Blog.</p>
+            </div>
+            <div class="col-md-4">
+                <h3>Get Involved &mdash; Install the Extensions</h3>
+                <p>This archive of data was created by users of the RECAP
+                    Extensions. Learn more and install them at the RECAP
+                    homepage.
+                </p>
+                <p>
+                    <a href="https://free.law/recap/"
+                       class="btn btn-primary">Install the Extensions</a>
+                </p>
+
+
+                <h3>Research Service and API</h3>
+                <p>Free Law Project, the non-profit behind RECAP, is proud to host a research service and API for PACER content. If you are an organization that needs PACER content or a researcher looking for bulk data, please get in touch.
+                </p>
+                <p>
+                    <a href="{% url "contact" %}" class="btn btn-primary">Contact Us</a>
+                </p>
+            </div>
+        </div>
+
+
         {% elif search_form.type.value == 'oa' %}
-        <div class="row" id="about-oral-arguments">
+        <div class="row learn-more" id="about-oral-arguments">
             <div class="col-xs-12">
                 <h2>About the CourtListener Oral Argument Archive</h2>
             </div>
@@ -606,7 +693,7 @@
         </div>
 
         {% elif search_form.type.value == 'p' %}
-        <div class="row v-offset-above-2" id="about-judges">
+        <div class="row v-offset-above-2 learn-more" id="about-judges">
             <div class="col-xs-12">
                 <h2>About the CourtListener Judicial Database</h2>
             </div>
