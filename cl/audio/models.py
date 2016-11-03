@@ -130,11 +130,13 @@ class Audio(models.Model):
         default=False,
     )
     stt_status = models.SmallIntegerField(
+        u"Speech to text status",
         help_text="The status of the Speech to Text for this item?",
         choices=STT_STATUSES,
         default=STT_NEEDED,
     )
     stt_google_response = models.TextField(
+        u"Speech to text Google response",
         help_text="The JSON response object returned by Google Speech.",
         blank=True,
     )
