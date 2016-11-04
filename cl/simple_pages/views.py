@@ -4,7 +4,7 @@ import os
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.core.urlresolvers import reverse
-from django.db.models import Count
+from django.db.models import Count, Sum
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render_to_response, get_object_or_404
@@ -14,10 +14,10 @@ from django.views.decorators.cache import cache_page
 
 from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
+from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib import magic
-from cl.lib import search_utils
 from cl.lib.bot_detector import is_bot
-from cl.lib.sunburnt import sunburnt
+from cl.people_db.models import Person
 from cl.search.forms import SearchForm
 from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument
 from cl.simple_pages.forms import ContactForm
@@ -35,21 +35,25 @@ def about(request):
 
 def faq(request):
     """Loads the FAQ page"""
-    scraped_court_count = Court.objects.filter(
-        in_use=True,
-        has_opinion_scraper=True
-    ).count()
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
-    response = conn.raw_query(
-        **search_utils.build_total_count_query()).execute()
-    total_opinion_count = response.result.numFound
+    template_data = {
+        'scraped_court_count': Court.objects.filter(
+            in_use=True,
+            has_opinion_scraper=True
+        ).count(),
+        'total_opinion_count': OpinionCluster.objects.all().count(),
+        'total_recap_count': RECAPDocument.objects.filter(
+            is_available=True).count(),
+        'total_oa_minutes': naturalduration(
+            Audio.objects.aggregate(Sum('duration'))['duration__sum'],
+            as_dict=True
+        )['m'],
+        'total_judge_count': Person.objects.all().count(),
+    }
+
     return contact(
         request,
         template_path='faq.html',
-        template_data={
-            'scraped_court_count': scraped_court_count,
-            'total_opinion_count': total_opinion_count,
-        },
+        template_data=template_data,
         initial={'subject': 'FAQs'},
     )
 

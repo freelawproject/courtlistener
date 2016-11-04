@@ -32,6 +32,15 @@
             <a href="#oral-args">How do you get the oral arguments you have?</a><br>
         </p>
 
+        <h3 class="bottom">RECAP Archive and Extensions</h3>
+        <p>
+            <a href="#what-is-recap-pacer">What is RECAP and what's PACER?</a><br>
+            <a href="#where-recap">Where does the content in the RECAP Archive come from?</a><br>
+            <a href="#how-fast">How quickly does an item appear here?</a><br>
+            <a href="#recap-privacy">How do you handle privacy of RECAP content?</a><br>
+            <a href="#learn-more">Where can I learn more about PACER and RECAP?</a><br>
+        </p>
+
         <h3 class="bottom">Supreme Court Citation Networks</h3>
         <p>
             <a href="#circles-change-size">Why do the case circles change size?</a><br>
@@ -90,7 +99,14 @@
 
     <h3 id="general">General</h3>
     <h4 id="who-and-what">What Is This Site? Who Runs It?</h4>
-    <p>CourtListener is a legal research website currently containing <a href="{% url "coverage" %}">{{ total_opinion_count|intcomma }}</a> legal opinions from federal and state courts. CourtListener is operated by the non-profit <a href="https://free.law">Free Law Project</a>. Free Law Project seeks to provide free access to primary legal materials, develop legal research tools, and support academic research on legal corpora. CourtListener embodies all of these efforts, as the primary free repository of all the court opinions we have collected, as the platform on which we attempt to deploy legal research tools, and as the source of bulk downloads that enable academic researchers to study our collection.
+    <p>CourtListener is a legal research website and data provider currently containing:</p>
+    <ul>
+        <li><a href="{% url "coverage" %}">{{ total_opinion_count|intcomma }}</a> legal opinions from federal, state, and specialty courts.</li>
+        <li>{{ total_recap_count|intcomma }} documents from the Federal PACER system.</li>
+        <li>{{ total_oa_minutes|intcomma }} minutes of oral argument recordings.</li>
+        <li>A database of {{ total_judge_count|intcomma }} judges.</li>
+    </ul>
+    <p>CourtListener is operated by the non-profit <a href="https://free.law">Free Law Project</a>. Free Law Project seeks to provide free access to primary legal materials, develop legal research tools, and support academic research on legal corpora. CourtListener embodies all of these efforts, as the primary free repository of all the court opinions we have collected, as the platform on which we attempt to deploy legal research tools, and as the source of bulk downloads that enable academic researchers to study our collection.
     </p>
 
 
@@ -102,9 +118,9 @@
 
 
     <h4 id="submit-documents">Can I send you documents from my case?</h4>
-    <p>In general, no, we can't accept documents from you about your case. As you might expect, people occasionally create fraudulent documents and that's a risk we simply cannot accept. If your case in a <a href="{% url "coverage" %}#scraped-jurisdictions">jurisdiction that we cover</a>, we will eventually receive the opinion directly from the court itself.
+    <p>In general, no, we can't accept documents from you about your case. As you might expect, people occasionally create fraudulent documents and that's a risk we cannot take. If your case in a <a href="{% url "coverage" %}#scraped-jurisdictions">jurisdiction that we cover</a>, we will eventually receive the opinion directly from the court itself.
     </p>
-    <p>The exception to this is that if your documents are on PACER, it's possible for you to use our <a href="https://www.recapthelaw.org">RECAP Project</a> to get us copies of the documents. Do to so, simply install either our Firefox or Chrome extension, and then purchase the documents from PACER.
+    <p>The exception to this is that if your documents are on PACER, it's possible for you to use our <a href="https://free.law/recap/">RECAP Project</a> to get us copies of the documents. Do to so, simply install either our Firefox or Chrome extension, and then purchase the documents from PACER.
     </p>
 
 
@@ -194,6 +210,33 @@
         available in search results, podcasts and bulk data.</p>
 
 
+
+    <h3 id="recap-archive">RECAP Archive and Extensions</h3>
+    <h4 id="what-is-recap-pacer">What is RECAP and What is PACER?</h4>
+    <p>PACER is a website run by the federal judiciary that makes public court records available to the general public. There are over one billion court records in PACER. PACER is typically used by lawyers and automated programs run by commercial ventures. The general public is not a big user of PACER because the site is too difficult to use and because it has a paywall that makes the documents very expensive.
+    </p>
+    <p><a href="https://free.law/recap/">RECAP is an extension for Firefox or Chrome</a> that makes PACER cheaper and easier to use. If you install the RECAP extension, you will donate the documents you purchase on PACER to our public collection, which we call the RECAP Archive. In addition, if you have the extension installed and try to download an item from PACER that we already have, you will instead get it for free from our archive.
+    </p>
+    <p>If you use PACER, we recommend you install RECAP &mdash; it will save you money:</p>
+    <p><a href="https://free.law/recap/" class="btn btn-primary">Install the Extensions&nbsp;<i class="fa fa-external-link"></i></a></p>
+
+    <h4 id="where-recap">Where does the content in the RECAP Archive come from?</h4>
+    <p>The content in the RECAP Archive comes from a variety of sources, including tools we use for automated data gathering, and from the <a href="https://free.law/recap/">RECAP extensions for Firefox and Chrome</a>.
+    </p>
+
+    <h4 id="how-fast">How quickly does an item appear here?</h4>
+    <p>There can be a delay between when you contribute an item using the RECAP extensions and when it appears here. Generally the delay is less than 24 hours.
+    </p>
+
+    <h4 id="recap-privacy">How do you handle privacy of RECAP content?</h4>
+    <p>We make decisions about the privacy of documents on a case by case basis. To learn more, please see our <a href="{% url "terms" %}#removal">removal policy</a>.
+    </p>
+
+    <h4 id="learn-more">Where can I learn more about PACER and RECAP?</h4>
+    <p>We have <a href="https://free.law/recap/faq/">a more detailed FAQ specifically about RECAP</a> at <a href="https://free.law/recap/">its homepage on the Free Law Project website</a>.
+    </p>
+
+
     <h3 id="supreme-court-networks">Supreme Court Citation Networks</h3>
     <h4 id="circles-change-size">Why do the case circles change size?</h4>
     <p>Circles change size based on the number of citations to it by other cases in the network. The more cases that cite to <i>Case A</i>, the larger it will be. The only exception to this rule is the rightmost case on network (with the most recent date). For visual clarity, this anchor case is always represented with a large circle.</p>
@@ -251,7 +294,7 @@
         Court opinions contain statements of the law and legal reasoning that guide legal researchers. We are
         attempting to build a site useful to legal researchers. If you have a concern about information from one
         of these opinions appearing in search engines, such as Google, you should review our <a
-                href="/removal/">removal policy</a>.</p>
+                href="{% url "terms" %}#removal">removal policy</a>.</p>
 
     <h4 id="non-precedential">Why Does This Site Contain Documents That Say "Not for Publication",
         "Unpublished", Etc?</h4>
