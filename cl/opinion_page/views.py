@@ -32,7 +32,36 @@ def view_docket(request, pk, _):
     )
 
 
-def view_recap_documents(request, pk):
+def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
+                        slug=''):
+    """This view can either load an attachment or a regular document,
+    depending on the URL pattern that is matched.
+    """
+    item = get_object_or_404(
+        RECAPDocument,
+        docket_entry__docket__id=docket_id,
+        document_number=doc_num,
+        attachment_number=att_num,
+    )
+    title = '%sDocument #%s%s in %s' % (
+        '%s &ndash; ' % item.description if item.description else '',
+        item.document_number,
+        ', Attachment #%s' % item.attachment_number if
+        item.document_type == RECAPDocument.ATTACHMENT else '',
+        best_case_name(item.docket_entry.docket),
+    )
+    return render_to_response(
+        'recap_document.html',
+        {
+            'document': item,
+            'title': title,
+            'private': True,  # Always True for RECAP docs.
+        },
+        RequestContext(request),
+    )
+
+
+def ajax_get_recap_documents_and_attachments(request, pk):
     """This is the ajax view that powers the modals on the docket
     page when a docket entry is clicked.
     """

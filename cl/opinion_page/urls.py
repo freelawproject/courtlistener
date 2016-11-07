@@ -3,8 +3,9 @@ from django.conf.urls import url
 from cl.opinion_page.sitemap import opinion_sitemap_maker
 from cl.opinion_page.views import (
     view_opinion, view_authorities, view_docket, cluster_visualizations,
-    citation_redirector,
-    view_recap_documents)
+    citation_redirector, view_recap_document,
+    ajax_get_recap_documents_and_attachments
+)
 
 urlpatterns = [
     url(
@@ -28,9 +29,19 @@ urlpatterns = [
         name="view_docket"
     ),
     url(
+        r'^docket/(?P<docket_id>\d*)/(?P<doc_num>\d*)/?(?P<slug>[^/]*)/$',
+        view_recap_document,
+        name='view_recap_document',
+    ),
+    url(
+        r'^docket/(?P<docket_id>\d*)/(?P<doc_num>\d*)/(?P<att_num>\d*)/?(?P<slug>[^/]*)/$',
+        view_recap_document,
+        name='view_recap_attachment',
+    ),
+    url(
         r'^docket-entry/(\d*)/$',
-        view_recap_documents,
-        name="view_recap_documents"
+        ajax_get_recap_documents_and_attachments,
+        name="ajax_get_recap_documents_and_attachments"
     ),
     url(
         r'^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,4})/(?P<page>\d{1,4})/)?$',

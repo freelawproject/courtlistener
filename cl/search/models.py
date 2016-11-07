@@ -442,6 +442,21 @@ class RECAPDocument(models.Model):
             self.attachment_number
         )
 
+    def get_absolute_url(self):
+        if self.document_type == self.PACER_DOCUMENT:
+            return reverse('view_recap_document', kwargs={
+                'docket_id': self.docket_entry.docket.pk,
+                'doc_num': self.document_number,
+                'slug': self.docket_entry.docket.slug,
+            })
+        elif self.document_type == self.ATTACHMENT:
+            return reverse('view_recap_attachment', kwargs={
+                'docket_id': self.docket_entry.docket.pk,
+                'doc_num': self.document_number,
+                'att_num': self.attachment_number,
+                'slug': self.docket_entry.docket.slug,
+            })
+
     def save(self, *args, **kwargs):
         if self.document_type == self.ATTACHMENT:
             if self.attachment_number is None:

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% load text_filters %}
+{% load extras %}
+{% load admin_urls %}
+
+
+{% block title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
+{% block og_title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
+{% block description %}{{ title|safe|striptags }}{% endblock %}
+{% block og_description %}{{ title|safe|striptags }}{% endblock %}
+
+{% block navbar-r %}active{% endblock %}
+
+
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+        <div class="sidebar-section">
+            <h4>
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="{{ document.docket_entry.docket.get_absolute_url }}">Back to Docket</a>
+            </h4>
+        </div>
+
+        {# show the admin tools if applicable #}
+        {% if perms.search.change_recapdocument or perms.search.change_docketentry or perms.search.change_docket %}
+            <div class="sidebar-section">
+                <h3><span>Admin</span></h3>
+                <p>
+                    {% if perms.search.change_docket %}
+                        <a href="{% url 'admin:search_docket_change' document.docket_entry.docket.pk %}"
+                           class="btn btn-primary btn-xs">Docket</a>
+                    {% endif %}
+                    {% if perms.search.change_docketentry %}
+                        <a href="{% url 'admin:search_docketentry_change' document.docket_entry.pk %}"
+                           class="btn btn-primary btn-xs">Docket Entry</a>
+                    {% endif %}
+                    {% if perms.search.change_recapdocument %}
+                        <a href="{% url 'admin:search_recapdocument_change' document.pk %}"
+                           class="btn btn-primary btn-xs">RECAP Document</a>
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+
+
+        {# Download #}
+        <div class="sidebar-section">
+            <h3><span>Download PDF</span></h3>
+            <p>
+                <a href="/{{ document.filepath_local }}"
+                   class="btn btn-primary btn-block"><i class="fa fa-download"></i>&nbsp;From CourtListener</a>
+                <a href="{{ document.filepath_ia }}"
+                   class="btn btn-primary btn-block"><i class="fa fa-cloud-download"></i>&nbsp;From Internet Archive</a>
+            </p>
+        </div>
+
+        {% include "includes/social_links.html" %}
+        {% include "includes/donate_sidebar.html" with referrer="ad-recap-document" %}
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <article class="col-sm-9">
+        <h2>{{ document.docket_entry.docket|best_case_name|safe|v_wrapper }}</h2>
+
+        <h3>
+            {% if document.description %}{{ document.description }}
+                <span class="gray">&mdash;</span>
+            {% endif %}
+            Document #{{ document.document_number }}{% if document.document_type == document.ATTACHMENT %}, Attachment #{{ document.attachment_number }}{% endif %}
+        </h3>
+        <h4>{{ document.docket_entry.docket.court }}</h4>
+        <p class="bottom">
+            <span class="meta-data-header">Uploaded:</span>
+            <span class="meta-data-value">
+                {{ document.date_upload|date:"F jS, Y" }}
+            </span>
+        </p>
+        <br>
+
+
+        <div class="tab-content">
+            {% if document.ocr_status and document.ocr_status != document.OCR_UNNECESSARY %}
+                <div class="col-sm-12 alert-warning alert">
+                    {% if document.ocr_status == document.OCR_COMPLETE %}
+                        <p class="bottom">The text of this document was
+                            obtained by analyzing a scanned document
+                            provided by the court. As a result it may have
+                            typos, and you may prefer <a
+                                    href="/{{ document.filepath_local }}"
+                                    class="visitable">reading the
+                                original PDF</a>.
+                        </p>
+                    {% elif document.ocr_status == document.OCR_FAILED %}
+                        <p class="bottom">We were unable to extract text from this document. Please <a
+                                    href="/{{ document.filepath_local }}"
+                                    class="visitable">download and read the
+                                original PDF</a>.
+                        </p>
+                    {% elif document.ocr_status == document.OCR_NEEDED %}
+                        <p class="bottom">We have not yet extracted text from
+                            this document. Please <a
+                                    href="/{{ document.filepath_local }}"
+                                    class="visitable">download and read the
+                                original PDF</a>.
+                        </p>
+                    {% endif %}
+                </div>
+                <div class="clearfix"></div>
+            {% endif %}
+
+            <div id='default-text'>
+                <div id="opinion-content"> {# used by Zotero, Juris-M #}
+                    {% if document.plain_text %}
+                        <pre>{{ document.plain_text }}</pre>
+                    {% else %}
+                        <div class="col-sm-12 alert-warning alert">
+                            <p>Text not yet extracted from this document. Please <a href="/{{ document.filepath_local }}" class="visitable">download and read the original PDF</a>.
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </article>
+{% endblock %}
