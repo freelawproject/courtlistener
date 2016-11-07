@@ -96,11 +96,15 @@
 
 
         <div>
-            <p class="well well-sm">
-                {% if document.docket_entry.description %}
-                    {{ document.docket_entry.description }}
-                {% endif %}
-            </p>
+            <div class="well well-sm">
+                <h4>Description</h4>
+                <p>
+                    {% if document.docket_entry.description %}
+                        {{ document.docket_entry.description }}
+                    {% endif %}
+                </p>
+            </div>
+
             {% if document.is_available %}
             {% if document.ocr_status and document.ocr_status != document.OCR_UNNECESSARY %}
                 <div class="col-sm-12 alert-warning alert">
