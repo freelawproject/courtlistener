@@ -135,6 +135,12 @@ class CourtAdmin(admin.ModelAdmin):
     )
 
 
+class RECAPDocumentAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'docket_entry',
+    )
+
+
 class RECAPDocumentInline(admin.StackedInline):
     model = RECAPDocument
     extra = 1
@@ -186,5 +192,6 @@ admin.site.register(Opinion, OpinionAdmin)
 admin.site.register(Court, CourtAdmin)
 admin.site.register(Docket, DocketAdmin)
 admin.site.register(DocketEntry, DocketEntryAdmin)
+admin.site.register(RECAPDocument, RECAPDocumentAdmin)
 admin.site.register(OpinionsCited, OpinionsCitedAdmin)
 admin.site.register(OpinionCluster, OpinionClusterAdmin)
