@@ -1,9 +1,9 @@
+import re
+
 from django.template import Library
 from django.template.defaultfilters import stringfilter
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
-
-import re
 
 register = Library()
 
@@ -35,7 +35,7 @@ def v_wrapper(text, autoescape=None):
     else:
         esc = lambda x: x
     return mark_safe(
-        re.sub(' v\. ', '<span class="alt bold"> v. </span>', esc(text)))
+        re.sub(' v\. ', '<span class="alt"> v. </span>', esc(text)))
 
 
 @register.filter(needs_autoescape=True)
