@@ -131,21 +131,27 @@
                 {% if docket.cause %}
                     <p class="bottom">
                         <span class="meta-data-header">Cause:</span>
-                        <span class="meta-data-value">{{ docket.cause }}</span>
+                        <span class="meta-data-value">
+                            <a href="?type=r&amp;cause=&quot;{{ docket.cause }}&quot;">{{ docket.cause }}</a>
+                        </span>
                     </p>
                 {% endif %}
 
                 {% if docket.nature_of_suit %}
                     <p class="bottom">
                         <span class="meta-data-header">Nature of Suit:</span>
-                        <span class="meta-data-value">{{ docket.nature_of_suit }}</span>
+                        <span class="meta-data-value">
+                            <a href="?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;">{{ docket.nature_of_suit }}</a>
+                        </span>
                     </p>
                 {% endif %}
 
                 {% if docket.jury_demand %}
                     <p class="bottom">
                         <span class="meta-data-header">Jury Demand:</span>
-                        <span class="meta-data-value">{{ docket.jury_demand }}</span>
+                        <span class="meta-data-value">
+                            <a href="?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;">{{ docket.jury_demand }}</a>
+                        </span>
                     </p>
                 {% endif %}
             </div>
