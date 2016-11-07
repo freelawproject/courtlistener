@@ -78,8 +78,10 @@ def ajax_get_recap_documents_and_attachments(request, pk):
             'document_number': doc.document_number,
             'attachment_number': doc.attachment_number,
             'is_available': doc.is_available,
+            'pacer_url': doc.pacer_url or '',
             'filepath_local': doc.filepath_local.name,
-            'description': doc.description
+            'absolute_url': doc.get_absolute_url(),
+            'description': doc.description,
         }
 
         if doc.document_type == RECAPDocument.PACER_DOCUMENT:

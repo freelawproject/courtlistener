@@ -53,29 +53,46 @@ var makeRow = function (item, type) {
     } else {
         number_attr = item.attachment_number;
     }
-    row.append($('<td>').text(type + number_attr));
+    if (item.filepath_local) {
+        row.append($('<td>').append($('<a>', {
+            'text': type + number_attr,
+            'href': item.absolute_url
+        })));
+    } else {
+        row.append($('<td>').text(type + number_attr))
+    }
+
     row.append($('<td>').text(item.description || "Unknown Description"));
     var btn_attrs = {'text': "Download"},
-        div_attrs = {'class': 'float-right'};
+        div_attrs = {'class': 'float-right btn-div'};
     if (item.filepath_local){
         $.extend(btn_attrs, {
             'href': "/" + item.filepath_local,
             'class': 'btn-primary btn'
         });
     } else {
-        // Item not yet in CourtListener. For now, show an error as a tooltip on
-        // the button (we might have the description). Later, we'll let people
-        // click to get the item.
-        $.extend(btn_attrs, {
-            'href': "#",
-            'class': "btn-primary btn disabled"
-        });
-        $.extend(div_attrs, {
-            'role': 'button',
-            'data-toggle': "tooltip",
-            'data-container': 'body',
-            'title': 'Item not yet in our collection. Please download it using RECAP and we will have it soon.'
-        });
+        // Item not yet in CourtListener.
+        if (item.pacer_url === '') {
+            // We can't make the PACER URL for some reason. Show an error as a
+            // tooltip on the button (we might have the description). Later,
+            // we'll let people click to get the item.
+            $.extend(btn_attrs, {
+                'href': "#",
+                'class': "btn btn-primary disabled"
+            });
+            $.extend(div_attrs, {
+                'role': 'button',
+                'data-toggle': "tooltip",
+                'data-container': 'body',
+                'title': 'Item not yet in our collection. Please download it using RECAP and we will have it soon.'
+            });
+        } else {
+            $.extend(btn_attrs, {
+                'href': item.pacer_url,
+                'class': "btn btn-primary",
+                'text': "Buy on PACER"
+            });
+        }
     }
 
     row.append($('<td>')
