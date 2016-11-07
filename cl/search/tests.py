@@ -709,7 +709,6 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # She is brought to the detail page for the results
         self.assertNotIn('Search Results', self.browser.title)
-        self.assert_text_in_body('Back to Search Results')
         article_text = self.browser.find_element_by_tag_name('article').text
 
         # and she can see lots of detail! This includes things like:

@@ -83,7 +83,6 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # On the detail page she now sees it might be useful later, so she
         # clicks on the little star next to the result result title
-        self.assert_text_in_body('Back to Search Results')
         title = self.browser.find_element_by_css_selector('article h2').text
         star = self.browser.find_element_by_id('favorites-star')
         self.assertEqual(
@@ -138,7 +137,6 @@ class UserFavoritesTest(BaseSeleniumTest):
         title_anchor.click()
 
         # She has used CL before and knows to click the star to favorite it
-        self.assert_text_in_body('Back to Search Results')
         star = self.browser.find_element_by_id('favorites-star')
         self.assertEqual(
                 star.get_attribute('title').strip(),
