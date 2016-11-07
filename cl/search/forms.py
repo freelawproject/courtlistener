@@ -414,6 +414,7 @@ class SearchForm(forms.Form):
         sub_pairs = (
             # Blended
             ('casename', 'caseName'),
+            ('case_name', 'caseName'),
             ('docketnumber', 'docketNumber'),
             ('datefiled', 'dateFiled'),
             ('suitnature', 'suitNature'),
