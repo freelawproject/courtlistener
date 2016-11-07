@@ -44,17 +44,20 @@
 
 
         {# Download #}
-        {% if document.is_available %}
-            <div class="sidebar-section">
-                <h3><span>Download PDF</span></h3>
-                <p>
+        <div class="sidebar-section">
+            <h3><span>Download PDF</span></h3>
+            <p>
+                {% if document.is_available %}
                     <a href="/{{ document.filepath_local }}"
                        class="btn btn-primary btn-block"><i class="fa fa-download"></i>&nbsp;From CourtListener</a>
                     <a href="{{ document.filepath_ia }}"
                        class="btn btn-primary btn-block"><i class="fa fa-cloud-download"></i>&nbsp;From Internet Archive</a>
-                </p>
-            </div>
-        {% endif %}
+                {% elif document.pacer_url %}
+                    <a href="{{ document.pacer_url }}"
+                       class="btn btn-primary btn-block>"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
+                {% endif %}
+            </p>
+        </div>
 
         {% include "includes/social_links.html" %}
         {% include "includes/donate_sidebar.html" with referrer="ad-recap-document" %}
@@ -93,6 +96,11 @@
 
 
         <div>
+            <p class="well well-sm">
+                {% if document.docket_entry.description %}
+                    {{ document.docket_entry.description }}
+                {% endif %}
+            </p>
             {% if document.is_available %}
             {% if document.ocr_status and document.ocr_status != document.OCR_UNNECESSARY %}
                 <div class="col-sm-12 alert-warning alert">
