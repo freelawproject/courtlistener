@@ -32,12 +32,17 @@
                         </a>
                     </p>
                 {% endif %}
-                <h2>
+                <h2 class="bottom">
                     {{ docket|best_case_name|safe|v_wrapper }}
                     {% if docket.docket_number %}
                         ({{ docket.docket_number }})
                     {% endif %}
                 </h2>
+                {% if docket.pacer_url %}
+                <p><a href="{{ docket.pacer_url }}" class="btn btn-primary btn-xs">View
+                    on PACER</a>
+                </p>
+                {% endif %}
                 <h3>{{ docket.court }}</h3>
 
 
