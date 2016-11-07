@@ -277,6 +277,19 @@ class Docket(models.Model):
     def get_absolute_url(self):
         return reverse('view_docket', args=[self.pk, self.slug])
 
+    @property
+    def pacer_url(self):
+        if not self.pacer_case_id:
+            return None
+        from cl.lib.pacer import cl_to_pacer_ids
+        court_id = self.court.pk
+        if court_id in cl_to_pacer_ids:
+            court_id = cl_to_pacer_ids[court_id]
+        return u"https://ecf.%s.uscourts.gov/cgi-bin/DktRpt.pl?%s" % (
+            court_id,
+            self.pacer_case_id,
+        )
+
 
 class DocketEntry(models.Model):
 
@@ -457,6 +470,19 @@ class RECAPDocument(models.Model):
                 'slug': self.docket_entry.docket.slug,
             })
 
+    @property
+    def pacer_url(self):
+        """Construct a doc1 URL for any item, if we can. Else, return None."""
+        from cl.lib.pacer import cl_to_pacer_ids
+        if self.pacer_doc_id:
+            court_id = self.docket_entry.docket.court.pk
+            if court_id in cl_to_pacer_ids:
+                court_id = cl_to_pacer_ids[court_id]
+            return "https://ecf.%s.uscourts.gov/doc1/%s" % (
+                court_id, self.pacer_doc_id)
+        else:
+            return self.docket_entry.docket.pacer_url()
+
     def save(self, *args, **kwargs):
         if self.document_type == self.ATTACHMENT:
             if self.attachment_number is None:
@@ -486,6 +512,7 @@ class RECAPDocument(models.Model):
 
         # RECAPDocument
         out.update({
+            'short_description': self.description,
             'document_type': self.get_document_type_display(),
             'document_number': self.document_number,
             'attachment_number': self.attachment_number,
@@ -531,7 +558,8 @@ class RECAPDocument(models.Model):
                 time()
             )
         try:
-            out['absolute_url'] = self.docket_entry.docket.get_absolute_url()
+            out['absolute_url'] = self.get_absolute_url()
+            out['docket_absolute_url'] = self.docket_entry.docket.get_absolute_url()
         except NoReverseMatch:
             raise InvalidDocumentError(
                 "Unable to save to index due to missing absolute_url: %s"

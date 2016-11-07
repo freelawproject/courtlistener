@@ -440,14 +440,14 @@ def add_highlighting(main_params, cd, highlight):
                 'court_citation_string', 'suitNature', 'citation',
                 'neutralCite', 'lexisCite']
     elif cd['type'] == 'r':
-        fl = ['id', 'absolute_url', 'court_id', 'dateFiled', 'docketNumber',
-              'caseName', 'suitNature', 'court', 'assigned_to_id',
-              'referred_to_id', 'dateArgued', 'dateTerminated',
-              'document_number', 'attachment_number', 'docket_id',
-              'is_available', 'page_count']
+        fl = ['id', 'absolute_url', 'docket_absolute_url', 'court_id',
+              'dateFiled', 'docketNumber', 'caseName', 'suitNature', 'court',
+              'assigned_to_id', 'referred_to_id', 'dateArgued',
+              'dateTerminated', 'document_number', 'attachment_number',
+              'docket_id', 'is_available', 'page_count']
         hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
                 'court_citation_string', 'docketNumber', 'suitNature', 'cause',
-                'juryDemand', 'assignedTo', 'referredTo',]
+                'juryDemand', 'assignedTo', 'referredTo', 'short_description']
     elif cd['type'] == 'oa':
         fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
               'download_url', 'docket_id', 'dateArgued', 'duration']

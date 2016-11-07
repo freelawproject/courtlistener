@@ -17,7 +17,7 @@
                 </a>
 
             {% elif type == 'r' or type_override == 'r' %}
-                <a href="{{ doc0.absolute_url }}?{{ request.META.QUERY_STRING }}"
+                <a href="{{ doc0.docket_absolute_url }}?{{ request.META.QUERY_STRING }}"
                    class="visitable">
                 {{ doc0.solr_highlights.caseName.0|safe }}
                 ({% if doc0.court_id != 'scotus' %}{{ doc0.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ doc0.dateFiled|date:"Y" }})
@@ -133,7 +133,7 @@
         {% for doc in result.doclist.docs|dictsort:"document_number" %}
         <div class="col-md-offset-half">
             <h4>
-                <a href="{{ doc.absolute_url }}#entry-{{ doc.document_number }}">Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
+                <a href="{{ doc.absolute_url }}">{% if doc.solr_highlights.short_description.0 %}{{ doc.solr_highlights.short_description.0|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
                 </a>
                 {% if not doc.is_available %}
                     <i class="fa fa-ban gray"

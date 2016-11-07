@@ -185,6 +185,14 @@
            termOffsets="true"
            termPositions="true"
            termVectors="true"/>
+    <field name="short_description"
+           type="text_en_splitting_cl"
+           indexed="true"
+           stored="true"
+           multiValued="false"
+           termOffsets="true"
+           termPositions="true"
+           termVectors="true"/>
     <field name="entry_number"
            type="long"
            indexed="true"
@@ -259,6 +267,11 @@
            stored="true"
            multiValued="false"/>
     <field name="absolute_url"
+           type="string"
+           indexed="false"
+           stored="true"
+           multiValued="false"/>
+    <field name="docket_absolute_url"
            type="string"
            indexed="false"
            stored="true"
