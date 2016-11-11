@@ -202,84 +202,84 @@
             {% endif %}
         </div>
 
+        {% if docket.docket_entries.count %}
         <div class="row">
             <div class="col-xs-12">
-                {% if docket.docket_entries %}
-                    <h3>Docket Entries</h3>
-                    <table class="table table-responsive table-hover">
-                        <thead>
-                            <tr>
-                                <th class="text-center">Document Number</th>
-                                <th>Date&nbsp;Filed</th>
-                                <th colspan="2">Description</th>
-                                {% if perms.search.change_docketentry %}
-                                    <th class="text-center">Admin</th>
-                                {% endif %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for entry in docket.docket_entries.all %}
-                            <tr class="cursor docket-entry" data-toggle="modal"
-                                data-docket-entry="{{ entry.pk }}"
-                                data-target="#actions-picker"
-                                id="entry-{{ entry.entry_number }}">
-                                <td class="text-center">{{ entry.entry_number }}</td>
-                                <td>{{ entry.date_filed|date:"DATE_FORMAT"|nbsp|default:"Unknown" }}</td>
-                                <td>{{ entry.description|safe|default:"Unknown Description" }}</td>
+                <h3>Docket Entries</h3>
+                <table class="table table-responsive table-hover">
+                    <thead>
+                        <tr>
+                            <th class="text-center">Document Number</th>
+                            <th>Date&nbsp;Filed</th>
+                            <th colspan="2">Description</th>
+                            {% if perms.search.change_docketentry %}
+                                <th class="text-center">Admin</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in docket.docket_entries.all %}
+                        <tr class="cursor docket-entry" data-toggle="modal"
+                            data-docket-entry="{{ entry.pk }}"
+                            data-target="#actions-picker"
+                            id="entry-{{ entry.entry_number }}">
+                            <td class="text-center">{{ entry.entry_number }}</td>
+                            <td>{{ entry.date_filed|date:"DATE_FORMAT"|nbsp|default:"Unknown" }}</td>
+                            <td>{{ entry.description|safe|default:"Unknown Description" }}</td>
+                            <td>
+                                <a href="#entry-{{ entry.entry_number }}"
+                                   data-toggle="tooltip"
+                                   data-placement="left"
+                                   title="Get direct link to this row"><i class="fa fa-share-alt gray"></i></a>
+                            </td>
+                            {% if perms.search.change_docketentry %}
                                 <td>
-                                    <a href="#entry-{{ entry.entry_number }}"
-                                       data-toggle="tooltip"
-                                       data-placement="left"
-                                       title="Get direct link to this row"><i class="fa fa-share-alt gray"></i></a>
+                                <a href="{% url 'admin:search_docketentry_change' entry.pk %}"
+                                   class="btn btn-primary btn-xs">Edit DocketEntry&nbsp;<i class="fa fa-pencil"></i></a>
                                 </td>
-                                {% if perms.search.change_docketentry %}
-                                    <td>
-                                    <a href="{% url 'admin:search_docketentry_change' entry.pk %}"
-                                       class="btn btn-primary btn-xs">Edit DocketEntry&nbsp;<i class="fa fa-pencil"></i></a>
-                                    </td>
-                                {% endif %}
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    <div class="modal" id="actions-picker" tabindex="-1" role="dialog"
-                         aria-hidden="true">
-                        <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <button type="button" class="close"
-                                                data-dismiss="modal" aria-label="Close">
-                                            <span aria-hidden="true" class="large">&times;</span>
-                                        </button>
-                                        <h3 class="modal-title">Entries</h3>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="row">
-                                            <div class="col-xs-12">
-                                                <table class="table table-responsive" id="document-table">
-                                                    <thead>
-                                                    <tr>
-                                                        <th>Number</th>
-                                                        <th colspan="2">Description</th>
-                                                    </tr>
-                                                    </thead>
-                                                    <tbody id="tablebody">
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <div class="modal" id="actions-picker" tabindex="-1" role="dialog"
+                     aria-hidden="true">
+                    <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <button type="button" class="close"
+                                            data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true" class="large">&times;</span>
+                                    </button>
+                                    <h3 class="modal-title">Entries</h3>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="row">
+                                        <div class="col-xs-12">
+                                            <table class="table table-responsive" id="document-table">
+                                                <thead>
+                                                <tr>
+                                                    <th>Number</th>
+                                                    <th colspan="2">Description</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody id="tablebody">
 
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                            <button type="button"
-                                                    class="btn btn-default float-right"
-                                                    data-dismiss="modal">Close
-                                            </button>
+                                                </tbody>
+                                            </table>
                                         </div>
+                                        <button type="button"
+                                                class="btn btn-default float-right"
+                                                data-dismiss="modal">Close
+                                        </button>
                                     </div>
                                 </div>
-                            </form>
-                        </div>
+                            </div>
+                        </form>
                     </div>
-                {% endif %}
+                </div>
             </div>
         </div>
+        {% endif %}
     </div>
 {% endblock %}
