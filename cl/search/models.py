@@ -450,9 +450,9 @@ class RECAPDocument(models.Model):
         ordering = ('document_number', 'attachment_number')
 
     def __unicode__(self):
-        return "Docket_%s , document_number_%s , attachment_number_%s" % (
-            self.docket_entry.docket.docket_number, self.document_number,
-            self.attachment_number
+        return "%s: Docket_%s , document_number_%s , attachment_number_%s" % (
+            self.pk, self.docket_entry.docket.docket_number,
+            self.document_number, self.attachment_number
         )
 
     def get_absolute_url(self):
@@ -481,7 +481,7 @@ class RECAPDocument(models.Model):
             return "https://ecf.%s.uscourts.gov/doc1/%s" % (
                 court_id, self.pacer_doc_id)
         else:
-            return self.docket_entry.docket.pacer_url()
+            return self.docket_entry.docket.pacer_url
 
     def save(self, *args, **kwargs):
         if self.document_type == self.ATTACHMENT:
