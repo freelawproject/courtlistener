@@ -1,0 +1,11 @@
+[
+  {
+    "fields": {
+      "status": 1,
+      "date_started": "2016-03-27T00:00:01.000Z",
+      "date_completed": "2016-03-27T00:00:01.000Z"
+    },
+    "model": "scrapers.recaplog",
+    "pk": 1
+  }
+]
