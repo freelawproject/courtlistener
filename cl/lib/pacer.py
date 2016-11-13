@@ -4,6 +4,7 @@ from datetime import date
 
 from dateutil import parser
 from dateutil.tz import gettz
+from django.db import IntegrityError
 from django.db.models import Q
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from lxml import etree
@@ -14,6 +15,7 @@ from cl.lib.recap_utils import (
     get_docketxml_url_from_path, get_ia_document_url_from_path,
     get_local_document_url_from_path,
 )
+from cl.scrapers.tasks import get_page_count
 from cl.search.models import Court, Docket, RECAPDocument, DocketEntry
 
 logger = logging.getLogger(__name__)
@@ -39,7 +41,7 @@ class PacerXMLParser(object):
     cnt = CaseNameTweaker()
 
     def __init__(self, path):
-        print "Doing %s" % path
+        logger.info("Initializing parser for %s" % path)
         # High-level attributes
         self.path = path
         self.xml = self.get_xml_contents()
@@ -93,11 +95,15 @@ class PacerXMLParser(object):
             d = Docket.objects.get(
                 Q(pacer_case_id=self.pacer_case_id) |
                 Q(docket_number=self.docket_number),
-                source=Docket.SCRAPER,
                 court=self.court,
             )
-            if d.source == Docket.SCRAPER:
+            # Add RECAP as a source if it's not already.
+            if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
                 d.source = Docket.RECAP_AND_SCRAPER
+            elif d.source == Docket.COLUMBIA:
+                d.source = Docket.COLUMBIA_AND_RECAP
+            elif d.source == Docket.COLUMBIA_AND_SCRAPER:
+                d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
         except Docket.DoesNotExist:
             d = Docket(source=Docket.RECAP)
         except Docket.MultipleObjectsReturned:
@@ -206,42 +212,58 @@ class PacerXMLParser(object):
         pacer_document_id = self.get_str_from_node(
             doc_node, 'pacer_doc_id')
         try:
-            recap_doc = RECAPDocument.objects.get(
-                pacer_doc_id=pacer_document_id
+            d = RECAPDocument.objects.get(
+                docket_entry=docket_entry,
+                document_number=entry_number,
+                # Use the attachment number if it is not 0, else use None.
+                attachment_number=attachment_number or None,
             )
         except RECAPDocument.DoesNotExist:
-            recap_doc = RECAPDocument(
+            d = RECAPDocument(
+                docket_entry=docket_entry,
                 pacer_doc_id=pacer_document_id,
-                docket_entry=docket_entry
             )
+        else:
+            d.pacer_doc_id = pacer_document_id or d.pacer_doc_id
 
-        recap_doc.date_upload = self.get_datetime_from_node(doc_node, 'upload_date')
-        recap_doc.document_type = document_type or recap_doc.document_type
+        d.date_upload = self.get_datetime_from_node(doc_node, 'upload_date')
+        d.document_type = document_type or d.document_type
         if isinstance(entry_number, int):
-            recap_doc.document_number = entry_number
+            d.document_number = entry_number
 
         # If we can't parse the availability node (it returns None), default it
         # to False.
         availability = self.get_bool_from_node(doc_node, 'available')
-        recap_doc.is_available = False if availability is None else availability
-        recap_doc.sha1 = self.get_str_from_node(doc_node, 'sha1')
-        recap_doc.description = (
-            self.get_str_from_node(doc_node, 'short_desc') or
-            recap_doc.description
-        )
-        if recap_doc.is_available:
-            recap_doc.filepath_ia = get_ia_document_url_from_path(
+        d.is_available = False if availability is None else availability
+        d.sha1 = self.get_str_from_node(doc_node, 'sha1')
+        d.description = (self.get_str_from_node(doc_node, 'short_desc') or
+                         d.description)
+        if d.is_available:
+            d.filepath_ia = get_ia_document_url_from_path(
                 self.path, entry_number, attachment_number)
-            recap_doc.filepath_local = os.path.join(
+            d.filepath_local = os.path.join(
                 'recap',
                 get_local_document_url_from_path(self.path, entry_number,
                                                  attachment_number),
             )
+            extension = d.filepath_local.path.split('.')[-1]
+            d.page_count = get_page_count(d.filepath_local.path, extension)
         if document_type == RECAPDocument.ATTACHMENT:
-            recap_doc.attachment_number = attachment_number
+            d.attachment_number = attachment_number
         if not debug:
-            recap_doc.save()
-        return recap_doc
+            try:
+                d.save()
+            except IntegrityError:
+                # This happens when a pacer_doc_id has been wrongly set as
+                # the document_number, see for example, document 19 and
+                # document 00405193374 here: https://ia802300.us.archive.org/23/items/gov.uscourts.ca4.14-1872/gov.uscourts.ca4.14-1872.docket.xml
+                logger.error("Unable to create RECAPDocument for document #%s, "
+                             "attachment #%s on entry: %s due to "
+                             "IntegrityError." % (d.document_number,
+                                                  d.attachment_number,
+                                                  d.docket_entry))
+                return None
+        return d
 
     def get_court(self):
         """Extract the court from the XML and return it as a Court object"""
@@ -353,7 +375,3 @@ class PacerXMLParser(object):
         if all([small_case, self.court.is_bankruptcy]):
             return True, date.today()
         return False, None
-
-
-
-
