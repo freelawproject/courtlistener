@@ -55,7 +55,6 @@ def make_download_tasks(data, line_count, start_line):
             completed += 1
             continue
 
-        last_item = (line_count == completed + 1)
         if item['casenum'] != previous_casenum:
             # New case, get the docket before getting the pdf
             logger.info("New docket found with casenum: %s" % item['casenum'])
@@ -70,7 +69,8 @@ def make_download_tasks(data, line_count, start_line):
         url = get_pdf_url(item['court'], item['casenum'], filename)
         subtasks.append(download_recap_item.subtask((url, filename)))
 
-        # Every n items send the subtasks to Celery.
+        # Every n items or on the last item, send the subtasks to Celery.
+        last_item = (line_count == completed + 1)
         if (len(subtasks) >= 1000) or last_item:
             msg = ("Sent %s subtasks to celery. We have processed %s "
                    "rows so far." % (len(subtasks), completed + 1))
