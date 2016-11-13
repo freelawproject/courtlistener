@@ -15,13 +15,13 @@ from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.alerts.models import RealTimeQueue
-from cl.lib.scrape_helpers import (
-    get_extension, get_binary_content, signal_handler
-)
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content, extract_by_ocr
+from cl.scrapers.utils import (
+    get_extension, get_binary_content, signal_handler
+)
 from cl.search.models import Court
 from cl.search.models import Docket
 from cl.search.models import Opinion

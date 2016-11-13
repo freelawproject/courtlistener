@@ -8,7 +8,6 @@ from django.utils.timezone import now
 
 from cl import settings
 from cl.audio.models import Audio
-from cl.lib.scrape_helpers import get_extension
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
@@ -19,6 +18,7 @@ from cl.scrapers.tasks import (
     extract_from_txt, extract_doc_content, extract_by_ocr, process_audio_file
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
+from cl.scrapers.utils import get_extension
 from cl.search.models import Court, Opinion
 
 

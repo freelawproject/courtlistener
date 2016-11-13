@@ -1,17 +1,17 @@
 import logging
 
-from celery.task import TaskSet
 from django.core.management import BaseCommand
 
-from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
+from scrapers.utils import extract_recap_documents
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
     help = ('Iterate over all of the RECAPDocuments and extract their '
-            'content.')
+            'content. This should later be modified to only do certain docs, '
+            'since doing all of them should be rare.')
 
     def add_arguments(self, parser):
         # Global args.
@@ -41,43 +41,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        docs = RECAPDocument.objects.exclude(filepath_local='')
+        docs = RECAPDocument.objects.all()
+        extract_recap_documents(docs, options['skip_ocr'], options.get('order'),
+                                options['queue'], options['queue_length'])
 
-        if options['skip_ocr']:
-            # Focus on the items that we don't know if they need OCR.
-            docs = docs.filter(ocr_status=None)
-        else:
-            # We're doing OCR. Only work with those items that require it.
-            docs = docs.filter(ocr_status=RECAPDocument.OCR_NEEDED)
-
-        count = docs.count()
-        print("There are %s documents to process." % count)
-
-        if options.get('order') is not None:
-            if options['order'] == 'small-first':
-                docs = docs.order_by('page_count')
-            elif options['order'] == 'big-first':
-                docs = docs.order_by('-page_count')
-
-        subtasks = []
-        completed = 0
-        for pk in docs.values_list('pk', flat=True):
-            # Send the items off for processing.
-            last_item = (count == completed)
-            subtasks.append(extract_recap_pdf.subtask(
-                (pk, options['skip_ocr']),
-                priority=5,
-                queue=options['queue']
-            ))
-
-            # Every enqueue_length items, send the subtasks to Celery.
-            if (len(subtasks) >= options['queue_length']) or last_item:
-                msg = ("Sent %s subtasks to celery. We have sent %s "
-                       "items so far." % (len(subtasks), completed + 1))
-                logger.info(msg)
-                print(msg)
-                job = TaskSet(tasks=subtasks)
-                job.apply_async().join()
-                subtasks = []
-
-            completed += 1

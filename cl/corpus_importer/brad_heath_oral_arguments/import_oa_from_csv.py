@@ -10,21 +10,22 @@ Some tricks that make it special:
    exploding.
 
 """
-from Queue import Queue
 import hashlib
 import random
 import sys
 import threading
 import traceback
-
+from Queue import Queue
 from datetime import datetime
+
 from django.core.files.base import ContentFile
-from juriscraper.lib.string_utils import clean_string, harmonize
 from juriscraper.AbstractSite import logger
+from juriscraper.lib.string_utils import clean_string, harmonize
+
 from cl.audio.models import Audio
-from cl.lib.scrape_helpers import get_extension, get_binary_content
 from cl.lib.string_utils import trunc
 from cl.scrapers.tasks import process_audio_file
+from cl.scrapers.utils import get_extension, get_binary_content
 from cl.search.models import Court, Docket
 
 

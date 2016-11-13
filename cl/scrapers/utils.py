@@ -4,12 +4,15 @@ import traceback
 from urlparse import urljoin
 
 import requests
+from celery.canvas import group
 from django.conf import settings
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 
 from cl.lib import magic
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.search.models import RECAPDocument
 
 
 def test_for_meta_redirections(r):
@@ -145,3 +148,57 @@ def signal_handler(signal, frame):
     logger.info('**************')
     global die_now
     die_now = True
+
+
+def extract_recap_documents(docs, skip_ocr=False, order_by=None, queue=None,
+                            queue_length=100):
+    """Loop over RECAPDocuments and extract their contents. Use OCR if requested.
+
+    :param docs: A queryset containing the RECAPDocuments to be processed.
+    :type docs: Django Queryset
+    :param skip_ocr: Whether OCR should be completed (False) or whether items
+    should simply be updated to have status OCR_NEEDED.
+    :type skip_ocr: Bool
+    :param order_by: An optimization parameter. You may opt to order the
+    processing by 'small-first' or 'big-first'.
+    :type order_by: str
+    :param queue: The celery queue to send the content to.
+    :type queue: str
+    :param queue_length: The number of items to send to the queue at a time.
+    :type queue_length: int
+    """
+    docs = docs.exclude(filepath_local='')
+    if skip_ocr:
+        # Focus on the items that we don't know if they need OCR.
+        docs = docs.filter(ocr_status=None)
+    else:
+        # We're doing OCR. Only work with those items that require it.
+        docs = docs.filter(ocr_status=RECAPDocument.OCR_NEEDED)
+
+    count = docs.count()
+    logger.info("There are %s documents to process." % count)
+
+    if order_by is not None:
+        if order_by == 'small-first':
+            docs = docs.order_by('page_count')
+        elif order_by == 'big-first':
+            docs = docs.order_by('-page_count')
+
+    tasks = []
+    completed = 0
+    for pk in docs.values_list('pk', flat=True):
+        # Send the items off for processing.
+        last_item = (count == completed)
+        tasks.append(extract_recap_pdf.s(pk, skip_ocr).set(priority=5,
+                                                           queue=queue))
+
+        # Every enqueue_length items, send the tasks to Celery.
+        if (len(tasks) >= queue_length) or last_item:
+            msg = ("Sent %s tasks to celery. We have sent %s "
+                   "items so far." % (len(tasks), completed + 1))
+            logger.info(msg)
+            job = group(*tasks)
+            job.apply_async().join()
+            tasks = []
+
+        completed += 1
