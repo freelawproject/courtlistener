@@ -166,6 +166,7 @@ class DocketAdmin(admin.ModelAdmin):
         DocketEntryInline,
     )
     readonly_fields = (
+        'date_created',
         'date_modified',
     )
     raw_id_fields = (
