@@ -16,6 +16,6 @@ class RECAPLogAdmin(admin.ModelAdmin):
     list_filter = ('status',)
     list_editable = ('status',)
     date_hierarchy = 'date_started'
-    ordering = ('date_started',)
+    ordering = ('-date_started',)
 
 admin.site.register(UrlHash)
