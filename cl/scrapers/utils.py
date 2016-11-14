@@ -175,9 +175,6 @@ def extract_recap_documents(docs, skip_ocr=False, order_by=None, queue=None,
         # We're doing OCR. Only work with those items that require it.
         docs = docs.filter(ocr_status=RECAPDocument.OCR_NEEDED)
 
-    count = docs.count()
-    logger.info("There are %s documents to process." % count)
-
     if order_by is not None:
         if order_by == 'small-first':
             docs = docs.order_by('page_count')
@@ -186,17 +183,18 @@ def extract_recap_documents(docs, skip_ocr=False, order_by=None, queue=None,
 
     tasks = []
     completed = 0
+    count = docs.count()
+    logger.info("There are %s documents to process." % count)
     for pk in docs.values_list('pk', flat=True):
         # Send the items off for processing.
-        last_item = (count == completed)
+        last_item = (count == completed + 1)
         tasks.append(extract_recap_pdf.s(pk, skip_ocr).set(priority=5,
                                                            queue=queue))
 
         # Every enqueue_length items, send the tasks to Celery.
         if (len(tasks) >= queue_length) or last_item:
-            msg = ("Sent %s tasks to celery. We have sent %s "
-                   "items so far." % (len(tasks), completed + 1))
-            logger.info(msg)
+            logger.info("Sent %s tasks to celery. We have sent %s "
+                        "items so far." % (len(tasks), completed + 1))
             job = group(*tasks)
             job.apply_async().join()
             tasks = []
