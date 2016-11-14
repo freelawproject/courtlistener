@@ -40,10 +40,11 @@ class PacerXMLParser(object):
 
     cnt = CaseNameTweaker()
 
-    def __init__(self, path):
+    def __init__(self, path, do_extraction=False):
         logger.info("Initializing parser for %s" % path)
         # High-level attributes
         self.path = path
+        self.do_extraction = do_extraction
         self.xml = self.get_xml_contents()
         self.case_details = self.get_case_details()
         self.document_list = self.get_document_list()
@@ -246,13 +247,14 @@ class PacerXMLParser(object):
                 get_local_document_url_from_path(self.path, entry_number,
                                                  attachment_number),
             )
-            extension = d.filepath_local.path.split('.')[-1]
-            d.page_count = get_page_count(d.filepath_local.path, extension)
+            if d.page_count is None:
+                extension = d.filepath_local.path.split('.')[-1]
+                d.page_count = get_page_count(d.filepath_local.path, extension)
         if document_type == RECAPDocument.ATTACHMENT:
             d.attachment_number = attachment_number
         if not debug:
             try:
-                d.save()
+                d.save(do_extraction=self.do_extraction)
             except IntegrityError:
                 # This happens when a pacer_doc_id has been wrongly set as
                 # the document_number, see for example, document 19 and

@@ -13,8 +13,6 @@ from cl.lib.recap_utils import get_docketxml_url, get_docket_filename, \
     get_document_filename, get_pdf_url
 from cl.lib.utils import previous_and_next
 from cl.scrapers.models import RECAPLog
-from cl.scrapers.utils import extract_recap_documents
-from cl.search.models import RECAPDocument
 
 RECAP_MOD_URL = "http://recapextension.org/recap/get_updated_cases/"
 logger = logging.getLogger(__name__)
@@ -67,7 +65,7 @@ def get_and_merge_items(items, log):
     """
     update_log_status(log, RECAPLog.GETTING_AND_MERGING_ITEMS)
     tasks = []
-    for prev, item, nxt in previous_and_next(items[:40]):
+    for prev, item, nxt in previous_and_next(items):
         if prev is None or item['case_number'] != prev['case_number']:
             # New case. Get the next docket before getting any PDFs.
             url = get_docketxml_url(item['court_id'], item['case_number'])
@@ -93,22 +91,7 @@ def get_and_merge_items(items, log):
                                                item['case_number'])
                 (group(*tasks) | parse_recap_docket.si(filename, debug=False))()
                 tasks = []
-    update_log_status(log, RECAPLog.ITEMS_MERGED)
     logger.info("Finished processing new cases.")
-
-
-def extract_updated_content(log):
-    logger.info("Extracting content from documents without doing OCR.")
-    update_log_status(log, RECAPLog.EXTRACTING_CONTENTS)
-
-    # First pass. Get everything, but don't do OCR.
-    docs = RECAPDocument.objects.all()
-    extract_recap_documents(docs, skip_ocr=True)
-
-    # Second pass. Do OCR on the items that need it.
-    logger.info("Extracting content from documents needing OCR.")
-    docs = RECAPDocument.objects.all()
-    extract_recap_documents(docs)
 
 
 class Command(BaseCommand):
@@ -118,7 +101,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         items, log = get_new_content_from_recap()
         get_and_merge_items(items, log)
-        extract_updated_content(log)
         log.status = RECAPLog.SCRAPE_SUCCESSFUL
         log.date_completed = now()
         log.save()

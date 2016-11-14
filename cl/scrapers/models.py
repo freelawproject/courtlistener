@@ -65,16 +65,12 @@ class RECAPLog(models.Model):
     GETTING_CHANGELIST = 4
     CHANGELIST_RECEIVED = 5
     GETTING_AND_MERGING_ITEMS = 6
-    ITEMS_MERGED = 7
-    EXTRACTING_CONTENTS = 8
     RECAP_STATUSES = (
         (SCRAPE_SUCCESSFUL, "Scrape Completed Successfully"),
         (SCRAPE_IN_PROGRESS, "Scrape currently in progress"),
         (GETTING_CHANGELIST, "Getting list of new content from archive server"),
         (CHANGELIST_RECEIVED, "Successfully got the change list."),
         (GETTING_AND_MERGING_ITEMS, "Getting and merging items from server"),
-        (ITEMS_MERGED, "All changes downloaded and merged from server."),
-        (EXTRACTING_CONTENTS, "Extracting contents."),
         (SCRAPE_FAILED, "Scrape Failed"),
     )
     date_started = models.DateTimeField(

@@ -54,7 +54,7 @@ def parse_recap_docket(filename, debug=False):
     """Parse a docket path, creating items or updating existing ones."""
     docket_path = os.path.join(settings.MEDIA_ROOT, 'recap', filename)
     try:
-        pacer_doc = PacerXMLParser(docket_path)
+        pacer_doc = PacerXMLParser(docket_path, do_extraction=True)
     except IOError:
         logger.warning("Unable to find the docket at: %s" % docket_path)
     else:

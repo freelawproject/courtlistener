@@ -2,6 +2,7 @@
 import re
 from datetime import datetime, time
 
+from celery.canvas import chain
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
@@ -484,7 +485,7 @@ class RECAPDocument(models.Model):
         else:
             return self.docket_entry.docket.pacer_url
 
-    def save(self, *args, **kwargs):
+    def save(self, do_extraction=True, index=True, *args, **kwargs):
         if self.document_type == self.ATTACHMENT:
             if self.attachment_number is None:
                 raise ValidationError('attachment_number cannot be null for an '
@@ -498,6 +499,31 @@ class RECAPDocument(models.Model):
             self.pacer_doc_id = None
 
         super(RECAPDocument, self).save(*args, **kwargs)
+        tasks = []
+        extraction_criteria = [
+            do_extraction,
+            self.ocr_status is None,
+            self.is_available is True,
+            bool(self.filepath_local.name),  # Just in case...
+        ]
+        if all(extraction_criteria):
+            # Context extraction not done and is requested.
+            from cl.scrapers.tasks import extract_recap_pdf
+            tasks.append(extract_recap_pdf.si(self.pk))
+        if index:
+            from cl.search.tasks import add_or_update_recap_document
+            tasks.append(add_or_update_recap_document.si([self.pk], False))
+        chain(*tasks)()
+
+    def delete(self, *args, **kwargs):
+        """
+        Note that this doesn't get called when an entire queryset
+        is deleted, but that should be OK.
+        """
+        id_cache = self.pk
+        super(RECAPDocument, self).delete(*args, **kwargs)
+        from cl.search.tasks import delete_items
+        delete_items.delay([id_cache], settings.SOLR_RECAP_URL)
 
     def as_search_dict(self):
         """Create a dict that can be ingested by Solr.
@@ -529,7 +555,6 @@ class RECAPDocument(models.Model):
         })
         if hasattr(self.filepath_local, 'path'):
             out['filepath_local'] = self.filepath_local.path
-
 
         # Docket Entry
         out['description'] = self.docket_entry.description
@@ -1293,6 +1318,7 @@ class Opinion(models.Model):
         }).translate(null_map)
 
         return nuke_nones(out)
+
 
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
