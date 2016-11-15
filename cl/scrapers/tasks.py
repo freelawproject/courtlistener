@@ -296,7 +296,7 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
             doc.ocr_status = RECAPDocument.OCR_UNNECESSARY
 
         doc.plain_text, _ = anonymize(content)
-        doc.save()
+        doc.save(index=False, do_extraction=False)
         processed.append(pk)
 
     return processed

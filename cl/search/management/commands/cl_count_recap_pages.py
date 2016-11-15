@@ -25,7 +25,7 @@ class Command(BaseCommand):
                 extension = path.split('.')[-1]
                 count = get_page_count(path, extension)
                 r.page_count = count
-                r.save()
+                r.save(do_extraction=False, index=False)
                 cnt['successes'] += 1
                 if count is not None:
                     cnt['total_pages'] += count
