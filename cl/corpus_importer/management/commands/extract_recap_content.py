@@ -2,8 +2,8 @@ import logging
 
 from django.core.management import BaseCommand
 
+from cl.scrapers.utils import extract_recap_documents
 from cl.search.models import RECAPDocument
-from scrapers.utils import extract_recap_documents
 
 logger = logging.getLogger(__name__)
 

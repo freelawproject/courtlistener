@@ -501,7 +501,7 @@ class RECAPDocument(models.Model):
             if self.attachment_number is None:
                 raise ValidationError('attachment_number cannot be null for an '
                                       'attachment.')
-        if not self.pacer_doc_id:
+        if self.pacer_doc_id == '':
             # Normally a char field would be never have a null value, opting
             # instead on having a blank value. However, blanks are not
             # considered unique while nulls are, so for this field, we reset
