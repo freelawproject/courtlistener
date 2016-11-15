@@ -3,7 +3,7 @@ import os
 import time
 
 import requests
-from celery.canvas import group
+from celery.canvas import chain, chord
 from django.conf import settings
 from django.core.management import BaseCommand
 from django.utils.timezone import now
@@ -13,6 +13,8 @@ from cl.lib.recap_utils import get_docketxml_url, get_docket_filename, \
     get_document_filename, get_pdf_url
 from cl.lib.utils import previous_and_next
 from cl.scrapers.models import RECAPLog
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.search.tasks import add_or_update_recap_document
 
 RECAP_MOD_URL = "http://recapextension.org/recap/get_updated_cases/"
 logger = logging.getLogger(__name__)
@@ -89,7 +91,11 @@ def get_and_merge_items(items, log):
                 logger.info("Sending %s tasks for processing." % len(tasks))
                 filename = get_docket_filename(item['court_id'],
                                                item['case_number'])
-                (group(*tasks) | parse_recap_docket.si(filename, debug=False))()
+                chord(tasks)(chain(
+                    parse_recap_docket.si(filename, debug=False),
+                    extract_recap_pdf.s(),
+                    add_or_update_recap_document.s(),
+                ))
                 tasks = []
     logger.info("Finished processing new cases.")
 

@@ -485,6 +485,17 @@ class RECAPDocument(models.Model):
         else:
             return self.docket_entry.docket.pacer_url
 
+    @property
+    def needs_extraction(self):
+        """Does the item need extraction and does it have all the right
+        fields?
+        """
+        return bool(all([
+            self.ocr_status is None,
+            self.is_available is True,
+            bool(self.filepath_local.name),  # Just in case
+        ]))
+
     def save(self, do_extraction=True, index=True, *args, **kwargs):
         if self.document_type == self.ATTACHMENT:
             if self.attachment_number is None:
@@ -500,20 +511,15 @@ class RECAPDocument(models.Model):
 
         super(RECAPDocument, self).save(*args, **kwargs)
         tasks = []
-        extraction_criteria = [
-            do_extraction,
-            self.ocr_status is None,
-            self.is_available is True,
-            bool(self.filepath_local.name),  # Just in case...
-        ]
-        if all(extraction_criteria):
+        if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
             from cl.scrapers.tasks import extract_recap_pdf
             tasks.append(extract_recap_pdf.si(self.pk))
         if index:
             from cl.search.tasks import add_or_update_recap_document
             tasks.append(add_or_update_recap_document.si([self.pk], False))
-        chain(*tasks)()
+        if len(tasks) > 0:
+            chain(*tasks)()
 
     def delete(self, *args, **kwargs):
         """

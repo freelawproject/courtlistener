@@ -53,11 +53,14 @@ def download_recap_item(self, url, filename, clobber=False):
 def parse_recap_docket(filename, debug=False):
     """Parse a docket path, creating items or updating existing ones."""
     docket_path = os.path.join(settings.MEDIA_ROOT, 'recap', filename)
+    recap_pks = []
     try:
-        pacer_doc = PacerXMLParser(docket_path, do_extraction=True)
+        pacer_doc = PacerXMLParser(docket_path)
     except IOError:
         logger.warning("Unable to find the docket at: %s" % docket_path)
     else:
         docket = pacer_doc.save(debug=debug)
         if docket is not None:
-            pacer_doc.make_documents(docket, debug=debug)
+            recap_pks = pacer_doc.make_documents(docket, debug=debug)
+
+    return recap_pks

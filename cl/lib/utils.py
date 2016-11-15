@@ -1,3 +1,4 @@
+import collections
 import errno
 import os
 from itertools import tee, islice, chain, izip
@@ -70,3 +71,10 @@ def previous_and_next(some_iterable):
     prevs = chain([None], prevs)
     nexts = chain(islice(nexts, 1, None), [None])
     return izip(prevs, items, nexts)
+
+
+def is_iter(item):
+    # See: http://stackoverflow.com/a/1952655/64911
+    if isinstance(item, collections.Iterable):
+        return True
+    return False

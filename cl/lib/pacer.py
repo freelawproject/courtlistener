@@ -40,11 +40,10 @@ class PacerXMLParser(object):
 
     cnt = CaseNameTweaker()
 
-    def __init__(self, path, do_extraction=False):
+    def __init__(self, path):
         logger.info("Initializing parser for %s" % path)
         # High-level attributes
         self.path = path
-        self.do_extraction = do_extraction
         self.xml = self.get_xml_contents()
         self.case_details = self.get_case_details()
         self.document_list = self.get_document_list()
@@ -154,6 +153,7 @@ class PacerXMLParser(object):
 
         Returns None if an error occurs.
         """
+        recap_docs = []
         for doc_node in self.document_list:
             # Make a DocketEntry object
             entry_number = int(doc_node.xpath('@doc_num')[0])
@@ -206,6 +206,10 @@ class PacerXMLParser(object):
                 document_type,
                 debug,
             )
+            if recap_doc is not None:
+                recap_docs.append(recap_doc)
+
+        return [item.pk for item in recap_docs]
 
     def make_recap_document(self, doc_node, docket_entry, entry_number,
                             attachment_number, document_type, debug):
@@ -254,7 +258,7 @@ class PacerXMLParser(object):
             d.attachment_number = attachment_number
         if not debug:
             try:
-                d.save(do_extraction=self.do_extraction)
+                d.save(do_extraction=False, index=False)
             except IntegrityError:
                 # This happens when a pacer_doc_id has been wrongly set as
                 # the document_number, see for example, document 19 and

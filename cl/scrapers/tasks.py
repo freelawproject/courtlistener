@@ -24,6 +24,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
+from cl.lib.utils import is_iter
 from cl.scrapers.models import ErrorLog
 from cl.search.models import Opinion, RECAPDocument
 
@@ -262,31 +263,43 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
 
 
 @app.task
-def extract_recap_pdf(pk, skip_ocr=False):
-    doc = RECAPDocument.objects.get(pk=pk)
-    path = doc.filepath_local.path
-    process = make_pdftotext_process(path)
-    content, err = process.communicate()
+def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
+    """Extract the contents from a RECAP PDF if necessary."""
+    if not is_iter(pks):
+        pks = [pks]
 
-    if needs_ocr(content):
-        if not skip_ocr:
-            # probably an image PDF. Send it to OCR.
-            success, content = extract_by_ocr(path)
-            if success:
-                doc.ocr_status = RECAPDocument.OCR_COMPLETE
-            elif content == u'' or not success:
-                content = u'Unable to extract document content.'
-                doc.ocr_status = RECAPDocument.OCR_FAILED
+    processed = []
+    for pk in pks:
+        doc = RECAPDocument.objects.get(pk=pk)
+        if check_if_needed and not doc.needs_extraction:
+            # Early abort if the item doesn't need extraction and the user
+            # hasn't disabled early abortion.
+            processed.append(pk)
+            continue
+        path = doc.filepath_local.path
+        process = make_pdftotext_process(path)
+        content, err = process.communicate()
+
+        if needs_ocr(content):
+            if not skip_ocr:
+                # probably an image PDF. Send it to OCR.
+                success, content = extract_by_ocr(path)
+                if success:
+                    doc.ocr_status = RECAPDocument.OCR_COMPLETE
+                elif content == u'' or not success:
+                    content = u'Unable to extract document content.'
+                    doc.ocr_status = RECAPDocument.OCR_FAILED
+            else:
+                content = u''
+                doc.ocr_status = RECAPDocument.OCR_NEEDED
         else:
-            content = u''
-            doc.ocr_status = RECAPDocument.OCR_NEEDED
-    else:
-        doc.ocr_status = RECAPDocument.OCR_UNNECESSARY
+            doc.ocr_status = RECAPDocument.OCR_UNNECESSARY
 
-    doc.plain_text, _ = anonymize(content)
-    doc.save()
+        doc.plain_text, _ = anonymize(content)
+        doc.save()
+        processed.append(pk)
 
-    return path
+    return processed
 
 
 def rasterize_pdf(path, destination):
