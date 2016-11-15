@@ -93,11 +93,11 @@ def get_and_merge_items(items, log):
                                                item['case_number'])
                 chord(tasks)(chain(
                     parse_recap_docket.si(filename, debug=False),
-                    extract_recap_pdf.s(),
+                    extract_recap_pdf.s().set(priority=5),
                     add_or_update_recap_document.s(),
                 ))
                 tasks = []
-    logger.info("Finished processing new cases.")
+    logger.info("Finished queueing new cases.")
 
 
 class Command(BaseCommand):

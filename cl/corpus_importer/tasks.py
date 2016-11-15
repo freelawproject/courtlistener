@@ -5,10 +5,12 @@ from tempfile import NamedTemporaryFile
 
 import requests
 from django.conf import settings
+from django.db import IntegrityError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from cl.celery import app
 from cl.lib.pacer import PacerXMLParser
+from cl.search.models import DocketEntry
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +51,8 @@ def download_recap_item(self, url, filename, clobber=False):
                 shutil.copyfile(tmp.name, location)
 
 
-@app.task
-def parse_recap_docket(filename, debug=False):
+@app.task(bind=True, max_retries=3)
+def parse_recap_docket(self, filename, debug=False):
     """Parse a docket path, creating items or updating existing ones."""
     docket_path = os.path.join(settings.MEDIA_ROOT, 'recap', filename)
     recap_pks = []
@@ -61,6 +63,9 @@ def parse_recap_docket(filename, debug=False):
     else:
         docket = pacer_doc.save(debug=debug)
         if docket is not None:
-            recap_pks = pacer_doc.make_documents(docket, debug=debug)
+            try:
+                recap_pks = pacer_doc.make_documents(docket, debug=debug)
+            except (IntegrityError, DocketEntry.MultipleObjectsReturned) as exc:
+                raise self.retry(exc=exc, countdown=20 * 60)
 
     return recap_pks

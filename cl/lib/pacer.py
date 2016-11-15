@@ -195,8 +195,16 @@ class PacerXMLParser(object):
                     self.get_str_from_node(doc_node, 'long_desc') or
                     docket_entry.description
                 )
-                if not debug:
-                    docket_entry.save()
+                try:
+                    if not debug:
+                        docket_entry.save()
+                except (IntegrityError,
+                        DocketEntry.MultipleObjectsReturned) as e:
+                    logger.error(
+                        "Unable to create docket entry for docket #%s, on "
+                        "entry: %s." % (docket, entry_number)
+                    )
+                    raise e
 
             recap_doc = self.make_recap_document(
                 doc_node,
@@ -259,7 +267,7 @@ class PacerXMLParser(object):
         if not debug:
             try:
                 d.save(do_extraction=False, index=False)
-            except IntegrityError:
+            except IntegrityError as e:
                 # This happens when a pacer_doc_id has been wrongly set as
                 # the document_number, see for example, document 19 and
                 # document 00405193374 here: https://ia802300.us.archive.org/23/items/gov.uscourts.ca4.14-1872/gov.uscourts.ca4.14-1872.docket.xml
@@ -268,7 +276,7 @@ class PacerXMLParser(object):
                              "IntegrityError." % (d.document_number,
                                                   d.attachment_number,
                                                   d.docket_entry))
-                return None
+                raise e
         return d
 
     def get_court(self):
