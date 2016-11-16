@@ -1,13 +1,13 @@
+from django.core.exceptions import ObjectDoesNotExist
+from django.shortcuts import get_object_or_404, render
+from django.views.decorators.cache import never_cache
+
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib import search_utils
 from cl.lib.string_utils import trunc
-from django.core.exceptions import ObjectDoesNotExist
-from django.shortcuts import get_object_or_404, render_to_response
-from django.template import RequestContext
-from django.views.decorators.cache import never_cache
 
 
 @never_cache
@@ -32,13 +32,10 @@ def view_audio_file(request, pk, _):
             }
         )
 
-    return render_to_response(
-        'oral_argument.html',
-        {'title': title,
-         'af': af,
-         'favorite_form': favorite_form,
-         'get_string': get_string,
-         'private': af.blocked,
-         },
-        RequestContext(request)
-    )
+    return render('oral_argument.html', {
+        'title': title,
+        'af': af,
+        'favorite_form': favorite_form,
+        'get_string': get_string,
+        'private': af.blocked,
+    })

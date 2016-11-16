@@ -1,14 +1,14 @@
 import logging
 
-from cl.donate.paypal import process_paypal_payment
-from cl.donate.forms import DonationForm, UserForm, ProfileForm
-from cl.donate.stripe_helpers import process_stripe_payment
-from cl.users.utils import create_stub_account
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.http import HttpResponseRedirect
-from django.shortcuts import render_to_response
-from django.template import RequestContext
+from django.shortcuts import render
+
+from cl.donate.forms import DonationForm, UserForm, ProfileForm
+from cl.donate.paypal import process_paypal_payment
+from cl.donate.stripe_helpers import process_stripe_payment
+from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)
 
@@ -192,18 +192,14 @@ def donate(request):
             user_form = UserForm()
             profile_form = ProfileForm()
 
-    return render_to_response(
-        'donate.html',
-        {
-            'donation_form': donation_form,
-            'user_form': user_form,
-            'profile_form': profile_form,
-            'private': False,
-            'message': message,
-            'stripe_public_key': settings.STRIPE_PUBLIC_KEY
-        },
-        RequestContext(request)
-    )
+    return render('donate.html', {
+        'donation_form': donation_form,
+        'user_form': user_form,
+        'profile_form': profile_form,
+        'private': False,
+        'message': message,
+        'stripe_public_key': settings.STRIPE_PUBLIC_KEY
+    })
 
 
 def donate_complete(request):
@@ -215,20 +211,7 @@ def donate_complete(request):
                 error = 'User Cancelled'
             elif 'insufficient funds' in request.GET.get('error_description').lower():
                 error = 'Insufficient Funds'
-            return render_to_response(
-                'donate_complete.html',
-                {
-                    'error': error,
-                    'private': True,
-                },
-                RequestContext(request),
-            )
+            return render('donate_complete.html', {'error': error,
+                                                   'private': True})
 
-    return render_to_response(
-        'donate_complete.html',
-        {
-            'error': error,
-            'private': True,
-        },
-        RequestContext(request)
-    )
+    return render('donate_complete.html', {'error': error, 'private': True})

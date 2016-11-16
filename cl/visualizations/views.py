@@ -1,29 +1,28 @@
 import time
 
-from cl.lib.bot_detector import is_bot
-from cl.stats import tally_stat
-from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
-from cl.visualizations.forms import VizForm, VizEditForm
-from cl.visualizations.tasks import get_title
-from cl.visualizations.utils import (
-    reverse_endpoints_if_needed, TooManyNodes, message_dict,
-)
-
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
 from django.db.models import F, Count
 from django.http import (
     HttpResponseRedirect, HttpResponse, HttpResponseNotAllowed
 )
-from django.shortcuts import render_to_response, get_object_or_404
-from django.template import RequestContext
+from django.shortcuts import render, get_object_or_404
 from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
+
+from cl.lib.bot_detector import is_bot
+from cl.stats import tally_stat
+from cl.visualizations.forms import VizForm, VizEditForm
+from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
+from cl.visualizations.tasks import get_title
+from cl.visualizations.utils import (
+    reverse_endpoints_if_needed, TooManyNodes, message_dict,
+)
 
 
 def render_visualization_page(request, pk, embed):
@@ -59,10 +58,9 @@ def render_visualization_page(request, pk, embed):
         template = 'visualization_embedded.html'
     else:
         template = 'visualization.html'
-    return render_to_response(
+    return render(
         template,
         {'viz': viz, 'private': True},
-        RequestContext(request),
         status=status,
     )
 
@@ -144,20 +142,18 @@ def new_visualization(request):
                     tally_stat('visualization.too_many_nodes_failure')
                     msg = message_dict['too_many_nodes']
                     messages.add_message(request, msg['level'], msg['message'])
-                    return render_to_response(
+                    return render(
                         'new_visualization.html',
                         context,
-                        RequestContext(request),
                     )
 
             if len(g.edges()) == 0:
                 tally_stat('visualization.too_few_nodes_failure')
                 msg = message_dict['too_few_nodes']
                 messages.add_message(request, msg['level'], msg['message'])
-                return render_to_response(
+                return render(
                     'new_visualization.html',
                     {'form': form, 'private': True},
-                    RequestContext(request),
                 )
 
             t2 = time.time()
@@ -175,10 +171,9 @@ def new_visualization(request):
             ))
     else:
         context['form'] = VizForm()
-    return render_to_response(
+    return render(
         'new_visualization.html',
         context,
-        RequestContext(request),
     )
 
 
@@ -202,11 +197,9 @@ def edit_visualization(request, pk):
             ))
     else:
         form_viz = VizEditForm(instance=viz)
-    return render_to_response(
+    return render(
         'edit_visualization.html',
-        {'form_viz': form_viz,
-         'private': True},
-        RequestContext(request),
+        {'form_viz': form_viz, 'private': True},
     )
 
 
@@ -289,13 +282,12 @@ def mapper_homepage(request):
         '-date_created',
     )[:2]
 
-    return render_to_response(
+    return render(
         'visualization_home.html',
         {
             'visualizations': visualizations,
             'private': False,
         },
-        RequestContext(request),
     )
 
 
@@ -319,12 +311,11 @@ def gallery(request):
         paged_vizes = paginator.page(1)
     except EmptyPage:
         paged_vizes = paginator.page(paginator.num_pages)
-    return render_to_response(
+    return render(
         'gallery.html',
         {
             'results': paged_vizes,
             'private': False,
         },
-        RequestContext(request)
     )
 

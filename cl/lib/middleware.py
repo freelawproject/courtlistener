@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import MiddlewareNotUsed
-from django.shortcuts import render_to_response
-from django.template import RequestContext
+from django.shortcuts import render
 from django.utils.cache import add_never_cache_headers
 from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE
 
@@ -42,11 +41,7 @@ class MaintenanceModeMiddleware(object):
             if ip_address_re.match(request.META['REMOTE_ADDR']):
                 return None
 
-        r = render_to_response(
-             'maintenance.html',
-             {'private': True},
-             RequestContext(request),
-             status=HTTP_503_SERVICE_UNAVAILABLE,
-        )
+        r = render('maintenance.html', {'private': True},
+                   status=HTTP_503_SERVICE_UNAVAILABLE)
         add_never_cache_headers(r)
         return r

@@ -1,17 +1,17 @@
 import logging
-import simplejson as json  # This is needed to handle Decimal objects.
+from urlparse import urlparse, parse_qs
+
 import requests
+import simplejson as json  # This is needed to handle Decimal objects.
+from django.conf import settings
 from django.core.urlresolvers import reverse
+from django.http import HttpResponseRedirect
+from django.shortcuts import render
+from django.utils.timezone import now
+from django.views.decorators.csrf import csrf_exempt
 
 from cl.donate.models import Donation
 from cl.donate.utils import send_thank_you_email
-from django.conf import settings
-from django.http import HttpResponseRedirect
-from django.shortcuts import render_to_response
-from django.template import RequestContext
-from django.utils.timezone import now
-from django.views.decorators.csrf import csrf_exempt
-from urlparse import urlparse, parse_qs
 
 logger = logging.getLogger(__name__)
 
@@ -156,11 +156,7 @@ def donate_paypal_cancel(request):
     d.status = 3  # Cancelled, bummer
     d.save()
 
-    return render_to_response(
-        'donate_complete.html',
-        {
-            'error': 'User Cancelled',
-            'private': False,
-        },
-        RequestContext(request)
-    )
+    return render('donate_complete.html', {
+        'error': 'User Cancelled',
+        'private': False,
+    })

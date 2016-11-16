@@ -1,8 +1,7 @@
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, render_to_response
-from django.template import RequestContext
+from django.shortcuts import get_object_or_404, render
 
 from cl.lib.sunburnt import SolrInterface
 from cl.people_db.models import Person
@@ -51,17 +50,15 @@ def view_person(request, pk, slug):
     }
     authored_opinions = conn.raw_query(**q).execute()
 
-    return render_to_response(
-        'view_person.html',
-        {'person': person,
-         'title': title,
-         'aba_ratings': person.aba_ratings.all().order_by('-year_rated'),
-         'political_affiliations': (person.political_affiliations.all()
-                                    .order_by('-date_start')),
-         'positions': positions,
-         'educations': person.educations.all().order_by('-degree_year'),
-         'authored_opinions': authored_opinions,
-         'ftm_last_updated': settings.FTM_LAST_UPDATED,
-         'private': False},
-        RequestContext(request),
-    )
+    return render('view_person.html', {
+        'person': person,
+        'title': title,
+        'aba_ratings': person.aba_ratings.all().order_by('-year_rated'),
+        'political_affiliations': (person.political_affiliations.all()
+                                   .order_by('-date_start')),
+        'positions': positions,
+        'educations': person.educations.all().order_by('-degree_year'),
+        'authored_opinions': authored_opinions,
+        'ftm_last_updated': settings.FTM_LAST_UPDATED,
+        'private': False
+    })

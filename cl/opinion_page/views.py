@@ -4,9 +4,7 @@ from django.core.urlresolvers import reverse
 from django.db.models import Q
 from django.http import HttpResponsePermanentRedirect, HttpResponseRedirect
 from django.http.response import JsonResponse
-from django.shortcuts import get_object_or_404
-from django.shortcuts import render_to_response
-from django.template import RequestContext
+from django.shortcuts import get_object_or_404, render
 from django.views.decorators.cache import never_cache
 
 from cl.citations.find_citations import get_citations
@@ -24,12 +22,10 @@ from cl.search.models import Docket, OpinionCluster, DocketEntry, RECAPDocument
 
 def view_docket(request, pk, _):
     docket = get_object_or_404(Docket, pk=pk)
-    return render_to_response(
-        'view_docket.html',
-        {'docket': docket,
-         'private': docket.blocked},
-        RequestContext(request),
-    )
+    return render('view_docket.html', {
+        'docket': docket,
+        'private': docket.blocked
+    })
 
 
 def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
@@ -50,15 +46,11 @@ def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
         item.document_type == RECAPDocument.ATTACHMENT else '',
         best_case_name(item.docket_entry.docket),
     )
-    return render_to_response(
-        'recap_document.html',
-        {
-            'document': item,
-            'title': title,
-            'private': True,  # Always True for RECAP docs.
-        },
-        RequestContext(request),
-    )
+    return render('recap_document.html', {
+        'document': item,
+        'title': title,
+        'private': True,  # Always True for RECAP docs.
+    })
 
 
 def ajax_get_recap_documents_and_attachments(request, pk):
@@ -143,53 +135,41 @@ def view_opinion(request, pk, _):
     }
     citing_clusters = conn.raw_query(**q).execute()
 
-    return render_to_response(
-        'view_opinion.html',
-        {
-            'title': title,
-            'cluster': cluster,
-            'favorite_form': favorite_form,
-            'get_string': get_string,
-            'private': cluster.blocked,
-            'citing_clusters': citing_clusters,
-            'top_authorities': cluster.authorities[:5],
-        },
-        RequestContext(request)
-    )
+    return render('view_opinion.html', {
+        'title': title,
+        'cluster': cluster,
+        'favorite_form': favorite_form,
+        'get_string': get_string,
+        'private': cluster.blocked,
+        'citing_clusters': citing_clusters,
+        'top_authorities': cluster.authorities[:5],
+    })
 
 
 def view_authorities(request, pk, slug):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
-    return render_to_response(
-        'view_opinion_authorities.html',
-        {
-            'title': '%s, %s' % (
-                trunc(best_case_name(cluster), 100),
-                cluster.citation_string
-            ),
-            'cluster': cluster,
-            'private': cluster.blocked or cluster.has_private_authority,
-            'authorities': cluster.authorities.order_by('case_name'),
-        },
-        RequestContext(request)
-    )
+    return render('view_opinion_authorities.html', {
+        'title': '%s, %s' % (
+            trunc(best_case_name(cluster), 100),
+            cluster.citation_string
+        ),
+        'cluster': cluster,
+        'private': cluster.blocked or cluster.has_private_authority,
+        'authorities': cluster.authorities.order_by('case_name'),
+    })
 
 
 def cluster_visualizations(request, pk, slug):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
-    return render_to_response(
-        'view_opinion_visualizations.html',
-        {
-            'title': '%s, %s' % (
-                trunc(best_case_name(cluster), 100),
-                cluster.citation_string
-            ),
-            'cluster': cluster,
-            'private': cluster.blocked or cluster.has_private_authority,
-        },
-        RequestContext(request)
-    )
+    return render('view_opinion_visualizations.html', {
+        'title': '%s, %s' % (
+            trunc(best_case_name(cluster), 100),
+            cluster.citation_string
+        ),
+        'cluster': cluster,
+        'private': cluster.blocked or cluster.has_private_authority,
+    })
 
 
 def citation_redirector(request, reporter=None, volume=None, page=None):
@@ -209,26 +189,20 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
             )
         else:
             # Error in form, somehow.
-            return render_to_response(
-                'citation_redirect_info_page.html',
-                {'show_homepage': True,
-                 'form': form,
-                 'private': True},
-                RequestContext(request),
-            )
+            return render('citation_redirect_info_page.html', {
+                'show_homepage': True,
+                'form': form,
+                'private': True
+            })
     else:
         if all(_ is None for _ in (reporter, volume, page)):
             # No parameters. Show the standard page.
             form = CitationRedirectorForm()
-            return render_to_response(
-                'citation_redirect_info_page.html',
-                {
-                    'show_homepage': True,
-                    'form': form,
-                    'private': False,
-                },
-                RequestContext(request),
-            )
+            return render('citation_redirect_info_page.html', {
+                'show_homepage': True,
+                'form': form,
+                'private': False,
+            })
 
         else:
             # We have a citation. Look it up, redirect the user or show
@@ -261,16 +235,11 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
             # Show the correct page....
             if clusters.count() == 0:
                 # No results for an otherwise valid citation.
-                return render_to_response(
-                    'citation_redirect_info_page.html',
-                    {
-                        'none_found': True,
-                        'citation_str': citation_str,
-                        'private': True,
-                    },
-                    RequestContext(request),
-                    status=404,
-                )
+                return render('citation_redirect_info_page.html', {
+                    'none_found': True,
+                    'citation_str': citation_str,
+                    'private': True,
+                })
 
             elif clusters.count() == 1:
                 # Total success. Redirect to correct location.
@@ -280,17 +249,12 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
 
             elif clusters.count() > 1:
                 # Multiple results. Show them.
-                return render_to_response(
-                    'citation_redirect_info_page.html',
-                    {
-                        'too_many': True,
-                        'citation_str': citation_str,
-                        'clusters': clusters,
-                        'private': True,
-                    },
-                    RequestContext(request),
-                    status=300,
-                )
+                return render('citation_redirect_info_page.html', {
+                    'too_many': True,
+                    'citation_str': citation_str,
+                    'clusters': clusters,
+                    'private': True,
+                })
 
 
 def redirect_opinion_pages(request, pk, slug):

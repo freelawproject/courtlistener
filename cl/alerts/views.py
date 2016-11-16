@@ -1,12 +1,9 @@
-from cl.alerts.models import Alert
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.urlresolvers import reverse
-from django.shortcuts import get_object_or_404
-from django.shortcuts import HttpResponseRedirect
-from django.shortcuts import render_to_response
-from django.template import RequestContext
+from django.shortcuts import get_object_or_404, HttpResponseRedirect, render
+
+from cl.alerts.models import Alert
 
 
 @login_required
@@ -54,6 +51,7 @@ def delete_alert_confirm(request, alert_id):
         alert_id = int(alert_id)
     except ValueError:
         return HttpResponseRedirect('/')
-    return render_to_response('delete_confirm.html',
-                              {'alert_id': alert_id, 'private': False},
-                              RequestContext(request))
+    return render('delete_confirm.html', {
+        'alert_id': alert_id,
+        'private': False
+    })

@@ -10,9 +10,7 @@ from django.contrib.auth.models import User
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.urlresolvers import reverse
 from django.db.models import Sum, Count
-from django.shortcuts import HttpResponseRedirect
-from django.shortcuts import render_to_response, get_object_or_404
-from django.template import RequestContext
+from django.shortcuts import HttpResponseRedirect, render, get_object_or_404
 from django.utils.timezone import utc, make_aware
 from django.views.decorators.cache import never_cache
 
@@ -244,10 +242,9 @@ def show_results(request):
             # with the errors
             render_dict.update(do_search(request))
             render_dict.update({'alert_form': alert_form})
-            return render_to_response(
+            return render(
                 'search.html',
                 render_dict,
-                RequestContext(request),
             )
 
     else:
@@ -272,10 +269,9 @@ def show_results(request):
             # Get a bunch of stats.
             render_dict.update(get_homepage_stats())
 
-            return render_to_response(
+            return render(
                 'homepage.html',
                 render_dict,
-                RequestContext(request)
             )
         else:
             # User placed a search or is trying to edit an alert
@@ -312,10 +308,9 @@ def show_results(request):
                 )
             render_dict.update(do_search(request))
             render_dict.update({'alert_form': alert_form})
-            return render_to_response(
+            return render(
                 'search.html',
                 render_dict,
-                RequestContext(request),
             )
 
 
@@ -335,8 +330,7 @@ def advanced(request):
 
     render_dict.update(do_search(request, rows=1, type=obj_type, facet=True))
     render_dict['search_form'] = SearchForm({'type': obj_type})
-    return render_to_response(
+    return render(
         'advanced.html',
         render_dict,
-        RequestContext(request)
     )

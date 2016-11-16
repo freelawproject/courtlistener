@@ -1,8 +1,7 @@
 from functools import wraps
 
 from django.conf import settings
-from django.shortcuts import render_to_response
-from django.template import RequestContext
+from django.shortcuts import render
 
 
 def honeypot_equals(val):
@@ -27,12 +26,8 @@ def verify_honeypot_value(request, field_name):
     if request.method == 'POST':
         field = field_name or settings.HONEYPOT_FIELD_NAME
         if field not in request.POST or not verifier(request.POST[field]):
-            return render_to_response(
-                'honeypot_error.html',
-                {'fieldname': field},
-                RequestContext(request),
-                status=400,
-            )
+            return render('honeypot_error.html', {'fieldname': field},
+                          status=400)
 
 
 def check_honeypot(func=None, field_name=None):

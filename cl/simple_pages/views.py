@@ -7,8 +7,7 @@ from django.core.urlresolvers import reverse
 from django.db.models import Count, Sum
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect, Http404
-from django.shortcuts import render_to_response, get_object_or_404
-from django.template import RequestContext
+from django.shortcuts import render, get_object_or_404
 from django.template import loader
 from django.views.decorators.cache import cache_page
 
@@ -26,11 +25,7 @@ from cl.stats import tally_stat
 
 def about(request):
     """Loads the about page"""
-    return render_to_response(
-        'about.html',
-        {'private': False},
-        RequestContext(request)
-    )
+    return render('about.html', {'private': False})
 
 
 def faq(request):
@@ -59,11 +54,7 @@ def faq(request):
 
 
 def markdown_help(request):
-    return render_to_response(
-        'markdown_help.html',
-        {'private': False},
-        RequestContext(request),
-    )
+    return render('markdown_help.html', {'private': False})
 
 
 def build_court_dicts(courts):
@@ -105,56 +96,39 @@ def coverage_graph(request):
     oral_argument_courts = Court.objects.filter(
         in_use=True,
         has_oral_argument_scraper=True)
-    return render_to_response(
-        'coverage_graph.html',
-        {
-            'sorted_courts': courts_json,
-            'precedential_statuses': precedential_statuses,
-            'count_pro': count_pro,
-            'count_lawbox': count_lawbox,
-            'count_scraper': count_scraper,
-            'courts_with_opinion_scrapers': opinion_courts,
-            'courts_with_oral_argument_scrapers': oral_argument_courts,
-            'private': False
-        },
-        RequestContext(request))
+    return render('coverage_graph.html', {
+        'sorted_courts': courts_json,
+        'precedential_statuses': precedential_statuses,
+        'count_pro': count_pro,
+        'count_lawbox': count_lawbox,
+        'count_scraper': count_scraper,
+        'courts_with_opinion_scrapers': opinion_courts,
+        'courts_with_oral_argument_scrapers': oral_argument_courts,
+        'private': False
+    })
 
 
 def feeds(request):
-    return render_to_response(
-        'feeds.html',
-        {
-            'opinion_courts': Court.objects.filter(
-                in_use=True,
-                has_opinion_scraper=True
-            ),
-            'private': False
-        },
-        RequestContext(request)
-    )
+    return render('feeds.html', {
+        'opinion_courts': Court.objects.filter(in_use=True,
+                                               has_opinion_scraper=True),
+        'private': False
+    })
 
 
 def podcasts(request):
-    return render_to_response(
-        'podcasts.html',
-        {
-            'oral_argument_courts': Court.objects.filter(
-                in_use=True,
-                has_oral_argument_scraper=True,
-            ),
-            'count': Audio.objects.all().count(),
-            'private': False
-        },
-        RequestContext(request)
-    )
+    return render('podcasts.html', {
+        'oral_argument_courts': Court.objects.filter(
+            in_use=True,
+            has_oral_argument_scraper=True,
+        ),
+        'count': Audio.objects.all().count(),
+        'private': False
+    })
 
 
 def contribute(request):
-    return render_to_response(
-        'contribute.html',
-        {'private': False},
-        RequestContext(request),
-    )
+    return render('contribute.html', {'private': False})
 
 
 @check_honeypot(field_name='skip_me_if_alive')
@@ -205,49 +179,29 @@ def contact(
         {u'form': form,
          u'private': False}
     )
-    return render_to_response(
-        template_path,
-        template_data,
-        RequestContext(request)
-    )
+    return render(template_path, template_data)
 
 
 def contact_thanks(request):
-    return render_to_response(
-        u'contact_thanks.html',
-        {u'private': True},
-        RequestContext(request)
-    )
+    return render(u'contact_thanks.html', {u'private': True})
 
 
 def advanced_search(request):
-    return render_to_response(
-        'advanced_search.html',
-        {'private': False},
-        RequestContext(request)
-    )
+    return render('advanced_search.html', {'private': False})
 
 
 def old_terms(request, v):
-    return render_to_response(
-        'terms/%s.html' % v,
-        {
-            'title': 'Archived Terms of Service and Policies, v%s - CourtListener.com' % v,
-            'private': True
-        },
-        RequestContext(request),
-    )
+    return render('terms/%s.html' % v, {
+        'title': 'Archived Terms of Service and Policies, v%s - CourtListener.com' % v,
+        'private': True
+    })
 
 
 def latest_terms(request):
-    return render_to_response(
-        'terms/latest.html',
-        {
-            'title': 'Terms of Service and Policies - CourtListener.com',
-            'private': False
-        },
-        RequestContext(request),
-    )
+    return render('terms/latest.html', {
+        'title': 'Terms of Service and Policies - CourtListener.com',
+        'private': False
+    })
 
 
 @cache_page(60 * 60 * 12)  # 12 hours
@@ -285,19 +239,11 @@ def validate_for_wot(request):
 
 
 def tools_page(request):
-    return render_to_response(
-        'tools.html',
-        {'private': False},
-        RequestContext(request)
-    )
+    return render('tools.html', {'private': False})
 
 
 def browser_warning(request):
-    return render_to_response(
-        'browser_warning.html',
-        {'private': True},
-        RequestContext(request)
-    )
+    return render('browser_warning.html', {'private': True})
 
 
 def serve_static_file(request, file_path=''):

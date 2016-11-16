@@ -1,15 +1,13 @@
-import json
 import os
+
+from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import render, get_object_or_404
+from rest_framework import status
 
 from cl import settings
 from cl.lib import magic, search_utils, sunburnt
 from cl.search.models import Court
 from cl.stats import tally_stat
-
-from django.http import Http404, HttpResponse, JsonResponse
-from django.shortcuts import render_to_response, get_object_or_404
-from django.template import RequestContext
-from rest_framework import status
 
 
 def annotate_courts_with_counts(courts, court_count_tuples):
@@ -47,12 +45,10 @@ def make_court_variable():
 def court_index(request):
     """Shows the information we have available for the courts."""
     courts = make_court_variable()
-    return render_to_response(
-        'jurisdictions.html',
-        {'courts': courts,
-         'private': False},
-        RequestContext(request)
-    )
+    return render('jurisdictions.html', {
+        'courts': courts,
+        'private': False
+    })
 
 
 def rest_docs(request, version):
@@ -61,38 +57,32 @@ def rest_docs(request, version):
     court_count = len(courts)
     if version is None:
         version = 'vlatest'
-    return render_to_response(
-        'rest-docs-%s.html' % version,
-        {'court_count': court_count,
-         'courts': courts,
-         'private': False},
-        RequestContext(request)
-    )
+    return render('rest-docs-%s.html' % version, {
+        'court_count': court_count,
+        'courts': courts,
+        'private': False
+    })
 
 
 def api_index(request):
     court_count = Court.objects.exclude(
         jurisdiction='T'
     ).count()  # Non-testing courts
-    return render_to_response(
-        'docs.html',
-        {'court_count': court_count,
-         'private': False},
-        RequestContext(request)
-    )
+    return render('docs.html', {
+        'court_count': court_count,
+        'private': False
+    })
 
 
 def bulk_data_index(request):
     """Shows an index page for the dumps."""
     courts = make_court_variable()
     court_count = len(courts)
-    return render_to_response(
-        'bulk-data.html',
-        {'court_count': court_count,
-         'courts': courts,
-         'private': False},
-        RequestContext(request)
-    )
+    return render('bulk-data.html', {
+        'court_count': court_count,
+        'courts': courts,
+        'private': False
+    })
 
 
 def serve_pagerank_file(request):
