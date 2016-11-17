@@ -5,7 +5,7 @@ from django.test.client import Client
 
 from cl.lib import sunburnt
 from cl.lib.test_helpers import SitemapTest
-from cl.sitemap import opinion_solr_params
+from cl.sitemap import make_sitemap_solr_params
 
 
 class ViewDocumentTest(TestCase):
@@ -96,9 +96,10 @@ class OpinionSitemapTest(SitemapTest):
         # accurate count comes from the index itself which will also be based on
         # the fixtures.
         conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
-        opinion_solr_params['rows'] = 1000
+        params = make_sitemap_solr_params('dateFiled asc', 'o_sitemap')
+        params['rows'] = 1000
 
-        search_results_object = conn.raw_query(**opinion_solr_params).execute()
+        search_results_object = conn.raw_query(**params).execute()
 
         # the underlying SitemapTest relies on counting url elements in the xml
         # response...this logic mimics the creation of the xml, so we at least

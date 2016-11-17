@@ -1,6 +1,6 @@
 from django.conf.urls import url
 
-from cl.opinion_page.sitemap import opinion_sitemap_maker
+from cl.opinion_page.sitemap import opinion_sitemap_maker, recap_sitemap_maker
 from cl.opinion_page.views import (
     view_opinion, view_authorities, view_docket, cluster_visualizations,
     citation_redirector, view_recap_document,
@@ -55,4 +55,9 @@ urlpatterns = [
         opinion_sitemap_maker,
         name='opinion_sitemap',
     ),
+    url(
+        r'^sitemap-recap\.xml',
+        recap_sitemap_maker,
+        name='recap_sitemap',
+    )
 ]

@@ -5,21 +5,30 @@ from django.template import loader
 from django.utils.encoding import smart_str
 from django.views.decorators.cache import never_cache
 
-from cl.lib import sunburnt
 from cl.lib.scorched_utils import ExtraSolrInterface
 
 items_per_sitemap = 250
 
-index_solr_params = {
-    'q': '*',
-    'rows': '0',  # just need the count
-    'start': '0',
-    'caller': 'sitemap_index',
-}
+
+def make_index_params(group):
+    params = {
+        'q': '*',
+        'rows': '0',  # just need the count
+        'start': '0',
+        'caller': 'sitemap_index',
+    }
+    if group:
+        params.update({
+            'group': 'true',
+            'group.ngroups': 'true',
+            'group.field': 'docket_id',
+            'group.limit': '0',
+        })
+    return params
 
 
 def make_sitemap_solr_params(sort, caller):
-    return {
+    params = {
         'q': '*',
         'rows': items_per_sitemap,
         'start': 0,
@@ -32,6 +41,25 @@ def make_sitemap_solr_params(sort, caller):
         'sort': sort,
         'caller': caller,
     }
+    if caller == 'r_sitemap':
+        params.update({
+            'group': 'true',
+            'group.ngroups': 'true',
+            'group.field': 'docket_id',
+        })
+    return params
+
+
+def normalize_grouping(result):
+    """If a grouped result item, normalize it to look like a regular one.
+
+    If a regular result, do nothing.
+    """
+    if result.get('doclist') is not None:
+        # Grouped result, normalize it.
+        return result['doclist']['docs'][0]
+    else:
+        return result
 
 
 def make_solr_sitemap(request, solr_url, params, changefreq,
@@ -44,6 +72,7 @@ def make_solr_sitemap(request, solr_url, params, changefreq,
     urls = []
     cl = 'https://www.courtlistener.com'
     for result in results:
+        result = normalize_grouping(result)
         url_strs = ['%s%s' % (cl, result['absolute_url'])]
         if result.get('local_path') and \
                 not result['local_path'].endswith('.xml'):
@@ -74,15 +103,15 @@ def index_sitemap_maker(request):
     provides links items.
     """
     connection_string_sitemap_path_pairs = (
-        (settings.SOLR_OPINION_URL, reverse('opinion_sitemap')),
-        (settings.SOLR_AUDIO_URL, reverse('oral_argument_sitemap')),
-        (settings.SOLR_PEOPLE_URL, reverse('people_sitemap')),
+        (settings.SOLR_OPINION_URL, reverse('opinion_sitemap'), False),
+        (settings.SOLR_RECAP_URL, reverse('recap_sitemap'), True),
+        (settings.SOLR_AUDIO_URL, reverse('oral_argument_sitemap'), False),
+        (settings.SOLR_PEOPLE_URL, reverse('people_sitemap'), False),
     )
     sites = []
-    for connection_string, path in connection_string_sitemap_path_pairs:
-        conn = sunburnt.SolrInterface(connection_string, mode='r')
-        search_results_object = conn.raw_query(**index_solr_params).execute()
-        count = search_results_object.result.numFound
+    for connection_string, path, group in connection_string_sitemap_path_pairs:
+        conn = ExtraSolrInterface(connection_string)
+        count = conn.query().add_extra(**make_index_params(group)).count()
         num_pages = count / items_per_sitemap + 1
         for i in range(1, num_pages + 1):
             sites.append('https://www.courtlistener.com%s?p=%s' % (path, i))

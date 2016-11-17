@@ -11,3 +11,13 @@ def opinion_sitemap_maker(request):
         'yearly',
         ['pdf', 'doc', 'wpd'],
     )
+
+
+def recap_sitemap_maker(request):
+    return make_solr_sitemap(
+        request,
+        settings.SOLR_RECAP_URL,
+        make_sitemap_solr_params('dateFiled asc', 'r_sitemap'),
+        'weekly',
+        [],
+    )

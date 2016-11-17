@@ -22,7 +22,7 @@ from cl.search.models import Docket, OpinionCluster, DocketEntry, RECAPDocument
 
 def view_docket(request, pk, _):
     docket = get_object_or_404(Docket, pk=pk)
-    return render('view_docket.html', {
+    return render(request, 'view_docket.html', {
         'docket': docket,
         'private': docket.blocked
     })
@@ -46,7 +46,7 @@ def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
         item.document_type == RECAPDocument.ATTACHMENT else '',
         best_case_name(item.docket_entry.docket),
     )
-    return render('recap_document.html', {
+    return render(request, 'recap_document.html', {
         'document': item,
         'title': title,
         'private': True,  # Always True for RECAP docs.
@@ -135,7 +135,7 @@ def view_opinion(request, pk, _):
     }
     citing_clusters = conn.raw_query(**q).execute()
 
-    return render('view_opinion.html', {
+    return render(request, 'view_opinion.html', {
         'title': title,
         'cluster': cluster,
         'favorite_form': favorite_form,
@@ -149,7 +149,7 @@ def view_opinion(request, pk, _):
 def view_authorities(request, pk, slug):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
-    return render('view_opinion_authorities.html', {
+    return render(request, 'view_opinion_authorities.html', {
         'title': '%s, %s' % (
             trunc(best_case_name(cluster), 100),
             cluster.citation_string
@@ -162,7 +162,7 @@ def view_authorities(request, pk, slug):
 
 def cluster_visualizations(request, pk, slug):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
-    return render('view_opinion_visualizations.html', {
+    return render(request, 'view_opinion_visualizations.html', {
         'title': '%s, %s' % (
             trunc(best_case_name(cluster), 100),
             cluster.citation_string
@@ -189,7 +189,7 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
             )
         else:
             # Error in form, somehow.
-            return render('citation_redirect_info_page.html', {
+            return render(request, 'citation_redirect_info_page.html', {
                 'show_homepage': True,
                 'form': form,
                 'private': True
@@ -198,7 +198,7 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
         if all(_ is None for _ in (reporter, volume, page)):
             # No parameters. Show the standard page.
             form = CitationRedirectorForm()
-            return render('citation_redirect_info_page.html', {
+            return render(request, 'citation_redirect_info_page.html', {
                 'show_homepage': True,
                 'form': form,
                 'private': False,
@@ -235,7 +235,7 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
             # Show the correct page....
             if clusters.count() == 0:
                 # No results for an otherwise valid citation.
-                return render('citation_redirect_info_page.html', {
+                return render(request, 'citation_redirect_info_page.html', {
                     'none_found': True,
                     'citation_str': citation_str,
                     'private': True,
@@ -249,7 +249,7 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
 
             elif clusters.count() > 1:
                 # Multiple results. Show them.
-                return render('citation_redirect_info_page.html', {
+                return render(request, 'citation_redirect_info_page.html', {
                     'too_many': True,
                     'citation_str': citation_str,
                     'clusters': clusters,
