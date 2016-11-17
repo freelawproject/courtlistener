@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
 from django.db.models import Q
 from django.http import HttpResponsePermanentRedirect, HttpResponseRedirect
@@ -22,9 +23,20 @@ from cl.search.models import Docket, OpinionCluster, DocketEntry, RECAPDocument
 
 def view_docket(request, pk, _):
     docket = get_object_or_404(Docket, pk=pk)
+    docket_entry_list = docket.docket_entries.all()
+    paginator = Paginator(docket_entry_list, 500, orphans=25)
+    page = request.GET.get('page')
+    try:
+        docket_entries = paginator.page(page)
+    except PageNotAnInteger:
+        docket_entries = paginator.page(1)
+    except EmptyPage:
+        docket_entries = paginator.page(paginator.num_pages)
+
     return render(request, 'view_docket.html', {
         'docket': docket,
-        'private': docket.blocked
+        'docket_entries': docket_entries,
+        'private': docket.blocked,
     })
 
 

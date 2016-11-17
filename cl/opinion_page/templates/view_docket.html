@@ -202,10 +202,15 @@
             {% endif %}
         </div>
 
-        {% if docket.docket_entries.count %}
+        {% if docket_entries.paginator.count %}
         <div class="row">
             <div class="col-xs-12">
-                <h3>Docket Entries</h3>
+                <h3>Docket Entries
+                    {% if docket_entries.paginator.num_pages > 1 %}
+                        (Page {{ docket_entries.number|intcomma }} of
+                        {{ docket_entries.paginator.num_pages|intcomma }})
+                    {% endif %}
+                </h3>
                 <table class="table table-responsive table-hover">
                     <thead>
                         <tr>
@@ -218,7 +223,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for entry in docket.docket_entries.all %}
+                        {% for entry in docket_entries %}
                         <tr class="cursor docket-entry" data-toggle="modal"
                             data-docket-entry="{{ entry.pk }}"
                             data-target="#actions-picker"
@@ -242,6 +247,12 @@
                         {% endfor %}
                     </tbody>
                 </table>
+
+                {% if docket_entries.paginator.num_pages > 1 %}
+                    {% include "includes/pagination.html" with results=docket_entries %}
+                {% endif %}
+
+                {# Modal at the bottom #}
                 <div class="modal" id="actions-picker" tabindex="-1" role="dialog"
                      aria-hidden="true">
                     <div class="modal-dialog">
