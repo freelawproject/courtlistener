@@ -99,18 +99,18 @@ class OpinionSitemapTest(SitemapTest):
         params = make_sitemap_solr_params('dateFiled asc', 'o_sitemap')
         params['rows'] = 1000
 
-        search_results_object = conn.raw_query(**params).execute()
+        r = conn.raw_query(**params).execute()
 
         # the underlying SitemapTest relies on counting url elements in the xml
         # response...this logic mimics the creation of the xml, so we at least
         # know what we *should* get getting for a count if the SiteMapTest's
         # HTTP client-based test gets an HTTP 200
         count = 0
-        for result in search_results_object:
+        for result in r:
             if result.get('local_path'):
-                count += 3
-            else:
                 count += 2
+            else:
+                count += 1
         return count
 
     def test_does_the_sitemap_have_content(self):
