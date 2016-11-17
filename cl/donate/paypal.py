@@ -156,7 +156,7 @@ def donate_paypal_cancel(request):
     d.status = 3  # Cancelled, bummer
     d.save()
 
-    return render('donate_complete.html', {
+    return render(request, 'donate_complete.html', {
         'error': 'User Cancelled',
         'private': False,
     })

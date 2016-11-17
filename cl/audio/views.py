@@ -32,7 +32,7 @@ def view_audio_file(request, pk, _):
             }
         )
 
-    return render('oral_argument.html', {
+    return render(request, 'oral_argument.html', {
         'title': title,
         'af': af,
         'favorite_form': favorite_form,

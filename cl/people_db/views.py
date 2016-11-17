@@ -50,7 +50,7 @@ def view_person(request, pk, slug):
     }
     authored_opinions = conn.raw_query(**q).execute()
 
-    return render('view_person.html', {
+    return render(request, 'view_person.html', {
         'person': person,
         'title': title,
         'aba_ratings': person.aba_ratings.all().order_by('-year_rated'),

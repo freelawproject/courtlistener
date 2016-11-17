@@ -26,7 +26,7 @@ def verify_honeypot_value(request, field_name):
     if request.method == 'POST':
         field = field_name or settings.HONEYPOT_FIELD_NAME
         if field not in request.POST or not verifier(request.POST[field]):
-            return render('honeypot_error.html', {'fieldname': field},
+            return render(request, 'honeypot_error.html', {'fieldname': field},
                           status=400)
 
 

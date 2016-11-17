@@ -45,7 +45,7 @@ def make_court_variable():
 def court_index(request):
     """Shows the information we have available for the courts."""
     courts = make_court_variable()
-    return render('jurisdictions.html', {
+    return render(request, 'jurisdictions.html', {
         'courts': courts,
         'private': False
     })
@@ -57,7 +57,7 @@ def rest_docs(request, version):
     court_count = len(courts)
     if version is None:
         version = 'vlatest'
-    return render('rest-docs-%s.html' % version, {
+    return render(request, 'rest-docs-%s.html' % version, {
         'court_count': court_count,
         'courts': courts,
         'private': False
@@ -68,7 +68,7 @@ def api_index(request):
     court_count = Court.objects.exclude(
         jurisdiction='T'
     ).count()  # Non-testing courts
-    return render('docs.html', {
+    return render(request, 'docs.html', {
         'court_count': court_count,
         'private': False
     })
@@ -78,7 +78,7 @@ def bulk_data_index(request):
     """Shows an index page for the dumps."""
     courts = make_court_variable()
     court_count = len(courts)
-    return render('bulk-data.html', {
+    return render(request, 'bulk-data.html', {
         'court_count': court_count,
         'courts': courts,
         'private': False

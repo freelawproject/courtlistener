@@ -192,7 +192,7 @@ def donate(request):
             user_form = UserForm()
             profile_form = ProfileForm()
 
-    return render('donate.html', {
+    return render(request, 'donate.html', {
         'donation_form': donation_form,
         'user_form': user_form,
         'profile_form': profile_form,
@@ -211,7 +211,12 @@ def donate_complete(request):
                 error = 'User Cancelled'
             elif 'insufficient funds' in request.GET.get('error_description').lower():
                 error = 'Insufficient Funds'
-            return render('donate_complete.html', {'error': error,
-                                                   'private': True})
+            return render(request, 'donate_complete.html', {
+                'error': error,
+                'private': True,
+            })
 
-    return render('donate_complete.html', {'error': error, 'private': True})
+    return render(request, 'donate_complete.html', {
+        'error': error,
+        'private': True,
+    })

@@ -25,7 +25,7 @@ from cl.stats import tally_stat
 
 def about(request):
     """Loads the about page"""
-    return render('about.html', {'private': False})
+    return render(request, 'about.html', {'private': False})
 
 
 def faq(request):
@@ -54,7 +54,7 @@ def faq(request):
 
 
 def markdown_help(request):
-    return render('markdown_help.html', {'private': False})
+    return render(request, 'markdown_help.html', {'private': False})
 
 
 def build_court_dicts(courts):
@@ -96,7 +96,7 @@ def coverage_graph(request):
     oral_argument_courts = Court.objects.filter(
         in_use=True,
         has_oral_argument_scraper=True)
-    return render('coverage_graph.html', {
+    return render(request, 'coverage_graph.html', {
         'sorted_courts': courts_json,
         'precedential_statuses': precedential_statuses,
         'count_pro': count_pro,
@@ -109,7 +109,7 @@ def coverage_graph(request):
 
 
 def feeds(request):
-    return render('feeds.html', {
+    return render(request, 'feeds.html', {
         'opinion_courts': Court.objects.filter(in_use=True,
                                                has_opinion_scraper=True),
         'private': False
@@ -117,7 +117,7 @@ def feeds(request):
 
 
 def podcasts(request):
-    return render('podcasts.html', {
+    return render(request, 'podcasts.html', {
         'oral_argument_courts': Court.objects.filter(
             in_use=True,
             has_oral_argument_scraper=True,
@@ -128,7 +128,7 @@ def podcasts(request):
 
 
 def contribute(request):
-    return render('contribute.html', {'private': False})
+    return render(request, 'contribute.html', {'private': False})
 
 
 @check_honeypot(field_name='skip_me_if_alive')
@@ -179,26 +179,26 @@ def contact(
         {u'form': form,
          u'private': False}
     )
-    return render(template_path, template_data)
+    return render(request, template_path, template_data)
 
 
 def contact_thanks(request):
-    return render(u'contact_thanks.html', {u'private': True})
+    return render(request, u'contact_thanks.html', {u'private': True})
 
 
 def advanced_search(request):
-    return render('advanced_search.html', {'private': False})
+    return render(request, 'advanced_search.html', {'private': False})
 
 
 def old_terms(request, v):
-    return render('terms/%s.html' % v, {
+    return render(request, 'terms/%s.html' % v, {
         'title': 'Archived Terms of Service and Policies, v%s - CourtListener.com' % v,
         'private': True
     })
 
 
 def latest_terms(request):
-    return render('terms/latest.html', {
+    return render(request, 'terms/latest.html', {
         'title': 'Terms of Service and Policies - CourtListener.com',
         'private': False
     })
@@ -239,11 +239,11 @@ def validate_for_wot(request):
 
 
 def tools_page(request):
-    return render('tools.html', {'private': False})
+    return render(request, 'tools.html', {'private': False})
 
 
 def browser_warning(request):
-    return render('browser_warning.html', {'private': True})
+    return render(request, 'browser_warning.html', {'private': True})
 
 
 def serve_static_file(request, file_path=''):

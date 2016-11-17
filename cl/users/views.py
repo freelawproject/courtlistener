@@ -45,7 +45,7 @@ def view_alerts(request):
             a.type = 'oa'
         else:
             a.type = 'o'
-    return render('profile/alerts.html', {
+    return render(request, 'profile/alerts.html', {
         'alerts': alerts,
         'private': True
     })
@@ -58,7 +58,7 @@ def view_favorites(request):
     favorite_forms = []
     for favorite in favorites:
         favorite_forms.append(FavoriteForm(instance=favorite))
-    return render('profile/favorites.html', {
+    return render(request, 'profile/favorites.html', {
         'private': True,
         'favorite_forms': favorite_forms,
         'blank_favorite_form': FavoriteForm()
@@ -68,7 +68,7 @@ def view_favorites(request):
 @login_required
 @never_cache
 def view_donations(request):
-    return render('profile/donations.html', {'private': True})
+    return render(request, 'profile/donations.html', {'private': True})
 
 
 @login_required
@@ -90,7 +90,7 @@ def view_visualizations(request):
         paged_vizes = paginator.page(1)
     except EmptyPage:
         paged_vizes = paginator.page(paginator.num_pages)
-    return render('profile/visualizations.html', {
+    return render(request, 'profile/visualizations.html', {
         'results': paged_vizes,
         'private': True,
     })
@@ -118,7 +118,7 @@ def view_deleted_visualizations(request):
     except EmptyPage:
         paged_vizes = paginator.page(paginator.num_pages)
 
-    return render('profile/visualizations_deleted.html', {
+    return render(request, 'profile/visualizations_deleted.html', {
         'results': paged_vizes,
         'private': True,
     })
@@ -127,7 +127,7 @@ def view_deleted_visualizations(request):
 @login_required
 @never_cache
 def view_api(request):
-    return render('profile/api.html', {'private': True})
+    return render(request, 'profile/api.html', {'private': True})
 
 
 @sensitive_variables('salt', 'activation_key', 'email_body')
@@ -174,7 +174,7 @@ def view_settings(request):
         user_form.save()
 
         return HttpResponseRedirect(reverse('view_settings'))
-    return render('profile/settings.html', {
+    return render(request, 'profile/settings.html', {
         'profile_form': profile_form,
         'user_form': user_form,
         'private': True
@@ -200,14 +200,14 @@ def delete_account(request):
         return HttpResponseRedirect(reverse('delete_profile_done'))
 
     non_deleted_map_count = request.user.scotus_maps.filter(deleted=False).count()
-    return render('profile/delete.html', {
+    return render(request, 'profile/delete.html', {
         'non_deleted_map_count': non_deleted_map_count,
         'private': True
     })
 
 
 def delete_profile_done(request):
-    return render('profile/deleted.html', {'private': True})
+    return render(request, 'profile/deleted.html', {'private': True})
 
 
 @sensitive_post_parameters('password1', 'password2')
@@ -306,7 +306,7 @@ def register(request):
                                             '?next=%s' % redirect_to)
         else:
             form = UserCreationFormExtended()
-        return render("register/register.html", {
+        return render(request, "register/register.html", {
             'form': form,
             'private': False
         })
@@ -321,7 +321,7 @@ def register_success(request):
     """Tell the user they have been registered and allow them to continue where
     they left off."""
     redirect_to = request.GET.get('next', '')
-    return render('register/registration_complete.html', {
+    return render(request, 'register/registration_complete.html', {
         'redirect_to': redirect_to,
         'private': True,
     })
@@ -336,7 +336,7 @@ def confirm_email(request, activation_key):
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
-        return render('register/confirm.html', {
+        return render(request, 'register/confirm.html', {
             'invalid': True,
             'private': True
         })
@@ -351,13 +351,13 @@ def confirm_email(request, activation_key):
 
     if confirmed_accounts_count == len(ups):
         # All the accounts were already confirmed.
-        return render('register/confirm.html', {
+        return render(request, 'register/confirm.html', {
             'already_confirmed': True,
             'private': True
         })
 
     if expired_key_count > 0:
-        return render('register/confirm.html', {
+        return render(request, 'register/confirm.html', {
             'expired': True,
             'private': True
         })
@@ -367,7 +367,7 @@ def confirm_email(request, activation_key):
         up.email_confirmed = True
         up.save()
 
-    return render('register/confirm.html', {
+    return render(request, 'register/confirm.html', {
         'success': True,
         'private': True
     })
@@ -410,7 +410,7 @@ def request_email_confirmation(request):
             return HttpResponseRedirect(reverse('email_confirm_success'))
     else:
         form = EmailConfirmationForm()
-    return render('register/request_email_confirmation.html', {
+    return render(request, 'register/request_email_confirmation.html', {
         'private': True,
         'form': form
     })
@@ -418,7 +418,7 @@ def request_email_confirmation(request):
 
 @never_cache
 def email_confirm_success(request):
-    return render('register/request_email_confirmation_success.html', {
+    return render(request, 'register/request_email_confirmation_success.html', {
         'private': False
     })
 
@@ -437,7 +437,7 @@ def password_change(request):
             return HttpResponseRedirect(reverse('password_change'))
     else:
         form = CustomPasswordChangeForm(user=request.user)
-    return render('profile/password_form.html', {
+    return render(request, 'profile/password_form.html', {
         'form': form,
         'private': False
     })

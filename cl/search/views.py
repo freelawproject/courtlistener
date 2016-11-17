@@ -242,10 +242,7 @@ def show_results(request):
             # with the errors
             render_dict.update(do_search(request))
             render_dict.update({'alert_form': alert_form})
-            return render(
-                'search.html',
-                render_dict,
-            )
+            return render(request, 'search.html', render_dict)
 
     else:
         # Either a search or the homepage
@@ -269,10 +266,7 @@ def show_results(request):
             # Get a bunch of stats.
             render_dict.update(get_homepage_stats())
 
-            return render(
-                'homepage.html',
-                render_dict,
-            )
+            return render(request, 'homepage.html',render_dict)
         else:
             # User placed a search or is trying to edit an alert
             if request.GET.get('edit_alert'):
@@ -308,10 +302,7 @@ def show_results(request):
                 )
             render_dict.update(do_search(request))
             render_dict.update({'alert_form': alert_form})
-            return render(
-                'search.html',
-                render_dict,
-            )
+            return render(request, 'search.html', render_dict)
 
 
 def advanced(request):
@@ -330,7 +321,4 @@ def advanced(request):
 
     render_dict.update(do_search(request, rows=1, type=obj_type, facet=True))
     render_dict['search_form'] = SearchForm({'type': obj_type})
-    return render(
-        'advanced.html',
-        render_dict,
-    )
+    return render(request, 'advanced.html', render_dict)

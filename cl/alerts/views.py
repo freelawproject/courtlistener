@@ -51,7 +51,7 @@ def delete_alert_confirm(request, alert_id):
         alert_id = int(alert_id)
     except ValueError:
         return HttpResponseRedirect('/')
-    return render('delete_confirm.html', {
+    return render(request, 'delete_confirm.html', {
         'alert_id': alert_id,
         'private': False
     })

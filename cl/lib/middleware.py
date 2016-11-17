@@ -41,7 +41,7 @@ class MaintenanceModeMiddleware(object):
             if ip_address_re.match(request.META['REMOTE_ADDR']):
                 return None
 
-        r = render('maintenance.html', {'private': True},
+        r = render(request, 'maintenance.html', {'private': True},
                    status=HTTP_503_SERVICE_UNAVAILABLE)
         add_never_cache_headers(r)
         return r

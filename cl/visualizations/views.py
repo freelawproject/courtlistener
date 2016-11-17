@@ -58,11 +58,10 @@ def render_visualization_page(request, pk, embed):
         template = 'visualization_embedded.html'
     else:
         template = 'visualization.html'
-    return render(
-        template,
-        {'viz': viz, 'private': True},
-        status=status,
-    )
+    return render(request, template, {
+        'viz': viz,
+        'private': True
+    }, status=status)
 
 
 @xframe_options_exempt
@@ -142,19 +141,16 @@ def new_visualization(request):
                     tally_stat('visualization.too_many_nodes_failure')
                     msg = message_dict['too_many_nodes']
                     messages.add_message(request, msg['level'], msg['message'])
-                    return render(
-                        'new_visualization.html',
-                        context,
-                    )
+                    return render(request, 'new_visualization.html', context)
 
             if len(g.edges()) == 0:
                 tally_stat('visualization.too_few_nodes_failure')
                 msg = message_dict['too_few_nodes']
                 messages.add_message(request, msg['level'], msg['message'])
-                return render(
-                    'new_visualization.html',
-                    {'form': form, 'private': True},
-                )
+                return render(request, 'new_visualization.html', {
+                    'form': form,
+                    'private': True
+                })
 
             t2 = time.time()
             viz.generation_time = t2 - t1
@@ -171,10 +167,7 @@ def new_visualization(request):
             ))
     else:
         context['form'] = VizForm()
-    return render(
-        'new_visualization.html',
-        context,
-    )
+    return render(request, 'new_visualization.html', context)
 
 
 @login_required
@@ -197,10 +190,10 @@ def edit_visualization(request, pk):
             ))
     else:
         form_viz = VizEditForm(instance=viz)
-    return render(
-        'edit_visualization.html',
-        {'form_viz': form_viz, 'private': True},
-    )
+    return render(request, 'edit_visualization.html', {
+        'form_viz': form_viz,
+        'private': True
+    })
 
 
 @ensure_csrf_cookie
@@ -282,13 +275,10 @@ def mapper_homepage(request):
         '-date_created',
     )[:2]
 
-    return render(
-        'visualization_home.html',
-        {
-            'visualizations': visualizations,
-            'private': False,
-        },
-    )
+    return render(request, 'visualization_home.html', {
+        'visualizations': visualizations,
+        'private': False,
+    })
 
 
 @never_cache
@@ -311,11 +301,8 @@ def gallery(request):
         paged_vizes = paginator.page(1)
     except EmptyPage:
         paged_vizes = paginator.page(paginator.num_pages)
-    return render(
-        'gallery.html',
-        {
-            'results': paged_vizes,
-            'private': False,
-        },
-    )
+    return render(request, 'gallery.html', {
+        'results': paged_vizes,
+        'private': False,
+    })
 
