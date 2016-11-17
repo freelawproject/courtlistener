@@ -11,4 +11,5 @@ def oral_argument_sitemap_maker(request):
                                  'oa_sitemap'),
         'yearly',
         ['mp3'],
+        'absolute_url',
     )

@@ -10,6 +10,7 @@ def opinion_sitemap_maker(request):
         make_sitemap_solr_params('dateFiled asc', 'o_sitemap'),
         'yearly',
         ['pdf', 'doc', 'wpd'],
+        'absolute_url',
     )
 
 
@@ -20,4 +21,5 @@ def recap_sitemap_maker(request):
         make_sitemap_solr_params('dateFiled asc', 'r_sitemap'),
         'weekly',
         [],
+        'docket_absolute_url',
     )

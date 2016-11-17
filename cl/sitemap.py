@@ -33,8 +33,9 @@ def make_sitemap_solr_params(sort, caller):
         'rows': items_per_sitemap,
         'start': 0,
         'fl': ','.join([
+            # Not all indexes have all these fields, but it causes no errors.
             'absolute_url',
-            # Not all indexes have this field, but it causes no errors.
+            'docket_absolute_url',
             'local_path',
             'timestamp',
         ]),
@@ -63,7 +64,7 @@ def normalize_grouping(result):
 
 
 def make_solr_sitemap(request, solr_url, params, changefreq,
-                      low_priority_pages):
+                      low_priority_pages, url_field):
     solr = ExtraSolrInterface(solr_url)
     page = int(request.GET.get('p', 1))
     params['start'] = (page - 1) * items_per_sitemap
@@ -73,7 +74,7 @@ def make_solr_sitemap(request, solr_url, params, changefreq,
     cl = 'https://www.courtlistener.com'
     for result in results:
         result = normalize_grouping(result)
-        url_strs = ['%s%s' % (cl, result['absolute_url'])]
+        url_strs = ['%s%s' % (cl, result[url_field])]
         if result.get('local_path') and \
                 not result['local_path'].endswith('.xml'):
             url_strs.append('%s/%s' % (cl, result['local_path']))

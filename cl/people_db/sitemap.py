@@ -11,4 +11,5 @@ def people_sitemap_maker(request):
                                  'p_sitemap'),
         'monthly',
         [],
+        'absolute_url',
     )
