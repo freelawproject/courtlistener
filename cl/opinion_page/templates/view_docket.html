@@ -211,6 +211,72 @@
                         {{ docket_entries.paginator.num_pages|intcomma }})
                     {% endif %}
                 </h3>
+                <div class="well well-sm">
+                    <form action="" method="get">
+                    <div class="row">
+                        <div class="form-inline">
+                            {% if form.errors %}
+                                <div class="col-xs-12">
+                                    <p class="text-danger"><strong>There were errors applying your filters.</strong>
+                                    </p>
+                                </div>
+                            {% endif %}
+                            <div class="col-xs-12 col-sm-6 col-md-5">
+                                <div class="form-group{% if form.filed_after.errors %} has-error{% endif %}">
+                                    <label for="id_filed_after"
+                                           class="control-label">Filed</label>
+                                    {{ form.filed_after }}
+                                </div>
+                                <div class="form-group{% if form.filed_before.errors %} has-error{% endif %}">
+                                    <label for="id_filed_before"
+                                           class="control-label">to</label>
+                                    {{ form.filed_before }}
+                                </div>
+                            </div>
+                            <div class="col-xs-8 col-sm-4">
+                                <div class="form-group{% if form.entry_gte.errors %} has-error{% endif %}">
+                                    <label for="id_entry_gte"
+                                           class="control-label">Documents</label>
+                                    {{ form.entry_gte }}
+                                </div>
+                                <div class="form-group{% if form.entry_lte.errors %} has-error{% endif %}">
+                                    <label for="id_entry_lte"
+                                           class="control-label">to</label>
+                                    {{ form.entry_lte }}
+                                </div>
+                            </div>
+                            <div class="col-xs-4 col-sm-2 col-md-3">
+                                <div id="sort-buttons"
+                                     class="btn-group pull-right"
+                                     data-toggle="buttons"
+                                     role="group"
+                                     aria-label="sorting buttons">
+                                    {% with v=form.order_by.value %}
+                                    <label for="id_order_by_0"
+                                           class="btn btn-default {% if v == "asc" or not v %}active{% endif %}">
+                                        <input type="radio"
+                                               id="id_order_by_0"
+                                               value="asc"
+                                               name="order_by"
+                                               {% if v == "asc" or not v %}checked="checked"{% endif %}/><i class="fa fa-sort-numeric-asc"></i>&nbsp;<span
+                                            class="hidden-xs hidden-sm">Ascending</span></label>
+                                    <label for="id_order_by_1"
+                                           class="btn btn-default {% if v == "desc" %}active{% endif %}">
+                                        <input type="radio"
+                                               id="id_order_by_1"
+                                               {% if v == "desc" %}checked=checked{% endif %}
+                                               value="desc"
+                                               name="order_by"/><i
+                                            class="fa fa-sort-numeric-desc"></i>&nbsp;<span class="hidden-xs hidden-sm">Descending</span></label>
+                                    {% endwith %}
+                                </div>
+                            </div>
+                            <button type="submit" class="sr-only">Filter</button>
+                        </div>
+                    </div>
+                    </form>
+                </div>
+
                 <table class="table table-responsive table-hover">
                     <thead>
                         <tr>

@@ -533,6 +533,14 @@ input.court-checkbox, input.status-checkbox {
     text-align: right;
 }
 
+/* Docket page */
+#id_entry_gte, #id_entry_lte {
+    width: 60px;
+}
+#id_filed_after, #id_filed_before {
+    width: 120px;
+}
+
 /* Donations page */
 #id_amount_other {
     float: none;
@@ -543,20 +551,6 @@ input.court-checkbox, input.status-checkbox {
     padding-left: 2em;
 }
 
-/*
-#payment-provider-radio input[type="radio"] {
-    position: absolute;
-    top: auto;
-}
-*/
-/*
-#cc-month-field {
-    width: 29px;
-}
-#cc-year-field {
-    width: 67px;
-}
-*/
 #unconfirmed-email-warning{
     margin-top: 9px;
     margin-left: 5px;

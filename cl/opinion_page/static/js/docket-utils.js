@@ -111,3 +111,8 @@ $('.docket-entry a').on('click', function (ev) {
 });
 // Initialize tooltips on profile pages.
 $('[data-toggle="tooltip"]').tooltip();
+
+// Change sort order when the asc/desc buttons are clicked.
+$("#sort-buttons :input").change(function () {
+    this.closest("form").submit();
+});

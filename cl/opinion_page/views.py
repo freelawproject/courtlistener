@@ -16,15 +16,30 @@ from cl.lib import search_utils
 from cl.lib import sunburnt
 from cl.lib.encode_decode import ascii_to_num
 from cl.lib.import_lib import map_citations_to_models
+from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
-from cl.opinion_page.forms import CitationRedirectorForm
+from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.search.models import Docket, OpinionCluster, DocketEntry, RECAPDocument
 
 
 def view_docket(request, pk, _):
     docket = get_object_or_404(Docket, pk=pk)
-    docket_entry_list = docket.docket_entries.all()
-    paginator = Paginator(docket_entry_list, 500, orphans=25)
+    de_list = docket.docket_entries.all()
+    form = DocketEntryFilterForm(request.GET)
+    if form.is_valid():
+        cd = form.cleaned_data
+        if cd.get('entry_gte'):
+            de_list = de_list.filter(entry_number__gte=cd['entry_gte'])
+        if cd.get('entry_lte'):
+            de_list = de_list.filter(entry_number__lte=cd['entry_lte'])
+        if cd.get('filed_after'):
+            de_list = de_list.filter(date_filed__gte=cd['filed_after'])
+        if cd.get('filed_before'):
+            de_list = de_list.filter(date_filed__lte=cd['filed_before'])
+        if cd.get('order_by') == DocketEntryFilterForm.DESCENDING:
+            de_list = de_list.order_by('-entry_number')
+
+    paginator = Paginator(de_list, 500, orphans=25)
     page = request.GET.get('page')
     try:
         docket_entries = paginator.page(page)
@@ -36,6 +51,8 @@ def view_docket(request, pk, _):
     return render(request, 'view_docket.html', {
         'docket': docket,
         'docket_entries': docket_entries,
+        'form': form,
+        'get_string': make_get_string(request),
         'private': docket.blocked,
     })
 
