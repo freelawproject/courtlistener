@@ -1,4 +1,5 @@
 from django.contrib import admin
+
 from cl.favorites.models import Favorite
 
 
@@ -9,4 +10,6 @@ class FavoriteInline(admin.TabularInline):
         'user',
         "cluster_id",
         "audio_id",
+        "docket_id",
+        "recap_doc_id",
     )

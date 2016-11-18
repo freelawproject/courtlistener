@@ -12,6 +12,8 @@ class FavoriteForm(ModelForm):
             'id',
             'audio_id',
             'cluster_id',
+            'docket_id',
+            'recap_doc_id',
             'name',
             'notes'
         )
@@ -19,13 +21,16 @@ class FavoriteForm(ModelForm):
             'id': forms.HiddenInput(),
             'cluster_id': forms.HiddenInput(),
             'audio_id': forms.HiddenInput(),
-            'name': forms.TextInput(
-                attrs={
-                    'id': 'save-favorite-name-field',
-                    'maxlength': '100'}),
-            'notes': forms.Textarea(
-                attrs={
-                    'class': 'bottom',
-                    'id': 'save-favorite-notes-field',
-                    'maxlength': '600'})
+            'docket_id': forms.HiddenInput(),
+            'recap_doc_id': forms.HiddenInput(),
+            'name': forms.TextInput(attrs={
+                'id': 'save-favorite-name-field',
+                'class': 'form-control',
+                'maxlength': '100'
+            }),
+            'notes': forms.Textarea(attrs={
+                'class': 'bottom form-control',
+                'id': 'save-favorite-notes-field',
+                'maxlength': '600'
+            })
         }

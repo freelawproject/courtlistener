@@ -1,8 +1,9 @@
 from django.contrib.auth.models import User
 from django.core.validators import MaxLengthValidator
 from django.db import models
+
 from cl.audio.models import Audio
-from cl.search.models import OpinionCluster
+from cl.search.models import OpinionCluster, Docket, RECAPDocument
 
 
 class Favorite(models.Model):
@@ -20,6 +21,18 @@ class Favorite(models.Model):
     audio_id = models.ForeignKey(
         Audio,
         verbose_name='the audio file that is favorited',
+        null=True,
+        blank=True,
+    )
+    docket_id = models.ForeignKey(
+        Docket,
+        verbose_name="the docket that is favorited",
+        null=True,
+        blank=True,
+    )
+    recap_doc_id = models.ForeignKey(
+        RECAPDocument,
+        verbose_name="the RECAP document that is favorited",
         null=True,
         blank=True,
     )
@@ -48,6 +61,8 @@ class Favorite(models.Model):
         unique_together = (
             ('cluster_id', 'user'),
             ('audio_id', 'user'),
+            ('docket_id', 'user'),
+            ('recap_doc_id', 'user'),
         )
 
     def __unicode__(self):

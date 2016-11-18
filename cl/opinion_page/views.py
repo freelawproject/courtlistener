@@ -24,6 +24,17 @@ from cl.search.models import Docket, OpinionCluster, DocketEntry, RECAPDocument
 
 def view_docket(request, pk, _):
     docket = get_object_or_404(Docket, pk=pk)
+    try:
+        fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
+    except (ObjectDoesNotExist, TypeError):
+        # Not favorited or anonymous user
+        favorite_form = FavoriteForm(initial={
+            'docket_id': docket.pk,
+            'name': trunc(best_case_name(docket), 100, ellipsis='...'),
+        })
+    else:
+        favorite_form = FavoriteForm(instance=fave)
+
     de_list = docket.docket_entries.all()
     form = DocketEntryFilterForm(request.GET)
     if form.is_valid():
@@ -52,6 +63,7 @@ def view_docket(request, pk, _):
         'docket': docket,
         'docket_entries': docket_entries,
         'form': form,
+        'favorite_form': favorite_form,
         'get_string': make_get_string(request),
         'private': docket.blocked,
     })
@@ -75,9 +87,21 @@ def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
         item.document_type == RECAPDocument.ATTACHMENT else '',
         best_case_name(item.docket_entry.docket),
     )
+    try:
+        fave = Favorite.objects.get(recap_doc_id=item.pk, user=request.user)
+    except (ObjectDoesNotExist, TypeError):
+        # Not favorited or anonymous user
+        favorite_form = FavoriteForm(initial={
+            'recap_doc_id': item.pk,
+            'name': trunc(title, 100, ellipsis='...'),
+        })
+    else:
+        favorite_form = FavoriteForm(instance=fave)
+
     return render(request, 'recap_document.html', {
         'document': item,
         'title': title,
+        'favorite_form': favorite_form,
         'private': True,  # Always True for RECAP docs.
     })
 
@@ -135,19 +159,15 @@ def view_opinion(request, pk, _):
     get_string = search_utils.make_get_string(request)
 
     try:
-        fave = Favorite.objects.get(
-            cluster_id=cluster.pk,
-            user=request.user,
-        )
-        favorite_form = FavoriteForm(instance=fave)
+        fave = Favorite.objects.get(cluster_id=cluster.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
-        favorite_form = FavoriteForm(
-            initial={
-                'cluster_id': cluster.pk,
-                'name': trunc(best_case_name(cluster), 100, ellipsis='...'),
-            }
-        )
+        favorite_form = FavoriteForm(initial={
+            'cluster_id': cluster.pk,
+            'name': trunc(best_case_name(cluster), 100, ellipsis='...'),
+        })
+    else:
+        favorite_form = FavoriteForm(instance=fave)
 
     # Get the citing results from Solr for speed.
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')

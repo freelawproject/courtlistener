@@ -16,6 +16,8 @@
                 var ds = $("#data-store-" + pk);
                 $("#id_cluster_id").val(ds.data("cluster_id"));
                 $("#id_audio_id").val(ds.data("audio_id"));
+                $("#id_docket_id").val(ds.data("docket_id"));
+                $("#id_recap_doc_id").val(ds.data("recap_doc_id"));
                 $("#save-favorite-notes-field").val(ds.data("notes"));
                 $("#save-favorite-name-field").val(ds.data("name"));
                 $("#modal-save-favorite").data("id", pk);
@@ -40,13 +42,25 @@
                             <tr id="favorite-row-{{ favorite_form.instance.id }}">
                                 <td id="name-{{ favorite_form.instance.id }}">
                                     {% if favorite_form.instance.cluster_id %}
-                                        <i class="fa-file-text-o fa gray" title="Opinion"></i>
+                                        <i class="fa-book fa gray" title="Opinion"></i>
                                         <a href="{{ favorite_form.instance.cluster_id.get_absolute_url }}">
                                             {{favorite_form.instance.name }}
                                         </a>
-                                    {% else %}
+                                    {% elif favorite_form.instance.audio_id %}
                                         <i class="fa-volume-up fa grey" title="Oral Argument"></i>
                                         <a href="{{ favorite_form.instance.audio_id.get_absolute_url }}">
+                                            {{ favorite_form.instance.name }}
+                                        </a>
+                                    {% elif favorite_form.instance.docket_id %}
+                                        <i class="fa-list fa grey"
+                                           title="Docket"></i>
+                                        <a href="{{ favorite_form.instance.docket_id.get_absolute_url }}">
+                                            {{ favorite_form.instance.name }}
+                                        </a>
+                                    {% elif favorite_form.instance.recap_doc_id %}
+                                        <i class="fa-file-text-o fa grey"
+                                           title="RECAP Document"></i>
+                                        <a href="{{ favorite_form.instance.recap_doc_id.get_absolute_url }}">
                                             {{ favorite_form.instance.name }}
                                         </a>
                                     {% endif %}
@@ -66,6 +80,8 @@
                                              class="hidden"
                                              data-cluster_id="{{ favorite_form.instance.cluster_id.pk|default_if_none:"" }}"
                                              data-audio_id="{{ favorite_form.instance.audio_id.pk|default_if_none:"" }}"
+                                             data-docket_id="{{ favorite_form.instance.docket_id.pk|default_if_none:"" }}"
+                                             data-recap_doc_id="{{ favorite_form.instance.recap_doc_id.pk|default_if_none:"" }}"
                                              data-name="{{ favorite_form.instance.name|default_if_none:"" }}"
                                              data-notes="{{ favorite_form.instance.notes|default_if_none:"" }}">
                                         </div>
@@ -82,9 +98,9 @@
         {% else %}
             <div class="row">
                 <div class="col-sm-12">
-                    <h3>You Have Not Saved Any Favorites</h3>
-                    <p>To save a favorite, click the star icon next to a
-                        document's title, give it a title and make a note.</p>
+                    <h3><i class="fa fa-star gold"></i>&nbsp;You Have Not Saved Any Favorites</h3>
+                    <p>To save a favorite, click the gold star next to the title of an opinion, docket, RECAP document, or oral argument. From there you can give it a title and make a note.
+                    </p>
                 </div>
             </div>
         {% endif %}

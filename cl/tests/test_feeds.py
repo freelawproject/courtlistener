@@ -183,7 +183,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         rss_link = result_count.find_element_by_tag_name('a')
         rss_link.click()
 
-        # She captures the URL and pops it into her favorite RSS Reader
+        # She captures the URL and pops it into her RSS Reader
         self.assertIn(
             'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
             self.browser.page_source

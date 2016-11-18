@@ -11,6 +11,12 @@
 
 {% block navbar-r %}active{% endblock %}
 
+{% block footer-scripts %}
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/save-favorites.js"></script>
+{% endblock %}
 
 {% block sidebar %}
     <div class="col-sm-3" id="sidebar">
@@ -59,6 +65,24 @@
             </p>
         </div>
 
+        {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
+        <div class="{% if not favorite_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
+             id="sidebar-notes">
+            <div>
+                <h3 class="inline"><span>Your Notes</span></h3>
+
+                <p class="inline" data-toggle="modal"
+                   data-target="#modal-save-favorite">
+                    (<a href="#favorite-editor">edit</a>)
+                    <i class="fa fa-pencil gray pointer"></i>
+                </p>
+
+                <p id="sidebar-notes-text">
+                    {{ favorite_form.instance.notes|default:"(none)" }}
+                </p>
+            </div>
+        </div>
+
         {% include "includes/social_links.html" %}
         {% include "includes/donate_sidebar.html" with referrer="ad-recap-document" %}
     </div>
@@ -67,7 +91,13 @@
 
 {% block content %}
     <article class="col-sm-9">
-        <h2>{{ document.docket_entry.docket|best_case_name|safe|v_wrapper }}</h2>
+        <i id="favorites-star"
+           class="{% if favorite_form.instance.recap_doc_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
+           data-toggle="modal"
+           data-target="#modal-save-favorite, #modal-logged-out"
+           title="{% if favorite_form.instance.recap_doc_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
+        <h2 class="inline">{{ document.docket_entry.docket|best_case_name|safe|v_wrapper }}</h2>
+        {% include "includes/favorites_modal.html" %}
 
         <h3>
             {% if document.description %}{{ document.description }}

@@ -14,6 +14,10 @@
 {% block footer-scripts %}
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/docket-utils.js"></script>
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/save-favorites.js"></script>
 {% endblock %}
 
 
@@ -32,12 +36,20 @@
                         </a>
                     </p>
                 {% endif %}
-                <h2 class="bottom">
+                <i id="favorites-star"
+                   class="{% if favorite_form.instance.docket_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
+                   data-toggle="modal"
+                   data-target="#modal-save-favorite, #modal-logged-out"
+                   title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
+
+                <h2 class="bottom inline">
                     {{ docket|best_case_name|safe|v_wrapper }}
                     {% if docket.docket_number %}
                         ({{ docket.docket_number }})
                     {% endif %}
                 </h2>
+                {% include "includes/favorites_modal.html" %}
+
                 {% if docket.pacer_url %}
                 <p><a href="{{ docket.pacer_url }}" class="btn btn-primary btn-xs">View
                     on PACER</a>
@@ -53,7 +65,7 @@
                         {% if docket.assigned_to %}
                             <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
                         {% elif docket.assigned_to_str %}
-                            <a href="?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;">{{ docket.assigned_to_str }}</a>
+                            <a href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;">{{ docket.assigned_to_str }}</a>
                         {% endif %}
                     </span>
                 </p>
@@ -66,7 +78,7 @@
                         {% if docket.referred_to %}
                             <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
                         {% elif docket.referred_to_str %}
-                            <a href="?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;">{{ docket.referred_to_str }}</a>
+                            <a href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;">{{ docket.referred_to_str }}</a>
                         {% endif %}
                     </span>
                 </p>
@@ -132,7 +144,7 @@
                     <p class="bottom">
                         <span class="meta-data-header">Cause:</span>
                         <span class="meta-data-value">
-                            <a href="?type=r&amp;cause=&quot;{{ docket.cause }}&quot;">{{ docket.cause }}</a>
+                            <a href="/?type=r&amp;cause=&quot;{{ docket.cause }}&quot;">{{ docket.cause }}</a>
                         </span>
                     </p>
                 {% endif %}
@@ -141,7 +153,7 @@
                     <p class="bottom">
                         <span class="meta-data-header">Nature of Suit:</span>
                         <span class="meta-data-value">
-                            <a href="?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;">{{ docket.nature_of_suit }}</a>
+                            <a href="/?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;">{{ docket.nature_of_suit }}</a>
                         </span>
                     </p>
                 {% endif %}
@@ -150,7 +162,7 @@
                     <p class="bottom">
                         <span class="meta-data-header">Jury Demand:</span>
                         <span class="meta-data-value">
-                            <a href="?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;">{{ docket.jury_demand }}</a>
+                            <a href="/?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;">{{ docket.jury_demand }}</a>
                         </span>
                     </p>
                 {% endif %}
@@ -322,37 +334,36 @@
                 <div class="modal" id="actions-picker" tabindex="-1" role="dialog"
                      aria-hidden="true">
                     <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <button type="button" class="close"
-                                            data-dismiss="modal" aria-label="Close">
-                                        <span aria-hidden="true" class="large">&times;</span>
-                                    </button>
-                                    <h3 class="modal-title">Entries</h3>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="row">
-                                        <div class="col-xs-12">
-                                            <table class="table table-responsive" id="document-table">
-                                                <thead>
-                                                <tr>
-                                                    <th>Number</th>
-                                                    <th colspan="2">Description</th>
-                                                </tr>
-                                                </thead>
-                                                <tbody id="tablebody">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <button type="button" class="close"
+                                        data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true" class="large">&times;</span>
+                                </button>
+                                <h3 class="modal-title">Entries</h3>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-xs-12">
+                                        <table class="table table-responsive" id="document-table">
+                                            <thead>
+                                            <tr>
+                                                <th>Number</th>
+                                                <th colspan="2">Description</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody id="tablebody">
 
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <button type="button"
-                                                class="btn btn-default float-right"
-                                                data-dismiss="modal">Close
-                                        </button>
+                                            </tbody>
+                                        </table>
                                     </div>
+                                    <button type="button"
+                                            class="btn btn-default float-right"
+                                            data-dismiss="modal">Close
+                                    </button>
                                 </div>
                             </div>
-                        </form>
+                        </div>
                     </div>
                 </div>
             </div>

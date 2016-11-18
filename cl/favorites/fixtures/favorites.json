@@ -7,7 +7,9 @@
       "cluster_id": 3,
       "user": 1,
       "date_created": "2015-12-18T20:47:03.103Z",
-      "audio_id": null
+      "audio_id": null,
+      "docket_id": null,
+      "recap_doc_id": null
     },
     "model": "favorites.favorite",
     "pk": 1

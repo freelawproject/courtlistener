@@ -16,13 +16,17 @@ $(document).ready(function() {
 $(function() {
     $("#saveFavorite").click(function() {
         // validate and process form here
-        var favorite_id = $("#modal-save-favorite").data("id");
-        var cluster_id  = $("input#id_cluster_id").val();
-        var audio_id    = $("input#id_audio_id").val();
-        var name        = $("input#save-favorite-name-field").val();
-        var notes       = $("textarea#save-favorite-notes-field").val();
-        var dataString  = '&cluster_id=' + cluster_id +
+        var favorite_id  = $("#modal-save-favorite").data("id");
+        var cluster_id   = $("input#id_cluster_id").val();
+        var audio_id     = $("input#id_audio_id").val();
+        var docket_id    = $("input#id_docket_id").val();
+        var recap_doc_id = $("input#id_recap_doc_id").val();
+        var name         = $("input#save-favorite-name-field").val();
+        var notes        = $("textarea#save-favorite-notes-field").val();
+        var dataString   = '&cluster_id=' + cluster_id +
                           '&audio_id=' + audio_id +
+                          '&docket_id=' + docket_id +
+                          '&recap_doc_id=' + recap_doc_id +
                           '&notes=' + notes +
                           '&name=' + name;
         $.ajax({
@@ -60,11 +64,15 @@ $(function() {
         event.preventDefault();
         // Send a post that deletes the favorite from the DB, and if successful
         // remove the notes from the sidebar; toggle the star icon.
-        var favorite_id = $("#modal-save-favorite").data("id");
-        var cluster_id  = $("input#id_cluster_id").val();
-        var audio_id    = $("input#id_audio_id").val();
-        var dataString = '&cluster_id=' + cluster_id +
-                         '&audio_id=' + audio_id;
+        var favorite_id  = $("#modal-save-favorite").data("id");
+        var cluster_id   = $("input#id_cluster_id").val();
+        var audio_id     = $("input#id_audio_id").val();
+        var docket_id    = $("input#id_docket_id").val();
+        var recap_doc_id = $("input#id_recap_doc_id").val();
+        var dataString  = '&cluster_id=' + cluster_id +
+                          '&audio_id=' + audio_id +
+                          '&docket_id=' + docket_id +
+                          '&recap_doc_id=' + recap_doc_id;
         $.ajax({
             type: "POST",
             url: "/favorite/delete/",
