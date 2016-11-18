@@ -4,11 +4,9 @@ def is_bot(request):
                   'kaloogabot', 'ia_archiver', 'msnbot', 'slurp',
                   'speedy spider', 'teoma', 'twiceler', 'yandexbot', 'yodaobot']
     user_agent = request.META.get('HTTP_USER_AGENT', "Testing U-A")
-    is_known_bot = False
     for bot in known_bots:
         if bot in user_agent.lower():
-            is_known_bot = True
-            break
+            return True
 
-    return is_known_bot
+    return False
 
