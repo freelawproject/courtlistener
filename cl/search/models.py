@@ -247,6 +247,10 @@ class Docket(models.Model):
         max_length=1000,
         blank=True,
     )
+    view_count = models.IntegerField(
+        help_text="The number of times the docket has been seen.",
+        default=0,
+    )
     date_blocked = models.DateField(
         help_text="The date that this opinion was blocked from indexing by "
                   "search engines",

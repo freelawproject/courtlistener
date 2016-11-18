@@ -2,7 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
-from django.db.models import Q
+from django.db.models import F, Q
 from django.http import HttpResponsePermanentRedirect, HttpResponseRedirect
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -12,8 +12,8 @@ from cl.citations.find_citations import get_citations
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
-from cl.lib import search_utils
-from cl.lib import sunburnt
+from cl.lib import search_utils, sunburnt
+from cl.lib.bot_detector import is_bot
 from cl.lib.encode_decode import ascii_to_num
 from cl.lib.import_lib import map_citations_to_models
 from cl.lib.search_utils import make_get_string
@@ -24,6 +24,10 @@ from cl.search.models import Docket, OpinionCluster, DocketEntry, RECAPDocument
 
 def view_docket(request, pk, _):
     docket = get_object_or_404(Docket, pk=pk)
+    if not is_bot(request):
+        docket.view_count = F('view_count') + 1
+        docket.save()
+
     try:
         fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):

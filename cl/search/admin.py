@@ -168,6 +168,7 @@ class DocketAdmin(admin.ModelAdmin):
     readonly_fields = (
         'date_created',
         'date_modified',
+        'view_count',
     )
     raw_id_fields = (
         'assigned_to',
