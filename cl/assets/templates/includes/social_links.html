@@ -2,7 +2,7 @@
 <div class="sidebar-section">
     <h3><span>Share This</span></h3>
 
-    <div id="share-links">
+    <div id="share-links" class="form-inline">
         <a href="mailto:?subject={{ title|urlencode }}%20at%20CourtListener.com&body={% get_full_host %}{{ request.path }}"
            title="Email this Link to a Friend or Colleague">
             <i class="fa fa-envelope-o fa-lg gray"></i>
@@ -17,10 +17,14 @@
            title="Share on Twitter">
             <i class="fa fa-twitter-square fa-lg gray"></i>
         </a>&nbsp;
-        <input type="text"
-               readonly="readonly"
-               id="copy-input"
-               value="{% get_full_host %}{{ request.path }}"
-               onclick="this.select()"/>
+
+        <div class="form-group">
+            <input type="text"
+                   readonly="readonly"
+                   id="copy-input"
+                   class="form-control input-sm form-inline"
+                   value="{% get_full_host %}{{ request.path }}"
+                   onclick="this.select()"/>
+        </div>
     </div>
 </div>
