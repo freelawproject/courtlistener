@@ -11,6 +11,8 @@
 {% block description %}Docket for {{ docket|best_case_name }}{% endblock %}
 {% block og_description %}Docket for {{ docket|best_case_name }}{% endblock %}
 
+{% block navbar-r %}active{% endblock %}
+
 {% block footer-scripts %}
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/docket-utils.js"></script>
