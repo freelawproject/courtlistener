@@ -93,6 +93,8 @@ class Docket(models.Model):
         (COLUMBIA_AND_RECAP, 'Columbia and RECAP'),
         (COLUMBIA_AND_RECAP_AND_SCRAPER, "Columbia, RECAP and Scraper"),
     )
+    RECAP_SOURCES = [RECAP, RECAP_AND_SCRAPER, COLUMBIA_AND_RECAP,
+                     COLUMBIA_AND_RECAP_AND_SCRAPER]
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
