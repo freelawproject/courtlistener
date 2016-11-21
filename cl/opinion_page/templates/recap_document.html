@@ -177,7 +177,14 @@
             </div>
             {% else %}
             <div class="col-sm-12 alert-warning alert">
-                <p class="bottom">This item is not yet in the RECAP collection. {% if document.pacer_url %}<a class="btn btn-primary btn-sm float-right" href="{{ document.pacer_url }}"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>{% endif %}
+                <p class="bottom">This item is not yet in the RECAP collection.
+                    <span class="float-right">
+                        {% if document.pacer_url %}
+                            <a class="btn btn-primary btn-sm" href="{{ document.pacer_url }}"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
+                        {% endif %}
+                        <a href="https://free.law/recap/"
+                           class="btn btn-success btn-sm">Install RECAP</a>
+                    </span>
                 </p>
             </div>
             {% endif %}
