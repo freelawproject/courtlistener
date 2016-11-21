@@ -36,6 +36,7 @@ def sitemap_maker(request):
 
         # Search
         make_url_dict('advanced_o', priority=0.7, changefreq='weekly'),
+        make_url_dict('advanced_r', priority=0.7, changefreq='weekly'),
         make_url_dict('advanced_oa', priority=0.7, changefreq='weekly'),
         make_url_dict('advanced_p', priority=0.7, changefreq='weekly'),
 
