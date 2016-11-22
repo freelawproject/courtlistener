@@ -75,7 +75,7 @@ a.button:active{
 
 #main-query-box {
     /* margin: 0 auto; */
-    -webkit-transition : all 0.5 s ease;
+    -webkit-transition : all 0.5s ease;
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;
     transition: all 0.5s ease;
@@ -239,7 +239,7 @@ div.hopscotch-bubble .hopscotch-bubble-close {
 }
 
 .settings-nav-item:last-child {
-    margin-right: 0em;
+    margin-right: 0;
 }
 
 .settings-nav-item.active {
@@ -314,11 +314,7 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     border-bottom-left-radius: 6px;
 }
 
-.pointer, .cursor {
-    cursor: pointer;
-    cursor: hand;
-}
-label {
+.pointer, .cursor, label {
     cursor: pointer;
     cursor: hand;
 }
@@ -470,7 +466,7 @@ input.bottom {
 }
 
 .sidebar-section h3 > span {
-    padding: 0.5em 0em 0.1em;
+    padding: 0.5em 0 0.1em;
     border-bottom: 1px solid #ddd;
     line-height: 1.4em;
 }
@@ -694,7 +690,6 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     -moz-border-left-colors: none;
     -moz-border-right-colors: none;
     -moz-border-top-colors: none;
-    background-color: #F5F5F5;
     border-color: #EEEEEE #DEDEDE #DEDEDE #EEEEEE;
     border-right: 1px solid #DEDEDE;
     border-style: solid;
@@ -783,12 +778,12 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     border-collapse: collapse;
 }
 .settings-table th {
-    border-width: 0px 0px 1px 0px;
+    border-width: 0 0 1px 0;
     border-style: solid;
     border-color: gray;
 }
 .settings-table tr {
-    border-width: 0px 0px 1px 0px;
+    border-width: 0 0 1px 0;
     border-style: dotted;
     border-color: gray;
 }
