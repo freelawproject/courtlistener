@@ -204,7 +204,6 @@ class PacerXMLParser(object):
                         "Unable to create docket entry for docket #%s, on "
                         "entry: %s." % (docket, entry_number)
                     )
-                    raise e
 
             recap_doc = self.make_recap_document(
                 doc_node,
@@ -276,7 +275,6 @@ class PacerXMLParser(object):
                              "IntegrityError." % (d.document_number,
                                                   d.attachment_number,
                                                   d.docket_entry))
-                raise e
         return d
 
     def get_court(self):
