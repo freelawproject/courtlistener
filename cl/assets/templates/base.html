@@ -308,7 +308,8 @@
                 <div class="col-xs-6">
                     <div class="col-sm-6 no-gutter">
                         <div class="footer-item">
-                            <a href="https://free.law">Blog</a>
+                            <a href="https://free.law">Blog</a> <span class="alt">&amp;</span>
+                            <a href="https://free.law/newsletter/">Newsletter</a>
                         </div>
                         <div class="footer-item">
                             <a href="{% url "contact" %}">Contact</a>
@@ -349,22 +350,21 @@
 
 {% block social %}
     <div class="text-center" id="social-container">
-        <a href="https://twitter.com/courtlistener" class="fa-stack fa-lg">
+        <a href="https://free.law/" class="fa-stack fa-lg">
+            <i class="fa fa-circle fa-stack-2x gray"></i>
+            <i class="fa fa-link fa-stack-1x fa-inverse"></i>
+        </a>
+        <a href="https://twitter.com/freelawproject" class="fa-stack fa-lg">
             <i class="fa fa-circle fa-stack-2x gray"></i>
             <i class="fa fa-twitter fa-stack-1x fa-inverse"></i>
+        </a>
+        <a href="https://free.law/newsletter/" class="fa-stack fa-lg">
+            <i class="fa fa-circle fa-stack-2x gray"></i>
+            <i class="fa fa-newspaper-o fa-stack-1x fa-inverse"></i>
         </a>
         <a href="https://www.facebook.com/freelawproject" class="fa-stack fa-lg">
             <i class="fa fa-circle fa-stack-2x gray"></i>
             <i class="fa fa-facebook fa-stack-1x fa-inverse"></i>
-        </a>
-        <a href="https://www.linkedin.com/company/free-law-project" class="fa-stack fa-lg">
-            <i class="fa fa-circle fa-stack-2x gray"></i>
-            <i class="fa fa-linkedin fa-stack-1x fa-inverse"></i>
-        </a>
-        <a href="https://plus.google.com/u/0/b/101318679730088826987/101318679730088826987/about"
-           class="fa-stack fa-lg">
-            <i class="fa fa-circle fa-stack-2x gray"></i>
-            <i class="fa fa-google-plus fa-stack-1x fa-inverse"></i>
         </a>
         <a href="https://github.com/freelawproject/courtlistener"
            class="fa-stack fa-lg">
