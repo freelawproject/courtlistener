@@ -6,15 +6,19 @@
         had no results.</h2>
     <p>Search tips:</p>
     <ul>
-        <li>Check your spelling</li>
-        <li>Try fewer filters</li>
-        <li>Remove quotes if you used them</li>
+        <li>Check your spelling.</li>
+        <li>Try fewer filters.</li>
+        <li>Remove quotes if you used them.</li>
     </ul>
-    <p>Our <a href="{% url "coverage" %}">coverage page</a> details which cases
-        we
-        have. If you expected more results than this, <a
-                href="{% url "contact" %}">let us know</a>.
-        We value your feedback.</p>
+    {% if type == 'r' or type_override == 'r' %}
+        <p>The RECAP Archive only contains cases that were downloaded from PACER using the <a href="https://free.law/recap/">RECAP Extensions</a>. If you are looking for a certain case or document that has not yet been downloaded in this way, it will not appear here. If you are encountering this problem, please install the <a href="https://free.law/recap/">RECAP Extension</a>, and purchase this case from PACER.
+        </p>
+    {% else %}
+        <p>Our <a href="{% url "coverage" %}">coverage page</a> details which jurisdictions we support.
+        </p>
+    {% endif %}
+    <p>If you expected more results than this, <a href="{% url "contact" %}">please let us know</a>. We value your feedback.
+    </p>
 {% else %}
     <h2 class="alt">Your search
         {% if request.GET.q %}
