@@ -4,12 +4,12 @@
 {% block description %}
     CourtListener is an initiative of Free Law Project, a Federal
     501(c)(3) non-profit. Your donations make our work possible and support
-    our lean staff.
+    our staff.
 {% endblock %}
 {% block og_description %}
     CourtListener is an initiative of Free Law Project, a Federal
     501(c)(3) non-profit. Your donations make our work possible and support
-    our lean staff.
+    our staff.
 {% endblock %}
 
 {% block navbar-donate %}active{% endblock %}
@@ -101,8 +101,13 @@
 
 {% block content %}
     <div class="col-xs-12">
-        <h2>Support Free Law Project</h2>
+        <div class="row">
+            <h2 class="col-xs-12">Support Free Law Project</h2>
+        </div>
     </div>
+
+    <div class="col-xs-12">
+    <div class="row">
     <div class="col-sm-7 v-offset-above-2">
         {% if message %}
             <div class="alert bg-danger" role="alert">
@@ -419,7 +424,7 @@
         </blockquote>
 
 
-        <h3>Data Donation</h3>
+        <h3>Data Donations</h3>
         <p>We happily accept data donations from a variety of sources. If you
             are interested in sharing data with us that is free from copyright
             restrictions, please get in touch on our <a
@@ -432,5 +437,7 @@
             your data, please refrain from sending it to us or get in touch for
             further discussion.
         </p>
+    </div>
+    </div>
     </div>
 {% endblock %}
