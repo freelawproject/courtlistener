@@ -306,19 +306,34 @@ def show_results(request):
 
 
 def advanced(request):
-    render_dict = {
-        'private': False,
-    }
+    render_dict = {'private': False}
+
     # I'm not thrilled about how this is repeating URLs in a view.
     if request.path == reverse('advanced_o'):
         obj_type = 'o'
-    elif request.path == reverse('advanced_r'):
-        obj_type = 'r'
-    elif request.path == reverse('advanced_oa'):
-        obj_type = 'oa'
-    elif request.path == reverse('advanced_p'):
-        obj_type = 'p'
+        # Needed b/c of facet values.
+        render_dict.update(do_search(request, rows=1, type=obj_type,
+                                     facet=True))
+        render_dict['search_form'] = SearchForm({'type': obj_type})
+        return render(request, 'advanced.html', render_dict)
+    else:
+        if request.path == reverse('advanced_r'):
+            obj_type = 'r'
+        elif request.path == reverse('advanced_oa'):
+            obj_type = 'oa'
+        elif request.path == reverse('advanced_p'):
+            obj_type = 'p'
+        else:
+            raise NotImplementedError("Unknown path: %s" % request.path)
 
-    render_dict.update(do_search(request, rows=1, type=obj_type, facet=True))
-    render_dict['search_form'] = SearchForm({'type': obj_type})
-    return render(request, 'advanced.html', render_dict)
+        courts = Court.objects.filter(in_use=True)
+        search_form = SearchForm({'type': obj_type})
+        courts, court_count_human, court_count = merge_form_with_courts(
+            courts, search_form)
+        render_dict.update({
+            'search_form': search_form,
+            'courts': courts,
+            'court_count_human': court_count_human,
+            'court_count': court_count,
+        })
+        return render(request, 'advanced.html', render_dict)
