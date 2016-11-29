@@ -103,6 +103,44 @@
 <div class="container round-bottom">
     {% block header %}
     <header class="row">
+        <!-- Donate Banner -->
+        {% if not request.COOKIES.no_banner and not user.profile.total_donated_last_year %}
+        <div class="navbar navbar-default subnav alert-danger" role="navigation">
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-xs-7 col-sm-8 col-md-9 col-lg-10">
+                        <p class="navbar-text lead"><a href="https://free.law" target="_blank" class="navbar-link">Free Law Project</a> is having its first ever fundraiser. If you use CourtListener or RECAP, please consider supporting our work with a donation.
+                        </p>
+                    </div>
+                    <div class="col-xs-5 col-sm-4 col-md-3 col-lg-2">
+                        <div class="row">
+                            <div class="col-xs-12">
+                                <button type="button" class="close"
+                                        data-dismiss="alert"
+                                        aria-label="Close"
+                                        id="dismiss-banner">
+                                    <span aria-hidden="true"
+                                          class="x-large">&times;</span></button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-xs-12">
+                                <p class="right">
+                                    <a href="{% url "donate" %}?referrer=navbar-banner"
+                                       class="btn btn-danger v-offset-above-1">Donate</a>
+                                    <a href="https://free.law/fundraisers/2016/"
+                                       target="_blank"
+                                       class="btn btn-default v-offset-above-1">Learn
+                                        More</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Static navbar -->
         <div class="navbar navbar-default" role="navigation">
             <div class="container-fluid">
@@ -187,7 +225,7 @@
         </div><!-- navbar -->
 
         <!--Secondary navbar -->
-        <div class="navbar navbar-default" role="navigation" id="subnav">
+        <div class="navbar navbar-default subnav white-background" role="navigation">
             <div class="container-fluid">
                 <div>
                     <ul class="nav navbar-nav">

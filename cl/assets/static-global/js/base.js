@@ -127,8 +127,6 @@ $(document).ready(function() {
     });
 
 
-
-
     //////////////////
     // Court Picker //
     //////////////////
@@ -174,6 +172,17 @@ $(document).ready(function() {
         }
     });
 
+
+    ///////////////////
+    // Banner Cookie //
+    ///////////////////
+    $('#dismiss-banner').click(function(){
+        var date = new Date();
+        date.setTime(date.getTime() + (2 * 24 * 60 * 60 * 1000)); // Two days.
+        var expires = "; expires=" + date.toGMTString();
+        document.cookie = 'no_banner' + "=" + 'true' + expires + "; path=/";
+        $(this).closest('.navbar').addClass('hidden');
+    });
 
     //////////
     // Tour //

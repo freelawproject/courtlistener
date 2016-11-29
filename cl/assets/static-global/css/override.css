@@ -28,15 +28,14 @@ header {
     background-color: transparent;
     border-bottom: 3px solid #AE0B0B;
 }
-#subnav {
+.subnav {
     min-height: 0;
-    background-color: transparent;
     border-top: 0;
 }
-#subnav .navbar-nav {
+.subnav .navbar-nav {
     margin: 0;
 }
-#subnav .navbar-nav > li {
+.subnav .navbar-nav > li {
     float: left;
 }
 
@@ -286,6 +285,9 @@ div.hopscotch-bubble .hopscotch-bubble-close {
 }
 .green {
     color: green;
+}
+.white-background {
+    background-color: white;
 }
 
 .align-top {
