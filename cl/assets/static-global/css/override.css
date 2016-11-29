@@ -51,6 +51,10 @@ header {
 .table-hover > tbody > tr:target {
     background-color: #f5f5f5;
 }
+/* Standard target color. */
+*:target {
+    background-color: lightyellow;
+}
 
 .alt {
   color: #666;
