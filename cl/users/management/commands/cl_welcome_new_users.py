@@ -1,6 +1,7 @@
 import logging
 import sys
 from datetime import datetime, timedelta
+
 from django.contrib.auth.models import User
 from django.core.mail import send_mass_mail
 from django.core.management.base import BaseCommand
@@ -29,9 +30,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.options = options
         yesterday = make_aware(datetime.now(), utc) - timedelta(days=1)
-        recipients = User.objects.filter(
-            date_joined__gt=yesterday,
-        )
+        recipients = User.objects.filter(date_joined__gt=yesterday,
+                                         profile__stub_account=False)
         if recipients:
             if self.options['simulate']:
                 sys.stdout.write(
