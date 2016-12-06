@@ -1,8 +1,9 @@
-from django.core.management.base import BaseCommand
 from datetime import timedelta
-from django.utils.timezone import now
-from cl.donate.models import Donation
 
+from django.core.management.base import BaseCommand
+from django.utils.timezone import now
+
+from cl.donate.models import Donation
 
 TOO_MANY_DAYS_AGO = now() - timedelta(days=7)
 
@@ -35,17 +36,15 @@ class Command(BaseCommand):
                 payment_provider='paypal',
                 date_created__lt=TOO_MANY_DAYS_AGO,
                 status__in=[
-                    0,
-                    1,
-                    3,  # Cancelled
+                    Donation.AWAITING_PAYMENT,
+                    Donation.UNKNOWN_ERROR,
+                    Donation.CANCELLED,
                 ]
             ),
             'Stripe': Donation.objects.filter(
                 payment_provider='stripe',
                 date_created__lt=TOO_MANY_DAYS_AGO,
-                status__in=[
-                    0,
-                ]
+                status=Donation.AWAITING_PAYMENT,
             ),
         }
 

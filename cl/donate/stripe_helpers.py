@@ -1,17 +1,16 @@
-import logging
 import json
-import stripe
-
+import logging
 from datetime import datetime
+
+import stripe
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.http import HttpResponseNotAllowed, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import utc
+from django.views.decorators.csrf import csrf_exempt
 
 from cl.donate.models import Donation
 from cl.donate.utils import send_thank_you_email
-
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +28,10 @@ def process_stripe_callback(request):
         # Now use the API to call back.
         stripe.api_key = settings.STRIPE_SECRET_KEY
         event = json.loads(str(stripe.Event.retrieve(event_id)))
-        logger.info('Stripe callback triggered. See webhook documentation for details.')
+        logger.info('Stripe callback triggered. See webhook documentation for '
+                    'details.')
         if event['type'].startswith('charge') and \
-                        event['livemode'] != settings.PAYMENT_TESTING_MODE:
+                event['livemode'] != settings.PAYMENT_TESTING_MODE:
             charge = event['data']['object']
             try:
                 d = Donation.objects.get(payment_id=charge['id'])
@@ -42,7 +42,7 @@ def process_stripe_callback(request):
             if event['type'].endswith('succeeded'):
                 d.clearing_date = datetime.utcfromtimestamp(
                     charge['created']).replace(tzinfo=utc)
-                d.status = 4
+                d.status = Donation.PROCESSED
                 send_thank_you_email(d)
             elif event['type'].endswith('failed'):
                 if not d:
@@ -50,15 +50,15 @@ def process_stripe_callback(request):
                                         'database. No action needed.</h1>')
                 d.clearing_date = datetime.utcfromtimestamp(
                     charge['created']).replace(tzinfo=utc)
-                d.status = 1
+                d.status = Donation.AWAITING_PAYMENT
             elif event['type'].endswith('refunded'):
                 d.clearing_date = datetime.utcfromtimestamp(
                     charge['created']).replace(tzinfo=utc)
-                d.status = 7
+                d.status = Donation.RECLAIMED_REFUNDED
             elif event['type'].endswith('captured'):
                 d.clearing_date = datetime.utcfromtimestamp(
                     charge['created']).replace(tzinfo=utc)
-                d.status = 8
+                d.status = Donation.CAPTURED
             elif event['type'].endswith('dispute.created'):
                 logger.critical("Somebody has created a dispute in "
                                 "Stripe: %s" % charge['id'])
@@ -91,7 +91,7 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
         )
         response = {
             'message': None,
-            'status': 0,  # Awaiting payment
+            'status': Donation.AWAITING_PAYMENT,
             'payment_id': charge.id,
             'redirect': reverse('stripe_complete'),
         }
@@ -101,7 +101,7 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
             'message': 'Oops, we had a problem processing your card: '
                        '<strong>%s</strong>' %
                        e.json_body['error']['message'],
-            'status': 1,  # ERROR
+            'status': Donation.UNKNOWN_ERROR,
             'payment_id': None,
             'redirect': None,
         }

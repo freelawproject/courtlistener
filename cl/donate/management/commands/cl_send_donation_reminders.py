@@ -7,6 +7,7 @@ from django.db.models import Sum
 from django.template import loader
 from django.utils.timezone import now
 
+from cl.donate.models import Donation
 from cl.search.models import Opinion, Court
 from cl.stats import Stat
 
@@ -45,7 +46,7 @@ class Command(BaseCommand):
             donations__date_created__gt=about_a_year_ago,
             donations__date_created__lte=about_a_year_ago + timedelta(days=1),
             donations__send_annual_reminder=True,
-            donations__status=4,
+            donations__status=Donation.PROCESSED,
         ).annotate(Sum('donations__amount'))
 
     def send_reminder_email(self, user, amount):

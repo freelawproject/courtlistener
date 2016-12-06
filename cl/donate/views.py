@@ -6,6 +6,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 
 from cl.donate.forms import DonationForm, UserForm, ProfileForm
+from cl.donate.models import Donation
 from cl.donate.paypal import process_paypal_payment
 from cl.donate.stripe_helpers import process_stripe_payment
 from cl.users.utils import create_stub_account
@@ -27,7 +28,7 @@ def route_and_process_donation(cd_donation_form, cd_user_form, stripe_token):
         if response['result'] == 'created':
             response = {
                 'message': None,
-                'status': 0,  # AWAITING_PAYMENT
+                'status': Donation.AWAITING_PAYMENT,
                 'payment_id': response['payment_id'],
                 'transaction_id': response['transaction_id'],
                 'redirect': response['redirect'],
@@ -36,7 +37,7 @@ def route_and_process_donation(cd_donation_form, cd_user_form, stripe_token):
             response = {
                 'message': 'We had an error working with PayPal. Please try '
                            'another payment method.',
-                'status': 1,  # ERROR
+                'status': Donation.UNKNOWN_ERROR,
                 'payment_id': None,
                 'redirect': None,
             }
@@ -107,14 +108,9 @@ def donate(request):
                 user_form = UserForm(request.POST)
                 profile_form = ProfileForm(request.POST)
         else:
-            user_form = UserForm(
-                request.POST,
-                instance=request.user
-            )
-            profile_form = ProfileForm(
-                request.POST,
-                instance=request.user.profile
-            )
+            user_form = UserForm(request.POST, instance=request.user)
+            profile_form = ProfileForm(request.POST,
+                                       instance=request.user.profile)
 
         if all([donation_form.is_valid(),
                 user_form.is_valid(),
@@ -133,7 +129,7 @@ def donate(request):
             )
             logger.info("Payment routed with response: %s" % response)
 
-            if response['status'] == 0:
+            if response['status'] == Donation.AWAITING_PAYMENT:
                 if request.user.is_anonymous() and not stub_account:
                     # Create a stub account with an unusable password
                     user, profile = create_stub_account(

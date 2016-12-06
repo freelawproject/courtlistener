@@ -75,13 +75,13 @@ def process_paypal_callback(request):
         # processing completed successfully (4). Alas, PayPal is so terrible
         # that I can't figure that out, so we just assume that if it gets
         # completed (2), it'll get processed (4).
-        d.status = 4
+        d.status = Donation.PROCESSED
         d.save()
         send_thank_you_email(d)
     else:
         logger.critical("Unable to execute PayPal transaction. Status code %s "
                         "with data: %s" % (r.status_code, r.content))
-        d.status = 1
+        d.status = Donation.UNKNOWN_ERROR
         d.save()
     # Finally, show them the thank you page
     return HttpResponseRedirect(reverse('paypal_complete'))
@@ -153,7 +153,7 @@ def process_paypal_payment(cd_donation_form):
 
 def donate_paypal_cancel(request):
     d = Donation.objects.get(transaction_id=request.GET['token'])
-    d.status = 3  # Cancelled, bummer
+    d.status = Donation.CANCELLED
     d.save()
 
     return render(request, 'donate_complete.html', {

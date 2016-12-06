@@ -1,28 +1,40 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-PROVIDERS = (
-    ('dwolla', 'Dwolla'),
-    ('paypal', 'PayPal'),
-    ('cc', 'Credit Card'),
-    ('check', 'Check'),
-)
-# These statuses are shown on the profile page. Be warned.
-PAYMENT_STATUSES = (
-    (0, 'Awaiting Payment'),
-    (1, 'Unknown Error'),
-    # This does not mean we get the money; must await "PROCESSED" for that.
-    (2, 'Completed, but awaiting processing'),
-    (3, 'Cancelled'),
-    (4, 'Processed'),  # Gold standard.
-    (5, 'Pending'),
-    (6, 'Failed'),
-    (7, 'Reclaimed/Refunded'),
-    (8, 'Captured'),
-)
-
 
 class Donation(models.Model):
+    # These statuses are shown on the profile page. Be warned.
+    AWAITING_PAYMENT = 0
+    UNKNOWN_ERROR = 1
+    COMPLETED_AWAITING_PROCESSING = 2
+    CANCELLED = 3
+    PROCESSED = 4
+    PENDING = 5
+    FAILED = 6
+    RECLAIMED_REFUNDED = 7
+    CAPTURED = 8
+    PAYMENT_STATUSES = (
+        (AWAITING_PAYMENT, 'Awaiting Payment'),
+        (UNKNOWN_ERROR, 'Unknown Error'),
+        # This does not mean we get the money; must await "PROCESSED" for that.
+        (COMPLETED_AWAITING_PROCESSING, 'Completed, but awaiting processing'),
+        (CANCELLED, 'Cancelled'),
+        (PROCESSED, 'Processed'),  # Gold standard.
+        (PENDING, 'Pending'),
+        (FAILED, 'Failed'),
+        (RECLAIMED_REFUNDED, 'Reclaimed/Refunded'),
+        (CAPTURED, 'Captured'),
+    )
+    DWOLLA = 'dwolla'
+    PAYPAL = 'paypal'
+    CREDIT_CARD = 'cc'
+    CHECK = 'check'
+    PROVIDERS = (
+        (DWOLLA, 'Dwolla'),
+        (PAYPAL, 'PayPal'),
+        (CREDIT_CARD, 'Credit Card'),
+        (CHECK, 'Check'),
+    )
     donor = models.ForeignKey(
         User,
         help_text="The user that made the donation",
