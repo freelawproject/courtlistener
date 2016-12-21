@@ -1,6 +1,6 @@
+import calendar
 import logging
 import os
-import time
 
 import requests
 from celery.canvas import chain, chord
@@ -37,7 +37,7 @@ def get_new_content_from_recap():
     new_log = RECAPLog.objects.create(status=RECAPLog.GETTING_CHANGELIST)
 
     r = requests.post(RECAP_MOD_URL, {
-        'tpq': time.mktime(last_success.date_started.timetuple())
+        'tpq': calendar.timegm(last_success.date_started.timetuple()),
     })
     items = []
     keys = ['court_id', 'case_number', 'document_number', 'attachment_number',
