@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 
 {% block title %}Markdown Guide – CourtListener.com{% endblock %}
+{% block footer-scripts %}
+    {% include "includes/anchors.html" %}
+{% endblock %}
 {% block sidebar %}{% endblock %}
+
 
 {% block content %}
     <div class="col-sm-8">
@@ -197,16 +201,16 @@ The [Free Law Project](https://free.law) is a 501(c)(3) non-profit.</pre>
                 </p>
             </div>
         </div>
+        <div id="links-footnote-style">
         <p>The third way is again borrowed from email and uses footnotes:</p>
         <pre>
 We rely on your [donations][1] to survive.
 
-Some of our projects are [CourtListener][cl], [RECAP][recap], and [OpenJudiciary][oj].
+Some of our projects are [CourtListener][cl] and [RECAP][r].
 
 [1]: https://www.courtlistener.com{% url "donate" %}
-[cl]: https://courtlistener.com/
-[recap]: https://free.law/recap/
-[oj]: http://openjudicary.org</pre>
+[cl]: https://www.courtlistener.com/
+[r]: https://free.law/recap/</pre>
 
         <p>Becomes:</p>
         <div class="panel panel-default">
@@ -216,15 +220,15 @@ Some of our projects are [CourtListener][cl], [RECAP][recap], and [OpenJudiciary
                     to survive.</p>
 
                 <p>Some of our projects are <a
-                        href="https://courtlistener.com/">CourtListener</a>, <a
-                        href="https://free.law/recap/">RECAP</a>, and <a
-                        href="http://openjudicary.org">OpenJudiciary</a>. </p>
+                        href="https://www.courtlistener.com/">CourtListener</a> and <a
+                        href="https://free.law/recap/">RECAP</a>. </p>
 
             </div>
         </div>
         <p>Note that you're free to use numbers or any other specific text when creating these footnote-style links. It's often easier to give them meaningful names instead of numbers so that you can remember them later if you want to use the same footnote a second or third time. (Above, I used
-            <code>1</code>, <code>cl</code>, <code>recap</code>, <code>oj</code>, but I could have used anything.)
+            <code>1</code>, <code>cl</code>, and <code>r</code> but I could have used anything.)
         </p>
+        </div>
 
 
         <h3 id="quotes" class="v-offset-above-3">Quotes</h3>
