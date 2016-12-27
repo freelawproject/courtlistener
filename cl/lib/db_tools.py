@@ -1,5 +1,6 @@
 from datetime import timedelta
-from cl import settings
+
+from django.conf import settings
 
 
 def queryset_generator(queryset, chunksize=1000):

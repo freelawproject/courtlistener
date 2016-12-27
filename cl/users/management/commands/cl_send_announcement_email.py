@@ -3,11 +3,11 @@ import logging
 import sys
 import time
 
+from django.conf import settings
 from django.core.mail import send_mass_mail
 from django.core.management.base import BaseCommand
 from django.template import loader
 
-from cl import settings
 from cl.lib.argparse_types import csv_list
 from cl.lib.utils import chunks
 from cl.stats import tally_stat

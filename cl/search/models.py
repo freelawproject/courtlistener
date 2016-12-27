@@ -3,6 +3,7 @@ import re
 from datetime import datetime, time
 
 from celery.canvas import chain
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
@@ -10,7 +11,6 @@ from django.template import loader
 from django.utils.encoding import smart_unicode
 from django.utils.text import slugify
 
-from cl import settings
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.model_helpers import make_upload_path, make_recap_path
 from cl.lib.search_index_utils import InvalidDocumentError, null_map, nuke_nones

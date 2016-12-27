@@ -3,10 +3,10 @@ import os
 from datetime import timedelta
 
 from celery.task.sets import subtask
+from django.conf import settings
 from django.test import TestCase, override_settings
 from django.utils.timezone import now
 
-from cl import settings
 from cl.audio.models import Audio
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.DupChecker import DupChecker

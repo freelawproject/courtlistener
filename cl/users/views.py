@@ -4,6 +4,7 @@ import random
 import re
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash, logout
 from django.contrib.auth.decorators import login_required
@@ -19,7 +20,6 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import (sensitive_post_parameters,
                                            sensitive_variables)
 
-from cl import settings
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib import search_utils
