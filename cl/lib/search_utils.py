@@ -3,7 +3,6 @@ from urllib import urlencode
 from urlparse import parse_qs
 
 from django.conf import settings
-from django.utils.timezone import now
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
@@ -655,30 +654,11 @@ def build_main_query(cd, highlight='all', order_by='', facet=True):
     return main_params
 
 
-def get_court_start_year(conn, court):
-    """Get the start year for a court by placing a Solr query. If a court is
-    active, but does not yet have any results, return the current year.
-    """
-    if court.lower() == 'all':
-        params = {'sort': 'dateFiled asc', 'rows': 1, 'q': '*'}
-    else:
-        params = {'fq': ['court_exact:%s' % court], 'sort': 'dateFiled asc', 'rows': 1}
-    params['caller'] = 'search_utils'
-    response = conn.raw_query(**params).execute()
-    try:
-        year = response.result.docs[0]['dateFiled'].year
-    except IndexError:
-        # Occurs when there are 0 results for an active court (rare but possible)
-        year = now().year
-
-    return year
-
-
-def build_coverage_query(court, start_year, q):
+def build_coverage_query(court, q):
     params = {
         'facet': 'true',
         'facet.range': 'dateFiled',
-        'facet.range.start': '%d-01-01T00:00:00Z' % start_year,
+        'facet.range.start': '1600-01-01T00:00:00Z',  # Assume very early date.
         'facet.range.end': 'NOW/DAY',
         'facet.range.gap': '+1YEAR',
         'rows': 0,

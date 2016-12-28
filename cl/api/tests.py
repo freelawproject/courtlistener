@@ -1,3 +1,4 @@
+import json
 import shutil
 from datetime import timedelta, date
 
@@ -10,6 +11,7 @@ from cl.api.management.commands.cl_make_bulk_data import Command
 from cl.api.utils import BulkJsonHistory
 from cl.api.views import coverage_data
 from cl.audio.models import Audio
+from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
     Command as OralArgumentCommand
 from cl.scrapers.test_assets import test_oral_arg_scraper
@@ -136,9 +138,7 @@ class BasicAPIPageTest(TestCase):
             self.assertContains(response, header)
 
 
-class ApiViewTest(TestCase):
-    """Tests views in API module via direct calls and not HTTP"""
-    fixtures = ['court_data.json']
+class CoverageTests(IndexedSolrTestCase):
 
     def test_coverage_data_view_provides_court_data(self):
         response = coverage_data(HttpRequest(), 'v2', 'ca9')
@@ -146,6 +146,24 @@ class ApiViewTest(TestCase):
         self.assertIsInstance(response, JsonResponse)
         self.assertContains(response, 'annual_counts')
         self.assertContains(response, 'total')
+
+    def test_coverage_data_all_courts(self):
+        r = self.client.get(reverse('coverage_data', kwargs={
+            'version': '3',
+            'court': 'all',
+        }))
+        j = json.loads(r.content)
+        self.assertTrue(len(j['annual_counts'].keys()) > 0)
+        self.assertIn('total', j)
+
+    def test_coverage_data_specific_court(self):
+        r = self.client.get(reverse('coverage_data', kwargs={
+            'version': '3',
+            'court': 'ca1',
+        }))
+        j = json.loads(r.content)
+        self.assertTrue(len(j['annual_counts'].keys()) > 0)
+        self.assertIn('total', j)
 
 
 def assertCount(cls, path, q, expected_count):

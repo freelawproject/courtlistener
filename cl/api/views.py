@@ -1,11 +1,12 @@
 import os
 
+from django.conf import settings
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from rest_framework import status
 
-from cl import settings
-from cl.lib import magic, search_utils, sunburnt
+from cl.lib import magic, sunburnt
+from cl.lib.search_utils import build_coverage_query, build_court_count_query
 from cl.search.models import Court
 from cl.stats import tally_stat
 
@@ -35,8 +36,7 @@ def annotate_courts_with_counts(courts, court_count_tuples):
 def make_court_variable():
     courts = Court.objects.exclude(jurisdiction='T')  # Non-testing courts
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
-    response = conn.raw_query(
-        **search_utils.build_court_count_query()).execute()
+    response = conn.raw_query(**build_court_count_query()).execute()
     court_count_tuples = response.facet_counts.facet_fields['court_exact']
     courts = annotate_courts_with_counts(courts, court_count_tuples)
     return courts
@@ -101,21 +101,28 @@ def serve_pagerank_file(request):
     return response
 
 
-def strip_trailing_zeroes(data):
-    """Removes zeroes from the end of the court data
+def strip_zero_years(data):
+    """Removes zeroes from the ends of the court data
 
     Some courts only have values through to a certain date, but we don't
     check for that in our queries. Instead, we truncate any zero-values that
     occur at the end of their stats.
     """
-    i = len(data) - 1
-    while i > 0:
-        if data[i][1] == 0:
-            i -= 1
-        else:
+    start = 0
+    end = len(data)
+    # Slice off zeroes at the beginning
+    for i, data_pair in enumerate(data):
+        if data_pair[1] != 0:
+            start = i
             break
 
-    return data[:i + 1]
+    # Slice off zeroes at the end
+    for i, data_pair in reversed(list(enumerate(data))):
+        if data_pair[1] != 0:
+            end = i
+            break
+
+    return data[start:end+1]
 
 
 def coverage_data(request, version, court):
@@ -130,12 +137,9 @@ def coverage_data(request, version, court):
         court_str = 'all'
     q = request.GET.get('q')
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
-    start_year = search_utils.get_court_start_year(conn, court_str)
-    response = conn.raw_query(
-        **search_utils.build_coverage_query(court_str, start_year, q)
-    ).execute()
+    response = conn.raw_query(**build_coverage_query(court_str, q)).execute()
     counts = response.facet_counts.facet_ranges[0][1][0][1]
-    counts = strip_trailing_zeroes(counts)
+    counts = strip_zero_years(counts)
 
     # Calculate the totals
     annual_counts = {}
@@ -143,12 +147,11 @@ def coverage_data(request, version, court):
     for date_string, count in counts:
         annual_counts[date_string[:4]] = count
         total_docs += count
-    response = {
+
+    return JsonResponse({
         'annual_counts': annual_counts,
         'total': total_docs,
-    }
-
-    return JsonResponse(response, safe=True)
+    }, safe=True)
 
 
 def deprecated_api(request, v):
