@@ -1,8 +1,10 @@
 import hashlib
-from cl.users.models import UserProfile
-from django.contrib.auth.models import User
+
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.models import User
+
+from cl.users.models import UserProfile
 
 
 def create_stub_account(user_data, profile_data):
@@ -74,7 +76,7 @@ emails = {
     },
     'email_changed_successfully': {
         'subject': 'Email changed successfully on CourtListener',
-        'body': "Hello, %s,\n\n"
+        'body': "Hello %s,\n\n"
                 "You have successfully changed your email address at "
                 "CourtListener. Please confirm this change by clicking the "
                 "following link within five days:\n\n"
