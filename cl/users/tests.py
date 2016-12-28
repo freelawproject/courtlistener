@@ -1,12 +1,14 @@
 # coding=utf-8
 from datetime import timedelta
+
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.urlresolvers import reverse
 from django.test import LiveServerTestCase
-from django.utils.timezone import now
 from django.utils.http import urlsafe_base64_encode
+from django.utils.timezone import now
 from selenium import webdriver
+from timeout_decorator import timeout_decorator
 
 from cl.users.models import UserProfile
 
@@ -105,6 +107,7 @@ class LiveUserTest(LiveServerTestCase):
         cls.selenium.quit()
         super(LiveUserTest, cls).tearDownClass()
 
+    @timeout_decorator.timeout(45)
     def test_reset_password_using_the_HTML(self):
         """Can we use the HTML form to send a reset email?
 
@@ -130,6 +133,7 @@ class LiveUserTest(LiveServerTestCase):
             )
         )
 
+    @timeout_decorator.timeout(45)
     def test_set_password_using_the_HTML(self):
         """Can we reset our password after generating a confirmation link?"""
         # Generate a token and use it to visit a generated reset URL
