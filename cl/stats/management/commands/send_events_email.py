@@ -17,8 +17,7 @@ class Command(BaseCommand):
         events = Event.objects.filter(date_created__gte=yesterday)
         if events.count() > 0:
             template = loader.get_template('emails/events_email.txt')
-            txt = template.render({'events': events})
             mail_admins(
                 'CourtListener events email for %s' % today.date().isoformat(),
-                txt,
+                template.render({'events': events}),
             )
