@@ -9,7 +9,7 @@ from django.utils.timezone import now
 
 from cl.donate.models import Donation
 from cl.search.models import Opinion, Court
-from cl.stats import Stat
+from cl.stats.models import Stat
 
 
 class Command(BaseCommand):

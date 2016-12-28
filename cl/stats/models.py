@@ -19,6 +19,17 @@ class Stat(models.Model):
 
     class Meta:
         unique_together = ('date_logged', 'name')
-        # needed b/c the __init__.py file imports this class before the
-        # application would normally be loaded.
-        app_label = 'stats'
+
+
+class Event(models.Model):
+    date_created = models.DateTimeField(
+        help_text="The moment when the event was logged",
+        auto_now_add=True,
+    )
+    description = models.CharField(
+        help_text="A human-readable description of the event",
+        max_length=200,
+    )
+
+    def __unicode__(self):
+        return '<%s: Event>' % self.pk

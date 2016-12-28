@@ -14,7 +14,7 @@ from cl.lib import search_utils
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import regroup_snippets
 from cl.search.forms import SearchForm
-from cl.stats import tally_stat
+from cl.stats.utils import tally_stat
 
 logger = logging.getLogger(__name__)
 

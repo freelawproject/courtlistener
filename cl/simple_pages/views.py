@@ -20,7 +20,7 @@ from cl.people_db.models import Person
 from cl.search.forms import SearchForm
 from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument
 from cl.simple_pages.forms import ContactForm
-from cl.stats import tally_stat
+from cl.stats.utils import tally_stat
 
 
 def about(request):

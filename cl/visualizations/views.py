@@ -16,7 +16,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
 
 from cl.lib.bot_detector import is_bot
-from cl.stats import tally_stat
+from cl.stats.utils import tally_stat
 from cl.visualizations.forms import VizForm, VizEditForm
 from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
 from cl.visualizations.tasks import get_title

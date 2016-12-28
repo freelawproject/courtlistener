@@ -23,7 +23,7 @@ from django.views.decorators.debug import (sensitive_post_parameters,
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib import search_utils
-from cl.stats import tally_stat
+from cl.stats.utils import tally_stat
 from cl.users.forms import (
     ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm,
     CustomPasswordChangeForm

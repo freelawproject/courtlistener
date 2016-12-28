@@ -10,7 +10,7 @@ from django.template import loader
 
 from cl.lib.argparse_types import csv_list
 from cl.lib.utils import chunks
-from cl.stats import tally_stat
+from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
 logger = logging.getLogger(__name__)

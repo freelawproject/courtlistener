@@ -25,7 +25,8 @@ from cl.lib.search_utils import build_main_query, get_query_citation, \
     regroup_snippets
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
-from cl.stats import tally_stat, Stat
+from cl.stats.models import Stat
+from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
