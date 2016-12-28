@@ -6,6 +6,8 @@ from datetime import date
 import redis
 from dateutil import parser
 from django.conf import settings
+from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
+from django.core.mail import send_mail
 from django.utils.encoding import force_text
 from django.utils.timezone import now
 from rest_framework import serializers
@@ -15,6 +17,8 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import RelatedFilter
 
 from cl.lib.utils import mkdir_p
+from cl.stats.models import Event
+from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
 
 DATETIME_LOOKUPS = ['exact', 'gte', 'gt', 'lte', 'lt', 'range', 'year',
                     'month', 'day', 'hour', 'minute', 'second']
@@ -120,6 +124,7 @@ class LoggingMixin(object):
      - How many queries total made by user X?
      - How many queries per day made by user X?
     """
+    milestones = get_milestone_range('SM', 'XXXL')
 
     def initial(self, request, *args, **kwargs):
         super(LoggingMixin, self).initial(request, *args, **kwargs)
@@ -149,7 +154,28 @@ class LoggingMixin(object):
         pipe.zincrby('api:v3.endpoint.counts', endpoint)
         pipe.zincrby('api:v3.endpoint.d:%s.counts' % d, endpoint)
 
-        pipe.execute()
+        results = pipe.execute()
+        total_count = results[0]
+        user_count = results[2]
+
+        if total_count in MILESTONES_FLAT:
+            Event.objects.create(description="API has logged %s total requests."
+                                             % total_count)
+        if user.is_authenticated():
+            if user_count in self.milestones:
+                Event.objects.create(
+                    description="User '%s' has placed their %s API request." %
+                                (user.username, intcomma(ordinal(user_count))),
+                    user=user,
+                )
+            if user_count == 5:
+                email = emails['new_api_user']
+                send_mail(
+                    email['subject'],
+                    email['body'] % user.first_name or 'there',
+                    email['from'],
+                    [user.email],
+                )
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):
@@ -281,3 +307,29 @@ class BulkJsonHistory(object):
             # last_attempt wasn't set ahead of time.
             self.json['duration'] = "Unknown"
         self.save_to_disk()
+
+
+emails = {
+    'new_api_user': {
+        'subject': "Welcome to the CourtListener API from Free Law Project",
+        'body': ("Hi%s,\n\n"
+                 "I'm Mike Lissner, the main guy behind CourtListener and Free "
+                 "Law Project, the non-profit that runs it. I noticed that you "
+                 "started using the API a bit today (we watch our logs closely "
+                 "when it comes to the API!) and I just wanted to reach out, "
+                 "say hello, and make sure that everything is working properly "
+                 "and making sense.\n\n"
+                 "We've found that the API can be a bit complicated at first, "
+                 "and that sometimes it helps to get a quick conversation "
+                 "going when people are first exploring the APIs.\n\n"
+                 "Feel free to respond to this email with any questions that "
+                 "come up or comments that occur to you about the API, and I "
+                 "can usually respond pretty quickly to help out or address "
+                 "issues.\n\n"
+                 "Enjoy the API and thanks for giving it a try!\n\n"
+                 "Mike Lisner\n"
+                 "Founder, Free Law Project\n"
+                 "https://www.courtlistener.com/donate/\n"),
+        'from': "Mike Lissner <mlissner@courtlistener.com>",
+    },
+}

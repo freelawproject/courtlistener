@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.db import models
 from django.utils.encoding import smart_unicode
 
@@ -30,6 +31,13 @@ class Event(models.Model):
         help_text="A human-readable description of the event",
         max_length=200,
     )
+    user = models.ForeignKey(
+        User,
+        help_text="A user associated with the event.",
+        related_name="events",
+        null=True,
+        blank=True,
+    )
 
     def __unicode__(self):
-        return '<%s: Event>' % self.pk
+        return '%s: Event Object' % self.pk
