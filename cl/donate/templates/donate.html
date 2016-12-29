@@ -351,16 +351,22 @@
         </form>
 
         <div id="check-info">
-            <p>For instructions on donating by check, please get in touch on <a
-                    href="{% url "contact" %}">our contact page</a>.
-                Unfortunately, due to the nature of our work, we no longer have
-                a public mailing address.
-            </p>
-            <p class="bold">We cannot accept starter checks, unnumbered checks
-                or non-personalized checks.
-            </p>
+            {% if user.is_staff %}
+                <h4>Welcome staff member</h4>
+                <p>Please use the staff-only form to log check donations.</p>
+                <a href="{% url "make_check_donation" %}" class="btn btn-lg btn-primary">Log Check Donation</a>
+            {% else %}
+                <p>For instructions on donating by check, <a
+                        href="{% url "contact" %}">please get in touch on our contact page</a>.
+                    Unfortunately, due to the nature of our work, we no longer have
+                    a public mailing address.
+                </p>
+                <p class="bold">We cannot accept starter checks, unnumbered checks
+                    or non-personalized checks.
+                </p>
 
-            <p>Thanks so much for your donation.</p>
+                <p>Thanks so much for your donation.</p>
+            {% endif %}
         </div>
     </div>
 
