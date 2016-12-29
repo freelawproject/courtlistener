@@ -279,8 +279,6 @@ REST_FRAMEWORK = {
         'user': '5000/hour',
     },
     'OVERRIDE_THROTTLE_RATES': {
-        'scout': '10000/hour',
-        'scout_test': '10000/hour',
         'waldo': '10000/hour',
         'peidelman': '20000/hour',
     },
