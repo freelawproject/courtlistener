@@ -1,7 +1,9 @@
 import logging
 
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import User
+from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 
@@ -86,27 +88,20 @@ def donate(request):
                     email__iexact=request.POST.get('email')
                 )
             except User.DoesNotExist:
-                stub_account = False
-
-            if stub_account:
+                # Either a regular account or an email address we've never
+                # seen before. Create a new user from the POST data.
+                user_form = UserForm(request.POST)
+                profile_form = ProfileForm(request.POST)
+            else:
                 # We use the stub account and anonymous users even are allowed
                 # to update it. This is OK, because we don't care too much
                 # about the accuracy of this data. Later if/when this becomes
                 # a real account, anonymous users won't be able to update this
                 # information -- that's what matters.
-                user_form = UserForm(
-                    request.POST,
-                    instance=stub_account
-                )
-                profile_form = ProfileForm(
-                    request.POST,
-                    instance=stub_account.profile
-                )
-            else:
-                # Either a regular account or an email address we've never
-                # seen before. Create a new user from the POST data.
-                user_form = UserForm(request.POST)
-                profile_form = ProfileForm(request.POST)
+                user_form = UserForm(request.POST, instance=stub_account)
+                profile_form = ProfileForm(request.POST,
+                                           instance=stub_account.profile)
+
         else:
             user_form = UserForm(request.POST, instance=request.user)
             profile_form = ProfileForm(request.POST,
@@ -132,16 +127,14 @@ def donate(request):
             if response['status'] == Donation.AWAITING_PAYMENT:
                 if request.user.is_anonymous() and not stub_account:
                     # Create a stub account with an unusable password
-                    user, profile = create_stub_account(
-                        cd_user_form,
-                        cd_profile_form,
-                    )
+                    user, profile = create_stub_account(cd_user_form,
+                                                        cd_profile_form)
                     user.save()
                     profile.save()
                 else:
                     # Logged in user or an existing stub account.
                     user = user_form.save()
-                    profile = profile_form.save()
+                    profile_form.save()
 
                 d = donation_form.save(commit=False)
                 d.status = response['status']
@@ -160,29 +153,23 @@ def donate(request):
     else:
         # Loading the page...
         try:
-            donation_form = DonationForm(
-                initial={
-                    'referrer': request.GET.get('referrer')
-                }
-            )
-            user_form = UserForm(
-                initial={
-                    'first_name': request.user.first_name,
-                    'last_name': request.user.last_name,
-                    'email': request.user.email,
-                }
-            )
+            donation_form = DonationForm(initial={
+                'referrer': request.GET.get('referrer')
+            })
+            user_form = UserForm(initial={
+                'first_name': request.user.first_name,
+                'last_name': request.user.last_name,
+                'email': request.user.email,
+            })
             up = request.user.profile
-            profile_form = ProfileForm(
-                initial={
-                    'address1': up.address1,
-                    'address2': up.address2,
-                    'city': up.city,
-                    'state': up.state,
-                    'zip_code': up.zip_code,
-                    'wants_newsletter': up.wants_newsletter
-                }
-            )
+            profile_form = ProfileForm(initial={
+                'address1': up.address1,
+                'address2': up.address2,
+                'city': up.city,
+                'state': up.state,
+                'zip_code': up.zip_code,
+                'wants_newsletter': up.wants_newsletter
+            })
         except AttributeError:
             # for anonymous users, who lack profile info
             user_form = UserForm()
@@ -216,3 +203,59 @@ def donate_complete(request):
         'error': error,
         'private': True,
     })
+
+
+@staff_member_required
+def make_check_donation(request):
+    """A page for admins to use to input check donations manually."""
+    if request.method == 'POST':
+        data = request.POST.copy()
+        data.update({
+            'payment_provider': Donation.CHECK,
+            'amount': 'other',
+        })
+        donation_form = DonationForm(data)
+        # Get the user, if we can. Else, set up the form to create a new user.
+        try:
+            user = User.objects.get(email__iexact=request.POST.get('email'))
+        except User.DoesNotExist:
+            user = None
+            user_form = UserForm(request.POST)
+            profile_form = ProfileForm(request.POST)
+        else:
+            user_form = UserForm(request.POST, instance=user)
+            profile_form = ProfileForm(request.POST, instance=user.profile)
+
+        if all([donation_form.is_valid(),
+                user_form.is_valid(),
+                profile_form.is_valid()]):
+            cd_user_form = user_form.cleaned_data
+            cd_profile_form = profile_form.cleaned_data
+            if user is not None:
+                user = user_form.save()
+                profile_form.save()
+            else:
+                user, profile = create_stub_account(cd_user_form,
+                                                    cd_profile_form)
+                user.save()
+                profile.save()
+
+            d = donation_form.save(commit=False)
+            d.status = Donation.PROCESSED
+            d.donor = user
+            d.save()
+
+            return HttpResponseRedirect(reverse('check_complete'))
+    else:
+        donation_form = DonationForm()
+        user_form = UserForm()
+        profile_form = ProfileForm()
+
+    return render(request, 'check_donation.html', {
+        'donation_form': donation_form,
+        'profile_form': profile_form,
+        'user_form': user_form,
+        'private': True,
+    })
+
+

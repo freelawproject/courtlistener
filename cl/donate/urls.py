@@ -2,7 +2,7 @@ from django.conf.urls import url
 
 from cl.donate.paypal import process_paypal_callback, donate_paypal_cancel
 from cl.donate.stripe_helpers import process_stripe_callback
-from cl.donate.views import donate, donate_complete
+from cl.donate.views import donate, donate_complete, make_check_donation
 from cl.users.views import view_donations
 
 urlpatterns = [
@@ -18,6 +18,10 @@ urlpatterns = [
     url(r'^donate/stripe/complete/$', donate_complete, name='stripe_complete'),
     url(r'^donate/callbacks/stripe/$', process_stripe_callback,
         name='stripe_callback'),
+
+    # Checks
+    url(r'^donate/check/$', make_check_donation, name='make_check_donation'),
+    url(r'^donate/check/complete/$', donate_complete, name='check_complete'),
 
     # Profile page
     url(r'^profile/donations/$', view_donations),
