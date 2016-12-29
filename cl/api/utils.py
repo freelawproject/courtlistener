@@ -1,11 +1,13 @@
 import json
 import os
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from datetime import date
 
 import redis
 from dateutil import parser
+from dateutil.rrule import DAILY, rrule
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.mail import send_mail
 from django.utils.encoding import force_text
@@ -309,6 +311,77 @@ class BulkJsonHistory(object):
         self.save_to_disk()
 
 
+def invert_user_logs(start, end):
+    """Invert the user logs for a period of time
+
+    The user logs have the date in the key and the user as part of the set:
+
+        'api:v3.user.d:2016-10-01.counts': {
+           mlissner: 22,
+           joe_hazard: 33,
+        }
+
+    This inverts these entries to:
+
+        users: {
+            mlissner: {
+                2016-10-01: 22,
+                total: 22,
+            },
+            joe_hazard: {
+                2016-10-01: 33,
+                total: 33,
+            }
+        }
+    """
+    r = redis.StrictRedis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        db=settings.REDIS_DATABASES['STATS'],
+    )
+    pipe = r.pipeline()
+
+    dates = [d.date().isoformat() for d in rrule(
+        DAILY,
+        dtstart=parser.parse(start, fuzzy=False),
+        until=parser.parse(end, fuzzy=False),
+    )]
+    for d in dates:
+        pipe.zrange('api:v3.user.d:%s.counts' % d, 0, -1,
+                    withscores=True)
+    results = pipe.execute()
+
+    # results is a list of results for each of the zrange queries above. Zip
+    # those results with the date that created it, and invert the whole thing.
+    out = defaultdict(dict)
+    for d, result in zip(dates, results):
+        for user_id, count in result:
+            if user_id == 'None':
+                continue
+            user_id = int(user_id)
+            count = int(count)
+            if out.get(user_id):
+                out[user_id][d] = count
+                out[user_id]['total'] += count
+            else:
+                out[user_id] = {d: count, 'total': count}
+
+    # Sort the values
+    for k, v in out.items():
+        out[k] = OrderedDict(sorted(v.items(), key=lambda t: t[0]))
+
+    # Add usernames as alternate keys for every value possible.
+    for k, v in out.items():
+        try:
+            user = User.objects.get(pk=k)
+        except (User.DoesNotExist, ValueError):
+            pass
+        else:
+            out[user.username] = v
+
+    return out
+
+
 emails = {
     'new_api_user': {
         'subject': "Welcome to the CourtListener API from Free Law Project",
@@ -327,7 +400,7 @@ emails = {
                  "can usually respond pretty quickly to help out or address "
                  "issues.\n\n"
                  "Enjoy the API and thanks for giving it a try!\n\n"
-                 "Mike Lisner\n"
+                 "Mike Lissner\n"
                  "Founder, Free Law Project\n"
                  "https://www.courtlistener.com/donate/\n"),
         'from': "Mike Lissner <mlissner@courtlistener.com>",
