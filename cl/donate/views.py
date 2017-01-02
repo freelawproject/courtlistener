@@ -90,6 +90,7 @@ def donate(request):
             except User.DoesNotExist:
                 # Either a regular account or an email address we've never
                 # seen before. Create a new user from the POST data.
+                stub_account = False
                 user_form = UserForm(request.POST)
                 profile_form = ProfileForm(request.POST)
             else:
