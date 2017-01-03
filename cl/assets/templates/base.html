@@ -104,7 +104,7 @@
     {% block header %}
     <header class="row">
         <!-- Donate Banner -->
-        {% if not request.COOKIES.no_banner and not user.profile.total_donated_last_year %}
+        {% if FUNDRAISING_MODE and not request.COOKIES.no_banner and not user.profile.total_donated_last_year %}
         <div class="navbar navbar-default subnav alert-danger" role="navigation">
             <div class="container-fluid">
                 <div class="row">

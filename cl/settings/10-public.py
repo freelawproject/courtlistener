@@ -252,6 +252,7 @@ MIN_DONATION = {
     'rt_alerts': 10,
     'no_ads': 10,
 }
+FUNDRAISING_MODE = False
 
 
 #######
