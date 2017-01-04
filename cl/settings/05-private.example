@@ -57,6 +57,7 @@ else:
 FTM_KEY = ''
 FTM_LAST_UPDATED = date.today()
 
+here = os.path.dirname(os.path.realpath(__file__))
 GOOGLE_AUTH = {
     'PATH': os.path.join(here, 'google_auth.json'),
     'PROJECT': 'courtlistener-development',
