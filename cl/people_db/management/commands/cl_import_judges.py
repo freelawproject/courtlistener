@@ -5,9 +5,14 @@ import pandas as pd
 from django.core.management import BaseCommand
 
 from cl.people_db.import_judges.assign_authors import assign_authors
-from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge
+from cl.people_db.import_judges.judge_utils import process_date_string
+from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge, \
+    get_fed_court_object
 from cl.people_db.import_judges.populate_presidents import make_president
 from cl.people_db.import_judges.populate_state_judges import make_state_judge
+from cl.people_db.models import Person, Position
+from cl.search.models import Court
+from cl.search.tasks import add_or_update_people
 
 
 class Command(BaseCommand):
@@ -107,12 +112,78 @@ class Command(BaseCommand):
         print('Assigning authors...')
         assign_authors(testing=self.debug)
 
+    def fix_fjc_positions(self, infile=None):
+        """
+        Addresses issue #624.
+
+        We had some errant regexes in the district court assignments. This code
+        reassigns the court fields for these judges where the new regexes
+        differs from the old ones.
+
+        :param infile: The import file with fjc-data.xslx
+        :return: None
+        """
+
+        if infile is None:
+            self.ensure_input_file()
+            infile = self.options['input_file']
+        textfields = ['firstname', 'midname', 'lastname', 'gender',
+                      'Place of Birth (City)', 'Place of Birth (State)',
+                      'Place of Death (City)', 'Place of Death (State)']
+        df = pd.read_excel(infile, 0)
+        for x in textfields:
+            df[x] = df[x].replace(np.nan, '', regex=True)
+        df['Employment text field'].replace(to_replace=r';\sno', value=r', no',
+                                            inplace=True, regex=True)
+        for i, item in df.iterrows():
+
+            fjc_check = Person.objects.get(
+                fjc_id=item['Judge Identification Number'])
+
+            for posnum in range(1, 7):
+                if posnum > 1:
+                    pos_str = ' (%s)' % posnum
+                else:
+                    pos_str = ''
+
+                if pd.isnull(item['Court Name' + pos_str]):
+                    continue
+                courtid = get_fed_court_object(item['Court Name' + pos_str])
+                if courtid is None:
+                    raise
+                date_start = process_date_string(
+                    item['Commission Date' + pos_str])
+                date_recess_appointment = process_date_string(
+                    item['Recess Appointment date' + pos_str])
+                if pd.isnull(date_start) and not pd.isnull(
+                        date_recess_appointment):
+                    date_start = date_recess_appointment
+                if pd.isnull(date_start):
+                    # if still no start date, skip
+                    continue
+                position = Position.objects.get(person=fjc_check,
+                                                date_start=date_start)
+
+                if position.court.pk == courtid:
+                    print "Court IDs are both %s. No changes made." % courtid
+                    continue
+                else:
+                    print "Court IDs are different! Old: %s, New: %s" % (
+                        position.court.pk, courtid)
+                    court = Court.objects.get(pk=courtid)
+                    position.court = court
+
+                    if not self.debug:
+                        position.save()
+                        add_or_update_people.delay([position.person.pk])
+
     VALID_ACTIONS = {
         'import-fjc-judges': import_fjc_judges,
         'import-state-judges': import_state_judges,
         'import-presidents': import_presidents,
         'import-all': import_all,
-        'assign-judges': assign_judges
+        'assign-judges': assign_judges,
+        'fix-fjc-positions': fix_fjc_positions,
     }
 
 
