@@ -1,26 +1,29 @@
 # -*- coding: utf-8 -*-
 
-import pandas as pd
 import re
+from datetime import date
+
+import pandas as pd
+from localflavor.us.us_states import STATES_NORMALIZED
 
 from cl.corpus_importer.court_regexes import fd_pairs
-from cl.people_db.models import Person, Position, Education, Race, \
-    PoliticalAffiliation, Source, ABARating, GRANULARITY_DAY, GRANULARITY_YEAR
 from cl.people_db.import_judges.judge_utils import get_school, process_date, \
     get_races, get_party, get_suffix, get_aba, get_degree_level, \
     process_date_string
-from datetime import date
-from localflavor.us.us_states import STATES_NORMALIZED
+from cl.people_db.models import Person, Position, Education, Race, \
+    PoliticalAffiliation, ABARating, GRANULARITY_DAY, GRANULARITY_YEAR
 
-def get_court_object(raw_court):
+
+def get_fed_court_object(raw_court):
     for regex, value in fd_pairs:
         if re.search(regex, raw_court):
             return value
     return None
 
+
 def transform_employ(string):
-    if pd.isnull(string): 
-        return [None],[None],[None],[None]
+    if pd.isnull(string):
+        return [None], [None], [None], [None]
     string_list = re.split('<BR>|;|<br>', string)
     #  separate dates from the rest
     employ_list = [[a] if a is None or a.startswith('Nominated') else re.split("\,+\s+(?=\d)+|\,+\s+(?=\-)", a, 1) for a in string_list]
@@ -76,12 +79,12 @@ def transform_bankruptcy(string):
     month = ['June', 'March', 'January', 'February', 'April', 'May', 'July', 'August', 'September', 'October', 'November',
          'December']
     season = ['Spring', 'Fall']
-    
-    if pd.isnull(string): 
-        return [None],[None],[None],[None]
-    if 'Allotment as Circuit Justice' in string:        
-        return [None],[None],[None],[None]
-   
+
+    if pd.isnull(string):
+        return [None], [None], [None], [None]
+    if 'Allotment as Circuit Justice' in string:
+        return [None], [None], [None], [None]
+
     string_list = str(string)
     string_list = re.split('<BR>|;|<br>', string_list)
     bankruptcy_list = [None if a is None else re.split("\,+\s+(?=\d)+", a, 1) if not any(
@@ -159,33 +162,33 @@ def make_federal_judge(item, testing=False):
     if len(fjc_check) > 0:
         print ('Warning: %s exists' % name)
         return
-   
+
     pres_check = Person.objects.filter(name_first=item['firstname'],
                                   name_last=item['lastname'], date_dob=date_dob)
 
     if not testing:
-        print ("Now processing: %s" % name)    
+        print ("Now processing: %s" % name)
         #pass
     if len(pres_check) > 0:
         print ('%s is a president.' % name)
         person = pres_check[0]
         person.fjc_id = item['Judge Identification Number']
-        
+
     else:
         date_dod, date_granularity_dod = process_date(item['Death year'],
                                                       item['Death month'],
                                                       item['Death day'])
-    
+
         dod_city = item['Place of Death (City)']
         dod_state = item['Place of Death (State)']
         # if foreign-dead, leave blank for now.
         if len(dod_state) > 2:
             dod_state = ''
-    
+
         if not pd.isnull(item['midname']):
             if len(item['midname']) == 1:
                 item['midname'] += '.'
-    
+
         # instantiate Judge object
         person = Person(
                 name_first=item['firstname'],
@@ -195,7 +198,7 @@ def make_federal_judge(item, testing=False):
                 gender=item['gender'],
                 fjc_id=item['Judge Identification Number'],
                 cl_id=item['cl_id'],
-    
+
                 date_dob=date_dob,
                 date_granularity_dob=date_granularity_dob,
                 dob_city=dob_city,
@@ -225,7 +228,7 @@ def make_federal_judge(item, testing=False):
 
         if pd.isnull(item['Court Name' + pos_str]):
             continue
-        courtid = get_court_object(item['Court Name' + pos_str])
+        courtid = get_fed_court_object(item['Court Name' + pos_str])
         if courtid is None:
             raise
 
@@ -242,7 +245,7 @@ def make_federal_judge(item, testing=False):
                 item['Senate Vote Date (Confirmation Date)' + pos_str])
 
         # assign start date
-        date_start = process_date_string(item['Commission Date' + pos_str])                
+        date_start = process_date_string(item['Commission Date' + pos_str])
         if pd.isnull(date_start) and not pd.isnull(date_recess_appointment):
             date_start = date_recess_appointment
         if pd.isnull(date_start):
@@ -257,10 +260,10 @@ def make_federal_judge(item, testing=False):
             date_granularity_termination = ''
         else:
             date_granularity_termination = GRANULARITY_DAY
-            
+
         # check duplicate position
         dupe_search = Position.objects.filter(
-                                            person=person,                                            
+                                            person=person,
                                             position_type='jud',
                                             date_start=date_start,
                                             date_termination=date_termination)
@@ -451,7 +454,7 @@ def make_federal_judge(item, testing=False):
     locations = locations + locations2
     startyears = startyears + startyears2
     endyears = endyears + endyears2
-   
+
     for i in range(len(titles)):
         job_title = titles[i]
         if pd.isnull(job_title) or job_title=='' or job_title.startswith('Nominated'):
@@ -459,11 +462,11 @@ def make_federal_judge(item, testing=False):
         location = locations[i]
         start_year = startyears[i]
         end_year = endyears[i]
-  
+
         job_title = job_title.strip()
         if pd.isnull(start_year) or start_year == '':
             #print
-            #print(name)            
+            #print(name)
             #print(job_title,location,start_year,end_year)
             #print('No start date.')
             continue
@@ -475,47 +478,47 @@ def make_federal_judge(item, testing=False):
             date_start = date(start_year,1,1)
             date_start_granularity = GRANULARITY_YEAR
         if not pd.isnull(end_year) and end_year.isdigit():
-            end_year = int(end_year)            
+            end_year = int(end_year)
             date_end = date(end_year,1,1)
             date_end_granularity = GRANULARITY_YEAR
         else:
             date_end = None
             date_end_granularity = ''
 
-        if not pd.isnull(location):   
-            location = location.strip()              
-            if ',' in location:            
+        if not pd.isnull(location):
+            location = location.strip()
+            if ',' in location:
                 city, state = [x.strip() for x in location.split(',')]
                 org = ''
                 if state in STATES_NORMALIZED.values():
                     pass
                 elif state.lower() in STATES_NORMALIZED.keys():
                     state = STATES_NORMALIZED[state.lower()]
-                else:                        
-                    city, state = '',''
+                else:
+                    city, state = '', ''
                     org = location
             else:
-                city, state = '',''
-                org = location                    
+                city, state = '', ''
+                org = location
              # test for schools and courts
         else:
-            city,state,org = '','',''
-                
+            city, state, org = '', '', ''
+
         position = Position(
-                person=person,                
+                person=person,
                 job_title=job_title,
-                
+
                 date_start=date_start,
                 date_granularity_start=date_start_granularity,
                 date_termination=date_end,
                 date_granularity_termination=date_end_granularity,
-                
-                location_city = city,
-                location_state = state,
-                organization_name = org
+
+                location_city=city,
+                location_state=state,
+                organization_name=org
         )
         if not testing:
             try:
-                position.save()            
+                position.save()
             except Exception, e:
                 continue

@@ -3,9 +3,11 @@ from django.test import TestCase
 
 from cl.corpus_importer.dup_helpers import case_name_in_candidate
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
-from cl.corpus_importer.import_columbia.parse_opinions import get_court_object
+from cl.corpus_importer.import_columbia.parse_opinions import \
+    get_state_court_object
 from cl.corpus_importer.lawbox.judge_extractor import get_judge_from_str, \
     REASONS
+from cl.people_db.import_judges.populate_fjc_judges import get_fed_court_object
 
 
 class JudgeExtractionTest(TestCase):
@@ -394,13 +396,47 @@ class CourtMatchingTest(TestCase):
                     'asdf',
                 ),
                 'answer': 'connsuperct'
-            }
+            },
         )
         for d in pairs:
-            got = get_court_object(*d['args'])
+            got = get_state_court_object(*d['args'])
             self.assertEqual(
                 got,
                 d['answer'],
                 msg="\nDid not get court we expected: '%s'.\n"
                     "               Instead we got: '%s'" % (d['answer'], got)
+            )
+
+    def test_get_fed_court_object_from_string(self):
+        """Can we get the correct federal courts?"""
+
+        pairs = (
+            {
+                'q': 'Eastern District of New York',
+                'a': 'nyed'
+            },
+            {
+                'q': 'Northern District of New York',
+                'a': 'nynd'
+            },
+            {
+                'q':  'Southern District of New York',
+                'a': 'nysd'
+            },
+            # When we have unknown first word, we assume it's errant.
+            {
+                'q': 'Nathan District of New York',
+                'a': 'nyd'
+            },
+            {
+                'q': "Nate District of New York",
+                'a': 'nyd',
+            },
+        )
+        for test in pairs:
+            print "Testing: %s, expecting: %s" % (test['q'], test['a'])
+            got = get_fed_court_object(test['q'])
+            self.assertEqual(
+                test['a'],
+                got,
             )

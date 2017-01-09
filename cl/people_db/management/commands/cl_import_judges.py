@@ -56,7 +56,7 @@ class Command(BaseCommand):
         # Run the requested method.
         self.options['action'](self)
 
-    def import_fjc_judges(self,infile=None):
+    def import_fjc_judges(self, infile=None):
         if infile is None:
             self.ensure_input_file()
             infile = self.options['input_file']
@@ -66,7 +66,7 @@ class Command(BaseCommand):
         df = pd.read_excel(infile, 0)
         for x in textfields:
             df[x] = df[x].replace(np.nan, '', regex=True)
-        df['Employment text field'].replace(to_replace=r';\sno', value=r', no', inplace = True, regex = True)
+        df['Employment text field'].replace(to_replace=r';\sno', value=r', no', inplace=True, regex=True)
         for i, row in df.iterrows():
             make_federal_judge(dict(row), testing=self.debug)
 

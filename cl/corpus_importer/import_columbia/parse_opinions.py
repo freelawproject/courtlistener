@@ -48,8 +48,8 @@ def parse_file(file_path):
     info['citations'] = raw_info.get('citation', [])
     info['attorneys'] = ''.join(raw_info.get('attorneys', [])) or None
     info['posture'] = ''.join(raw_info.get('posture', [])) or None
-    info['court_id'] = get_court_object(''.join(raw_info.get('court', [])),
-                                        file_path) or None
+    info['court_id'] = get_state_court_object(''.join(raw_info.get('court', [])),
+                                              file_path) or None
     if not info['court_id']:
         raise Exception('Failed to find a court ID for "%s".' %
                         ''.join(raw_info.get('court', [])))
@@ -335,7 +335,7 @@ def format_case_name(n):
     return titlecase(harmonize(n.lower()))
 
 
-def get_court_object(raw_court, file_path):
+def get_state_court_object(raw_court, file_path):
     """Get the court object from a string. Searches through `state_pairs`.
 
     :param raw_court: A raw court string, parsed from an XML file.

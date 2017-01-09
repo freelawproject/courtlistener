@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-import pandas as pd
-
 from datetime import date
 
-from cl.corpus_importer.import_columbia.parse_opinions import get_court_object
-from cl.people_db.models import Person, Position, Education, Race, \
-    PoliticalAffiliation, Source, ABARating
+import pandas as pd
+
+from cl.corpus_importer.import_columbia.parse_opinions import \
+    get_state_court_object
 from cl.people_db.import_judges.judge_utils import get_school, process_date, \
-    get_races, get_party, get_appointer, get_suffix
+     get_suffix
+from cl.people_db.models import Person, Position, Education, \
+    PoliticalAffiliation, Source
 
 
 def make_state_judge(item, testing=False):
@@ -78,9 +79,9 @@ def make_state_judge(item, testing=False):
                 person_alias.save()
 
     if 'colr' in item['cl_id']:
-        courtid = get_court_object(item['court'] + ' of ' + item['state'])
+        courtid = get_state_court_object(item['court'] + ' of ' + item['state'])
     else:
-        courtid = get_court_object(item['court'])
+        courtid = get_state_court_object(item['court'])
 
     if courtid is None:
         print(item)
