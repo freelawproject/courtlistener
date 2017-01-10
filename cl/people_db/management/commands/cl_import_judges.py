@@ -136,9 +136,9 @@ class Command(BaseCommand):
         df['Employment text field'].replace(to_replace=r';\sno', value=r', no',
                                             inplace=True, regex=True)
         for i, item in df.iterrows():
-
-            fjc_check = Person.objects.get(
-                fjc_id=item['Judge Identification Number'])
+            fjc_id = item['Judge Identification Number']
+            print "Doing person with FJC ID: %s" % fjc_id
+            p = Person.objects.get(fjc_id=fjc_id)
 
             for posnum in range(1, 7):
                 if posnum > 1:
@@ -161,12 +161,10 @@ class Command(BaseCommand):
                 if pd.isnull(date_start):
                     # if still no start date, skip
                     continue
-                position = Position.objects.get(person=fjc_check,
-                                                date_start=date_start)
+                position = Position.objects.get(person=p, date_start=date_start)
 
                 if position.court.pk == courtid:
                     print "Court IDs are both %s. No changes made." % courtid
-                    continue
                 else:
                     print "Court IDs are different! Old: %s, New: %s" % (
                         position.court.pk, courtid)
