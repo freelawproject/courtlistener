@@ -140,6 +140,7 @@ class Command(BaseCommand):
             print "Doing person with FJC ID: %s" % fjc_id
             p = Person.objects.get(fjc_id=fjc_id)
 
+            exclusions = []
             for posnum in range(1, 7):
                 if posnum > 1:
                     pos_str = ' (%s)' % posnum
@@ -162,14 +163,21 @@ class Command(BaseCommand):
                     # if still no start date, skip
                     continue
                 try:
-                    position = Position.objects.get(person=p,
-                                                    date_start=date_start)
+                    position = (Position.objects
+                                    .get(person=p, date_start=date_start)
+                                    .exclude(pk__in=exclusions))
                 except Position.MultipleObjectsReturned:
-                    print "Got too many results for %s on %s" % (p, date_start)
+                    print "Got too many results for '%s' on '%s'" % (p, date_start)
                     continue
+                except Position.DoesNotExist:
+                    print "Couldn't find position to match '%s' on '%s' with " \
+                          "exclusions: %s" % (p, date_start, exclusions)
+                    continue
+                else:
+                    exclusions.append(position.pk)
 
                 if position.court.pk == courtid:
-                    print "Court IDs are both %s. No changes made." % courtid
+                    print "Court IDs are both '%s'. No changes made." % courtid
                 else:
                     print "Court IDs are different! Old: %s, New: %s" % (
                         position.court.pk, courtid)
