@@ -161,7 +161,12 @@ class Command(BaseCommand):
                 if pd.isnull(date_start):
                     # if still no start date, skip
                     continue
-                position = Position.objects.get(person=p, date_start=date_start)
+                try:
+                    position = Position.objects.get(person=p,
+                                                    date_start=date_start)
+                except Position.MultipleObjectsReturned:
+                    print "Got too many results for %s on %s" % (p, date_start)
+                    continue
 
                 if position.court.pk == courtid:
                     print "Court IDs are both %s. No changes made." % courtid
