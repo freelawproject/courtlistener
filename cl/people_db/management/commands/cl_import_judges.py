@@ -137,8 +137,11 @@ class Command(BaseCommand):
                                             inplace=True, regex=True)
         for i, item in df.iterrows():
             fjc_id = item['Judge Identification Number']
-            print "Doing person with FJC ID: %s" % fjc_id
             p = Person.objects.get(fjc_id=fjc_id)
+            print(
+                "Doing person with FJC ID: %s, https://courtlistener.com%s" %
+                  (fjc_id, p.get_absolute_url())
+            )
 
             exclusions = []
             for posnum in range(1, 7):
@@ -152,6 +155,8 @@ class Command(BaseCommand):
                 courtid = get_fed_court_object(item['Court Name' + pos_str])
                 if courtid is None:
                     raise
+                date_termination = process_date_string(
+                    item['Date of Termination' + pos_str])
                 date_start = process_date_string(
                     item['Commission Date' + pos_str])
                 date_recess_appointment = process_date_string(
@@ -163,7 +168,9 @@ class Command(BaseCommand):
                     # if still no start date, skip
                     continue
                 positions = (Position.objects
-                                .filter(person=p, date_start=date_start)
+                                .filter(person=p, date_start=date_start,
+                                        date_termination=date_termination,
+                                        position_type='jud')
                                 .exclude(pk__in=exclusions))
                 position_count = positions.count()
                 if position_count < 1:
