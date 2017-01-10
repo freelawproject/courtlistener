@@ -162,19 +162,22 @@ class Command(BaseCommand):
                 if pd.isnull(date_start):
                     # if still no start date, skip
                     continue
-                try:
-                    position = (Position.objects
-                                    .get(person=p, date_start=date_start)
-                                    .exclude(pk__in=exclusions))
-                except Position.MultipleObjectsReturned:
-                    print "Got too many results for '%s' on '%s'" % (p, date_start)
-                    continue
-                except Position.DoesNotExist:
+                positions = (Position.objects
+                                .filter(person=p, date_start=date_start)
+                                .exclude(pk__in=exclusions))
+                position_count = positions.count()
+                if position_count < 1:
                     print "Couldn't find position to match '%s' on '%s' with " \
                           "exclusions: %s" % (p, date_start, exclusions)
                     continue
-                else:
+                elif position_count == 1:
+                    # Good case. Press on!
+                    position = positions[0]
                     exclusions.append(position.pk)
+                elif position_count > 1:
+                    print "Got too many results for '%s' on '%s'. Got %s" % \
+                          (p, date_start, position_count)
+                    continue
 
                 if position.court.pk == courtid:
                     print "Court IDs are both '%s'. No changes made." % courtid
