@@ -102,6 +102,7 @@ class Command(BaseCommand):
         cluster = OpinionCluster(
             judges=item.get('judges', ''),
             date_filed=item['case_dates'],
+            date_filed_is_approximate=item['date_filed_is_approximate'],
             case_name=item['case_names'],
             case_name_short=case_name_short,
             source='C',
