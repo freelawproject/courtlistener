@@ -194,7 +194,9 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             person=person,
             position_type='jud',
             date_start=date_start,
-            date_termination=date_termination)
+            date_termination=date_termination,
+            court_id=courtid,
+        )
         if len(dupe_search) > 0:
             print('Duplicate position:', dupe_search)
             continue
