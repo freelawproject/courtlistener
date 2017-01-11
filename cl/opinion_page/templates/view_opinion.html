@@ -174,9 +174,17 @@
 
         <h3>{{ cluster.docket.court }}</h3>
         <p class="bottom">
-            <span class="meta-data-header">Filed:</span>
+            <span class="meta-data-header">Filed
+                {% if cluster.date_filed_is_approximate %}
+                    Approximately{% endif %}:</span>
             <span class="meta-data-value">
                 {{cluster.date_filed|date:"F jS, Y"}}
+                {% if cluster.date_filed_is_approximate %}
+                    <i class="fa fa-question-circle gray cursor-help"
+                       data-toggle="tooltip"
+                       data-placement="right"
+                       title="This filing date was gathered by an automated tool and is not exact. In general approximated dates are within a month of the correct date."></i>
+                {% endif %}
             </span>
         </p>
         <p class="bottom">
