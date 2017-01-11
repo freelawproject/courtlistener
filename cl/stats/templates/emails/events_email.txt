@@ -3,6 +3,6 @@ Hello Admins!
 The following {{ events.count }} event{{ events.count|pluralize }} occurred during the past 24 hours:
 {% for e in events %}
   - {{ e.description|safe }}{% if e.user %}
-    {{ e.user.username}}{% if e.user.first_name %}, {{ e.user.first_name }} {{ e.user.last_name }}{% endif %}
+    {{ e.user.username}}{% if e.user.first_name %}, {{ e.user.first_name }} {{ e.user.last_name }}, {{ e.user.email }}{% endif %}
     https://www.courtlistener.com{% url "admin:auth_user_change" e.user.pk %}{% endif %}
 {% endfor %}
