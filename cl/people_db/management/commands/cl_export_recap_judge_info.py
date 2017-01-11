@@ -103,11 +103,9 @@ class Command(BaseCommand):
 
                     name, title = split_name_title(judge)
                     if name not in out[court.pk]:
-                        out[court.pk] = {
-                            name: {
-                                'titles': {title},
-                                'years': Counter([docket.date_filed.year]),
-                            }
+                        out[court.pk][name] = {
+                            'titles': {title},
+                            'years': Counter([docket.date_filed.year]),
                         }
                     else:
                         out[court.pk][name]['titles'].add(title)
