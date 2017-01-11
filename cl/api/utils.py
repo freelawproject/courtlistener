@@ -385,7 +385,7 @@ def invert_user_logs(start, end):
 emails = {
     'new_api_user': {
         'subject': "Welcome to the CourtListener API from Free Law Project",
-        'body': ("Hi%s,\n\n"
+        'body': ("Hi %s,\n\n"
                  "I'm Mike Lissner, the main guy behind CourtListener and Free "
                  "Law Project, the non-profit that runs it. I noticed that you "
                  "started using the API a bit today (we watch our logs closely "
