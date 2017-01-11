@@ -6,6 +6,7 @@ from django.db.models import Q
 
 from juriscraper.lib.string_utils import titlecase
 from pandas import to_pickle
+from unidecode import unidecode
 
 from cl.search.models import Court, Docket
 
@@ -16,7 +17,7 @@ titles = [
 ]
 blacklist = [
     '(settlement)',  'hon.', 'honorable', 'u.s.', 'unassigned', 'pro', 'se',
-    'pslc',  'law', 'clerk', 'ch.', 'discovery', 'usdc', 'us',
+    'pslc',  'law', 'clerk', 'ch.', 'discovery', 'usdc', 'us', 'unknown',
 ]
 
 
@@ -101,7 +102,9 @@ class Command(BaseCommand):
                     if not judge:
                         continue
 
-                    name, title = split_name_title(judge)
+                    name, title = split_name_title(unidecode(judge))
+                    if not name:
+                        continue
                     if name not in out[court.pk]:
                         out[court.pk][name] = {
                             'titles': {title},
