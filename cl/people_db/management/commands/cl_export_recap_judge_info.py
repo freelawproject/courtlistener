@@ -92,7 +92,8 @@ class Command(BaseCommand):
             out[court.pk] = {}
             dockets = (court.dockets
                        .exclude(Q(assigned_to_str='') & Q(referred_to_str=''))
-                       .filter(source__in=Docket.RECAP_SOURCES))
+                       .filter(source__in=Docket.RECAP_SOURCES)
+                       .only('assigned_to_str', 'referred_to_str', 'date_filed'))
             for docket in dockets:
                 for judge_type in ['assigned', 'referred']:
                     judge = getattr(docket, '%s_to_str' % judge_type)
