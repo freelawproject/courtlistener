@@ -142,6 +142,206 @@ def transform_bankruptcy(string):
     return position, location, start_year, end_year
 
 
+def add_positions_from_row(item, person, testing, fix_nums=None):
+    # add position items (up to 6 of them)
+    prev_politics = None
+    for posnum in range(1, 7):
+        # Save the position if we're running all positions or specifically
+        # fixing this one.
+        save_this_position = (fix_nums is None or posnum in fix_nums)
+        if posnum > 1:
+            pos_str = ' (%s)' % posnum
+        else:
+            pos_str = ''
+
+        if pd.isnull(item['Court Name' + pos_str]):
+            continue
+        courtid = get_fed_court_object(item['Court Name' + pos_str])
+        if courtid is None:
+            raise
+
+        date_nominated = process_date_string(
+            item['Nomination Date Senate Executive Journal' + pos_str])
+        date_recess_appointment = process_date_string(
+            item['Recess Appointment date' + pos_str])
+        date_referred_to_judicial_committee = process_date_string(
+            item['Referral date (referral to Judicial Committee)' + pos_str])
+        date_judicial_committee_action = process_date_string(
+            item['Committee action date' + pos_str])
+        date_hearing = process_date_string(item['Hearings' + pos_str])
+        date_confirmation = process_date_string(
+            item['Senate Vote Date (Confirmation Date)' + pos_str])
+
+        # assign start date
+        date_start = process_date_string(item['Commission Date' + pos_str])
+        if pd.isnull(date_start) and not pd.isnull(date_recess_appointment):
+            date_start = date_recess_appointment
+        if pd.isnull(date_start):
+            # if still no start date, skip
+            continue
+        date_termination = process_date_string(
+            item['Date of Termination' + pos_str])
+        date_retirement = process_date_string(
+            item['Retirement from Active Service' + pos_str])
+
+        if date_termination is None:
+            date_granularity_termination = ''
+        else:
+            date_granularity_termination = GRANULARITY_DAY
+
+        # check duplicate position
+        dupe_search = Position.objects.filter(
+            person=person,
+            position_type='jud',
+            date_start=date_start,
+            date_termination=date_termination)
+        if len(dupe_search) > 0:
+            print('Duplicate position:', dupe_search)
+            continue
+
+        # assign appointing president
+        if not pd.isnull(item['Renominating President name' + pos_str]):
+            appointstr = item['Renominating President name' + pos_str]
+        else:
+            appointstr = item['President name' + pos_str]
+        appointer = None
+        if appointstr not in ['Assignment', 'Reassignment']:
+            names = appointstr.split()
+
+            if len(names) == 3:
+                first, mid, last = names
+            else:
+                first, last = names[0], names[-1]
+                mid = ''
+            appoint_search = Position.objects.filter(
+                person__name_first__iexact=first,
+                person__name_last__iexact=last)
+            if len(appoint_search) > 1:
+                appoint_search = Position.objects.filter(
+                    person__name_first__iexact=first,
+                    person__name_last__iexact=last,
+                    person__name_middle__iexact=mid,
+                    position_type='pres',
+                )
+            if len(appoint_search) > 1:
+                appoint_search = Position.objects.filter(
+                    person__name_first__iexact=first,
+                    person__name_last__iexact=last,
+                    person__name_middle__iexact=mid,
+                    position_type='pres',
+                    date_start__lte=date_nominated,
+                    date_termination__gte=date_nominated
+                )
+            if len(appoint_search) == 0:
+                print(names, appoint_search)
+            if len(appoint_search) > 1:
+                print(names, appoint_search)
+            if len(appoint_search) == 1:
+                appointer = appoint_search[0]
+
+        # senate votes data
+        votes = item['Senate vote Ayes/Nays' + pos_str]
+        if not pd.isnull(votes):
+            votes_yes, votes_no = votes.split('/')
+        else:
+            votes_yes = None
+            votes_no = None
+        if item['Senate voice vote' + pos_str] == "Yes":
+            voice_vote = True
+        else:
+            voice_vote = False
+
+        termdict = {'Abolition of Court': 'abolished',
+                    'Death': 'ded',
+                    'Reassignment': 'other_pos',
+                    'Appointment to Another Judicial Position': 'other_pos',
+                    'Impeachment & Conviction': 'bad_judge',
+                    'Recess Appointment-Not Confirmed': 'recess_not_confirmed',
+                    'Resignation': 'resign',
+                    'Retirement': 'retire_vol'
+                    }
+        term_reason = item['Termination specific reason' + pos_str]
+        if pd.isnull(term_reason):
+            term_reason = ''
+        else:
+            term_reason = termdict[term_reason]
+
+        position = Position(
+            person=person,
+            court_id=courtid,
+            position_type='jud',
+
+            date_nominated=date_nominated,
+            date_recess_appointment=date_recess_appointment,
+            date_referred_to_judicial_committee=date_referred_to_judicial_committee,
+            date_judicial_committee_action=date_judicial_committee_action,
+            date_hearing=date_hearing,
+            date_confirmation=date_confirmation,
+            date_start=date_start,
+            date_granularity_start=GRANULARITY_DAY,
+            date_termination=date_termination,
+            date_granularity_termination=date_granularity_termination,
+            date_retirement=date_retirement,
+
+            appointer=appointer,
+
+            voice_vote=voice_vote,
+            votes_yes=votes_yes,
+            votes_no=votes_no,
+            vote_type='s',
+            how_selected='a_pres',
+            termination_reason=term_reason
+        )
+
+        if not testing and save_this_position:
+            position.save()
+
+        # set party
+        p = item['Party Affiliation of President' + pos_str]
+        if not pd.isnull(p) and p not in ['Assignment', 'Reassignment']:
+            party = get_party(item['Party Affiliation of President' + pos_str])
+            if prev_politics is None:
+                if pd.isnull(date_nominated):
+                    politicsgran = ''
+                else:
+                    politicsgran = GRANULARITY_DAY
+                politics = PoliticalAffiliation(
+                    person=person,
+                    political_party=party,
+                    date_start=date_nominated,
+                    date_granularity_start=politicsgran,
+                    source='a',
+                )
+                if not testing and save_this_position:
+                    politics.save()
+                prev_politics = party
+            elif party != prev_politics:
+                # account for changing political affiliation
+                politics.date_end = date_nominated
+                politics.date_granularity_end = GRANULARITY_DAY
+                if not testing and save_this_position:
+                    politics.save()
+                politics = PoliticalAffiliation(
+                    person=person,
+                    political_party=party,
+                    date_start=date_nominated,
+                    date_granularity_start=GRANULARITY_DAY,
+                    source='a'
+                )
+                if not testing and save_this_position:
+                    politics.save()
+        rating = get_aba(item['ABA Rating' + pos_str])
+        if rating is not None:
+            nom_year = date_nominated.year
+            aba = ABARating(
+                person=person,
+                rating=rating,
+                year_rated=nom_year
+            )
+            if not testing and save_this_position:
+                aba.save()
+
+
 def make_federal_judge(item, testing=False):
     """Takes the federal judge data <item> and associates it with a Judge object.
     Returns a Judge object.
@@ -218,200 +418,7 @@ def make_federal_judge(item, testing=False):
         if not testing:
             person.race.add(r)
 
-    prev_politics = None
-    # add position items (up to 6 of them)
-    for posnum in range(1, 7):
-        if posnum > 1:
-            pos_str = ' (%s)' % posnum
-        else:
-            pos_str = ''
-
-        if pd.isnull(item['Court Name' + pos_str]):
-            continue
-        courtid = get_fed_court_object(item['Court Name' + pos_str])
-        if courtid is None:
-            raise
-
-        date_nominated = process_date_string(
-                item['Nomination Date Senate Executive Journal' + pos_str])
-        date_recess_appointment = process_date_string(
-                item['Recess Appointment date' + pos_str])
-        date_referred_to_judicial_committee = process_date_string(
-                item['Referral date (referral to Judicial Committee)' + pos_str])
-        date_judicial_committee_action = process_date_string(
-                item['Committee action date' + pos_str])
-        date_hearing = process_date_string(item['Hearings' + pos_str])
-        date_confirmation = process_date_string(
-                item['Senate Vote Date (Confirmation Date)' + pos_str])
-
-        # assign start date
-        date_start = process_date_string(item['Commission Date' + pos_str])
-        if pd.isnull(date_start) and not pd.isnull(date_recess_appointment):
-            date_start = date_recess_appointment
-        if pd.isnull(date_start):
-            # if still no start date, skip
-            continue
-        date_termination = process_date_string(
-                item['Date of Termination' + pos_str])
-        date_retirement = process_date_string(
-                item['Retirement from Active Service' + pos_str])
-
-        if date_termination is None:
-            date_granularity_termination = ''
-        else:
-            date_granularity_termination = GRANULARITY_DAY
-
-        # check duplicate position
-        dupe_search = Position.objects.filter(
-                                            person=person,
-                                            position_type='jud',
-                                            date_start=date_start,
-                                            date_termination=date_termination)
-        if len(dupe_search) > 0:
-            print('Duplicate position:',dupe_search)
-            continue
-
-        # assign appointing president
-        if not pd.isnull(item['Renominating President name' + pos_str]):
-            appointstr = item['Renominating President name' + pos_str]
-        else:
-            appointstr = item['President name' + pos_str]
-        appointer = None
-        if appointstr not in ['Assignment', 'Reassignment']:
-            names = appointstr.split()
-
-            if len(names) == 3:
-                first, mid, last = names
-            else:
-                first, last = names[0], names[-1]
-                mid = ''
-            appoint_search = Position.objects.filter(
-                person__name_first__iexact=first,
-                person__name_last__iexact=last)
-            if len(appoint_search) > 1:
-                appoint_search = Position.objects.filter(
-                    person__name_first__iexact=first,
-                    person__name_last__iexact=last,
-                    person__name_middle__iexact=mid,
-                    position_type='pres',
-                    )
-            if len(appoint_search) > 1:
-                appoint_search = Position.objects.filter(
-                    person__name_first__iexact=first,
-                    person__name_last__iexact=last,
-                    person__name_middle__iexact=mid,
-                    position_type='pres',
-                    date_start__lte=date_nominated,
-                    date_termination__gte=date_nominated
-                    )
-            if len(appoint_search) == 0:
-                print(names, appoint_search)
-            if len(appoint_search) > 1:
-                print(names, appoint_search)
-            if len(appoint_search) == 1:
-                appointer = appoint_search[0]
-
-        # senate votes data
-        votes = item['Senate vote Ayes/Nays' + pos_str]
-        if not pd.isnull(votes):
-            votes_yes, votes_no = votes.split('/')
-        else:
-            votes_yes = None
-            votes_no = None
-        if item['Senate voice vote' + pos_str] == "Yes":
-            voice_vote = True
-        else:
-            voice_vote = False
-
-        termdict = {'Abolition of Court': 'abolished',
-                    'Death': 'ded',
-                    'Reassignment': 'other_pos',
-                    'Appointment to Another Judicial Position': 'other_pos',
-                    'Impeachment & Conviction': 'bad_judge',
-                    'Recess Appointment-Not Confirmed': 'recess_not_confirmed',
-                    'Resignation': 'resign',
-                    'Retirement': 'retire_vol'
-                    }
-        term_reason = item['Termination specific reason' + pos_str]
-        if pd.isnull(term_reason):
-            term_reason = ''
-        else:
-            term_reason = termdict[term_reason]
-
-        position = Position(
-                person=person,
-                court_id=courtid,
-                position_type='jud',
-
-                date_nominated=date_nominated,
-                date_recess_appointment=date_recess_appointment,
-                date_referred_to_judicial_committee=date_referred_to_judicial_committee,
-                date_judicial_committee_action=date_judicial_committee_action,
-                date_hearing=date_hearing,
-                date_confirmation=date_confirmation,
-                date_start=date_start,
-                date_granularity_start=GRANULARITY_DAY,
-                date_termination=date_termination,
-                date_granularity_termination=date_granularity_termination,
-                date_retirement=date_retirement,
-
-                appointer=appointer,
-
-                voice_vote=voice_vote,
-                votes_yes=votes_yes,
-                votes_no=votes_no,
-                vote_type='s',
-                how_selected='a_pres',
-                termination_reason=term_reason
-        )
-
-        if not testing:
-            position.save()
-
-        # set party
-        p = item['Party Affiliation of President' + pos_str]
-        if not pd.isnull(p) and p not in ['Assignment', 'Reassignment']:
-            party = get_party(item['Party Affiliation of President' + pos_str])
-            if prev_politics is None:
-                if pd.isnull(date_nominated):
-                    politicsgran = ''
-                else:
-                    politicsgran = GRANULARITY_DAY
-                politics = PoliticalAffiliation(
-                        person=person,
-                        political_party=party,
-                        date_start=date_nominated,
-                        date_granularity_start=politicsgran,
-                        source='a',
-                )
-                if not testing:
-                    politics.save()
-                prev_politics = party
-            elif party != prev_politics:
-                # account for changing political affiliation
-                politics.date_end = date_nominated
-                politics.date_granularity_end = GRANULARITY_DAY
-                if not testing:
-                    politics.save()
-                politics = PoliticalAffiliation(
-                    person=person,
-                    political_party=party,
-                    date_start=date_nominated,
-                    date_granularity_start=GRANULARITY_DAY,
-                    source='a'
-                )
-                if not testing:
-                    politics.save()
-        rating = get_aba(item['ABA Rating' + pos_str])
-        if rating is not None:
-            nom_year = date_nominated.year
-            aba = ABARating(
-                    person=person,
-                    rating=rating,
-                    year_rated=nom_year
-            )
-            if not testing:
-                aba.save()
+    add_positions_from_row(item, person, testing)
 
     # add education items (up to 5 of them)
     for schoolnum in range(1, 6):

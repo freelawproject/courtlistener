@@ -4,10 +4,14 @@ Created on Wed Feb 17 12:31:34 2016
 
 @author: elliott
 """
-from datetime import date, datetime
-from cl.people_db.models import School, GRANULARITY_YEAR, GRANULARITY_MONTH, GRANULARITY_DAY
-import pandas as pd
 import re
+from collections import Counter
+from datetime import date, datetime
+
+import pandas as pd
+
+from cl.people_db.models import School, GRANULARITY_YEAR, GRANULARITY_MONTH, GRANULARITY_DAY
+
 
 def process_date(year,month,day):
     """ return date object and accompanying granularity """
@@ -25,8 +29,8 @@ def process_date(year,month,day):
         granularity = GRANULARITY_DAY
     return pdate, granularity
 
-def process_date_string(date_input):
 
+def process_date_string(date_input):
     if pd.isnull(date_input):
         return None
 
@@ -34,9 +38,7 @@ def process_date_string(date_input):
 
     return date_object
 
-from collections import Counter
 C = Counter() # for fixing school names.
-
 def get_school(schoolname, testing=False):
     "Takes the name of a school from judges data and tries to match to a unique School object."
 

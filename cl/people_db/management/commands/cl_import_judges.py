@@ -7,7 +7,7 @@ from django.core.management import BaseCommand
 from cl.people_db.import_judges.assign_authors import assign_authors
 from cl.people_db.import_judges.judge_utils import process_date_string
 from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge, \
-    get_fed_court_object
+    get_fed_court_object, add_positions_from_row
 from cl.people_db.import_judges.populate_presidents import make_president
 from cl.people_db.import_judges.populate_state_judges import make_state_judge
 from cl.people_db.models import Person, Position
@@ -176,6 +176,10 @@ class Command(BaseCommand):
                 if position_count < 1:
                     print "Couldn't find position to match '%s' on '%s' with " \
                           "exclusions: %s" % (p, date_start, exclusions)
+                    add_positions_from_row(item, p, self.debug,
+                                           fix_nums=[posnum])
+                    if not self.debug:
+                        add_or_update_people.delay([p.pk])
                     continue
                 elif position_count == 1:
                     # Good case. Press on!
@@ -196,7 +200,7 @@ class Command(BaseCommand):
 
                     if not self.debug:
                         position.save()
-                        add_or_update_people.delay([position.person.pk])
+                        add_or_update_people.delay([p.pk])
 
     VALID_ACTIONS = {
         'import-fjc-judges': import_fjc_judges,
