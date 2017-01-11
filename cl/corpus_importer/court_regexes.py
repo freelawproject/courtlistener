@@ -132,7 +132,7 @@ fd_pairs = (
     (re.compile('(^|\s)W(\.|(estern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Oklahoma', re.I), 'okwd'),
     (re.compile('(^|\s)D(\.|:|,|(ist(\.|(rict))))? ?(of )?Oregon', re.I), 'ord'),
     (re.compile('(^|\s)E(\.|(astern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?P(a|(ennsylvania))', re.I), 'paed'),
-    (re.compile('(^|\s)M(\.|(iddle))? ?D(\.|(ist\.))?,? ?(of )?P(a|(ennsylvania))', re.I), 'pamd'),
+    (re.compile('(^|\s)M(\.|(iddle))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?P(a|(ennsylvania))', re.I), 'pamd'),
     (re.compile('(^|\s)W(\.|(estern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?P(a|(ennsylvania))', re.I), 'pawd'),
     # Abolished. 1789-09-24 to 1818-04-20
     (re.compile('(^|\s)D(\.|:|,|(ist(\.|(rict))))? ?(of )?P(a|(ennsylvania))', re.I), 'pennsylvaniad'),  # Must go last

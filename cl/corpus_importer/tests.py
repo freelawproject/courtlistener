@@ -432,6 +432,18 @@ class CourtMatchingTest(TestCase):
                 'q': "Nate District of New York",
                 'a': 'nyd',
             },
+            {
+                'q': "Middle District of Pennsylvania",
+                'a': 'pamd',
+            },
+            {
+                'q': "Middle Dist. of Pennsylvania",
+                'a': 'pamd',
+            },
+            {
+                'q': "M.D. of Pennsylvania",
+                'a': 'pamd',
+            }
         )
         for test in pairs:
             print "Testing: %s, expecting: %s" % (test['q'], test['a'])
