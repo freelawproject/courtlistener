@@ -15,8 +15,8 @@ from cl.search.models import OpinionCluster
 def assign_authors(testing=False):
 
     clusters = (OpinionCluster.objects
+                .filter(docket__court__jurisdiction__in=['FD', 'F', 'FS'])
                 .exclude(judges='')
-                .exclude(docket__court__jurisdiction='FB')
                 .select_related('docket__court__id')
                 .only('date_filed', 'judges', 'docket__court_id'))
     total = clusters.count()
