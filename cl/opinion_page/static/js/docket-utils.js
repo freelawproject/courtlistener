@@ -109,8 +109,6 @@ var makeRow = function (item, type) {
 $('.docket-entry a').on('click', function (ev) {
     ev.stopPropagation();
 });
-// Initialize tooltips on profile pages.
-$('[data-toggle="tooltip"]').tooltip();
 
 // Change sort order when the asc/desc buttons are clicked.
 $("#sort-buttons :input").change(function () {

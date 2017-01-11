@@ -30,11 +30,7 @@
           href="/podcast/court/all/">
 {% endblock %}
 
-{% block footer-scripts %}
-    <script type="text/javascript">
-        $(function () {$('[data-toggle="tooltip"]').tooltip()});
-    </script>
-{% endblock %}
+{% block footer-scripts %}{% endblock %}
 
 {% block navbar-o %}
     {% if search_form.type.value == "o" %}active{% else %}{{ block.super }}{% endif %}
