@@ -419,6 +419,8 @@ class Position(models.Model):
             # Chief
             ('c-jud',     'Chief Judge'),
             ('c-jus',     'Chief Justice'),
+            ('c-mag',     'Chief Magistrate'),
+            ('c-spec-m',  'Chief Special Master'),
             ('pres-jud',  'Presiding Judge'),
             ('pres-jus',  'Presiding Justice'),
             ('pres-mag',  'Presiding Magistrate'),
@@ -754,6 +756,12 @@ class Position(models.Model):
         choices=SELECTION_METHODS,
         max_length=20,
         blank=True,
+    )
+    has_inferred_values = models.BooleanField(
+        help_text="Some or all of the values for this position were inferred "
+                  "from a data source instead of manually added. See sources "
+                  "field for more details.",
+        default=False,
     )
 
     def __unicode__(self):
