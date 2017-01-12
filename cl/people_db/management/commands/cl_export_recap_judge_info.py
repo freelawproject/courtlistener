@@ -42,6 +42,7 @@ judge_normalizers = {
     'Magistrate Judge': 'mag',
     'Magistrate-Judge': 'mag',
     'Magistrate Judge Mag': 'mag',
+    'Magistrate Judge Magistrate': 'mag',
     'Magistrate Judge Magistrate Judge': 'mag',
 
     # Chief
