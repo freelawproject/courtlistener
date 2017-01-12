@@ -26,7 +26,7 @@ blacklist = [
 ]
 
 judge_normalizers = {
-    # Generic Judge
+    # Generic Judge & Bankruptcy Judge we merge together for simplicity.
     '': 'jud',
     'Judge': 'jud',
     'Judge Judge': 'jud',
@@ -46,12 +46,12 @@ judge_normalizers = {
     'Magistrate Judge Magistrate': 'mag',
     'Magistrate Judge Magistrate Judge': 'mag',
 
-    # Chief
+    # Chief & Senior
     'Chief': 'c-jud',
     'Chief Judge': 'c-jud',
     'Chief District Judge': 'c-jud',
-    'Senior Judge': 'c-jud',
-    'Senior-Judge': 'c-jud',
+    'Senior Judge': 'ret-senior-jud',
+    'Senior-Judge': 'ret-senior-jud',
 
     # Chief Magistrate
     'Chief Magistrate': 'c-mag',
@@ -90,7 +90,7 @@ def split_name_title(judge):
                 ')' in w,
                 w.startswith('-'),
                 w.startswith('~'),
-                (len(w) > 2 and '.' in w),
+                (len(w) > 2 and '.' in w and w not in ['jr.', 'sr.']),
                 (i == 0 and w == 'j.'),
                 w in blacklist]):
             continue
