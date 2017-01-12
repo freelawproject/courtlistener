@@ -32,6 +32,7 @@ judge_normalizers = {
     'Judge Judge': 'jud',
     'District Judge': 'jud',
     'Visiting Judge': 'jud',
+    'Bankruptcy': 'jud',
     'Bankruptcy Judge': 'jud',
 
     # Magistrate
@@ -74,7 +75,7 @@ def normalize_judge_titles(title):
      - Blank --> Judge
      - Bankruptcy Judge --> Judge
     """
-    return judge_normalizers[title]
+    return judge_normalizers.get(title, 'UNKNOWN: %s' % title)
 
 
 def split_name_title(judge):
