@@ -25,6 +25,56 @@ blacklist = [
     'unassigneddj', 'unknown', 'us', 'usdc', 'vjdistrict',
 ]
 
+judge_normalizers = {
+    # Generic Judge
+    '': 'jud',
+    'Judge': 'jud',
+    'Judge Judge': 'jud',
+    'District Judge': 'jud',
+    'Visiting Judge': 'jud',
+    'Bankruptcy Judge': 'jud',
+
+    # Magistrate
+    'Mag': 'mag',
+    'Mag Judge': 'mag',
+    'mag/judge': 'mag',
+    'Magistrate': 'mag',
+    'Magistrate Judge': 'mag',
+    'Magistrate-Judge': 'mag',
+    'Magistrate Judge Mag': 'mag',
+    'Magistrate Judge Magistrate Judge': 'mag',
+
+    # Chief
+    'Chief': 'c-jud',
+    'Chief Judge': 'c-jud',
+    'Chief District Judge': 'c-jud',
+    'Senior Judge': 'c-jud',
+    'Senior-Judge': 'c-jud',
+
+    # Chief Magistrate
+    'Chief Magistrate': 'c-mag',
+    'Chief Magistrate Judge': 'c-mag',
+
+    # Special Master
+    'Special Master': 'spec-m',
+    'Chief Special Master': 'c-spec-m',
+}
+
+
+def normalize_judge_titles(title):
+    """Normalize judge titles
+
+    Take in a string like "Magistrate Judge" and return the normalized
+    abbreviation from the POSITION_TYPES variable. Assumes that input is
+    titlecased.
+
+    Also normalizes things like:
+     - District Judge --> Judge
+     - Blank --> Judge
+     - Bankruptcy Judge --> Judge
+    """
+    return judge_normalizers[title]
+
 
 def split_name_title(judge):
     """Split a value from PACER and return the title and name"""
@@ -36,6 +86,8 @@ def split_name_title(judge):
     for i, w in enumerate(words):
         if any(['(' in w,
                 ')' in w,
+                w.startswith('-'),
+                w.startswith('~'),
                 (len(w) > 2 and '.' in w),
                 (i == 0 and w == 'j.'),
                 w in blacklist]):
@@ -50,7 +102,7 @@ def split_name_title(judge):
         else:
             name_words.append(w)
 
-    title = titlecase(' '.join(title_words))
+    title = normalize_judge_titles(titlecase(' '.join(title_words)))
     name = titlecase(' '.join(name_words))
 
     return name, title
