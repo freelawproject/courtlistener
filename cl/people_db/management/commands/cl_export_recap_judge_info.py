@@ -16,8 +16,13 @@ titles = [
     'visiting', 'special', 'senior-judge', 'master', 'u.s.magistrate',
 ]
 blacklist = [
-    '(settlement)',  'hon.', 'honorable', 'u.s.', 'unassigned', 'pro', 'se',
-    'pslc',  'law', 'clerk', 'ch.', 'discovery', 'usdc', 'us', 'unknown',
+    'a998', 'agb', 'am', 'ca', 'cet', 'ch.', 'cla', 'clerk', 'cp', 'cvb', 'db',
+    'debt-magistrate', 'discovery', 'dj', 'docket', 'duty', 'duty', 'ec', 'eck',
+    'general', 'grc', 'gs', 'hhl', 'hon', 'honorable', 'inactive', 'jne', 'jv',
+    'kec', 'law', 'lc', 'llh', 'lq', 'maryland', 'mediator', 'merged', 'mj',
+    'mmh', 'msh', 'mwd', 'no', 'none', 'prisoner', 'pslc', 'pro', 'pso', 'pt',
+    'rmh', 'se', 'sf', 'successor', 'u.s.', 'tjc', 'unassigned', 'unassigned2',
+    'unassigneddj', 'unknown', 'us', 'usdc', 'vjdistrict',
 ]
 
 
@@ -71,17 +76,18 @@ class Command(BaseCommand):
         """Make a CSV of the data extracted from the database.
 
         CSV will have the following format:
-            Court, Name, Titles, Count, 2000, 2011...
+            Court, Name, Title, Count, 2000, 2011...
 
         {
             'ca2': {
                 "harold baller": {
-                    "titles": {"Mag judge", "Senior Judge"},
-                    "years": {
-                        "1999': 22,
-                        "2000': 14,
+                    "Mag judge": {
+                        "years": {
+                            "1999': 22,
+                            "2000': 14,
+                        },
+                        'total count': 36,
                     },
-                    'total count': 36,
                 }
             }
         }
@@ -106,35 +112,38 @@ class Command(BaseCommand):
                     if not name:
                         continue
                     if name not in out[court.pk]:
+                        # No entry for this person.
                         out[court.pk][name] = {
-                            'titles': {title},
-                            'years': Counter([docket.date_filed.year]),
+                            title: Counter([docket.date_filed.year]),
                         }
                     else:
-                        out[court.pk][name]['titles'].add(title)
-                        out[court.pk][name]['years'][docket.date_filed.year] += 1
+                        # Person already exists.
+                        if title not in out[court.pk][name]:
+                            # Title not yet found.
+                            out[court.pk][name][title] = Counter([docket.date_filed.year])
+                        else:
+                            # Title already exists.
+                            out[court.pk][name][title][docket.date_filed.year] += 1
+
         self.export_files(out)
 
     @staticmethod
     def export_files(out):
         to_pickle(out, 'recap_export.pkl')
         out_csv = []
-        for k, v in out.items():
-            court = k
-            for judge, data in v.items():
-                titles = data['titles']
-                years = data['years']
-                titles_str = ';'.join(sorted(titles))
-                row = OrderedDict([
-                    ('court', court),
-                    ('name', judge),
-                    ('titles', titles_str),
-                    ('total count', sum(years.values()))
-                ])
-                for year, count in years.items():
-                    row[str(year)] = count
-                out_csv.append(row)
+        for court, v in out.items():
+            for judge_name, data in v.items():
+                for title, years in data.items():
+                    row = OrderedDict([
+                        ('court', court),
+                        ('name', judge_name),
+                        ('title', title),
+                        ('total count', sum(years.values()))
+                    ])
+                    for year, count in years.items():
+                        row[str(year)] = count
+                    out_csv.append(row)
         df = pandas.DataFrame(out_csv)
-        df = df[['court', 'name', 'titles', 'total count'] + sorted(
+        df = df[['court', 'name', 'title', 'total count'] + sorted(
             [x for x in df.columns if x.isdigit()])]
         df.to_csv('recap_export.csv', index=False)
