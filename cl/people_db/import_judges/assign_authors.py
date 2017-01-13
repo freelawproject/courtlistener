@@ -12,13 +12,14 @@ from cl.lib.import_lib import find_person
 from cl.search.models import OpinionCluster
 
 
-def assign_authors(testing=False):
-
+def assign_authors(jurisdictions=None, testing=False):
     clusters = (OpinionCluster.objects
-                .filter(docket__court__jurisdiction__in=['FD', 'F', 'FS'])
                 .exclude(judges='')
                 .select_related('docket__court__id')
                 .only('date_filed', 'judges', 'docket__court_id'))
+    if jurisdictions is not None:
+        clusters = clusters.filter(
+            docket__court__jurisdiction__in=jurisdictions)
     total = clusters.count()
     i = 0
 

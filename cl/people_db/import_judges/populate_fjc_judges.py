@@ -6,7 +6,7 @@ from datetime import date
 import pandas as pd
 from localflavor.us.us_states import STATES_NORMALIZED
 
-from cl.corpus_importer.court_regexes import fd_pairs
+from cl.corpus_importer.court_regexes import fd_pairs, fb_pairs
 from cl.people_db.import_judges.judge_utils import get_school, process_date, \
     get_races, get_party, get_suffix, get_aba, get_degree_level, \
     process_date_string
@@ -344,6 +344,36 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                 aba.save()
 
 
+def get_bankruptcy_court(raw_court):
+    for regex, value in fb_pairs:
+        if re.search(regex, raw_court):
+            return value
+    return None
+
+
+def update_bankruptcy_and_magistrate(testing=False):
+    # update bankrupcty positions
+    positions = Position.object.filter(job_title__icontains='Bankruptcy')
+    for position in positions:
+        location = position.location
+        bcourt = get_bankruptcy_court(location)
+        if bcourt is None:
+            continue
+        position.court_id = bcourt
+        position.position_type = 'jud'
+        if not testing:
+            position.save()
+
+        positions = Position.object.filter(job_title__icontains='Magistrate')
+        for position in positions:
+            location = position.location
+            mcourt = get_fed_court_object(location)
+            position.court_id = mcourt
+            position.position_type = 'm-jud'
+            if not testing:
+                position.save()
+
+
 def make_federal_judge(item, testing=False):
     """Takes the federal judge data <item> and associates it with a Judge object.
     Returns a Judge object.
@@ -370,7 +400,6 @@ def make_federal_judge(item, testing=False):
 
     if not testing:
         print ("Now processing: %s" % name)
-        #pass
     if len(pres_check) > 0:
         print ('%s is a president.' % name)
         person = pres_check[0]

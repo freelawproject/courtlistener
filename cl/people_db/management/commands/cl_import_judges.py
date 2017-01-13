@@ -7,11 +7,12 @@ from django.core.management import BaseCommand
 from cl.people_db.import_judges.assign_authors import assign_authors
 from cl.people_db.import_judges.judge_utils import process_date_string
 from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge, \
-    get_fed_court_object, add_positions_from_row
+    get_fed_court_object, add_positions_from_row, \
+    update_bankruptcy_and_magistrate
 from cl.people_db.import_judges.populate_presidents import make_president
 from cl.people_db.import_judges.populate_state_judges import make_state_judge
 from cl.people_db.models import Person, Position
-from cl.search.models import Court
+from cl.search.models import Court, JURISDICTIONS
 from cl.search.tasks import add_or_update_people
 
 
@@ -52,6 +53,14 @@ class Command(BaseCommand):
         parser.add_argument(
             '--input_file',
             help='The input file required for certain operations.'
+        )
+        parser.add_argument(
+            '--jurisdictions',
+            help='A list of jurisdiction abbreviations for use with the '
+                 'assign-authors command. If no value is provided it will '
+                 'default to all jurisdictions. Valid options are:\n%s' %
+                 ', '.join(['%s (%s)' % (j[0], j[1]) for j in JURISDICTIONS]),
+            nargs='*',
         )
 
     def handle(self, *args, **options):
@@ -110,7 +119,13 @@ class Command(BaseCommand):
 
     def assign_judges(self):
         print('Assigning authors...')
-        assign_authors(testing=self.debug)
+        assign_authors(jurisdictions=self.options['jurisdictions'],
+                       testing=self.debug)
+
+    def assign_bankruptcy_fjc(self):
+        """update FJC judges with bankruptcy positions"""
+        print('Assigning bankruptcy courtids...')
+        update_bankruptcy_and_magistrate(testing=self.debug)
 
     def fix_fjc_positions(self, infile=None):
         """
@@ -208,6 +223,7 @@ class Command(BaseCommand):
         'import-presidents': import_presidents,
         'import-all': import_all,
         'assign-judges': assign_judges,
+        'assign-bankruptcy-fjc': assign_bankruptcy_fjc,
         'fix-fjc-positions': fix_fjc_positions,
     }
 
