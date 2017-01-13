@@ -70,6 +70,10 @@ header {
   padding:0 2px;
 }
 
+.tooltip {
+    text-transform: none;
+}
+
 a.button:active{
   background-color:#6299c5;
 /* border:1px solid #6299c5; */
@@ -221,14 +225,6 @@ a.button:active{
 div.hopscotch-bubble .hopscotch-bubble-content {
     margin: 0;
 }
-
-/*
-div.hopscotch-bubble .hopscotch-bubble-close {
-    background: none;
-    text-indent: 0;
-    top: -6px;
-}
-*/
 
 .settings-nav-item a,
 .settings-nav-item a:hover,
@@ -586,18 +582,6 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
     text-decoration: none;
 }
 
-/* errors - replaced with bg-danger, bg-warning, bg-success*/
-/*.error a, .notice a, .success a {
-    text-decoration: underline;
-}
-.error a:focus, .error a:hover {
-    color: #8A1F11;
-}
-.notice a:focus, .notice a:hover, .success a:focus, .success a:hover {
-    color: #514721;
-}
-*/
-
 
 /* Display cases from Resource.org neatly */
 #resource-org-text span.num {
@@ -675,17 +659,8 @@ span.star-pagination::after {
 blockquote span.star-pagination::after {
     left: -2.5em;
 }
-
-
 /* End lawbox display CSS */
 
-/*
-input.wide-title {
-    width: 390px;
-    padding: 5px;
-    font-size:1.5em;
-}
-*/
 
 /* Disabled button formatting */
 button[disabled]:active, button[disabled]:hover, button[disabled] {
