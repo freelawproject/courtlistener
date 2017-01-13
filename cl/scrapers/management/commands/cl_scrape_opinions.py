@@ -15,6 +15,7 @@ from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.alerts.models import RealTimeQueue
+from cl.lib.import_lib import get_candidate_judge_objects
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import ErrorLog
@@ -147,13 +148,23 @@ class Command(BaseCommand):
         docket.save()
         cluster.docket = docket
         cluster.save(index=False)  # Index only when the opinion is associated.
+        if cluster.judges:
+            candidate_judges = get_candidate_judge_objects(
+                cluster.judges,
+                docket.court.pk,
+                cluster.date_filed,
+            )
+            if len(candidate_judges) == 1:
+                opinion.author = candidate_judges[0]
+
+            if len(candidate_judges) > 1:
+                for candidate in candidate_judges:
+                    cluster.panel.add(candidate)
+
         opinion.cluster = cluster
         opinion.save(index=index)
         if not backscrape:
-            RealTimeQueue.objects.create(
-                item_type='o',
-                item_pk=opinion.pk,
-            )
+            RealTimeQueue.objects.create(item_type='o', item_pk=opinion.pk)
 
     def scrape_court(self, site, full_crawl=False):
         download_error = False

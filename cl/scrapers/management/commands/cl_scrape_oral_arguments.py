@@ -9,6 +9,7 @@ from juriscraper.AbstractSite import logger
 
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
+from cl.lib.import_lib import get_candidate_judge_objects
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
@@ -73,15 +74,20 @@ class Command(cl_scrape_opinions.Command):
         return docket, audio_file, error
 
     def save_everything(self, items, index=False, backscrape=False):
-        docket, audio_file = items['docket'], items['audio_file']
+        docket, af = items['docket'], items['audio_file']
         docket.save()
-        audio_file.docket = docket
-        audio_file.save(index=index)
-        if not backscrape:
-            RealTimeQueue.objects.create(
-                item_type='oa',
-                item_pk=audio_file.pk,
+        af.docket = docket
+        af.save(index=index)
+        if af.judges:
+            candidate_judges = get_candidate_judge_objects(
+                af.judges,
+                docket.court.pk,
+                af.date_argued,
             )
+            for candidate in candidate_judges:
+                af.panel.add(candidate)
+        if not backscrape:
+            RealTimeQueue.objects.create(item_type='oa', item_pk=af.pk)
 
     def scrape_court(self, site, full_crawl=False):
         download_error = False
