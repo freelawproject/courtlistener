@@ -164,79 +164,122 @@
 
 {% block content %}
     <article class="col-sm-9">
-        <i id="favorites-star"
-           class="{% if favorite_form.instance.cluster_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
-           data-toggle="modal"
-           data-target="#modal-save-favorite, #modal-logged-out"
-           title="Save this record as a favorite in your profile"></i>
-        <h2 class="inline">{{ cluster.caption|safe|v_wrapper }}</h2>
-        {% include "includes/favorites_modal.html" %}
-
-        <h3>{{ cluster.docket.court }}</h3>
-        <p class="bottom">
-            <span class="meta-data-header">Filed
-                {% if cluster.date_filed_is_approximate %}
-                    Approximately{% endif %}:</span>
-            <span class="meta-data-value">
-                {{cluster.date_filed|date:"F jS, Y"}}
-                {% if cluster.date_filed_is_approximate %}
-                    <i class="fa fa-question-circle gray cursor-help"
-                       data-toggle="tooltip"
-                       data-placement="right"
-                       title="This filing date was gathered by an automated tool and is not exact. In general approximated dates are within a month of the correct date."></i>
-                {% endif %}
-            </span>
-        </p>
-        <p class="bottom">
-            <span class="meta-data-header">Precedential Status:</span>
-            <span class="meta-data-value">
-                {{cluster.get_precedential_status_display|default:'Unknown'}}
-            </span>
-        </p>
-        <p class="bottom">
-            <span class="meta-data-header">Citations:</span>
-            <span class="meta-data-value">
-                {{ cluster.citation_string|default:"None known" }}
-            </span>
-        </p>
-        <p class="bottom">
-            <span class="meta-data-header">Docket Number:</span>
-            <span class="meta-data-value">
-                {{ cluster.docket.docket_number|default:"Unknown" }}
-            </span>
-        </p>
-        {% if cluster.docket.court_id == 'scotus' %}
-        <p class="bottom">
-            <span class="meta-data-header">Supreme Court Database ID:</span>
-            <span class="meta-data-value">
-                {% if cluster.scdb_id %}
-                    <a href="http://scdb.wustl.edu/analysisCaseDetail.php?cid={{ cluster.scdb_id }}-01" target="_blank">
-                    {{ cluster.scdb_id }}
-                    </a><i class="gray fa fa-external-link"></i>
-                {% else %}
-                    Unknown
-                {% endif %}
-            </span>
-        </p>
-        {% endif %}
-        <p class="bottom">
-            <span class="meta-data-header">Judges:</span>
-            <span class="meta-data-value">
-                {{ cluster.judges|default:"Unknown" }}
-            </span>
-        </p>
-        <p class="bottom">
-            <span class="meta-data-header">Nature of suit:</span>
-            <span class="meta-data-value">
-                {{ cluster.nature_of_suit|default:"Unknown" }}
-            </span>
-        </p>
-        <br>
-
-        {# Only display tabs and make panels if more than one sub-opinion. #}
         {% with opinion_count=cluster.sub_opinions.all.count %}
+            <i id="favorites-star"
+               class="{% if favorite_form.instance.cluster_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
+               data-toggle="modal"
+               data-target="#modal-save-favorite, #modal-logged-out"
+               title="Save this record as a favorite in your profile"></i>
+            <h2 class="inline">{{ cluster.caption|safe|v_wrapper }}</h2>
+            {% include "includes/favorites_modal.html" %}
+
+            <h3>{{ cluster.docket.court }}</h3>
+            <p class="bottom">
+                <span class="meta-data-header">Filed
+                    {% if cluster.date_filed_is_approximate %}
+                        Approximately{% endif %}:</span>
+                <span class="meta-data-value">
+                    {{cluster.date_filed|date:"F jS, Y"}}
+                    {% if cluster.date_filed_is_approximate %}
+                        <i class="fa fa-question-circle gray cursor-help"
+                           data-toggle="tooltip"
+                           data-placement="right"
+                           title="This filing date was gathered by an automated tool and is not exact. In general approximated dates are within a month of the correct date."></i>
+                    {% endif %}
+                </span>
+            </p>
+            <p class="bottom">
+                <span class="meta-data-header">Precedential Status:</span>
+                <span class="meta-data-value">
+                    {{cluster.get_precedential_status_display|default:'Unknown'}}
+                </span>
+            </p>
+            <p class="bottom">
+                <span class="meta-data-header">Citations:</span>
+                <span class="meta-data-value">
+                    {{ cluster.citation_string|default:"None known" }}
+                </span>
+            </p>
+            <p class="bottom">
+                <span class="meta-data-header">Docket Number:</span>
+                <span class="meta-data-value">
+                    {{ cluster.docket.docket_number|default:"Unknown" }}
+                </span>
+            </p>
+            {% if cluster.docket.court_id == 'scotus' %}
+            <p class="bottom">
+                <span class="meta-data-header">Supreme Court Database ID:</span>
+                <span class="meta-data-value">
+                    {% if cluster.scdb_id %}
+                        <a href="http://scdb.wustl.edu/analysisCaseDetail.php?cid={{ cluster.scdb_id }}-01" target="_blank">
+                        {{ cluster.scdb_id }}
+                        </a><i class="gray fa fa-external-link"></i>
+                    {% else %}
+                        Unknown
+                    {% endif %}
+                </span>
+            </p>
+            {% endif %}
+            {% if cluster.panel.all.count > 0 %}
+                <p class="bottom">
+                    <span class="meta-data-header">Panel:</span>
+                    {% for p in cluster.panel.all %}
+                        <a href="{{ p.get_absolute_url }}">{{ p.name_full }}</a>{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </p>
+            {% endif %}
+            {% if cluster.non_participating_judges.all.count > 0 %}
+                <p class="bottom">
+                    <span class="meta-data-header">Non-Participating Judges:</span>
+                    {% for p in cluster.non_participating_judges.all %}
+                        <a href="{{ p.get_absolute_url }}">{{ p.name_full }}</a>{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </p>
+            {% endif %}
+            {% if opinion_count == 1 %}
+                {% with opinion=cluster.sub_opinions.all.0 %}
+                {% if opinion.author %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Author:</span>
+                        <span class="meta-data-value">
+                            <a href="{{ opinion.author.get_absolute_url }}">{{ opinion.author.name_full }}</a>
+                        </span>
+                    </p>
+                {% elif opinion.author_str %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Author:</span>
+                        <span class="meta-data-value">{{ opinion.author_str }}</span>
+                    </p>
+                {% elif cluster.judges %}
+                    <p class="bottom">
+                        <span class="meta-data-header">Judges:</span>
+                        <span class="meta-data-value">{{ cluster.judges }}</span>
+                    </p>
+                {% endif %}
+
+                {% if opinion.joined_by.all.count > 0 %}
+                <p class="bottom">
+                    <span class="meta-data-header">Joined By:</span>
+                    {% for p in opinion.joined_by.all %}
+                        <a href="{{ p.get_absolute_url }}">{{ p.name_full }}</a>{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </p>
+                {% endif %}
+                {% endwith %}
+            {% endif %}
+
+
+            {% if cluster.nature_of_suit %}
+            <p class="bottom">
+                <span class="meta-data-header">Nature of suit:</span>
+                <span class="meta-data-value">{{ cluster.nature_of_suit }}</span>
+            </p>
+            {% endif %}
+            <br>
+
+            {# Only display tabs and make panels if more than one sub-opinion. #}
             {% if opinion_count > 1 %}
-                <ul class="nav nav-tabs v-offset-below-3" role="tablist">
+                <ul class="nav nav-tabs v-offset-below-1" role="tablist">
                     {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                         <li role="presentation" {% if forloop.first %}class="active"{% endif %}>
                             <a href="#{{ sub_opinion.type }}{{ forloop.counter }}"
@@ -255,9 +298,39 @@
                             class="tab-pane {% if forloop.first %}active{% endif %}"
                         {% endif %}
                             id="{{ sub_opinion.type }}{{ forloop.counter }}">
+                        {% if opinion_count > 1 %}
+                            {% if sub_opinion.author %}
+                                <p class="bottom">
+                                    <span class="meta-data-header">Author:</span>
+                                    <span class="meta-data-value">
+                                        <a href="{{ sub_opinion.author.get_absolute_url }}">{{ sub_opinion.author.name_full }}</a>
+                                    </span>
+                                </p>
+                            {% elif sub_opinion.author_str %}
+                                <p class="bottom">
+                                    <span class="meta-data-header">Author:</span>
+                                    <span class="meta-data-value">{{ sub_opinion.author_str }}</span>
+                                </p>
+                            {% elif cluster.judges %}
+                                <p class="bottom">
+                                    <span class="meta-data-header">Judges:</span>
+                                    <span class="meta-data-value">{{ cluster.judges }}</span>
+                                </p>
+                            {% endif %}
 
+                            {% if sub_opinion.joined_by.all.count > 0 %}
+                                <p class="bottom">
+                                    <span class="meta-data-header">Joined By:</span>
+                                    {% for p in sub_opinion.joined_by.all %}
+                                        <a href="{{ p.get_absolute_url }}">{{ p.name_full }}</a>
+                                        {% if not forloop.last %},
+                                        {% endif %}
+                                    {% endfor %}
+                                </p>
+                            {% endif %}
+                        {% endif %}
                         {% if sub_opinion.extracted_by_ocr %}
-                            <div class="col-sm-12 alert-warning alert">
+                            <div class="col-sm-12 alert-warning alert v-offset-above-2">
                                 <p class="bottom">The text of this document was
                                     obtained by analyzing a scanned document
                                     provided by the court. As a result it may have
@@ -270,13 +343,13 @@
                             <div class="clearfix"></div>
                         {% endif %}
                         {% if 'Z' in cluster.source %}
-                        <div id="columbia-text">
+                        <div id="columbia-text" class="v-offset-above-2">
                         {% elif 'L' in cluster.source %}
-                        <div id='lawbox-text'>
+                        <div id="lawbox-text" class="v-offset-above-2">
                         {% elif 'R' in cluster.source %}
-                        <div id='resource-org-text'>
+                        <div id="resource-org-text" class="v-offset-above-2">
                         {% else %}
-                        <div id='default-text'>
+                        <div id="default-text" class="v-offset-above-2">
                         {% endif %}
                             <div id="opinion-content"> {# used by Zotero, Juris-M #}
                                 {% if sub_opinion.html_with_citations %}
