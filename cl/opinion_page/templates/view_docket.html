@@ -55,7 +55,7 @@
                 {% if docket.source in docket.RECAP_SOURCES %}
                 <p>
                     {% if docket.pacer_url %}
-                        <a href="{{ dcket.pacer_url }}" class="btn btn-primary btn-xs">View on PACER</a>
+                        <a href="{{ docket.pacer_url }}" class="btn btn-primary btn-xs">View on PACER</a>
                     {% endif %}
                     <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}" class="btn btn-primary btn-xs">Search this Docket</a>
                 </p>
