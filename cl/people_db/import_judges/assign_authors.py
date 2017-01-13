@@ -7,8 +7,7 @@ Created on Fri Mar 18 18:27:09 2016
 
 from unidecode import unidecode
 
-from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
-from cl.lib.import_lib import find_person
+from cl.lib.import_lib import get_candidate_judge_objects
 from cl.search.models import OpinionCluster
 
 
@@ -39,43 +38,24 @@ def assign_authors(jurisdictions=None, testing=False):
                 opinion.save(index=False)
             continue
 
-        judges = find_judge_names(judge_str)
-
-        if len(judges) == 0:
-            continue
-
-        candidates = []
-        for judge in judges:
-            candidates.append(find_person(judge, cluster.docket.court_id,
-                                          case_date=cluster.date_filed))
-        candidates = [c for c in candidates if c is not None]
-
-        if len(candidates) == 0:
-            # more than one judge token, but no DB matches, continue
+        candidates = get_candidate_judge_objects(judge_str,
+                                                 cluster.docket.court_id,
+                                                 cluster.date_filed)
+        if len(candidates) < 1:
+            # No DB matches
             print u'  No match.'
-            continue
 
-        if len(candidates) > 1:
-            # more than one DB match, assign panel and continue
+        elif len(candidates) == 1:
+            # only one candidate, assign author
+            opinion = cluster.sub_opinions.all()[0]
+            opinion.author = candidates[0]
+            print u'  Author assigned: %s' % unidecode(str(candidates[0]))
+            if not testing:
+                opinion.save(index=False)
+
+        elif len(candidates) > 1:
+            # more than one DB match, assign panel
             print u'  Panel assigned: %s' % candidates
             if not testing:
                 for candidate in candidates:
                     cluster.panel.add(candidate)
-            continue
-
-        # only one candidate, assign author
-        opinion = cluster.sub_opinions.all()[0]
-        if len(judges) == 1:
-            # one judge token, one DB match
-            opinion.author = candidates[0]
-            print '  Author assigned: %s' % unidecode(str(candidates[0]))
-        else:
-            # multiple judge tokens, one DB match
-            opinion.author = candidates[0]
-            print '  Author assigned: %s (with %d missing tokens)' % (
-                unidecode(str(candidates[0])),
-                len(judges)-1
-            )
-
-        if not testing:
-            opinion.save(index=False)

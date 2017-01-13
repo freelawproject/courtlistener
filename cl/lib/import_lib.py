@@ -2,6 +2,7 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import Min, Q
 from reporters_db import REPORTERS
 
+from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.people_db.models import Person
 from cl.search.models import Court, Opinion
 
@@ -121,7 +122,25 @@ def find_person(name_last, court_id, name_first=None, case_date=None,
         print('First name %s not found in group %s' % (name_first, str([c.name_first for c in candidates])))
 
     if raise_mult:
-        raise Exception("Multiple judges: Last name '%s', court '%s', options: %s." % (name_last,court_id, str([c.name_first for c in candidates])))
+        raise Exception(
+            "Multiple judges: Last name '%s', court '%s', options: %s." %
+            (name_last, court_id, str([c.name_first for c in candidates]))
+        )
+
+
+def get_candidate_judge_objects(judge_str, court_id, event_date):
+    """Take a string of text in a time and place and figure out which judges
+    match up to it.
+    """
+    judges = find_judge_names(judge_str)
+
+    if len(judges) == 0:
+        return []
+
+    candidates = []
+    for judge in judges:
+        candidates.append(find_person(judge, court_id, case_date=event_date))
+    return [c for c in candidates if c is not None]
 
 
 def get_min_dates():
