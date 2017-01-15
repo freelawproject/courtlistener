@@ -465,6 +465,7 @@ input.bottom {
 
 .sidebar-section h3 {
     margin-bottom: 0.6em;
+    margin-top: 0;
 }
 
 .sidebar-section h3 > span {

@@ -134,28 +134,6 @@
             </div>
         {% endif %}
 
-        {# Download original? #}
-        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
-            {% if sub_opinion.download_url or sub_opinion.local_path %}
-                <div class="sidebar-section">
-                    {% if cluster.source != 'R' and cluster.source != 'L' and cluster.source != 'LR' and cluster.source != "Z" %}
-                        <h3><span>Original {{sub_opinion.get_type_display}}</span></h3>
-                        <p>
-                            {% if sub_opinion.download_url and cluster.source != 'R' %}
-                                <a href="{{sub_opinion.download_url}}" class="visitable">From the court</a>
-                            {% endif %}
-                            {% if sub_opinion.download_url and cluster.source != 'R' and sub_opinion.local_path %}
-                                &nbsp;&nbsp;|&nbsp;&nbsp;
-                            {% endif %}
-                            {% if sub_opinion.local_path %}
-                                <a href="/{{sub_opinion.local_path}}" class="visitable">Our backup</a>
-                            {% endif %}
-                        </p>
-                    {% endif %}
-                </div>
-            {% endif %}
-        {% endfor %}
-
         {% include "includes/social_links.html" %}
         {% include "includes/donate_sidebar.html" with referrer="ad-o" %}
     </div>
@@ -275,6 +253,44 @@
                 <span class="meta-data-value">{{ cluster.nature_of_suit }}</span>
             </p>
             {% endif %}
+
+            {# Download original? #}
+            {% if 'C' in cluster.source and has_downloads %}
+                <div class="btn-group v-offset-below-3 v-offset-above-1">
+                    <button type="button"
+                            class="btn btn-primary dropdown-toggle"
+                            data-toggle="dropdown" aria-haspopup="true"
+                            aria-expanded="false">
+                        Download Original <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                            {% if sub_opinion.local_path %}
+                                <li>
+                                    <a href="{{ sub_opinion.local_path }}">
+                                        {{ sub_opinion.get_type_display }} from
+                                        our Backup
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                            {% if sub_opinion.download_url %}
+                                {% if forloop.counter == 1 %}
+                                    <li role="separator" class="divider"></li>
+                                {% endif %}
+                                <li>
+                                    <a href="{{ sub_opinion.download_url }}">
+                                        {{ sub_opinion.get_type_display }} from
+                                        the Court
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
             <br>
 
             {# Only display tabs and make panels if more than one sub-opinion. #}

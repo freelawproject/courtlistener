@@ -160,6 +160,11 @@ def view_opinion(request, pk, _):
         trunc(best_case_name(cluster), 100),
         cluster.citation_string,
     )
+    has_downloads = False
+    for sub_opinion in cluster.sub_opinions.all():
+        if sub_opinion.local_path or sub_opinion.download_url:
+            has_downloads = True
+            break
     get_string = search_utils.make_get_string(request)
 
     try:
@@ -191,6 +196,7 @@ def view_opinion(request, pk, _):
     return render(request, 'view_opinion.html', {
         'title': title,
         'cluster': cluster,
+        'has_downloads': has_downloads,
         'favorite_form': favorite_form,
         'get_string': get_string,
         'private': cluster.blocked,
