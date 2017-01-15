@@ -82,7 +82,7 @@ class Command(cl_scrape_opinions.Command):
             candidate_judges = get_candidate_judge_objects(
                 af.judges,
                 docket.court.pk,
-                af.date_argued,
+                af.docket.date_argued,
             )
             for candidate in candidate_judges:
                 af.panel.add(candidate)
