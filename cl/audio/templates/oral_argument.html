@@ -83,26 +83,19 @@
             </div>
         </div>
 
-        {# Download original? #}
-        {% if af.download_url or af.local_path_mp3 %}
-            <div class="sidebar-section">
-                <h3><span>Download</span></h3>
-                <p>
-                    {% if af.download_url %}
-                        <a href="{{ af.download_url }}" class="visitable">Original</a>
-                    {% endif %}
-                    {% if af.download_url and af.local_path_mp3 %}
-                        &nbsp;&nbsp;|&nbsp;&nbsp;
-                    {% endif %}
-                    {% if af.local_path_mp3 %}
-                        <a href="/{{ af.local_path_mp3 }}" class="visitable">Our Version</a>
-                    {% endif %}
-                </p>
-            </div>
-        {% endif %}
-
+        <div class="sidebar-section">
+            <h3 class="inline"><span>Support Us</span></h3>
+            <p class="v-offset-above-1">CourtListener is a project of <a href="https://free.law" target="_blank">Free Law Project</a>, a federally-recognized 501(c)(3) non-profit. We rely heavily on donations for our financial security.
+            </p>
+            <p>Please support our work with a donation.
+            </p>
+            <p>
+                <a href="{% url "donate" %}?referrer=oa-donate-now"
+                   class="btn btn-danger btn-lg">Donate Now</a>
+            </p>
+        </div>
         {% include "includes/social_links.html" %}
-        {% include "includes/donate_sidebar.html" with referrer="ad-oa" %}
+
     </div>
 {% endblock %}
 
@@ -146,17 +139,17 @@
         </p>
 
         <p class="bottom">
-            {% if af.judges %}
+            {% if af.panel.all.count > 0 %}
+                <span class="meta-data-header">Judges:</span>
+                {% for p in af.panel.all %}
+                    <a href="{{ p.get_absolute_url }}">{{ p.name_full }}</a>{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            {% elif af.judges %}
                 <span class="meta-data-header">Judges:</span>
                 <span class="meta-data-value">{{ af.judges }}</span>
             {% endif %}
         </p>
 
-        <p>
-            <span class="meta-data-header"
-                  title="SHA1 Hash of the binary or text">Fingerprint:</span>
-            <span class="meta-data-value">{{ af.sha1 }}</span>
-        </p>
         <br>
         {% if not af.processing_complete %}
             <div class="col-xs-12 alert alert-warning">
@@ -164,8 +157,7 @@
                     our server. Please try again in a few moments or if you
                     prefer not to wait you may download the audio <a
                             href="{{ af.download_url }}">directly from the
-                        court website</a>. Generally this process takes about
-                    thirty minutes.
+                        court website</a>.
                 </p>
             </div>
         {% else %}
@@ -219,13 +211,42 @@
                     </div>
                     <div class="jp-no-solution">
                         <span>Update Required</span>
-                        To play the media you will need to either update your
-                        browser to a recent version or update your <a
-                            href="http://get.adobe.com/flashplayer/"
+                        To play the media update your browser to a recent version or update your <a href="http://get.adobe.com/flashplayer/"
                             target="_blank">Flash plugin</a>.
                     </div>
                 </div>
             </div>
+        {% endif %}
+        {# Download original? #}
+        {% if af.download_url or af.local_path_mp3 %}
+            <p>
+                {% if af.download_url and not af.local_path_mp3 %}
+                    <a href="{{ af.download_url }}"
+                       class="btn btn-sm btn-primary">Download MP3</a>
+                {% elif not af.download_url and af.local_path_mp3 %}
+                    <a href="{{ af.local_path_mp3 }}"
+                       class="btn btn-sm btn-primary">Download MP3</a>
+                {% elif af.download_url and af.local_path_mp3 %}
+                    <div class="btn-group btn-group-sm" role="group"
+                         aria-label="Download buttons">
+                        <a href="{{ af.local_path_mp3 }}"
+                           class="btn btn-primary">Download MP3</a>
+
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button"
+                                    class="btn btn-primary dropdown-toggle"
+                                    data-toggle="dropdown" aria-haspopup="true"
+                                    aria-expanded="false">
+                                <span class="caret"></span>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a href="{{ af.download_url }}">Download
+                                    Original from Court</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                {% endif %}
+            </p>
         {% endif %}
     </article>
 {% endblock %}
