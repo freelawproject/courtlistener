@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 from django.core.management import BaseCommand
 
-from cl.people_db.import_judges.assign_authors import assign_authors
+from cl.people_db.import_judges.assign_authors import assign_authors_to_opinions, \
+    assign_authors_to_oral_arguments
 from cl.people_db.import_judges.judge_utils import process_date_string
 from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge, \
     get_fed_court_object, add_positions_from_row, \
@@ -95,6 +96,15 @@ class Command(BaseCommand):
         for i, row in df.iterrows():
             make_state_judge(dict(row), testing=self.debug)
 
+    def import_recap_judges(self, infile=None):
+        if infile is None:
+            self.ensure_input_file()
+            infile = self.options['input_file']
+        # TODO: Read the file; sorted correctly and parse it in.
+        rows = []
+        for row in rows:
+            pass
+
     def import_presidents(self, infile=None):
         if infile is None:
             self.ensure_input_file()
@@ -117,10 +127,14 @@ class Command(BaseCommand):
         print('importing state IAC judges...')
         self.import_state_judges(infile=datadir+'/state-iac-bios-2016-04-06.xlsx')
 
-    def assign_judges(self):
+    def assign_judges_to_opinions(self):
         print('Assigning authors...')
-        assign_authors(jurisdictions=self.options['jurisdictions'],
-                       testing=self.debug)
+        assign_authors_to_opinions(jurisdictions=self.options['jurisdictions'],
+                                   testing=self.debug)
+
+    def assign_judges_to_oral_arguments(self):
+        print("Assigning panel members to oral arguments...")
+        assign_authors_to_oral_arguments(testing=self.debug)
 
     def assign_bankruptcy_fjc(self):
         """update FJC judges with bankruptcy positions"""
@@ -218,11 +232,13 @@ class Command(BaseCommand):
                         add_or_update_people.delay([p.pk])
 
     VALID_ACTIONS = {
+        'import-all': import_all,
         'import-fjc-judges': import_fjc_judges,
         'import-state-judges': import_state_judges,
         'import-presidents': import_presidents,
-        'import-all': import_all,
-        'assign-judges': assign_judges,
+        'import-recap-judges': import_recap_judges,
+        'assign-judges-to-opinions': assign_judges_to_opinions,
+        'assign-judges-to-oral-arguments': assign_judges_to_oral_arguments,
         'assign-bankruptcy-fjc': assign_bankruptcy_fjc,
         'fix-fjc-positions': fix_fjc_positions,
     }

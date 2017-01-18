@@ -7,11 +7,12 @@ Created on Fri Mar 18 18:27:09 2016
 
 from unidecode import unidecode
 
+from cl.audio.models import Audio
 from cl.lib.import_lib import get_candidate_judge_objects
 from cl.search.models import OpinionCluster
 
 
-def assign_authors(jurisdictions=None, testing=False):
+def assign_authors_to_opinions(jurisdictions=None, testing=False):
     clusters = (OpinionCluster.objects
                 .exclude(judges='')
                 .select_related('docket__court__id')
@@ -59,3 +60,18 @@ def assign_authors(jurisdictions=None, testing=False):
             if not testing:
                 for candidate in candidates:
                     cluster.panel.add(candidate)
+
+
+def assign_authors_to_oral_arguments(testing=False):
+    afs = (Audio.objects.exclude(judge='')
+           .select_related('docket__court_id', 'docket__date_argued')
+           .only('docket__date_argued', 'judges', 'docket__court_id'))
+    for af in afs:
+        judge_str = unidecode(af.judges)
+        print "  Judge string: %s" % judge_str
+
+        candidates = get_candidate_judge_objects(judge_str, af.docket.court_id,
+                                                 af.docket.date_argued)
+        for candidate in candidates:
+            if not testing:
+                af.panel.add(candidate)
