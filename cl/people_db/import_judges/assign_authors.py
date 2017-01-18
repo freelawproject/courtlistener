@@ -64,7 +64,7 @@ def assign_authors_to_opinions(jurisdictions=None, testing=False):
 
 def assign_authors_to_oral_arguments(testing=False):
     afs = (Audio.objects.exclude(judges='')
-           .select_related('docket__court_id', 'docket__date_argued')
+           .select_related('docket__court__id', 'docket__date_argued')
            .only('docket__date_argued', 'judges', 'docket__court_id'))
     for af in afs:
         judge_str = unidecode(af.judges)
