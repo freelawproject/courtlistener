@@ -267,7 +267,7 @@
                         {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                             {% if sub_opinion.local_path %}
                                 <li>
-                                    <a href="{{ sub_opinion.local_path }}">
+                                    <a href="/{{ sub_opinion.local_path }}">
                                         {{ sub_opinion.get_type_display }} from
                                         our Backup
                                     </a>

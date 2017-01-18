@@ -224,12 +224,12 @@
                     <a href="{{ af.download_url }}"
                        class="btn btn-sm btn-primary">Download MP3</a>
                 {% elif not af.download_url and af.local_path_mp3 %}
-                    <a href="{{ af.local_path_mp3 }}"
+                    <a href="/{{ af.local_path_mp3 }}"
                        class="btn btn-sm btn-primary">Download MP3</a>
                 {% elif af.download_url and af.local_path_mp3 %}
                     <div class="btn-group btn-group-sm" role="group"
                          aria-label="Download buttons">
-                        <a href="{{ af.local_path_mp3 }}"
+                        <a href="/{{ af.local_path_mp3 }}"
                            class="btn btn-primary">Download MP3</a>
 
                         <div class="btn-group btn-group-sm" role="group">
