@@ -83,17 +83,7 @@
             </div>
         </div>
 
-        <div class="sidebar-section">
-            <h3 class="inline"><span>Support Us</span></h3>
-            <p class="v-offset-above-1">CourtListener is a project of <a href="https://free.law" target="_blank">Free Law Project</a>, a federally-recognized 501(c)(3) non-profit. We rely heavily on donations for our financial security.
-            </p>
-            <p>Please support our work with a donation.
-            </p>
-            <p>
-                <a href="{% url "donate" %}?referrer=oa-donate-now"
-                   class="btn btn-danger btn-lg">Donate Now</a>
-            </p>
-        </div>
+        {% include "includes/donate_sidebar.html" with referrer="oa-donate-now" %}
         {% include "includes/social_links.html" %}
 
     </div>
