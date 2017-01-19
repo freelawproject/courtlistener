@@ -143,6 +143,19 @@ def get_candidate_judge_objects(judge_str, court_id, event_date):
     return [c for c in candidates if c is not None]
 
 
+def get_scotus_judges(d):
+    """Get the panel of scotus judges at a given date."""
+    return Person.objects.filter(                 # Find all the judges...
+        Q(positions__court_id='scotus'),          # In SCOTUS...
+        Q(positions__date_start__lt=d),           # Started as of the date...
+        Q(positions__date_retirement__gt=d) |
+            Q(positions__date_retirement=None),   # Haven't retired yet...
+        Q(positions__date_termination__gt=d) |
+            Q(positions__date_termination=None),  # Nor been terminated...
+        Q(date_dod__gt=d) | Q(date_dod=None),     # And are still alive.
+    ).distinct()
+
+
 def get_min_dates():
     """returns a dictionary with key-value (courtid, minimum date)"""
     min_dates = {}

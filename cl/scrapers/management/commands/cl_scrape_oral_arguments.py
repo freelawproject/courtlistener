@@ -9,7 +9,7 @@ from juriscraper.AbstractSite import logger
 
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
-from cl.lib.import_lib import get_candidate_judge_objects
+from cl.lib.import_lib import get_candidate_judge_objects, get_scotus_judges
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
@@ -78,14 +78,19 @@ class Command(cl_scrape_opinions.Command):
         docket.save()
         af.docket = docket
         af.save(index=index)
-        if af.judges:
-            candidate_judges = get_candidate_judge_objects(
-                af.judges,
-                docket.court.pk,
-                af.docket.date_argued,
-            )
-            for candidate in candidate_judges:
-                af.panel.add(candidate)
+        candidate_judges = []
+        if af.docket.court_id != 'scotus':
+            if af.judges:
+                candidate_judges = get_candidate_judge_objects(
+                    af.judges,
+                    docket.court.pk,
+                    af.docket.date_argued,
+                )
+        else:
+            candidate_judges = get_scotus_judges(af.docket.date_argued)
+
+        for candidate in candidate_judges:
+            af.panel.add(candidate)
         if not backscrape:
             RealTimeQueue.objects.create(item_type='oa', item_pk=af.pk)
 
