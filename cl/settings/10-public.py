@@ -280,6 +280,11 @@ REST_FRAMEWORK = {
         'user': '5000/hour',
     },
     'OVERRIDE_THROTTLE_RATES': {
+        # Throttling down.
+        'leo': '100/hour',
+        'miffy': '100/hour',
+        'safetynet': '100/hour',
+        # Throttling up.
         'waldo': '10000/hour',
         'peidelman': '20000/hour',
     },
