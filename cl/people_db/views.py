@@ -50,6 +50,19 @@ def view_person(request, pk, slug):
     }
     authored_opinions = conn.raw_query(**q).execute()
 
+    # Use Solr to get the oral arguments for the judge
+    conn = SolrInterface(settings.SOLR_AUDIO_URL, mode='r')
+    q = {
+        'q': 'panel_ids:{p}'.format(p=person.pk),
+        'fl': ['id', 'absolute_url', 'caseName', 'court_id', 'dateArgued',
+               'docketNumber'],
+        'rows': 5,
+        'start': 0,
+        'sort': 'score desc',
+        'caller': 'view_person',
+    }
+    oral_arguments_heard = conn.raw_query(**q).execute()
+
     return render(request, 'view_person.html', {
         'person': person,
         'title': title,
@@ -59,6 +72,7 @@ def view_person(request, pk, slug):
         'positions': positions,
         'educations': person.educations.all().order_by('-degree_year'),
         'authored_opinions': authored_opinions,
+        'oral_arguments_heard': oral_arguments_heard,
         'ftm_last_updated': settings.FTM_LAST_UPDATED,
         'private': False
     })
