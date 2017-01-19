@@ -58,7 +58,7 @@ def view_person(request, pk, slug):
                'docketNumber'],
         'rows': 5,
         'start': 0,
-        'sort': 'score desc',
+        'sort': 'dateArgued desc',
         'caller': 'view_person',
     }
     oral_arguments_heard = conn.raw_query(**q).execute()
