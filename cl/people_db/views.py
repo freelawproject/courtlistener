@@ -55,7 +55,7 @@ def view_person(request, pk, slug):
     q = {
         'q': 'panel_ids:{p}'.format(p=person.pk),
         'fl': ['id', 'absolute_url', 'caseName', 'court_id', 'dateArgued',
-               'docketNumber'],
+               'docketNumber', 'court_citation_string'],
         'rows': 5,
         'start': 0,
         'sort': 'dateArgued desc',
