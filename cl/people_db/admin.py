@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 
 from cl.people_db.models import (
@@ -11,6 +12,7 @@ class RetentionEventInline(admin.TabularInline):
     extra = 1
 
 
+@admin.register(Position)
 class PositionAdmin(admin.ModelAdmin):
     list_filter = (
         'court__jurisdiction',
@@ -31,6 +33,11 @@ class PositionAdmin(admin.ModelAdmin):
         from cl.search.tasks import add_or_update_people
         add_or_update_people.delay([obj.person_id])
 
+    def delete_model(self, request, obj):
+        obj.delete()
+        from cl.search.tasks import add_or_update_people
+        add_or_update_people.delay([obj.person_id])
+
 
 class PositionInline(admin.StackedInline):
     model = Position
@@ -45,6 +52,7 @@ class PositionInline(admin.StackedInline):
     )
 
 
+@admin.register(School)
 class SchoolAdmin(admin.ModelAdmin):
     search_fields = (
         'id',
@@ -53,6 +61,7 @@ class SchoolAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(Education)
 class EducationAdmin(admin.ModelAdmin):
     search_fields = (
         'school__name',
@@ -82,6 +91,7 @@ class ABARatingInline(admin.TabularInline):
     extra = 1
 
 
+@admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['name_first', 'name_middle', 'name_last',
                                     'name_suffix']}
@@ -117,19 +127,20 @@ class PersonAdmin(admin.ModelAdmin):
         from cl.search.tasks import add_or_update_people
         add_or_update_people.delay([obj.pk])
 
+    def delete_model(self, request, obj):
+        obj.delete()
+        from cl.search.tasks import delete_items
+        delete_items.delay([obj.pk], settings.SOLR_PEOPLE_URL)
 
+
+@admin.register(Race)
 class RaceAdmin(admin.ModelAdmin):
     list_display = (
         'get_race_display',
     )
 
 
-admin.site.register(Person, PersonAdmin)
-admin.site.register(Education, EducationAdmin)
-admin.site.register(School, SchoolAdmin)
-admin.site.register(Position, PositionAdmin)
 admin.site.register(PoliticalAffiliation)
 admin.site.register(RetentionEvent)
-admin.site.register(Race, RaceAdmin)
 admin.site.register(Source)
 admin.site.register(ABARating)
