@@ -4,7 +4,7 @@ from cl.opinion_page.sitemap import opinion_sitemap_maker, recap_sitemap_maker
 from cl.opinion_page.views import (
     view_opinion, view_authorities, view_docket, cluster_visualizations,
     citation_redirector, view_recap_document,
-    ajax_get_recap_documents_and_attachments
+    ajax_get_recap_documents_and_attachments, block_item,
 )
 
 urlpatterns = [
@@ -59,5 +59,12 @@ urlpatterns = [
         r'^sitemap-recap\.xml',
         recap_sitemap_maker,
         name='recap_sitemap',
+    ),
+
+    # Admin tools
+    url(
+        r'^admin-tools/block-item/$',
+        block_item,
+        name='block_item',
     )
 ]

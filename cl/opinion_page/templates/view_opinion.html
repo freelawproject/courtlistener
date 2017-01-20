@@ -15,6 +15,14 @@
 {% block footer-scripts %}
     <script defer type="text/javascript" src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
     <script defer type="text/javascript" src="{{ STATIC_URL }}js/save-favorites.js"></script>
+    {% if request.user.is_staff %}
+        <script defer type="text/javascript" src="{{ STATIC_URL }}js/admin_tools.js"></script>
+        {% if DEBUG %}
+            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
+        {% else %}
+            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+        {% endif %}
+    {% endif %}
 {% endblock %}
 
 {% block sidebar %}
@@ -39,9 +47,15 @@
                         {% endfor %}
                     {% endif %}
                     {% if request.user.is_superuser %}
-                      {% if private %}
-                      <div class="btn btn-danger btn-xs">Blocked from Search Engines</div>
-                      {% endif %}
+                        {% if private %}
+                            <div class="btn btn-danger btn-xs">Blocked <i
+                                    class="fa fa-ban"></i></div>
+                        {% else %}
+                            <div class="btn btn-success btn-sm block-item"
+                                 data-id="{{ cluster.pk }}"
+                                 data-type="cluster">Block Cluster and Docket <i
+                                    class="fa fa-ban"></i></div>
+                        {% endif %}
                     {% endif %}
                 </p>
             </div>

@@ -20,6 +20,15 @@
             src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/save-favorites.js"></script>
+    {% if request.user.is_staff %}
+        <script defer type="text/javascript"
+                src="{{ STATIC_URL }}js/admin_tools.js"></script>
+        {% if DEBUG %}
+            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
+        {% else %}
+            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+        {% endif %}
+    {% endif %}
 {% endblock %}
 
 
@@ -32,10 +41,19 @@
                         <a href="{% url 'admin:search_docket_change' docket.id %}"
                            class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;<i
                            class="fa fa-pencil"></i>
-                            {% if private and request.user.is_superuser %}
-                                &nbsp;<i class="fa fa-ban" title="Blocked from Search Engines"></i>
-                            {% endif %}
                         </a>
+                        {% if request.user.is_superuser %}
+                            {% if private %}
+                               &nbsp;<span class="btn btn-danger btn-xs">Blocked <i
+                                    class="fa fa-ban"></i></span>
+                            {% else %}
+                                <a class="btn btn-success btn-xs block-item"
+                                     data-id="{{ docket.pk }}"
+                                     data-type="docket">Block This Docket <i
+                                        class="fa fa-ban"></i>
+                                </a>
+                            {% endif %}
+                        {% endif %}
                     </p>
                 {% endif %}
                 <i id="favorites-star"

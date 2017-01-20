@@ -4,9 +4,12 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
 from django.db.models import F, Q
 from django.http import HttpResponsePermanentRedirect, HttpResponseRedirect
-from django.http.response import JsonResponse
+from django.http.response import JsonResponse, HttpResponse, \
+    HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
+from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import ensure_csrf_cookie
 
 from cl.citations.find_citations import get_citations
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -315,6 +318,34 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
                     'private': True,
                 })
 
+
+@ensure_csrf_cookie
+def block_item(request):
+    """Block an item from search results using AJAX"""
+    if request.is_ajax() and request.user.is_superuser:
+        obj_type = request.POST['type']
+        pk = request.POST['id']
+        if obj_type == 'docket':
+            # Block the docket
+            d = get_object_or_404(Docket, pk=pk)
+            d.blocked = True
+            d.date_blocked = now()
+            d.save()
+        elif obj_type == 'cluster':
+            # Block the cluster and the docket
+            cluster = get_object_or_404(OpinionCluster, pk=pk)
+            cluster.blocked = True
+            cluster.date_blocked = now()
+            cluster.save(index=False)
+            cluster.docket.blocked = True
+            cluster.docket.date_blocked = now()
+            cluster.docket.save()
+        return HttpResponse("It worked")
+    else:
+        return HttpResponseNotAllowed(
+            permitted_methods=['POST'],
+            content="Not an ajax request",
+        )
 
 
 def redirect_cited_by_feeds(request, pk):
