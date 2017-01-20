@@ -8,7 +8,7 @@ from timeout_decorator import timeout_decorator
 from cl.search.models import Docket
 from cl.tests.base import BaseSeleniumTest
 
-BLOCKED_MSG = 'Blocked from Search Engines'
+BLOCKED_MSG = 'Blocked'
 
 
 class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
