@@ -6,7 +6,13 @@ $(document).ready(function() {
     var citedGreaterThan = $('#id_cited_gt');
     var citedLessThan = $('#id_cited_lt');
 
-    function makeSearchPath() {
+    function submitSearchForm() {
+        // Ensure that the correct value is set in the radio button (correct
+        // is defined by the label that is .selected). This is needed because
+        // the "wrong" value will be selected after a user presses the back
+        // button in their browser.
+        $('#type-switcher .selected input').prop('checked', true);
+
         // Empty the sliders if they are both at their max
         if (citedGreaterThan.val() === 0 && citedLessThan.val() === 20000) {
         // see https://github.com/freelawproject/courtlistener/issues/303
@@ -69,8 +75,7 @@ $(document).ready(function() {
                 .val(el.val())
                 .appendTo('#search-form');
         });
-        var path = '/?' + $('#search-form').serialize();
-        return path;
+        document.location = '/?' + $('#search-form').serialize();
     }
 
     // Statuses
@@ -87,14 +92,11 @@ $(document).ready(function() {
       '#sidebar-search-form, ' +
       '.search-page #court-picker-search-form').submit(function (e) {
         e.preventDefault();
+        submitSearchForm();
+    });
 
-        // Ensure that the correct value is set in the radio button (correct
-        // is defined by the label that is .selected). This is needed because
-        // the "wrong" value will be selected after a user presses the back
-        // button in their browser.
-        $('#type-switcher .selected input').prop('checked', true);
-
-        document.location = makeSearchPath(false);
+    $('.search-page #id_order_by').change(function () {
+        submitSearchForm();
     });
 
     // Make the enter key work in the search form
@@ -158,9 +160,14 @@ $(document).ready(function() {
     });
 
 
-    ///////////////
-    // RT Alerts //
-    ///////////////
+    ////////////
+    // Alerts //
+    ////////////
+    $('#save-alert-button').click(function (e) {
+        e.preventDefault();
+        $('#alert-sidebar form').submit();
+    });
+
     $('#id_rate').change(function(){
         if ($(this).val() === 'rt' && totalDonatedLastYear < priceRtAlerts){
             $('#donate-for-rt').removeClass('hidden');
