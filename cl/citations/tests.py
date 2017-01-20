@@ -11,6 +11,7 @@ from cl.citations.find_citations import get_citations, is_date_in_reporter, \
     Citation
 from cl.citations.management.commands.cl_add_parallel_citations import \
     identify_parallel_citations, make_edge_list
+from cl.citations.match_citations import match_citation
 from cl.citations.reporter_tokenizer import tokenize
 from cl.citations.tasks import update_document, create_cited_html
 from cl.lib.test_helpers import IndexedSolrTestCase
@@ -300,6 +301,14 @@ class MatchingTest(IndexedSolrTestCase):
                 u"the citation was not found. Count was: %s instead of %s"
                 % (cited.cluster.citation_count, expected_count)
         )
+
+    def test_citation_matching_issue621(self):
+        """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
+        # The fixture contains a reference to 9 F. 1, so we expect no results.
+        citation_str = '1 F. 9 (1795)'
+        citation = get_citations(citation_str)[0]
+        results = match_citation(citation)
+        self.assertEqual([], results)
 
 
 class CitationFeedTest(IndexedSolrTestCase):

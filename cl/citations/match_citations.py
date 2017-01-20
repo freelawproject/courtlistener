@@ -125,9 +125,9 @@ def match_citation(citation, citing_doc=None):
     if citation.court:
         main_params['fq'].append('court_exact:%s' % citation.court)
 
-    # Take 1: Use a proximity query to search the citation field.
+    # Take 1: Use a phrase query to search the citation field.
     main_params['fq'].append(
-        'citation:("%s"~5)' % citation.base_citation()
+        'citation:("%s")' % citation.base_citation()
     )
     results = conn.raw_query(**main_params).execute()
     if len(results) == 1:
