@@ -63,13 +63,8 @@ class RedirectionTest(TestCase):
     def test_various_redirections(self):
         self.client = Client()
         old_urls = [
-            # Opinion pages
-            ('/ca3/a/asdf/', '/opinion/9/asdf/'),
-            ('/ca3/a/asdf/authorities/', '/opinion/9/asdf/authorities/'),
-
             # Cited-by pages
             ('/opinion/9/asdf/cited-by/', '/?q=cites%3A9'),
-            ('/ca3/a/asdf/cited-by/', '/?q=cites%3A9'),
             ('/feed/a/cited-by/', '/feed/search/?q=cites%3A9'),
             ('/feed/9/cited-by/', '/feed/search/?q=cites%3A9'),
         ]
