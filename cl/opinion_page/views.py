@@ -316,18 +316,6 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
                 })
 
 
-def redirect_opinion_pages(request, pk, slug):
-    # Handles the old /$court/$ascii/$slug/(authorities)? format. /cited-by/
-    # is handled elsewhere since that page has now been through additional
-    # movements.
-    pk = ascii_to_num(pk)
-    path = reverse('view_case', args=[pk, slug])
-    if request.path.endswith('/authorities/'):
-        path += 'authorities/'
-    if request.META['QUERY_STRING']:
-        path = '%s?%s' % (path, request.META['QUERY_STRING'])
-    return HttpResponsePermanentRedirect(path)
-
 
 def redirect_cited_by_feeds(request, pk):
     try:

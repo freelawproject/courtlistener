@@ -1,9 +1,8 @@
 from django.conf.urls import include, url
 from django.contrib import admin
 from django.views.generic import RedirectView
-from cl.opinion_page.views import (
-    redirect_opinion_pages, redirect_cited_by_feeds,
-    redirect_cited_by_page)
+from cl.opinion_page.views import redirect_cited_by_feeds, \
+    redirect_cited_by_page
 from cl.sitemap import index_sitemap_maker
 
 urlpatterns = [
@@ -48,13 +47,10 @@ urlpatterns = [
         permanent=True,
     )),
 
-    # Court stripped from the URL on 2014-09-30.
     # cited-by pages and feeds moved to search results on 2015-08-25
     url(r'^feed/(.*)/cited-by/$', redirect_cited_by_feeds),
     # catch the formats:
     #    /$court/$ascii/$slug/cited-by/ and
     #    /$opinion/$number/$slug/cited-by/
     url(r'^(?:\w{1,15})/(.*)/(?:.*)/cited-by/$', redirect_cited_by_page),
-    url(r'^(?:\w{1,15})/(.*)/(.*)/authorities/$', redirect_opinion_pages),
-    url(r'^(?:\w{1,15})/(.*)/(.*)/$', redirect_opinion_pages),
 ]
