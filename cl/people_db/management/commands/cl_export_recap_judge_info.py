@@ -35,6 +35,11 @@ judge_normalizers = {
     'Bankruptcy': 'jud',
     'Bankruptcy Judge': 'jud',
 
+    # Chief (normalize to jud for now, due to low sample size)
+    'Chief': 'jud',
+    'Chief Judge': 'jud',
+    'Chief District Judge': 'jud',
+
     # Magistrate
     'Mag': 'mag',
     'Mag Judge': 'mag',
@@ -46,16 +51,13 @@ judge_normalizers = {
     'Magistrate Judge Magistrate': 'mag',
     'Magistrate Judge Magistrate Judge': 'mag',
 
-    # Chief & Senior
-    'Chief': 'c-jud',
-    'Chief Judge': 'c-jud',
-    'Chief District Judge': 'c-jud',
+    # Chief Magistrate (normalize to magistrate for now, due to low sample size)
+    'Chief Magistrate': 'mag',
+    'Chief Magistrate Judge': 'mag',
+
+    # Senior
     'Senior Judge': 'ret-senior-jud',
     'Senior-Judge': 'ret-senior-jud',
-
-    # Chief Magistrate
-    'Chief Magistrate': 'c-mag',
-    'Chief Magistrate Judge': 'c-mag',
 
     # Special Master
     'Special Master': 'spec-m',
@@ -78,6 +80,32 @@ def normalize_judge_titles(title):
     return judge_normalizers.get(title, 'UNKNOWN: %s' % title)
 
 
+def normalize_judge_names(name):
+    """Cleans up little issues with people's names"""
+    out = []
+    words = name.split()
+    for i, w in enumerate(words):
+        # Michael J Lissner --> Michael J. Lissner
+        if len(w) == 1 and w.isalpha():
+            w = '%s.' % w
+
+        # Michael Lissner Jr --> Michael Lissner Jr.
+        if w.lower() in ['jr', 'sr']:
+            w = '%s.' % w
+
+        # J. Michael Lissner --> Michael Lissner
+        # J. G. Lissner --> J. G. Lissner
+        if i == 0 and w.lower() in ['j.', 'j']:
+            next_word = words[i + 1]
+            if not any([len(next_word) == 2 and next_word.endswith('.'),
+                        len(next_word) == 1]):
+                # Drop the word.
+                continue
+        out.append(w)
+
+    return ' '.join(out)
+
+
 def split_name_title(judge):
     """Split a value from PACER and return the title and name"""
     judge = judge.replace(',', '')
@@ -91,7 +119,6 @@ def split_name_title(judge):
                 w.startswith('-'),
                 w.startswith('~'),
                 (len(w) > 2 and '.' in w and w not in ['jr.', 'sr.']),
-                (i == 0 and w == 'j.'),
                 w in blacklist]):
             continue
         clean_words.append(w)
@@ -105,7 +132,7 @@ def split_name_title(judge):
             name_words.append(w)
 
     title = normalize_judge_titles(titlecase(' '.join(title_words)))
-    name = titlecase(' '.join(name_words))
+    name = normalize_judge_names(titlecase(' '.join(name_words)))
 
     return name, title
 
@@ -154,7 +181,8 @@ class Command(BaseCommand):
             dockets = (court.dockets
                        .exclude(Q(assigned_to_str='') & Q(referred_to_str=''))
                        .filter(source__in=Docket.RECAP_SOURCES)
-                       .only('assigned_to_str', 'referred_to_str', 'date_filed'))
+                       .only('assigned_to_str', 'referred_to_str',
+                             'date_filed'))
             print "Processing %s dockets in %s" % (dockets.count(), court.pk)
             for docket in dockets:
                 for judge_type in ['assigned', 'referred']:
@@ -174,10 +202,12 @@ class Command(BaseCommand):
                         # Person already exists.
                         if title not in out[court.pk][name]:
                             # Title not yet found.
-                            out[court.pk][name][title] = Counter([docket.date_filed.year])
+                            out[court.pk][name][title] = Counter(
+                                [docket.date_filed.year])
                         else:
                             # Title already exists.
-                            out[court.pk][name][title][docket.date_filed.year] += 1
+                            out[court.pk][name][title][
+                                docket.date_filed.year] += 1
 
         self.export_files(out)
 
