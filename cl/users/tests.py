@@ -11,6 +11,7 @@ from selenium import webdriver
 from timeout_decorator import timeout_decorator
 
 from cl.users.models import UserProfile
+from cl.tests.base import PHANTOMJS_TIMEOUT
 
 
 class UserTest(LiveServerTestCase):
@@ -107,7 +108,7 @@ class LiveUserTest(LiveServerTestCase):
         cls.selenium.quit()
         super(LiveUserTest, cls).tearDownClass()
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_reset_password_using_the_HTML(self):
         """Can we use the HTML form to send a reset email?
 
@@ -133,7 +134,7 @@ class LiveUserTest(LiveServerTestCase):
             )
         )
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_set_password_using_the_HTML(self):
         """Can we reset our password after generating a confirmation link?"""
         # Generate a token and use it to visit a generated reset URL

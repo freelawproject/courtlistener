@@ -14,6 +14,13 @@ from cl.lib.solr_core_admin import create_temp_solr_core, delete_solr_core
 from cl.search.models import Opinion
 from cl.search.tasks import add_or_update_opinions, add_or_update_audio_files
 
+PHANTOMJS_TIMEOUT = 180
+if 'PHANTOMJS_TIMEOUT' in os.environ:
+    try:
+        PHANTOMJS_TIMEOUT = int(os.environ['PHANTOMJS_TIMEOUT'])
+    except ValueError:
+        pass
+
 DESKTOP_WINDOW = (1024, 768)
 MOBILE_WINDOW = (640, 960)
 
@@ -37,7 +44,11 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.screenshot = False
+        if 'SELENIUM_DEBUG' in os.environ:
+            cls.screenshot = True
+        else:
+            cls.screenshot = False
+
         for arg in sys.argv:
             if 'liveserver' in arg:
                 cls.server_url = 'http://' + arg.split('=')[1]
