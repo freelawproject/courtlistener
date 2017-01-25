@@ -62,13 +62,8 @@
           href="/apple-touch-icon-precomposed.png">
     {% endblock %}
 
-    {% if DEBUG %}
-        <link href="{{ STATIC_PREFIX }}css/font-awesome.css"
-              rel="stylesheet">
-    {% else %}
-        <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css"
-              rel="stylesheet">
-    {% endif %}
+    <link href="{{ STATIC_PREFIX }}css/font-awesome.css" rel="stylesheet">
+
     {% block privacy %}
         {% if private %}
             <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />

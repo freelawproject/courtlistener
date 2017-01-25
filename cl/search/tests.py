@@ -149,7 +149,7 @@ class ModelTest(TestCase):
             cf = ContentFile(StringIO.StringIO('blah').read())
             o.file_with_date = datetime.date(1899, 1, 1)
             o.local_path.save('file_name.pdf', cf, save=False)
-            o.save(index=True)
+            o.save(index=False)
         except ValueError as e:
             raise ValueError("Unable to save a case older than 1900. Did you "
                              "try to use `strftime`...again?")
