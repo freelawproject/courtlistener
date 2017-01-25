@@ -21,7 +21,7 @@ from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.search.views import do_search
-from cl.tests.base import BaseSeleniumTest, PHANTOMJS_TIMEOUT
+from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
 
 class SetupException(Exception):
@@ -651,7 +651,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         result_count = self.browser.find_element_by_id('result-count')
         self.assertIn('Opinions', result_count.text)
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_toggle_to_oral_args_search_results(self):
         # Dora navigates to the global SERP from the homepage
         self.browser.get(self.server_url)
@@ -669,7 +669,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # She clicks on Oral Arguments
         self.browser.find_element_by_id('navbar-oa').click()
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_search_and_facet_docket_numbers(self):
         # Dora goes to CL and performs an initial wildcard Search
         self.browser.get(self.server_url)
@@ -696,7 +696,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         for result in search_results.find_elements_by_tag_name('article'):
             self.assertIn('1337', result.text)
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_opinion_search_result_detail_page(self):
         # Dora navitages to CL and does a simple wild card search
         self.browser.get(self.server_url)
@@ -785,7 +785,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
                 article_text
         )
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_search_and_add_precedential_results(self):
         # Dora navigates to CL and just hits Search to just start with
         # a global result set
@@ -833,7 +833,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         second_count = self.extract_result_count_from_serp()
         self.assertTrue(second_count > first_count)
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_basic_homepage_search_and_signin_and_signout(self):
 
         # Dora navigates to the CL website.

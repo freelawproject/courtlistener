@@ -18,10 +18,10 @@ from cl.lib.solr_core_admin import create_temp_solr_core, delete_solr_core
 from cl.search.models import Opinion
 from cl.search.tasks import add_or_update_opinions, add_or_update_audio_files
 
-PHANTOMJS_TIMEOUT = 45
-if 'PHANTOMJS_TIMEOUT' in os.environ:
+SELENIUM_TIMEOUT = 45
+if 'SELENIUM_TIMEOUT' in os.environ:
     try:
-        PHANTOMJS_TIMEOUT = int(os.environ['PHANTOMJS_TIMEOUT'])
+        SELENIUM_TIMEOUT = int(os.environ['SELENIUM_TIMEOUT'])
     except ValueError:
         pass
 
@@ -37,38 +37,41 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     """Base class for Selenium Tests. Sets up a few attributes:
         * server_url - either from a sys argument for liveserver or
             the default from the LiveServerTestCase
-        * browser - instance of PhantomJS Selenium WebDriver
+        * browser - instance of Selenium WebDriver
         * screenshot - boolean for if the test should save a final screenshot
         Also sets window size to default of 1024x768.
     """
 
-    driverClass = webdriver.Remote
+    @staticmethod
+    def _create_browser(options=None):
+        if options is None:
+            options = webdriver.ChromeOptions()
+
+        if 'REMOTE_SELENIUM_ADDRESS' in os.environ:
+            address = str(os.environ['REMOTE_SELENIUM_ADDRESS']).strip()
+            if not address.startswith('http'):
+                address = 'http://' + address
+            capabilities = options.to_capabilities()
+            return webdriver.Remote(address,
+                                    desired_capabilities=capabilities)
+        return webdriver.Chrome(chrome_options=options)
 
     @classmethod
     def setUpClass(cls):
+        super(BaseSeleniumTest, cls).setUpClass()
+
         if 'SELENIUM_DEBUG' in os.environ:
             cls.screenshot = True
         else:
             cls.screenshot = False
-
-        for arg in sys.argv:
-            if 'liveserver' in arg:
-                cls.server_url = 'http://' + arg.split('=')[1]
-                return
-        super(BaseSeleniumTest, cls).setUpClass()
         cls.server_url = cls.live_server_url
-
-    @classmethod
-    def tearDownClass(cls):
-        if cls.server_url == cls.live_server_url:
-            super(BaseSeleniumTest, cls).tearDownClass()
 
     def setUp(self):
         self.resetBrowser()
         self._initialize_test_solr()
         self._update_index()
 
-    def resetBrowser(self, window_width=DESKTOP_WINDOW[0], window_height=DESKTOP_WINDOW[1]):
+    def resetBrowser(self, width=DESKTOP_WINDOW[0], height=DESKTOP_WINDOW[1]):
         try:
             self.browser.quit()
         except AttributeError:
@@ -76,10 +79,10 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             pass
         finally:
             options = webdriver.ChromeOptions()
-            options.add_argument('window-size=%s,%s' % (window_width, window_height))
-            self.browser = self.driverClass('http://10.0.2.2:9515', options.to_capabilities())
+            options.add_argument('window-size=%s,%s' % (width, height))
+            self.browser = self._create_browser(options)
 
-        self.browser.implicitly_wait(10)
+        self.browser.implicitly_wait(3)
 
     def tearDown(self):
         if self.screenshot:

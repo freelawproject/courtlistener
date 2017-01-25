@@ -8,7 +8,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW, MOBILE_WINDOW, \
-    PHANTOMJS_TIMEOUT
+    SELENIUM_TIMEOUT
 
 
 class LayoutTest(BaseSeleniumTest):
@@ -18,7 +18,7 @@ class LayoutTest(BaseSeleniumTest):
                 'judge_judy.json', 'test_objects_search.json',
                 'functest_opinions.json', 'test_objects_audio.json']
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_general_homepage_layout(self):
         """
         Tests the general layout of things like the ordering of the Search,
@@ -88,9 +88,9 @@ class DesktopLayoutTest(BaseSeleniumTest):
 
     def setUp(self):
         super(DesktopLayoutTest, self).setUp()
-        self.resetBrowser(window_height=DESKTOP_WINDOW[0], window_width=DESKTOP_WINDOW[1])
+        self.resetBrowser(height=DESKTOP_WINDOW[0], width=DESKTOP_WINDOW[1])
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_desktop_home_page_aesthetics(self):
         self.browser.get(self.server_url)
 
@@ -128,9 +128,9 @@ class MobileLayoutTest(BaseSeleniumTest):
 
     def setUp(self):
         super(MobileLayoutTest, self).setUp()
-        self.resetBrowser(window_height=MOBILE_WINDOW[0], window_width=MOBILE_WINDOW[1])
+        self.resetBrowser(height=MOBILE_WINDOW[0], width=MOBILE_WINDOW[1])
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_mobile_home_page_aesthetics(self):
         self.browser.get(self.server_url)
 

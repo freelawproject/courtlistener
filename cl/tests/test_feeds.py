@@ -13,7 +13,7 @@ from timeout_decorator import timeout_decorator
 
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.search.models import Court
-from cl.tests.base import BaseSeleniumTest, PHANTOMJS_TIMEOUT
+from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
 
 @override_settings(
@@ -43,7 +43,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         IncrementingFileSystemStorage.path = patched_path
         super(FeedsFunctionalTest, cls).setUpClass()
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_can_get_to_feeds_from_homepage(self):
         """Can we get to the feeds/podcasts page from the homepage?"""
         self.browser.get(self.server_url)
@@ -63,7 +63,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         self.assertIn("/podcasts", self.browser.current_url)
         self.assert_text_in_body("Podcasts")
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_feeds_page_shows_jurisdiction_links(self):
         """
         Does the feeds page show all the proper links for each jurisdiction?
@@ -163,7 +163,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 )
                 self.assertEqual(r['Content-Type'], 'audio/mpeg')
 
-    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_search_based_opinion_feed(self):
         """
         Can a user perform a search via CL and use the RSS feed feature?
