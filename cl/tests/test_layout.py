@@ -162,7 +162,7 @@ class MobileLayoutTest(BaseSeleniumTest):
         self.assertAlmostEqual(
             menu.size['width'],
             MOBILE_WINDOW[0] - 100,
-            delta=5
+            delta=25
         )
 
         # and the menu hides when the button is clicked
