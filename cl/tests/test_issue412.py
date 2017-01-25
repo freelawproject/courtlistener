@@ -6,7 +6,7 @@ blocked from search engines
 from timeout_decorator import timeout_decorator
 
 from cl.search.models import Docket
-from cl.tests.base import BaseSeleniumTest
+from cl.tests.base import BaseSeleniumTest, PHANTOMJS_TIMEOUT
 
 BLOCKED_MSG = 'Blocked'
 
@@ -19,7 +19,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
     fixtures = ['test_court.json', 'authtest_data.json', 'judge_judy.json',
                 'opinions-issue-412.json', 'audio-issue-412.json']
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_admin_viewing_blocked_opinion(self):
         """ For a blocked Opinion, an Admin should see indication. """
         # Admin logs into CL using her admin account
@@ -37,7 +37,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertIn(BLOCKED_MSG, sidebar.text)
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_non_admin_viewing_blocked_opinion(self):
         """ For a blocked Opinion, a Non-admin should see NO indication. """
         # Pandora (not an Admin) logs into CL using her admin account
@@ -55,7 +55,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_admin_viewing_not_blocked_opinion(self):
         """ For a non-blocked Opinion, there should be no indication """
         # Admin logs into CL using her admin account
@@ -82,7 +82,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
     fixtures = ['test_court.json', 'authtest_data.json', 'judge_judy.json',
                 'opinions-issue-412.json', 'audio-issue-412.json']
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_admin_viewing_blocked_docket(self):
         """ For a blocked Dockets, an Admin should see indication. """
         # Admin navigates to CL and logs in
@@ -98,7 +98,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # And sees a badge that lets her know it's blocked
         self.assertIn(BLOCKED_MSG, self.browser.page_source)
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_non_admin_viewing_blocked_docket(self):
         """ For a blocked Docket, a Non-admin should see NO indication. """
         # Pandora navigates to CL and logs in
@@ -115,7 +115,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_admin_viewing_not_blocked_docket(self):
         """ For a non-blocked Docket, there should be no indication. """
         # Admin navigates to CL and logs in
@@ -141,7 +141,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
     fixtures = ['test_court.json', 'authtest_data.json', 'judge_judy.json',
                 'opinions-issue-412.json', 'audio-issue-412.json']
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_admin_viewing_blocked_audio_page(self):
         """ For a blocked Audio pages, an Admin should see indication. """
         # Admin logs into CL using her admin account
@@ -167,7 +167,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertIn(BLOCKED_MSG, sidebar.text)
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_non_admin_viewing_blocked_audio_page(self):
         """ For a blocked Audio pages, a Non-admin should see NO indication. """
         # Pandora logs into CL using her admin account
@@ -192,7 +192,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_admin_viewing_not_blocked_audio_page(self):
         """ For a non-blocked Audio pages, there should be no indication """
         # Admin logs into CL using her admin account

@@ -271,7 +271,7 @@ def show_results(request):
             # Get a bunch of stats.
             render_dict.update(get_homepage_stats())
 
-            return render(request, 'homepage.html',render_dict)
+            return render(request, 'homepage.html', render_dict)
         else:
             # User placed a search or is trying to edit an alert
             if request.GET.get('edit_alert'):

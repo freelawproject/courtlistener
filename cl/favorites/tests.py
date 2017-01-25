@@ -5,7 +5,7 @@ from django.test import Client, TestCase
 from timeout_decorator import timeout_decorator
 
 from cl.favorites.models import Favorite
-from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW
+from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW, PHANTOMJS_TIMEOUT
 
 
 class FavoriteTest(TestCase):
@@ -61,7 +61,7 @@ class UserFavoritesTest(BaseSeleniumTest):
     fixtures = ['test_court.json', 'authtest_data.json', 'judge_judy.json',
                 'test_objects_search.json', 'favorites.json']
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(self):
         # Clean up favorites to start
         Favorite.objects.all().delete()
@@ -116,7 +116,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         modal_title = self.browser.find_element_by_id('save-favorite-title')
         self.assertIn('Save Favorite', modal_title.text)
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_logged_in_user_can_save_favorite(self):
         # Meta: assure no Faves even if part of fixtures
         Favorite.objects.all().delete()
@@ -171,7 +171,6 @@ class UserFavoritesTest(BaseSeleniumTest):
         # She closes her browser and goes to the gym for a bit since it's
         # always leg day amiright
         self.resetBrowser()
-        self.browser.set_window_size(*DESKTOP_WINDOW)
 
         # When she returns, she signs back into CL and wants to pull up
         # that favorite again, so she goes to Favorites under the Profile menu
@@ -190,8 +189,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         profile_dropdown.click()
 
-        favorites = self.browser.find_element_by_link_text('Favorites')
-        favorites.click()
+        self.click_link_for_new_page('Favorites')
 
         # The case is right there with the same name and notes she gave it!
         # There are columns that show the names and notes of her favorites
@@ -218,14 +216,12 @@ class UserFavoritesTest(BaseSeleniumTest):
                     already_found = True
 
         # Clicking the name of the favorite brings her right back to the details
-        link = table.find_element_by_link_text(short_title)
-        link.click()
+        self.click_link_for_new_page(short_title)
 
         self.assertIn(short_title, self.browser.title)
         self.assert_text_in_body(short_title)
-        self.assert_text_in_body('Back to Home Page')
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_user_can_change_favorites(self):
         # Dora already has some favorites and she logs in and pulls them up
         self.browser.get(self.server_url)

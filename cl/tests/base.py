@@ -4,18 +4,29 @@ Base class(es) for functional testing CourtListener using Selenium and PhantomJS
 import os
 import sys
 
+from contextlib import contextmanager
+
 from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test.utils import override_settings
 from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.expected_conditions import staleness_of
 
 from cl.audio.models import Audio
 from cl.lib.solr_core_admin import create_temp_solr_core, delete_solr_core
 from cl.search.models import Opinion
 from cl.search.tasks import add_or_update_opinions, add_or_update_audio_files
 
+PHANTOMJS_TIMEOUT = 45
+if 'PHANTOMJS_TIMEOUT' in os.environ:
+    try:
+        PHANTOMJS_TIMEOUT = int(os.environ['PHANTOMJS_TIMEOUT'])
+    except ValueError:
+        pass
+
 DESKTOP_WINDOW = (1024, 768)
-MOBILE_WINDOW = (640, 960)
+MOBILE_WINDOW = (500, 120)
 
 
 @override_settings(
@@ -31,13 +42,15 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         Also sets window size to default of 1024x768.
     """
 
-    driverClass = webdriver.PhantomJS
-    #driverClass = webdriver.Firefox
-    log_path = '/var/log/courtlistener/django.log'
+    driverClass = webdriver.Remote
 
     @classmethod
     def setUpClass(cls):
-        cls.screenshot = False
+        if 'SELENIUM_DEBUG' in os.environ:
+            cls.screenshot = True
+        else:
+            cls.screenshot = False
+
         for arg in sys.argv:
             if 'liveserver' in arg:
                 cls.server_url = 'http://' + arg.split('=')[1]
@@ -55,16 +68,18 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self._initialize_test_solr()
         self._update_index()
 
-    def resetBrowser(self):
+    def resetBrowser(self, window_width=DESKTOP_WINDOW[0], window_height=DESKTOP_WINDOW[1]):
         try:
             self.browser.quit()
         except AttributeError:
             # it's ok we forgive you http://stackoverflow.com/a/610923
             pass
         finally:
-            self.browser = self.driverClass(service_log_path=self.log_path)
-        self.browser.implicitly_wait(3)
-        self.browser.set_window_size(*DESKTOP_WINDOW)
+            options = webdriver.ChromeOptions()
+            options.add_argument('window-size=%s,%s' % (window_width, window_height))
+            self.browser = self.driverClass('http://10.0.2.2:9515', options.to_capabilities())
+
+        self.browser.implicitly_wait(10)
 
     def tearDown(self):
         if self.screenshot:
@@ -83,9 +98,19 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             self.browser.find_element_by_tag_name('body').text
         )
 
+    # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
+    @contextmanager
+    def wait_for_page_load(self, timeout=10):
+        old_page = self.browser.find_element_by_tag_name('html')
+        yield
+        WebDriverWait(self.browser, timeout).until(staleness_of(old_page))
+
+    def click_link_for_new_page(self, link_text, timeout=10):
+        with self.wait_for_page_load(timeout=timeout):
+            self.browser.find_element_by_link_text(link_text).click()
+
     def attempt_sign_in(self, username, password):
-        signin = self.browser.find_element_by_link_text('Sign in / Register')
-        signin.click()
+        self.click_link_for_new_page('Sign in / Register')
         self.assertIn('Sign In', self.browser.title)
         self.browser.find_element_by_id('username').send_keys(username)
         self.browser.find_element_by_id('password').send_keys(password + '\n')
