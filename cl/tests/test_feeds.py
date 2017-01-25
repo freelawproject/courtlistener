@@ -5,6 +5,7 @@ Functional testing of courtlistener RSS feeds
 import os
 
 import feedparser
+import requests
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
@@ -181,18 +182,21 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         # and decides to click it
         result_count = self.browser.find_element_by_id('result-count')
         rss_link = result_count.find_element_by_tag_name('a')
-        rss_link.click()
+
+        with self.wait_for_page_load(timeout=10):
+            rss_link.click()
 
         # She captures the URL and pops it into her RSS Reader
         self.assertIn(
             'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
             self.browser.page_source
         )
-        rss_url = self.browser.current_url
+        rss_url = self.browser.current_url.replace('0.0.0.0', 'localhost')
 
         # The RSS Reader validates the feed and Dora is thrilled! The same
         # first page of results are there!
-        f = feedparser.parse(rss_url)
+        xml = self.browser.find_element_by_tag_name('pre').text
+        f = feedparser.parse(xml)
         self.assertEqual(len(link_titles), len(f.entries))
 
         for entry in f.entries:

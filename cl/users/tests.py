@@ -7,11 +7,10 @@ from django.core.urlresolvers import reverse
 from django.test import LiveServerTestCase
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
-from selenium import webdriver
 from timeout_decorator import timeout_decorator
 
 from cl.users.models import UserProfile
-from cl.tests.base import PHANTOMJS_TIMEOUT
+from cl.tests.base import PHANTOMJS_TIMEOUT, BaseSeleniumTest
 
 
 class UserTest(LiveServerTestCase):
@@ -93,20 +92,8 @@ class UserTest(LiveServerTestCase):
             self.assertTrue(up.email_confirmed)
 
 
-class LiveUserTest(LiveServerTestCase):
+class LiveUserTest(BaseSeleniumTest):
     fixtures = ['authtest_data.json']
-
-    @classmethod
-    def setUpClass(cls):
-        cls.selenium = webdriver.PhantomJS(
-            service_log_path='/var/log/courtlistener/django.log',
-        )
-        super(LiveUserTest, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.selenium.quit()
-        super(LiveUserTest, cls).tearDownClass()
 
     @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_reset_password_using_the_HTML(self):
@@ -115,11 +102,11 @@ class LiveUserTest(LiveServerTestCase):
         This test checks that the email goes out and that the status code
         returned is valid.
         """
-        self.selenium.get('{host}{path}'.format(
+        self.browser.get('{host}{path}'.format(
             host=self.live_server_url,
             path=reverse('password_reset'),
         ))
-        email_input = self.selenium.find_element_by_name("email")
+        email_input = self.browser.find_element_by_name("email")
         email_input.send_keys('pandora@courtlistener.com')
         email_input.submit()
 
@@ -127,7 +114,7 @@ class LiveUserTest(LiveServerTestCase):
 
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
-            self.selenium.current_url,
+            self.browser.current_url,
             '{host}{path}'.format(
                 host=self.live_server_url,
                 path=reverse('password_reset_done'),
@@ -147,23 +134,23 @@ class LiveUserTest(LiveServerTestCase):
                 'token': token,
             }),
         )
-        self.selenium.get(url)
+        self.browser.get(url)
         #self.selenium.save_screenshot('/home/mlissner/phantom.png')
 
         self.assertIn(
             "Enter New Password",
-            self.selenium.page_source
+            self.browser.page_source
         )
 
         # Next, change the user's password and submit the form.
-        pwd1 = self.selenium.find_element_by_name('new_password1')
+        pwd1 = self.browser.find_element_by_name('new_password1')
         pwd1.send_keys('password')
-        pwd2 = self.selenium.find_element_by_name('new_password2')
+        pwd2 = self.browser.find_element_by_name('new_password2')
         pwd2.send_keys('password')
         pwd2.submit()
 
         self.assertEqual(
-            self.selenium.current_url,
+            self.browser.current_url,
             '{host}{path}'.format(
                 host=self.live_server_url,
                 path=reverse('password_reset_complete'),

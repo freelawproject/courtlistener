@@ -171,7 +171,6 @@ class UserFavoritesTest(BaseSeleniumTest):
         # She closes her browser and goes to the gym for a bit since it's
         # always leg day amiright
         self.resetBrowser()
-        self.browser.set_window_size(*DESKTOP_WINDOW)
 
         # When she returns, she signs back into CL and wants to pull up
         # that favorite again, so she goes to Favorites under the Profile menu
@@ -190,8 +189,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         profile_dropdown.click()
 
-        favorites = self.browser.find_element_by_link_text('Favorites')
-        favorites.click()
+        self.click_link_for_new_page('Favorites')
 
         # The case is right there with the same name and notes she gave it!
         # There are columns that show the names and notes of her favorites
@@ -218,12 +216,10 @@ class UserFavoritesTest(BaseSeleniumTest):
                     already_found = True
 
         # Clicking the name of the favorite brings her right back to the details
-        link = table.find_element_by_link_text(short_title)
-        link.click()
+        self.click_link_for_new_page(short_title)
 
         self.assertIn(short_title, self.browser.title)
         self.assert_text_in_body(short_title)
-        #self.assert_text_in_body('Back to Home Page')
 
     @timeout_decorator.timeout(PHANTOMJS_TIMEOUT)
     def test_user_can_change_favorites(self):
