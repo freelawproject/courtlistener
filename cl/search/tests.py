@@ -775,8 +775,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Like before, she's just curious of the list and clicks Back to
         # Document.
-        back = self.browser.find_element_by_link_text('Back to Opinion')
-        back.click()
+        self.click_link_for_new_page('Back to Opinion')
 
         # And she's back at the Opinion in question and pretty happy about that
         self.assertNotIn('Table of Authorities', self.browser.title)

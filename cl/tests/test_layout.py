@@ -147,7 +147,7 @@ class MobileLayoutTest(BaseSeleniumTest):
         self.assertIn('collapsed', navbtn.get_attribute('class'))
         self.assertAlmostEqual(
             navbtn.location['x'] + navbtn.size['width'] + 30,
-            MOBILE_WINDOW[0] - 50,
+            MOBILE_WINDOW[0] - 100,
             delta=85
         )
 
@@ -162,7 +162,7 @@ class MobileLayoutTest(BaseSeleniumTest):
         self.assertAlmostEqual(
             menu.size['width'],
             MOBILE_WINDOW[0] - 100,
-            delta=25
+            delta=100
         )
 
         # and the menu hides when the button is clicked

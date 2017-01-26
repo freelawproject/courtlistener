@@ -2,8 +2,6 @@
 Base class(es) for functional testing CourtListener using Selenium and PhantomJS
 """
 import os
-import sys
-
 from contextlib import contextmanager
 
 from django.conf import settings
@@ -18,7 +16,7 @@ from cl.lib.solr_core_admin import create_temp_solr_core, delete_solr_core
 from cl.search.models import Opinion
 from cl.search.tasks import add_or_update_opinions, add_or_update_audio_files
 
-SELENIUM_TIMEOUT = 45
+SELENIUM_TIMEOUT = 60
 if 'SELENIUM_TIMEOUT' in os.environ:
     try:
         SELENIUM_TIMEOUT = int(os.environ['SELENIUM_TIMEOUT'])
@@ -82,7 +80,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             options.add_argument('window-size=%s,%s' % (width, height))
             self.browser = self._create_browser(options)
 
-        self.browser.implicitly_wait(3)
+        self.browser.implicitly_wait(10)
 
     def tearDown(self):
         if self.screenshot:
