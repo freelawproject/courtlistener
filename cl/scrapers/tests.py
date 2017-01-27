@@ -330,8 +330,10 @@ class AudioFileTaskTest(TestCase):
         audio.save()
 
         audio = Audio.objects.get(pk=1)
-        self.assertNotEqual(audio.duration, 15)
+        self.assertNotEqual(audio.duration, 15,
+                            msg='we start with a fake duration in the fixture')
 
         process_audio_file(pk=1)
         audio = Audio.objects.get(pk=1)
-        self.assertEqual(audio.duration, 12)
+        self.assertEqual(audio.duration, 15,
+                         msg='we should end up with the proper duration')

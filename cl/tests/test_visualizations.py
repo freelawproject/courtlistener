@@ -5,7 +5,7 @@ Functional tests for the Visualization feature of CourtListener
 from django.contrib.auth.models import User
 from timeout_decorator import timeout_decorator
 
-from cl.tests.base import BaseSeleniumTest
+from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 from cl.users.models import UserProfile
 
 
@@ -27,7 +27,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
         )
         super(VisualizationCrudTests, self).setUp()
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_creating_new_visualization(self):
         """ Test if a user can create a new Visualization """
         # Beth Beta-User logs into CL

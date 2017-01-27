@@ -168,14 +168,14 @@ class StaticFilesTest(TestCase):
             type='Lead Opinion',
             local_path=self.good_txt_path
         )
-        self.txtopinion.save()
+        self.txtopinion.save(index=False)
 
         self.pdfopinion = Opinion(
             cluster=self.opinioncluster,
             type='Lead Opinion',
             local_path=self.good_pdf_path
         )
-        self.pdfopinion.save()
+        self.pdfopinion.save(index=False)
 
     def test_serve_static_file_serves_mp3(self):
         request = HttpRequest()
