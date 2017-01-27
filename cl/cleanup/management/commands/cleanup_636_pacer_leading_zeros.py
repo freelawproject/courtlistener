@@ -81,7 +81,7 @@ class CleanupPacerXMLParser(PacerXMLParser):
 
         if not debug:
             try:
-                extract_recap_pdf(d.pk)
+                extract_recap_pdf(d.pk, check_if_needed=False)
                 d.save(do_extraction=False, index=True)
                 logger.info("    Item saved at https://www.courtlistener.com%s"
                             % d.get_absolute_url())
