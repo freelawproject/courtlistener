@@ -66,10 +66,10 @@ class CleanupPacerXMLParser(PacerXMLParser):
                 d.filepath_local = new_local_path
                 filename = d.filepath_ia.rsplit('/', 1)[-1]
                 logger.info("    Downloading item with filename %s" % filename)
-                download_recap_item(d.filepath_ia, filename)
+                if not debug:
+                    download_recap_item(d.filepath_ia, filename)
             else:
                 logger.info("    File already on disk. Punting.")
-                return None
 
             if d.page_count is None:
                 logger.info("    Getting page count.")
