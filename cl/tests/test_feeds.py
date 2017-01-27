@@ -5,7 +5,6 @@ Functional testing of courtlistener RSS feeds
 import os
 
 import feedparser
-import requests
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
@@ -191,7 +190,6 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
             self.browser.page_source
         )
-        rss_url = self.browser.current_url.replace('0.0.0.0', 'localhost')
 
         # The RSS Reader validates the feed and Dora is thrilled! The same
         # first page of results are there!
