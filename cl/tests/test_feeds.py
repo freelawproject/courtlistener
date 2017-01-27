@@ -5,6 +5,7 @@ Functional testing of courtlistener RSS feeds
 import os
 
 import feedparser
+import requests
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
@@ -12,7 +13,7 @@ from timeout_decorator import timeout_decorator
 
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.search.models import Court
-from cl.tests.base import BaseSeleniumTest
+from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
 
 @override_settings(
@@ -42,7 +43,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         IncrementingFileSystemStorage.path = patched_path
         super(FeedsFunctionalTest, cls).setUpClass()
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_can_get_to_feeds_from_homepage(self):
         """Can we get to the feeds/podcasts page from the homepage?"""
         self.browser.get(self.server_url)
@@ -62,7 +63,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         self.assertIn("/podcasts", self.browser.current_url)
         self.assert_text_in_body("Podcasts")
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_feeds_page_shows_jurisdiction_links(self):
         """
         Does the feeds page show all the proper links for each jurisdiction?
@@ -162,7 +163,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 )
                 self.assertEqual(r['Content-Type'], 'audio/mpeg')
 
-    @timeout_decorator.timeout(45)
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_search_based_opinion_feed(self):
         """
         Can a user perform a search via CL and use the RSS feed feature?
@@ -181,18 +182,21 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         # and decides to click it
         result_count = self.browser.find_element_by_id('result-count')
         rss_link = result_count.find_element_by_tag_name('a')
-        rss_link.click()
+
+        with self.wait_for_page_load(timeout=10):
+            rss_link.click()
 
         # She captures the URL and pops it into her RSS Reader
         self.assertIn(
             'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
             self.browser.page_source
         )
-        rss_url = self.browser.current_url
+        rss_url = self.browser.current_url.replace('0.0.0.0', 'localhost')
 
         # The RSS Reader validates the feed and Dora is thrilled! The same
         # first page of results are there!
-        f = feedparser.parse(rss_url)
+        xml = self.browser.find_element_by_tag_name('pre').text
+        f = feedparser.parse(xml)
         self.assertEqual(len(link_titles), len(f.entries))
 
         for entry in f.entries:

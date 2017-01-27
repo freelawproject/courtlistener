@@ -252,6 +252,10 @@ def show_results(request):
             if not is_bot(request):
                 tally_stat('search.homepage_loaded')
 
+            # Ensure we get nothing from the future.
+            request.GET = request.GET.copy()  # Makes it mutable
+            request.GET['filed_before'] = date.today()
+
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
             render_dict.update(do_search(request, rows=5,
@@ -267,7 +271,7 @@ def show_results(request):
             # Get a bunch of stats.
             render_dict.update(get_homepage_stats())
 
-            return render(request, 'homepage.html',render_dict)
+            return render(request, 'homepage.html', render_dict)
         else:
             # User placed a search or is trying to edit an alert
             if request.GET.get('edit_alert'):

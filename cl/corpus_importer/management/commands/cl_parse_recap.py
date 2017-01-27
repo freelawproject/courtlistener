@@ -2,25 +2,29 @@ import argparse
 import glob
 import logging
 import os
+import pickle
 import random
+from collections import Counter
 
 from django.conf import settings
 from django.core.management import BaseCommand
 from lxml import etree
+from lxml.etree import XMLSyntaxError, XPathEvalError
 
 from cl.lib.pacer import PacerXMLParser
 
 logger = logging.getLogger(__name__)
 
 
-def get_docket_list():
+def get_docket_list(path=None):
     """Get a list of files from the recap directory and prep it for
     iteration.
     """
-    recap_files_path = os.path.join(settings.MEDIA_ROOT, 'recap', '*.xml')
-    files = sorted(glob.glob(recap_files_path))
-    file_count = len(files)
-    return files, file_count
+    if not path:
+        path = os.path.join(settings.MEDIA_ROOT, 'recap', '*.xml')
+    else:
+        path = os.path.join(path, '*.xml')
+    return sorted(glob.glob(path))
 
 
 class Command(BaseCommand):
@@ -80,6 +84,10 @@ class Command(BaseCommand):
             default=1000,
             help="The number of items to sample",
         )
+        parser.add_argument(
+            '--path',
+            help="The path where docket XML files can be found.",
+        )
 
     def handle(self, *args, **options):
         self.debug = options['debug']
@@ -91,37 +99,53 @@ class Command(BaseCommand):
     def sample_dockets(self):
         """Iterate over `node_count` items and extract the value at the XPath.
 
-        If there are not `node_count` recap dockets on disk, do the lesser of the
-        two.
+        If there are not `node_count` recap dockets on disk, do the lesser of
+        the two.
         """
-        docket_paths, file_count = get_docket_list()
-        random_numbers = random.sample(
-            range(0, file_count),
-            min(self.options['sample_size'], file_count),
-        )
+        docket_paths = get_docket_list(self.options['path'])
+        random.shuffle(docket_paths)
 
         completed = 0
-        for selection in random_numbers:
-            docket_path = docket_paths[selection]
-
-            # Open the file
+        no_value = 0
+        errors = 0
+        c = Counter()
+        for docket_path in docket_paths:
             with open(docket_path, 'r') as f:
                 docket_xml_content = f.read()
 
                 if not docket_xml_content:
-                    print "Failed to open %s" % docket_path
+                    continue
 
             # Extract the xpath value
-            tree = etree.fromstring(docket_xml_content)
-            value = tree.xpath(self.options['xpath'])
+            try:
+                tree = etree.fromstring(docket_xml_content)
+            except XMLSyntaxError:
+                errors += 1
+                continue
+            try:
+                values = tree.xpath(self.options['xpath'])
+            except XPathEvalError:
+                print "ERROR: Invalid XPath expression."
+                exit(1)
 
-            print "%s: %s" % (completed, value)
+            if values:
+                print "%s: %s" % (completed, values)
+                c.update([str(v) for v in values])
+                completed += 1
+            else:
+                no_value += 1
 
-            completed += 1
+            if completed == self.options['sample_size']:
+                break
+
+        with open('sample.pkl', 'wb') as f:
+            pickle.dump(c, f)
+        print '\n%s items had no value. %s errors. Sample saved at ' \
+              '"sample.pkl"' % (no_value, errors)
 
     def parse_items(self):
         """For every item in the directory, send it to Celery for processing"""
-        docket_paths, file_count = get_docket_list()
+        docket_paths = get_docket_list()
 
         completed = 0
         for docket_path in docket_paths:

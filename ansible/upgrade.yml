@@ -4,7 +4,7 @@
 
 - hosts: all
   tasks:
-  - include_vars: ../defaults.yml
+  - include_vars: defaults.yml
   - name: git pull
     become: yes
     become_user: www-data

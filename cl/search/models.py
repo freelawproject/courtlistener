@@ -390,9 +390,11 @@ class RECAPDocument(models.Model):
         db_index=True,
         choices=DOCUMENT_TYPES,
     )
-    document_number = models.BigIntegerField(
+    document_number = models.CharField(
         help_text="If the file is a document, the number is the "
                   "document_number in RECAP docket.",
+        max_length=32,
+        db_index=True,
     )
     attachment_number = models.SmallIntegerField(
         help_text="If the file is an attachment, the number is the attachment "
@@ -405,7 +407,7 @@ class RECAPDocument(models.Model):
                   "provided by RECAP.",
         max_length=32,  # Same as in RECAP
         unique=True,
-        null=True,
+        null=True,  # This is weird. See reasoning below.
     )
     is_available = models.NullBooleanField(
         help_text="True if the item is available in RECAP",

@@ -2,6 +2,7 @@ import json
 import stripe
 
 from datetime import datetime, timedelta
+from unittest import skipIf
 from django.conf import settings
 from django.core import mail
 from django.core.urlresolvers import reverse
@@ -43,6 +44,8 @@ class EmailCommandTest(TestCase):
         self.assertIn('you donated $1', mail.outbox[0].alternatives[0][0])
 
 
+@skipIf(settings.PAYPAL_SECRET_KEY is None or settings.PAYPAL_SECRET_KEY == '',
+        'Only run PayPal tests if we have an API key available.')
 class DonationFormSubmissionTest(TestCase):
     def setUp(self):
         self.client = Client()
@@ -85,6 +88,8 @@ class DonationFormSubmissionTest(TestCase):
         self.assertEqual(r.redirect_chain[0][1], 302)
 
 
+@skipIf(settings.STRIPE_SECRET_KEY is None or settings.STRIPE_SECRET_KEY == '',
+        'Only run Stripe tests if we have an API key available.')
 class StripeTest(TestCase):
     def setUp(self):
         self.client = Client()
