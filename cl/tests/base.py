@@ -2,20 +2,31 @@
 Base class(es) for functional testing CourtListener using Selenium and PhantomJS
 """
 import os
-import sys
+from contextlib import contextmanager
 
 from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test.utils import override_settings
 from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.expected_conditions import staleness_of
 
 from cl.audio.models import Audio
 from cl.lib.solr_core_admin import create_temp_solr_core, delete_solr_core
 from cl.search.models import Opinion
 from cl.search.tasks import add_or_update_opinions, add_or_update_audio_files
 
+SELENIUM_TIMEOUT = 120
+if 'SELENIUM_TIMEOUT' in os.environ:
+    try:
+        SELENIUM_TIMEOUT = int(os.environ['SELENIUM_TIMEOUT'])
+    except ValueError:
+        pass
+
 DESKTOP_WINDOW = (1024, 768)
-MOBILE_WINDOW = (640, 960)
+MOBILE_WINDOW = (500, 120)
 
 
 @override_settings(
@@ -26,45 +37,53 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     """Base class for Selenium Tests. Sets up a few attributes:
         * server_url - either from a sys argument for liveserver or
             the default from the LiveServerTestCase
-        * browser - instance of PhantomJS Selenium WebDriver
+        * browser - instance of Selenium WebDriver
         * screenshot - boolean for if the test should save a final screenshot
         Also sets window size to default of 1024x768.
     """
 
-    driverClass = webdriver.PhantomJS
-    #driverClass = webdriver.Firefox
-    log_path = '/var/log/courtlistener/django.log'
+    @staticmethod
+    def _create_browser(options=None):
+        if options is None:
+            options = webdriver.ChromeOptions()
+            options.add_argument("silent")
+
+        if 'SELENIUM_REMOTE_ADDRESS' in os.environ:
+            address = str(os.environ['SELENIUM_REMOTE_ADDRESS']).strip()
+            if not address.startswith('http'):
+                address = 'http://' + address
+            capabilities = options.to_capabilities()
+            return webdriver.Remote(address,
+                                    desired_capabilities=capabilities)
+        return webdriver.Chrome(chrome_options=options)
 
     @classmethod
     def setUpClass(cls):
-        cls.screenshot = False
-        for arg in sys.argv:
-            if 'liveserver' in arg:
-                cls.server_url = 'http://' + arg.split('=')[1]
-                return
         super(BaseSeleniumTest, cls).setUpClass()
-        cls.server_url = cls.live_server_url
 
-    @classmethod
-    def tearDownClass(cls):
-        if cls.server_url == cls.live_server_url:
-            super(BaseSeleniumTest, cls).tearDownClass()
+        if 'SELENIUM_DEBUG' in os.environ:
+            cls.screenshot = True
+        else:
+            cls.screenshot = False
+        cls.server_url = cls.live_server_url
 
     def setUp(self):
         self.resetBrowser()
         self._initialize_test_solr()
         self._update_index()
 
-    def resetBrowser(self):
+    def resetBrowser(self, width=DESKTOP_WINDOW[0], height=DESKTOP_WINDOW[1]):
         try:
             self.browser.quit()
         except AttributeError:
             # it's ok we forgive you http://stackoverflow.com/a/610923
             pass
         finally:
-            self.browser = self.driverClass(service_log_path=self.log_path)
-        self.browser.implicitly_wait(3)
-        self.browser.set_window_size(*DESKTOP_WINDOW)
+            options = webdriver.ChromeOptions()
+            options.add_argument('window-size=%s,%s' % (width, height))
+            self.browser = self._create_browser(options)
+
+        self.browser.implicitly_wait(15)
 
     def tearDown(self):
         if self.screenshot:
@@ -83,13 +102,28 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             self.browser.find_element_by_tag_name('body').text
         )
 
+    # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
+    @contextmanager
+    def wait_for_page_load(self, timeout=30):
+        old_page = self.browser.find_element_by_tag_name('html')
+        yield
+        WebDriverWait(self.browser, timeout).until(staleness_of(old_page))
+
+    def click_link_for_new_page(self, link_text, timeout=30):
+        with self.wait_for_page_load(timeout=timeout):
+            self.browser.find_element_by_link_text(link_text).click()
+
     def attempt_sign_in(self, username, password):
-        signin = self.browser.find_element_by_link_text('Sign in / Register')
-        signin.click()
+        self.click_link_for_new_page('Sign in / Register')
         self.assertIn('Sign In', self.browser.title)
         self.browser.find_element_by_id('username').send_keys(username)
         self.browser.find_element_by_id('password').send_keys(password + '\n')
         self.assertTrue(self.extract_result_count_from_serp() > 0)
+
+    def get_url_and_wait(self, url, timeout=30):
+        self.browser.get(url)
+        wait = WebDriverWait(self.browser, timeout)
+        wait.until(EC.presence_of_element_located((By.TAG_NAME, 'html')))
 
     def extract_result_count_from_serp(self):
         results = self.browser.find_element_by_id('result-count').text.strip()
