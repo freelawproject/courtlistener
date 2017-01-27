@@ -19,7 +19,7 @@ You have two options for installing the CourtListener project. The easiest and r
   
  - https://free.law/2016/03/01/its-easier-than-ever-to-contribute-to-courtlistener-and-free-law-project/
 
-Vagrant provides a VM containing all of the CourtListener dependencies that you can run in headless mode. In this configuration, you can either connect to your VM as if it's a remote computer via SSH, or you can use shared drives (sort of like network folders) to access things inside the VM. You can read more about it at the link above. 
+Vagrant provides a self-contained, controlled environment preconfigured to run CourtListener locally in development mode. For more details, check out the blob post above or the [DEVELOPING.md](DEVELOPING.md) file for more details on how to get started.
 
 The other, harder way to get set up is to follow the instructions on our wiki:
 

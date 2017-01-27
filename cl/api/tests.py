@@ -38,14 +38,12 @@ class BulkDataTest(TestCase):
             date_filed=last_month
         )
         self.doc_cluster.save(index=False)
-        opinion = Opinion.objects.create(
-            cluster=self.doc_cluster,
-            type='Lead Opinion'
-        )
-        opinion2 = Opinion.objects.create(
-            cluster=self.doc_cluster,
-            type='Concurrence'
-        )
+        opinion = Opinion(cluster=self.doc_cluster, type='Lead Opinion')
+        opinion.save(index=False)
+
+        opinion2 = Opinion(cluster=self.doc_cluster, type='Concurrence')
+        opinion2.save(index=False)
+
         OpinionsCited.objects.create(
             citing_opinion=opinion2,
             cited_opinion=opinion
