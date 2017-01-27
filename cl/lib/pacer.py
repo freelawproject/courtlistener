@@ -156,7 +156,7 @@ class PacerXMLParser(object):
         recap_docs = []
         for doc_node in self.document_list:
             # Make a DocketEntry object
-            entry_number = int(doc_node.xpath('@doc_num')[0])
+            entry_number = doc_node.xpath('@doc_num')[0]
             attachment_number = int(doc_node.xpath('@attachment_num')[0])
             print "Working on document %s, attachment %s" % (entry_number,
                                                              attachment_number)
@@ -241,8 +241,7 @@ class PacerXMLParser(object):
 
         d.date_upload = self.get_datetime_from_node(doc_node, 'upload_date')
         d.document_type = document_type or d.document_type
-        if isinstance(entry_number, int):
-            d.document_number = entry_number
+        d.document_number = entry_number
 
         # If we can't parse the availability node (it returns None), default it
         # to False.
