@@ -10,7 +10,7 @@ from cl.lib.pacer import PacerXMLParser
 from cl.lib.recap_utils import get_ia_document_url_from_path, \
     get_local_document_url_from_path
 from cl.search.models import RECAPDocument, Docket
-from cl.scrapers.tasks import get_page_count
+from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,8 @@ class CleanupPacerXMLParser(PacerXMLParser):
 
         if not debug:
             try:
-                d.save(do_extraction=True, index=True)
+                extract_recap_pdf(d.pk)
+                d.save(do_extraction=False, index=True)
                 logger.info("    Item saved at https://www.courtlistener.com%s"
                             % d.get_absolute_url())
             except IntegrityError:
