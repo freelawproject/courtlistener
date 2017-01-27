@@ -1,8 +1,6 @@
 from django.conf.urls import include, url
 from django.contrib import admin
 from django.views.generic import RedirectView
-from cl.opinion_page.views import redirect_cited_by_feeds, \
-    redirect_cited_by_page
 from cl.sitemap import index_sitemap_maker
 
 urlpatterns = [

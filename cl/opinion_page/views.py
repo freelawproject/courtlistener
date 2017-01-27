@@ -17,7 +17,6 @@ from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib import search_utils, sunburnt
 from cl.lib.bot_detector import is_bot
-from cl.lib.encode_decode import ascii_to_num
 from cl.lib.import_lib import map_citations_to_models
 from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
