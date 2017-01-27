@@ -2,6 +2,7 @@ import argparse
 import glob
 import logging
 import os
+import pickle
 import random
 
 from django.conf import settings
@@ -104,6 +105,7 @@ class Command(BaseCommand):
 
         completed = 0
         no_value = 0
+        all_items = set()
         for docket_path in docket_paths:
             with open(docket_path, 'r') as f:
                 docket_xml_content = f.read()
@@ -113,10 +115,11 @@ class Command(BaseCommand):
 
             # Extract the xpath value
             tree = etree.fromstring(docket_xml_content)
-            value = tree.xpath(self.options['xpath'])
+            values = tree.xpath(self.options['xpath'])
 
-            if value:
-                print "%s: %s" % (completed, value)
+            if values:
+                print "%s: %s" % (completed, values)
+                all_items |= set([str(v) for v in values])
                 completed += 1
             else:
                 no_value += 1
@@ -124,7 +127,9 @@ class Command(BaseCommand):
             if completed == self.options['sample_size']:
                 break
 
-        print '\n%s items had no value.' % no_value
+        with open('sample.pkl', 'wb') as f:
+            pickle.dump(all_items, f)
+        print '\n%s items had no value. Sample saved at "sample.pkl"' % no_value
 
     def parse_items(self):
         """For every item in the directory, send it to Celery for processing"""
