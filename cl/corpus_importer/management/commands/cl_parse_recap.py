@@ -4,10 +4,12 @@ import logging
 import os
 import pickle
 import random
+from collections import Counter
 
 from django.conf import settings
 from django.core.management import BaseCommand
 from lxml import etree
+from lxml.etree import XMLSyntaxError, XPathEvalError
 
 from cl.lib.pacer import PacerXMLParser
 
@@ -105,7 +107,8 @@ class Command(BaseCommand):
 
         completed = 0
         no_value = 0
-        all_items = set()
+        errors = 0
+        c = Counter()
         for docket_path in docket_paths:
             with open(docket_path, 'r') as f:
                 docket_xml_content = f.read()
@@ -114,12 +117,20 @@ class Command(BaseCommand):
                     continue
 
             # Extract the xpath value
-            tree = etree.fromstring(docket_xml_content)
-            values = tree.xpath(self.options['xpath'])
+            try:
+                tree = etree.fromstring(docket_xml_content)
+            except XMLSyntaxError:
+                errors += 1
+                continue
+            try:
+                values = tree.xpath(self.options['xpath'])
+            except XPathEvalError:
+                print "ERROR: Invalid XPath expression."
+                exit(1)
 
             if values:
                 print "%s: %s" % (completed, values)
-                all_items |= set([str(v) for v in values])
+                c.update([str(v) for v in values])
                 completed += 1
             else:
                 no_value += 1
@@ -128,8 +139,9 @@ class Command(BaseCommand):
                 break
 
         with open('sample.pkl', 'wb') as f:
-            pickle.dump(all_items, f)
-        print '\n%s items had no value. Sample saved at "sample.pkl"' % no_value
+            pickle.dump(c, f)
+        print '\n%s items had no value. %s errors. Sample saved at ' \
+              '"sample.pkl"' % (no_value, errors)
 
     def parse_items(self):
         """For every item in the directory, send it to Celery for processing"""
