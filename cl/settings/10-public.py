@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     'cl.audio',
     'cl.api',
     'cl.citations',
+    'cl.cleanup',
     'cl.corpus_importer',
     'cl.custom_filters',
     'cl.donate',

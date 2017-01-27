@@ -1,15 +1,15 @@
 # https://github.com/freelawproject/courtlistener/issues/636
-import argparse
 import os
 
+from django.core.management import BaseCommand
 from django.db import IntegrityError
 
+from cl.corpus_importer.tasks import download_recap_item
 from cl.lib.pacer import PacerXMLParser
-from cl.search.models import RECAPDocument
 from cl.lib.recap_utils import get_ia_document_url_from_path, \
     get_local_document_url_from_path
+from cl.search.models import RECAPDocument
 from cl.scrapers.tasks import get_page_count
-from cl.corpus_importer.tasks import download_recap_item
 
 
 class CleanupPacerXMLParser(PacerXMLParser):
@@ -89,22 +89,24 @@ class CleanupPacerXMLParser(PacerXMLParser):
         return d
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="A command line parser.")
-    parser.add_argument('--debug', dest='debug', action='store_true')
-    parser.set_defaults(debug=False)
-    args = parser.parse_args()
+class Command(BaseCommand):
+    help = "Fix issues identified in 636."
 
-    docs = RECAPDocument.objects.filter(ocr_status=RECAPDocument.OCR_FAILED)
-    for doc in docs:
-        docket_path = doc.docket_entry.docket.filepath_local.path
-        try:
-            print "Doing docket at: %s" % docket_path
-            pacer_doc = CleanupPacerXMLParser(docket_path)
-        except IOError:
-            print "Couldn't find docket at: %s" % docket_path
-        else:
-            recap_pks = pacer_doc.make_documents(
-                doc.docket_entry.docket,
-                debug=args['debug'],
-            )
+    def add_arguments(self, parser):
+        parser.add_argument('--debug', dest='debug', action='store_true')
+        parser.set_defaults(debug=False)
+
+    def handle(self, *args, **options):
+        docs = RECAPDocument.objects.filter(ocr_status=RECAPDocument.OCR_FAILED)
+        for doc in docs:
+            docket_path = doc.docket_entry.docket.filepath_local.path
+            try:
+                print "Doing docket at: %s" % docket_path
+                pacer_doc = CleanupPacerXMLParser(docket_path)
+            except IOError:
+                print "Couldn't find docket at: %s" % docket_path
+            else:
+                _ = pacer_doc.make_documents(
+                    doc.docket_entry.docket,
+                    debug=options['debug'],
+                )
