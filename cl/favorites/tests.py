@@ -170,7 +170,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # She closes her browser and goes to the gym for a bit since it's
         # always leg day amiright
-        self.resetBrowser()
+        self.reset_browser()
 
         # When she returns, she signs back into CL and wants to pull up
         # that favorite again, so she goes to Favorites under the Profile menu

@@ -88,7 +88,7 @@ class DesktopLayoutTest(BaseSeleniumTest):
 
     def setUp(self):
         super(DesktopLayoutTest, self).setUp()
-        self.resetBrowser(height=DESKTOP_WINDOW[0], width=DESKTOP_WINDOW[1])
+        self.reset_browser(height=DESKTOP_WINDOW[0], width=DESKTOP_WINDOW[1])
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_desktop_home_page_aesthetics(self):
@@ -128,7 +128,7 @@ class MobileLayoutTest(BaseSeleniumTest):
 
     def setUp(self):
         super(MobileLayoutTest, self).setUp()
-        self.resetBrowser(height=MOBILE_WINDOW[0], width=MOBILE_WINDOW[1])
+        self.reset_browser(height=MOBILE_WINDOW[0], width=MOBILE_WINDOW[1])
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_mobile_home_page_aesthetics(self):

@@ -68,11 +68,11 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         cls.server_url = cls.live_server_url
 
     def setUp(self):
-        self.resetBrowser()
+        self.reset_browser()
         self._initialize_test_solr()
         self._update_index()
 
-    def resetBrowser(self, width=DESKTOP_WINDOW[0], height=DESKTOP_WINDOW[1]):
+    def reset_browser(self, width=DESKTOP_WINDOW[0], height=DESKTOP_WINDOW[1]):
         try:
             self.browser.quit()
         except AttributeError:
