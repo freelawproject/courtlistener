@@ -48,8 +48,8 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             options = webdriver.ChromeOptions()
             options.add_argument("silent")
 
-        if 'REMOTE_SELENIUM_ADDRESS' in os.environ:
-            address = str(os.environ['REMOTE_SELENIUM_ADDRESS']).strip()
+        if 'SELENIUM_REMOTE_ADDRESS' in os.environ:
+            address = str(os.environ['SELENIUM_REMOTE_ADDRESS']).strip()
             if not address.startswith('http'):
                 address = 'http://' + address
             capabilities = options.to_capabilities()
