@@ -46,11 +46,4 @@ urlpatterns = [
         url='https://github.com/freelawproject/related-literature/raw/master/CourtListener%20Studies/Sarah%20Tyler/sarah_tyler_dissertation.pdf',
         permanent=True,
     )),
-
-    # cited-by pages and feeds moved to search results on 2015-08-25
-    url(r'^feed/(.*)/cited-by/$', redirect_cited_by_feeds),
-    # catch the formats:
-    #    /$court/$ascii/$slug/cited-by/ and
-    #    /$opinion/$number/$slug/cited-by/
-    url(r'^(?:\w{1,15})/(.*)/(?:.*)/cited-by/$', redirect_cited_by_page),
 ]

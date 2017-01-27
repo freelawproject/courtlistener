@@ -97,16 +97,12 @@ def find_person(name_last, court_id, name_first=None, case_date=None,
         return candidates[0]
 
     if len(candidates) == 0:
-        print("No judge: Last name '%s', position '%s'." % (name_last,
-                                                            court_id))
+        msg = "No judge: Last name '%s', position '%s'." % (name_last, court_id)
+        print(msg)
         if raise_zero:
-            raise Exception("No judge: Last name '%s', position '%s'." % (
-                name_last,court_id
-            ))
+            raise Exception(msg)
         else:
-             print("No judge: Last name '%s', position '%s'." % (name_last,
-                                                                 court_id))
-             return None
+            return None
 
     if name_first is not None:
         candidates = Person.objects.filter(

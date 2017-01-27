@@ -346,21 +346,3 @@ def block_item(request):
             permitted_methods=['POST'],
             content="Not an ajax request",
         )
-
-
-def redirect_cited_by_feeds(request, pk):
-    try:
-        int(pk)
-    except ValueError:
-        # Cannot cast to int, must be ascii.
-        pk = ascii_to_num(pk)
-    return HttpResponsePermanentRedirect('/feed/search/?q=cites%%3A%s' % pk)
-
-
-def redirect_cited_by_page(request, pk):
-    try:
-        int(pk)
-    except ValueError:
-        # Cannot cast to int, must be ascii
-        pk = ascii_to_num(pk)
-    return HttpResponsePermanentRedirect('/?q=cites%%3A%s' % pk)
