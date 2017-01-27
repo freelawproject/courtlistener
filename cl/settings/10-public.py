@@ -284,9 +284,11 @@ REST_FRAMEWORK = {
         'leo': '100/hour',
         'miffy': '100/hour',
         'safetynet': '100/hour',
+
         # Throttling up.
-        'waldo': '10000/hour',
+        'gpilapil': '10000/hour',
         'peidelman': '20000/hour',
+        'waldo': '10000/hour',
     },
 
     # Auth
