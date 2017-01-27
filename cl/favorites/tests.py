@@ -174,7 +174,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # When she returns, she signs back into CL and wants to pull up
         # that favorite again, so she goes to Favorites under the Profile menu
-        self.browser.get(self.server_url)
+        self.get_url_and_wait(self.server_url)
         self.attempt_sign_in('pandora', 'password')
 
         # TODO: Refactor. Same code used in
@@ -188,7 +188,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.assertIsNone(dropdown_menu.get_attribute('display'))
 
         profile_dropdown.click()
-
+        time.sleep(1)
         self.click_link_for_new_page('Favorites')
 
         # The case is right there with the same name and notes she gave it!

@@ -768,9 +768,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
         authority_links = authorities.find_elements_by_tag_name('li')
         self.assertTrue(0 < len(authority_links) < 6)
-        (authorities
-         .find_element_by_link_text('View All Authorities')
-         .click())
+        self.click_link_for_new_page('View All Authorities')
         self.assertIn('Table of Authorities', self.browser.title)
 
         # Like before, she's just curious of the list and clicks Back to
