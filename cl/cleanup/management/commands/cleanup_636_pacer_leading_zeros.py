@@ -103,7 +103,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dockets = Docket.objects.filter(
-            docket_entries__recap_documents__ocr_status=RECAPDocument.OCR_FAILED)
+            docket_entries__recap_documents__ocr_status=RECAPDocument.OCR_FAILED).distinct()
         for docket in dockets:
             docket_path = docket.filepath_local.path
             try:
