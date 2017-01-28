@@ -53,30 +53,6 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(r.redirect_chain[0][1], 302)
 
 
-class RedirectionTest(TestCase):
-    """We have a number of redirections in place now. These tests make sure that
-    those tests actually work.
-    """
-
-    fixtures = ['test_objects_search.json', 'judge_judy.json']
-
-    def test_various_redirections(self):
-        self.client = Client()
-        old_urls = [
-            # Cited-by pages
-            ('/opinion/9/asdf/cited-by/', '/?q=cites%3A9'),
-            ('/feed/a/cited-by/', '/feed/search/?q=cites%3A9'),
-            ('/feed/9/cited-by/', '/feed/search/?q=cites%3A9'),
-        ]
-        for target, destination in old_urls:
-            print "Does %s redirect to %s" % (target, destination)
-            r = self.client.get(target, follow=True)
-            self.assertEquals(
-                r.redirect_chain[0][0],
-                'http://testserver%s' % destination,
-            )
-
-
 @override_settings(
     SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,

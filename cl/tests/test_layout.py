@@ -88,11 +88,10 @@ class DesktopLayoutTest(BaseSeleniumTest):
 
     def setUp(self):
         super(DesktopLayoutTest, self).setUp()
-        self.reset_browser(height=DESKTOP_WINDOW[0], width=DESKTOP_WINDOW[1])
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_desktop_home_page_aesthetics(self):
-        self.browser.get(self.server_url)
+        self.get_url_and_wait(self.server_url)
 
         # At desktop-level resolution, the menu should be fully visible by
         # default and not start collapsed like in mobile
@@ -106,12 +105,12 @@ class DesktopLayoutTest(BaseSeleniumTest):
                         search_button.size['width'])
         self.assertAlmostEqual(
             searchbox.location['x'] + (search_width / 2),
-            DESKTOP_WINDOW[0] / 3,
+            DESKTOP_WINDOW[0] / 2,
             delta=50
         )
         self.assertAlmostEqual(
             searchbox.size['width'],
-            400,
+            600,
             delta=15
         )
 

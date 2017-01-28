@@ -335,5 +335,13 @@ class AudioFileTaskTest(TestCase):
 
         process_audio_file(pk=1)
         audio = Audio.objects.get(pk=1)
-        self.assertEqual(audio.duration, 15,
-                         msg='we should end up with the proper duration')
+        correct_duration = 15
+        measured_duration = audio.duration
+        # Use almost equal because measuring MP3's is wonky.
+        self.assertAlmostEqual(
+            measured_duration,
+            correct_duration,
+            delta=5,
+            msg='We should end up with the proper duration of about %s. '
+                'Instead we got %s.' % (correct_duration, measured_duration)
+        )
