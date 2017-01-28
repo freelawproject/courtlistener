@@ -145,8 +145,8 @@ You should find screenshot files available in the project directory. It's recomm
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux
 [chromedriver]: https://sites.google.com/a/chromium.org/chromedriver/downloads
 [django-testing]: https://docs.djangoproject.com/en/1.8/topics/testing/
-[vagrantfile]: https://https://raw.githubusercontent.com/freelawproject/freelawmachine/master/Vagrantfile
-[vagrantfile-desktop]: https://https://raw.githubusercontent.com/freelawproject/freelawmachine/master/Vagrantfile.desktop
+[vagrantfile]: https://raw.githubusercontent.com/freelawproject/freelawmachine/master/Vagrantfile
+[vagrantfile-desktop]: https://raw.githubusercontent.com/freelawproject/freelawmachine/master/Vagrantfile.desktop
 [flm]: https://github.com/freelawproject/freelawmachine
 [flm-readme]: https://github.com/freelawproject/freelawmachine/blob/master/README.md
 [vagrant-ports]: https://www.vagrantup.com/docs/networking/forwarded_ports.html
