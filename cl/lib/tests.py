@@ -11,6 +11,7 @@ from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_upload_path
+from cl.lib.pacer import normalize_party_types
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import trunc
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
@@ -157,3 +158,59 @@ class TestMaintenanceMiddleware(TestCase):
         )
 
 
+class TestPACERPartyParsing(TestCase):
+    """Various tests for the PACER party parsers."""
+
+    def test_party_type_normalization(self):
+        pairs = [{
+            'q': 'Defendant                                 (1)',
+            'a': 'Defendant'
+        }, {
+            'q': 'Debtor 2',
+            'a': 'Debtor',
+        }, {
+            'q': 'ThirdParty Defendant',
+            'a': 'Third Party Defendant',
+        }, {
+            'q': 'ThirdParty Plaintiff',
+            'a': 'Third Party Plaintiff',
+        }, {
+            'q': '3rd Pty Defendant',
+            'a': 'Third Party Defendant',
+        }, {
+            'q': '3rd party defendant',
+            'a': 'Third Party Defendant',
+        }, {
+            'q': 'Counter-defendant',
+            'a': 'Counter Defendant',
+        }, {
+            'q': 'Counter-Claimaint',
+            'a': 'Counter Claimaint',
+        }, {
+            'q': 'US Trustee',
+            'a': 'U.S. Trustee',
+        }, {
+            'q': 'United States Trustee',
+            'a': 'U.S. Trustee',
+        }, {
+            'q': 'U. S. Trustee',
+            'a': 'U.S. Trustee',
+        }, {
+            'q': 'BUS BOY',
+            'a': 'Bus Boy',
+        }, {
+            'q': 'JointAdmin Debtor',
+            'a': 'Jointly Administered Debtor',
+        }, {
+            'q': 'Intervenor-Plaintiff',
+            'a': 'Intervenor Plaintiff',
+        }, {
+            'q': 'Intervenor Dft',
+            'a': 'Intervenor Defendant',
+        }]
+        for pair in pairs:
+            print "Normalizing PACER type of '%s' to '%s'..." % \
+                    (pair['q'], pair['a']),
+            result = normalize_party_types(pair['q'])
+            self.assertEqual(result, pair['a'])
+            print '✓'
