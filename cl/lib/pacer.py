@@ -18,6 +18,7 @@ from cl.lib.recap_utils import (
 )
 from cl.scrapers.tasks import get_page_count
 from cl.search.models import Court, Docket, RECAPDocument, DocketEntry
+from cl.people_db.models import Role
 
 logger = logging.getLogger(__name__)
 
@@ -415,3 +416,36 @@ def normalize_party_types(t):
     t = re.sub(r'intervenor dft\b', 'intervenor defendant', t)
 
     return titlecase(t)
+
+
+def normalize_attorney_role(r):
+    """Normalize attorney roles into the valid set"""
+    r = r.lower()
+
+    # Bad values we can expect. Nuke these early so they don't cause problems.
+    if any([r.startswith(u'bar status'),
+            r.startswith(u'designation')]):
+        return None
+
+    if u'to be noticed' in r:
+        return Role.ATTORNEY_TO_BE_NOTICED
+    elif u'lead attorney' in r:
+        return Role.ATTORNEY_LEAD
+    elif u'sealed group' in r:
+        return Role.ATTORNEY_IN_SEALED_GROUP
+    elif u'pro hac vice' in r:
+        return Role.PRO_HAC_VICE
+    elif u'self- terminated' in r:
+        return Role.SELF_TERMINATED
+    elif u'terminated' in r:
+        return Role.TERMINATED
+    elif u'suspended' in r:
+        return Role.SUSPENDED
+    elif u'inactive' in r:
+        return Role.INACTIVE
+    elif u'disbarred' in r:
+        return Role.DISBARRED
+
+    raise ValueError(u"Unable to match role: %s" % r)
+
+

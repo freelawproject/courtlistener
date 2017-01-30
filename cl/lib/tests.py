@@ -11,9 +11,10 @@ from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_upload_path
-from cl.lib.pacer import normalize_party_types
+from cl.lib.pacer import normalize_party_types, normalize_attorney_role
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import trunc
+from cl.people_db.models import Role
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
 
 
@@ -214,3 +215,48 @@ class TestPACERPartyParsing(TestCase):
             result = normalize_party_types(pair['q'])
             self.assertEqual(result, pair['a'])
             print '✓'
+
+    def test_attorney_role_normalization(self):
+        """Can we normalize the attorney roles into a small number of roles?"""
+        pairs = [{
+            'q': '(Inactive)',
+            'a': Role.INACTIVE,
+        }, {
+            'q': 'ATTORNEY IN SEALED GROUP',
+            'a': Role.ATTORNEY_IN_SEALED_GROUP,
+        }, {
+            'q': 'ATTORNEY TO BE NOTICED',
+            'a': Role.ATTORNEY_TO_BE_NOTICED,
+        }, {
+            'q': 'Bar Status: ACTIVE',
+            'a': None,
+        }, {
+            'q': 'DISBARRED 02/19/2010',
+            'a': Role.DISBARRED,
+        }, {
+            'q': 'Designation: ADR Pro Bono Limited Scope Counsel',
+            'a': None,
+        }, {
+            'q': 'LEAD ATTORNEY',
+            'a': Role.ATTORNEY_LEAD,
+        }, {
+            'q': 'PRO HAC VICE',
+            'a': Role.PRO_HAC_VICE,
+        }, {
+            'q': 'SELF- TERMINATED: 01/14/2013',
+            'a': Role.SELF_TERMINATED,
+        }, {
+            'q': 'SUSPENDED 01/22/2016',
+            'a': Role.SUSPENDED,
+        }, {
+            'q': 'TERMINATED: 01/01/2007',
+            'a': Role.TERMINATED,
+        }]
+        for pair in pairs:
+            print "Normalizing PACER role of '%s' to '%s'..." % \
+                  (pair['q'], pair['a']),
+            result = normalize_attorney_role(pair['q'])
+            self.assertEqual(result, pair['a'])
+            print '✓'
+        with self.assertRaises(ValueError):
+            normalize_attorney_role('this is an unknown role')
