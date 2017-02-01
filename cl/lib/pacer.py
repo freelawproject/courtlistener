@@ -3,11 +3,16 @@ import os
 import re
 from datetime import date
 
+import usaddress
 from dateutil import parser
 from dateutil.tz import gettz
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.db.models import Q
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
+from localflavor.us.forms import phone_digits_re
+from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 from lxml import etree
 
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
@@ -18,7 +23,7 @@ from cl.lib.recap_utils import (
 )
 from cl.scrapers.tasks import get_page_count
 from cl.search.models import Court, Docket, RECAPDocument, DocketEntry
-from cl.people_db.models import Role
+#from cl.people_db.models import Role, Party, AttorneyOrganization
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +54,7 @@ class PacerXMLParser(object):
         self.xml = self.get_xml_contents()
         self.case_details = self.get_case_details()
         self.document_list = self.get_document_list()
+        self.party_list = self.get_party_list()
         self.document_count = self.get_document_count()
 
         # Docket attributes
@@ -90,7 +96,7 @@ class PacerXMLParser(object):
         required_fields = ['case_name', 'date_filed']
         for field in required_fields:
             if not getattr(self, field):
-                print "  Missing required field: %s" % field
+                logger.error("Missing required field: %s" % field)
                 return None
 
         try:
@@ -109,7 +115,7 @@ class PacerXMLParser(object):
         except Docket.DoesNotExist:
             d = Docket(source=Docket.RECAP)
         except Docket.MultipleObjectsReturned:
-            print "  Got multiple results while attempting save."
+            logger.error("Got multiple results while attempting save.")
             return None
 
         for attr, v in self.__dict__.items():
@@ -117,10 +123,8 @@ class PacerXMLParser(object):
 
         if not debug:
             d.save()
-            print "  Saved as Docket %s: https://www.courtlistener.com%s" % (
-                d.pk,
-                d.get_absolute_url()
-            )
+            logger.info("Saved as Docket %s: https://www.courtlistener.com%s" %
+                        (d.pk, d.get_absolute_url()))
         return d
 
     def get_xml_contents(self):
@@ -142,6 +146,10 @@ class PacerXMLParser(object):
         """Get the XML nodes for the documents"""
         return self.xml.xpath('//document_list/document')
 
+    def get_party_list(self):
+        """Get the XML nodes for the parties"""
+        return self.xml.xpath('//party_list/party')
+
     def get_document_count(self):
         """Get the number of documents associated with this docket."""
         return len(self.document_list)
@@ -160,8 +168,8 @@ class PacerXMLParser(object):
             # Make a DocketEntry object
             entry_number = doc_node.xpath('@doc_num')[0]
             attachment_number = int(doc_node.xpath('@attachment_num')[0])
-            print "Working on document %s, attachment %s" % (entry_number,
-                                                             attachment_number)
+            logger.info("Working on document %s, attachment %s" %
+                        (entry_number, attachment_number))
 
             if attachment_number == 0:
                 document_type = RECAPDocument.PACER_DOCUMENT
@@ -180,10 +188,8 @@ class PacerXMLParser(object):
                         entry_number=entry_number,
                     )
                 else:
-                    logger.error(
-                        "Tried to create attachment without a DocketEntry "
-                        "object to associate it with."
-                    )
+                    logger.error("Tried to create attachment without a "
+                                 "DocketEntry object to associate it with.")
                     continue
 
             if document_type == RECAPDocument.PACER_DOCUMENT:
@@ -202,10 +208,8 @@ class PacerXMLParser(object):
                         docket_entry.save()
                 except (IntegrityError,
                         DocketEntry.MultipleObjectsReturned) as e:
-                    logger.error(
-                        "Unable to create docket entry for docket #%s, on "
-                        "entry: %s." % (docket, entry_number)
-                    )
+                    logger.error("Unable to create docket entry for docket "
+                                 "#%s, on entry: %s." % (docket, entry_number))
                     continue
 
             recap_doc = self.make_recap_document(
@@ -280,6 +284,38 @@ class PacerXMLParser(object):
                 return None
         return d
 
+    # def make_parties(self):
+    #     """Pull out the parties and their attorneys and save them to the DB."""
+    #     for party_node in self.party_list:
+    #         party_name = self.get_str_from_node(party_node, './name/text()')
+    #         party_type = self.get_str_from_node(party_node, './type/text()')
+    #         party_type = normalize_party_types(party_type)
+    #         party_extra_info = self.get_str_from_node(party_node,
+    #                                                   './extra_info/text()')
+    #         logger.info("Working on party '%s' of type '%s'" % (party_name,
+    #                                                             party_type))
+    #
+    #         # TODO: This will save extra_info as latest info found. Hm.
+    #         try:
+    #             party = Party.objects.get(name=party_name)
+    #         except Party.DoesNotExist:
+    #             party = Party(
+    #                 name=party_name,
+    #                 extra_info=party_extra_info,
+    #             )
+    #
+    #         atty_nodes = party_node.xpath('.//attorney_list/attorney')
+    #         for atty_node in atty_nodes:
+    #             atty_name = self.get_str_from_node(
+    #                 atty_node, './attorney_name/text()')
+    #             atty_contact_raw = self.get_str_from_node(
+    #                 atty_node, './contact/text()')
+    #             atty_roles = self.get_str_from_node(
+    #                 atty_node, './attorney_role/text()')
+    #             atty_roles = [normalize_attorney_role(r) for r in
+    #                           atty_roles.split('\n')]
+
+
     def get_court(self):
         """Extract the court from the XML and return it as a Court object"""
         court_str = self.case_details.xpath('court/text()')[0].strip()
@@ -296,11 +332,11 @@ class PacerXMLParser(object):
             s = node.xpath('%s/text()' % path)[0].strip()
             n = int(s)
         except IndexError:
-            print "  Couldn't get bool from path: %s" % path
+            logger.info("Couldn't get bool from path: %s" % path)
             return None
         except ValueError:
-            print ("  Couldn't convert text '%s' to int when making boolean "
-                   "for path: %s" % (s, path))
+            logger.info("Couldn't convert text '%s' to int when making boolean "
+                        "for path: %s" % (s, path))
             return None
         else:
             return bool(n)
@@ -310,7 +346,7 @@ class PacerXMLParser(object):
         try:
             s = node.xpath('%s/text()' % path)[0].strip()
         except IndexError:
-            print "  Couldn't get string from path: %s" % path
+            logger.info("Couldn't get string from path: %s" % path)
             return ''  # Return an empty string. Don't return None.
         else:
             return s
@@ -321,7 +357,7 @@ class PacerXMLParser(object):
             return int(s)
         except ValueError:
             # Can't parse string to int
-            print "  Couldn't get int for node %s" % node
+            logger.info("Couldn't get int for node %s" % node)
             raise ParsingException("Cannot extract int for node %s" % node)
 
     @staticmethod
@@ -330,13 +366,13 @@ class PacerXMLParser(object):
         try:
             s = node.xpath('%s/text()' % path)[0].strip()
         except IndexError:
-            print "  Couldn't get date from path: %s" % path
+            logger.info("Couldn't get date from path: %s" % path)
             return None
         else:
             try:
                 d = parser.parse(s)
             except ValueError:
-                print "  Couldn't parse date: %s" % s
+                logger.info("Couldn't parse date: %s" % s)
                 return None
             else:
                 d = d.replace(tzinfo=d.tzinfo or gettz('UTC'))  # Set it to UTC.
@@ -349,7 +385,7 @@ class PacerXMLParser(object):
         try:
             s = self.case_details.xpath('%s/text()' % node)[0].strip()
         except IndexError:
-            print "  Couldn't get judge for node: %s" % node
+            logger.info("Couldn't get judge for node: %s" % node)
             return None, ''
         else:
             judge_names = find_judge_names(s)
@@ -359,7 +395,6 @@ class PacerXMLParser(object):
                                           case_date=self.date_filed))
             judges = [c for c in judges if c is not None]
             if len(judges) == 0:
-                print "  No judges found after lookup."
                 logger.info("No judge for: %s" % (
                     (s, self.court.pk, self.date_filed),
                 ))
@@ -367,7 +402,7 @@ class PacerXMLParser(object):
             elif len(judges) == 1:
                 return judges[0], s
             elif len(judges) > 1:
-                print "  Too many judges found: %s" % len(judges)
+                logger.info("Too many judges found: %s" % len(judges))
                 return None, s
 
     def set_blocked_fields(self):
@@ -392,60 +427,138 @@ class PacerXMLParser(object):
         return False, None
 
 
-def normalize_party_types(t):
-    """Normalize various party types to as few as possible."""
-    t = t.lower()
-
-    # Numerical types
-    t = re.sub(r'defendant\s+\(\d+\)', r'defendant', t)
-    t = re.sub(r'debtor\s+\d+', 'debtor', t)
-
-    # Assorted other
-    t = re.sub(r'(thirdparty|3rd pty|3rd party)', r'third party', t)
-    t = re.sub(r'(fourthparty|4th pty|4th party)', r'fourth party', t)
-    t = re.sub(r'counter-(defendant|claimaint)', r'counter \1', t)
-    t = re.sub(r'\bus\b', 'u.s.', t)
-    t = re.sub(r'u\. s\.', 'u.s.', t)
-    t = re.sub(r'united states', 'u.s.', t)
-    t = re.sub(r'jointadmin', 'jointly administered', t)
-    t = re.sub(r'consolidated-debtor', 'consolidated debtor', t)
-    t = re.sub(r'plaintiff-? consolidated', 'consolidated plaintiff', t)
-    t = re.sub(r'defendant-? consolidated', 'consolidated defendant', t)
-    t = re.sub(r'intervenor-plaintiff', 'intervenor plaintiff', t)
-    t = re.sub(r'intervenor pla\b', 'intervenor plaintiff', t)
-    t = re.sub(r'intervenor dft\b', 'intervenor defendant', t)
-
-    return titlecase(t)
-
-
-def normalize_attorney_role(r):
-    """Normalize attorney roles into the valid set"""
-    r = r.lower()
-
-    # Bad values we can expect. Nuke these early so they don't cause problems.
-    if any([r.startswith(u'bar status'),
-            r.startswith(u'designation')]):
-        return None
-
-    if u'to be noticed' in r:
-        return Role.ATTORNEY_TO_BE_NOTICED
-    elif u'lead attorney' in r:
-        return Role.ATTORNEY_LEAD
-    elif u'sealed group' in r:
-        return Role.ATTORNEY_IN_SEALED_GROUP
-    elif u'pro hac vice' in r:
-        return Role.PRO_HAC_VICE
-    elif u'self- terminated' in r:
-        return Role.SELF_TERMINATED
-    elif u'terminated' in r:
-        return Role.TERMINATED
-    elif u'suspended' in r:
-        return Role.SUSPENDED
-    elif u'inactive' in r:
-        return Role.INACTIVE
-    elif u'disbarred' in r:
-        return Role.DISBARRED
-
-    raise ValueError(u"Unable to match role: %s" % r)
-
-
+# def normalize_party_types(t):
+#     """Normalize various party types to as few as possible."""
+#     t = t.lower()
+#
+#     # Numerical types
+#     t = re.sub(r'defendant\s+\(\d+\)', r'defendant', t)
+#     t = re.sub(r'debtor\s+\d+', 'debtor', t)
+#
+#     # Assorted other
+#     t = re.sub(r'(thirdparty|3rd pty|3rd party)', r'third party', t)
+#     t = re.sub(r'(fourthparty|4th pty|4th party)', r'fourth party', t)
+#     t = re.sub(r'counter-(defendant|claimaint)', r'counter \1', t)
+#     t = re.sub(r'\bus\b', 'u.s.', t)
+#     t = re.sub(r'u\. s\.', 'u.s.', t)
+#     t = re.sub(r'united states', 'u.s.', t)
+#     t = re.sub(r'jointadmin', 'jointly administered', t)
+#     t = re.sub(r'consolidated-debtor', 'consolidated debtor', t)
+#     t = re.sub(r'plaintiff-? consolidated', 'consolidated plaintiff', t)
+#     t = re.sub(r'defendant-? consolidated', 'consolidated defendant', t)
+#     t = re.sub(r'intervenor-plaintiff', 'intervenor plaintiff', t)
+#     t = re.sub(r'intervenor pla\b', 'intervenor plaintiff', t)
+#     t = re.sub(r'intervenor dft\b', 'intervenor defendant', t)
+#
+#     return titlecase(t)
+#
+#
+# def normalize_attorney_role(r):
+#     """Normalize attorney roles into the valid set"""
+#     r = r.lower()
+#
+#     # Bad values we can expect. Nuke these early so they don't cause problems.
+#     if any([r.startswith(u'bar status'),
+#             r.startswith(u'designation')]):
+#         return None
+#
+#     if u'to be noticed' in r:
+#         return Role.ATTORNEY_TO_BE_NOTICED
+#     elif u'lead attorney' in r:
+#         return Role.ATTORNEY_LEAD
+#     elif u'sealed group' in r:
+#         return Role.ATTORNEY_IN_SEALED_GROUP
+#     elif u'pro hac vice' in r:
+#         return Role.PRO_HAC_VICE
+#     elif u'self- terminated' in r:
+#         return Role.SELF_TERMINATED
+#     elif u'terminated' in r:
+#         return Role.TERMINATED
+#     elif u'suspended' in r:
+#         return Role.SUSPENDED
+#     elif u'inactive' in r:
+#         return Role.INACTIVE
+#     elif u'disbarred' in r:
+#         return Role.DISBARRED
+#
+#     raise ValueError(u"Unable to match role: %s" % r)
+#
+#
+# def normalize_us_state(state):
+#     """Convert state values to valid state postal abbreviations
+#
+#     va --> VA
+#     Virginia --> VA
+#
+#     Raises KeyError if state cannot be normalized.
+#     """
+#     abbreviations = [t[0] for t in USPS_CHOICES]
+#     if state in abbreviations:
+#         return state
+#     return STATES_NORMALIZED[state.lower()]
+#
+#
+# def normalize_attorney_contact(c):
+#     """Normalize the contact string for an attorney.
+#
+#     Attorney contact strings are newline separated addresses like:
+#
+#         Landye Bennett Blumstein LLP
+#         701 West Eighth Avenue, Suite 1200
+#         Anchorage, AK 99501
+#         907-276-5152
+#         Email: brucem@lbblawyers.com
+#
+#     We need to pull off email and phone numbers, and then our address parser
+#     should work nicely.
+#     """
+#     address_lines = []
+#     lines = c.split('\n')
+#     for line in lines:
+#         try:
+#             clean_line = re.sub('Email: ', '', line)
+#             validate_email(clean_line)
+#         except ValidationError:
+#             # Not an email address, press on.
+#             pass
+#         else:
+#             # An email address.
+#             continue
+#
+#         # Perhaps a phone number?
+#         clean_line = re.sub('(\(|\)|\s+)', '', line)
+#         m = phone_digits_re.search(clean_line)
+#         if m:
+#             continue
+#
+#         # Not email or phone
+#         address_lines.append(line)
+#
+#     address_info, address_type = usaddress.tag(', '.join(address_lines))
+#     if address_type == 'PO Box':
+#         response = {
+#             'address1': ' '.join([
+#                 address_info['USPSBoxType'],
+#                 address_info['USPSBoxID'],
+#             ]),
+#         }
+#     elif address_type == 'Street Address':
+#         response = {
+#             'address1': ' '.join([
+#                 address_info['AddressNumber'],
+#                 address_info['StreetNamePreDirectional'],
+#                 address_info['StreetName'],
+#                 address_info['StreetNamePostType']
+#             ]),
+#         }
+#     response.update({
+#         'name': address_info['Recipient'],
+#         'address2': u' '.join([
+#             address_info.get('OccupancyType', ''),
+#             address_info.get('OccupancyIdentifier', ''),
+#         ]).strip(),
+#         'city': address_info['PlaceName'],
+#         'state': normalize_us_state(address_info['StateName']),
+#         'zip_code': address_info['ZipCode'],
+#     })
+#     return response
