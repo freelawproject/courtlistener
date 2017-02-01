@@ -103,10 +103,7 @@ class Command(BaseCommand):
         cluster = OpinionCluster(
             judges=item.get('judges', ''),
             date_filed=item['case_dates'],
-            # TODO: Replace with regular dict access once Juriscraper is
-            # updated to version supporting this field.
-            date_filed_is_approximate=item.get('date_filed_is_approximate',
-                                               False),
+            date_filed_is_approximate=item['date_filed_is_approximate'],
             case_name=item['case_names'],
             case_name_short=case_name_short,
             source='C',
@@ -117,6 +114,7 @@ class Command(BaseCommand):
             federal_cite_one=item.get('west_citations', ''),
             state_cite_one=item.get('west_state_citations', ''),
             neutral_cite=item.get('neutral_citations', ''),
+            syllabus=item.get('summaries', ''),
         )
         opinion = Opinion(
             type='010combined',
