@@ -7,6 +7,7 @@ from cl.search.models import (
 )
 
 
+@admin.register(Opinion)
 class OpinionAdmin(admin.ModelAdmin):
     fields = (
         'cluster',
@@ -54,6 +55,7 @@ class OpinionAdmin(admin.ModelAdmin):
         delete_items.delay([obj.pk], settings.SOLR_OPINION_URL)
 
 
+@admin.register(OpinionCluster)
 class OpinionClusterAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['case_name']}
     fields = (
@@ -116,6 +118,7 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         add_or_update_cluster.delay(obj.pk)
 
 
+@admin.register(Court)
 class CourtAdmin(admin.ModelAdmin):
     list_display = (
         'full_name',
@@ -135,6 +138,7 @@ class CourtAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(RECAPDocument)
 class RECAPDocumentAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'docket_entry',
@@ -146,6 +150,7 @@ class RECAPDocumentInline(admin.StackedInline):
     extra = 1
 
 
+@admin.register(DocketEntry)
 class DocketEntryAdmin(admin.ModelAdmin):
     inlines = (
         RECAPDocumentInline,
@@ -160,6 +165,7 @@ class DocketEntryInline(admin.TabularInline):
     extra = 1
 
 
+@admin.register(Docket)
 class DocketAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['case_name']}
     inlines = (
@@ -176,6 +182,7 @@ class DocketAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(OpinionsCited)
 class OpinionsCitedAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'citing_opinion',
@@ -189,11 +196,3 @@ class OpinionsCitedAdmin(admin.ModelAdmin):
         obj.save()
         from cl.search.tasks import add_or_update_opinions
         add_or_update_opinions.delay([obj.citing_opinion_id])
-
-admin.site.register(Opinion, OpinionAdmin)
-admin.site.register(Court, CourtAdmin)
-admin.site.register(Docket, DocketAdmin)
-admin.site.register(DocketEntry, DocketEntryAdmin)
-admin.site.register(RECAPDocument, RECAPDocumentAdmin)
-admin.site.register(OpinionsCited, OpinionsCitedAdmin)
-admin.site.register(OpinionCluster, OpinionClusterAdmin)
