@@ -73,6 +73,7 @@ six
 sqlparse==0.1.15
 stripe==1.22.3
 timeout-decorator
+usaddress
 wsgiref==0.1.2
 xlrd
 unidecode

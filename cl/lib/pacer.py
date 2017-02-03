@@ -9,6 +9,7 @@ from dateutil.tz import gettz
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError
+from django.db import transaction
 from django.db.models import Q
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from localflavor.us.forms import phone_digits_re
@@ -23,7 +24,8 @@ from cl.lib.recap_utils import (
 )
 from cl.scrapers.tasks import get_page_count
 from cl.search.models import Court, Docket, RECAPDocument, DocketEntry
-#from cl.people_db.models import Role, Party, AttorneyOrganization
+from cl.people_db.models import Role, Party, AttorneyOrganization, PartyType, \
+    Attorney
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +209,7 @@ class PacerXMLParser(object):
                     if not debug:
                         docket_entry.save()
                 except (IntegrityError,
-                        DocketEntry.MultipleObjectsReturned) as e:
+                        DocketEntry.MultipleObjectsReturned):
                     logger.error("Unable to create docket entry for docket "
                                  "#%s, on entry: %s." % (docket, entry_number))
                     continue
@@ -284,37 +286,107 @@ class PacerXMLParser(object):
                 return None
         return d
 
-    # def make_parties(self):
-    #     """Pull out the parties and their attorneys and save them to the DB."""
-    #     for party_node in self.party_list:
-    #         party_name = self.get_str_from_node(party_node, './name/text()')
-    #         party_type = self.get_str_from_node(party_node, './type/text()')
-    #         party_type = normalize_party_types(party_type)
-    #         party_extra_info = self.get_str_from_node(party_node,
-    #                                                   './extra_info/text()')
-    #         logger.info("Working on party '%s' of type '%s'" % (party_name,
-    #                                                             party_type))
-    #
-    #         # TODO: This will save extra_info as latest info found. Hm.
-    #         try:
-    #             party = Party.objects.get(name=party_name)
-    #         except Party.DoesNotExist:
-    #             party = Party(
-    #                 name=party_name,
-    #                 extra_info=party_extra_info,
-    #             )
-    #
-    #         atty_nodes = party_node.xpath('.//attorney_list/attorney')
-    #         for atty_node in atty_nodes:
-    #             atty_name = self.get_str_from_node(
-    #                 atty_node, './attorney_name/text()')
-    #             atty_contact_raw = self.get_str_from_node(
-    #                 atty_node, './contact/text()')
-    #             atty_roles = self.get_str_from_node(
-    #                 atty_node, './attorney_role/text()')
-    #             atty_roles = [normalize_attorney_role(r) for r in
-    #                           atty_roles.split('\n')]
+    @transaction.atomic
+    def make_parties(self, docket, debug):
+        """Pull out the parties and their attorneys and save them to the DB."""
+        attorney_info = {}
+        for party_node in self.party_list:
+            party_name = self.get_str_from_node(party_node, 'name')
+            party_type = self.get_str_from_node(party_node, 'type')
+            party_type = normalize_party_types(party_type)
+            party_extra_info = self.get_str_from_node(party_node, 'extra_info')
+            logger.info("Working on party '%s' of type '%s'" % (party_name,
+                                                                party_type))
 
+            try:
+                party = Party.objects.get(name=party_name)
+            except Party.DoesNotExist:
+                party = Party(
+                    name=party_name,
+                    extra_info=party_extra_info,
+                )
+                if not debug:
+                    party.save()
+            else:
+                if party_extra_info and not debug:
+                    party.extra_info = party_extra_info
+                    party.save()
+
+            # If the party type doesn't exist, make a new one.
+            if not party.party_types.filter(docket=docket,
+                                            name=party_type).exists():
+                pt = PartyType(
+                    docket=docket,
+                    party=party,
+                    name=party_type,
+                )
+                if not debug:
+                    pt.save()
+
+            atty_nodes = party_node.xpath('.//attorney_list/attorney')
+            logger.info("Adding %s attorneys to the party." % len(atty_nodes))
+            for atty_node in atty_nodes:
+                atty_name = self.get_str_from_node(atty_node, 'attorney_name')
+                logger.info("Adding attorney: '%s'" % atty_name)
+                atty_contact_raw = self.get_str_from_node(atty_node, 'contact')
+                atty_roles = self.get_str_from_node(atty_node, 'attorney_role')
+
+                try:
+                    atty = Attorney.objects.get(name=atty_name,
+                                                contact_raw=atty_contact_raw)
+                except Attorney.DoesNotExist:
+                    atty = Attorney(name=atty_name,
+                                    contact_raw=atty_contact_raw)
+                    if not debug:
+                        atty.save()
+
+                if atty_contact_raw:
+                    if 'see above' in atty_contact_raw.lower():
+                        # Try to look up the info from an earlier iteration.
+                        atty_org_info, atty_info = attorney_info.get(
+                            'atty_name', ({}, {}))
+                    else:
+                        atty_org_info, atty_info = normalize_attorney_contact(
+                            atty_contact_raw, fallback_name=atty_name)
+                        attorney_info[atty_name] = (atty_org_info, atty_info)
+
+                    if atty_org_info:
+                        logger.info("Adding organization information to "
+                                    "'%s': %s" % (atty_name, atty_org_info))
+                        try:
+                            org = AttorneyOrganization.objects.get(
+                                **atty_org_info)
+                        except AttorneyOrganization.DoesNotExist:
+                            org = AttorneyOrganization(**atty_org_info)
+                            if not debug:
+                                org.save()
+
+                        # Add the attorney to the organization
+                        if not debug:
+                            atty.organizations.add(org)
+
+                    if atty_info:
+                        if atty_info['email']:
+                            atty.email = atty_info['email']
+                        if atty_info['phone']:
+                            atty.phone = atty_info['phone']
+                        if atty_info['fax']:
+                            atty.fax = atty_info['fax']
+                        if not debug:
+                            atty.save()
+
+                atty_roles = [normalize_attorney_role(r) for r in
+                              atty_roles.split('\n') if r]
+                atty_roles = [r for r in atty_roles if r]
+                logger.info("Linking attorney '%s' to party '%s' via %s roles: "
+                            "%s" % (atty_name, party_name, len(atty_roles),
+                                    atty_roles))
+                for atty_role in atty_roles:
+                    if not Role.objects.filter(role=atty_role, attorney=atty,
+                                               party=party).exists():
+                        role = Role(role=atty_role, attorney=atty, party=party)
+                        if not debug:
+                            role.save()
 
     def get_court(self):
         """Extract the court from the XML and return it as a Court object"""
@@ -427,138 +499,186 @@ class PacerXMLParser(object):
         return False, None
 
 
-# def normalize_party_types(t):
-#     """Normalize various party types to as few as possible."""
-#     t = t.lower()
-#
-#     # Numerical types
-#     t = re.sub(r'defendant\s+\(\d+\)', r'defendant', t)
-#     t = re.sub(r'debtor\s+\d+', 'debtor', t)
-#
-#     # Assorted other
-#     t = re.sub(r'(thirdparty|3rd pty|3rd party)', r'third party', t)
-#     t = re.sub(r'(fourthparty|4th pty|4th party)', r'fourth party', t)
-#     t = re.sub(r'counter-(defendant|claimaint)', r'counter \1', t)
-#     t = re.sub(r'\bus\b', 'u.s.', t)
-#     t = re.sub(r'u\. s\.', 'u.s.', t)
-#     t = re.sub(r'united states', 'u.s.', t)
-#     t = re.sub(r'jointadmin', 'jointly administered', t)
-#     t = re.sub(r'consolidated-debtor', 'consolidated debtor', t)
-#     t = re.sub(r'plaintiff-? consolidated', 'consolidated plaintiff', t)
-#     t = re.sub(r'defendant-? consolidated', 'consolidated defendant', t)
-#     t = re.sub(r'intervenor-plaintiff', 'intervenor plaintiff', t)
-#     t = re.sub(r'intervenor pla\b', 'intervenor plaintiff', t)
-#     t = re.sub(r'intervenor dft\b', 'intervenor defendant', t)
-#
-#     return titlecase(t)
-#
-#
-# def normalize_attorney_role(r):
-#     """Normalize attorney roles into the valid set"""
-#     r = r.lower()
-#
-#     # Bad values we can expect. Nuke these early so they don't cause problems.
-#     if any([r.startswith(u'bar status'),
-#             r.startswith(u'designation')]):
-#         return None
-#
-#     if u'to be noticed' in r:
-#         return Role.ATTORNEY_TO_BE_NOTICED
-#     elif u'lead attorney' in r:
-#         return Role.ATTORNEY_LEAD
-#     elif u'sealed group' in r:
-#         return Role.ATTORNEY_IN_SEALED_GROUP
-#     elif u'pro hac vice' in r:
-#         return Role.PRO_HAC_VICE
-#     elif u'self- terminated' in r:
-#         return Role.SELF_TERMINATED
-#     elif u'terminated' in r:
-#         return Role.TERMINATED
-#     elif u'suspended' in r:
-#         return Role.SUSPENDED
-#     elif u'inactive' in r:
-#         return Role.INACTIVE
-#     elif u'disbarred' in r:
-#         return Role.DISBARRED
-#
-#     raise ValueError(u"Unable to match role: %s" % r)
-#
-#
-# def normalize_us_state(state):
-#     """Convert state values to valid state postal abbreviations
-#
-#     va --> VA
-#     Virginia --> VA
-#
-#     Raises KeyError if state cannot be normalized.
-#     """
-#     abbreviations = [t[0] for t in USPS_CHOICES]
-#     if state in abbreviations:
-#         return state
-#     return STATES_NORMALIZED[state.lower()]
-#
-#
-# def normalize_attorney_contact(c):
-#     """Normalize the contact string for an attorney.
-#
-#     Attorney contact strings are newline separated addresses like:
-#
-#         Landye Bennett Blumstein LLP
-#         701 West Eighth Avenue, Suite 1200
-#         Anchorage, AK 99501
-#         907-276-5152
-#         Email: brucem@lbblawyers.com
-#
-#     We need to pull off email and phone numbers, and then our address parser
-#     should work nicely.
-#     """
-#     address_lines = []
-#     lines = c.split('\n')
-#     for line in lines:
-#         try:
-#             clean_line = re.sub('Email: ', '', line)
-#             validate_email(clean_line)
-#         except ValidationError:
-#             # Not an email address, press on.
-#             pass
-#         else:
-#             # An email address.
-#             continue
-#
-#         # Perhaps a phone number?
-#         clean_line = re.sub('(\(|\)|\s+)', '', line)
-#         m = phone_digits_re.search(clean_line)
-#         if m:
-#             continue
-#
-#         # Not email or phone
-#         address_lines.append(line)
-#
-#     address_info, address_type = usaddress.tag(', '.join(address_lines))
-#     if address_type == 'PO Box':
-#         response = {
-#             'address1': ' '.join([
-#                 address_info['USPSBoxType'],
-#                 address_info['USPSBoxID'],
-#             ]),
-#         }
-#     elif address_type == 'Street Address':
-#         response = {
-#             'address1': ' '.join([
-#                 address_info['AddressNumber'],
-#                 address_info['StreetNamePreDirectional'],
-#                 address_info['StreetName'],
-#                 address_info['StreetNamePostType']
-#             ]),
-#         }
-#     response.update({
-#         'name': address_info['Recipient'],
-#         'address2': u' '.join([
-#             address_info.get('OccupancyType', ''),
-#             address_info.get('OccupancyIdentifier', ''),
-#         ]).strip(),
-#         'city': address_info['PlaceName'],
-#         'state': normalize_us_state(address_info['StateName']),
-#         'zip_code': address_info['ZipCode'],
-#     })
-#     return response
+def normalize_party_types(t):
+    """Normalize various party types to as few as possible."""
+    t = t.lower()
+
+    # Numerical types
+    t = re.sub(r'defendant\s+\(\d+\)', r'defendant', t)
+    t = re.sub(r'debtor\s+\d+', 'debtor', t)
+
+    # Assorted other
+    t = re.sub(r'(thirdparty|3rd pty|3rd party)', r'third party', t)
+    t = re.sub(r'(fourthparty|4th pty|4th party)', r'fourth party', t)
+    t = re.sub(r'counter-(defendant|claimaint)', r'counter \1', t)
+    t = re.sub(r'\bus\b', 'u.s.', t)
+    t = re.sub(r'u\. s\.', 'u.s.', t)
+    t = re.sub(r'united states', 'u.s.', t)
+    t = re.sub(r'jointadmin', 'jointly administered', t)
+    t = re.sub(r'consolidated-debtor', 'consolidated debtor', t)
+    t = re.sub(r'plaintiff-? consolidated', 'consolidated plaintiff', t)
+    t = re.sub(r'defendant-? consolidated', 'consolidated defendant', t)
+    t = re.sub(r'intervenor-plaintiff', 'intervenor plaintiff', t)
+    t = re.sub(r'intervenor pla\b', 'intervenor plaintiff', t)
+    t = re.sub(r'intervenor dft\b', 'intervenor defendant', t)
+
+    return titlecase(t)
+
+
+def normalize_attorney_role(r):
+    """Normalize attorney roles into the valid set"""
+    r = r.lower()
+
+    # Bad values we can expect. Nuke these early so they don't cause problems.
+    if any([r.startswith(u'bar status'),
+            r.startswith(u'designation')]):
+        return None
+
+    if u'to be noticed' in r:
+        return Role.ATTORNEY_TO_BE_NOTICED
+    elif u'lead attorney' in r:
+        return Role.ATTORNEY_LEAD
+    elif u'sealed group' in r:
+        return Role.ATTORNEY_IN_SEALED_GROUP
+    elif u'pro hac vice' in r:
+        return Role.PRO_HAC_VICE
+    elif u'self- terminated' in r:
+        return Role.SELF_TERMINATED
+    elif u'terminated' in r:
+        return Role.TERMINATED
+    elif u'suspended' in r:
+        return Role.SUSPENDED
+    elif u'inactive' in r:
+        return Role.INACTIVE
+    elif u'disbarred' in r:
+        return Role.DISBARRED
+
+    raise ValueError(u"Unable to match role: %s" % r)
+
+
+def normalize_us_state(state):
+    """Convert state values to valid state postal abbreviations
+
+    va --> VA
+    Virginia --> VA
+
+    Raises KeyError if state cannot be normalized.
+    """
+    abbreviations = [t[0] for t in USPS_CHOICES]
+    if state in abbreviations:
+        return state
+    return STATES_NORMALIZED[state.lower()]
+
+
+def normalize_attorney_contact(c, fallback_name=''):
+    """Normalize the contact string for an attorney.
+
+    Attorney contact strings are newline separated addresses like:
+
+        Landye Bennett Blumstein LLP
+        701 West Eighth Avenue, Suite 1200
+        Anchorage, AK 99501
+        907-276-5152
+        Email: brucem@lbblawyers.com
+
+    We need to pull off email and phone numbers, and then our address parser
+    should work nicely.
+    """
+    if not c:
+        return {}, {}
+
+    address_lines = []
+    atty_info = {
+        'email': '',
+        'fax': '',
+        'phone': '',
+    }
+    lines = c.split('\n')
+    for i, line in enumerate(lines):
+        line = re.sub('Email:\s*', '', line).strip()
+        line = re.sub('pro se', '', line, re.I)
+        if not line:
+            continue
+        try:
+            validate_email(line)
+        except ValidationError:
+            # Not an email address, press on.
+            pass
+        else:
+            # An email address.
+            atty_info['email'] = line
+            continue
+
+        # Perhaps a phone/fax number?
+        clean_line = re.sub(r'(\(|\)|\\|/|\s+)', '', line)
+        if clean_line.startswith('Fax:'):
+            clean_line = re.sub('Fax:', '', clean_line)
+            m = phone_digits_re.search(clean_line)
+            if m:
+                atty_info['fax'] = clean_line
+            continue
+        else:
+            m = phone_digits_re.search(clean_line)
+            if m:
+                atty_info['phone'] = clean_line
+                continue
+
+        # First line containing an ampersand? These are usually law firm names.
+        if u'&' in line and i == 0:
+            fallback_name = line
+            continue
+
+        has_chars = re.search('[a-zA-Z]', line)
+        if has_chars:
+            # Not email, phone, fax, and has at least one char.
+            address_lines.append(line)
+
+    mapping = {
+        'Recipient': 'name',
+        'AddressNumber': 'address1',
+        'AddressNumberPrefix': 'address1',
+        'AddressNumberSuffix': 'address1',
+        'StreetName': 'address1',
+        'StreetNamePreDirectional': 'address1',
+        'StreetNamePreModifier': 'address1',
+        'StreetNamePreType': 'address1',
+        'StreetNamePostDirectional': 'address1',
+        'StreetNamePostModifier': 'address1',
+        'StreetNamePostType': 'address1',
+        'CornerOf': 'address1',
+        'IntersectionSeparator': 'address1',
+        'LandmarkName': 'address1',
+        'USPSBoxGroupID': 'address1',
+        'USPSBoxGroupType': 'address1',
+        'USPSBoxID': 'address1',
+        'USPSBoxType': 'address1',
+        'BuildingName': 'address2',
+        'OccupancyType': 'address2',
+        'OccupancyIdentifier': 'address2',
+        'SubaddressIdentifier': 'address2',
+        'SubaddressType': 'address2',
+        'PlaceName': 'city',
+        'StateName': 'state',
+        'ZipCode': 'zip_code',
+    }
+    try:
+        address_info, address_type = usaddress.tag(
+            ', '.join(address_lines),
+            tag_mapping=mapping,
+        )
+    except usaddress.RepeatedLabelError:
+        logger.warn("Unable to parse address (RepeatedLabelError): %s" %
+                    ', '.join(c.split('\n')))
+        return {}, atty_info
+
+    if any([address_type == 'Ambiguous',
+            'CountryName' in address_info]):
+        logger.warn("Unable to parse address (Ambiguous address type): %s" %
+                    ', '.join(c.split('\n')))
+        return {}, atty_info
+
+    if address_info.get('name') is None and fallback_name:
+        address_info['name'] = fallback_name
+    if address_info.get('state'):
+        address_info['state'] = normalize_us_state(address_info['state'])
+    return dict(address_info), atty_info

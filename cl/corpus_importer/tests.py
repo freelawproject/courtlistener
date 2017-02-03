@@ -1,4 +1,7 @@
 # coding=utf-8
+import os
+
+from django.conf import settings
 from django.test import TestCase
 
 from cl.corpus_importer.dup_helpers import case_name_in_candidate
@@ -7,6 +10,7 @@ from cl.corpus_importer.import_columbia.parse_opinions import \
     get_state_court_object
 from cl.corpus_importer.lawbox.judge_extractor import get_judge_from_str, \
     REASONS
+from cl.lib.pacer import PacerXMLParser
 from cl.people_db.import_judges.populate_fjc_judges import get_fed_court_object
 
 
@@ -452,3 +456,45 @@ class CourtMatchingTest(TestCase):
                 test['a'],
                 got,
             )
+
+
+class PacerDocketParserTest(TestCase):
+    """Can we parse RECAP dockets successfully?"""
+    NUM_PARTIES = 3
+    NUM_PETRO_ATTYS = 6
+    NUM_FLOYD_ROLES = 3
+    DOCKET_PATH = os.path.join(settings.MEDIA_ROOT, 'test', 'xml',
+                               'gov.uscourts.akd.41664.docket.xml')
+
+    def setUp(self):
+        self.pacer_doc = PacerXMLParser(self.DOCKET_PATH)
+        self.docket = self.pacer_doc.save(debug=False)
+
+    def tearDown(self):
+        self.docket.delete()
+
+    def test_party_parsing(self):
+        """Can we parse an XML docket and get good results in the DB"""
+        self.pacer_doc.make_parties(self.docket, debug=False)
+
+        self.assertEqual(self.docket.parties.all().count(), self.NUM_PARTIES)
+
+        petro = self.docket.parties.get(name__contains="Petro")
+        self.assertEqual(petro.party_types.all()[0].name, "Plaintiff")
+
+        attorneys = petro.attorneys.all().distinct()
+        self.assertEqual(attorneys.count(), self.NUM_PETRO_ATTYS)
+
+        floyd = petro.attorneys.distinct().get(name__contains='Floyd')
+        self.assertEqual(floyd.roles.all().count(), self.NUM_FLOYD_ROLES)
+        self.assertEqual(floyd.name, u'Floyd G. Short')
+        self.assertEqual(floyd.email, u'fshort@susmangodfrey.com')
+        self.assertEqual(floyd.fax, u'206-516-3883')
+        self.assertEqual(floyd.phone, u'206-373-7381')
+
+        godfrey_llp = floyd.organizations.all()[0]
+        self.assertEqual(godfrey_llp.name, u'Susman Godfrey, LLP')
+        self.assertEqual(godfrey_llp.address1, u'1201 Third Avenue')
+        self.assertEqual(godfrey_llp.address2, u'Suite 3800')
+        self.assertEqual(godfrey_llp.city, u'Seattle')
+        self.assertEqual(godfrey_llp.state, u'WA')

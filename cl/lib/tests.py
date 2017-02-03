@@ -11,7 +11,8 @@ from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_upload_path
-from cl.lib.pacer import normalize_party_types, normalize_attorney_role
+from cl.lib.pacer import normalize_party_types, normalize_attorney_role, \
+    normalize_attorney_contact, normalize_us_state
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import trunc
 from cl.people_db.models import Role
@@ -19,7 +20,6 @@ from cl.search.models import Opinion, OpinionCluster, Docket, Court
 
 
 class TestStringUtils(TestCase):
-
     def test_trunc(self):
         """Does trunc give us the results we expect?"""
         s = 'Henry wants apple.'
@@ -121,10 +121,10 @@ class TestMimeLookup(TestCase):
     def test_known_good_mimetypes(self):
         """ For known good mimetypes, make sure we return the right value """
         tests = {
-            'mp3/2015/1/1/something_v._something_else.mp3':'audio/mpeg',
-            'doc/2015/1/1/voutila_v._bonvini.doc':'application/msword',
-            'pdf/2015/1/1/voutila_v._bonvini.pdf':'application/pdf',
-            'txt/2015/1/1/voutila_v._bonvini.txt':'text/plain',
+            'mp3/2015/1/1/something_v._something_else.mp3': 'audio/mpeg',
+            'doc/2015/1/1/voutila_v._bonvini.doc': 'application/msword',
+            'pdf/2015/1/1/voutila_v._bonvini.pdf': 'application/pdf',
+            'txt/2015/1/1/voutila_v._bonvini.txt': 'text/plain',
         }
         for test_path in tests.keys():
             self.assertEqual(tests.get(test_path), lookup_mime_type(test_path))
@@ -211,7 +211,7 @@ class TestPACERPartyParsing(TestCase):
         }]
         for pair in pairs:
             print "Normalizing PACER type of '%s' to '%s'..." % \
-                    (pair['q'], pair['a']),
+                  (pair['q'], pair['a']),
             result = normalize_party_types(pair['q'])
             self.assertEqual(result, pair['a'])
             print '✓'
@@ -260,3 +260,200 @@ class TestPACERPartyParsing(TestCase):
             print '✓'
         with self.assertRaises(ValueError):
             normalize_attorney_role('this is an unknown role')
+
+    def test_state_normalization(self):
+        pairs = [{
+            'q': 'CA',
+            'a': 'CA',
+        }, {
+            'q': 'ca',
+            'a': 'CA',
+        }, {
+            'q': 'California',
+            'a': 'CA',
+        }, {
+            'q': 'california',
+            'a': 'CA',
+        }]
+        for pair in pairs:
+            print "Normalizing state of '%s' to '%s'..." % \
+                  (pair['q'], pair['a']),
+            result = normalize_us_state(pair['q'])
+            self.assertEqual(result, pair['a'])
+            print '✓'
+
+    def test_normalize_atty_contact(self):
+        pairs = [{
+            # Email and phone number
+            'q': "Landye Bennett Blumstein LLP\n"
+                 "701 West Eighth Avenue, Suite 1200\n"
+                 "Anchorage, AK 99501\n"
+                 "907-276-5152\n"
+                 "Email: brucem@lbblawyers.com",
+            'a': ({
+                'name': u"Landye Bennett Blumstein LLP",
+                'address1': u'701 West Eighth Avenue',
+                'address2': u'Suite 1200',
+                'city': u'Anchorage',
+                'state': u'AK',
+                'zip_code': u'99501',
+            }, {
+                'email': u'brucem@lbblawyers.com',
+                'phone': u'907-276-5152',
+                'fax': u'',
+            })
+        }, {
+            # PO Box
+            'q': "Sands Anderson PC\n"
+                 "P.O. Box 2188\n"
+                 "Richmond, VA 23218-2188\n"
+                 "(804) 648-1636",
+            'a': ({
+                'name': u'Sands Anderson PC',
+                'address1': u'P.O. Box 2188',
+                'city': u'Richmond',
+                'state': u'VA',
+                'zip_code': u'23218-2188',
+            }, {
+                'phone': u'804648-1636',
+                'fax': u'',
+                'email': u'',
+            })
+        }, {
+            # Lowercase state (needs normalization)
+            'q': "Sands Anderson PC\n"
+                 "P.O. Box 2188\n"
+                 "Richmond, va 23218-2188\n"
+                 "(804) 648-1636",
+            'a': ({
+                'name': u'Sands Anderson PC',
+                'address1': u'P.O. Box 2188',
+                'city': u'Richmond',
+                'state': u'VA',
+                'zip_code': u'23218-2188',
+            }, {
+                'phone': u"804648-1636",
+                'fax': u'',
+                'email': u'',
+            })
+        }, {
+            # Phone, fax, and email -- the whole package.
+            'q': "Susman Godfrey, LLP\n"
+                 "1201 Third Avenue, Suite 3800\n"
+                 "Seattle, WA 98101\n"
+                 "206-373-7381\n"
+                 "Fax: 206-516-3883\n"
+                 "Email: fshort@susmangodfrey.com",
+            'a': ({
+                'name': u'Susman Godfrey, LLP',
+                'address1': u'1201 Third Avenue',
+                'address2': u'Suite 3800',
+                'city': u'Seattle',
+                'state': u'WA',
+                'zip_code': u'98101',
+            }, {
+                'phone': u'206-373-7381',
+                'fax': u'206-516-3883',
+                'email': u'fshort@susmangodfrey.com',
+            })
+        }, {
+            # No recipient name
+            'q': "211 E. Livingston Ave\n"
+                 "Columbus, OH 43215\n"
+                 "(614) 228-3727\n"
+                 "Email:",
+            'a': ({
+                'address1': u'211 E. Livingston Ave',
+                'city': u'Columbus',
+                'state': u'OH',
+                'zip_code': u'43215',
+            }, {
+                'phone': u'614228-3727',
+                'email': u'',
+                'fax': u'',
+            }),
+        }, {
+            # Weird ways of doing phone numbers
+            'q': """1200 Boulevard Tower
+                    1018 Kanawha Boulevard, E
+                    Charleston, WV 25301
+                    304/342-3174
+                    Fax: 304/342-0448
+                    Email: caglelaw@aol.com
+                """,
+            'a': ({
+                'address1': u'1018 Kanawha Boulevard, E',
+                'address2': u'1200 Boulevard Tower',
+                'city': u'Charleston',
+                'state': u'WV',
+                'zip_code': u'25301',
+            }, {
+                'phone': '304342-3174',
+                'fax': '304342-0448',
+                'email': 'caglelaw@aol.com',
+            })
+        }, {
+            # Empty fax numbers (b/c PACER).
+            'q': """303 E 17th Ave
+                    Suite 300
+                    Denver, CO 80203
+                    303-861-1764
+                    Fax:
+                    Email: jeff@dyerberens.com
+            """,
+            'a': ({
+                'address1': u'303 E 17th Ave',
+                'address2': u'Suite 300',
+                'city': u'Denver',
+                'state': u'CO',
+                'zip_code': u'80203',
+            }, {
+                'phone': u'303-861-1764',
+                'fax': u'',
+                'email': u'jeff@dyerberens.com',
+            })
+        }, {
+            # Funky phone number
+            'q': """Guerrini Law Firm
+                    106 SOUTH MENTOR AVE. #150
+                    Pasadena, CA 91106
+                    626-229-9611-202
+                    Fax: 626-229-9615
+                    Email: guerrini@guerrinilaw.com
+                """,
+            'a': ({
+                'name': u'Guerrini Law Firm',
+                'address1': u'106 SOUTH MENTOR AVE.',
+                'address2': u'# 150',
+                'city': u'Pasadena',
+                'state': u'CA',
+                'zip_code': u'91106',
+            }, {
+                'phone': u'',
+                'fax': u'626-229-9615',
+                'email': u'guerrini@guerrinilaw.com',
+            })
+        }, {
+            'q': """Duncan & Sevin, LLC
+                    400 Poydras St.
+                    Suite 1200
+                    New Orleans, LA 70130
+                """,
+            'a': ({
+                'name': u'Duncan & Sevin, LLC',
+                'address1': u'400 Poydras St.',
+                'address2': u'Suite 1200',
+                'city': u'New Orleans',
+                'state': u'LA',
+                'zip_code': u'70130',
+            }, {
+                'phone': u'',
+                'fax': u'',
+                'email': u'',
+            })
+        }]
+        for i, pair in enumerate(pairs):
+            print "Normalizing address %s..." % i,
+            result = normalize_attorney_contact(pair['q'])
+            self.assertEqual(result, pair['a'])
+            print '✓'
