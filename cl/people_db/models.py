@@ -1,3 +1,4 @@
+# coding=utf-8
 from datetime import datetime, time
 
 from django.core.urlresolvers import reverse
@@ -21,7 +22,7 @@ from cl.lib.model_helpers import (
 )
 from cl.lib.search_index_utils import solr_list, null_map, nuke_nones
 from cl.lib.string_utils import trunc
-from cl.search.models import Court
+from cl.search.models import Court, Docket
 
 SUFFIXES = (
     ('jr', 'Jr.'),
@@ -1196,3 +1197,183 @@ class ABARating(models.Model):
     def clean_fields(self, *args, **kwargs):
         validate_is_not_alias(self, ['person'])
         super(ABARating, self).clean_fields(*args, **kwargs)
+
+
+class PartyType(models.Model):
+    docket = models.ForeignKey(
+        'search.Docket',
+        related_name="party_types",
+    )
+    party = models.ForeignKey(
+        'Party',
+        related_name="party_types",
+    )
+    name = models.CharField(
+        help_text="The name of the type (Defendant, Plaintiff, etc.)",
+        max_length="100",  # 2× the max in first 100,000 sampled.
+        db_index=True,
+    )
+
+    class Meta:
+        unique_together = ('docket', 'party', 'name')
+
+
+class Party(models.Model):
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    attorneys = models.ManyToManyField(
+        'Attorney',
+        help_text="The attorneys involved with the party.",
+        through="Role",
+        related_name="parties",
+    )
+    name = models.TextField(
+        help_text="The name of the party.",
+        db_index=True,
+    )
+    extra_info = models.TextField(
+        help_text="Additional info from PACER",
+        db_index=True,
+    )
+
+    class Meta:
+        unique_together = ('name', 'extra_info')
+
+
+class Role(models.Model):
+    ATTORNEY_TO_BE_NOTICED = 1
+    ATTORNEY_LEAD = 2
+    ATTORNEY_IN_SEALED_GROUP = 3
+    PRO_HAC_VICE = 4
+    SELF_TERMINATED = 5
+    TERMINATED = 6
+    SUSPENDED = 7
+    INACTIVE = 8
+    DISBARRED = 9
+    ATTORNEY_ROLES = (
+        (ATTORNEY_TO_BE_NOTICED, "Attorney to be noticed"),
+        (ATTORNEY_LEAD, "Lead Attorney"),
+        (ATTORNEY_IN_SEALED_GROUP, "Attorney in sealed group"),
+        (PRO_HAC_VICE, "Pro hac vice"),
+        (SELF_TERMINATED, "Self-terminated"),
+        (TERMINATED, "Terminated"),
+        (SUSPENDED, "Suspended"),
+        (INACTIVE, "Inactive"),
+        (DISBARRED, "Disbarred"),
+    )
+    party = models.ForeignKey(
+        Party,
+        related_name="roles",
+    )
+    attorney = models.ForeignKey(
+        "Attorney",
+        related_name="roles",
+    )
+    role = models.SmallIntegerField(
+        help_text="The name of the attorney's role.",
+        choices=ATTORNEY_ROLES,
+        db_index=True,
+    )
+
+    class Meta:
+        unique_together = ('party', 'attorney', 'role')
+
+
+class Attorney(models.Model):
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    organizations = models.ManyToManyField(
+        'AttorneyOrganization',
+        help_text="The organizations that the attorney is affiliated with",
+        related_name="attorneys",
+    )
+    name = models.TextField(
+        help_text="The name of the attorney.",
+        db_index=True,
+    )
+    contact_raw = models.TextField(
+        help_text="The raw contents of the contact field",
+        db_index=True,
+    )
+    phone = local_models.PhoneNumberField(
+        help_text="The phone number of the attorney.",
+    )
+    fax = local_models.PhoneNumberField(
+        help_text="The fax number of the attorney.",
+    )
+    email = models.EmailField(
+        help_text="The email address of the attorney.",
+    )
+
+    class Meta:
+        unique_together = ('name', 'contact_raw')
+
+
+class AttorneyOrganization(models.Model):
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    name = models.TextField(
+        help_text="The name of the organization.",
+        db_index=True,
+    )
+    address1 = models.TextField(
+        help_text="The normalized address1 of the organization",
+        db_index=True,
+    )
+    address2 = models.TextField(
+        help_text="The normalized address2 of the organization",
+        db_index=True,
+    )
+    city = models.TextField(
+        help_text="The normalized city of the organization",
+        db_index=True,
+    )
+    state = local_models.USPostalCodeField(
+        help_text="The two-letter USPS postal abbreviation for the "
+                  "organization",
+        db_index=True,
+    )
+    zip_code = local_models.USZipCodeField(
+        help_text="The zip code for the organization, XXXXX or XXXXX-XXXX "
+                  "work.",
+        db_index=True,
+    )
+
+    class Meta:
+        unique_together = ('name', 'address1', 'address2', 'city', 'state',
+                           'zip_code')
+
+    def __unicode__(self):
+        return "%s: %s, %s, %s, %s, %s, %s" % (
+            self.pk,
+            self.name,
+            self.address1,
+            self.address2,
+            self.city,
+            self.state,
+            self.zip_code,
+        )

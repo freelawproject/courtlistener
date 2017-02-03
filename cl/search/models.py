@@ -128,6 +128,13 @@ class Docket(models.Model):
         help_text="The judge that the case was referred to, as a string.",
         blank=True,
     )
+    parties = models.ManyToManyField(
+        'people_db.Party',
+        help_text="The parties involved in the docket",
+        related_name="dockets",
+        through='people_db.PartyType',
+        blank=True,
+    )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
