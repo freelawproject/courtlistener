@@ -161,6 +161,7 @@ class Command(BaseCommand):
                 docket = pacer_doc.save(self.debug)
                 if docket is not None:
                     pacer_doc.make_documents(docket, self.debug)
+                    pacer_doc.make_parties(docket, self.debug)
 
                 completed += 1
 
