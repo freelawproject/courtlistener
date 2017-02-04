@@ -1217,6 +1217,14 @@ class PartyType(models.Model):
     class Meta:
         unique_together = ('docket', 'party', 'name')
 
+    def __unicode__(self):
+        return u'%s: Party %s is %s in Docket %s' % (
+            self.pk,
+            self.party_id,
+            self.name,
+            self.docket_id,
+        )
+
 
 class Party(models.Model):
     date_created = models.DateTimeField(
@@ -1246,6 +1254,10 @@ class Party(models.Model):
 
     class Meta:
         unique_together = ('name', 'extra_info')
+        verbose_name_plural = "Parties"
+
+    def __unicode__(self):
+        return u'%s: %s' % (self.pk, self.name)
 
 
 class Role(models.Model):
@@ -1286,6 +1298,14 @@ class Role(models.Model):
     class Meta:
         unique_together = ('party', 'attorney', 'role')
 
+    def __unicode__(self):
+        return u'%s: Attorney %s is %s for Party %s' % (
+            self.pk,
+            self.party_id,
+            self.get_role_display(),
+            self.attorney_id,
+        )
+
 
 class Attorney(models.Model):
     date_created = models.DateTimeField(
@@ -1324,6 +1344,9 @@ class Attorney(models.Model):
     class Meta:
         unique_together = ('name', 'contact_raw')
 
+    def __unicode__(self):
+        return u'%s: %s' % (self.pk, self.name)
+
 
 class AttorneyOrganization(models.Model):
     date_created = models.DateTimeField(
@@ -1334,6 +1357,10 @@ class AttorneyOrganization(models.Model):
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
+        db_index=True,
+    )
+    lookup_key = models.TextField(
+        help_text="A trimmed version of the address for duplicate matching.",
         db_index=True,
     )
     name = models.TextField(
