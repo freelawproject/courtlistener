@@ -2,8 +2,9 @@ from django.conf import settings
 from django.contrib import admin
 
 from cl.people_db.models import (
-    Education, School, Person, Position, RetentionEvent,
-    Race, PoliticalAffiliation, Source, ABARating
+    Education, School, Person, Position, RetentionEvent, Race,
+    PoliticalAffiliation, Source, ABARating, PartyType,
+    Party, Role, Attorney, AttorneyOrganization
 )
 
 
@@ -139,6 +140,40 @@ class RaceAdmin(admin.ModelAdmin):
         'get_race_display',
     )
 
+
+@admin.register(Party)
+class PartyAdmin(admin.ModelAdmin):
+    extra = 1
+
+
+@admin.register(PartyType)
+class PartyTypeAdmin(admin.ModelAdmin):
+    raw_id_fields = ('party',)
+
+
+@admin.register(Role)
+class RoleAdmin(admin.ModelAdmin):
+    list_filter = (
+        'role',
+    )
+    list_display = (
+        '__unicode__',
+        'attorney',
+        'get_role_display',
+        'party',
+    )
+
+
+@admin.register(Attorney)
+class AttorneyAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'organizations',
+    )
+
+
+@admin.register(AttorneyOrganization)
+class AttorneyOrganizationAdmin(admin.ModelAdmin):
+    pass
 
 admin.site.register(PoliticalAffiliation)
 admin.site.register(RetentionEvent)
