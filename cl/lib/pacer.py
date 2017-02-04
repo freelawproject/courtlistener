@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from collections import OrderedDict
 from datetime import date
 
 import usaddress
@@ -289,7 +290,7 @@ class PacerXMLParser(object):
     @transaction.atomic
     def make_parties(self, docket, debug):
         """Pull out the parties and their attorneys and save them to the DB."""
-        attorney_info = {}
+        atty_obj_cache = {}
         for party_node in self.party_list:
             party_name = self.get_str_from_node(party_node, 'name')
             party_type = self.get_str_from_node(party_node, 'type')
@@ -331,31 +332,57 @@ class PacerXMLParser(object):
                 atty_contact_raw = self.get_str_from_node(atty_node, 'contact')
                 atty_roles = self.get_str_from_node(atty_node, 'attorney_role')
 
-                try:
-                    atty = Attorney.objects.get(name=atty_name,
-                                                contact_raw=atty_contact_raw)
-                except Attorney.DoesNotExist:
-                    atty = Attorney(name=atty_name,
-                                    contact_raw=atty_contact_raw)
-                    if not debug:
-                        atty.save()
+                if 'see above' in atty_contact_raw.lower():
+                    # Try to look up the atty object from an earlier iteration.
+                    try:
+                        atty, atty_org_info, atty_info = atty_obj_cache['atty_name']
+                    except KeyError:
+                        logger.warn("Unable to get atty with 'see above' "
+                                    "contact information")
+                        continue
+                else:
+                    atty_org_info, atty_info = normalize_attorney_contact(
+                        atty_contact_raw, fallback_name=atty_name)
+                    try:
+                        # Find an atty with the same name and one of another
+                        # several IDs.
+                        q = Q()
+                        fields = [
+                            ('phone', atty_info['phone']),
+                            ('fax', atty_info['fax']),
+                            ('email', atty_info['email']),
+                            ('organizations__lookup_key',
+                                     atty_org_info.get('lookup_key')),
+                        ]
+                        for field, lookup in fields:
+                            if lookup:
+                                q |= Q(**{field: lookup})
+                        attys = Attorney.objects.filter(Q(name=atty_name) & q)
+                        if attys.count() == 0:
+                            raise Attorney.DoesNotExist
+                        elif attys.count() == 1:
+                            atty = attys[0]
+                        elif attys.count() > 1:
+                            raise Attorney.MultipleObjectsReturned
+                    except Attorney.DoesNotExist:
+                        atty = Attorney(name=atty_name,
+                                        contact_raw=atty_contact_raw)
+                        if not debug:
+                            atty.save()
+                    except Attorney.MultipleObjectsReturned:
+                        continue
+
+                    # Cache the atty object and info for "See above" entries.
+                    atty_obj_cache[atty_name] = (atty, atty_org_info, atty_info)
 
                 if atty_contact_raw:
-                    if 'see above' in atty_contact_raw.lower():
-                        # Try to look up the info from an earlier iteration.
-                        atty_org_info, atty_info = attorney_info.get(
-                            'atty_name', ({}, {}))
-                    else:
-                        atty_org_info, atty_info = normalize_attorney_contact(
-                            atty_contact_raw, fallback_name=atty_name)
-                        attorney_info[atty_name] = (atty_org_info, atty_info)
-
                     if atty_org_info:
                         logger.info("Adding organization information to "
                                     "'%s': %s" % (atty_name, atty_org_info))
                         try:
                             org = AttorneyOrganization.objects.get(
-                                **atty_org_info)
+                                lookup_key=atty_org_info['lookup_key'],
+                            )
                         except AttorneyOrganization.DoesNotExist:
                             org = AttorneyOrganization(**atty_org_info)
                             if not debug:
@@ -570,6 +597,59 @@ def normalize_us_state(state):
     return STATES_NORMALIZED[state.lower()]
 
 
+def make_lookup_key(address_info):
+    """Strip anything that's not a character or number"""
+    sorted_info = OrderedDict(sorted(address_info.items()))
+    fixes = {
+        r'atty.': '',
+        r'and': '',  # These are often used instead of & in firm names.
+        r'boulevard': 'blvd',
+        r'llp': '',
+        r'offices': 'office',
+        r'pc': '',
+        r'p\.c\.': '',
+        r'pa': '',
+        r'p\.a\.': '',
+        r'post office box': 'P.O. Box',
+        r'Ste': 'Suite',
+    }
+    for k, v in sorted_info.items():
+        for bad, good in fixes.items():
+            v = re.sub(r'\b%s\b' % bad, good, v, flags=re.IGNORECASE)
+        sorted_info[k] = v
+    key = ''.join(sorted_info.values())
+    return re.sub(r'[^a-z0-9]', '', key.lower())
+
+
+def normalize_address_info(address_info):
+    """Normalize various street address abbreviations
+
+     - Titlecase where appropriate
+     - Normalize street abbreviations (St --> Street, etc.)
+    """
+    fixes = OrderedDict((
+        ('Street', 'St.'),
+        ('Avenue', 'Ave.'),
+        ('Boulevard', 'Blvd.'),
+    ))
+
+    for k, v in address_info.items():
+        if k == 'state':
+            continue
+        address_info[k] = titlecase(v)
+
+    for address_part in ['address1', 'address2']:
+        a = address_info.get(address_part)
+        if not a:
+            continue
+
+        for bad, good in fixes.items():
+            a = re.sub(r'\b%s\b' % bad, good, a, flags=re.IGNORECASE)
+
+        address_info[address_part] = a
+    return address_info
+
+
 def normalize_attorney_contact(c, fallback_name=''):
     """Normalize the contact string for an attorney.
 
@@ -681,4 +761,7 @@ def normalize_attorney_contact(c, fallback_name=''):
         address_info['name'] = fallback_name
     if address_info.get('state'):
         address_info['state'] = normalize_us_state(address_info['state'])
-    return dict(address_info), atty_info
+
+    address_info = normalize_address_info(dict(address_info))
+    address_info['lookup_key'] = make_lookup_key(address_info)
+    return address_info, atty_info

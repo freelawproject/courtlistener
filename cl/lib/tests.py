@@ -12,7 +12,7 @@ from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.pacer import normalize_party_types, normalize_attorney_role, \
-    normalize_attorney_contact, normalize_us_state
+    normalize_attorney_contact, normalize_us_state, make_lookup_key
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import trunc
 from cl.people_db.models import Role
@@ -292,11 +292,12 @@ class TestPACERPartyParsing(TestCase):
                  "Email: brucem@lbblawyers.com",
             'a': ({
                 'name': u"Landye Bennett Blumstein LLP",
-                'address1': u'701 West Eighth Avenue',
+                'address1': u'701 West Eighth Ave.',
                 'address2': u'Suite 1200',
                 'city': u'Anchorage',
                 'state': u'AK',
                 'zip_code': u'99501',
+                'lookup_key': u'701westeighthavesuite1200anchoragelandyebennettblumsteinak99501',
             }, {
                 'email': u'brucem@lbblawyers.com',
                 'phone': u'907-276-5152',
@@ -314,6 +315,7 @@ class TestPACERPartyParsing(TestCase):
                 'city': u'Richmond',
                 'state': u'VA',
                 'zip_code': u'23218-2188',
+                'lookup_key': u'pobox2188richmondsandsandersonva232182188',
             }, {
                 'phone': u'804648-1636',
                 'fax': u'',
@@ -331,6 +333,7 @@ class TestPACERPartyParsing(TestCase):
                 'city': u'Richmond',
                 'state': u'VA',
                 'zip_code': u'23218-2188',
+                'lookup_key': u'pobox2188richmondsandsandersonva232182188',
             }, {
                 'phone': u"804648-1636",
                 'fax': u'',
@@ -346,11 +349,12 @@ class TestPACERPartyParsing(TestCase):
                  "Email: fshort@susmangodfrey.com",
             'a': ({
                 'name': u'Susman Godfrey, LLP',
-                'address1': u'1201 Third Avenue',
+                'address1': u'1201 Third Ave.',
                 'address2': u'Suite 3800',
                 'city': u'Seattle',
                 'state': u'WA',
                 'zip_code': u'98101',
+                'lookup_key': u'1201thirdavesuite3800seattlesusmangodfreywa98101',
             }, {
                 'phone': u'206-373-7381',
                 'fax': u'206-516-3883',
@@ -367,6 +371,7 @@ class TestPACERPartyParsing(TestCase):
                 'city': u'Columbus',
                 'state': u'OH',
                 'zip_code': u'43215',
+                'lookup_key': u'211elivingstonavecolumbusoh43215',
             }, {
                 'phone': u'614228-3727',
                 'email': u'',
@@ -382,11 +387,12 @@ class TestPACERPartyParsing(TestCase):
                     Email: caglelaw@aol.com
                 """,
             'a': ({
-                'address1': u'1018 Kanawha Boulevard, E',
-                'address2': u'1200 Boulevard Tower',
+                'address1': u'1018 Kanawha Blvd., E',
+                'address2': u'1200 Blvd. Tower',
                 'city': u'Charleston',
                 'state': u'WV',
                 'zip_code': u'25301',
+                'lookup_key': u'1018kanawhablvde1200blvdtowercharlestonwv25301',
             }, {
                 'phone': '304342-3174',
                 'fax': '304342-0448',
@@ -407,6 +413,7 @@ class TestPACERPartyParsing(TestCase):
                 'city': u'Denver',
                 'state': u'CO',
                 'zip_code': u'80203',
+                'lookup_key': u'303e17thavesuite300denverco80203',
             }, {
                 'phone': u'303-861-1764',
                 'fax': u'',
@@ -423,11 +430,12 @@ class TestPACERPartyParsing(TestCase):
                 """,
             'a': ({
                 'name': u'Guerrini Law Firm',
-                'address1': u'106 SOUTH MENTOR AVE.',
+                'address1': u'106 South Mentor Ave.',
                 'address2': u'# 150',
                 'city': u'Pasadena',
                 'state': u'CA',
                 'zip_code': u'91106',
+                'lookup_key': u'106southmentorave150pasadenaguerrinilawfirmca91106',
             }, {
                 'phone': u'',
                 'fax': u'626-229-9615',
@@ -446,14 +454,50 @@ class TestPACERPartyParsing(TestCase):
                 'city': u'New Orleans',
                 'state': u'LA',
                 'zip_code': u'70130',
+                'lookup_key': u'400poydrasstsuite1200neworleansduncansevinllcla70130',
             }, {
                 'phone': u'',
                 'fax': u'',
                 'email': u'',
             })
+        }, {
+            # Ambiguous address. Returns empty dict.
+            'q': """Darden, Koretzky, Tessier, Finn, Blossman & Areaux
+                    Energy Centre
+                    1100 Poydras Street
+                    Suite 3100
+                    New Orleans, LA 70163
+                    504-585-3800
+                    Email: darden@carverdarden.com
+                """,
+            'a': ({}, {
+                'phone': u'504-585-3800',
+                'email': u'darden@carverdarden.com',
+                'fax': u'',
+            })
         }]
         for i, pair in enumerate(pairs):
             print "Normalizing address %s..." % i,
             result = normalize_attorney_contact(pair['q'])
+            self.maxDiff = None
             self.assertEqual(result, pair['a'])
             print '✓'
+
+    def test_making_a_lookup_key(self):
+        self.assertEqual(
+            make_lookup_key({
+                'address1': u'400 Poydras St.',
+                'address2': u'Suite 1200',
+                'city': u'New Orleans',
+                'name': u'Duncan and Sevin, LLC',
+                'state': u'LA',
+                'zip_code': u'70130',
+            }),
+            '400poydrasstsuite1200neworleansduncansevinllcla70130',
+        )
+        self.assertEqual(
+            make_lookup_key({
+                'name': 'Offices of Lissner AND Strook & Levin, LLP',
+            }),
+            'officeoflissnerstrooklevin',
+        )

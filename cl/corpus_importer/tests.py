@@ -494,7 +494,7 @@ class PacerDocketParserTest(TestCase):
 
         godfrey_llp = floyd.organizations.all()[0]
         self.assertEqual(godfrey_llp.name, u'Susman Godfrey, LLP')
-        self.assertEqual(godfrey_llp.address1, u'1201 Third Avenue')
+        self.assertEqual(godfrey_llp.address1, u'1201 Third Ave.')
         self.assertEqual(godfrey_llp.address2, u'Suite 3800')
         self.assertEqual(godfrey_llp.city, u'Seattle')
         self.assertEqual(godfrey_llp.state, u'WA')
