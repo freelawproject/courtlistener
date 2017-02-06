@@ -342,7 +342,7 @@ class PacerXMLParser(object):
 
                 # Try to look up the atty object from an earlier iteration.
                 try:
-                    atty, atty_org_info, atty_info = atty_obj_cache['atty_name']
+                    atty, atty_org_info, atty_info = atty_obj_cache[atty_name]
                 except KeyError:
                     if 'see above' in atty_contact_raw.lower():
                         logger.info("Unable to get atty with 'see above' "
