@@ -291,6 +291,14 @@ class PacerXMLParser(object):
     def make_parties(self, docket, debug):
         """Pull out the parties and their attorneys and save them to the DB."""
         atty_obj_cache = {}
+
+        # Get the most recent date on the docket, casting datetimes
+        # if needed. We'll use this to have the most updated attorney info.
+        newest_docket_date = max(
+            [d for d in [docket.date_filed,
+                         docket.date_terminated,
+                         docket.date_last_filing] if d],
+        )
         for party_node in self.party_list:
             party_name = self.get_str_from_node(party_node, 'name')
             party_type = self.get_str_from_node(party_node, 'type')
@@ -332,44 +340,47 @@ class PacerXMLParser(object):
                 atty_contact_raw = self.get_str_from_node(atty_node, 'contact')
                 atty_roles = self.get_str_from_node(atty_node, 'attorney_role')
 
-                if 'see above' in atty_contact_raw.lower():
-                    # Try to look up the atty object from an earlier iteration.
-                    try:
-                        atty, atty_org_info, atty_info = atty_obj_cache['atty_name']
-                    except KeyError:
-                        logger.warn("Unable to get atty with 'see above' "
-                                    "contact information")
-                        continue
-                else:
+                # Try to look up the atty object from an earlier iteration.
+                try:
+                    atty, atty_org_info, atty_info = atty_obj_cache['atty_name']
+                except KeyError:
+                    if 'see above' in atty_contact_raw.lower():
+                        logger.info("Unable to get atty with 'see above' "
+                                    "contact information.")
+                        atty_contact_raw = ''
+
+                    # New attorney for this docket. Look them up in DB or
+                    # create new attorney if necessary.
                     atty_org_info, atty_info = normalize_attorney_contact(
                         atty_contact_raw, fallback_name=atty_name)
                     try:
                         # Find an atty with the same name and one of another
-                        # several IDs.
+                        # several IDs. Important to add contact_raw here, b/c
+                        # if it cannot be parsed, all other values are blank.
                         q = Q()
                         fields = [
                             ('phone', atty_info['phone']),
                             ('fax', atty_info['fax']),
                             ('email', atty_info['email']),
+                            ('contact_raw', atty_contact_raw),
                             ('organizations__lookup_key',
-                                     atty_org_info.get('lookup_key')),
+                             atty_org_info.get('lookup_key')),
                         ]
                         for field, lookup in fields:
                             if lookup:
                                 q |= Q(**{field: lookup})
-                        attys = Attorney.objects.filter(Q(name=atty_name) & q)
-                        if attys.count() == 0:
-                            raise Attorney.DoesNotExist
-                        elif attys.count() == 1:
-                            atty = attys[0]
-                        elif attys.count() > 1:
-                            raise Attorney.MultipleObjectsReturned
+                        atty = Attorney.objects.get(Q(name=atty_name) & q)
                     except Attorney.DoesNotExist:
+                        logger.info("Unable to find matching attorney. "
+                                    "Creating a new one: %s" % atty_name)
                         atty = Attorney(name=atty_name,
+                                        date_sourced=newest_docket_date,
                                         contact_raw=atty_contact_raw)
                         if not debug:
                             atty.save()
                     except Attorney.MultipleObjectsReturned:
+                        logger.warn("Got too many results for attorney: '%s' "
+                                    "Punting." % atty_name)
                         continue
 
                     # Cache the atty object and info for "See above" entries.
@@ -392,13 +403,17 @@ class PacerXMLParser(object):
                         if not debug:
                             atty.organizations.add(org)
 
-                    if atty_info:
-                        if atty_info['email']:
-                            atty.email = atty_info['email']
-                        if atty_info['phone']:
-                            atty.phone = atty_info['phone']
-                        if atty_info['fax']:
-                            atty.fax = atty_info['fax']
+                    atty_info_is_newer = (atty.date_sourced <= newest_docket_date)
+                    if atty_info and atty_info_is_newer:
+                        logger.info("Updating atty info because %s is more "
+                                    "recent than %s." % (newest_docket_date,
+                                                         atty.date_sourced))
+                        atty.date_sourced = newest_docket_date
+                        atty.contact_raw = atty_contact_raw
+                        atty.email = atty_info['email']
+                        atty.phone = atty_info['phone']
+                        atty.fax = atty_info['fax']
+
                         if not debug:
                             atty.save()
 
@@ -408,12 +423,13 @@ class PacerXMLParser(object):
                 logger.info("Linking attorney '%s' to party '%s' via %s roles: "
                             "%s" % (atty_name, party_name, len(atty_roles),
                                     atty_roles))
-                for atty_role in atty_roles:
-                    if not Role.objects.filter(role=atty_role, attorney=atty,
-                                               party=party).exists():
-                        role = Role(role=atty_role, attorney=atty, party=party)
-                        if not debug:
-                            role.save()
+                if not debug:
+                    # Delete the old roles, replace with new.
+                    Role.objects.filter(attorney=atty, party=party).delete()
+                    Role.objects.bulk_create([
+                        Role(role=atty_role, attorney=atty, party=party) for
+                        atty_role in atty_roles
+                    ])
 
     def get_court(self):
         """Extract the court from the XML and return it as a Court object"""
@@ -461,7 +477,12 @@ class PacerXMLParser(object):
 
     @staticmethod
     def get_datetime_from_node(node, path, cast_to_date=False):
-        """Parse a datetime from the XML located at node."""
+        """Parse a datetime from the XML located at node.
+
+        If cast_to_date is true, the datetime object will be converted to a
+        date. Else, will return a datetime object in parsed TZ if possible.
+        Failing that, it will assume UTC.
+        """
         try:
             s = node.xpath('%s/text()' % path)[0].strip()
         except IndexError:
@@ -664,15 +685,15 @@ def normalize_attorney_contact(c, fallback_name=''):
     We need to pull off email and phone numbers, and then our address parser
     should work nicely.
     """
-    if not c:
-        return {}, {}
-
-    address_lines = []
     atty_info = {
         'email': '',
         'fax': '',
         'phone': '',
     }
+    if not c:
+        return {}, atty_info
+
+    address_lines = []
     lines = c.split('\n')
     for i, line in enumerate(lines):
         line = re.sub('Email:\s*', '', line).strip()

@@ -1318,6 +1318,12 @@ class Attorney(models.Model):
         auto_now=True,
         db_index=True,
     )
+    date_sourced = models.DateField(
+        help_text="The latest date on the source docket that populated this "
+                  "information. When information is in conflict use the "
+                  "latest data.",
+        db_index=True,
+    )
     organizations = models.ManyToManyField(
         'AttorneyOrganization',
         help_text="The organizations that the attorney is affiliated with",
@@ -1362,6 +1368,7 @@ class AttorneyOrganization(models.Model):
     lookup_key = models.TextField(
         help_text="A trimmed version of the address for duplicate matching.",
         db_index=True,
+        unique=True,
     )
     name = models.TextField(
         help_text="The name of the organization.",
