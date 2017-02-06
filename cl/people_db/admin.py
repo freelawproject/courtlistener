@@ -143,7 +143,9 @@ class RaceAdmin(admin.ModelAdmin):
 
 @admin.register(Party)
 class PartyAdmin(admin.ModelAdmin):
-    extra = 1
+    search_fields = (
+        'name',
+    )
 
 
 @admin.register(PartyType)
@@ -169,11 +171,20 @@ class AttorneyAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'organizations',
     )
+    search_fields = (
+        'name',
+    )
 
 
 @admin.register(AttorneyOrganization)
 class AttorneyOrganizationAdmin(admin.ModelAdmin):
-    pass
+    search_fields = (
+        'name',
+        'address1',
+        'address2',
+        'city',
+        'zip_code',
+    )
 
 admin.site.register(PoliticalAffiliation)
 admin.site.register(RetentionEvent)
