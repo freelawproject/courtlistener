@@ -1,6 +1,6 @@
-                         Free Law Project
-     Individual Contributor License Agreement ("Agreement") V1.0
-                 http://www.freelawproject.org
+                                Free Law Project
+          Individual Contributor License Agreement ("Agreement") V1.0
+                                https://free.law
 
 Thank you for your interest in Free Law Project (the "Project"), a project
 co-founded by Brian Carver and Michael Lissner. In order to clarify the
