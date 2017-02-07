@@ -12,10 +12,7 @@ well as the protection of Free Law Project and our users; it does not change
 your rights to use your own Contributions for any other purpose.
 
 If you have not already done so, please complete and sign, then scan and email
-a pdf file of this Agreement to bcarver@courtlistener.com. Alternatively, you
-may send it by facsimile to Free Law Project at +1-510-642-5814 or may send an
-original signed Agreement to Brian W. Carver, UC Berkeley School of Information,
-102 South Hall #4600 Berkeley, CA 94720-4600, U.S.A. Please read this document
+a pdf file of this Agreement to legal@free.law. Please read this document
 carefully before signing and keep a copy for your records.
 
   Full name: ______________________________________________________
@@ -37,6 +34,7 @@ future Contributions submitted to the Project. In return, the Project shall not
 use Your Contributions in a way that is contrary to the public benefit or
 inconsistent with universal access to public court documents. For details, see
 the ByLaws of the Project at:
+
  - https://free.law/non-profit-documents/
 
 Except for the license granted herein to the Project and recipients of software
@@ -67,28 +65,32 @@ to Your Contributions.
    and improving the Work, but excluding communication that is conspicuously
    marked or otherwise designated in writing by You as "Not a Contribution."
 
-2. Grant of Copyright License. Subject to the terms and conditions of this
-   Agreement, You hereby grant to the Project and to recipients of software
-   distributed by the Project a perpetual, worldwide, non-exclusive, no-charge,
-   royalty-free, irrevocable copyright license to reproduce, prepare derivative
-   works of, publicly display, publicly perform, sublicense, and distribute
-   Your Contributions and such derivative works.
+2. Grant of Copyright License.
 
-3. Grant of Patent License. Subject to the terms and conditions of this
-   Agreement, You hereby grant to the Project and to recipients of software
-   distributed by the Project a perpetual, worldwide, non-exclusive, no-charge,
-   royalty-free, irrevocable (except as stated in this section) patent license
-   to make, have made, use, offer to sell, sell, import, and otherwise transfer
-   the Work, where such license applies only to those patent claims licensable
-   by You that are necessarily infringed by Your Contribution(s) alone or by
-   combination of Your Contribution(s) with the Work to which such
-   Contribution(s) was submitted. If any entity institutes patent litigation
-   against You or any other entity (including a cross-claim or counterclaim in
-   a lawsuit) alleging that your Contribution, or the Work to which you have
-   contributed, constitutes direct or contributory patent infringement, then
-   any patent licenses granted to that entity under this Agreement for that
-   Contribution or Work shall terminate as of the date such litigation is
-   filed.
+   Subject to the terms and conditions of this Agreement, You hereby grant to
+   the Project and to recipients of software distributed by the Project a
+   perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+   copyright license to reproduce, prepare derivative works of, publicly
+   display, publicly perform, sublicense, and distribute Your Contributions and
+   such derivative works.
+
+3. Grant of Patent License.
+
+   Subject to the terms and conditions of this Agreement, You hereby grant to
+   the Project and to recipients of software distributed by the Project a
+   perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+   (except as stated in this section) patent license to make, have made, use,
+   offer to sell, sell, import, and otherwise transfer the Work, where such
+   license applies only to those patent claims licensable by You that are
+   necessarily infringed by Your Contribution(s) alone or by combination of Your
+   Contribution(s) with the Work to which such Contribution(s) was submitted.
+
+   If any entity institutes patent litigation against You or any other entity
+   (including a cross-claim or counterclaim in a lawsuit) alleging that your
+   Contribution, or the Work to which you have contributed, constitutes direct
+   or contributory patent infringement, then any patent licenses granted to that
+   entity under this Agreement for that Contribution or Work shall terminate as
+   of the date such litigation is filed.
 
 4. You represent that you are legally entitled to grant the above license. If
    your employer(s) has rights to intellectual property that you create that
