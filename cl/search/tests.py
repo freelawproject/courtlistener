@@ -156,6 +156,11 @@ class ModelTest(TestCase):
 
 
 class SearchTest(IndexedSolrTestCase):
+    @staticmethod
+    def get_article_count(r):
+        """Get the article count in a query response"""
+        return len(html.fromstring(r.content).xpath('//article'))
+
     def test_a_simple_text_query(self):
         """Does typing into the main query box work?"""
         r = self.client.get('/', {'q': 'supreme'})
@@ -282,7 +287,7 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_oa_case_name_filtering(self):
         r = self.client.get('/', {'type': 'oa', 'case_name': 'jose'})
-        actual = len(html.fromstring(r.content).xpath('//article'))
+        actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(
             actual,
@@ -293,7 +298,7 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_oa_jurisdiction_filtering(self):
         r = self.client.get('/', {'type': 'oa', 'court': 'test'})
-        actual = len(html.fromstring(r.content).xpath('//article'))
+        actual = self.get_article_count(r)
         expected = 2
         self.assertEqual(
             actual,
@@ -335,6 +340,14 @@ class SearchTest(IndexedSolrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('an error', response.content,
                       msg="Invalid search did not result in an error.")
+
+    def test_issue_635_leading_zeros(self):
+        """Do queries with leading zeros work equal to ones without?"""
+        r = self.client.get('/?docket_number=005&stat_Errata=on')
+        expected = 1
+        self.assertEqual(expected, self.get_article_count(r))
+        r = self.client.get('/?docket_number=5&stat_Errata=on')
+        self.assertEqual(expected, self.get_article_count(r))
 
 
 class GroupedSearchTest(EmptySolrTestCase):

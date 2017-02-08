@@ -459,7 +459,7 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
         # Simple filter
         q['docket_number'] = '14-1165-nope'
         assertCount(self, path, q, 0)
-        q['docket_number'] = 'docket number 1'
+        q['docket_number'] = 'docket number 1 005'
         assertCount(self, path, q, 1)
 
         # Related filters
