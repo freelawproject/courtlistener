@@ -349,9 +349,12 @@ def get_selected_field_string(cd, prefix):
     selected_fields = ['"%s"' % k.replace(prefix, '')
                        for k, v in cd.items()
                        if (k.startswith(prefix) and v is True)]
-
-    selected_field_string = ' OR '.join(selected_fields)
-    return selected_field_string
+    if len(selected_fields) == cd["_%scount" % prefix]:
+        # All the boxes are checked. No need for filtering.
+        return ''
+    else:
+        selected_field_string = ' OR '.join(selected_fields)
+        return selected_field_string
 
 
 def make_boost_string(fields):
@@ -547,19 +550,14 @@ def add_filter_queries(main_params, cd):
                                        cd['born_after']))
 
     # Facet filters
-    selected_courts_string = get_selected_field_string(cd, 'court_')
     if cd['type'] == 'o':
         selected_stats_string = get_selected_field_string(cd, 'stat_')
-        if len(selected_courts_string) + len(selected_stats_string) > 0:
-            main_fq.extend([
-                '{!tag=dt}status_exact:(%s)' % selected_stats_string,
-                'court_exact:(%s)' % selected_courts_string
-            ])
-    elif cd['type'] in ['oa', 'p', 'r']:
-        if len(selected_courts_string) > 0:
-            main_fq.extend([
-                'court_exact:(%s)' % selected_courts_string
-            ])
+        if len(selected_stats_string) > 0:
+            main_fq.append('{!tag=dt}status_exact:(%s)' % selected_stats_string)
+
+    selected_courts_string = get_selected_field_string(cd, 'court_')
+    if len(selected_courts_string) > 0:
+        main_fq.append('court_exact:(%s)' % selected_courts_string)
 
     # If a param has been added to the fq variables, then we add them to the
     # main_params var. Otherwise, we don't, as doing so throws an error.
