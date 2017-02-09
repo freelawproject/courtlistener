@@ -2,6 +2,7 @@ from django.contrib import admin
 from cl.alerts.models import Alert, RealTimeQueue
 
 
+@admin.register(Alert)
 class AlertAdmin(admin.ModelAdmin):
     list_filter = (
         'rate',
@@ -22,6 +23,7 @@ class AlertInline(admin.TabularInline):
     extra = 1
 
 
+@admin.register(RealTimeQueue)
 class RealTimeQueueAdmin(admin.ModelAdmin):
     list_filter = ('item_type',)
     list_display = (
@@ -32,6 +34,3 @@ class RealTimeQueueAdmin(admin.ModelAdmin):
     readonly_fields = (
         'date_modified',
     )
-
-admin.site.register(Alert, AlertAdmin)
-admin.site.register(RealTimeQueue, RealTimeQueueAdmin)

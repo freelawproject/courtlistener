@@ -2,6 +2,7 @@ from cl.audio.models import Audio
 from django.contrib import admin
 
 
+@admin.register(Audio)
 class AudioAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'docket',
@@ -11,6 +12,3 @@ class AudioAdmin(admin.ModelAdmin):
         'date_created',
         'date_modified',
     )
-
-admin.site.register(Audio, AudioAdmin)
-

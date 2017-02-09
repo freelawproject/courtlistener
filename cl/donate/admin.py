@@ -2,6 +2,7 @@ from django.contrib import admin
 from cl.donate.models import Donation
 
 
+@admin.register(Donation)
 class DonationAdmin(admin.ModelAdmin):
     readonly_fields = (
         'date_modified',
@@ -23,6 +24,3 @@ class DonationAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'donor',
     )
-
-
-admin.site.register(Donation, DonationAdmin)
