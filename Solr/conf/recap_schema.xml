@@ -143,6 +143,21 @@
            indexed="true"
            stored="true"
            multiValued="false"/>
+    <field name="party_id"
+           type="int"
+           indexed="true"
+           stored="true"
+           multiValued="true"/>
+    <field name="attorney_id"
+           type="int"
+           indexed="true"
+           stored="true"
+           multiValued="true"/>
+    <field name="firm_id"
+           type="int"
+           indexed="true"
+           stored="true"
+           multiValued="true"/>
 
     <!-- RECAPDocument -->
     <field name="document_type"
@@ -309,6 +324,32 @@
            indexed="true"
            stored="true"
            multiValued="false"
+           termVectors="true"
+           termPositions="true"
+           termOffsets="true"/>
+
+    <!--Parties, Attorneys, Attorney Orgs.-->
+    <field name="party"
+           type="text_en_splitting_cl"
+           indexed="true"
+           stored="true"
+           multiValued="true"
+           termVectors="true"
+           termPositions="true"
+           termOffsets="true"/>
+    <field name="attorney"
+           type="text_en_splitting_cl"
+           indexed="true"
+           stored="true"
+           multiValued="true"
+           termVectors="true"
+           termPositions="true"
+           termOffsets="true"/>
+    <field name="firm"
+           type="text_en_splitting_cl"
+           indexed="true"
+           stored="true"
+           multiValued="true"
            termVectors="true"
            termPositions="true"
            termOffsets="true"/>
