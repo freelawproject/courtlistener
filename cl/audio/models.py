@@ -9,7 +9,7 @@ from django.template import loader
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.model_helpers import make_upload_path
-from cl.lib.search_index_utils import InvalidDocumentError, null_map, nuke_nones
+from cl.lib.search_index_utils import InvalidDocumentError, null_map, normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person
@@ -246,5 +246,5 @@ class Audio(models.Model):
         text_template = loader.get_template('indexes/audio_text.txt')
         out['text'] = text_template.render({'item': self}).translate(null_map)
 
-        return nuke_nones(out)
+        return normalize_search_dicts(out)
 

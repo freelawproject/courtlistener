@@ -13,7 +13,7 @@ from django.utils.text import slugify
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.model_helpers import make_upload_path, make_recap_path
-from cl.lib.search_index_utils import InvalidDocumentError, null_map, nuke_nones
+from cl.lib.search_index_utils import InvalidDocumentError, null_map, normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
 
@@ -637,10 +637,29 @@ class RECAPDocument(models.Model):
             'court_citation_string': self.docket_entry.docket.court.citation_string
         })
 
+        # Parties, Attorneys, Firms
+        out.update({
+            'party_id': set(),
+            'party': set(),
+            'attorney_id': set(),
+            'attorney': set(),
+            'firm_id': set(),
+            'firm': set(),
+        })
+        for p in self.docket_entry.docket.parties.all():
+            out['party_id'].add(p.pk)
+            out['party'].add(p.name)
+            for a in p.attorneys.all():
+                out['attorney_id'].add(a.pk)
+                out['attorney'].add(a.name)
+                for f in a.organizations.all():
+                    out['firm_id'].add(f.pk)
+                    out['firm'].add(f.name)
+
         text_template = loader.get_template('indexes/dockets_text.txt')
         out['text'] = text_template.render({'item': self}).translate(null_map)
 
-        return nuke_nones(out)
+        return normalize_search_dicts(out)
 
 
 class Court(models.Model):
@@ -1338,7 +1357,7 @@ class Opinion(models.Model):
             'citation_string': self.cluster.citation_string
         }).translate(null_map)
 
-        return nuke_nones(out)
+        return normalize_search_dicts(out)
 
 
 class OpinionsCited(models.Model):

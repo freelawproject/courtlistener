@@ -23,13 +23,27 @@ class InvalidDocumentError(Exception):
 null_map = dict.fromkeys(range(0, 10) + range(11, 13) + range(14, 32))
 
 
-def nuke_nones(d):
-    """Remove any kv from a dictionary if v is None
+def normalize_search_dicts(d):
+    """Prepare search dicts for indexing by solr.
 
-    This is needed to send dictionaries to Sunburnt or Scorched, instead of
-    sending objects, and should provide a performance improvement. If you try
-    to send None values to integer fields (for example), things break, b/c
-    integer fields shouldn't be getting None values. Fair 'nuf.
+    1. Remove any kv from a dictionary if v is None
+
+       This is needed to send dictionaries to Sunburnt or Scorched, instead of
+       sending objects, and should provide a performance improvement. If you try
+       to send None values to integer fields (for example), things break, b/c
+       integer fields shouldn't be getting None values. Fair 'nuf.
+
+    2. Convert any sets to lists.
+
+       This is needed because sets aren't JSON serializable, but they're
+       convenient to use when building up a search object.
     """
-    [d.pop(k) for k, v in d.items() if v is None]
-    return d
+    new_dict = {}
+    for k, v in d.items():
+        if v is None:
+            continue
+        if isinstance(v, set):
+            new_dict[k] = list(v)
+        else:
+            new_dict[k] = v
+    return new_dict

@@ -20,9 +20,9 @@ from cl.lib.model_helpers import (
     validate_at_most_n,
     validate_supervisor,
 )
-from cl.lib.search_index_utils import solr_list, null_map, nuke_nones
+from cl.lib.search_index_utils import solr_list, null_map, normalize_search_dicts
 from cl.lib.string_utils import trunc
-from cl.search.models import Court, Docket
+from cl.search.models import Court
 
 SUFFIXES = (
     ('jr', 'Jr.'),
@@ -346,7 +346,7 @@ class Person(models.Model):
         text_template = loader.get_template('indexes/person_text.txt')
         out['text'] = text_template.render({'item': self}).translate(null_map)
 
-        return nuke_nones(out)
+        return normalize_search_dicts(out)
 
 
 class School(models.Model):
