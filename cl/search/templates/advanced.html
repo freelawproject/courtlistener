@@ -316,7 +316,19 @@
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-xs-12">
+                    <div class="col-sm-4">
+                         <div class="form-group">
+                             {{ search_form.party_name.label_tag }}
+                             {{ search_form.party_name }}
+                         </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.atty_name.label_tag }}
+                            {{ search_form.atty_name }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
                         <div class="form-group">
                             <div class="sidebar-checkbox">
                                 {{ search_form.available_only }}

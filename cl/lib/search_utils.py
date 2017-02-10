@@ -446,7 +446,7 @@ def add_highlighting(main_params, cd, highlight):
               'dateFiled', 'docketNumber', 'caseName', 'suitNature', 'court',
               'assigned_to_id', 'referred_to_id', 'dateArgued',
               'dateTerminated', 'document_number', 'attachment_number',
-              'docket_id', 'is_available', 'page_count']
+              'docket_id', 'is_available', 'page_count', 'party', 'attorney']
         hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
                 'court_citation_string', 'docketNumber', 'suitNature', 'cause',
                 'juryDemand', 'assignedTo', 'referredTo', 'short_description']
@@ -517,6 +517,10 @@ def add_filter_queries(main_params, cd):
             main_fq.append(make_fq(cd, 'referredTo', 'referred_to'))
         if cd['available_only']:
             main_fq.append(make_boolean_fq(cd, 'is_available', 'available_only'))
+        if cd['party_name']:
+            main_fq.append(make_fq(cd, 'party', 'party_name'))
+        if cd['atty_name']:
+            main_fq.append(make_fq(cd, 'attorney', 'atty_name'))
 
         main_fq.append(make_date_query('dateFiled', cd['filed_before'],
                                        cd['filed_after']))

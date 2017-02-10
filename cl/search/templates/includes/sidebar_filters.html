@@ -159,6 +159,14 @@
                         {{ search_form.referred_to.label_tag }}
                         {{ search_form.referred_to }}
                     </div>
+                    <div class="form-group">
+                        {{ search_form.party_name.label_tag }}
+                        {{ search_form.party_name }}
+                    </div>
+                    <div class="form-group">
+                        {{ search_form.atty_name.label_tag }}
+                        {{ search_form.atty_name }}
+                    </div>
 
 
                 {% elif type == 'oa' %}
@@ -238,7 +246,7 @@
                 {% endif %}
 
                 <button type="submit"
-                        class="btn btn-primary title"
+                        class="btn btn-primary btn-lg title"
                         name="search"><i class="fa fa-search"></i>&nbsp;Search
                 </button>
             </div>

@@ -129,6 +129,22 @@
                 </span>
             </div>
         {% endif %}
+        {% if doc0.party.0 %}
+            <div class="inline-block">
+                <span class="meta-data-header">Parties:</span>
+                <span class="meta-data-value">
+                    {{ doc0.party|safeseq|join:", "|read_more:"13" }}
+                </span>
+            </div>
+        {% endif %}
+        {% if doc0.attorney.0 %}
+            <div class="inline-block">
+                <span class="meta-data-header">Attorneys:</span>
+                <span class="meta-data-value">
+                    {{ doc0.attorney|safeseq|join:", "|read_more:"13" }}
+                </span>
+            </div>
+        {% endif %}
 
         {% for doc in result.doclist.docs|dictsort:"document_number" %}
         <div class="col-md-offset-half">

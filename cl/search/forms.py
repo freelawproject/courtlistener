@@ -189,6 +189,22 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    party_name = forms.CharField(
+        required=False,
+        label="Party Name",
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'},
+        )
+    )
+    atty_name = forms.CharField(
+        required=False,
+        label="Attorney Name",
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'},
+        )
+    )
 
     #
     # Oral argument fields
