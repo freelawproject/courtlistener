@@ -220,37 +220,41 @@ class TestPACERPartyParsing(TestCase):
         """Can we normalize the attorney roles into a small number of roles?"""
         pairs = [{
             'q': '(Inactive)',
-            'a': Role.INACTIVE,
+            'a': {'role': Role.INACTIVE, 'date_action': None},
         }, {
             'q': 'ATTORNEY IN SEALED GROUP',
-            'a': Role.ATTORNEY_IN_SEALED_GROUP,
+            'a': {'role': Role.ATTORNEY_IN_SEALED_GROUP, 'date_action': None},
         }, {
             'q': 'ATTORNEY TO BE NOTICED',
-            'a': Role.ATTORNEY_TO_BE_NOTICED,
+            'a': {'role': Role.ATTORNEY_TO_BE_NOTICED, 'date_action': None},
         }, {
             'q': 'Bar Status: ACTIVE',
-            'a': None,
+            'a': {'role': None, 'date_action': None},
         }, {
             'q': 'DISBARRED 02/19/2010',
-            'a': Role.DISBARRED,
+            'a': {'role': Role.DISBARRED,
+                  'date_action': datetime.date(2010, 2, 19)},
         }, {
             'q': 'Designation: ADR Pro Bono Limited Scope Counsel',
-            'a': None,
+            'a': {'role': None, 'date_action': None},
         }, {
             'q': 'LEAD ATTORNEY',
-            'a': Role.ATTORNEY_LEAD,
+            'a': {'role': Role.ATTORNEY_LEAD, 'date_action': None},
         }, {
             'q': 'PRO HAC VICE',
-            'a': Role.PRO_HAC_VICE,
+            'a': {'role': Role.PRO_HAC_VICE, 'date_action': None},
         }, {
             'q': 'SELF- TERMINATED: 01/14/2013',
-            'a': Role.SELF_TERMINATED,
+            'a': {'role': Role.SELF_TERMINATED,
+                  'date_action': datetime.date(2013, 1, 14)},
         }, {
             'q': 'SUSPENDED 01/22/2016',
-            'a': Role.SUSPENDED,
+            'a': {'role': Role.SUSPENDED,
+                  'date_action': datetime.date(2016, 1, 22)},
         }, {
             'q': 'TERMINATED: 01/01/2007',
-            'a': Role.TERMINATED,
+            'a': {'role': Role.TERMINATED,
+                  'date_action': datetime.date(2007, 1, 1)},
         }]
         for pair in pairs:
             print "Normalizing PACER role of '%s' to '%s'..." % \

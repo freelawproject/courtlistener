@@ -19,6 +19,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('date_created', models.DateTimeField(help_text=b'The time when this item was created', auto_now_add=True, db_index=True)),
                 ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
+                ('date_sourced', models.DateField(help_text=b'The latest date on the source docket that populated this information. When information is in conflict use the latest data.', db_index=True)),
                 ('name', models.TextField(help_text=b'The name of the attorney.', db_index=True)),
                 ('contact_raw', models.TextField(help_text=b'The raw contents of the contact field', db_index=True)),
                 ('phone', localflavor.us.models.PhoneNumberField(help_text=b'The phone number of the attorney.', max_length=20)),
@@ -32,12 +33,22 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('date_created', models.DateTimeField(help_text=b'The time when this item was created', auto_now_add=True, db_index=True)),
                 ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
+                ('lookup_key', models.TextField(help_text=b'A trimmed version of the address for duplicate matching.', unique=True, db_index=True)),
                 ('name', models.TextField(help_text=b'The name of the organization.', db_index=True)),
                 ('address1', models.TextField(help_text=b'The normalized address1 of the organization', db_index=True)),
                 ('address2', models.TextField(help_text=b'The normalized address2 of the organization', db_index=True)),
                 ('city', models.TextField(help_text=b'The normalized city of the organization', db_index=True)),
                 ('state', localflavor.us.models.USPostalCodeField(help_text=b'The two-letter USPS postal abbreviation for the organization', max_length=2, db_index=True, choices=[(b'AL', b'Alabama'), (b'AK', b'Alaska'), (b'AS', b'American Samoa'), (b'AZ', b'Arizona'), (b'AR', b'Arkansas'), (b'AA', b'Armed Forces Americas'), (b'AE', b'Armed Forces Europe'), (b'AP', b'Armed Forces Pacific'), (b'CA', b'California'), (b'CO', b'Colorado'), (b'CT', b'Connecticut'), (b'DE', b'Delaware'), (b'DC', b'District of Columbia'), (b'FM', b'Federated States of Micronesia'), (b'FL', b'Florida'), (b'GA', b'Georgia'), (b'GU', b'Guam'), (b'HI', b'Hawaii'), (b'ID', b'Idaho'), (b'IL', b'Illinois'), (b'IN', b'Indiana'), (b'IA', b'Iowa'), (b'KS', b'Kansas'), (b'KY', b'Kentucky'), (b'LA', b'Louisiana'), (b'ME', b'Maine'), (b'MH', b'Marshall Islands'), (b'MD', b'Maryland'), (b'MA', b'Massachusetts'), (b'MI', b'Michigan'), (b'MN', b'Minnesota'), (b'MS', b'Mississippi'), (b'MO', b'Missouri'), (b'MT', b'Montana'), (b'NE', b'Nebraska'), (b'NV', b'Nevada'), (b'NH', b'New Hampshire'), (b'NJ', b'New Jersey'), (b'NM', b'New Mexico'), (b'NY', b'New York'), (b'NC', b'North Carolina'), (b'ND', b'North Dakota'), (b'MP', b'Northern Mariana Islands'), (b'OH', b'Ohio'), (b'OK', b'Oklahoma'), (b'OR', b'Oregon'), (b'PW', b'Palau'), (b'PA', b'Pennsylvania'), (b'PR', b'Puerto Rico'), (b'RI', b'Rhode Island'), (b'SC', b'South Carolina'), (b'SD', b'South Dakota'), (b'TN', b'Tennessee'), (b'TX', b'Texas'), (b'UT', b'Utah'), (b'VT', b'Vermont'), (b'VI', b'Virgin Islands'), (b'VA', b'Virginia'), (b'WA', b'Washington'), (b'WV', b'West Virginia'), (b'WI', b'Wisconsin'), (b'WY', b'Wyoming')])),
                 ('zip_code', localflavor.us.models.USZipCodeField(help_text=b'The zip code for the organization, XXXXX or XXXXX-XXXX work.', max_length=10, db_index=True)),
+            ],
+        ),
+        migrations.CreateModel(
+            name='AttorneyOrganizationAssociation',
+            fields=[
+                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('attorney', models.ForeignKey(related_name='attorney_organization_associations', to='people_db.Attorney')),
+                ('attorney_organization', models.ForeignKey(related_name='attorney_organization_associations', to='people_db.AttorneyOrganization')),
+                ('docket', models.ForeignKey(help_text=b'The docket that the attorney worked on while at this organization.', to='search.Docket')),
             ],
         ),
         migrations.CreateModel(
@@ -49,6 +60,9 @@ class Migration(migrations.Migration):
                 ('name', models.TextField(help_text=b'The name of the party.', db_index=True)),
                 ('extra_info', models.TextField(help_text=b'Additional info from PACER', db_index=True)),
             ],
+            options={
+                'verbose_name_plural': 'Parties',
+            },
         ),
         migrations.CreateModel(
             name='PartyType',
@@ -63,8 +77,10 @@ class Migration(migrations.Migration):
             name='Role',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('role', models.SmallIntegerField(help_text=b"The name of the attorney's role.", db_index=True, choices=[(1, b'Attorney to be noticed'), (2, b'Lead Attorney'), (3, b'Attorney in sealed group'), (4, b'Pro hac vice'), (5, b'Self-terminated'), (6, b'Terminated'), (7, b'Suspended'), (8, b'Inactive'), (9, b'Disbarred')])),
+                ('role', models.SmallIntegerField(help_text=b"The name of the attorney's role.", db_index=True, choices=[(1, b'Attorney to be noticed'), (2, b'Lead attorney'), (3, b'Attorney in sealed group'), (4, b'Pro hac vice'), (5, b'Self-terminated'), (6, b'Terminated'), (7, b'Suspended'), (8, b'Inactive'), (9, b'Disbarred')])),
+                ('date_action', models.DateField(help_text=b'The date the attorney was disbarred, suspended, terminated...', null=True)),
                 ('attorney', models.ForeignKey(related_name='roles', to='people_db.Attorney')),
+                ('docket', models.ForeignKey(help_text=b'The attorney represented the party on this docket in this role.', to='search.Docket')),
                 ('party', models.ForeignKey(related_name='roles', to='people_db.Party')),
             ],
         ),
@@ -80,7 +96,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='attorney',
             name='organizations',
-            field=models.ManyToManyField(help_text=b'The organizations that the attorney is affiliated with', related_name='attorneys', to='people_db.AttorneyOrganization'),
+            field=models.ManyToManyField(help_text=b'The organizations that the attorney is affiliated with', related_name='attorneys', through='people_db.AttorneyOrganizationAssociation', to='people_db.AttorneyOrganization'),
         ),
         migrations.AlterUniqueTogether(
             name='role',
@@ -93,6 +109,10 @@ class Migration(migrations.Migration):
         migrations.AlterUniqueTogether(
             name='party',
             unique_together=set([('name', 'extra_info')]),
+        ),
+        migrations.AlterUniqueTogether(
+            name='attorneyorganizationassociation',
+            unique_together=set([('attorney', 'attorney_organization', 'docket')]),
         ),
         migrations.AlterUniqueTogether(
             name='attorney',

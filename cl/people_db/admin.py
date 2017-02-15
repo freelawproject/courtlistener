@@ -4,8 +4,8 @@ from django.contrib import admin
 from cl.people_db.models import (
     Education, School, Person, Position, RetentionEvent, Race,
     PoliticalAffiliation, Source, ABARating, PartyType,
-    Party, Role, Attorney, AttorneyOrganization
-)
+    Party, Role, Attorney, AttorneyOrganization,
+    AttorneyOrganizationAssociation)
 
 
 class RetentionEventInline(admin.TabularInline):
@@ -173,6 +173,21 @@ class AttorneyAdmin(admin.ModelAdmin):
     )
     search_fields = (
         'name',
+    )
+
+
+@admin.register(AttorneyOrganizationAssociation)
+class AttorneyOrgAssAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'attorney',
+        'attorney_organization',
+        'docket',
+    )
+    list_display = (
+        '__unicode__',
+        'attorney',
+        'docket',
+        'attorney_organization',
     )
 
 

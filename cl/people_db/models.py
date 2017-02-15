@@ -1272,7 +1272,7 @@ class Role(models.Model):
     DISBARRED = 9
     ATTORNEY_ROLES = (
         (ATTORNEY_TO_BE_NOTICED, "Attorney to be noticed"),
-        (ATTORNEY_LEAD, "Lead Attorney"),
+        (ATTORNEY_LEAD, "Lead attorney"),
         (ATTORNEY_IN_SEALED_GROUP, "Attorney in sealed group"),
         (PRO_HAC_VICE, "Pro hac vice"),
         (SELF_TERMINATED, "Self-terminated"),
@@ -1289,10 +1289,20 @@ class Role(models.Model):
         "Attorney",
         related_name="roles",
     )
+    docket = models.ForeignKey(
+        "search.Docket",
+        help_text="The attorney represented the party on this docket in this "
+                  "role.",
+    )
     role = models.SmallIntegerField(
         help_text="The name of the attorney's role.",
         choices=ATTORNEY_ROLES,
         db_index=True,
+    )
+    date_action = models.DateField(
+        help_text="The date the attorney was disbarred, suspended, "
+                  "terminated...",
+        null=True,
     )
 
     class Meta:
@@ -1328,6 +1338,7 @@ class Attorney(models.Model):
         'AttorneyOrganization',
         help_text="The organizations that the attorney is affiliated with",
         related_name="attorneys",
+        through="AttorneyOrganizationAssociation",
     )
     name = models.TextField(
         help_text="The name of the attorney.",
@@ -1352,6 +1363,40 @@ class Attorney(models.Model):
 
     def __unicode__(self):
         return u'%s: %s' % (self.pk, self.name)
+
+
+class AttorneyOrganizationAssociation(models.Model):
+    """A through table linking an attorneys with organizations.
+
+    E.g: "This attorney worked at this organization on this case."
+
+    This way, we when we know that an attorney worked at four different firms,
+    we also know what they did while there.
+    """
+    attorney = models.ForeignKey(
+        Attorney,
+        related_name="attorney_organization_associations",
+    )
+    attorney_organization = models.ForeignKey(
+        "AttorneyOrganization",
+        related_name="attorney_organization_associations",
+    )
+    docket = models.ForeignKey(
+        "search.Docket",
+        help_text="The docket that the attorney worked on while at this "
+                  "organization.",
+    )
+
+    class Meta:
+        unique_together = ('attorney', 'attorney_organization', 'docket')
+
+    def __unicode__(self):
+        return u'%s: Atty %s worked on docket %s while at org %s' % (
+            self.pk,
+            self.attorney_id,
+            self.docket_id,
+            self.attorney_organization_id,
+        )
 
 
 class AttorneyOrganization(models.Model):

@@ -26,7 +26,7 @@ from cl.lib.recap_utils import (
 from cl.scrapers.tasks import get_page_count
 from cl.search.models import Court, Docket, RECAPDocument, DocketEntry
 from cl.people_db.models import Role, Party, AttorneyOrganization, PartyType, \
-    Attorney
+    Attorney, AttorneyOrganizationAssociation
 
 logger = logging.getLogger(__name__)
 
@@ -401,7 +401,11 @@ class PacerXMLParser(object):
 
                         # Add the attorney to the organization
                         if not debug:
-                            atty.organizations.add(org)
+                            AttorneyOrganizationAssociation.objects.get_or_create(
+                                attorney=atty,
+                                attorney_organization=org,
+                                docket=docket,
+                            )
 
                     atty_info_is_newer = (atty.date_sourced <= newest_docket_date)
                     if atty_info and atty_info_is_newer:
@@ -425,9 +429,11 @@ class PacerXMLParser(object):
                                     atty_roles))
                 if not debug:
                     # Delete the old roles, replace with new.
-                    Role.objects.filter(attorney=atty, party=party).delete()
+                    Role.objects.filter(attorney=atty, party=party,
+                                        docket=docket).delete()
                     Role.objects.bulk_create([
-                        Role(role=atty_role, attorney=atty, party=party) for
+                        Role(attorney=atty, party=party, docket=docket,
+                             **atty_role) for
                         atty_role in atty_roles
                     ])
 
@@ -575,33 +581,42 @@ def normalize_party_types(t):
 
 def normalize_attorney_role(r):
     """Normalize attorney roles into the valid set"""
-    r = r.lower()
+    role = {'role': None, 'date_action': None}
 
+    r = r.lower()
     # Bad values we can expect. Nuke these early so they don't cause problems.
     if any([r.startswith(u'bar status'),
             r.startswith(u'designation')]):
-        return None
+        return role
 
     if u'to be noticed' in r:
-        return Role.ATTORNEY_TO_BE_NOTICED
+        role['role'] = Role.ATTORNEY_TO_BE_NOTICED
     elif u'lead attorney' in r:
-        return Role.ATTORNEY_LEAD
+        role['role'] = Role.ATTORNEY_LEAD
     elif u'sealed group' in r:
-        return Role.ATTORNEY_IN_SEALED_GROUP
+        role['role'] = Role.ATTORNEY_IN_SEALED_GROUP
     elif u'pro hac vice' in r:
-        return Role.PRO_HAC_VICE
+        role['role'] = Role.PRO_HAC_VICE
     elif u'self- terminated' in r:
-        return Role.SELF_TERMINATED
+        role['role'] = Role.SELF_TERMINATED
     elif u'terminated' in r:
-        return Role.TERMINATED
+        role['role'] = Role.TERMINATED
     elif u'suspended' in r:
-        return Role.SUSPENDED
+        role['role'] = Role.SUSPENDED
     elif u'inactive' in r:
-        return Role.INACTIVE
+        role['role'] = Role.INACTIVE
     elif u'disbarred' in r:
-        return Role.DISBARRED
+        role['role'] = Role.DISBARRED
 
-    raise ValueError(u"Unable to match role: %s" % r)
+    try:
+        role['date_action'] = parser.parse(r, fuzzy=True).date()
+    except ValueError:
+        role['date_action'] = None
+
+    if role['role'] is None:
+        raise ValueError(u"Unable to match role: %s" % r)
+    else:
+        return role
 
 
 def normalize_us_state(state):
