@@ -422,9 +422,15 @@ class PacerXMLParser(object):
                 atty_roles = [normalize_attorney_role(r) for r in
                               atty_roles.split('\n') if r]
                 atty_roles = [r for r in atty_roles if r['role'] is not None]
-                logger.info("Linking attorney '%s' to party '%s' via %s roles: "
-                            "%s" % (atty_name, party_name, len(atty_roles),
-                                    atty_roles))
+                if len(atty_roles) > 0:
+                    logger.info("Linking attorney '%s' to party '%s' via %s "
+                                "roles: %s" % (atty_name, party_name,
+                                               len(atty_roles), atty_roles))
+                else:
+                    logger.info("No role data parsed. Linking via 'UNKNOWN' "
+                                "role.")
+                    atty_roles = [{'role': Role.UNKNOWN, 'date_action': None}]
+
                 if not debug:
                     # Delete the old roles, replace with new.
                     Role.objects.filter(attorney=atty, party=party,
@@ -631,8 +637,14 @@ def normalize_us_state(state):
     return STATES_NORMALIZED[state.lower()]
 
 
-def make_lookup_key(address_info):
-    """Strip anything that's not a character or number"""
+def make_address_lookup_key(address_info):
+    """Make a key for looking up normalized addresses in the DB
+
+     - Sort the fields alphabetically
+     - Strip anything that's not a character or number
+     - Remove/normalize a variety of words that add little meaning and are often
+       omitted.
+    """
     sorted_info = OrderedDict(sorted(address_info.items()))
     fixes = {
         r'atty.': '',
@@ -797,5 +809,5 @@ def normalize_attorney_contact(c, fallback_name=''):
         address_info['state'] = normalize_us_state(address_info['state'])
 
     address_info = normalize_address_info(dict(address_info))
-    address_info['lookup_key'] = make_lookup_key(address_info)
+    address_info['lookup_key'] = make_address_lookup_key(address_info)
     return address_info, atty_info

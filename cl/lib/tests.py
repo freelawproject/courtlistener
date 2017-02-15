@@ -12,7 +12,7 @@ from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.pacer import normalize_party_types, normalize_attorney_role, \
-    normalize_attorney_contact, normalize_us_state, make_lookup_key
+    normalize_attorney_contact, normalize_us_state, make_address_lookup_key
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import trunc
 from cl.people_db.models import Role
@@ -489,7 +489,7 @@ class TestPACERPartyParsing(TestCase):
 
     def test_making_a_lookup_key(self):
         self.assertEqual(
-            make_lookup_key({
+            make_address_lookup_key({
                 'address1': u'400 Poydras St.',
                 'address2': u'Suite 1200',
                 'city': u'New Orleans',
@@ -500,7 +500,7 @@ class TestPACERPartyParsing(TestCase):
             '400poydrasstsuite1200neworleansduncansevinllcla70130',
         )
         self.assertEqual(
-            make_lookup_key({
+            make_address_lookup_key({
                 'name': 'Offices of Lissner AND Strook & Levin, LLP',
             }),
             'officeoflissnerstrooklevin',

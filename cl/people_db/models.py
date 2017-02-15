@@ -1270,6 +1270,7 @@ class Role(models.Model):
     SUSPENDED = 7
     INACTIVE = 8
     DISBARRED = 9
+    UNKNOWN = 10
     ATTORNEY_ROLES = (
         (ATTORNEY_TO_BE_NOTICED, "Attorney to be noticed"),
         (ATTORNEY_LEAD, "Lead attorney"),
@@ -1280,6 +1281,7 @@ class Role(models.Model):
         (SUSPENDED, "Suspended"),
         (INACTIVE, "Inactive"),
         (DISBARRED, "Disbarred"),
+        (UNKNOWN, "Unknown"),
     )
     party = models.ForeignKey(
         Party,
