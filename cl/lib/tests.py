@@ -479,6 +479,24 @@ class TestPACERPartyParsing(TestCase):
                 'email': u'darden@carverdarden.com',
                 'fax': u'',
             })
+        }, {
+            # Missing zip code, phone number ambiguously used instead.
+            'q': """NSB - Department of Law
+                    POB 69
+                    Barrow, AK 907-852-0300
+                """,
+            'a': ({
+                'name': u'NSB Department of Law',
+                'address1': u'Pob 69',
+                'city': u'Barrow',
+                'state': u'AK',
+                'zip_code': u'',
+                'lookup_key': u'pob69barrownsbdepartmentoflawak',
+            }, {
+                'phone': u'',
+                'fax': u'',
+                'email': u'',
+            })
         }]
         for i, pair in enumerate(pairs):
             print "Normalizing address %s..." % i,

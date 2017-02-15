@@ -668,22 +668,20 @@ def make_address_lookup_key(address_info):
 
 
 def normalize_address_info(address_info):
-    """Normalize various street address abbreviations
+    """Normalize various address components"""
 
-     - Titlecase where appropriate
-     - Normalize street abbreviations (St --> Street, etc.)
-    """
-    fixes = OrderedDict((
-        ('Street', 'St.'),
-        ('Avenue', 'Ave.'),
-        ('Boulevard', 'Blvd.'),
-    ))
-
+    # Titlecase where appropriate
     for k, v in address_info.items():
         if k == 'state':
             continue
         address_info[k] = titlecase(v)
 
+    # Normalize street abbreviations (St --> Street, etc.)
+    fixes = OrderedDict((
+        ('Street', 'St.'),
+        ('Avenue', 'Ave.'),
+        ('Boulevard', 'Blvd.'),
+    ))
     for address_part in ['address1', 'address2']:
         a = address_info.get(address_part)
         if not a:
@@ -693,6 +691,12 @@ def normalize_address_info(address_info):
             a = re.sub(r'\b%s\b' % bad, good, a, flags=re.IGNORECASE)
 
         address_info[address_part] = a
+
+    # Nuke any zip code that's longer than allowed in the DB (usually caused by
+    # phone numbers)
+    zip_code_field = AttorneyOrganization._meta.get_field('zip_code')
+    if len(address_info['zip_code']) > zip_code_field.max_length:
+        address_info['zip_code'] = ''
     return address_info
 
 
