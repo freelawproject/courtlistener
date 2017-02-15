@@ -338,17 +338,15 @@ class PacerXMLParser(object):
                 atty_name = self.get_str_from_node(atty_node, 'attorney_name')
                 logger.info("Adding attorney: '%s'" % atty_name)
                 atty_contact_raw = self.get_str_from_node(atty_node, 'contact')
+                if 'see above' in atty_contact_raw.lower():
+                    logger.info("Got 'see above' entry for atty_contact_raw.")
+                    atty_contact_raw = ''
                 atty_roles = self.get_str_from_node(atty_node, 'attorney_role')
 
                 # Try to look up the atty object from an earlier iteration.
                 try:
                     atty, atty_org_info, atty_info = atty_obj_cache[atty_name]
                 except KeyError:
-                    if 'see above' in atty_contact_raw.lower():
-                        logger.info("Unable to get atty with 'see above' "
-                                    "contact information.")
-                        atty_contact_raw = ''
-
                     # New attorney for this docket. Look them up in DB or
                     # create new attorney if necessary.
                     atty_org_info, atty_info = normalize_attorney_contact(
@@ -423,7 +421,7 @@ class PacerXMLParser(object):
 
                 atty_roles = [normalize_attorney_role(r) for r in
                               atty_roles.split('\n') if r]
-                atty_roles = [r for r in atty_roles if r]
+                atty_roles = [r for r in atty_roles if r['role'] is not None]
                 logger.info("Linking attorney '%s' to party '%s' via %s roles: "
                             "%s" % (atty_name, party_name, len(atty_roles),
                                     atty_roles))
