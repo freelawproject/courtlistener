@@ -12,6 +12,8 @@ from cl.corpus_importer.lawbox.judge_extractor import get_judge_from_str, \
     REASONS
 from cl.lib.pacer import PacerXMLParser
 from cl.people_db.import_judges.populate_fjc_judges import get_fed_court_object
+from cl.people_db.models import Attorney, AttorneyOrganization, Party
+from cl.search.models import Docket
 
 
 class JudgeExtractionTest(TestCase):
@@ -471,7 +473,10 @@ class PacerDocketParserTest(TestCase):
         self.docket = self.pacer_doc.save(debug=False)
 
     def tearDown(self):
-        self.docket.delete()
+        Docket.objects.all().delete()
+        Party.objects.all().delete()
+        Attorney.objects.all().delete()
+        AttorneyOrganization.objects.all().delete()
 
     def test_party_parsing(self):
         """Can we parse an XML docket and get good results in the DB"""

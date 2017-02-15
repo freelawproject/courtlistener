@@ -1308,7 +1308,7 @@ class Role(models.Model):
     )
 
     class Meta:
-        unique_together = ('party', 'attorney', 'role')
+        unique_together = ('party', 'attorney', 'role', 'docket')
 
     def __unicode__(self):
         return u'%s: Attorney %s is %s for Party %s' % (
