@@ -150,11 +150,19 @@ class PartyAdmin(admin.ModelAdmin):
 
 @admin.register(PartyType)
 class PartyTypeAdmin(admin.ModelAdmin):
-    raw_id_fields = ('party',)
+    raw_id_fields = (
+        'party',
+        'docket',
+    )
 
 
 @admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'party',
+        'attorney',
+        'docket',
+    )
     list_filter = (
         'role',
     )
