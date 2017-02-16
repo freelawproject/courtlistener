@@ -291,14 +291,6 @@ class PacerXMLParser(object):
     def make_parties(self, docket, debug):
         """Pull out the parties and their attorneys and save them to the DB."""
         atty_obj_cache = {}
-
-        # Get the most recent date on the docket, casting datetimes
-        # if needed. We'll use this to have the most updated attorney info.
-        newest_docket_date = max(
-            [d for d in [docket.date_filed,
-                         docket.date_terminated,
-                         docket.date_last_filing] if d],
-        )
         for party_node in self.party_list:
             party_name = self.get_str_from_node(party_node, 'name')
             party_type = self.get_str_from_node(party_node, 'type')
@@ -332,116 +324,124 @@ class PacerXMLParser(object):
                 if not debug:
                     pt.save()
 
-            atty_nodes = party_node.xpath('.//attorney_list/attorney')
-            logger.info("Adding %s attorneys to the party." % len(atty_nodes))
-            for atty_node in atty_nodes:
-                atty_name = self.get_str_from_node(atty_node, 'attorney_name')
-                logger.info("Adding attorney: '%s'" % atty_name)
-                atty_contact_raw = self.get_str_from_node(atty_node, 'contact')
-                if 'see above' in atty_contact_raw.lower():
-                    logger.info("Got 'see above' entry for atty_contact_raw.")
-                    atty_contact_raw = ''
-                atty_roles = self.get_str_from_node(atty_node, 'attorney_role')
+            self.add_attorneys(docket, party_node, party, atty_obj_cache, debug)
 
-                # Try to look up the atty object from an earlier iteration.
+    def add_attorneys(self, docket, party_node, party, atty_obj_cache, debug):
+        # Get the most recent date on the docket. We'll use this to have the
+        # most updated attorney info.
+        newest_docket_date = max(
+            [d for d in [docket.date_filed,
+                         docket.date_terminated,
+                         docket.date_last_filing] if d],
+        )
+        atty_nodes = party_node.xpath('.//attorney_list/attorney')
+        logger.info("Adding %s attorneys to the party." % len(atty_nodes))
+        for atty_node in atty_nodes:
+            atty_name = self.get_str_from_node(atty_node, 'attorney_name')
+            logger.info("Adding attorney: '%s'" % atty_name)
+            atty_contact_raw = self.get_str_from_node(atty_node, 'contact')
+            if 'see above' in atty_contact_raw.lower():
+                logger.info("Got 'see above' entry for atty_contact_raw.")
+                atty_contact_raw = ''
+            atty_roles = self.get_str_from_node(atty_node, 'attorney_role')
+
+            # Try to look up the atty object from an earlier iteration.
+            try:
+                atty, atty_org_info, atty_info = atty_obj_cache[atty_name]
+            except KeyError:
+                # New attorney for this docket. Look them up in DB or create new
+                # attorney if necessary.
+                atty_org_info, atty_info = normalize_attorney_contact(
+                    atty_contact_raw, fallback_name=atty_name)
                 try:
-                    atty, atty_org_info, atty_info = atty_obj_cache[atty_name]
-                except KeyError:
-                    # New attorney for this docket. Look them up in DB or
-                    # create new attorney if necessary.
-                    atty_org_info, atty_info = normalize_attorney_contact(
-                        atty_contact_raw, fallback_name=atty_name)
+                    logger.info("Didn't find attorney in cache, attempting "
+                                "lookup in the DB.")
+                    # Find an atty with the same name and one of another several
+                    # IDs. Important to add contact_raw here, b/c if it cannot
+                    # be parsed, all other values are blank.
+                    q = Q()
+                    fields = [
+                        ('phone', atty_info['phone']),
+                        ('fax', atty_info['fax']),
+                        ('email', atty_info['email']),
+                        ('contact_raw', atty_contact_raw),
+                        ('organizations__lookup_key',
+                         atty_org_info.get('lookup_key')),
+                    ]
+                    for field, lookup in fields:
+                        if lookup:
+                            q |= Q(**{field: lookup})
+                    atty = Attorney.objects.get(Q(name=atty_name) & q)
+                except Attorney.DoesNotExist:
+                    logger.info("Unable to find matching attorney. Creating a "
+                                "new one: %s" % atty_name)
+                    atty = Attorney(name=atty_name,
+                                    date_sourced=newest_docket_date,
+                                    contact_raw=atty_contact_raw)
+                    if not debug:
+                        atty.save()
+                except Attorney.MultipleObjectsReturned:
+                    logger.warn("Got too many results for attorney: '%s' "
+                                "Punting." % atty_name)
+                    continue
+
+                # Cache the atty object and info for "See above" entries.
+                atty_obj_cache[atty_name] = (atty, atty_org_info, atty_info)
+
+            if atty_contact_raw:
+                if atty_org_info:
+                    logger.info("Adding organization information to "
+                                "'%s': %s" % (atty_name, atty_org_info))
                     try:
-                        logger.info("Didn't find attorney in cache, attempting "
-                                    "lookup in the DB.")
-                        # Find an atty with the same name and one of another
-                        # several IDs. Important to add contact_raw here, b/c
-                        # if it cannot be parsed, all other values are blank.
-                        q = Q()
-                        fields = [
-                            ('phone', atty_info['phone']),
-                            ('fax', atty_info['fax']),
-                            ('email', atty_info['email']),
-                            ('contact_raw', atty_contact_raw),
-                            ('organizations__lookup_key',
-                             atty_org_info.get('lookup_key')),
-                        ]
-                        for field, lookup in fields:
-                            if lookup:
-                                q |= Q(**{field: lookup})
-                        atty = Attorney.objects.get(Q(name=atty_name) & q)
-                    except Attorney.DoesNotExist:
-                        logger.info("Unable to find matching attorney. "
-                                    "Creating a new one: %s" % atty_name)
-                        atty = Attorney(name=atty_name,
-                                        date_sourced=newest_docket_date,
-                                        contact_raw=atty_contact_raw)
+                        org = AttorneyOrganization.objects.get(
+                            lookup_key=atty_org_info['lookup_key'],
+                        )
+                    except AttorneyOrganization.DoesNotExist:
+                        org = AttorneyOrganization(**atty_org_info)
                         if not debug:
-                            atty.save()
-                    except Attorney.MultipleObjectsReturned:
-                        logger.warn("Got too many results for attorney: '%s' "
-                                    "Punting." % atty_name)
-                        continue
+                            org.save()
 
-                    # Cache the atty object and info for "See above" entries.
-                    atty_obj_cache[atty_name] = (atty, atty_org_info, atty_info)
+                    # Add the attorney to the organization
+                    if not debug:
+                        AttorneyOrganizationAssociation.objects.get_or_create(
+                            attorney=atty,
+                            attorney_organization=org,
+                            docket=docket,
+                        )
 
-                if atty_contact_raw:
-                    if atty_org_info:
-                        logger.info("Adding organization information to "
-                                    "'%s': %s" % (atty_name, atty_org_info))
-                        try:
-                            org = AttorneyOrganization.objects.get(
-                                lookup_key=atty_org_info['lookup_key'],
-                            )
-                        except AttorneyOrganization.DoesNotExist:
-                            org = AttorneyOrganization(**atty_org_info)
-                            if not debug:
-                                org.save()
+                atty_info_is_newer = (atty.date_sourced <= newest_docket_date)
+                if atty_info and atty_info_is_newer:
+                    logger.info("Updating atty info because %s is more recent "
+                                "than %s." % (newest_docket_date,
+                                              atty.date_sourced))
+                    atty.date_sourced = newest_docket_date
+                    atty.contact_raw = atty_contact_raw
+                    atty.email = atty_info['email']
+                    atty.phone = atty_info['phone']
+                    atty.fax = atty_info['fax']
+                    if not debug:
+                        atty.save()
 
-                        # Add the attorney to the organization
-                        if not debug:
-                            AttorneyOrganizationAssociation.objects.get_or_create(
-                                attorney=atty,
-                                attorney_organization=org,
-                                docket=docket,
-                            )
+            atty_roles = [normalize_attorney_role(r) for r in
+                          atty_roles.split('\n') if r]
+            atty_roles = [r for r in atty_roles if r['role'] is not None]
+            if len(atty_roles) > 0:
+                logger.info("Linking attorney '%s' to party '%s' via %s "
+                            "roles: %s" % (atty_name, party.name,
+                                           len(atty_roles), atty_roles))
+            else:
+                logger.info("No role data parsed. Linking via 'UNKNOWN' role.")
+                atty_roles = [{'role': Role.UNKNOWN, 'date_action': None}]
 
-                    atty_info_is_newer = (atty.date_sourced <= newest_docket_date)
-                    if atty_info and atty_info_is_newer:
-                        logger.info("Updating atty info because %s is more "
-                                    "recent than %s." % (newest_docket_date,
-                                                         atty.date_sourced))
-                        atty.date_sourced = newest_docket_date
-                        atty.contact_raw = atty_contact_raw
-                        atty.email = atty_info['email']
-                        atty.phone = atty_info['phone']
-                        atty.fax = atty_info['fax']
-
-                        if not debug:
-                            atty.save()
-
-                atty_roles = [normalize_attorney_role(r) for r in
-                              atty_roles.split('\n') if r]
-                atty_roles = [r for r in atty_roles if r['role'] is not None]
-                if len(atty_roles) > 0:
-                    logger.info("Linking attorney '%s' to party '%s' via %s "
-                                "roles: %s" % (atty_name, party_name,
-                                               len(atty_roles), atty_roles))
-                else:
-                    logger.info("No role data parsed. Linking via 'UNKNOWN' "
-                                "role.")
-                    atty_roles = [{'role': Role.UNKNOWN, 'date_action': None}]
-
-                if not debug:
-                    # Delete the old roles, replace with new.
-                    Role.objects.filter(attorney=atty, party=party,
-                                        docket=docket).delete()
-                    Role.objects.bulk_create([
-                        Role(attorney=atty, party=party, docket=docket,
-                             **atty_role) for
-                        atty_role in atty_roles
-                    ])
+            if not debug:
+                # Delete the old roles, replace with new.
+                Role.objects.filter(attorney=atty, party=party,
+                                    docket=docket).delete()
+                Role.objects.bulk_create([
+                    Role(attorney=atty, party=party, docket=docket,
+                         **atty_role) for
+                    atty_role in atty_roles
+                ])
 
     def get_court(self):
         """Extract the court from the XML and return it as a Court object"""
