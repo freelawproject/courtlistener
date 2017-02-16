@@ -352,6 +352,8 @@ class PacerXMLParser(object):
                     atty_org_info, atty_info = normalize_attorney_contact(
                         atty_contact_raw, fallback_name=atty_name)
                     try:
+                        logger.info("Didn't find attorney in cache, attempting "
+                                    "lookup in the DB.")
                         # Find an atty with the same name and one of another
                         # several IDs. Important to add contact_raw here, b/c
                         # if it cannot be parsed, all other values are blank.
