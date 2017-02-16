@@ -695,7 +695,7 @@ def normalize_address_info(address_info):
     # Nuke any zip code that's longer than allowed in the DB (usually caused by
     # phone numbers)
     zip_code_field = AttorneyOrganization._meta.get_field('zip_code')
-    if len(address_info['zip_code']) > zip_code_field.max_length:
+    if len(address_info.get('zip_code', '')) > zip_code_field.max_length:
         address_info['zip_code'] = ''
     return address_info
 
@@ -726,7 +726,7 @@ def normalize_attorney_contact(c, fallback_name=''):
     lines = c.split('\n')
     for i, line in enumerate(lines):
         line = re.sub('Email:\s*', '', line).strip()
-        line = re.sub('pro se', '', line, re.I)
+        line = re.sub('pro se', '', line, flags=re.I)
         if not line:
             continue
         try:
