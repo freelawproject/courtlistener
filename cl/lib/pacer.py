@@ -647,7 +647,12 @@ def normalize_us_state(state):
     abbreviations = [t[0] for t in USPS_CHOICES]
     if state in abbreviations:
         return state
-    return STATES_NORMALIZED[state.lower()]
+
+    try:
+        state = STATES_NORMALIZED[state.lower()]
+    except KeyError:
+        state = ''
+    return state
 
 
 def make_address_lookup_key(address_info):

@@ -497,6 +497,27 @@ class TestPACERPartyParsing(TestCase):
                 'fax': u'',
                 'email': u'',
             })
+        }, {
+            # Unknown/invalid state.
+            'q': """Kessler Topaz Meltzer Check LLP
+                    280 King of Prussia Road
+                    Radnor, OA 19087
+                    (610) 667-7706
+                    Fax: (610) 667-7056
+                    Email: jneumann@ktmc.com
+                """,
+            'a': ({
+                'name': u'Kessler Topaz Meltzer Check LLP',
+                'city': u'Radnor',
+                'address1': u'280 King of Prussia Road',
+                'lookup_key': u'280kingofprussiaroadradnorkesslertopazmeltzercheck19087',
+                'state': u'',
+                'zip_code': u'19087'
+            }, {
+                'phone': u'610667-7706',
+                'fax': u'610667-7056',
+                'email': u'jneumann@ktmc.com'
+            })
         }]
         for i, pair in enumerate(pairs):
             print "Normalizing address %s..." % i,
