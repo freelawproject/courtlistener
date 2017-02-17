@@ -823,7 +823,7 @@ def normalize_attorney_contact(c, fallback_name=''):
         return {}, atty_info
 
     # We don't want this getting through to the database layer. Pop it.
-    address_info.pop('NotAddress')
+    address_info.pop('NotAddress', None)
 
     if any([address_type == 'Ambiguous',
             'CountryName' in address_info]):
