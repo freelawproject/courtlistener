@@ -524,6 +524,21 @@ class RECAPDocument(models.Model):
             # http://stackoverflow.com/a/3124586/64911
             self.pacer_doc_id = None
 
+        if self.attachment_number is None:
+            # Validate that we don't already have such an entry. This is needed
+            # because None values in SQL are all considered different.
+            exists = RECAPDocument.objects.exclude(pk=self.pk).filter(
+                document_number=self.document_number,
+                attachment_number=self.attachment_number,
+                docket_entry=self.docket_entry,
+            ).exists()
+            if exists:
+                raise ValidationError(
+                    "Duplicate values violate save constraint. An object with "
+                    "this document_number and docket_entry already exists: "
+                    "(%s, %s)" % (self.document_number, self.docket_entry_id)
+                )
+
         super(RECAPDocument, self).save(*args, **kwargs)
         tasks = []
         if do_extraction and self.needs_extraction:

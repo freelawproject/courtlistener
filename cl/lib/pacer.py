@@ -245,13 +245,13 @@ class PacerXMLParser(object):
             d = RECAPDocument(
                 docket_entry=docket_entry,
                 pacer_doc_id=pacer_document_id,
+                document_number=entry_number,
             )
         else:
             d.pacer_doc_id = pacer_document_id or d.pacer_doc_id
 
         d.date_upload = self.get_datetime_from_node(doc_node, 'upload_date')
         d.document_type = document_type or d.document_type
-        d.document_number = entry_number
 
         # If we can't parse the availability node (it returns None), default it
         # to False.
