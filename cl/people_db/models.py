@@ -1313,9 +1313,9 @@ class Role(models.Model):
     def __unicode__(self):
         return u'%s: Attorney %s is %s for Party %s' % (
             self.pk,
-            self.party_id,
-            self.get_role_display(),
             self.attorney_id,
+            self.get_role_display(),
+            self.party_id,
         )
 
 

@@ -343,12 +343,22 @@ class PacerXMLParser(object):
             if 'see above' in atty_contact_raw.lower():
                 logger.info("Got 'see above' entry for atty_contact_raw.")
                 atty_contact_raw = ''
-            atty_roles = self.get_str_from_node(atty_node, 'attorney_role')
+                try:
+                    atty, atty_org_info, atty_info = atty_obj_cache[atty_name]
+                except KeyError:
+                    logger.warn("Unable to lookup 'see above' entry. "
+                                "Creating/using atty with no contact info.")
+                    try:
+                        atty = Attorney.objects.get(name=atty_name,
+                                                    contact_raw=atty_contact_raw)
+                    except Attorney.DoesNotExist:
+                        atty = Attorney(name=atty_name,
+                                        date_sourced=newest_docket_date,
+                                        contact_raw=atty_contact_raw)
+                        if not debug:
+                            atty.save()
 
-            # Try to look up the atty object from an earlier iteration.
-            try:
-                atty, atty_org_info, atty_info = atty_obj_cache[atty_name]
-            except KeyError:
+            else:
                 # New attorney for this docket. Look them up in DB or create new
                 # attorney if necessary.
                 atty_org_info, atty_info = normalize_attorney_contact(
@@ -422,8 +432,9 @@ class PacerXMLParser(object):
                     if not debug:
                         atty.save()
 
+            atty_role_str = self.get_str_from_node(atty_node, 'attorney_role')
             atty_roles = [normalize_attorney_role(r) for r in
-                          atty_roles.split('\n') if r]
+                          atty_role_str.split('\n') if r]
             atty_roles = [r for r in atty_roles if r['role'] is not None]
             if len(atty_roles) > 0:
                 logger.info("Linking attorney '%s' to party '%s' via %s "
