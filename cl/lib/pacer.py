@@ -818,6 +818,7 @@ def normalize_attorney_contact(c, fallback_name=''):
         'PlaceName': 'city',
         'StateName': 'state',
         'ZipCode': 'zip_code',
+        'ZipPlus4': 'zip_code',
     }
     try:
         address_info, address_type = usaddress.tag(
