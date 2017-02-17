@@ -10,14 +10,11 @@
                 <div class="cursor v-offset-below-2"
                      data-toggle="modal"
                      data-target="#court-picker">
-                    <label class="bottom cursor">
-                        Select Jurisdictions <i
-                            class="gray fa fa-external-link"></i>
-                    </label>
-
-                    <p class="top"><span
-                            id="jurisdiction-count">{{ court_count_human }}</span>
-                        Jurisdictions Selected</p>
+                    <a href="#" class="btn btn-primary btn-lg" type="button">
+                        Select Jurisdictions
+                        <span id="jurisdiction-count"
+                              class="badge">{{ court_count_human|default:"" }}</span>
+                    </a>
                 </div>
 
                 {% include "includes/order_by_dropdown.html" %}

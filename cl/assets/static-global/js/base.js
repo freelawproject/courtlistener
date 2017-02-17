@@ -116,16 +116,6 @@ $(document).ready(function() {
         // advanced search page.
         $('#jurisdiction-count').text($(this).find('input:checked').length);
         $('#court-picker').modal('hide');
-        $('#jurisdiction-count').css({
-            'background-color': 'yellow',
-            'font-weight': 'bold'
-        });
-        setTimeout(function () {
-            $('#jurisdiction-count').css({
-                'background-color': 'transparent',
-                'font-weight': 'normal'
-            });
-        }, 1500);
     });
 
 

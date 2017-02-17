@@ -187,7 +187,7 @@ def merge_form_with_courts(courts, search_form):
     all_facets_selected = all(checked_statuses)
     court_count = len([status for status in checked_statuses if status is True])
     court_count_human = court_count
-    if no_facets_selected or all_facets_selected:
+    if all_facets_selected:
         court_count_human = 'All'
 
     for field in search_form:
