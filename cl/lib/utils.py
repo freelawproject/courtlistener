@@ -78,3 +78,11 @@ def is_iter(item):
     if isinstance(item, collections.Iterable):
         return True
     return False
+
+
+def remove_duplicate_dicts(l):
+    """Given a list of dicts, remove any that are the same.
+
+    See: http://stackoverflow.com/a/9427216/64911
+    """
+    return [dict(t) for t in set([tuple(d.items()) for d in l])]

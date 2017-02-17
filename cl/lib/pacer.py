@@ -23,6 +23,7 @@ from cl.lib.recap_utils import (
     get_docketxml_url_from_path, get_ia_document_url_from_path,
     get_local_document_url_from_path,
 )
+from cl.lib.utils import remove_duplicate_dicts
 from cl.scrapers.tasks import get_page_count
 from cl.search.models import Court, Docket, RECAPDocument, DocketEntry
 from cl.people_db.models import Role, Party, AttorneyOrganization, PartyType, \
@@ -436,6 +437,7 @@ class PacerXMLParser(object):
             atty_roles = [normalize_attorney_role(r) for r in
                           atty_role_str.split('\n') if r]
             atty_roles = [r for r in atty_roles if r['role'] is not None]
+            atty_roles = remove_duplicate_dicts(atty_roles)
             if len(atty_roles) > 0:
                 logger.info("Linking attorney '%s' to party '%s' via %s "
                             "roles: %s" % (atty_name, party.name,
