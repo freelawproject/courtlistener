@@ -822,6 +822,9 @@ def normalize_attorney_contact(c, fallback_name=''):
                     ', '.join(c.split('\n')))
         return {}, atty_info
 
+    # We don't want this getting through to the database layer. Pop it.
+    address_info.pop('NotAddress')
+
     if any([address_type == 'Ambiguous',
             'CountryName' in address_info]):
         logger.warn("Unable to parse address (Ambiguous address type): %s" %
