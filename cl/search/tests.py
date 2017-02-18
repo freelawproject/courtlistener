@@ -817,9 +817,6 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.assertNotIn('(0)', prec_count.text)
         self.assertNotIn('(0)', non_prec_count.text)
 
-        # Even though she notices all jurisdictions were included in her search
-        self.assert_text_in_body('All Jurisdictions Selected')
-
         # But she also notices the option to select and include
         # non_precedential results. She checks the box.
         non_prec.click()
