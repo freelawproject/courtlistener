@@ -1,4 +1,3 @@
-am => american,america
 ann => annotated,annual
 app => appellate,appendix,appendicies
 comm => committee,communications
