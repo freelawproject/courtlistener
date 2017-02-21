@@ -67,5 +67,7 @@ def parse_recap_docket(self, filename, debug=False):
                 recap_pks = pacer_doc.make_documents(docket, debug=debug)
             except (IntegrityError, DocketEntry.MultipleObjectsReturned) as exc:
                 raise self.retry(exc=exc, countdown=20 * 60)
+            else:
+                pacer_doc.make_parties(docket, debug=debug)
 
     return recap_pks
