@@ -388,19 +388,18 @@ class Command(BaseCommand):
                 # Court
                 'docket_entry__docket__court__full_name',
                 'docket_entry__docket__court__citation_string',
+
+                # Party, attorney, firm
+                'docket_entry__docket__parties',
+                'docket_entry__docket__parties__attorneys',
+                'docket_entry__docket__parties__attorneys__organizations',
             )
             count = q.count()
-            q = queryset_generator(
-                q,
-                chunksize=5000,
-            )
+            q = queryset_generator(q, chunksize=5000)
         else:
             q = self.type.objects.all()
             count = q.count()
-            q = queryset_generator(
-                q,
-                chunksize=5000,
-            )
+            q = queryset_generator(q, chunksize=5000)
         self._chunk_queryset_into_tasks(q, count)
 
     @print_timing
