@@ -661,7 +661,8 @@ class RECAPDocument(models.Model):
             'firm_id': set(),
             'firm': set(),
         })
-        for p in self.docket_entry.docket.parties.all():
+        for p in self.docket_entry.docket.parties.prefetch_related(
+                'attorneys', 'attorneys__organizations'):
             out['party_id'].add(p.pk)
             out['party'].add(p.name)
             for a in p.attorneys.all():
