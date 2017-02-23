@@ -472,11 +472,11 @@ class PacerXMLParser(object):
             s = node.xpath('%s/text()' % path)[0].strip()
             n = int(s)
         except IndexError:
-            logger.info("Couldn't get bool from path: %s" % path)
+            logger.debug("Couldn't get bool from path: %s" % path)
             return None
         except ValueError:
-            logger.info("Couldn't convert text '%s' to int when making boolean "
-                        "for path: %s" % (s, path))
+            logger.debug("Couldn't convert text '%s' to int when making boolean "
+                         "for path: %s" % (s, path))
             return None
         else:
             return bool(n)
@@ -486,7 +486,7 @@ class PacerXMLParser(object):
         try:
             s = node.xpath('%s/text()' % path)[0].strip()
         except IndexError:
-            logger.info("Couldn't get string from path: %s" % path)
+            logger.debug("Couldn't get string from path: %s" % path)
             return ''  # Return an empty string. Don't return None.
         else:
             return s
@@ -497,7 +497,7 @@ class PacerXMLParser(object):
             return int(s)
         except ValueError:
             # Can't parse string to int
-            logger.info("Couldn't get int for node %s" % node)
+            logger.debug("Couldn't get int for node %s" % node)
             raise ParsingException("Cannot extract int for node %s" % node)
 
     @staticmethod
@@ -511,13 +511,13 @@ class PacerXMLParser(object):
         try:
             s = node.xpath('%s/text()' % path)[0].strip()
         except IndexError:
-            logger.info("Couldn't get date from path: %s" % path)
+            logger.debug("Couldn't get date from path: %s" % path)
             return None
         else:
             try:
                 d = parser.parse(s)
             except ValueError:
-                logger.info("Couldn't parse date: %s" % s)
+                logger.debug("Couldn't parse date: %s" % s)
                 return None
             else:
                 d = d.replace(tzinfo=d.tzinfo or gettz('UTC'))  # Set it to UTC.
