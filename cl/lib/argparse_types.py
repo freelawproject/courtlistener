@@ -7,7 +7,7 @@ from django.utils.timezone import is_naive, make_aware, utc
 
 from cl.audio.models import Audio
 from cl.people_db.models import Person
-from cl.search.models import Opinion, RECAPDocument
+from cl.search.models import Opinion, RECAPDocument, Docket
 
 
 def valid_date(s):
@@ -47,15 +47,20 @@ def readable_dir(prospective_dir):
 
 
 def valid_obj_type(s):
-    options = ('opinions', 'audio', 'people', 'recap-documents')
-    if s.lower() == 'opinions':
+    from cl.search.management.commands.cl_update_index import VALID_OBJ_TYPES
+    s = s.lower()
+    if s not in VALID_OBJ_TYPES:
+        raise argparse.ArgumentTypeError("Unable to parse type, %s. Valid "
+                                         "options are %s" % (s, VALID_OBJ_TYPES))
+
+    if s == 'opinions':
         return Opinion
-    elif s.lower() == 'audio':
+    elif s == 'audio':
         return Audio
-    elif s.lower() == 'people':
+    elif s == 'people':
         return Person
-    elif s.lower() == 'recap':
+    elif s == 'recap':
         return RECAPDocument
-    else:
-        raise argparse.ArgumentTypeError(
-            "Unable to parse type, %s. Valid options are %s" % (s, options))
+    elif s == 'recap-dockets':
+        return Docket
+

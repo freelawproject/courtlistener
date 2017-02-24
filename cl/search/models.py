@@ -304,6 +304,117 @@ class Docket(models.Model):
             self.pacer_case_id,
         )
 
+    def as_search_list(self):
+        """Create list of search dicts from a single docket. This should be
+        faster than creating a search dict per document on the docket.
+        """
+        search_list = []
+
+        # Docket
+        out = {
+            'docketNumber': self.docket_number,
+            'caseName': best_case_name(self),
+            'suitNature': self.nature_of_suit,
+            'cause': self.cause,
+            'juryDemand': self.jury_demand,
+            'jurisdictionType': self.jurisdiction_type,
+        }
+        if self.date_argued is not None:
+            out['dateArgued'] = datetime.combine(self.date_argued, time())
+        if self.date_filed is not None:
+            out['dateFiled'] = datetime.combine(self.date_filed, time())
+        if self.date_terminated is not None:
+            out['dateTerminated'] = datetime.combine(self.date_terminated, time())
+        try:
+            out['docket_absolute_url'] = self.get_absolute_url()
+        except NoReverseMatch:
+            raise InvalidDocumentError("Unable to save to index due to missing "
+                                       "absolute_url: %s" % self.pk)
+
+        # Judges
+        if self.assigned_to is not None:
+            out['assignedTo'] = self.assigned_to.name_full
+        elif self.assigned_to_str:
+            out['assignedTo'] = self.assigned_to_str
+        if self.referred_to is not None:
+            out['referredTo'] = self.referred_to.name_full
+        elif self.referred_to_str:
+            out['referredTo'] = self.referred_to_str
+
+        # Court
+        out.update({
+            'court': self.court.full_name,
+            'court_exact': self.court_id,  # For faceting
+            'court_citation_string': self.court.citation_string,
+        })
+
+        # Parties, attorneys, firms
+        out.update({
+            'party_id': set(),
+            'party': set(),
+            'attorney_id': set(),
+            'attorney': set(),
+            'firm_id': set(),
+            'firm': set(),
+        })
+        for p in self.parties.all():
+            out['party_id'].add(p.pk)
+            out['party'].add(p.name)
+            for a in p.attorneys.all():
+                out['attorney_id'].add(a.pk)
+                out['attorney'].add(a.name)
+                for org in a.organizations.all():
+                    out['firm_id'].add(org.pk)
+                    out['firm'].add(org.name)
+
+        # Do RECAPDocument and Docket Entries in a nested loop
+        for de in self.docket_entries.all():
+            # Docket Entry
+            out['description'] = de.description
+            if de.entry_number is not None:
+                out['entry_number'] = de.entry_number
+            if de.date_filed is not None:
+                out['entry_date_filed'] = datetime.combine(de.date_filed,
+                                                           time())
+
+            for rd in de.recap_documents.all():
+                # IDs
+                out.update({
+                    'id': rd.pk,
+                    'docket_entry_id': de.pk,
+                    'docket_id': self.pk,
+                    'court_id': self.court.pk,
+                    'assigned_to_id': getattr(self.assigned_to, 'pk', None),
+                    'referred_to_id': getattr(self.referred_to, 'pk', None),
+                })
+
+                # RECAPDocument
+                out.update({
+                    'short_description': rd.description,
+                    'document_type': rd.get_document_type_display(),
+                    'document_number': rd.document_number,
+                    'attachment_number': rd.attachment_number,
+                    'is_available': rd.is_available,
+                    'page_count': rd.page_count,
+                })
+                if hasattr(rd.filepath_local, 'path'):
+                    out['filepath_local'] = self.filepath_local.path
+                try:
+                    out['absolute_url'] = rd.get_absolute_url()
+                except NoReverseMatch:
+                    raise InvalidDocumentError(
+                        "Unable to save to index due to missing absolute_url: "
+                        "%s" % self.pk
+                    )
+
+                text_template = loader.get_template('indexes/dockets_text.txt')
+                out['text'] = text_template.render({'item': rd}).translate(
+                    null_map)
+
+                search_list.append(normalize_search_dicts(out))
+
+        return search_list
+
 
 class DocketEntry(models.Model):
 
@@ -638,11 +749,11 @@ class RECAPDocument(models.Model):
         # Judges
         if self.docket_entry.docket.assigned_to is not None:
             out['assignedTo'] = self.docket_entry.docket.assigned_to.name_full
-        elif self.docket_entry.docket.assigned_to_str is not None:
+        elif self.docket_entry.docket.assigned_to_str:
             out['assignedTo'] = self.docket_entry.docket.assigned_to_str
         if self.docket_entry.docket.referred_to is not None:
             out['referredTo'] = self.docket_entry.docket.referred_to.name_full
-        elif self.docket_entry.docket.referred_to_str is not None:
+        elif self.docket_entry.docket.referred_to_str:
             out['referredTo'] = self.docket_entry.docket.referred_to_str
 
         # Court

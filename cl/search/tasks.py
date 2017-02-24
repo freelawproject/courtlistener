@@ -8,7 +8,7 @@ from cl.celery import app
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.lib.sunburnt import SolrError
 from cl.people_db.models import Person
-from cl.search.models import Opinion, OpinionCluster, RECAPDocument
+from cl.search.models import Opinion, OpinionCluster, RECAPDocument, Docket
 
 
 @app.task
@@ -29,11 +29,15 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
     search_item_list = []
     for item in items:
         try:
-            if type(item) == Audio:
-                search_item_list.append(item.as_search_dict())
-            elif type(item) == Opinion:
+            if type(item) == Opinion:
                 search_item_list.append(item.as_search_dict())
             elif type(item) == RECAPDocument:
+                search_item_list.append(item.as_search_dict())
+            elif type(item) == Docket:
+                # Slightly different here b/c dockets return a list of search
+                # dicts.
+                search_item_list.extend(item.as_search_list())
+            elif type(item) == Audio:
                 search_item_list.append(item.as_search_dict())
             elif type(item) == Person:
                 search_item_list.append(item.as_search_dict())

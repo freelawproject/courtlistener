@@ -11,10 +11,12 @@ from cl.lib.db_tools import queryset_generator
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timer import print_timing
 from cl.people_db.models import Person
-from cl.search.models import Opinion, RECAPDocument
+from cl.search.models import Opinion, RECAPDocument, Docket
 from cl.search.tasks import (delete_items, add_or_update_audio_files,
                              add_or_update_opinions, add_or_update_items,
                              add_or_update_people, add_or_update_recap_document)
+
+VALID_OBJ_TYPES = ('opinions', 'audio', 'people', 'recap', 'recap-dockets')
 
 
 def proceed_with_deletion(out, count, noinput):
@@ -63,8 +65,7 @@ class Command(BaseCommand):
             type=valid_obj_type,
             help='Because the Solr indexes are loosely bound to the database, '
                  'commands require that the correct model is provided in this '
-                 'argument. Current choices are "audio", "opinions", "people", '
-                 'and "recap".'
+                 'argument. Current choices are %s' % ', '.join(VALID_OBJ_TYPES)
         )
         parser.add_argument(
             '--solr-url',
@@ -199,6 +200,9 @@ class Command(BaseCommand):
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
 
+            bundle_size: how many items are in a task
+            chunksize: how many tasks we create before enqueueing them.
+
         Potential performance improvements:
          - Postgres is quiescent when Solr is popping tasks from Celery,
            instead, it should be fetching the next 1,000
@@ -244,7 +248,7 @@ class Command(BaseCommand):
 
     def delete_all(self):
         """
-        Deletes all items from the database.
+        Deletes all items from the index.
         """
         count = self.si.query('*').add_extra(caller='cl_update_index').count()
 
@@ -327,6 +331,7 @@ class Command(BaseCommand):
         If run on an existing index, existing items will be updated.
         """
         self.stdout.write("Adding or updating all items...\n")
+        bundle_size = 250
         if self.type == Person:
             q = self.type.objects.filter(
                 is_alias_of=None
@@ -390,17 +395,60 @@ class Command(BaseCommand):
                 'docket_entry__docket__court__citation_string',
 
                 # Party, attorney, firm
-                'docket_entry__docket__parties',
-                'docket_entry__docket__parties__attorneys',
-                'docket_entry__docket__parties__attorneys__organizations',
+                'docket_entry__docket__parties__pk',
+                'docket_entry__docket__parties__name',
+                'docket_entry__docket__parties__attorneys__pk',
+                'docket_entry__docket__parties__attorneys__name',
+                'docket_entry__docket__parties__attorneys__organizations__pk',
+                'docket_entry__docket__parties__attorneys__organizations__name',
             )
             count = q.count()
             q = queryset_generator(q, chunksize=5000)
+        elif self.type == Docket:
+            q = Docket.objects.filter(
+                source__in=Docket.RECAP_SOURCES
+            ).prefetch_related(
+                # IDs
+                'docket_entries__pk',
+                'assigned_to__pk',
+                'referred_to__pk',
+
+                # Court
+                'court__full_name',
+                'court__citation_string',
+                'court__id',
+
+                # Judges
+                'assigned_to__name_first',
+                'assigned_to__name_middle',
+                'assigned_to__name_last',
+                'assigned_to__name_suffix',
+                'referred_to__name_first',
+                'referred_to__name_middle',
+                'referred_to__name_last',
+                'referred_to__name_suffix',
+
+                # Docket entries
+                'docket_entries__description',
+                'docket_entries__entry_number',
+                'docket_entries__date_filed',
+
+                # Parties, attorneys, firms
+                'parties__pk',
+                'parties__name',
+                'parties__attorneys__pk',
+                'parties__attorneys__name',
+                'parties__attorneys__organizations__pk',
+                'parties__attorneys__organizations__name',
+            )
+            count = q.count()
+            q = queryset_generator(q, chunksize=5000)
+            bundle_size = 25
         else:
             q = self.type.objects.all()
             count = q.count()
             q = queryset_generator(q, chunksize=5000)
-        self._chunk_queryset_into_tasks(q, count)
+        self._chunk_queryset_into_tasks(q, count, bundle_size=bundle_size)
 
     @print_timing
     def optimize(self):
