@@ -144,6 +144,14 @@ class Command(BaseCommand):
                  'date and time (YYYY-MM-DD HH:MM:SS)'
         )
 
+        parser.add_argument(
+            '--start-at',
+            type=int,
+            default=0,
+            help="For use with the --everything flag, skip this many items "
+                 "before starting the processing."
+        )
+
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
         self.options = options
@@ -196,7 +204,7 @@ class Command(BaseCommand):
             sys.exit(1)
 
     def _chunk_queryset_into_tasks(self, items, count, chunksize=50,
-                                   bundle_size=250):
+                                   bundle_size=250, start_at=0):
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
 
@@ -211,9 +219,10 @@ class Command(BaseCommand):
         subtasks = []
         item_bundle = []
         for item in items:
-            last_item = (count == processed_count + 1)
-            if self.verbosity >= 2:
-                self.stdout.write('Indexing item %s' % item.pk)
+            processed_count += 1
+            last_item = (count == processed_count)
+            if processed_count < start_at:
+                continue
 
             item_bundle.append(item)
             if (len(item_bundle) >= bundle_size) or last_item:
@@ -222,7 +231,6 @@ class Command(BaseCommand):
                     add_or_update_items.subtask((item_bundle, self.solr_url))
                 )
                 item_bundle = []
-            processed_count += 1
 
             if (len(subtasks) >= chunksize) or last_item:
                 # Every chunksize items, we send the subtasks for processing
@@ -448,7 +456,8 @@ class Command(BaseCommand):
             q = self.type.objects.all()
             count = q.count()
             q = queryset_generator(q, chunksize=5000)
-        self._chunk_queryset_into_tasks(q, count, bundle_size=bundle_size)
+        self._chunk_queryset_into_tasks(q, count, bundle_size=bundle_size,
+                                        start_at=self.options['start_at'])
 
     @print_timing
     def optimize(self):
