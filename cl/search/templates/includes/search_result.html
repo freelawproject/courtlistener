@@ -218,12 +218,12 @@
                     {% if result.solr_highlights.dob_city or result.solr_highlights.dob_state %}
                         <span class="gray">in </span>
                         {% if result.solr_highlights.dob_city %}
-                            <span>{{ result.solr_highlights.dob_city.0 }}</span>
+                            <span>{{ result.solr_highlights.dob_city.0|safe }}</span>
                         {% endif %}
                         {% if result.solr_highlights.dob_city and result.solr_highlights.dob_state %}<span class="gray">, </span>
                         {% endif %}
                         {% if result.solr_highlights.dob_state %}
-                            <span>{{ result.solr_highlights.dob_state.0 }}</span>
+                            <span>{{ result.solr_highlights.dob_state.0|safe }}</span>
                         {% endif %}
                     {% endif %}
                     {% endspaceless %}
