@@ -443,7 +443,7 @@ class Command(BaseCommand):
             )
             count = q.count()
             q = queryset_generator(q, chunksize=5000)
-            bundle_size = 25
+            bundle_size = 10  # Too big and things start dropping/failing.
         else:
             q = self.type.objects.all()
             count = q.count()
