@@ -435,21 +435,19 @@ def add_highlighting(main_params, cd, highlight):
     # params are not set here because they do not retrieve results,
     # only counts (they are set to 0 rows).
     if cd['type'] == 'o':
-        fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
-              'download_url', 'status', 'dateFiled', 'citeCount',
-              'sibling_ids']
-        hlfl = ['text', 'caseName', 'judge', 'docketNumber',
-                'court_citation_string', 'suitNature', 'citation',
-                'neutralCite', 'lexisCite']
+        fl = ['absolute_url', 'citeCount', 'court_id', 'dateFiled',
+              'download_url', 'id',  'local_path', 'sibling_ids', 'source',
+              'status']
+        hlfl = ['caseName', 'citation', 'court_citation_string', 'docketNumber',
+                'judge', 'lexisCite', 'neutralCite', 'suitNature', 'text']
     elif cd['type'] == 'r':
-        fl = ['id', 'absolute_url', 'docket_absolute_url', 'court_id',
-              'dateFiled', 'docketNumber', 'caseName', 'suitNature', 'court',
-              'assigned_to_id', 'referred_to_id', 'dateArgued',
-              'dateTerminated', 'document_number', 'attachment_number',
-              'docket_id', 'is_available', 'page_count', 'party', 'attorney']
-        hlfl = ['text', 'caseName', 'assignedTo', 'court_id', 'court',
-                'court_citation_string', 'docketNumber', 'suitNature', 'cause',
-                'juryDemand', 'assignedTo', 'referredTo', 'short_description']
+        fl = ['absolute_url', 'assigned_to_id', 'attachment_number', 'attorney',
+              'court_id', 'dateArgued', 'dateFiled', 'dateTerminated',
+              'docket_absolute_url', 'docket_id', 'document_number', 'id',
+              'is_available', 'page_count', 'party', 'referred_to_id']
+        hlfl = ['assignedTo', 'caseName', 'cause', 'court_citation_string',
+                'docketNumber', 'juryDemand', 'referredTo', 'short_description',
+                'suitNature', 'text']
     elif cd['type'] == 'oa':
         fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
               'download_url', 'docket_id', 'dateArgued', 'duration']

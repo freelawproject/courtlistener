@@ -129,10 +129,7 @@
            indexed="true"
            stored="true"
            required="true"
-           multiValued="false"
-           termVectors="true"
-           termPositions="true"
-           termOffsets="true"/>
+           multiValued="false"/>
     <field name="assigned_to_id"
            type="int"
            indexed="true"
@@ -196,10 +193,7 @@
            type="text_en_splitting_cl"
            indexed="true"
            stored="true"
-           multiValued="false"
-           termOffsets="true"
-           termPositions="true"
-           termVectors="true"/>
+           multiValued="false"/>
     <field name="short_description"
            type="text_en_splitting_cl"
            indexed="true"
@@ -315,10 +309,7 @@
            type="text_en_splitting_cl"
            indexed="true"
            stored="true"
-           multiValued="false"
-           termVectors="true"
-           termPositions="true"
-           termOffsets="true"/>
+           multiValued="false"/>
     <field name="court_citation_string"
            type="string"
            indexed="true"
@@ -333,26 +324,17 @@
            type="text_en_splitting_cl"
            indexed="true"
            stored="true"
-           multiValued="true"
-           termVectors="true"
-           termPositions="true"
-           termOffsets="true"/>
+           multiValued="true"/>
     <field name="attorney"
            type="text_en_splitting_cl"
            indexed="true"
            stored="true"
-           multiValued="true"
-           termVectors="true"
-           termPositions="true"
-           termOffsets="true"/>
+           multiValued="true"/>
     <field name="firm"
            type="text_en_splitting_cl"
            indexed="true"
            stored="true"
-           multiValued="true"
-           termVectors="true"
-           termPositions="true"
-           termOffsets="true"/>
+           multiValued="true"/>
 
     <!--Faceting-->
     <field name="court_exact"
