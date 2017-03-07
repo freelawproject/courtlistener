@@ -251,17 +251,21 @@
                     <div class="col-md-2">
                         <div class="row">
                             <div class="sidebar-section col-xs-12">
-                                <p><a href="{% url "new_visualization" %}"
-                                      class="btn btn-success btn-lg btn-block">
-                                    <i class="fa fa-plus"></i>&nbsp;New <span class="visible-lg-inline">Network</span></a>
+                                <p>
+                                    <a href="{% url "new_visualization" %}"
+                                       class="btn btn-success btn-lg btn-block">
+                                        <i class="fa fa-plus"></i>&nbsp;New <span class="visible-lg-inline">Network</span>
+                                    </a>
                                 </p>
                                 {% if not viz.published and viz.user == user%}
-                                <p><a href="{% url "share_visualization" %}"
-                                      class="btn btn-primary btn-lg btn-block share-button"
-                                      data-id="{{ viz.pk }}"
-                                      data-function="share">
-                                    <i class="fa fa-share-alt"></i>&nbsp;<span id="share">Share</span>
-                                    <span class="visible-lg-inline">Network</span></a>
+                                <p>
+                                    <a href="{% url "share_visualization" %}"
+                                       class="btn btn-primary btn-lg btn-block share-button"
+                                       data-id="{{ viz.pk }}"
+                                       data-function="share">
+                                        <i class="fa fa-share-alt"></i>&nbsp;<span id="share">Share</span>
+                                        <span class="visible-lg-inline">Network</span>
+                                    </a>
                                 </p>
                                 {% endif %}
                                 {% if viz.user == user %}
@@ -280,7 +284,7 @@
                                 {% endif %}
                             </div>
 
-                            <div class="sidebar-section col-sm-12">
+                            <div class="sidebar-section col-xs-12">
                                 <h3><span>Embed</span></h3>
                                 <div class="form-group">
                                     <input type="text"
