@@ -21,9 +21,9 @@ class RECAPLogAdmin(admin.ModelAdmin):
 
 @admin.register(PACERFreeDocumentLog)
 class PACERFreeDocumentLogAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'status', 'date_started', 'date_completed',
-                    'date_queried')
-    list_filter = ('status',)
+    list_display = ('__str__', 'court_id', 'status', 'date_started',
+                    'date_completed', 'date_queried')
+    list_filter = ('status', 'court__jurisdiction')
     list_editable = ('status',)
     date_hierarchy = 'date_queried'
     ordering = ('-date_started',)
