@@ -1,16 +1,16 @@
 BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 
 
-def get_bucketname(court, casenum):
-    bucketlist = ["gov", "uscourts", court, unicode(casenum)]
+def get_bucketname(court, pacer_case_id):
+    bucketlist = ["gov", "uscourts", court, unicode(pacer_case_id)]
     return ".".join(bucketlist)
 
 
-def get_docketxml_url(court, casenum):
+def get_docketxml_url(court, pacer_case_id):
     return "%s/%s/%s" % (
         BASE_DOWNLOAD_URL,
-        get_bucketname(court, casenum),
-        get_docket_filename(court, casenum),
+        get_bucketname(court, pacer_case_id),
+        get_docket_filename(court, pacer_case_id),
     )
 
 
@@ -55,22 +55,23 @@ def get_local_document_url_from_path(path, document_number, attachment_number):
     )
 
 
-def get_pdf_url(court, casenum, filename):
+def get_pdf_url(court, pacer_case_id, filename):
     return "%s/%s/%s" % (
         BASE_DOWNLOAD_URL,
-        get_bucketname(court, casenum),
+        get_bucketname(court, pacer_case_id),
         filename,
     )
 
 
-def get_docket_filename(court, casenum):
-    return ".".join(["gov", "uscourts", unicode(court), unicode(casenum),
+def get_docket_filename(court, pacer_case_id):
+    return ".".join(["gov", "uscourts", unicode(court), unicode(pacer_case_id),
                      "docket.xml"])
 
 
-def get_document_filename(court, casenum, docnum, subdocnum):
-    return ".".join(["gov", "uscourts", unicode(court), unicode(casenum),
-                     unicode(docnum), unicode(subdocnum), "pdf"])
+def get_document_filename(court, pacer_case_id, document_number,
+                          attachment_number):
+    return ".".join(["gov", "uscourts", unicode(court), unicode(pacer_case_id),
+                     unicode(document_number), unicode(attachment_number), "pdf"])
 
 
 def needs_ocr(content):
