@@ -11,7 +11,7 @@ from django.core.management import BaseCommand
 from lxml import etree
 from lxml.etree import XMLSyntaxError, XPathEvalError
 
-from cl.lib.pacer import PacerXMLParser
+from cl.lib.pacer import PacerXMLParser, lookup_and_save
 
 logger = logging.getLogger(__name__)
 
@@ -157,8 +157,13 @@ class Command(BaseCommand):
                 logger.info("%s: Parsing docket: %s" % (completed, docket_path))
 
                 pacer_doc = PacerXMLParser(docket_path)
+                required_fields = ['case_name', 'date_filed']
+                for field in required_fields:
+                    if not getattr(pacer_doc, field):
+                        logger.error("Missing required field: %s" % field)
+                        continue
 
-                docket = pacer_doc.save(self.debug)
+                docket = lookup_and_save(pacer_doc, self.debug)
                 if docket is not None:
                     pacer_doc.make_documents(docket, self.debug)
                     pacer_doc.make_parties(docket, self.debug)

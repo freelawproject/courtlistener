@@ -1,5 +1,9 @@
+import os
+
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
+
+from cl.lib.recap_utils import get_bucketname
 
 
 def make_recap_path(instance, filename):
@@ -9,6 +13,21 @@ def make_recap_path(instance, filename):
     so far.
     """
     return "recap/%s" % get_valid_filename(filename)
+
+
+def make_recap_pdf_path(instance, filename):
+    """Make a path for storing the a PACER document in RECAP.
+
+    Mirrors technique used by original RECAP server to upload PDFs to IA.
+    """
+    return os.path.join(
+        "recap",
+        get_bucketname(
+            instance.docket_entry.docket.court_id,
+            instance.docket_entry.docket.pacer_case_id,
+        ),
+        filename,
+    )
 
 
 def make_upload_path(instance, filename):
