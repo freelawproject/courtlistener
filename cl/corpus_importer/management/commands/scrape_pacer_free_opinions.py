@@ -91,9 +91,8 @@ def go():
         for court_id in temp_list:
             next_start_date, next_end_date = get_next_date_range(court_id)
 
-            if next_start_date == tomorrow.date():
-                # We finished the court! Remove it from original list and
-                # continue
+            if next_start_date >= tomorrow.date():
+                logger.info("Finished '%s'. Marking it complete." % court_id)
                 court_ids.remove(court_id)
                 continue
 
