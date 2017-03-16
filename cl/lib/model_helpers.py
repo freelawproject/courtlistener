@@ -3,7 +3,7 @@ import os
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
 
-from cl.lib.recap_utils import get_bucketname
+from cl.lib.recap_utils import get_bucket_name
 
 
 def make_recap_path(instance, filename):
@@ -22,7 +22,7 @@ def make_recap_pdf_path(instance, filename):
     """
     return os.path.join(
         "recap",
-        get_bucketname(
+        get_bucket_name(
             instance.docket_entry.docket.court_id,
             instance.docket_entry.docket.pacer_case_id,
         ),

@@ -1,15 +1,19 @@
+from django.conf import settings
+
 BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 
 
-def get_bucketname(court, pacer_case_id):
+def get_bucket_name(court, pacer_case_id):
     bucketlist = ["gov", "uscourts", court, unicode(pacer_case_id)]
+    if settings.DEBUG is True:
+        bucketlist.insert(0, 'dev')
     return ".".join(bucketlist)
 
 
 def get_docketxml_url(court, pacer_case_id):
     return "%s/%s/%s" % (
         BASE_DOWNLOAD_URL,
-        get_bucketname(court, pacer_case_id),
+        get_bucket_name(court, pacer_case_id),
         get_docket_filename(court, pacer_case_id),
     )
 
@@ -58,7 +62,7 @@ def get_local_document_url_from_path(path, document_number, attachment_number):
 def get_pdf_url(court, pacer_case_id, filename):
     return "%s/%s/%s" % (
         BASE_DOWNLOAD_URL,
-        get_bucketname(court, pacer_case_id),
+        get_bucket_name(court, pacer_case_id),
         filename,
     )
 

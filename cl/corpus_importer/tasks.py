@@ -8,9 +8,10 @@ import requests
 from django.conf import settings
 from django.db import IntegrityError
 from juriscraper.pacer import FreeOpinionReport
-from requests.exceptions import ChunkedEncodingError
+from requests.exceptions import ChunkedEncodingError, HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError, \
-    ConnectionError, HTTPError
+    ConnectionError
+from rest_framework.status import HTTP_403_FORBIDDEN
 
 from cl.celery import app
 from cl.lib.pacer import PacerXMLParser, lookup_and_save
@@ -83,11 +84,11 @@ def parse_recap_docket(self, filename, debug=False):
 
 
 @app.task(bind=True, max_retries=5)
-def get_free_document_report(self, court_id, d, session):
+def get_free_document_report(self, court_id, start, end, session):
     """Get structured results from the PACER free document report"""
     report = FreeOpinionReport(court_id, session)
     try:
-        responses = report.query(d, d, sort='case_number')
+        responses = report.query(start, end, sort='case_number')
     except (ConnectionError, ChunkedEncodingError) as exc:
         logger.warning("Unable to get free document report results from %s on "
                        "%s. Trying again." % (court_id, d))
@@ -144,6 +145,8 @@ def upload_to_ia(self, identifier, files, metadata=None, session=None):
         'access': access_key,
         'secret': secret_key,
     }})
+    logger.info("Uploading file to Internet Archive with identifier: %s and "
+                "files %s" % (identifier, files))
     item = session.get_item(identifier)
     try:
         # Before pushing files, check if the endpoint is overloaded. This is
@@ -153,8 +156,13 @@ def upload_to_ia(self, identifier, files, metadata=None, session=None):
                 raise Exception("S3 is currently overloaded.")
             except Exception as exc:
                 raise self.retry(exc=exc, countdown=countdown)
-        return item.upload(identifier, files=files, metadata=metadata,
-                           queue_derive=False, verify=True)
+        responses = item.upload(files=files, metadata=metadata,
+                                queue_derive=False, verify=True)
+        logger.info("Item uploaded to IA with responses %s" %
+                    [r.status_code for r in responses])
+        return responses
     except HTTPError as exc:
+        if exc.response.status_code == HTTP_403_FORBIDDEN:
+            return [exc.response]
         raise self.retry(exc=exc, countdown=countdown)
 

@@ -94,6 +94,39 @@ def lookup_and_save(new, debug=False):
     return d
 
 
+def get_blocked_status(docket, count_override=None):
+    """Set the blocked status for the Docket.
+
+    Dockets are public (blocked is False) when:
+
+                                       Is Bankr. Court
+                                    +---------+--------+
+                                    |   YES   |   NO   |
+                    +---------------+---------+--------+
+             Size   | > 500 items   |    X    |    X   |
+              of    +---------------+---------+--------+
+            Docket  | <= 500 items  |         |    X   |
+                    +---------------+---------+--------+
+
+    :param docket: A Docket or Docket-like object that contains a `court`
+    attribute that can be checked to see if it is a bankruptcy court.
+    :param count_override: Allows a calling function to provide the count, if
+    it is known in advance.
+    :returns A tuple containing two entries. The first is a boolean stating
+    whether the item should be private. The second is the date of the privacy
+    decision (today) or None if the item should not be private.
+    """
+    bankruptcy_privacy_threshold = 500
+    if count_override is not None:
+        count = count_override
+    else:
+        count = docket.docket_entries.all().count()
+    small_case = count <= bankruptcy_privacy_threshold
+    if all([small_case, docket.court.is_bankruptcy]):
+        return True, date.today()
+    return False, None
+
+
 class ParsingException(Exception):
     pass
 
@@ -138,7 +171,8 @@ class PacerXMLParser(object):
             self.case_details, 'jurisdiction')
         self.assigned_to, self.assigned_to_str = self.get_judges('assigned_to')
         self.referred_to, self.referred_to_str = self.get_judges('referred_to')
-        self.blocked, self.date_blocked = self.set_blocked_fields()
+        self.blocked, self.date_blocked = get_blocked_status(
+            self, self.document_count)
 
         # Non-parsed fields
         self.filepath_local = os.path.join('recap', self.path)
@@ -562,27 +596,6 @@ class PacerXMLParser(object):
             elif len(judges) > 1:
                 logger.info("Too many judges found: %s" % len(judges))
                 return None, s
-
-    def set_blocked_fields(self):
-        """Set the blocked status for the Docket.
-
-        Dockets are public (blocked is False) when:
-
-                                   Is Bankr. Court
-                                +---------+--------+
-                                |   YES   |   NO   |
-                +---------------+---------+--------+
-         Size   | > 500 items   |    X    |    X   |
-          of    +---------------+---------+--------+
-        Docket  | <= 500 items  |         |    X   |
-                +---------------+---------+--------+
-
-        """
-        bankruptcy_privacy_threshold = 500
-        small_case = self.document_count <= bankruptcy_privacy_threshold
-        if all([small_case, self.court.is_bankruptcy]):
-            return True, date.today()
-        return False, None
 
 
 def normalize_party_types(t):
