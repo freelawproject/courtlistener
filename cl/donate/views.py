@@ -137,12 +137,13 @@ def donate(request):
                     user = user_form.save()
                     profile_form.save()
 
-                d = donation_form.save(commit=False)
-                d.status = response['status']
-                d.payment_id = response['payment_id']
-                d.transaction_id = response.get('transaction_id')  # Will only work for Paypal.
-                d.donor = user
-                d.save()
+                donation = donation_form.save(commit=False)
+                donation.status = response['status']
+                donation.payment_id = response['payment_id']
+                # Will only work for Paypal:
+                donation.transaction_id = response.get('transaction_id')
+                donation.donor = user
+                donation.save()
 
                 return HttpResponseRedirect(response['redirect'])
 
