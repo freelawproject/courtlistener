@@ -623,7 +623,7 @@ class RECAPDocument(models.Model):
             bool(self.filepath_local.name),  # Just in case
         ]))
 
-    def save(self, do_extraction=True, index=True, *args, **kwargs):
+    def save(self, do_extraction=False, index=False, *args, **kwargs):
         if self.document_type == self.ATTACHMENT:
             if self.attachment_number is None:
                 raise ValidationError('attachment_number cannot be null for an '
