@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from celery.canvas import subtask, group
+from celery.canvas import subtask, group, chain
 
 from cl.celery import app
 
@@ -15,5 +15,15 @@ def dmap(iterable, callback):
     See: http://stackoverflow.com/a/13569873/64911
     Usage: process_list = (get_list.s(10) | dmap.s(process_item.s()))
     """
+    # callback = subtask(callback)
+    # return group(callback.clone([arg]) for arg in iterable)()
+    # tasks = []
+    # for i in iterable:
+    #     cb = deepcopy(callback)
+    #     tasks.append(app.signature(cb).clone([i]))
+    # return group(tasks)
+
     callback = subtask(callback)
-    return group(deepcopy(callback).clone([arg]) for arg in iterable)()
+    if isinstance(callback, chain):
+        return [callback.delay(arg) for arg in iterable]
+    return group(callback.clone([arg]) for arg in iterable)()

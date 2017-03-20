@@ -1,3 +1,5 @@
+import copy
+import hashlib
 import logging
 import os
 import shutil
@@ -6,7 +8,10 @@ from tempfile import NamedTemporaryFile
 import internetarchive as ia
 import requests
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.db import IntegrityError
+from django.utils.encoding import force_bytes
+from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import FreeOpinionReport
 from requests.exceptions import ChunkedEncodingError, HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError, \
@@ -14,8 +19,10 @@ from requests.packages.urllib3.exceptions import ReadTimeoutError, \
 from rest_framework.status import HTTP_403_FORBIDDEN
 
 from cl.celery import app
-from cl.lib.pacer import PacerXMLParser, lookup_and_save
-from cl.search.models import DocketEntry
+from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status
+from cl.lib.recap_utils import get_document_filename, get_bucket_name
+from cl.scrapers.tasks import get_page_count, extract_recap_pdf
+from cl.search.models import DocketEntry, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
@@ -98,19 +105,141 @@ def get_free_document_report(self, court_id, start, end, session):
 
 
 @app.task(bind=True, max_retries=5)
-def get_pdf(self, data, court_id, session):
+def process_free_opinion_result(self, result, court, cnt):
+    """Process a single result from the free opinion report"""
+    result.court = court
+    result.case_name = harmonize(result.case_name)
+    result.case_name_short = cnt.make_case_name_short(result.case_name)
+    result_copy = copy.copy(result)
+    # If we don't do this, the doc's date_filed becomes the docket's
+    # date_filed. Bad.
+    delattr(result_copy, 'date_filed')
+    # If we don't do this, we get the PACER court id and it crashes
+    delattr(result_copy, 'court_id')
+    docket = lookup_and_save(result_copy)
+    if not docket:
+        logger.error("Unable to create docket for %s" % result)
+        self.request.chain = None
+        return
+    docket.blocked, docket.date_blocked = get_blocked_status(docket)
+    docket.save()
+
+    de, de_created = DocketEntry.objects.update_or_create(
+        docket=docket,
+        entry_number=result.document_number,
+        defaults={
+            'date_filed': result.date_filed,
+            'description': result.description,
+        }
+    )
+    rd, rd_created = RECAPDocument.objects.update_or_create(
+        docket_entry=de,
+        document_number=result.document_number,
+        attachment_number=None,
+        defaults={
+            'pacer_doc_id': result.pacer_doc_id,
+            'document_type': RECAPDocument.PACER_DOCUMENT,
+        }
+    )
+
+    if rd_created and rd.is_available:
+        logger.info("Found the item already in the DB with document_number: %s "
+                    "and docket_entry: %s!" % (result.document_number, de))
+        self.request.chain = None
+        return
+
+    return {'result': result, 'rd_pk': rd.pk}
+
+
+@app.task(bind=True, max_retries=5)
+def get_and_process_pdf(self, data, court_id, session):
+    result = data['result']
+    rd = RECAPDocument.objects.get(pk=data['rd_pk'])
     report = FreeOpinionReport(court_id, session)
     try:
-        r = report.download_pdf(data.pacer_case_id, data.pacer_doc_id)
+        r = report.download_pdf(result.pacer_case_id, result.pacer_doc_id)
     except ConnectionError as exc:
-        logger.warning("Unable to get PDF for %s" % data)
+        logger.warning("Unable to get PDF for %s" % result)
         raise self.retry(exc=exc, countdown=5)
-    else:
-        return r
+
+    file_name = get_document_filename(
+        result.court.pk,
+        result.pacer_case_id,
+        result.document_number,
+        0,  # Attachment number is zero for all free opinions.
+    )
+    cf = ContentFile(r.content)
+    rd.filepath_local.save(file_name, cf, save=False)
+    rd.is_available = True  # We've got the PDF.
+
+    # request.content is sometimes a str, sometimes unicode, so
+    # force it all to be bytes, pleasing hashlib.
+    rd.sha1 = hashlib.sha1(force_bytes(r.content)).hexdigest()
+    rd.is_free_on_pacer = True
+    rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
+
+    # Save and extract, skipping OCR.
+    rd.save(do_extraction=False, index=False)
+    extract_recap_pdf(rd.pk, skip_ocr=True, check_if_needed=False)
+    return {'result': result, 'rd_pk': rd.pk}
+
+
+class OverloadedException(Exception):
+    pass
 
 
 @app.task(bind=True, max_retries=15)
-def upload_to_ia(self, identifier, files, metadata=None, session=None):
+def upload_free_opinion_to_ia(self, data):
+    countdown = 5 * self.request.retries + 1  # 5s, 10s, 15s...
+    result = data['result']
+    rd = RECAPDocument.objects.get(pk=data['rd_pk'])
+    file_name = get_document_filename(
+        result.court.pk,
+        result.pacer_case_id,
+        result.document_number,
+        0,  # Attachment number is zero for all free opinions.
+    )
+    bucket_name = get_bucket_name(result.court.pk, result.pacer_case_id)
+    try:
+        responses = upload_to_ia(
+            identifier=bucket_name,
+            files=rd.filepath_local.path,
+            metadata={
+                'title': result.case_name,
+                'collection': settings.IA_COLLECTIONS,
+                'contributor': '<a href="https://free.law">Free Law Project</a>',
+                'court': result.court.pk,
+                'language': 'eng',
+                'mediatype': 'texts',
+                'description': "This item represents a case in PACER, "
+                               "the U.S. Government's website for "
+                               "federal case data. If you wish to see "
+                               "the entire case, please consult PACER "
+                               "directly.",
+                'licenseurl': 'https://www.usa.gov/government-works',
+            },
+        )
+    except OverloadedException as exc:
+        raise self.retry(exc=exc, countdown=countdown)
+    except HTTPError as exc:
+        if exc.response.status_code == HTTP_403_FORBIDDEN:
+            return [exc.response]
+        raise self.retry(exc=exc, countdown=countdown)
+    if all(r.ok for r in responses):
+        rd.filepath_ia = "https://archive.org/download/%s/%s" % (
+            bucket_name, file_name)
+        rd.save(do_extraction=False, index=False)
+
+
+access_key = settings.IA_ACCESS_KEY
+secret_key = settings.IA_SECRET_KEY
+session = ia.get_session({'s3': {
+    'access': access_key,
+    'secret': secret_key,
+}})
+
+
+def upload_to_ia(identifier, files, metadata=None):
     """Upload an item and its files to the Internet Archive
 
     On the Internet Archive there are Items and files. Items have a global
@@ -129,40 +258,25 @@ def upload_to_ia(self, identifier, files, metadata=None, session=None):
     an iterable or a single file-like object or string.
     :param metadata: Metadata used to create a new item. If the item already
     exists, the metadata will not be updated
-    :param session: An ArchiveSession object. If none is provided, one will be
-    created automatically. However, if more than one item is being uploaded,
-    it's best to create one session for the entire batch rather than one session
-    per upload.
 
     :rtype: list
     :returns: List of response objects, one per file.
     """
     metadata = {} if metadata is None else metadata
-    countdown = 5 * self.request.retries  # 5s, 10s, 15s...
-    access_key = settings.IA_ACCESS_KEY
-    secret_key = settings.IA_SECRET_KEY
-    session = session or ia.get_session({'s3': {
-        'access': access_key,
-        'secret': secret_key,
-    }})
     logger.info("Uploading file to Internet Archive with identifier: %s and "
                 "files %s" % (identifier, files))
-    item = session.get_item(identifier)
     try:
-        # Before pushing files, check if the endpoint is overloaded. This is
-        # lighter-weight than attempting a document upload off the bat.
-        if session.s3_is_overloaded(identifier, access_key):
-            try:
-                raise Exception("S3 is currently overloaded.")
-            except Exception as exc:
-                raise self.retry(exc=exc, countdown=countdown)
-        responses = item.upload(files=files, metadata=metadata,
-                                queue_derive=False, verify=True)
-        logger.info("Item uploaded to IA with responses %s" %
-                    [r.status_code for r in responses])
-        return responses
-    except HTTPError as exc:
-        if exc.response.status_code == HTTP_403_FORBIDDEN:
-            return [exc.response]
-        raise self.retry(exc=exc, countdown=countdown)
+        item = session.get_item(identifier)
+    except AttributeError:
+        logger.info(session.__dict__)
+        raise
+    # Before pushing files, check if the endpoint is overloaded. This is
+    # lighter-weight than attempting a document upload off the bat.
+    if session.s3_is_overloaded(identifier, access_key):
+        raise OverloadedException("S3 is currently overloaded.")
+    responses = item.upload(files=files, metadata=metadata,
+                            queue_derive=False, verify=True)
+    logger.info("Item uploaded to IA with responses %s" %
+                [r.status_code for r in responses])
+    return responses
 
