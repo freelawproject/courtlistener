@@ -282,58 +282,58 @@ class PacerXMLParser(object):
         pacer_document_id = self.get_str_from_node(
             doc_node, 'pacer_doc_id')
         try:
-            rd = RECAPDocument.objects.get(
+            d = RECAPDocument.objects.get(
                 docket_entry=docket_entry,
                 document_number=entry_number,
                 # Use the attachment number if it is not 0, else use None.
                 attachment_number=attachment_number or None,
             )
         except RECAPDocument.DoesNotExist:
-            rd = RECAPDocument(
+            d = RECAPDocument(
                 docket_entry=docket_entry,
                 pacer_doc_id=pacer_document_id,
                 document_number=entry_number,
             )
         else:
-            rd.pacer_doc_id = pacer_document_id or rd.pacer_doc_id
+            d.pacer_doc_id = pacer_document_id or d.pacer_doc_id
 
-        rd.date_upload = self.get_datetime_from_node(doc_node, 'upload_date')
-        rd.document_type = document_type or rd.document_type
+        d.date_upload = self.get_datetime_from_node(doc_node, 'upload_date')
+        d.document_type = document_type or d.document_type
 
         # If we can't parse the availability node (it returns None), default it
         # to False.
         availability = self.get_bool_from_node(doc_node, 'available')
-        rd.is_available = False if availability is None else availability
-        rd.sha1 = self.get_str_from_node(doc_node, 'sha1')
-        rd.description = (self.get_str_from_node(doc_node, 'short_desc') or
-                         rd.description)
-        if rd.is_available:
-            rd.filepath_ia = get_ia_document_url_from_path(
+        d.is_available = False if availability is None else availability
+        d.sha1 = self.get_str_from_node(doc_node, 'sha1')
+        d.description = (self.get_str_from_node(doc_node, 'short_desc') or
+                         d.description)
+        if d.is_available:
+            d.filepath_ia = get_ia_document_url_from_path(
                 self.path, entry_number, attachment_number)
-            rd.filepath_local = os.path.join(
+            d.filepath_local = os.path.join(
                 'recap',
                 get_local_document_url_from_path(self.path, entry_number,
                                                  attachment_number),
             )
-            if rd.page_count is None:
-                extension = rd.filepath_local.path.split('.')[-1]
-                rd.page_count = get_page_count(rd.filepath_local.path, extension)
+            if d.page_count is None:
+                extension = d.filepath_local.path.split('.')[-1]
+                d.page_count = get_page_count(d.filepath_local.path, extension)
         if document_type == RECAPDocument.ATTACHMENT:
-            rd.attachment_number = attachment_number
+            d.attachment_number = attachment_number
         if not debug:
             try:
-                rd.save(do_extraction=False, index=False)
+                d.save(do_extraction=False, index=False)
             except IntegrityError as e:
                 # This happens when a pacer_doc_id has been wrongly set as
                 # the document_number, see for example, document 19 and
                 # document 00405193374 here: https://ia802300.us.archive.org/23/items/gov.uscourts.ca4.14-1872/gov.uscourts.ca4.14-1872.docket.xml
                 logger.error("Unable to create RECAPDocument for document #%s, "
                              "attachment #%s on entry: %s due to "
-                             "IntegrityError." % (rd.document_number,
-                                                  rd.attachment_number,
-                                                  rd.docket_entry))
+                             "IntegrityError." % (d.document_number,
+                                                  d.attachment_number,
+                                                  d.docket_entry))
                 return None
-        return rd
+        return d
 
     @transaction.atomic
     def make_parties(self, docket, debug):
