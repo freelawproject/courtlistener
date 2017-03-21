@@ -25,7 +25,6 @@ class PACERFreeDocumentLogAdmin(admin.ModelAdmin):
                     'date_completed', 'date_queried')
     list_filter = ('status', 'court__jurisdiction')
     list_editable = ('status',)
-    date_hierarchy = 'date_queried'
     ordering = ('-date_started',)
 
 

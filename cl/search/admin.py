@@ -136,6 +136,9 @@ class CourtAdmin(admin.ModelAdmin):
         'short_name',
         'id',
     )
+    readonly_fields = (
+        'date_modified',
+    )
 
 
 @admin.register(RECAPDocument)
@@ -144,10 +147,20 @@ class RECAPDocumentAdmin(admin.ModelAdmin):
         'docket_entry',
     )
 
+    readonly_fields = (
+        'date_created',
+        'date_modified',
+    )
+
 
 class RECAPDocumentInline(admin.StackedInline):
     model = RECAPDocument
     extra = 1
+
+    readonly_fields = (
+        'date_created',
+        'date_modified',
+    )
 
 
 @admin.register(DocketEntry)
@@ -157,6 +170,10 @@ class DocketEntryAdmin(admin.ModelAdmin):
     )
     raw_id_fields = (
         'docket',
+    )
+    readonly_fields = (
+        'date_created',
+        'date_modified',
     )
 
 
