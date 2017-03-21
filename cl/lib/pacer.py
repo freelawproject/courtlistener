@@ -36,10 +36,95 @@ pacer_to_cl_ids = {
     # Maps PACER ids to their CL equivalents
     'azb': 'arb',         # Arizona Bankruptcy Court
     'cofc': 'uscfc',      # Court of Federal Claims
+    'neb': 'nebraskab',   # Nebraska Bankruptcy
     'nysb-mega': 'nysb',  # Remove the mega thing
+    '': 'tennesseeb',
 }
+
 # Reverse dict of pacer_to_cl_ids
 cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items()}
+
+
+def map_pacer_to_cl_id(pacer_id):
+    return pacer_to_cl_ids.get(pacer_id, pacer_id)
+
+
+def map_cl_to_pacer_id(cl_id):
+    if cl_id == 'nysb':
+        return cl_id
+    else:
+        return cl_to_pacer_ids.get(cl_id, cl_id)
+
+
+def lookup_and_save(new, debug=False):
+    """Merge new docket info into the database.
+
+    Start by attempting to lookup an existing Docket. If that's not found,
+    create a new one. Either way, merge all the attributes of `new` into the
+    Docket found, and then save the Docket.
+
+    Returns None if an error occurs, else, return the new or updated Docket.
+    """
+    try:
+        d = Docket.objects.get(
+            Q(pacer_case_id=new.pacer_case_id) |
+            Q(docket_number=new.docket_number),
+            court=new.court,
+        )
+        # Add RECAP as a source if it's not already.
+        if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
+            d.source = Docket.RECAP_AND_SCRAPER
+        elif d.source == Docket.COLUMBIA:
+            d.source = Docket.COLUMBIA_AND_RECAP
+        elif d.source == Docket.COLUMBIA_AND_SCRAPER:
+            d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
+    except Docket.DoesNotExist:
+        d = Docket(source=Docket.RECAP)
+    except Docket.MultipleObjectsReturned:
+        logger.error("Got multiple results while attempting save.")
+        return None
+
+    for attr, v in new.__dict__.items():
+        setattr(d, attr, v)
+
+    if not debug:
+        d.save()
+        logger.info("Saved as Docket %s: https://www.courtlistener.com%s" %
+                    (d.pk, d.get_absolute_url()))
+    return d
+
+
+def get_blocked_status(docket, count_override=None):
+    """Set the blocked status for the Docket.
+
+    Dockets are public (blocked is False) when:
+
+                                       Is Bankr. Court
+                                    +---------+--------+
+                                    |   YES   |   NO   |
+                    +---------------+---------+--------+
+             Size   | > 500 items   |    X    |    X   |
+              of    +---------------+---------+--------+
+            Docket  | <= 500 items  |         |    X   |
+                    +---------------+---------+--------+
+
+    :param docket: A Docket or Docket-like object that contains a `court`
+    attribute that can be checked to see if it is a bankruptcy court.
+    :param count_override: Allows a calling function to provide the count, if
+    it is known in advance.
+    :returns A tuple containing two entries. The first is a boolean stating
+    whether the item should be private. The second is the date of the privacy
+    decision (today) or None if the item should not be private.
+    """
+    bankruptcy_privacy_threshold = 500
+    if count_override is not None:
+        count = count_override
+    else:
+        count = docket.docket_entries.all().count()
+    small_case = count <= bankruptcy_privacy_threshold
+    if all([small_case, docket.court.is_bankruptcy]):
+        return True, date.today()
+    return False, None
 
 
 class ParsingException(Exception):
@@ -86,50 +171,12 @@ class PacerXMLParser(object):
             self.case_details, 'jurisdiction')
         self.assigned_to, self.assigned_to_str = self.get_judges('assigned_to')
         self.referred_to, self.referred_to_str = self.get_judges('referred_to')
-        self.blocked, self.date_blocked = self.set_blocked_fields()
+        self.blocked, self.date_blocked = get_blocked_status(
+            self, self.document_count)
 
         # Non-parsed fields
         self.filepath_local = os.path.join('recap', self.path)
         self.filepath_ia = get_docketxml_url_from_path(self.path)
-
-    def save(self, debug):
-        """Save the item to the database, updating any existing items.
-
-        Returns None if an error occurs.
-        """
-        required_fields = ['case_name', 'date_filed']
-        for field in required_fields:
-            if not getattr(self, field):
-                logger.error("Missing required field: %s" % field)
-                return None
-
-        try:
-            d = Docket.objects.get(
-                Q(pacer_case_id=self.pacer_case_id) |
-                Q(docket_number=self.docket_number),
-                court=self.court,
-            )
-            # Add RECAP as a source if it's not already.
-            if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
-                d.source = Docket.RECAP_AND_SCRAPER
-            elif d.source == Docket.COLUMBIA:
-                d.source = Docket.COLUMBIA_AND_RECAP
-            elif d.source == Docket.COLUMBIA_AND_SCRAPER:
-                d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
-        except Docket.DoesNotExist:
-            d = Docket(source=Docket.RECAP)
-        except Docket.MultipleObjectsReturned:
-            logger.error("Got multiple results while attempting save.")
-            return None
-
-        for attr, v in self.__dict__.items():
-            setattr(d, attr, v)
-
-        if not debug:
-            d.save()
-            logger.info("Saved as Docket %s: https://www.courtlistener.com%s" %
-                        (d.pk, d.get_absolute_url()))
-        return d
 
     def get_xml_contents(self):
         """Extract the XML from the file on disk and return it as an lxml
@@ -460,7 +507,7 @@ class PacerXMLParser(object):
         """Extract the court from the XML and return it as a Court object"""
         court_str = self.case_details.xpath('court/text()')[0].strip()
         try:
-            c = Court.objects.get(pk=pacer_to_cl_ids.get(court_str, court_str))
+            c = Court.objects.get(pk=map_pacer_to_cl_id(court_str))
         except Court.DoesNotExist:
             raise ParsingException("Unable to identify court: %s" % court_str)
         else:
@@ -549,27 +596,6 @@ class PacerXMLParser(object):
             elif len(judges) > 1:
                 logger.info("Too many judges found: %s" % len(judges))
                 return None, s
-
-    def set_blocked_fields(self):
-        """Set the blocked status for the Docket.
-
-        Dockets are public (blocked is False) when:
-
-                                   Is Bankr. Court
-                                +---------+--------+
-                                |   YES   |   NO   |
-                +---------------+---------+--------+
-         Size   | > 500 items   |    X    |    X   |
-          of    +---------------+---------+--------+
-        Docket  | <= 500 items  |         |    X   |
-                +---------------+---------+--------+
-
-        """
-        bankruptcy_privacy_threshold = 500
-        small_case = self.document_count <= bankruptcy_privacy_threshold
-        if all([small_case, self.court.is_bankruptcy]):
-            return True, date.today()
-        return False, None
 
 
 def normalize_party_types(t):

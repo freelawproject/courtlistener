@@ -270,13 +270,13 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
 
     processed = []
     for pk in pks:
-        doc = RECAPDocument.objects.get(pk=pk)
-        if check_if_needed and not doc.needs_extraction:
+        rd = RECAPDocument.objects.get(pk=pk)
+        if check_if_needed and not rd.needs_extraction:
             # Early abort if the item doesn't need extraction and the user
             # hasn't disabled early abortion.
             processed.append(pk)
             continue
-        path = doc.filepath_local.path
+        path = rd.filepath_local.path
         process = make_pdftotext_process(path)
         content, err = process.communicate()
 
@@ -285,18 +285,18 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
                 # probably an image PDF. Send it to OCR.
                 success, content = extract_by_ocr(path)
                 if success:
-                    doc.ocr_status = RECAPDocument.OCR_COMPLETE
+                    rd.ocr_status = RECAPDocument.OCR_COMPLETE
                 elif content == u'' or not success:
                     content = u'Unable to extract document content.'
-                    doc.ocr_status = RECAPDocument.OCR_FAILED
+                    rd.ocr_status = RECAPDocument.OCR_FAILED
             else:
                 content = u''
-                doc.ocr_status = RECAPDocument.OCR_NEEDED
+                rd.ocr_status = RECAPDocument.OCR_NEEDED
         else:
-            doc.ocr_status = RECAPDocument.OCR_UNNECESSARY
+            rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
 
-        doc.plain_text, _ = anonymize(content)
-        doc.save(index=False, do_extraction=False)
+        rd.plain_text, _ = anonymize(content)
+        rd.save(index=False, do_extraction=False)
         processed.append(pk)
 
     return processed

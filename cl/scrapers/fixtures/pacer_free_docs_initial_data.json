@@ -1,0 +1,2257 @@
+[
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca1",
+      "date_started": "2017-03-01T01:11:06.058Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1990-01-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca2",
+      "date_started": "2017-03-01T01:11:06.062Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1993-09-07"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca3",
+      "date_started": "2017-03-01T01:11:06.064Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1974-05-30"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 3
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca4",
+      "date_started": "2017-03-01T01:11:06.066Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1990-05-30"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 4
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca5",
+      "date_started": "2017-03-01T01:11:06.068Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1960-01-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 5
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca6",
+      "date_started": "2017-03-01T01:11:06.070Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1977-06-13"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 6
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca7",
+      "date_started": "2017-03-01T01:11:06.071Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1989-08-21"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 7
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca8",
+      "date_started": "2017-03-01T01:11:06.073Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1983-07-25"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 8
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca9",
+      "date_started": "2017-03-01T01:11:06.075Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1950-05-12"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 9
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca10",
+      "date_started": "2017-03-01T01:11:06.076Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1978-01-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 10
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca11",
+      "date_started": "2017-03-01T01:11:06.078Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2010-01-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 11
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "cafc",
+      "date_started": "2017-03-01T01:11:06.080Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2012-03-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 12
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "cadc",
+      "date_started": "2017-03-01T01:11:06.081Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1968-04-26"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 13
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "bap1",
+      "date_started": "2017-03-01T01:11:06.083Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1996-02-10"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 14
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "bap9",
+      "date_started": "2017-03-01T01:11:06.084Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1985-07-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 15
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "bap10",
+      "date_started": "2017-03-01T01:11:06.086Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1996-02-10"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 16
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "almd",
+      "date_started": "2017-03-01T01:11:06.088Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1991-04-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 17
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "alnd",
+      "date_started": "2017-03-01T01:11:06.090Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1986-06-30"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 18
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "alsd",
+      "date_started": "2017-03-01T01:11:06.093Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-01-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 19
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "akd",
+      "date_started": "2017-03-01T01:11:06.094Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-12-05"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 20
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "azd",
+      "date_started": "2017-03-01T01:11:06.096Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-07-14"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 21
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ared",
+      "date_started": "2017-03-01T01:11:06.098Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1995-05-25"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 22
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "arwd",
+      "date_started": "2017-03-01T01:11:06.101Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1996-11-08"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 23
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "cacd",
+      "date_started": "2017-03-01T01:11:06.103Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1987-05-13"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 24
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "caed",
+      "date_started": "2017-03-01T01:11:06.104Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1986-06-10"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 25
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "cand",
+      "date_started": "2017-03-01T01:11:06.106Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1983-02-15"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 26
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "casd",
+      "date_started": "2017-03-01T01:11:06.108Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1960-03-09"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 27
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "cod",
+      "date_started": "2017-03-01T01:11:06.109Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2003-08-22"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 28
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ctd",
+      "date_started": "2017-03-01T01:11:06.111Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2001-08-29"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 29
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ded",
+      "date_started": "2017-03-01T01:11:06.113Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-07-14"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 30
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "dcd",
+      "date_started": "2017-03-01T01:11:06.114Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-01-03"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 31
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "flmd",
+      "date_started": "2017-03-01T01:11:06.116Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-07-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 32
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "flnd",
+      "date_started": "2017-03-01T01:11:06.117Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-06-21"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 33
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "flsd",
+      "date_started": "2017-03-01T01:11:06.120Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1992-04-23"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 34
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "gamd",
+      "date_started": "2017-03-01T01:11:06.123Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2001-07-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 35
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "gand",
+      "date_started": "2017-03-01T01:11:06.124Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2003-03-28"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 36
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "gasd",
+      "date_started": "2017-03-01T01:11:06.126Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1998-07-07"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 37
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "gud",
+      "date_started": "2017-03-01T01:11:06.128Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-05-26"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 38
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "hid",
+      "date_started": "2017-03-01T01:11:06.129Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-12-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 39
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "idd",
+      "date_started": "2017-03-01T01:11:06.131Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-01-08"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 40
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ilcd",
+      "date_started": "2017-03-01T01:11:06.135Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-06-02"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 41
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ilnd",
+      "date_started": "2017-03-01T01:11:06.137Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1991-01-11"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 42
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ilsd",
+      "date_started": "2017-03-01T01:11:06.138Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2002-07-12"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 43
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "innd",
+      "date_started": "2017-03-01T01:11:06.140Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1994-03-25"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 44
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "insd",
+      "date_started": "2017-03-01T01:11:06.141Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-11"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 45
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "iand",
+      "date_started": "2017-03-01T01:11:06.143Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1999-10-29"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 46
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "iasd",
+      "date_started": "2017-03-01T01:11:06.145Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-08"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 47
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ksd",
+      "date_started": "2017-03-01T01:11:06.146Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-07-06"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 48
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "kyed",
+      "date_started": "2017-03-01T01:11:06.148Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-01-07"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 49
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "kywd",
+      "date_started": "2017-03-01T01:11:06.150Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-10-21"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 50
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "laed",
+      "date_started": "2017-03-01T01:11:06.153Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2003-11-05"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 51
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "lamd",
+      "date_started": "2017-03-01T01:11:06.154Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-05-12"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 52
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "lawd",
+      "date_started": "2017-03-01T01:11:06.156Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2000-03-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 53
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "med",
+      "date_started": "2017-03-01T01:11:06.158Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-11-08"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 54
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mdd",
+      "date_started": "2017-03-01T01:11:06.159Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-15"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 55
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mad",
+      "date_started": "2017-03-01T01:11:06.161Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-09-07"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 56
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mied",
+      "date_started": "2017-03-01T01:11:06.162Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2002-05-08"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 57
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "miwd",
+      "date_started": "2017-03-01T01:11:06.164Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-04-15"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 58
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mnd",
+      "date_started": "2017-03-01T01:11:06.168Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-03-23"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 59
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "msnd",
+      "date_started": "2017-03-01T01:11:06.169Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1996-07-09"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 60
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mssd",
+      "date_started": "2017-03-01T01:11:06.171Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-01-23"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 61
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "moed",
+      "date_started": "2017-03-01T01:11:06.172Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1984-10-29"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 62
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mowd",
+      "date_started": "2017-03-01T01:11:06.174Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-08-24"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 63
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mtd",
+      "date_started": "2017-03-01T01:11:06.176Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-11-03"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 64
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ned",
+      "date_started": "2017-03-01T01:11:06.177Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1975-02-14"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 65
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nvd",
+      "date_started": "2017-03-01T01:11:06.179Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1990-05-17"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 66
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nhd",
+      "date_started": "2017-03-01T01:11:06.181Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1983-08-15"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 67
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "njd",
+      "date_started": "2017-03-01T01:11:06.183Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1965-09-05"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 68
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nmd",
+      "date_started": "2017-03-01T01:11:06.185Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1993-10-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 69
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nyed",
+      "date_started": "2017-03-01T01:11:06.186Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1991-02-04"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 70
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nynd",
+      "date_started": "2017-03-01T01:11:06.191Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1990-01-30"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 71
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nysd",
+      "date_started": "2017-03-01T01:11:06.193Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2000-01-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 72
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nywd",
+      "date_started": "2017-03-01T01:11:06.194Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-01-07"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 73
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nced",
+      "date_started": "2017-03-01T01:11:06.196Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1991-11-25"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 74
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ncmd",
+      "date_started": "2017-03-01T01:11:06.198Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-02-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 75
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ncwd",
+      "date_started": "2017-03-01T01:11:06.200Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1992-08-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 76
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ndd",
+      "date_started": "2017-03-01T01:11:06.202Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-11-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 77
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nmid",
+      "date_started": "2017-03-01T01:11:06.204Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-03-30"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 78
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ohnd",
+      "date_started": "2017-03-01T01:11:06.205Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1975-04-09"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 79
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ohnd",
+      "date_started": "2017-03-01T01:11:06.207Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1975-04-09"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 80
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ohsd",
+      "date_started": "2017-03-01T01:11:06.208Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2003-10-29"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 81
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "oked",
+      "date_started": "2017-03-01T01:11:06.211Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1994-08-22"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 82
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "oknd",
+      "date_started": "2017-03-01T01:11:06.214Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-05-31"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 83
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "okwd",
+      "date_started": "2017-03-01T01:11:06.217Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-08-31"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 84
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ord",
+      "date_started": "2017-03-01T01:11:06.218Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1996-01-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 85
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "paed",
+      "date_started": "2017-03-01T01:11:06.220Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-10-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 86
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "pamd",
+      "date_started": "2017-03-01T01:11:06.225Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-02-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 87
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "pawd",
+      "date_started": "2017-03-01T01:11:06.226Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2002-08-05"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 88
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "prd",
+      "date_started": "2017-03-01T01:11:06.231Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1991-07-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 89
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "rid",
+      "date_started": "2017-03-01T01:11:06.232Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-05-31"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 90
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "scd",
+      "date_started": "2017-03-01T01:11:06.234Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-02-22"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 91
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "sdd",
+      "date_started": "2017-03-01T01:11:06.236Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2003-08-11"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 92
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "tned",
+      "date_started": "2017-03-01T01:11:06.237Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2001-04-23"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 93
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "tnmd",
+      "date_started": "2017-03-01T01:11:06.239Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-06-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 94
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "tnwd",
+      "date_started": "2017-03-01T01:11:06.241Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-07-09"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 95
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "txed",
+      "date_started": "2017-03-01T01:11:06.244Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-02-12"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 96
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "txnd",
+      "date_started": "2017-03-01T01:11:06.246Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2002-06-04"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 97
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "txsd",
+      "date_started": "2017-03-01T01:11:06.247Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1998-03-04"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 98
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "txwd",
+      "date_started": "2017-03-01T01:11:06.250Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-08-11"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 99
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "cit",
+      "date_started": "2017-03-01T01:11:06.253Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1981-09-09"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 100
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "uscfc",
+      "date_started": "2017-03-01T01:11:06.254Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-15"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 101
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "utd",
+      "date_started": "2017-03-01T01:11:06.256Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-10-25"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 102
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "vtd",
+      "date_started": "2017-03-01T01:11:06.257Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2003-04-07"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 103
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "vid",
+      "date_started": "2017-03-01T01:11:06.259Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2007-06-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 104
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "vaed",
+      "date_started": "2017-03-01T01:11:06.260Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-03-16"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 105
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "vawd",
+      "date_started": "2017-03-01T01:11:06.262Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-08-13"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 106
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "waed",
+      "date_started": "2017-03-01T01:11:06.264Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1991-01-25"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 107
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wawd",
+      "date_started": "2017-03-01T01:11:06.265Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2003-10-24"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 108
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wvnd",
+      "date_started": "2017-03-01T01:11:06.267Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1989-01-13"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 109
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wvsd",
+      "date_started": "2017-03-01T01:11:06.269Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1992-02-24"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 110
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wied",
+      "date_started": "2017-03-01T01:11:06.271Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-16"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 111
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wiwd",
+      "date_started": "2017-03-01T01:11:06.274Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1986-02-10"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 112
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wyd",
+      "date_started": "2017-03-01T01:11:06.275Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-10-13"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 113
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "almb",
+      "date_started": "2017-03-01T01:11:06.277Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-06-22"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 114
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "alnb",
+      "date_started": "2017-03-01T01:11:06.279Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-08-02"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 115
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "alsb",
+      "date_started": "2017-03-01T01:11:06.281Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-05-25"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 116
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "akb",
+      "date_started": "2017-03-01T01:11:06.285Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-28"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 117
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "arb",
+      "date_started": "2017-03-01T01:11:06.287Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 118
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "areb",
+      "date_started": "2017-03-01T01:11:06.289Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2006-10-03"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 119
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "arwb",
+      "date_started": "2017-03-01T01:11:06.291Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2006-08-08"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 120
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "cacb",
+      "date_started": "2017-03-01T01:11:06.292Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2002-05-31"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 121
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "caeb",
+      "date_started": "2017-03-01T01:11:06.294Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-21"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 122
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "canb",
+      "date_started": "2017-03-01T01:11:06.296Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 123
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "cob",
+      "date_started": "2017-03-01T01:11:06.301Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-05-13"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 126
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ctb",
+      "date_started": "2017-03-01T01:11:06.304Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2006-05-22"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 127
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "deb",
+      "date_started": "2017-03-01T01:11:06.306Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 128
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "dcb",
+      "date_started": "2017-03-01T01:11:06.307Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-01-11"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 129
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "flmb",
+      "date_started": "2017-03-01T01:11:06.309Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1998-12-21"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 130
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "flnb",
+      "date_started": "2017-03-01T01:11:06.310Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-12-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 131
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "flsb",
+      "date_started": "2017-03-01T01:11:06.312Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2006-09-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 132
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "gamb",
+      "date_started": "2017-03-01T01:11:06.314Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2006-10-02"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 133
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ganb",
+      "date_started": "2017-03-01T01:11:06.317Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1992-01-02"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 134
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "gasb",
+      "date_started": "2017-03-01T01:11:06.319Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-05-14"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 135
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "gud",
+      "date_started": "2017-03-01T01:11:06.320Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-05-26"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 136
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "hib",
+      "date_started": "2017-03-01T01:11:06.322Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-01-12"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 137
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "idb",
+      "date_started": "2017-03-01T01:11:06.324Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-03-10"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 138
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ilcb",
+      "date_started": "2017-03-01T01:11:06.325Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 139
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ilnb",
+      "date_started": "2017-03-01T01:11:06.327Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-06"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 140
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ilsb",
+      "date_started": "2017-03-01T01:11:06.329Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2006-08-25"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 141
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "innb",
+      "date_started": "2017-03-01T01:11:06.330Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1988-01-04"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 142
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "insb",
+      "date_started": "2017-03-01T01:11:06.333Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-04-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 143
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ianb",
+      "date_started": "2017-03-01T01:11:06.335Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2002-01-04"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 144
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "iasb",
+      "date_started": "2017-03-01T01:11:06.337Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-11-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 145
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ksb",
+      "date_started": "2017-03-01T01:11:06.338Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 146
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "kyeb",
+      "date_started": "2017-03-01T01:11:06.340Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-29"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 147
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "kywb",
+      "date_started": "2017-03-01T01:11:06.342Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-20"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 148
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "laeb",
+      "date_started": "2017-03-01T01:11:06.343Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-08-06"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 149
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "lamb",
+      "date_started": "2017-03-01T01:11:06.345Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-10-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 150
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "lawb",
+      "date_started": "2017-03-01T01:11:06.347Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 151
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "meb",
+      "date_started": "2017-03-01T01:11:06.349Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-02-02"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 152
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mdb",
+      "date_started": "2017-03-01T01:11:06.352Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2003-09-29"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 153
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mab",
+      "date_started": "2017-03-01T01:11:06.354Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-14"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 154
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mieb",
+      "date_started": "2017-03-01T01:11:06.356Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1985-03-13"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 155
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "miwb",
+      "date_started": "2017-03-01T01:11:06.357Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1988-01-04"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 156
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mnb",
+      "date_started": "2017-03-01T01:11:06.359Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2013-07-16"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 157
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "msnb",
+      "date_started": "2017-03-01T01:11:06.361Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-05-05"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 158
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mssb",
+      "date_started": "2017-03-01T01:11:06.363Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-05-20"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 159
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "moeb",
+      "date_started": "2017-03-01T01:11:06.365Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2006-07-31"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 160
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mowb",
+      "date_started": "2017-03-01T01:11:06.367Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2002-01-24"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 161
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "mtb",
+      "date_started": "2017-03-01T01:11:06.368Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2007-03-05"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 162
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nebraskab",
+      "date_started": "2017-03-01T01:11:06.370Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-22"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 163
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nvb",
+      "date_started": "2017-03-01T01:11:06.372Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1984-01-03"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 164
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nhb",
+      "date_started": "2017-03-01T01:11:06.373Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2006-09-13"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 165
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "njb",
+      "date_started": "2017-03-01T01:11:06.375Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-25"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 166
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nmb",
+      "date_started": "2017-03-01T01:11:06.376Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1997-04-07"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 167
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nyeb",
+      "date_started": "2017-03-01T01:11:06.378Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 168
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nynb",
+      "date_started": "2017-03-01T01:11:06.380Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-05-11"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 169
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nysb",
+      "date_started": "2017-03-01T01:11:06.383Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-20"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 170
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nywb",
+      "date_started": "2017-03-01T01:11:06.384Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 171
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "nceb",
+      "date_started": "2017-03-01T01:11:06.386Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-28"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 172
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ncmb",
+      "date_started": "2017-03-01T01:11:06.388Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-21"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 173
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ncwb",
+      "date_started": "2017-03-01T01:11:06.389Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2001-01-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 174
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ndb",
+      "date_started": "2017-03-01T01:11:06.391Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-06-21"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 175
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ohnb",
+      "date_started": "2017-03-01T01:11:06.394Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-06-02"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 176
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "ohsb",
+      "date_started": "2017-03-01T01:11:06.396Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1991-01-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 177
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "okeb",
+      "date_started": "2017-03-01T01:11:06.398Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-12-20"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 178
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "oknb",
+      "date_started": "2017-03-01T01:11:06.402Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2006-06-06"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 179
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "okwb",
+      "date_started": "2017-03-01T01:11:06.403Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 180
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "orb",
+      "date_started": "2017-03-01T01:11:06.405Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-04-14"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 181
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "paeb",
+      "date_started": "2017-03-01T01:11:06.407Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 182
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "pamb",
+      "date_started": "2017-03-01T01:11:06.412Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1997-05-12"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 183
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "pawb",
+      "date_started": "2017-03-01T01:11:06.413Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-21"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 184
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "prb",
+      "date_started": "2017-03-01T01:11:06.415Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-05-03"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 185
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "rib",
+      "date_started": "2017-03-01T01:11:06.417Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-04-13"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 186
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "scb",
+      "date_started": "2017-03-01T01:11:06.418Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2006-06-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 187
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "sdb",
+      "date_started": "2017-03-01T01:11:06.420Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 188
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "tneb",
+      "date_started": "2017-03-01T01:11:06.422Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-05-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 189
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "tnmb",
+      "date_started": "2017-03-01T01:11:06.425Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-10-06"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 190
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "tnwb",
+      "date_started": "2017-03-01T01:11:06.427Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1991-01-02"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 191
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "txeb",
+      "date_started": "2017-03-01T01:11:06.428Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 192
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "txnb",
+      "date_started": "2017-03-01T01:11:06.430Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 193
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "txsb",
+      "date_started": "2017-03-01T01:11:06.432Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-22"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 194
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "txwb",
+      "date_started": "2017-03-01T01:11:06.435Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-26"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 195
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "utb",
+      "date_started": "2017-03-01T01:11:06.437Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-05-11"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 196
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "vtb",
+      "date_started": "2017-03-01T01:11:06.438Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-07-27"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 197
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "vid",
+      "date_started": "2017-03-01T01:11:06.440Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2007-06-18"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 198
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "vaeb",
+      "date_started": "2017-03-01T01:11:06.442Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-22"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 199
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "vawb",
+      "date_started": "2017-03-01T01:11:06.443Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-10-26"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 200
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "waeb",
+      "date_started": "2017-03-01T01:11:06.445Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-12-23"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 201
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wawb",
+      "date_started": "2017-03-01T01:11:06.446Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-01-21"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 202
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wvnb",
+      "date_started": "2017-03-01T01:11:06.448Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-06-16"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 203
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wvsb",
+      "date_started": "2017-03-01T01:11:06.450Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-08-09"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 204
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wieb",
+      "date_started": "2017-03-01T01:11:06.451Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-04-30"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 205
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wiwb",
+      "date_started": "2017-03-01T01:11:06.453Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2004-07-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 206
+  },
+  {
+    "fields": {
+      "status": 1,
+      "court": "wyb",
+      "date_started": "2017-03-01T01:11:06.456Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "2005-04-19"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 207
+  }
+]

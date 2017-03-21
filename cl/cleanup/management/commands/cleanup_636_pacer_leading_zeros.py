@@ -35,7 +35,7 @@ class CleanupPacerXMLParser(PacerXMLParser):
         old_entry_number = int(entry_number)
 
         try:
-            d = RECAPDocument.objects.get(
+            rd = RECAPDocument.objects.get(
                 docket_entry=docket_entry,
                 document_number=old_entry_number,
                 attachment_number=attachment_number or None,
@@ -45,15 +45,15 @@ class CleanupPacerXMLParser(PacerXMLParser):
             logger.info("    Failed to find item.")
             return None
 
-        d.document_number = entry_number
-        if d.is_available:
+        rd.document_number = entry_number
+        if rd.is_available:
             new_ia = get_ia_document_url_from_path(
                 self.path, entry_number, attachment_number)
             logger.info("    Updating IA URL from %s to %s" %
-                        (d.filepath_ia, new_ia))
-            d.filepath_ia = new_ia
+                        (rd.filepath_ia, new_ia))
+            rd.filepath_ia = new_ia
 
-            if not os.path.isfile(d.filepath_local.path):
+            if not os.path.isfile(rd.filepath_local.path):
                 # Set the value correctly and get the file from IA if we don't
                 # already have it.
                 new_local_path = os.path.join(
@@ -62,36 +62,36 @@ class CleanupPacerXMLParser(PacerXMLParser):
                                                      attachment_number),
                 )
                 logger.info("    Updating local path from %s to %s" %
-                            (d.filepath_local, new_local_path))
-                d.filepath_local = new_local_path
-                filename = d.filepath_ia.rsplit('/', 1)[-1]
+                            (rd.filepath_local, new_local_path))
+                rd.filepath_local = new_local_path
+                filename = rd.filepath_ia.rsplit('/', 1)[-1]
                 logger.info("    Downloading item with filename %s" % filename)
                 if not debug:
-                    download_recap_item(d.filepath_ia, filename)
+                    download_recap_item(rd.filepath_ia, filename)
             else:
                 logger.info("    File already on disk. Punting.")
 
-            if d.page_count is None:
+            if rd.page_count is None:
                 logger.info("    Getting page count.")
-                extension = d.filepath_local.path.split('.')[-1]
-                d.page_count = get_page_count(d.filepath_local.path, extension)
+                extension = rd.filepath_local.path.split('.')[-1]
+                rd.page_count = get_page_count(rd.filepath_local.path, extension)
         else:
             logger.info("    Item not available in RECAP. Punting.")
             return None
 
         if not debug:
             try:
-                extract_recap_pdf(d.pk, check_if_needed=False)
-                d.save(do_extraction=False, index=True)
+                extract_recap_pdf(rd.pk, check_if_needed=False)
+                rd.save(do_extraction=False, index=True)
                 logger.info("    Item saved at https://www.courtlistener.com%s"
-                            % d.get_absolute_url())
+                            % rd.get_absolute_url())
             except IntegrityError:
                 logger.info("    Integrity error while saving.")
                 return None
         else:
             logger.info("    No save requested in debug mode.")
 
-        return d
+        return rd
 
 
 class Command(BaseCommand):

@@ -10,7 +10,7 @@ from cl.corpus_importer.import_columbia.parse_opinions import \
     get_state_court_object
 from cl.corpus_importer.lawbox.judge_extractor import get_judge_from_str, \
     REASONS
-from cl.lib.pacer import PacerXMLParser
+from cl.lib.pacer import PacerXMLParser, lookup_and_save
 from cl.people_db.import_judges.populate_fjc_judges import get_fed_court_object
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.search.models import Docket
@@ -470,7 +470,7 @@ class PacerDocketParserTest(TestCase):
 
     def setUp(self):
         self.pacer_doc = PacerXMLParser(self.DOCKET_PATH)
-        self.docket = self.pacer_doc.save(debug=False)
+        self.docket = lookup_and_save(self.pacer_doc, debug=False)
 
     def tearDown(self):
         Docket.objects.all().delete()

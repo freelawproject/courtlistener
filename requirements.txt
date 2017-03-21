@@ -36,6 +36,7 @@ google-api-python-client
 hiredis==0.2.0
 httplib2==0.9.1
 idna==2.1
+internetarchive
 ipaddress==1.0.16
 ipython==3.2.0
 juriscraper

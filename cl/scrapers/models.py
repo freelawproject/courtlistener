@@ -87,3 +87,36 @@ class RECAPLog(models.Model):
         help_text="The current status of the RECAP scrape.",
         choices=RECAP_STATUSES,
     )
+
+
+class PACERFreeDocumentLog(models.Model):
+    SCRAPE_SUCCESSFUL = 1
+    SCRAPE_IN_PROGRESS = 2
+    SCRAPE_FAILED = 3
+    SCRAPE_STATUSES = (
+        (SCRAPE_SUCCESSFUL, "Scrape completed successfully"),
+        (SCRAPE_IN_PROGRESS, "Scrape currently in progress"),
+        (SCRAPE_FAILED, "Scrape failed"),
+    )
+    court = models.ForeignKey(
+        Court,
+        help_text="The court where items were being downloaded from."
+    )
+    date_started = models.DateTimeField(
+        help_text="The moment when the scrape of the RECAP content began.",
+        auto_now_add=True,
+    )
+    date_completed = models.DateTimeField(
+        help_text="The moment when the scrape of the RECAP content ended.",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    date_queried = models.DateField(
+        help_text="The date that was queried.",
+        db_index=True,
+    )
+    status = models.SmallIntegerField(
+        help_text="The status of the scrape.",
+        choices=SCRAPE_STATUSES,
+    )

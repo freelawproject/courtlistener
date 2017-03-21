@@ -98,16 +98,13 @@
                     <div class="col-sm-8">
                         <div class="row">
                             <div class="col-sm-6">
-                                <div class="pointer"
-                                     data-toggle="modal"
-                                     data-target="#court-picker">
-                                    <a href="#" class="btn btn-primary btn-lg"
-                                       type="button">
-                                        Select Jurisdictions
-                                        <span id="jurisdiction-count"
-                                              class="badge">{{ court_count_human|default:""}}</span>
-                                    </a>
-                                </div>
+                                <a href="#" class="btn btn-default btn-lg v-offset-above-1"
+                                   type="button" data-toggle="modal"
+                                   data-target="#court-picker">
+                                    <span class="hidden-sm">Select </span>Jurisdictions
+                                    <span id="jurisdiction-count"
+                                          class="badge">{{ court_count_human|default:""}}</span>
+                                </a>
                             </div>
                             <div class="col-sm-6">
                                 {% include "includes/order_by_dropdown.html" %}
@@ -229,22 +226,19 @@
             {# Modal is at bottom of results, so it loads last #}
             <div id="extra-sidebar-fields" class="col-sm-9">
                 <div class="row">
-                    <div class="col-sm-4">
-                        <div class="pointer"
-                             data-toggle="modal"
-                             data-target="#court-picker">
-                            <a href="#" class="btn btn-primary btn-lg"
-                               type="button">
-                                Select Jurisdictions
-                                <span id="jurisdiction-count"
-                                      class="badge">{{ court_count_human|default:"" }}</span>
-                            </a>
-                        </div>
+                    <div class="col-sm-3">
+                        <a href="#" class="btn btn-default btn-lg v-offset-above-1"
+                           type="button" data-toggle="modal"
+                           data-target="#court-picker">
+                            <span class="hidden-sm">Select </span>Jurisdictions
+                            <span id="jurisdiction-count"
+                                  class="badge">{{ court_count_human|default:"" }}</span>
+                        </a>
                     </div>
                     <div class="col-sm-4">
                         {% include "includes/order_by_dropdown.html" %}
                     </div>
-                    <div class="col-sm-4">
+                    <div class="col-sm-5">
                         <div class="form-group">
                             {{ search_form.docket_number.label_tag }}
                             {{ search_form.docket_number }}
@@ -357,22 +351,19 @@
             {#  Modal is at bottom of results, so it loads last. #}
             <div id="extra-sidebar-fields" class="col-sm-9">
                 <div class="row">
-                    <div class="col-sm-4">
-                        <div class="pointer"
-                             data-toggle="modal"
-                             data-target="#court-picker">
-                            <a href="#" class="btn btn-primary btn-lg"
-                               type="button">
-                                Select Jurisdictions
-                                <span id="jurisdiction-count"
-                                      class="badge">{{ court_count_human|default:"" }}</span>
-                            </a>
-                        </div>
+                    <div class="col-sm-3">
+                        <a href="#" class="btn btn-default btn-lg v-offset-above-1"
+                           type="button" data-toggle="modal"
+                           data-target="#court-picker">
+                            <span class="hidden-sm">Select </span>Jurisdictions
+                            <span id="jurisdiction-count"
+                                  class="badge">{{ court_count_human|default:"" }}</span>
+                        </a>
                     </div>
                     <div class="col-sm-4">
                         {% include "includes/order_by_dropdown.html" %}
                     </div>
-                    <div class="col-sm-4">
+                    <div class="col-sm-5">
                         <div class="form-group">
                             {{ search_form.case_name.label_tag }}
                             {{ search_form.case_name }}
@@ -433,16 +424,13 @@
             <div id="extra-sidebar-fields" class="col-sm-12">
                 <div class="row">
                     <div class="col-sm-3">
-                        <div class="pointer"
-                             data-toggle="modal"
-                             data-target="#court-picker">
-                            <a href="#" class="btn btn-primary btn-lg"
-                               type="button">
-                                Select Jurisdictions
-                                <span id="jurisdiction-count"
-                                      class="badge">{{ court_count_human|default:"" }}</span>
-                            </a>
-                        </div>
+                        <a href="#" class="btn btn-default btn-lg v-offset-above-1"
+                           type="button" data-toggle="modal"
+                           data-target="#court-picker">
+                            <span class="hidden-sm">Select </span>Jurisdictions
+                            <span id="jurisdiction-count"
+                                  class="badge">{{ court_count_human|default:"" }}</span>
+                        </a>
                     </div>
                     <div class="col-sm-3">
                         {% include "includes/order_by_dropdown.html" %}

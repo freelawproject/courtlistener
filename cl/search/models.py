@@ -12,7 +12,8 @@ from django.utils.encoding import smart_unicode
 from django.utils.text import slugify
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.model_helpers import make_upload_path, make_recap_path
+from cl.lib.model_helpers import make_upload_path, make_recap_path, \
+    make_recap_pdf_path
 from cl.lib.search_index_utils import InvalidDocumentError, null_map, normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
@@ -295,10 +296,8 @@ class Docket(models.Model):
     def pacer_url(self):
         if not self.pacer_case_id:
             return None
-        from cl.lib.pacer import cl_to_pacer_ids
-        court_id = self.court.pk
-        if court_id in cl_to_pacer_ids:
-            court_id = cl_to_pacer_ids[court_id]
+        from cl.lib.pacer import map_cl_to_pacer_id
+        court_id = map_cl_to_pacer_id(self.court.pk)
         return u"https://ecf.%s.uscourts.gov/cgi-bin/DktRpt.pl?%s" % (
             court_id,
             self.pacer_case_id,
@@ -545,7 +544,7 @@ class RECAPDocument(models.Model):
     )
     filepath_local = models.FileField(
         help_text="The path of the file in the local storage area.",
-        upload_to=make_recap_path,
+        upload_to=make_recap_pdf_path,
         storage=IncrementingFileSystemStorage(),
         max_length=1000,
         blank=True,
@@ -570,6 +569,10 @@ class RECAPDocument(models.Model):
         choices=OCR_STATUSES,
         null=True,
         blank=True,
+    )
+    is_free_on_pacer = models.NullBooleanField(
+        help_text="Is this item freely available as an opinion on PACER?",
+        db_index=True,
     )
 
     class Meta:
@@ -601,11 +604,9 @@ class RECAPDocument(models.Model):
     @property
     def pacer_url(self):
         """Construct a doc1 URL for any item, if we can. Else, return None."""
-        from cl.lib.pacer import cl_to_pacer_ids
+        from cl.lib.pacer import map_cl_to_pacer_id
         if self.pacer_doc_id:
-            court_id = self.docket_entry.docket.court.pk
-            if court_id in cl_to_pacer_ids:
-                court_id = cl_to_pacer_ids[court_id]
+            court_id = map_cl_to_pacer_id(self.docket_entry.docket.court_id)
             return "https://ecf.%s.uscourts.gov/doc1/%s" % (
                 court_id, self.pacer_doc_id)
         else:
@@ -622,7 +623,7 @@ class RECAPDocument(models.Model):
             bool(self.filepath_local.name),  # Just in case
         ]))
 
-    def save(self, do_extraction=True, index=True, *args, **kwargs):
+    def save(self, do_extraction=False, index=False, *args, **kwargs):
         if self.document_type == self.ATTACHMENT:
             if self.attachment_number is None:
                 raise ValidationError('attachment_number cannot be null for an '

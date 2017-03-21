@@ -16,16 +16,16 @@ class Command(BaseCommand):
             "Otherwise, press CTRL+C to exit."
         )
         cnt = Counter()
-        for r in RECAPDocument.objects.all():
+        for rd in RECAPDocument.objects.all():
             try:
-                path = r.filepath_local.path
+                path = rd.filepath_local.path
             except ValueError:
                 cnt['no_file'] += 1
             else:
                 extension = path.split('.')[-1]
                 count = get_page_count(path, extension)
-                r.page_count = count
-                r.save(do_extraction=False, index=False)
+                rd.page_count = count
+                rd.save(do_extraction=False, index=False)
                 cnt['successes'] += 1
                 if count is not None:
                     cnt['total_pages'] += count

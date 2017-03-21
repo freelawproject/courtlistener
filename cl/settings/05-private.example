@@ -57,6 +57,10 @@ else:
 FTM_KEY = ''
 FTM_LAST_UPDATED = date.today()
 
+# Internet Archive
+IA_ACCESS_KEY = ''
+IA_SECRET_KEY = ''
+
 here = os.path.dirname(os.path.realpath(__file__))
 GOOGLE_AUTH = {
     'PATH': os.path.join(here, 'google_auth.json'),

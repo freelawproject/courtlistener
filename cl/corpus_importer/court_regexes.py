@@ -86,9 +86,10 @@ fd_pairs = (
     (re.compile('(^|\s)N(\.|(orthern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Mississippi', re.I), 'msnd'),
     (re.compile('(^|\s)S(\.|(outhern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Mississippi', re.I), 'mssd'),
     # 1822-1857 --> MOD
-    (re.compile('(^|\s)C(\.|(entral))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Missouri', re.I), 'mocd'),
     (re.compile('(^|\s)E(\.|(astern))? ?D(\.|(istrict))?,? ?(of )?(the )?Missouri', re.I), 'moed'),
+        (re.compile('(^|\s)District Court,? C|S\. D\. Missouri,? E\. ?D\.', re.I), 'moed'),
     (re.compile('(^|\s)W(\.|(estern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Missouri', re.I), 'mowd'),
+        (re.compile('(^|\s)District Court,? C|S\. D\. Missouri,? W\. ?D\.', re.I), 'mowd'),
     (re.compile('(^|\s)S(\.|(outhern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Missouri', re.I), 'mosd'),
         (re.compile('Missouri, W\.D', re.I), 'mowd'),
     (re.compile('(^|\s)D(\.|:|,|(ist(\.|(rict))))? ?(of )?Montana', re.I), 'mtd'),
@@ -338,7 +339,7 @@ fb_pairs = (
         (re.compile('M\.D\.S\. Tennessee', re.I), 'tnmb'),
         (re.compile('Nashville', re.I), 'tnmb'),
     (re.compile('(^|\s)W\.? ?D(\.|(istrict))? (of )?Tennessee', re.I), 'tnwb'),
-    (re.compile('(^|\s)D\. Tennessee', re.I), 'tennesseeb'),
+    (re.compile('(^|\s)D\. Tennessee', re.I), 'tennesseeb'),  # Only exists 1797-1801
     (re.compile('(^|\s)E\.? ?D ?(\.|(istrict))? (of )?Texas', re.I), 'txeb'),
     (re.compile('(^|\s)N\.? ?D(\.|(istrict))? (of )?Texas', re.I), 'txnb'),
     (re.compile('(^|\s)S\.? ?D(\.|(istrict))? (of )?Texas', re.I), 'txsb'),
