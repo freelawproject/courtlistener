@@ -38,7 +38,6 @@ pacer_to_cl_ids = {
     'cofc': 'uscfc',      # Court of Federal Claims
     'neb': 'nebraskab',   # Nebraska Bankruptcy
     'nysb-mega': 'nysb',  # Remove the mega thing
-    '': 'tennesseeb',
 }
 
 # Reverse dict of pacer_to_cl_ids
