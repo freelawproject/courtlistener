@@ -11,16 +11,19 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
+from django.utils.timezone import now
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import FreeOpinionReport
-from requests.exceptions import ChunkedEncodingError, HTTPError
-from requests.packages.urllib3.exceptions import ReadTimeoutError, \
-    ConnectionError
+from requests.exceptions import ChunkedEncodingError, HTTPError, ConnectionError
+from requests.packages.urllib3.exceptions import ReadTimeoutError
+
 from rest_framework.status import HTTP_403_FORBIDDEN
 
 from cl.celery import app
-from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status
+from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
+    map_pacer_to_cl_id
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
+from cl.scrapers.models import PACERFreeDocumentLog
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument
 
@@ -105,7 +108,8 @@ def get_free_document_report(self, court_id, start, end, session):
 
 
 @app.task(bind=True, max_retries=5)
-def process_free_opinion_result(self, result, court, cnt):
+def process_free_opinion_result(self, result, court, cnt, pacer_court_id,
+                                next_end_date):
     """Process a single result from the free opinion report"""
     result.court = court
     result.case_name = harmonize(result.case_name)
@@ -120,6 +124,7 @@ def process_free_opinion_result(self, result, court, cnt):
     if not docket:
         logger.error("Unable to create docket for %s" % result)
         self.request.chain = None
+        mark_court_done_on_date(pacer_court_id, next_end_date)
         return
     docket.blocked, docket.date_blocked = get_blocked_status(docket)
     docket.save()
@@ -146,6 +151,7 @@ def process_free_opinion_result(self, result, court, cnt):
         logger.info("Found the item already in the DB with document_number: %s "
                     "and docket_entry: %s!" % (result.document_number, de))
         self.request.chain = None
+        mark_court_done_on_date(pacer_court_id, next_end_date)
         return
 
     return {'result': result, 'rd_pk': rd.pk}
@@ -254,8 +260,8 @@ def upload_to_ia(identifier, files, metadata=None):
 
     :param identifier: The global identifier within IA for the item you wish to
     work with.
-    :param files: The filepaths or file-like objects to upload. This value can be
-    an iterable or a single file-like object or string.
+    :param files: The filepaths or file-like objects to upload. This value can
+    be an iterable or a single file-like object or string.
     :param metadata: Metadata used to create a new item. If the item already
     exists, the metadata will not be updated
 
@@ -280,3 +286,15 @@ def upload_to_ia(identifier, files, metadata=None):
                 [r.status_code for r in responses])
     return responses
 
+
+@app.task
+def mark_court_done_on_date(court_id, d):
+    court_id = map_pacer_to_cl_id(court_id)
+    doc_log = PACERFreeDocumentLog.objects.filter(
+        status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
+        court_id=court_id,
+    ).latest('date_queried')
+    doc_log.date_queried = d
+    doc_log.status = PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+    doc_log.date_completed = now()
+    doc_log.save()
