@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
 import subprocess
-import time
 import traceback
+import uuid
 from tempfile import NamedTemporaryFile
 
 import eyed3
@@ -451,17 +451,13 @@ def process_audio_file(pk):
     meta data to the database.
     """
     af = Audio.objects.get(pk=pk)
-    path_to_original = af.local_path_original_file.path
-
-    path_to_tmp_location = os.path.join('/tmp', str(time.time()) + '.mp3')
-
-    # Convert original file to:
-    #  - sample rate (audio samples / s) of 22050Hz (-ar 22050)
-    #  - constant bit rate (sample resolution) of 48kbps (-ab 48k)
-    avconv_command = ['avconv', '-i', path_to_original,
-                      '-ar', '22050',
-                      '-ab', '48k',
-                      path_to_tmp_location]
+    tmp_path = os.path.join('/tmp', 'audio_' + uuid.uuid4().hex + '.mp3')
+    avconv_command = [
+        'avconv', '-i', af.local_path_original_file.path,
+        '-ar', '22050',  # sample rate (audio samples/s) of 22050Hz
+        '-ab', '48k',    # constant bit rate (sample resolution) of 48kbps
+        tmp_path
+    ]
     try:
         _ = subprocess.check_output(
             avconv_command,
@@ -473,25 +469,22 @@ def process_audio_file(pk):
         print traceback.format_exc()
         raise
 
-    # Have to do this last because otherwise the mp3 hasn't yet been generated.
-    set_mp3_meta_data(af, path_to_tmp_location)
-
-    af.duration = eyed3.load(path_to_tmp_location).info.time_secs
-
-    with open(path_to_tmp_location, 'r') as mp3:
-        try:
+    set_mp3_meta_data(af, tmp_path)
+    try:
+        with open(tmp_path, 'r') as mp3:
             cf = ContentFile(mp3.read())
             file_name = trunc(best_case_name(af).lower(), 72) + '_cl.mp3'
             af.file_with_date = af.docket.date_argued
             af.local_path_mp3.save(file_name, cf, save=False)
-        except:
-            msg = "Unable to save mp3 to audio_file in scraper.tasks.process_" \
-                  "audio_file for item: %s\nTraceback:\n%s" % \
-                  (af.pk, traceback.format_exc())
-            print msg
-            ErrorLog(log_level='CRITICAL', court=af.docket.court,
-                     message=msg).save()
+    except:
+        msg = ("Unable to save mp3 to audio_file in scraper.tasks."
+               "process_audio_file for item: %s\n"
+               "Traceback:\n"
+               "%s" % (af.pk, traceback.format_exc()))
+        print msg
+        ErrorLog.objects.create(log_level='CRITICAL', court=af.docket.court,
+                                message=msg)
 
+    af.duration = eyed3.load(tmp_path).info.time_secs
     af.processing_complete = True
     af.save()
-    os.remove(path_to_tmp_location)
