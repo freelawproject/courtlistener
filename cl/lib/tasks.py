@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 from celery.canvas import subtask, group, chain
 
 from cl.celery import app
