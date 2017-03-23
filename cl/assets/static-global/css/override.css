@@ -6,6 +6,7 @@ Sets up all the overrides or additional CSS that the site uses.
 
 .navbar-brand {
     padding: 16px 15px 16px 30px;
+    height: 65px;
 }
 
 header {
@@ -15,6 +16,9 @@ header {
 .navbar {
     margin-bottom: 0;
     border-bottom: 1px solid #e7e7e7;
+}
+.navbar-toggle {
+    margin-bottom: 0;
 }
 
 .navbar-nav > li > a {
