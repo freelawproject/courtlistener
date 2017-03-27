@@ -17,7 +17,7 @@ from juriscraper.pacer import FreeOpinionReport
 from requests.exceptions import ChunkedEncodingError, HTTPError, ConnectionError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
-from rest_framework.status import HTTP_403_FORBIDDEN
+from rest_framework.status import HTTP_403_FORBIDDEN, HTTP_400_BAD_REQUEST
 
 from cl.celery import app
 from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
@@ -228,7 +228,10 @@ def upload_free_opinion_to_ia(self, data):
     except OverloadedException as exc:
         raise self.retry(exc=exc, countdown=countdown)
     except HTTPError as exc:
-        if exc.response.status_code == HTTP_403_FORBIDDEN:
+        if exc.response.status_code in [
+            HTTP_403_FORBIDDEN,    # Can't access bucket, typically.
+            HTTP_400_BAD_REQUEST,  # Corrupt PDF, typically.
+        ]:
             return [exc.response]
         raise self.retry(exc=exc, countdown=countdown)
     if all(r.ok for r in responses):
