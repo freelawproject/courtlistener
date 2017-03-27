@@ -99,7 +99,7 @@ def get_free_document_report(self, court_id, start, end, session):
     report = FreeOpinionReport(court_id, session)
     try:
         responses = report.query(start, end, sort='case_number')
-    except (ConnectionError, ChunkedEncodingError) as exc:
+    except (ConnectionError, ChunkedEncodingError, ReadTimeoutError) as exc:
         logger.warning("Unable to get free document report results from %s "
                        "(%s to %s). Trying again." % (court_id, start, end))
         raise self.retry(exc=exc, countdown=5)
