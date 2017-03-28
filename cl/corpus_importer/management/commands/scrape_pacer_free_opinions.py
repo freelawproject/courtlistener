@@ -3,6 +3,7 @@ import os
 from datetime import timedelta
 
 from celery.canvas import chain
+from django.conf import settings
 from django.core.management import BaseCommand
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -16,8 +17,8 @@ from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
 from cl.lib.tasks import dmap
 from cl.scrapers.models import PACERFreeDocumentLog
 
-PACER_USERNAME = os.environ.get('PACER_USERNAME', None)
-PACER_PASSWORD = os.environ.get('PACER_PASSWORD', None)
+PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
+PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 logger = logging.getLogger(__name__)
 

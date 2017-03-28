@@ -60,6 +60,11 @@ FTM_LAST_UPDATED = date.today()
 # Internet Archive
 IA_ACCESS_KEY = ''
 IA_SECRET_KEY = ''
+IA_COLLECTIONS = []
+
+# PACER
+PACER_USERNAME = ''
+PACER_PASSWORD = ''
 
 here = os.path.dirname(os.path.realpath(__file__))
 GOOGLE_AUTH = {
