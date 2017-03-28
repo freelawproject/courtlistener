@@ -103,8 +103,12 @@ def get_free_document_report(self, court_id, start, end, session):
         logger.warning("Unable to get free document report results from %s "
                        "(%s to %s). Trying again." % (court_id, start, end))
         raise self.retry(exc=exc, countdown=5)
-    else:
+
+    try:
         return report.parse(responses)
+    except IndexError as exc:
+        # Happens when the page isn't downloaded properly, ugh.
+        raise self.retry(exc=exc, countdown=5)
 
 
 @app.task(bind=True, max_retries=5)
@@ -124,7 +128,6 @@ def process_free_opinion_result(self, result, court, cnt, pacer_court_id,
     if not docket:
         logger.error("Unable to create docket for %s" % result)
         self.request.chain = None
-        mark_court_done_on_date(pacer_court_id, next_end_date)
         return
     docket.blocked, docket.date_blocked = get_blocked_status(docket)
     docket.save()
@@ -151,10 +154,10 @@ def process_free_opinion_result(self, result, court, cnt, pacer_court_id,
         logger.info("Found the item already in the DB with document_number: %s "
                     "and docket_entry: %s!" % (result.document_number, de))
         self.request.chain = None
-        mark_court_done_on_date(pacer_court_id, next_end_date)
         return
 
-    return {'result': result, 'rd_pk': rd.pk}
+    return {'result': result, 'rd_pk': rd.pk, 'pacer_court_id': pacer_court_id,
+            'next_end_date': next_end_date}
 
 
 @app.task(bind=True, max_retries=5)
@@ -167,6 +170,11 @@ def get_and_process_pdf(self, data, court_id, session):
     except ConnectionError as exc:
         logger.warning("Unable to get PDF for %s" % result)
         raise self.retry(exc=exc, countdown=5)
+
+    if r is None:
+        logger.error("Unable to get PDF for %s" % result)
+        self.request.chain = None
+        return
 
     file_name = get_document_filename(
         result.court.pk,
