@@ -11,9 +11,9 @@ from django.conf import settings
 
 app = Celery('cl')
 
-# Bump the recursion limit to 5× normal to account for really big chains. See:
+# Bump the recursion limit to 10× normal to account for really big chains. See:
 # https://github.com/celery/celery/issues/1078
-sys.setrecursionlimit(5000)
+sys.setrecursionlimit(10000)
 
 # Using a string here means the worker will not have to
 # pickle the object when using Windows.

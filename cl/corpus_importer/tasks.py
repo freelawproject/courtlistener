@@ -301,11 +301,15 @@ def upload_to_ia(identifier, files, metadata=None):
 @app.task
 def mark_court_done_on_date(court_id, d):
     court_id = map_pacer_to_cl_id(court_id)
-    doc_log = PACERFreeDocumentLog.objects.filter(
-        status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
-        court_id=court_id,
-    ).latest('date_queried')
-    doc_log.date_queried = d
-    doc_log.status = PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
-    doc_log.date_completed = now()
-    doc_log.save()
+    try:
+        doc_log = PACERFreeDocumentLog.objects.filter(
+            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
+            court_id=court_id,
+        ).latest('date_queried')
+    except PACERFreeDocumentLog.DoesNotExist:
+        return
+    else:
+        doc_log.date_queried = d
+        doc_log.status = PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+        doc_log.date_completed = now()
+        doc_log.save()
