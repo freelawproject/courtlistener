@@ -162,6 +162,8 @@ def process_free_opinion_result(self, result, court, cnt, pacer_court_id,
 
 @app.task(bind=True, max_retries=5)
 def get_and_process_pdf(self, data, court_id, session):
+    if data is None:
+        return
     result = data['result']
     rd = RECAPDocument.objects.get(pk=data['rd_pk'])
     report = FreeOpinionReport(court_id, session)
@@ -204,6 +206,8 @@ class OverloadedException(Exception):
 
 @app.task(bind=True, max_retries=15)
 def upload_free_opinion_to_ia(self, data):
+    if data is None:
+        return
     countdown = 5 * self.request.retries + 1  # 5s, 10s, 15s...
     result = data['result']
     rd = RECAPDocument.objects.get(pk=data['rd_pk'])
