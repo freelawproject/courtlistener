@@ -108,7 +108,7 @@ def get_free_document_report(self, court_id, start, end, session):
         return report.parse(responses)
     except IndexError as exc:
         # Happens when the page isn't downloaded properly, ugh.
-        raise self.retry(exc=exc, countdown=5)
+        raise self.retry(exc=exc, countdown=15)
 
 
 @app.task(bind=True, max_retries=5)
