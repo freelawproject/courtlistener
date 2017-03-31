@@ -91,7 +91,7 @@ def go():
                 continue
 
             next_start_date, next_end_date = get_next_date_range(
-                pacer_court_id, span=5)
+                pacer_court_id, span=3)
             if next_start_date is None:
                 next_delay = min(delay['count'] * 5, 30)  # backoff w/cap
                 logger.info("Court %s still in progress. Delaying at least "
