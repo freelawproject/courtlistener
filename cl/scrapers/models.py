@@ -120,3 +120,30 @@ class PACERFreeDocumentLog(models.Model):
         help_text="The status of the scrape.",
         choices=SCRAPE_STATUSES,
     )
+
+
+class PACERFreeDocumentRow(models.Model):
+    """Rows from the Free Opinion report table converted to rows in the DB."""
+    court_id = models.CharField(
+        max_length=15,
+    )
+    pacer_case_id = models.CharField(
+        max_length=100,
+    )
+    docket_number = models.CharField(
+        max_length=5000,
+    )
+    case_name = models.TextField()
+    date_filed = models.DateField()
+    pacer_doc_id = models.CharField(
+        max_length=32,
+        unique=True,
+    )
+    document_number = models.CharField(
+        max_length=32,
+    )
+    description = models.TextField()
+    nature_of_suit = models.TextField()
+    cause = models.CharField(
+        max_length=2000,
+    )

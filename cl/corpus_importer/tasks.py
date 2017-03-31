@@ -23,7 +23,7 @@ from cl.celery import app
 from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
-from cl.scrapers.models import PACERFreeDocumentLog
+from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument
 
@@ -109,6 +109,47 @@ def get_free_document_report(self, court_id, start, end, session):
     except IndexError as exc:
         # Happens when the page isn't downloaded properly, ugh.
         raise self.retry(exc=exc, countdown=15)
+
+
+@app.task(bind=True, max_retries=20)
+def get_and_save_free_document_report(self, court_id, start, end, session):
+    """Download the Free document report and save it to the DB.
+    
+    :param self: The Celery task.
+    :param court_id: A pacer court id.
+    :param start: a date object representing the first day to get results.
+    :param end: a date object representing the last day to get results.
+    :param session: A PACER Session object
+    :return: None
+    """
+    report = FreeOpinionReport(court_id, session)
+    try:
+        responses = report.query(start, end, sort='case_number')
+    except (ConnectionError, ChunkedEncodingError, ReadTimeoutError) as exc:
+        logger.warning("Unable to get free document report results from %s "
+                       "(%s to %s). Trying again." % (court_id, start, end))
+        raise self.retry(exc=exc, countdown=10)
+
+    try:
+        results = report.parse(responses)
+    except IndexError as exc:
+        # Happens when the page isn't downloaded properly, ugh.
+        raise self.retry(exc=exc, countdown=10)
+
+    PACERFreeDocumentRow.objects.bulk_create(
+        PACERFreeDocumentRow(
+            court_id=row.court_id,
+            pacer_case_id=row.pacer_case_id,
+            docket_number=row.docket_number,
+            case_name=row.case_name,
+            date_filed=row.date_filed,
+            pacer_doc_id=row.pacer_doc_id,
+            document_number=row.document_number,
+            description=row.description,
+            nature_of_suit=row.nature_of_suit,
+            cause=row.cause,
+        ) for row in results
+    )
 
 
 @app.task(bind=True, max_retries=5)

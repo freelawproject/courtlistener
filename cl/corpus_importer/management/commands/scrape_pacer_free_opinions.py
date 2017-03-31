@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 from datetime import timedelta
@@ -10,11 +11,11 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer.http import login
 
 from cl.search.models import Court
-from cl.corpus_importer.tasks import get_free_document_report, \
-    process_free_opinion_result, get_and_process_pdf, upload_free_opinion_to_ia, \
-    mark_court_done_on_date
+from cl.corpus_importer.tasks import (
+    mark_court_done_on_date,
+    get_and_save_free_document_report,
+)
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
-from cl.lib.tasks import dmap
 from cl.scrapers.models import PACERFreeDocumentLog
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
@@ -63,7 +64,7 @@ def mark_court_in_progress(court_id, d):
     )
 
 
-def go():
+def get_and_save_free_document_reports():
     pacer_court_ids = {
         map_cl_to_pacer_id(v): {'until': now(), 'count': 1} for v in
             Court.objects.filter(
@@ -90,8 +91,7 @@ def go():
                 # anything since at the end there will only be one court left.
                 continue
 
-            next_start_date, next_end_date = get_next_date_range(
-                pacer_court_id, span=3)
+            next_start_date, next_end_date = get_next_date_range(pacer_court_id)
             if next_start_date is None:
                 next_delay = min(delay['count'] * 5, 30)  # backoff w/cap
                 logger.info("Court %s still in progress. Delaying at least "
@@ -115,20 +115,44 @@ def go():
             mark_court_in_progress(pacer_court_id, next_end_date)
             pacer_court_ids[pacer_court_id]['count'] = 1  # Reset
             chain(
-                get_free_document_report.si(pacer_court_id, next_start_date,
-                                            next_end_date, pacer_session),
-                dmap.s(
-                    process_free_opinion_result.s(court, cnt, pacer_court_id,
-                                                  next_end_date) |
-                    get_and_process_pdf.s(pacer_court_id, pacer_session) |
-                    upload_free_opinion_to_ia.s()
+                get_and_save_free_document_report.si(
+                    pacer_court_id,
+                    next_start_date,
+                    next_end_date,
+                    pacer_session
                 ),
                 mark_court_done_on_date.si(pacer_court_id, next_end_date),
             )()
 
 
 class Command(BaseCommand):
-    help = "Get all the free content from PACER."
+    help = "Get all the free content from PACER. There are three modes."
+
+    def valid_actions(self, s):
+        if s.lower() not in self.VALID_ACTIONS:
+            raise argparse.ArgumentTypeError(
+                "Unable to parse action. Valid actions are: %s" % (
+                    ', '.join(self.VALID_ACTIONS.keys())
+                )
+            )
+
+        return self.VALID_ACTIONS[s]
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--action',
+            type=self.valid_actions,
+            required=True,
+            help="The action you wish to take. Valid choices are: %s" % (
+                ', '.join(self.VALID_ACTIONS.keys())
+            )
+        )
 
     def handle(self, *args, **options):
-        go()
+        self.options = options
+        self.options['action']()
+
+    VALID_ACTIONS = {
+        'get-report-results': get_and_save_free_document_reports,
+    }
+
