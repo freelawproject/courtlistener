@@ -139,20 +139,24 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
         # HTTPError: raise_for_status in parse hit bad status.
         raise self.retry(exc=exc, countdown=10)
 
-    PACERFreeDocumentRow.objects.bulk_create(
-        PACERFreeDocumentRow(
-            court_id=row.court_id,
-            pacer_case_id=row.pacer_case_id,
-            docket_number=row.docket_number,
-            case_name=row.case_name,
-            date_filed=row.date_filed,
-            pacer_doc_id=row.pacer_doc_id,
-            document_number=row.document_number,
-            description=row.description,
-            nature_of_suit=row.nature_of_suit,
-            cause=row.cause,
-        ) for row in results
-    )
+    for row in results:
+        try:
+            PACERFreeDocumentRow.objects.create(
+                court_id=row.court_id,
+                pacer_case_id=row.pacer_case_id,
+                docket_number=row.docket_number,
+                case_name=row.case_name,
+                date_filed=row.date_filed,
+                pacer_doc_id=row.pacer_doc_id,
+                document_number=row.document_number,
+                description=row.description,
+                nature_of_suit=row.nature_of_suit,
+                cause=row.cause,
+             )
+        except IntegrityError:
+            # Duplicate for whatever reason.
+            continue
+
 
 
 @app.task(bind=True, max_retries=5)
