@@ -14,7 +14,8 @@ from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import FreeOpinionReport
-from requests.exceptions import ChunkedEncodingError, HTTPError, ConnectionError
+from requests.exceptions import ChunkedEncodingError, HTTPError, \
+    ConnectionError, ReadTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from rest_framework.status import HTTP_403_FORBIDDEN, HTTP_400_BAD_REQUEST
@@ -125,15 +126,17 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
     report = FreeOpinionReport(court_id, session)
     try:
         responses = report.query(start, end, sort='case_number')
-    except (ConnectionError, ChunkedEncodingError, ReadTimeoutError) as exc:
+    except (ConnectionError, ChunkedEncodingError, ReadTimeoutError,
+            ReadTimeout) as exc:
         logger.warning("Unable to get free document report results from %s "
                        "(%s to %s). Trying again." % (court_id, start, end))
         raise self.retry(exc=exc, countdown=10)
 
     try:
         results = report.parse(responses)
-    except IndexError as exc:
-        # Happens when the page isn't downloaded properly, ugh.
+    except (IndexError, HTTPError) as exc:
+        # IndexError: When the page isn't downloaded properly.
+        # HTTPError: raise_for_status in parse hit bad status.
         raise self.retry(exc=exc, countdown=10)
 
     PACERFreeDocumentRow.objects.bulk_create(
