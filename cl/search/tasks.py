@@ -110,7 +110,10 @@ def add_or_update_recap_document(item_pks, coalesce_docket=False,
     si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode='w')
     rds = RECAPDocument.objects.filter(pk__in=item_pks)
     if coalesce_docket:
-        metadata = rds[0].get_docket_metadata()
+        try:
+            metadata = rds[0].get_docket_metadata()
+        except IndexError:
+            metadata = None
     else:
         metadata = None
 
