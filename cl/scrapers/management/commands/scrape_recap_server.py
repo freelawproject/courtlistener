@@ -94,7 +94,7 @@ def get_and_merge_items(items, log):
                 chord(tasks)(chain(
                     parse_recap_docket.si(filename, debug=False),
                     extract_recap_pdf.s().set(priority=5),
-                    add_or_update_recap_document.s(),
+                    add_or_update_recap_document.s(coalesce_docket=True),
                 ))
                 tasks = []
     logger.info("Finished queueing new cases.")

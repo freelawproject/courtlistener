@@ -659,7 +659,8 @@ class RECAPDocument(models.Model):
             tasks.append(extract_recap_pdf.si(self.pk))
         if index:
             from cl.search.tasks import add_or_update_recap_document
-            tasks.append(add_or_update_recap_document.si([self.pk], False))
+            tasks.append(add_or_update_recap_document.si([self.pk],
+                                                         force_commit=False))
         if len(tasks) > 0:
             chain(*tasks)()
 
@@ -673,24 +674,101 @@ class RECAPDocument(models.Model):
         from cl.search.tasks import delete_items
         delete_items.delay([id_cache], settings.SOLR_RECAP_URL)
 
-    def as_search_dict(self):
+    def get_docket_metadata(self):
+        """The metadata for the item that comes from the Docket."""
+        docket = self.docket_entry.docket
+        # IDs
+        out = {
+            'docket_id': docket.pk,
+            'court_id': docket.court.pk,
+            'assigned_to_id': getattr(docket.assigned_to, 'pk', None),
+            'referred_to_id': getattr(docket.referred_to, 'pk', None)
+        }
+
+        # Docket
+        out.update({
+            'docketNumber': docket.docket_number,
+            'caseName': best_case_name(docket),
+            'suitNature': docket.nature_of_suit,
+            'cause': docket.cause,
+            'juryDemand': docket.jury_demand,
+            'jurisdictionType': docket.jurisdiction_type,
+        })
+        if docket.date_argued is not None:
+            out['dateArgued'] = datetime.combine(docket.date_argued, time())
+        if docket.date_filed is not None:
+            out['dateFiled'] = datetime.combine(docket.date_filed, time())
+        if docket.date_terminated is not None:
+            out['dateTerminated'] = datetime.combine(docket.date_terminated,
+                                                     time())
+        try:
+            out['absolute_url'] = self.get_absolute_url()
+            out['docket_absolute_url'] = docket.get_absolute_url()
+        except NoReverseMatch:
+            raise InvalidDocumentError(
+                "Unable to save to index due to missing absolute_url: %s"
+                % self.pk
+            )
+
+        # Judges
+        if docket.assigned_to is not None:
+            out['assignedTo'] = docket.assigned_to.name_full
+        elif docket.assigned_to_str:
+            out['assignedTo'] = docket.assigned_to_str
+        if docket.referred_to is not None:
+            out['referredTo'] = docket.referred_to.name_full
+        elif docket.referred_to_str:
+            out['referredTo'] = docket.referred_to_str
+
+        # Court
+        out.update({
+            'court': docket.court.full_name,
+            'court_exact': docket.court_id,  # For faceting
+            'court_citation_string': docket.court.citation_string
+        })
+
+        # Parties, Attorneys, Firms
+        out.update({
+            'party_id': set(),
+            'party': set(),
+            'attorney_id': set(),
+            'attorney': set(),
+            'firm_id': set(),
+            'firm': set(),
+        })
+        for p in docket.parties.prefetch_related('attorneys',
+                                                 'attorneys__organizations'):
+            out['party_id'].add(p.pk)
+            out['party'].add(p.name)
+            for a in p.attorneys.all():
+                out['attorney_id'].add(a.pk)
+                out['attorney'].add(a.name)
+                for f in a.organizations.all():
+                    out['firm_id'].add(f.pk)
+                    out['firm'].add(f.name)
+
+        return out
+
+    def as_search_dict(self, docket_metadata=None):
         """Create a dict that can be ingested by Solr.
 
         Search results are presented as Dockets, but they're indexed as
         RECAPDocument's, which are then grouped back together in search results
         to form Dockets.
+        
+        Since it's common to update an entire docket, there's a shortcut, 
+        get_docket_metadata that lets you query that information first and then
+        pass it in as an argument so that it doesn't have to be queried for
+        every RECAPDocument on the docket. This can provide big performance
+        boosts.
         """
+        out = docket_metadata or self.get_docket_metadata()
+
         # IDs
-        out = {
+        out.update({
             'id': self.pk,
             'docket_entry_id': self.docket_entry.pk,
-            'docket_id': self.docket_entry.docket.pk,
-            'court_id': self.docket_entry.docket.court.pk,
-            'assigned_to_id': getattr(
-                self.docket_entry.docket.assigned_to, 'pk', None),
-            'referred_to_id': getattr(
-                self.docket_entry.docket.referred_to, 'pk', None)
-        }
+        })
 
         # RECAPDocument
         out.update({
@@ -713,76 +791,6 @@ class RECAPDocument(models.Model):
                 self.docket_entry.date_filed,
                 time()
             )
-
-        # Docket
-        out.update({
-            'docketNumber': self.docket_entry.docket.docket_number,
-            'caseName': best_case_name(self.docket_entry.docket),
-            'suitNature': self.docket_entry.docket.nature_of_suit,
-            'cause': self.docket_entry.docket.cause,
-            'juryDemand': self.docket_entry.docket.jury_demand,
-            'jurisdictionType': self.docket_entry.docket.jurisdiction_type,
-        })
-        if self.docket_entry.docket.date_argued is not None:
-            out['dateArgued'] = datetime.combine(
-                self.docket_entry.docket.date_argued,
-                time()
-            )
-        if self.docket_entry.docket.date_filed is not None:
-            out['dateFiled'] = datetime.combine(
-                self.docket_entry.docket.date_filed,
-                time()
-            )
-        if self.docket_entry.docket.date_terminated is not None:
-            out['dateTerminated'] = datetime.combine(
-                self.docket_entry.docket.date_terminated,
-                time()
-            )
-        try:
-            out['absolute_url'] = self.get_absolute_url()
-            out['docket_absolute_url'] = self.docket_entry.docket.get_absolute_url()
-        except NoReverseMatch:
-            raise InvalidDocumentError(
-                "Unable to save to index due to missing absolute_url: %s"
-                % self.pk
-            )
-
-        # Judges
-        if self.docket_entry.docket.assigned_to is not None:
-            out['assignedTo'] = self.docket_entry.docket.assigned_to.name_full
-        elif self.docket_entry.docket.assigned_to_str:
-            out['assignedTo'] = self.docket_entry.docket.assigned_to_str
-        if self.docket_entry.docket.referred_to is not None:
-            out['referredTo'] = self.docket_entry.docket.referred_to.name_full
-        elif self.docket_entry.docket.referred_to_str:
-            out['referredTo'] = self.docket_entry.docket.referred_to_str
-
-        # Court
-        out.update({
-            'court': self.docket_entry.docket.court.full_name,
-            'court_exact': self.docket_entry.docket.court_id,  # For faceting
-            'court_citation_string': self.docket_entry.docket.court.citation_string
-        })
-
-        # Parties, Attorneys, Firms
-        out.update({
-            'party_id': set(),
-            'party': set(),
-            'attorney_id': set(),
-            'attorney': set(),
-            'firm_id': set(),
-            'firm': set(),
-        })
-        for p in self.docket_entry.docket.parties.prefetch_related(
-                'attorneys', 'attorneys__organizations'):
-            out['party_id'].add(p.pk)
-            out['party'].add(p.name)
-            for a in p.attorneys.all():
-                out['attorney_id'].add(a.pk)
-                out['attorney'].add(a.name)
-                for f in a.organizations.all():
-                    out['firm_id'].add(f.pk)
-                    out['firm'].add(f.name)
 
         text_template = loader.get_template('indexes/dockets_text.txt')
         out['text'] = text_template.render({'item': self}).translate(null_map)

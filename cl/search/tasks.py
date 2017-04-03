@@ -91,11 +91,31 @@ def add_or_update_people(item_pks, force_commit=False):
 
 
 @app.task
-def add_or_update_recap_document(item_pks, force_commit=False):
+def add_or_update_recap_document(item_pks, coalesce_docket=False,
+                                 force_commit=False):
+    """Add or update recap documents in Solr.
+    
+    :param item_pks: RECAPDocument pks to add or update in Solr.
+    :param coalesce_docket: If True, assume that the PKs all correspond to 
+    RECAPDocument objects on the same docket. Instead of processing each
+    RECAPDocument individually, pull out repeated metadata so that it is 
+    only queried from the database once instead of once/RECAPDocument. This can
+    provide significant performance improvements since some dockets have
+    thousands of entries, each of which would otherwise need to make the same
+    queries to the DB.
+    :param force_commit: Should we send a commit message at the end of our 
+    updates?
+    :return: None
+    """
     si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode='w')
+    rds = RECAPDocument.objects.filter(pk__in=item_pks)
+    if coalesce_docket:
+        metadata = rds[0].get_docket_metadata()
+    else:
+        metadata = None
+
     try:
-        si.add([item.as_search_dict() for item in
-                RECAPDocument.objects.filter(pk__in=item_pks)])
+        si.add([item.as_search_dict(docket_metadata=metadata) for item in rds])
         if force_commit:
             si.commit()
     except SolrError, exc:
