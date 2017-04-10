@@ -26,8 +26,6 @@ def queryset_generator(queryset, chunksize=1000):
             except KeyError:
                 raise Exception("Unable to lookup key '%s' of item. Did you "
                                 "forget to include it in a values query?" % key)
-    if settings.DEVELOPMENT:
-        chunksize = 5
 
     # Make a query that doesn't do related fetching for optimization
     queryset = queryset.order_by('pk').prefetch_related(None)
@@ -37,13 +35,18 @@ def queryset_generator(queryset, chunksize=1000):
 
     lowest_pk = get_attr_or_value(queryset.order_by('pk')[0], 'id')
     highest_pk = get_attr_or_value(queryset.order_by('-pk')[0], 'id')
+    lookup = 'pk__gte'
     while lowest_pk <= highest_pk:
-        for row in queryset.filter(pk__gte=lowest_pk)[:chunksize]:
+        for row in queryset.filter(**{lookup: lowest_pk})[:chunksize]:
             yield row
             row_id = get_attr_or_value(row, 'id')
             if row_id == highest_pk:
                 raise StopIteration
             else:
+                # After first loop, tweak lookup to be a gt query. This allows
+                # the loop to support single results, which require gte, and
+                # n > 1 results, which require gte for subsequent iterations.
+                lookup = 'pk__gt'
                 lowest_pk = row_id
 
 

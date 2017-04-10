@@ -26,10 +26,6 @@ class TestDBTools(TestCase):
     # are wickedly simple objects.
     fixtures = ['test_queryset_generator.json']
 
-    @classmethod
-    def tearDownClass(cls):
-        UrlHash.objects.all().delete()
-
     def test_queryset_generator(self):
         """Does the generator work properly with a variety of queries?"""
         tests = [
@@ -64,6 +60,18 @@ class TestDBTools(TestCase):
         self.assertEqual(
             sum(1 for _ in queryset_generator(UrlHash.objects.values())),
             2,
+        )
+        print '✓'
+
+    def test_queryset_generator_chunking(self):
+        """Does chunking work properly without duplicates or omissions?"""
+        print "Testing if queryset_iterator chunking returns the right " \
+              "number of results...",
+        expected_count = 2
+        results = queryset_generator(UrlHash.objects.all(), chunksize=1)
+        self.assertEqual(
+            expected_count,
+            sum(1 for _ in results),
         )
         print '✓'
 
