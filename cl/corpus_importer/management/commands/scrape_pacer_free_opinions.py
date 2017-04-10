@@ -14,16 +14,15 @@ from cl.search.models import Court
 from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     get_and_save_free_document_report,
-)
+    process_free_opinion_result, get_and_process_pdf)
+from cl.lib.db_tools import queryset_generator
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
-from cl.scrapers.models import PACERFreeDocumentLog
+from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 logger = logging.getLogger(__name__)
-
-cnt = CaseNameTweaker()
 
 
 def get_next_date_range(court_id, span=7):
@@ -125,6 +124,34 @@ def get_and_save_free_document_reports():
             )()
 
 
+def get_pdfs():
+    """Get PDFs for the results of the Free Document Report queries.
+    
+    At this stage, we have rows in the PACERFreeDocumentRow table, each of which
+    represents a PDF we need to download and merge into our normal tables: 
+    Docket, DocketEntry, and RECAPDocument.
+    
+    In this function, we iterate over the entire table of results, merge it into
+    our normal tables, and then download and extract the PDF.
+    
+    :return: None
+    """
+    cnt = CaseNameTweaker()
+    pacer_session = login('cand', PACER_USERNAME, PACER_PASSWORD)
+    rows = PACERFreeDocumentRow.objects.only('pk')
+    do = 40
+    done = 0
+    for row in queryset_generator(rows):
+        if do == done:
+            break
+        else:
+            done += 1
+        chain(
+            process_free_opinion_result.si(row.pk, cnt),
+            get_and_process_pdf.s(pacer_session),
+        )()
+
+
 class Command(BaseCommand):
     help = "Get all the free content from PACER. There are three modes."
 
@@ -154,5 +181,6 @@ class Command(BaseCommand):
 
     VALID_ACTIONS = {
         'get-report-results': get_and_save_free_document_reports,
+        'get-pdfs': get_pdfs,
     }
 

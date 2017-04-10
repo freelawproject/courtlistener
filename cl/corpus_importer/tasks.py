@@ -9,7 +9,7 @@ import internetarchive as ia
 import requests
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction, DatabaseError
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import harmonize
@@ -26,7 +26,7 @@ from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
-from cl.search.models import DocketEntry, RECAPDocument
+from cl.search.models import DocketEntry, RECAPDocument, Court
 
 logger = logging.getLogger(__name__)
 
@@ -158,63 +158,67 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
             continue
 
 
-
 @app.task(bind=True, max_retries=5)
-def process_free_opinion_result(self, result, court, cnt, pacer_court_id,
-                                next_end_date):
+def process_free_opinion_result(self, row_pk, cnt):
     """Process a single result from the free opinion report"""
-    result.court = court
+    result = PACERFreeDocumentRow.objects.get(pk=row_pk)
+    result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
     result.case_name = harmonize(result.case_name)
     result.case_name_short = cnt.make_case_name_short(result.case_name)
-    result_copy = copy.copy(result)
+    row_copy = copy.copy(result)
     # If we don't do this, the doc's date_filed becomes the docket's
     # date_filed. Bad.
-    delattr(result_copy, 'date_filed')
+    delattr(row_copy, 'date_filed')
     # If we don't do this, we get the PACER court id and it crashes
-    delattr(result_copy, 'court_id')
-    docket = lookup_and_save(result_copy)
-    if not docket:
-        logger.error("Unable to create docket for %s" % result)
+    delattr(row_copy, 'court_id')
+    try:
+        with transaction.atomic():
+            docket = lookup_and_save(row_copy)
+            if not docket:
+                logger.error("Unable to create docket for %s" % result)
+                self.request.chain = None
+                return
+            docket.blocked, docket.date_blocked = get_blocked_status(docket)
+            docket.save()
+
+            de, de_created = DocketEntry.objects.update_or_create(
+                docket=docket,
+                entry_number=result.document_number,
+                defaults={
+                    'date_filed': result.date_filed,
+                    'description': result.description,
+                }
+            )
+            rd, rd_created = RECAPDocument.objects.update_or_create(
+                docket_entry=de,
+                document_number=result.document_number,
+                attachment_number=None,
+                defaults={
+                    'pacer_doc_id': result.pacer_doc_id,
+                    'document_type': RECAPDocument.PACER_DOCUMENT,
+                }
+            )
+    except DatabaseError as e:
+        logger.error("Unable to complete database transaction:\n%s" % e)
         self.request.chain = None
         return
-    docket.blocked, docket.date_blocked = get_blocked_status(docket)
-    docket.save()
 
-    de, de_created = DocketEntry.objects.update_or_create(
-        docket=docket,
-        entry_number=result.document_number,
-        defaults={
-            'date_filed': result.date_filed,
-            'description': result.description,
-        }
-    )
-    rd, rd_created = RECAPDocument.objects.update_or_create(
-        docket_entry=de,
-        document_number=result.document_number,
-        attachment_number=None,
-        defaults={
-            'pacer_doc_id': result.pacer_doc_id,
-            'document_type': RECAPDocument.PACER_DOCUMENT,
-        }
-    )
-
-    if rd_created and rd.is_available:
+    if not rd_created and rd.is_available:
         logger.info("Found the item already in the DB with document_number: %s "
                     "and docket_entry: %s!" % (result.document_number, de))
         self.request.chain = None
         return
 
-    return {'result': result, 'rd_pk': rd.pk, 'pacer_court_id': pacer_court_id,
-            'next_end_date': next_end_date}
+    return {'result': result, 'rd_pk': rd.pk, 'pacer_court_id': result.court_id}
 
 
 @app.task(bind=True, max_retries=5)
-def get_and_process_pdf(self, data, court_id, session):
+def get_and_process_pdf(self, data, session):
     if data is None:
         return
     result = data['result']
     rd = RECAPDocument.objects.get(pk=data['rd_pk'])
-    report = FreeOpinionReport(court_id, session)
+    report = FreeOpinionReport(data['pacer_court_id'], session)
     try:
         r = report.download_pdf(result.pacer_case_id, result.pacer_doc_id)
     except ConnectionError as exc:
