@@ -26,7 +26,8 @@ class TestDBTools(TestCase):
     # are wickedly simple objects.
     fixtures = ['test_queryset_generator.json']
 
-    def tearDown(self):
+    @classmethod
+    def tearDownClass(cls):
         UrlHash.objects.all().delete()
 
     def test_queryset_generator(self):
@@ -47,6 +48,24 @@ class TestDBTools(TestCase):
                 count += 1
             self.assertEqual(count, test['count'])
             print '✓'
+
+    def test_queryset_generator_values_query(self):
+        """Do values queries work?"""
+        print "Testing raising an error when we can't get a PK in a values " \
+              "query...",
+        self.assertRaises(
+            Exception,
+            queryset_generator(UrlHash.objects.values('sha1')),
+            msg="Values query did not fail when pk was not provided."
+        )
+        print '✓'
+
+        print "Testing a good values query...",
+        self.assertEqual(
+            sum(1 for _ in queryset_generator(UrlHash.objects.values())),
+            2,
+        )
+        print '✓'
 
 
 class TestStringUtils(TestCase):

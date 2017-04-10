@@ -16,6 +16,16 @@ def queryset_generator(queryset, chunksize=1000):
     Note that the implementation of the iterator does not support ordered query
     sets.
     """
+    def get_attr_or_value(obj, key):
+        """Get an attr of an object that's either a dict or a Django object"""
+        try:
+            return getattr(obj, key)
+        except AttributeError:
+            try:
+                return obj.get(key)
+            except KeyError:
+                raise Exception("Unable to lookup key '%s' of item. Did you "
+                                "forget to include it in a values query?" % key)
     if settings.DEVELOPMENT:
         chunksize = 5
 
@@ -25,15 +35,16 @@ def queryset_generator(queryset, chunksize=1000):
     if count == 0:
         return
 
-    lowest_pk = queryset.order_by('pk')[0].pk
-    highest_pk = queryset.order_by('-pk')[0].pk
+    lowest_pk = get_attr_or_value(queryset.order_by('pk')[0], 'id')
+    highest_pk = get_attr_or_value(queryset.order_by('-pk')[0], 'id')
     while lowest_pk <= highest_pk:
         for row in queryset.filter(pk__gte=lowest_pk)[:chunksize]:
             yield row
-            if row.pk == highest_pk:
+            row_id = get_attr_or_value(row, 'id')
+            if row_id == highest_pk:
                 raise StopIteration
             else:
-                lowest_pk = row.pk
+                lowest_pk = row_id
 
 
 def queryset_generator_by_date(queryset, date_field, start_date, end_date,
