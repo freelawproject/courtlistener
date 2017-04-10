@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.test import override_settings
 from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 
+from cl.lib.db_tools import queryset_generator
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.pacer import normalize_party_types, normalize_attorney_role, \
@@ -16,7 +17,36 @@ from cl.lib.pacer import normalize_party_types, normalize_attorney_role, \
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import trunc
 from cl.people_db.models import Role
+from cl.scrapers.models import UrlHash
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
+
+
+class TestDBTools(TestCase):
+    # This fixture uses UrlHash objects b/c they've been around a long while and
+    # are wickedly simple objects.
+    fixtures = ['test_queryset_generator.json']
+
+    def tearDown(self):
+        UrlHash.objects.all().delete()
+
+    def test_queryset_generator(self):
+        """Does the generator work properly with a variety of queries?"""
+        tests = [
+            {'query': UrlHash.objects.filter(pk__in=['BAD ID']),
+             'count': 0},
+            {'query': UrlHash.objects.filter(pk__in=['0']),
+             'count': 1},
+            {'query': UrlHash.objects.filter(pk__in=['0', '1']),
+             'count': 2},
+        ]
+        for test in tests:
+            print "Testing queryset_generator with %s expected results..." % \
+                  test['count'],
+            count = 0
+            for _ in queryset_generator(test['query']):
+                count += 1
+            self.assertEqual(count, test['count'])
+            print '✓'
 
 
 class TestStringUtils(TestCase):

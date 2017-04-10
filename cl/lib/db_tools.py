@@ -20,19 +20,20 @@ def queryset_generator(queryset, chunksize=1000):
         chunksize = 5
 
     # Make a query that doesn't do related fetching for optimization
-    bare_qs = queryset.prefetch_related(None)
-    if bare_qs.count() == 0:
+    queryset = queryset.order_by('pk').prefetch_related(None)
+    count = queryset.count()
+    if count == 0:
         return
-    pk = bare_qs.order_by('pk')[0].pk
-    # Decrement pk for use with 'greater than' filter
-    if pk > 0:
-        pk -= 1
-    last_pk = bare_qs.order_by('-pk')[0].pk
-    queryset = bare_qs.order_by('pk')
-    while pk < last_pk:
-        for row in queryset.filter(pk__gt=pk)[:chunksize]:
-            pk = row.pk
+
+    lowest_pk = queryset.order_by('pk')[0].pk
+    highest_pk = queryset.order_by('-pk')[0].pk
+    while lowest_pk <= highest_pk:
+        for row in queryset.filter(pk__gte=lowest_pk)[:chunksize]:
             yield row
+            if row.pk == highest_pk:
+                raise StopIteration
+            else:
+                lowest_pk = row.pk
 
 
 def queryset_generator_by_date(queryset, date_field, start_date, end_date,

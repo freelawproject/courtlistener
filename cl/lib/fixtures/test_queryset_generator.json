@@ -1,0 +1,16 @@
+[
+  {
+    "fields": {
+      "sha1": "0"
+    },
+    "model": "scrapers.urlhash",
+    "pk": "0"
+  },
+  {
+    "fields": {
+      "sha1": "1"
+    },
+    "model": "scrapers.urlhash",
+    "pk": "1"
+  }
+]
