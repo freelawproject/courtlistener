@@ -369,3 +369,8 @@ def mark_court_done_on_date(court_id, d):
         doc_log.status = PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
         doc_log.date_completed = now()
         doc_log.save()
+
+
+@app.task
+def delete_pacer_row(pk):
+    PACERFreeDocumentRow.objects.get(pk=pk).delete()

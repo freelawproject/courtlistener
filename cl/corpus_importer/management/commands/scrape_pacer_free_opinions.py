@@ -14,7 +14,8 @@ from cl.search.models import Court
 from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     get_and_save_free_document_report,
-    process_free_opinion_result, get_and_process_pdf)
+    process_free_opinion_result, get_and_process_pdf, delete_pacer_row)
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.db_tools import queryset_generator
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
@@ -139,16 +140,13 @@ def get_pdfs():
     cnt = CaseNameTweaker()
     pacer_session = login('cand', PACER_USERNAME, PACER_PASSWORD)
     rows = PACERFreeDocumentRow.objects.only('pk')
-    do = 40
-    done = 0
+    throttle = CeleryThrottle(min_items=40, task_name='get_and_process_pdf')
     for row in queryset_generator(rows):
-        if do == done:
-            break
-        else:
-            done += 1
+        throttle.maybe_wait()
         chain(
             process_free_opinion_result.si(row.pk, cnt),
             get_and_process_pdf.s(pacer_session),
+            delete_pacer_row.si(row.pk),
         )()
 
 
