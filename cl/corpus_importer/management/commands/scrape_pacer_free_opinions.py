@@ -147,7 +147,7 @@ def get_pdfs():
             process_free_opinion_result.si(row.pk, cnt),
             get_and_process_pdf.s(pacer_session),
             delete_pacer_row.si(row.pk),
-        )()
+        ).apply_async()
 
 
 class Command(BaseCommand):

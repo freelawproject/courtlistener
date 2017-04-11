@@ -171,12 +171,14 @@ def process_free_opinion_result(self, row_pk, cnt):
     delattr(row_copy, 'date_filed')
     # If we don't do this, we get the PACER court id and it crashes
     delattr(row_copy, 'court_id')
+    # If we don't do this, the id of result tries to smash that of the docket.
+    delattr(row_copy, 'id')
     try:
         with transaction.atomic():
             docket = lookup_and_save(row_copy)
             if not docket:
                 logger.error("Unable to create docket for %s" % result)
-                self.request.chain = None
+                self.request.callbacks = None
                 return
             docket.blocked, docket.date_blocked = get_blocked_status(docket)
             docket.save()
@@ -200,13 +202,13 @@ def process_free_opinion_result(self, row_pk, cnt):
             )
     except DatabaseError as e:
         logger.error("Unable to complete database transaction:\n%s" % e)
-        self.request.chain = None
+        self.request.callbacks = None
         return
 
     if not rd_created and rd.is_available:
         logger.info("Found the item already in the DB with document_number: %s "
                     "and docket_entry: %s!" % (result.document_number, de))
-        self.request.chain = None
+        self.request.callbacks = None
         return
 
     return {'result': result, 'rd_pk': rd.pk, 'pacer_court_id': result.court_id}
@@ -227,7 +229,7 @@ def get_and_process_pdf(self, data, session):
 
     if r is None:
         logger.error("Unable to get PDF for %s" % result)
-        self.request.chain = None
+        self.request.callbacks = None
         return
 
     file_name = get_document_filename(
