@@ -52,9 +52,12 @@ class CeleryThrottle(object):
 
     def _get_worker_task_count(self):
         """Get the count of tasks currently executing across all workers."""
+        reserved_tasks = self.inspector.reserved()
+        if reserved_tasks is None:
+            return 0
+
         # Make a flat list of tasks across all workers.
-        tasks = [t for worker in self.inspector.reserved().values()
-                 for t in worker]
+        tasks = [t for worker in reserved_tasks.values() for t in worker]
         if self.task_name is not None:
             tasks = filter(lambda task: self.task_name in task['name'], tasks)
         return len(tasks)
