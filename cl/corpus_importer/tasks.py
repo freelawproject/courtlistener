@@ -158,7 +158,7 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
             continue
 
 
-@app.task(bind=True, max_retries=5)
+@app.task(bind=True, max_retries=5, ignore_result=True)
 def process_free_opinion_result(self, row_pk, cnt):
     """Process a single result from the free opinion report"""
     result = PACERFreeDocumentRow.objects.get(pk=row_pk)
@@ -214,7 +214,7 @@ def process_free_opinion_result(self, row_pk, cnt):
     return {'result': result, 'rd_pk': rd.pk, 'pacer_court_id': result.court_id}
 
 
-@app.task(bind=True, max_retries=5)
+@app.task(bind=True, max_retries=5, ignore_result=True)
 def get_and_process_pdf(self, data, session):
     if data is None:
         return
@@ -258,7 +258,7 @@ class OverloadedException(Exception):
     pass
 
 
-@app.task(bind=True, max_retries=15)
+@app.task(bind=True, max_retries=15, ignore_result=True)
 def upload_free_opinion_to_ia(self, data):
     if data is None:
         return
@@ -356,7 +356,7 @@ def upload_to_ia(identifier, files, metadata=None):
     return responses
 
 
-@app.task
+@app.task(ignore_result=True)
 def mark_court_done_on_date(court_id, d):
     court_id = map_pacer_to_cl_id(court_id)
     try:
@@ -373,6 +373,6 @@ def mark_court_done_on_date(court_id, d):
         doc_log.save()
 
 
-@app.task
+@app.task(ignore_result=True)
 def delete_pacer_row(pk):
     PACERFreeDocumentRow.objects.get(pk=pk).delete()

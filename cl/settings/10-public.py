@@ -183,6 +183,7 @@ else:
                                                   REDIS_DATABASES['CELERY'])
     CELERYD_CONCURRENCY = 20
     BROKER_POOL_LIMIT = 30
+    CELERY_TASK_RESULT_EXPIRES = 3600
     BROKER_TRANSPORT_OPTIONS = {
         # This is the length of time a task will wait to be acknowledged by a
         # worker. This value *must* be greater than the largest ETA/countdown
