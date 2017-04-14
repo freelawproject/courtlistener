@@ -80,7 +80,7 @@ def create_cited_html(opinion, citations):
     return new_html.encode('utf-8')
 
 
-@app.task
+@app.task(ignore_result=True)
 def update_document(opinion, index=True):
     """Get the citations for an item and save it and add it to the index if
     requested."""
