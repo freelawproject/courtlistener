@@ -10,7 +10,7 @@ from cl.search.models import Opinion, OpinionsCited
 PARALLEL_DISTANCE = 4
 
 
-@app.task(ignore_result=True)
+@app.task
 def identify_parallel_citations(citations):
     """Work through a list of citations and identify ones that are physically
     near each other in the document.
@@ -46,7 +46,7 @@ def identify_parallel_citations(citations):
     return parallel_citations
 
 
-@app.task(ignore_result=True)
+@app.task
 def get_document_citations(opinion):
     """Identify and return citations from the html or plain text of the
     opinion.
@@ -80,7 +80,7 @@ def create_cited_html(opinion, citations):
     return new_html.encode('utf-8')
 
 
-@app.task(ignore_result=True)
+@app.task
 def update_document(opinion, index=True):
     """Get the citations for an item and save it and add it to the index if
     requested."""
