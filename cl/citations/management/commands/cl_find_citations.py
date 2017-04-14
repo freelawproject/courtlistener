@@ -5,9 +5,9 @@ import sys
 from cl.citations.tasks import update_document
 from cl.lib import sunburnt
 from cl.lib.argparse_types import valid_date_time
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.db_tools import queryset_generator
 from cl.search.models import Opinion
-from celery.task.sets import TaskSet
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management import BaseCommand, CommandError
@@ -100,52 +100,48 @@ class Command(BaseCommand):
         if options.get('start_id'):
             query = query.filter(pk__gte=options.get('start_id'))
         if options.get('filed_after'):
-            query = query.filter(cluster__date_filed__gte=options['filed_after'])
+            query = query.filter(
+                cluster__date_filed__gte=options['filed_after'])
         if options.get('all'):
             query = Opinion.objects.all()
-        count = query.count()
+        self.count = query.count()
+        self.average_per_s = 0
+        self.timings = []
         docs = queryset_generator(query, chunksize=10000)
-        self.update_documents(docs, count)
+        self.update_documents(docs)
 
-    def update_documents(self, documents, count):
-        sys.stdout.write('Graph size is {0:d} nodes.\n'.format(count))
+    def log_progress(self, processed_count, last_pk):
+        if processed_count % 1000 == 1:
+            t1 = time.time()
+        if processed_count % 1000 == 0:
+            t2 = time.time()
+            self.timings.append(t2 - t1)
+            self.average_per_s = 1000 / (sum(self.timings) / float(len(self.timings)))
+        template = ("\rProcessing items in Celery queue: {:.0%} ({}/{}, "
+                    "{:.1f}/s, Last id: {})")
+        sys.stdout.write(template.format(
+            float(processed_count) / self.count,  # Percent
+            processed_count,
+            self.count,
+            self.average_per_s,
+            last_pk,
+        ))
+        sys.stdout.flush()
+
+    def update_documents(self, documents):
+        sys.stdout.write('Graph size is {0:d} nodes.\n'.format(self.count))
         sys.stdout.flush()
         processed_count = 0
-        subtasks = []
-        timings = []
-        average_per_s = 0
         if self.index == 'concurrently':
             index_during_subtask = True
         else:
             index_during_subtask = False
+        throttle = CeleryThrottle(min_items=100, task_name='update_document')
         for doc in documents:
+            throttle = throttle.maybe_wait()
+            update_document.delay(doc, index_during_subtask)
             processed_count += 1
-            subtasks.append(update_document.subtask((doc, index_during_subtask)))
-            if processed_count % 1000 == 1:
-                t1 = time.time()
-            if processed_count % 1000 == 0:
-                t2 = time.time()
-                timings.append(t2 - t1)
-                average_per_s = 1000 / (sum(timings) / float(len(timings)))
-            sys.stdout.write("\rProcessing items in Celery queue: {:.0%} ({}/{}, {:.1f}/s, Last id: {})".format(
-                processed_count * 1.0 / count,
-                processed_count,
-                count,
-                average_per_s,
-                doc.pk,
-            ))
-            sys.stdout.flush()
-            last_document = (count == processed_count)
-            if (processed_count % 50 == 0) or last_document:
-                # Every 50 documents, we send the subtasks off for processing
-                # Poll to see when they're done.
-                job = TaskSet(tasks=subtasks)
-                result = job.apply_async()
-                while not result.ready():
-                    time.sleep(1)
-
-                # The jobs finished - clean things up for the next round
-                subtasks = []
+            self.log_progress(processed_count, doc.pk)
 
         if self.index == 'all_at_end':
             call_command(
