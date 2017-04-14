@@ -138,7 +138,7 @@ class Command(BaseCommand):
             index_during_subtask = False
         throttle = CeleryThrottle(min_items=100, task_name='update_document')
         for doc in documents:
-            throttle = throttle.maybe_wait()
+            throttle.maybe_wait()
             update_document.delay(doc, index_during_subtask)
             processed_count += 1
             self.log_progress(processed_count, doc.pk)
