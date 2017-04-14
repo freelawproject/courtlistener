@@ -112,10 +112,10 @@ class Command(BaseCommand):
 
     def log_progress(self, processed_count, last_pk):
         if processed_count % 1000 == 1:
-            t1 = time.time()
+            self.t1 = time.time()
         if processed_count % 1000 == 0:
-            t2 = time.time()
-            self.timings.append(t2 - t1)
+            self.t2 = time.time()
+            self.timings.append(self.t2 - self.t1)
             self.average_per_s = 1000 / (sum(self.timings) / float(len(self.timings)))
         template = ("\rProcessing items in Celery queue: {:.0%} ({}/{}, "
                     "{:.1f}/s, Last id: {})")
