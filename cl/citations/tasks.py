@@ -1,4 +1,5 @@
 import re
+from httplib import ResponseNotReady
 
 from cl.celery import app
 from cl.citations import find_citations, match_citations
@@ -80,8 +81,8 @@ def create_cited_html(opinion, citations):
     return new_html.encode('utf-8')
 
 
-@app.task(ignore_result=True)
-def update_document(opinion, index=True):
+@app.task(bind=True, max_retries=5, ignore_result=True)
+def update_document(self, opinion, index=True):
     """Get the citations for an item and save it and add it to the index if
     requested."""
     citations = get_document_citations(opinion)
@@ -89,10 +90,14 @@ def update_document(opinion, index=True):
     # List used so we can do one simple update to the citing opinion.
     opinions_cited = set()
     for citation in citations:
-        matches = match_citations.match_citation(
-            citation,
-            citing_doc=opinion
-        )
+        try:
+            matches = match_citations.match_citation(
+                citation,
+                citing_doc=opinion
+            )
+        except ResponseNotReady as e:
+            # Threading problem in httplib, which is used in the Solr query.
+            raise self.retry(exc=e, countdown=2)
 
         # TODO: Figure out what to do if there's more than one
         if len(matches) == 1:
