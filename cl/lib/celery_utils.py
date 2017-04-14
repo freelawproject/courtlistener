@@ -2,24 +2,39 @@
 from collections import deque
 
 import time
+
+import redis
+from django.conf import settings
 from django.utils.timezone import now
 
 from cl.celery import app
 
 
+def get_queue_length(queue_name='celery'):
+    """Get the number of tasks in a celery queue.
+    
+    :param queue_name: The name of the queue you want to inspect.
+    :return: the number of items in the queue.
+    """
+    r = redis.StrictRedis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        db=settings.REDIS_DATABASES['CELERY'],
+    )
+    return r.llen(queue_name)
+
+
 class CeleryThrottle(object):
     """A class for throttling celery."""
 
-    def __init__(self, min_items, task_name=None):
+    def __init__(self, min_items=100, queue_name=None):
         """Create a throttle to prevent celery run aways.
         
-        :param min_items: The minimum number of items that should be enqueued by
-        across all workers. A maximum of 2× this number may be created. This
-        minimum value is not guaranteed and so a number slightly higher than
-        your max concurrency should be used.
-        :param task_name: If provided, the throttle will prevent a specific task
-        from running away. Partial names are allowed. If not provided, the 
-        throttle will stop your code until the entire queue has min_items in it.
+        :param min_items: The minimum number of items that should be enqueued. 
+        A maximum of 2× this number may be created. This minimum value is not 
+        guaranteed and so a number slightly higher than your max concurrency 
+        should be used. Note that this number includes all tasks unless you use
+        a specific queue for your processing.
         """
         self.min = min_items
         self.max = self.min * 2
@@ -36,7 +51,7 @@ class CeleryThrottle(object):
 
         # For inspections
         self.inspector = app.control.inspect()
-        self.task_name = task_name
+        self.queue_name = queue_name
 
     def _calculate_avg(self):
         return float(sum(self.rates)) / (len(self.rates) or 1)
@@ -49,18 +64,6 @@ class CeleryThrottle(object):
         self.last_measurement = right_now
         self.last_processed_count = 0
         self.avg_rate = self._calculate_avg()
-
-    def _get_worker_task_count(self):
-        """Get the count of tasks currently executing across all workers."""
-        reserved_tasks = self.inspector.reserved()
-        if reserved_tasks is None:
-            return 0
-
-        # Make a flat list of tasks across all workers.
-        tasks = [t for worker in reserved_tasks.values() for t in worker]
-        if self.task_name is not None:
-            tasks = filter(lambda task: self.task_name in task['name'], tasks)
-        return len(tasks)
 
     def maybe_wait(self):
         """Stall the calling function or let it proceed, depending on the queue.
@@ -83,7 +86,7 @@ class CeleryThrottle(object):
             return
 
         self._add_latest_rate()
-        task_count = self._get_worker_task_count()
+        task_count = get_queue_length(self.queue_name)
         if task_count > self.min:
             # Estimate how long the surplus will take to complete and wait that
             # long + 5% to ensure we're below self.min on next iteration.

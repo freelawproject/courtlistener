@@ -136,7 +136,7 @@ class Command(BaseCommand):
             index_during_subtask = True
         else:
             index_during_subtask = False
-        throttle = CeleryThrottle(min_items=100, task_name='update_document')
+        throttle = CeleryThrottle(min_items=500)
         for doc in documents:
             throttle.maybe_wait()
             update_document.delay(doc, index_during_subtask)

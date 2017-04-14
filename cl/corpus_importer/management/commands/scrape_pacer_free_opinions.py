@@ -140,7 +140,7 @@ def get_pdfs():
     cnt = CaseNameTweaker()
     pacer_session = login('cand', PACER_USERNAME, PACER_PASSWORD)
     rows = PACERFreeDocumentRow.objects.only('pk')
-    throttle = CeleryThrottle(min_items=40, task_name='get_and_process_pdf')
+    throttle = CeleryThrottle()
     for row in queryset_generator(rows):
         throttle.maybe_wait()
         chain(
