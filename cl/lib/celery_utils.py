@@ -62,13 +62,6 @@ class CeleryThrottle(object):
         self.last_processed_count = 0
         self.avg_rate = self._calculate_avg()
 
-    def print_status(self, task_count, wait_time):
-        print "Remaining count: %s. Length of queue: %s. Wait: %s" % (
-            self.count_to_do,
-            task_count,
-            wait_time,
-        )
-
     def maybe_wait(self):
         """Stall the calling function or let it proceed, depending on the queue.
         
@@ -101,11 +94,9 @@ class CeleryThrottle(object):
             # Assume we're below self.min due to waiting; max out the queue.
             if task_count < self.max:
                 self.count_to_do = self.max - self.min
-            self.print_status(task_count, wait_time)
             return
 
         elif task_count <= self.min:
             # Add more items.
             self.count_to_do = self.max - task_count
-            self.print_status(task_count, wait_time=0)
             return
