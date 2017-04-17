@@ -240,6 +240,7 @@ start_workers () {
         ulimit $CELERYD_ULIMIT
     fi
     _chuid $* start $CELERYD_NODES $DAEMON_OPTS     \
+                 -Q "celery,batch1,batch2,batch3,batch4" \
                  -Ofair                             \
                  --pidfile="$CELERYD_PID_FILE"      \
                  --logfile="$CELERYD_LOG_FILE"      \
@@ -261,6 +262,7 @@ stop_workers () {
 
 restart_workers () {
     _chuid restart $CELERYD_NODES $DAEMON_OPTS      \
+                   -Q "celery,batch1,batch2,batch3,batch4" \
                    -Ofair                           \
                    --pidfile="$CELERYD_PID_FILE"    \
                    --logfile="$CELERYD_LOG_FILE"    \
