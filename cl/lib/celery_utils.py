@@ -7,8 +7,6 @@ import redis
 from django.conf import settings
 from django.utils.timezone import now
 
-from cl.celery import app
-
 
 def get_queue_length(queue_name='celery'):
     """Get the number of tasks in a celery queue.
@@ -50,7 +48,6 @@ class CeleryThrottle(object):
         self.avg_rate = self._calculate_avg()
 
         # For inspections
-        self.inspector = app.control.inspect()
         self.queue_name = queue_name
 
     def _calculate_avg(self):

@@ -7,9 +7,11 @@ from django.core.management.base import BaseCommand
 
 from cl.audio.models import Audio
 from cl.lib.argparse_types import valid_date_time, valid_obj_type
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.db_tools import queryset_generator
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timer import print_timing
+from cl.lib.utils import chunks
 from cl.people_db.models import Person
 from cl.search.models import Opinion, RECAPDocument, Docket
 from cl.search.tasks import (delete_items, add_or_update_audio_files,
@@ -204,46 +206,29 @@ class Command(BaseCommand):
             sys.exit(1)
 
     def _chunk_queryset_into_tasks(self, items, count, chunksize=50,
-                                   bundle_size=250, start_at=0):
+                                   start_at=0):
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
-
-            bundle_size: how many items are in a task
-            chunksize: how many tasks we create before enqueueing them.
-
-        Potential performance improvements:
-         - Postgres is quiescent when Solr is popping tasks from Celery,
-           instead, it should be fetching the next 1,000
         """
         processed_count = 0
-        subtasks = []
-        item_bundle = []
+        throttle = CeleryThrottle(min_items=50)
+        chunk = []
         for item in items:
             processed_count += 1
             last_item = (count == processed_count)
             if processed_count < start_at:
                 continue
-
-            item_bundle.append(item)
-            if (len(item_bundle) >= bundle_size) or last_item:
-                # Every bundle_size documents we create a subtask
-                subtasks.append(
-                    add_or_update_items.subtask((item_bundle, self.solr_url))
-                )
-                item_bundle = []
-
-            if (len(subtasks) >= chunksize) or last_item:
-                # Every chunksize items, we send the subtasks for processing
-                job = TaskSet(tasks=subtasks)
-                job.apply_async().join()
-                subtasks = []
-
-            sys.stdout.write("\rProcessed {}/{} ({:.0%})".format(
-                processed_count,
-                count,
-                processed_count * 1.0 / count,
-            ))
-            self.stdout.flush()
+            throttle.maybe_wait()
+            chunk.append(item)
+            if processed_count % chunksize == 0 or last_item:
+                add_or_update_items.delay(chunk, self.solr_url)
+                chunk = []
+                sys.stdout.write("\rProcessed {}/{} ({:.0%})".format(
+                    processed_count,
+                    count,
+                    processed_count * 1.0 / count,
+                ))
+                self.stdout.flush()
         self.stdout.write('\n')
 
     @print_timing
@@ -456,7 +441,7 @@ class Command(BaseCommand):
             q = self.type.objects.all()
             count = q.count()
             q = queryset_generator(q, chunksize=5000)
-        self._chunk_queryset_into_tasks(q, count, bundle_size=bundle_size,
+        self._chunk_queryset_into_tasks(q, count,
                                         start_at=self.options['start_at'])
 
     @print_timing
