@@ -25,7 +25,7 @@ def get_queue_length(queue_name='celery'):
 class CeleryThrottle(object):
     """A class for throttling celery."""
 
-    def __init__(self, min_items=100, queue_name=None):
+    def __init__(self, min_items=100, queue_name='celery'):
         """Create a throttle to prevent celery run aways.
         
         :param min_items: The minimum number of items that should be enqueued. 
