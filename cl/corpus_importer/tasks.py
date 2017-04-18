@@ -202,13 +202,11 @@ def process_free_opinion_result(self, row_pk, cnt):
             )
     except DatabaseError as e:
         logger.error("Unable to complete database transaction:\n%s" % e)
-        self.request.callbacks = None
         return
 
     if not rd_created and rd.is_available:
         logger.info("Found the item already in the DB with document_number: %s "
                     "and docket_entry: %s!" % (result.document_number, de))
-        self.request.callbacks = None
         return
 
     return {'result': result, 'rd_pk': rd.pk, 'pacer_court_id': result.court_id}
