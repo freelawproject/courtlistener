@@ -221,7 +221,8 @@ def get_and_process_pdf(self, data, session):
     report = FreeOpinionReport(data['pacer_court_id'], session)
     try:
         r = report.download_pdf(result.pacer_case_id, result.pacer_doc_id)
-    except ConnectionError as exc:
+    except (ConnectionError, ChunkedEncodingError, ReadTimeout,
+            ReadTimeoutError) as exc:
         logger.warning("Unable to get PDF for %s" % result)
         raise self.retry(exc=exc, countdown=5)
 
