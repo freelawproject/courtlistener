@@ -1,3 +1,6 @@
+### 2017-04-18
+Ran an opinion update using 1-2 celery workers and a new system of enqueing tasks. Completed 3.9M docs across several restarts of the indexer. Timing unclear. Total run time something like 10 hours, but 1/3 of reindex completed only by the remote celery worker.  
+
 ### 2016-10-21
 First index of RECAP content. Completed in 516 minutes with 9094520 items.
 
