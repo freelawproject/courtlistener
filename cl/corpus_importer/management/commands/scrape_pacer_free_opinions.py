@@ -64,7 +64,7 @@ def mark_court_in_progress(court_id, d):
     )
 
 
-def get_and_save_free_document_reports():
+def get_and_save_free_document_reports(options):
     pacer_court_ids = {
         map_cl_to_pacer_id(v): {'until': now(), 'count': 1} for v in
             Court.objects.filter(
@@ -125,6 +125,32 @@ def get_and_save_free_document_reports():
             )()
 
 
+def get_pdfs(options):
+    """Get PDFs for the results of the Free Document Report queries.
+
+    At this stage, we have rows in the PACERFreeDocumentRow table, each of 
+    which represents a PDF we need to download and merge into our normal 
+    tables: Docket, DocketEntry, and RECAPDocument.
+
+    In this function, we iterate over the entire table of results, merge it 
+    into our normal tables, and then download and extract the PDF.
+
+    :return: None
+    """
+    q = options['queue']
+    cnt = CaseNameTweaker()
+    pacer_session = login('cand', PACER_USERNAME, PACER_PASSWORD)
+    rows = PACERFreeDocumentRow.objects.only('pk')
+    throttle = CeleryThrottle(queue_name=q)
+    for row in queryset_generator(rows):
+        throttle.maybe_wait()
+        chain(
+            process_free_opinion_result.si(row.pk, cnt).set(queue=q),
+            get_and_process_pdf.s(pacer_session).set(queue=q),
+            delete_pacer_row.si(row.pk).set(queue=q),
+        ).apply_async()
+
+
 class Command(BaseCommand):
     help = "Get all the free content from PACER. There are three modes."
 
@@ -154,33 +180,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        self.options = options
-        self.options['action']()
-
-    def get_pdfs(self):
-        """Get PDFs for the results of the Free Document Report queries.
-
-        At this stage, we have rows in the PACERFreeDocumentRow table, each of 
-        which represents a PDF we need to download and merge into our normal 
-        tables: Docket, DocketEntry, and RECAPDocument.
-
-        In this function, we iterate over the entire table of results, merge it 
-        into our normal tables, and then download and extract the PDF.
-
-        :return: None
-        """
-        q = self.options['queue']
-        cnt = CaseNameTweaker()
-        pacer_session = login('cand', PACER_USERNAME, PACER_PASSWORD)
-        rows = PACERFreeDocumentRow.objects.only('pk')
-        throttle = CeleryThrottle(queue_name=q)
-        for row in queryset_generator(rows):
-            throttle.maybe_wait()
-            chain(
-                process_free_opinion_result.si(row.pk, cnt).set(queue=q),
-                get_and_process_pdf.s(pacer_session).set(queue=q),
-                delete_pacer_row.si(row.pk).set(queue=q),
-            ).apply_async()
+        options['action'](options)
 
     VALID_ACTIONS = {
         'get-report-results': get_and_save_free_document_reports,
