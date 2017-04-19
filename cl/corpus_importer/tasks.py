@@ -15,7 +15,7 @@ from django.utils.timezone import now
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import FreeOpinionReport
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
-    ConnectionError, ReadTimeout
+    ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from rest_framework.status import HTTP_403_FORBIDDEN, HTTP_400_BAD_REQUEST
@@ -100,7 +100,8 @@ def get_free_document_report(self, court_id, start, end, session):
     report = FreeOpinionReport(court_id, session)
     try:
         responses = report.query(start, end, sort='case_number')
-    except (ConnectionError, ChunkedEncodingError, ReadTimeoutError) as exc:
+    except (ConnectionError, ChunkedEncodingError, ReadTimeoutError,
+            ConnectTimeout) as exc:
         logger.warning("Unable to get free document report results from %s "
                        "(%s to %s). Trying again." % (court_id, start, end))
         raise self.retry(exc=exc, countdown=5)
@@ -127,7 +128,7 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
     try:
         responses = report.query(start, end, sort='case_number')
     except (ConnectionError, ChunkedEncodingError, ReadTimeoutError,
-            ReadTimeout) as exc:
+            ReadTimeout, ConnectTimeout) as exc:
         logger.warning("Unable to get free document report results from %s "
                        "(%s to %s). Trying again." % (court_id, start, end))
         raise self.retry(exc=exc, countdown=10)
@@ -212,19 +213,20 @@ def process_free_opinion_result(self, row_pk, cnt):
     return {'result': result, 'rd_pk': rd.pk, 'pacer_court_id': result.court_id}
 
 
-@app.task(bind=True, max_retries=5, ignore_result=True)
+@app.task(bind=True, max_retries=15, ignore_result=True)
 def get_and_process_pdf(self, data, session):
     if data is None:
         return
+    countdown = 5 * self.request.retries + 1
     result = data['result']
     rd = RECAPDocument.objects.get(pk=data['rd_pk'])
     report = FreeOpinionReport(data['pacer_court_id'], session)
     try:
         r = report.download_pdf(result.pacer_case_id, result.pacer_doc_id)
     except (ConnectionError, ChunkedEncodingError, ReadTimeout,
-            ReadTimeoutError) as exc:
+            ReadTimeoutError, ConnectTimeout) as exc:
         logger.warning("Unable to get PDF for %s" % result)
-        raise self.retry(exc=exc, countdown=5)
+        raise self.retry(exc=exc, countdown=countdown)
 
     if r is None:
         logger.error("Unable to get PDF for %s" % result)
