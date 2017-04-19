@@ -246,11 +246,11 @@ def get_and_process_pdf(self, data, session, row_pk):
         if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
                                         HTTP_504_GATEWAY_TIMEOUT]:
             logger.warning("Ran into HTTPError: %s. Retrying." %
-                           exc.request.status_code)
+                           exc.response.status_code)
             raise self.retry(exc)
         else:
             msg = "Ran into unknown HTTPError. %s. Aborting." % \
-                  exc.request.status_code
+                  exc.response.status_code
             logger.error(msg)
             PACERFreeDocumentRow.objects.filter(pk=row_pk).update(error_msg=msg)
             self.request.callbacks = None
