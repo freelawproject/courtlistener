@@ -16,6 +16,7 @@ class SchoolSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = School
+        fields = '__all__'
 
 
 class EducationSerializer(DynamicFieldsModelSerializer,
@@ -29,6 +30,7 @@ class EducationSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = Education
+        fields = '__all__'
 
 
 class PoliticalAffiliationSerializer(DynamicFieldsModelSerializer,
@@ -41,6 +43,7 @@ class PoliticalAffiliationSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = PoliticalAffiliation
+        fields = '__all__'
 
 
 class SourceSerializer(DynamicFieldsModelSerializer,
@@ -53,6 +56,7 @@ class SourceSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = Source
+        fields = '__all__'
 
 
 class ABARatingSerializer(DynamicFieldsModelSerializer,
@@ -65,6 +69,7 @@ class ABARatingSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = ABARating
+        fields = '__all__'
 
 
 class PersonSerializer(DynamicFieldsModelSerializer,
@@ -90,6 +95,7 @@ class PersonSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = Person
+        fields = '__all__'
 
 
 class RetentionEventSerializer(DynamicFieldsModelSerializer,
@@ -102,6 +108,7 @@ class RetentionEventSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = RetentionEvent
+        fields = '__all__'
 
 
 class PositionSerializer(DynamicFieldsModelSerializer,
@@ -122,3 +129,4 @@ class PositionSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = Position
+        fields = '__all__'

@@ -21,3 +21,4 @@ class AudioSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = audio_models.Audio
+        fields = '__all__'

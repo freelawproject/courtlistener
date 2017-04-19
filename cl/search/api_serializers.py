@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from cl.api.utils import DynamicFieldsModelSerializer
 from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
-    OpinionsCited
+    OpinionsCited, DocketEntry, RECAPDocument
 
 
 class DocketSerializer(DynamicFieldsModelSerializer,
@@ -24,11 +24,48 @@ class DocketSerializer(DynamicFieldsModelSerializer,
         view_name='audio-detail',
         read_only=True,
     )
+    assigned_to = serializers.HyperlinkedRelatedField(
+        many=True,
+        view_name='person-detail',
+        read_only=True,
+    )
+    referred_to = serializers.HyperlinkedRelatedField(
+        many=True,
+        view_name='person-detail',
+        read_only=True,
+    )
+    parties = serializers.HyperlinkedRelatedField(
+        many=True,
+        view_name='party-detail',
+        read_only=True,
+    )
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
 
     class Meta:
         model = Docket
+        exclude = ('view_count',)
+
+
+class RECAPDocumentSerializer(DynamicFieldsModelSerializer,
+                              serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = RECAPDocument
+        fields = '__all__'
+
+
+class DocketEntrySerializer(DynamicFieldsModelSerializer,
+                            serializers.HyperlinkedModelSerializer):
+    docket = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='docket-detail',
+        read_only=True,
+    )
+    recap_documents = RECAPDocumentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DocketEntry
+        fields = '__all__'
 
 
 class CourtSerializer(DynamicFieldsModelSerializer,
@@ -60,6 +97,7 @@ class OpinionSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = Opinion
+        fields = '__all__'
 
 
 class OpinionsCitedSerializer(DynamicFieldsModelSerializer,
@@ -80,6 +118,7 @@ class OpinionsCitedSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = OpinionsCited
+        fields = '__all__'
 
 
 class OpinionClusterSerializer(DynamicFieldsModelSerializer,
@@ -101,7 +140,6 @@ class OpinionClusterSerializer(DynamicFieldsModelSerializer,
         view_name='docket-detail',
         read_only=True,
     )
-
     sub_opinions = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='opinion-detail',
@@ -110,6 +148,7 @@ class OpinionClusterSerializer(DynamicFieldsModelSerializer,
 
     class Meta:
         model = OpinionCluster
+        fields = '__all__'
 
 
 class SearchResultSerializer(serializers.Serializer):
