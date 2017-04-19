@@ -232,8 +232,8 @@ def get_and_process_pdf(self, data, session):
         logger.warning("Unable to get PDF for %s" % result)
         raise self.retry(exc=exc)
     except HTTPError as exc:
-        if exc.request.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
-                                       HTTP_504_GATEWAY_TIMEOUT]:
+        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
+                                        HTTP_504_GATEWAY_TIMEOUT]:
             logger.warning("Ran into HTTPError: %s. Retrying." %
                            exc.request.status_code)
             raise self.retry(exc)
