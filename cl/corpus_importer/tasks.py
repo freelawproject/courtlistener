@@ -17,8 +17,12 @@ from juriscraper.pacer import FreeOpinionReport
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
-
-from rest_framework.status import HTTP_403_FORBIDDEN, HTTP_400_BAD_REQUEST
+from rest_framework.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_403_FORBIDDEN,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_504_GATEWAY_TIMEOUT,
+)
 
 from cl.celery import app
 from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
@@ -213,20 +217,30 @@ def process_free_opinion_result(self, row_pk, cnt):
     return {'result': result, 'rd_pk': rd.pk, 'pacer_court_id': result.court_id}
 
 
-@app.task(bind=True, max_retries=15, ignore_result=True)
+@app.task(bind=True, max_retries=15, interval_start=5, interval_step=5,
+          ignore_result=True)
 def get_and_process_pdf(self, data, session):
     if data is None:
         return
-    countdown = 5 * self.request.retries + 1
     result = data['result']
     rd = RECAPDocument.objects.get(pk=data['rd_pk'])
     report = FreeOpinionReport(data['pacer_court_id'], session)
     try:
         r = report.download_pdf(result.pacer_case_id, result.pacer_doc_id)
-    except (ConnectionError, ChunkedEncodingError, ReadTimeout,
-            ReadTimeoutError, ConnectTimeout) as exc:
+    except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
+            ChunkedEncodingError) as exc:
         logger.warning("Unable to get PDF for %s" % result)
-        raise self.retry(exc=exc, countdown=countdown)
+        raise self.retry(exc=exc)
+    except HTTPError as exc:
+        if exc.request.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
+                                       HTTP_504_GATEWAY_TIMEOUT]:
+            logger.warning("Ran into HTTPError: %s. Retrying." %
+                           exc.request.status_code)
+            raise self.retry(exc)
+        else:
+            logger.error("Ran into unknown HTTPError. %s. Aborting." %
+                         exc.request.status_code)
+            raise
 
     if r is None:
         logger.error("Unable to get PDF for %s" % result)
@@ -259,11 +273,11 @@ class OverloadedException(Exception):
     pass
 
 
-@app.task(bind=True, max_retries=15, ignore_result=True)
+@app.task(bind=True, max_retries=15, interval_start=5, interval_step=5,
+          ignore_result=True)
 def upload_free_opinion_to_ia(self, data):
     if data is None:
         return
-    countdown = 5 * self.request.retries + 1  # 5s, 10s, 15s...
     result = data['result']
     rd = RECAPDocument.objects.get(pk=data['rd_pk'])
     file_name = get_document_filename(
@@ -293,14 +307,14 @@ def upload_free_opinion_to_ia(self, data):
             },
         )
     except OverloadedException as exc:
-        raise self.retry(exc=exc, countdown=countdown)
+        raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response.status_code in [
             HTTP_403_FORBIDDEN,    # Can't access bucket, typically.
             HTTP_400_BAD_REQUEST,  # Corrupt PDF, typically.
         ]:
             return [exc.response]
-        raise self.retry(exc=exc, countdown=countdown)
+        raise self.retry(exc=exc)
     if all(r.ok for r in responses):
         rd.filepath_ia = "https://archive.org/download/%s/%s" % (
             bucket_name, file_name)
