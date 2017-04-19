@@ -182,7 +182,10 @@ def process_free_opinion_result(self, row_pk, cnt):
         with transaction.atomic():
             docket = lookup_and_save(row_copy)
             if not docket:
-                logger.error("Unable to create docket for %s" % result)
+                msg = "Unable to create docket for %s" % result
+                logger.error(msg)
+                result.error_msg = msg
+                result.save()
                 self.request.callbacks = None
                 return
             docket.blocked, docket.date_blocked = get_blocked_status(docket)
@@ -206,12 +209,20 @@ def process_free_opinion_result(self, row_pk, cnt):
                 }
             )
     except DatabaseError as e:
-        logger.error("Unable to complete database transaction:\n%s" % e)
+        msg = "Unable to complete database transaction:\n%s" % e
+        logger.error(msg)
+        result.error_msg = msg
+        result.save()
+        self.request.callbacks = None
         return
 
     if not rd_created and rd.is_available:
-        logger.info("Found the item already in the DB with document_number: %s "
-                    "and docket_entry: %s!" % (result.document_number, de))
+        msg = ("Found the item already in the DB with document_number: %s "
+               "and docket_entry: %s!" % (result.document_number, de))
+        logger.info(msg)
+        result.error_msg = msg
+        result.save()
+        self.request.callbacks = None
         return
 
     return {'result': result, 'rd_pk': rd.pk, 'pacer_court_id': result.court_id}
@@ -219,7 +230,7 @@ def process_free_opinion_result(self, row_pk, cnt):
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5,
           ignore_result=True)
-def get_and_process_pdf(self, data, session):
+def get_and_process_pdf(self, data, session, row_pk):
     if data is None:
         return
     result = data['result']
@@ -238,12 +249,17 @@ def get_and_process_pdf(self, data, session):
                            exc.request.status_code)
             raise self.retry(exc)
         else:
-            logger.error("Ran into unknown HTTPError. %s. Aborting." %
-                         exc.request.status_code)
-            raise
+            msg = "Ran into unknown HTTPError. %s. Aborting." % \
+                  exc.request.status_code
+            logger.error(msg)
+            PACERFreeDocumentRow.objects.filter(pk=row_pk).update(error_msg=msg)
+            self.request.callbacks = None
+            return
 
     if r is None:
-        logger.error("Unable to get PDF for %s" % result)
+        msg = "Unable to get PDF for %s" % result
+        logger.error(msg)
+        PACERFreeDocumentRow.objects.filter(pk=row_pk).update(error_msg=msg)
         self.request.callbacks = None
         return
 

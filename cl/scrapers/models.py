@@ -147,3 +147,4 @@ class PACERFreeDocumentRow(models.Model):
     cause = models.CharField(
         max_length=2000,
     )
+    error_msg = models.TextField()
