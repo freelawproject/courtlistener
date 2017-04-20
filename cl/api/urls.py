@@ -1,10 +1,12 @@
+from django.conf.urls import url, include
+from rest_framework.routers import DefaultRouter
+from rest_framework.schemas import get_schema_view
+from rest_framework_swagger.renderers import OpenAPIRenderer, SwaggerUIRenderer
+
 from cl.api import views
 from cl.audio import api_views as audio_views
 from cl.people_db import api_views as people_views
 from cl.search import api_views as search_views
-
-from django.conf.urls import url, include
-from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
 # Search & Audio
@@ -28,11 +30,22 @@ router.register(r'sources', people_views.SourceViewSet)
 router.register(r'aba-ratings', people_views.ABARatingViewSet)
 router.register(r'parties', people_views.PartyViewSet)
 
+core_api_schema_view = get_schema_view(
+    title="CourtListener Legal Data API",
+    url='https://www.courtlistener.com/api/',
+)
+swagger_schema_view = get_schema_view(
+    title="CourtListener Legal Data API",
+    url='https://www.courtlistener.com/api/',
+    renderer_classes=[OpenAPIRenderer, SwaggerUIRenderer],
+)
 
 urlpatterns = [
     url(r'^api-auth/',
         include('rest_framework.urls', namespace='rest_framework')),
     url(r'^api/rest/(?P<version>[v3]+)/', include(router.urls)),
+    url('^api/schema/$', core_api_schema_view),
+    url('^api/swagger/$', swagger_schema_view),
 
     # Documentation
     url(r'^api/$',
