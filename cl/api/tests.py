@@ -168,8 +168,13 @@ def assertCount(cls, path, q, expected_count):
     cls.client.login(username='pandora', password='password')
     print("Path and q are: %s, %s" % (path, q))
     r = cls.client.get(path, q)
-    cls.assertEqual(len(r.data['results']), expected_count,
-                    msg="r.data was: %s" % r.data)
+    got = len(r.data['results'])
+    cls.assertEqual(
+        got,
+        expected_count,
+        msg="Expected %s, but got %s.\n"
+            "r.data was: %s" % (expected_count, got, r.data)
+    )
 
 
 class DRFOrderingTests(TestCase):
