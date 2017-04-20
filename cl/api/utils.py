@@ -33,8 +33,12 @@ ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ['contains', 'icontains']
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
     """
-    A ModelSerializer that takes an additional `fields` argument that
-    controls which fields should be displayed.
+    A ModelSerializer that takes an additional `fields` argument.
+     
+    This allows calling code to only return certain fields in the JSON object,
+    making it smaller.
+    
+    See: https://www.courtlistener.com/api/rest-info/#field-selection
     """
 
     def __init__(self, *args, **kwargs):
