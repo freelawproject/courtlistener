@@ -14,6 +14,7 @@ class AudioSerializer(DynamicFieldsMixin,
         many=True,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
     # This seems unnecessary and it serializes the same data either way. But
     # when this is not here, the API does a query that pulls back ALL dockets.
@@ -21,6 +22,7 @@ class AudioSerializer(DynamicFieldsMixin,
         many=False,
         view_name='docket-detail',
         queryset=Docket.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:

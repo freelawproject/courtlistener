@@ -12,6 +12,7 @@ class SchoolSerializer(DynamicFieldsMixin,
         many=False,
         view_name='school-detail',
         queryset=School.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
@@ -26,6 +27,7 @@ class EducationSerializer(DynamicFieldsMixin,
         many=False,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
@@ -39,6 +41,7 @@ class PoliticalAffiliationSerializer(DynamicFieldsMixin,
         many=False,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
@@ -52,6 +55,7 @@ class SourceSerializer(DynamicFieldsMixin,
         many=False,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
@@ -65,6 +69,7 @@ class ABARatingSerializer(DynamicFieldsMixin,
         many=False,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
@@ -82,6 +87,7 @@ class PersonSerializer(DynamicFieldsMixin,
         many=True,
         view_name='position-detail',
         queryset=Position.objects.all(),
+        style={'base_template': 'input.html'},
     )
     political_affiliations = PoliticalAffiliationSerializer(many=True,
                                                             read_only=True)
@@ -89,6 +95,7 @@ class PersonSerializer(DynamicFieldsMixin,
         many=False,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
@@ -102,6 +109,7 @@ class RetentionEventSerializer(DynamicFieldsMixin,
         many=False,
         view_name='position-detail',
         queryset=Position.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
@@ -123,6 +131,7 @@ class PositionSerializer(DynamicFieldsMixin,
         many=False,
         view_name='position-detail',
         queryset=Position.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:

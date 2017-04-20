@@ -20,26 +20,31 @@ class DocketSerializer(DynamicFieldsMixin,
         many=True,
         view_name='opinioncluster-detail',
         queryset=OpinionCluster.objects.all(),
+        style={'base_template': 'input.html'},
     )
     audio_files = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='audio-detail',
         queryset=Audio.objects.all(),
+        style={'base_template': 'input.html'},
     )
     assigned_to = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
     referred_to = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
     parties = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='party-detail',
         queryset=Party.objects.all(),
+        style={'base_template': 'input.html'},
     )
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
@@ -85,16 +90,19 @@ class OpinionSerializer(DynamicFieldsMixin,
         many=False,
         view_name='opinioncluster-detail',
         queryset=OpinionCluster.objects.all(),
+        style={'base_template': 'input.html'},
     )
     author = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
     joined_by = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
@@ -111,11 +119,13 @@ class OpinionsCitedSerializer(DynamicFieldsMixin,
         many=False,
         view_name='opinion-detail',
         queryset=Opinion.objects.all(),
+        style={'base_template': 'input.html'},
     )
     cited_opinion = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='opinion-detail',
         queryset=Opinion.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
@@ -131,21 +141,25 @@ class OpinionClusterSerializer(DynamicFieldsMixin,
         many=True,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
     non_participating_judges = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
         queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
     docket = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='docket-detail',
         queryset=Docket.objects.all(),
+        style={'base_template': 'input.html'},
     )
     sub_opinions = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='opinion-detail',
         queryset=Opinion.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
