@@ -30,22 +30,26 @@ router.register(r'sources', people_views.SourceViewSet)
 router.register(r'aba-ratings', people_views.ABARatingViewSet)
 router.register(r'parties', people_views.PartyViewSet)
 
+API_TITLE = "CourtListener Legal Data API"
 core_api_schema_view = get_schema_view(
-    title="CourtListener Legal Data API",
+    title=API_TITLE,
     url='https://www.courtlistener.com/api/',
 )
 swagger_schema_view = get_schema_view(
-    title="CourtListener Legal Data API",
+    title=API_TITLE,
     url='https://www.courtlistener.com/api/',
     renderer_classes=[OpenAPIRenderer, SwaggerUIRenderer],
 )
+
 
 urlpatterns = [
     url(r'^api-auth/',
         include('rest_framework.urls', namespace='rest_framework')),
     url(r'^api/rest/(?P<version>[v3]+)/', include(router.urls)),
-    url('^api/schema/$', core_api_schema_view),
-    url('^api/swagger/$', swagger_schema_view),
+
+    # Schemas
+    url('^api/schema/$', core_api_schema_view, name="core_api_schema"),
+    url('^api/swagger/$', swagger_schema_view, name="swagger_schema"),
 
     # Documentation
     url(r'^api/$',
