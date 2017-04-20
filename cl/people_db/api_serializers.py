@@ -1,12 +1,12 @@
+from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
-from cl.api.utils import DynamicFieldsModelSerializer
 from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, Party
 from cl.search.api_serializers import CourtSerializer
 
 
-class SchoolSerializer(DynamicFieldsModelSerializer,
+class SchoolSerializer(DynamicFieldsMixin,
                        serializers.HyperlinkedModelSerializer):
     is_alias_of = serializers.HyperlinkedRelatedField(
         many=False,
@@ -19,7 +19,7 @@ class SchoolSerializer(DynamicFieldsModelSerializer,
         fields = '__all__'
 
 
-class EducationSerializer(DynamicFieldsModelSerializer,
+class EducationSerializer(DynamicFieldsMixin,
                           serializers.HyperlinkedModelSerializer):
     school = SchoolSerializer(many=False, read_only=True)
     person = serializers.HyperlinkedRelatedField(
@@ -33,7 +33,7 @@ class EducationSerializer(DynamicFieldsModelSerializer,
         fields = '__all__'
 
 
-class PoliticalAffiliationSerializer(DynamicFieldsModelSerializer,
+class PoliticalAffiliationSerializer(DynamicFieldsMixin,
                                      serializers.HyperlinkedModelSerializer):
     person = serializers.HyperlinkedRelatedField(
         many=False,
@@ -46,7 +46,7 @@ class PoliticalAffiliationSerializer(DynamicFieldsModelSerializer,
         fields = '__all__'
 
 
-class SourceSerializer(DynamicFieldsModelSerializer,
+class SourceSerializer(DynamicFieldsMixin,
                        serializers.HyperlinkedModelSerializer):
     person = serializers.HyperlinkedRelatedField(
         many=False,
@@ -59,7 +59,7 @@ class SourceSerializer(DynamicFieldsModelSerializer,
         fields = '__all__'
 
 
-class ABARatingSerializer(DynamicFieldsModelSerializer,
+class ABARatingSerializer(DynamicFieldsMixin,
                           serializers.HyperlinkedModelSerializer):
     person = serializers.HyperlinkedRelatedField(
         many=False,
@@ -72,7 +72,7 @@ class ABARatingSerializer(DynamicFieldsModelSerializer,
         fields = '__all__'
 
 
-class PersonSerializer(DynamicFieldsModelSerializer,
+class PersonSerializer(DynamicFieldsMixin,
                        serializers.HyperlinkedModelSerializer):
     race = serializers.StringRelatedField(many=True)
     sources = SourceSerializer(many=True, read_only=True)
@@ -96,7 +96,7 @@ class PersonSerializer(DynamicFieldsModelSerializer,
         fields = '__all__'
 
 
-class RetentionEventSerializer(DynamicFieldsModelSerializer,
+class RetentionEventSerializer(DynamicFieldsMixin,
                                serializers.HyperlinkedModelSerializer):
     position = serializers.HyperlinkedRelatedField(
         many=False,
@@ -109,7 +109,7 @@ class RetentionEventSerializer(DynamicFieldsModelSerializer,
         fields = '__all__'
 
 
-class PositionSerializer(DynamicFieldsModelSerializer,
+class PositionSerializer(DynamicFieldsMixin,
                          serializers.HyperlinkedModelSerializer):
     retention_events = RetentionEventSerializer(many=True, read_only=True)
     person = PersonSerializer(many=False, read_only=True)
@@ -130,7 +130,7 @@ class PositionSerializer(DynamicFieldsModelSerializer,
         fields = '__all__'
 
 
-class PartySerializer(DynamicFieldsModelSerializer,
+class PartySerializer(DynamicFieldsMixin,
                       serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Party
