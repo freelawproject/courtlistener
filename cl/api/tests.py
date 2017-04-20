@@ -166,7 +166,7 @@ class CoverageTests(IndexedSolrTestCase):
 
 def assertCount(cls, path, q, expected_count):
     cls.client.login(username='pandora', password='password')
-    print "Path and q are: %s, %s" % (path, q)
+    print("Path and q are: %s, %s" % (path, q))
     r = cls.client.get(path, q)
     cls.assertEqual(len(r.data['results']), expected_count,
                     msg="r.data was: %s" % r.data)
