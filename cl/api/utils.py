@@ -1,8 +1,8 @@
 import json
-import os
 from collections import OrderedDict, defaultdict
 from datetime import date
 
+import os
 import redis
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
@@ -12,7 +12,6 @@ from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.mail import send_mail
 from django.utils.encoding import force_text
 from django.utils.timezone import now
-from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.throttling import UserRateThrottle
@@ -29,32 +28,6 @@ INTEGER_LOOKUPS = ['exact', 'gte', 'gt', 'lte', 'lt', 'range']
 BASIC_TEXT_LOOKUPS = ['exact', 'iexact', 'startswith', 'istartswith',
                       'endswith', 'iendswith']
 ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ['contains', 'icontains']
-
-
-class DynamicFieldsModelSerializer(serializers.ModelSerializer):
-    """
-    A ModelSerializer that takes an additional `fields` argument.
-     
-    This allows calling code to only return certain fields in the JSON object,
-    making it smaller.
-    
-    See: https://www.courtlistener.com/api/rest-info/#field-selection
-    """
-
-    def __init__(self, *args, **kwargs):
-        # Instantiate the superclass normally
-        super(DynamicFieldsModelSerializer, self).__init__(*args, **kwargs)
-        if not self.context or not self.context.get('request'):
-            # This happens during initialization.
-            return
-        fields = getattr(self.context['request'], 'query_params', {}).get('fields')
-        if fields is not None:
-            fields = fields.split(',')
-            # Drop any fields that are not specified in the `fields` argument.
-            allowed = set(fields)
-            existing = set(self.fields.keys())
-            for field_name in existing - allowed:
-                self.fields.pop(field_name)
 
 
 class SimpleMetadataWithFilters(SimpleMetadata):
