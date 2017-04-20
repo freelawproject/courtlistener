@@ -1,8 +1,8 @@
 import datetime
-import os
 import re
 import sys
 
+import os
 from django.contrib.messages import constants as message_constants
 from judge_pics import judge_root
 
@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     'mathfilters',
     'rest_framework',
     'rest_framework.authtoken',
+    'rest_framework_swagger',
     'crispy_forms',  # For DRF HTML site.
     'django_filters',
 
@@ -314,7 +315,7 @@ REST_FRAMEWORK = {
 
     # Filtering
     'DEFAULT_FILTER_BACKENDS': (
-        'rest_framework.filters.DjangoFilterBackend',
+        'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.OrderingFilter',
     ),
 

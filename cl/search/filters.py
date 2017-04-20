@@ -1,12 +1,14 @@
 import rest_framework_filters as filters
+from django_filters.rest_framework import FilterSet
 
 from cl.api.utils import INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.search.models import (
     Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES,
-    JURISDICTIONS)
+    JURISDICTIONS
+)
 
 
-class CourtFilter(filters.FilterSet):
+class CourtFilter(FilterSet):
     dockets = filters.RelatedFilter(
         'cl.search.filters.DocketFilter',
         name='dockets',
@@ -29,7 +31,7 @@ class CourtFilter(filters.FilterSet):
         }
 
 
-class DocketFilter(filters.FilterSet):
+class DocketFilter(FilterSet):
     court = filters.RelatedFilter(CourtFilter, name='court')
     clusters = filters.RelatedFilter(
         "cl.search.filters.OpinionClusterFilter",
@@ -55,7 +57,7 @@ class DocketFilter(filters.FilterSet):
         }
 
 
-class OpinionFilter(filters.FilterSet):
+class OpinionFilter(FilterSet):
     # Cannot to reference to opinions_cited here, due to it being a self join,
     # which is not supported (possibly for good reasons?)
     cluster = filters.RelatedFilter(
@@ -79,14 +81,14 @@ class OpinionFilter(filters.FilterSet):
         fields = {
             'id': INTEGER_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
-            'date_created': DATETIME_LOOKUPS,            
+            'date_created': DATETIME_LOOKUPS,
             'sha1': ['exact'],
             'extracted_by_ocr': ['exact'],
             'per_curiam': ['exact'],
         }
 
 
-class OpinionClusterFilter(filters.FilterSet):
+class OpinionClusterFilter(FilterSet):
     docket = filters.RelatedFilter(DocketFilter, name='docket')
     non_participating_judges = filters.RelatedFilter(
         'cl.people_db.filters.PersonFilter',
@@ -135,7 +137,7 @@ class OpinionClusterFilter(filters.FilterSet):
         }
 
 
-class OpinionsCitedFilter(filters.FilterSet):
+class OpinionsCitedFilter(FilterSet):
     citing_opinion = filters.RelatedFilter(
             OpinionFilter,
             name='citing_opinion',

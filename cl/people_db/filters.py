@@ -1,4 +1,5 @@
 import rest_framework_filters as filters
+from django_filters.rest_framework import FilterSet
 
 from cl.api.utils import (
     DATETIME_LOOKUPS, DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, INTEGER_LOOKUPS,
@@ -6,11 +7,11 @@ from cl.api.utils import (
 )
 from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, \
-    Race
+    Race, Party
 from cl.search.filters import CourtFilter
 
 
-class SourceFilter(filters.FilterSet):
+class SourceFilter(FilterSet):
     class Meta:
         model = Source
         fields = {
@@ -20,7 +21,7 @@ class SourceFilter(filters.FilterSet):
         }
 
 
-class ABARatingFilter(filters.FilterSet):
+class ABARatingFilter(FilterSet):
     class Meta:
         model = ABARating
         fields = {
@@ -33,7 +34,7 @@ class ABARatingFilter(filters.FilterSet):
         }
 
 
-class PoliticalAffiliationFilter(filters.FilterSet):
+class PoliticalAffiliationFilter(FilterSet):
     class Meta:
         model = PoliticalAffiliation
         fields = {
@@ -48,7 +49,7 @@ class PoliticalAffiliationFilter(filters.FilterSet):
         }
 
 
-class SchoolFilter(filters.FilterSet):
+class SchoolFilter(FilterSet):
     educations = filters.RelatedFilter(
         'cl.people_db.filters.EducationFilter',
         name='educations',
@@ -65,7 +66,7 @@ class SchoolFilter(filters.FilterSet):
         }
 
 
-class EducationFilter(filters.FilterSet):
+class EducationFilter(FilterSet):
     school = filters.RelatedFilter(SchoolFilter, name='school')
     person = filters.RelatedFilter('cl.people_db.filters.PersonFilter', name='person')
 
@@ -82,7 +83,7 @@ class EducationFilter(filters.FilterSet):
         }
 
 
-class RetentionEventFilter(filters.FilterSet):
+class RetentionEventFilter(FilterSet):
     class Meta:
         model = RetentionEvent
         fields = {
@@ -99,7 +100,7 @@ class RetentionEventFilter(filters.FilterSet):
         }
 
 
-class PositionFilter(filters.FilterSet):
+class PositionFilter(FilterSet):
     court = filters.RelatedFilter(CourtFilter, name='court')
     retention_events = filters.RelatedFilter(
             RetentionEventFilter, name='retention_events')
@@ -137,7 +138,7 @@ class PositionFilter(filters.FilterSet):
         }
 
 
-class PersonFilter(filters.FilterSet):
+class PersonFilter(FilterSet):
     # filter_overrides = default_filter_overrides
     educations = filters.RelatedFilter(EducationFilter, name='educations')
     political_affiliations = filters.RelatedFilter(
@@ -191,6 +192,6 @@ class PersonFilter(filters.FilterSet):
         }
 
 
-class PartyFilter(filters.FilterSet):
+class PartyFilter(FilterSet):
     class Meta:
-        model = RetentionEvent
+        model = Party

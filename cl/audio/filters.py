@@ -1,4 +1,5 @@
 import rest_framework_filters as filters
+from django_filters.rest_framework import FilterSet
 
 from cl.api.utils import DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.audio.models import Audio
@@ -6,7 +7,7 @@ from cl.search.filters import DocketFilter
 from cl.search.models import SOURCES
 
 
-class AudioFilter(filters.FilterSet):
+class AudioFilter(FilterSet):
     docket = filters.RelatedFilter(DocketFilter, name='docket')
     source = filters.MultipleChoiceFilter(
         choices=SOURCES,
