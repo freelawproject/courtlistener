@@ -2,7 +2,9 @@ from collections import OrderedDict
 
 from rest_framework import serializers
 
+from cl.audio.models import Audio
 from cl.api.utils import DynamicFieldsModelSerializer
+from cl.people_db.models import Person, Party
 from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
     OpinionsCited, DocketEntry, RECAPDocument
 
@@ -12,32 +14,32 @@ class DocketSerializer(DynamicFieldsModelSerializer,
     court = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='court-detail',
-        read_only=True,
+        queryset=Court.objects.exclude(jurisdiction='T'),
     )
     clusters = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='opinioncluster-detail',
-        read_only=True,
+        queryset=OpinionCluster.objects.all(),
     )
     audio_files = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='audio-detail',
-        read_only=True,
+        queryset=Audio.objects.all(),
     )
     assigned_to = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
     )
     referred_to = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
     )
     parties = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='party-detail',
-        read_only=True,
+        queryset=Party.objects.all(),
     )
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
@@ -59,7 +61,7 @@ class DocketEntrySerializer(DynamicFieldsModelSerializer,
     docket = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='docket-detail',
-        read_only=True,
+        queryset=Docket.objects.all(),
     )
     recap_documents = RECAPDocumentSerializer(many=True, read_only=True)
 
@@ -82,17 +84,17 @@ class OpinionSerializer(DynamicFieldsModelSerializer,
     cluster = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='opinioncluster-detail',
-        read_only=True,
+        queryset=OpinionCluster.objects.all(),
     )
     author = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
     )
     joined_by = serializers.HyperlinkedRelatedField(
-            many=True,
-            view_name='person-detail',
-            read_only=True,
+        many=True,
+        view_name='person-detail',
+        queryset=Person.objects.all(),
     )
 
     class Meta:
@@ -108,12 +110,12 @@ class OpinionsCitedSerializer(DynamicFieldsModelSerializer,
     citing_opinion = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='opinion-detail',
-        read_only=True,
+        queryset=Opinion.objects.all(),
     )
     cited_opinion = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='opinion-detail',
-        read_only=True,
+        queryset=Opinion.objects.all(),
     )
 
     class Meta:
@@ -128,22 +130,22 @@ class OpinionClusterSerializer(DynamicFieldsModelSerializer,
     panel = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
     )
     non_participating_judges = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
     )
     docket = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='docket-detail',
-        read_only=True,
+        queryset=Docket.objects.all(),
     )
     sub_opinions = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='opinion-detail',
-        read_only=True,
+        queryset=Opinion.objects.all(),
     )
 
     class Meta:

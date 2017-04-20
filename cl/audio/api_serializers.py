@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
 from cl.audio import models as audio_models
+from cl.people_db.models import Person
+from cl.search.models import Docket
 
 
 class AudioSerializer(serializers.HyperlinkedModelSerializer):
@@ -9,14 +11,14 @@ class AudioSerializer(serializers.HyperlinkedModelSerializer):
     panel = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
     )
     # This seems unnecessary and it serializes the same data either way. But
     # when this is not here, the API does a query that pulls back ALL dockets.
     docket = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='docket-detail',
-        read_only=True,
+        queryset=Docket.objects.all(),
     )
 
     class Meta:

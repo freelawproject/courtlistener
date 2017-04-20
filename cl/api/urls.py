@@ -1,6 +1,6 @@
 from cl.api import views
 from cl.audio import api_views as audio_views
-from cl.people_db import api_views as judge_views
+from cl.people_db import api_views as people_views
 from cl.search import api_views as search_views
 
 from django.conf.urls import url, include
@@ -16,16 +16,17 @@ router.register(r'opinions', search_views.OpinionViewSet)
 router.register(r'opinions-cited', search_views.OpinionsCitedViewSet)
 router.register(r'search', search_views.SearchViewSet, base_name='search')
 
-# Judges
-router.register(r'people', judge_views.PersonViewSet)
-router.register(r'positions', judge_views.PositionViewSet)
-router.register(r'retention-events', judge_views.RetentionEventViewSet)
-router.register(r'educations', judge_views.EducationViewSet)
-router.register(r'schools', judge_views.SchoolViewSet)
+# People & Entities
+router.register(r'people', people_views.PersonViewSet)
+router.register(r'positions', people_views.PositionViewSet)
+router.register(r'retention-events', people_views.RetentionEventViewSet)
+router.register(r'educations', people_views.EducationViewSet)
+router.register(r'schools', people_views.SchoolViewSet)
 router.register(r'political-affiliations',
-                judge_views.PoliticalAffiliationViewSet)
-router.register(r'sources', judge_views.SourceViewSet)
-router.register(r'aba-ratings', judge_views.ABARatingViewSet)
+                people_views.PoliticalAffiliationViewSet)
+router.register(r'sources', people_views.SourceViewSet)
+router.register(r'aba-ratings', people_views.ABARatingViewSet)
+router.register(r'parties', people_views.PartyViewSet)
 
 
 urlpatterns = [

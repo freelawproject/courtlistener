@@ -189,3 +189,8 @@ class PersonFilter(filters.FilterSet):
             'dod_state': BASIC_TEXT_LOOKUPS,
             'gender': ['exact'],
         }
+
+
+class PartyFilter(filters.FilterSet):
+    class Meta:
+        model = RetentionEvent

@@ -6,14 +6,14 @@ from cl.people_db.api_serializers import (
     RetentionEventSerializer, EducationSerializer, SchoolSerializer,
     PoliticalAffiliationSerializer,
     ABARatingSerializer, SourceSerializer,
-)
+    PartySerializer)
 from cl.people_db.filters import (
     PersonFilter, PositionFilter, RetentionEventFilter,
     EducationFilter, SchoolFilter,
     PoliticalAffiliationFilter, ABARatingFilter, SourceFilter,
-)
+    PartyFilter)
 from cl.people_db.models import Person, Position, RetentionEvent, \
-    Education, School, PoliticalAffiliation, Source, ABARating
+    Education, School, PoliticalAffiliation, Source, ABARating, Party
 
 
 class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -83,3 +83,10 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = (
         'date_created', 'date_modified', 'year_rated',
     )
+
+
+class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
+    queryset = Party.objects.all()
+    serializer_class = PartySerializer
+    filter_class = PartyFilter
+    ordering_fields = []

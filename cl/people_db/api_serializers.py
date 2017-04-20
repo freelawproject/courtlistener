@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from cl.api.utils import DynamicFieldsModelSerializer
 from cl.people_db.models import Person, Position, RetentionEvent, \
-    Education, School, PoliticalAffiliation, Source, ABARating
+    Education, School, PoliticalAffiliation, Source, ABARating, Party
 from cl.search.api_serializers import CourtSerializer
 
 
@@ -11,7 +11,7 @@ class SchoolSerializer(DynamicFieldsModelSerializer,
     is_alias_of = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='school-detail',
-        read_only=True
+        queryset=School.objects.all(),
     )
 
     class Meta:
@@ -25,7 +25,7 @@ class EducationSerializer(DynamicFieldsModelSerializer,
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
     )
 
     class Meta:
@@ -38,7 +38,7 @@ class PoliticalAffiliationSerializer(DynamicFieldsModelSerializer,
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
     )
 
     class Meta:
@@ -51,7 +51,7 @@ class SourceSerializer(DynamicFieldsModelSerializer,
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
     )
 
     class Meta:
@@ -64,7 +64,7 @@ class ABARatingSerializer(DynamicFieldsModelSerializer,
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
     )
 
     class Meta:
@@ -81,16 +81,14 @@ class PersonSerializer(DynamicFieldsModelSerializer,
     positions = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='position-detail',
-        read_only=True,
+        queryset=Position.objects.all(),
     )
-    political_affiliations = PoliticalAffiliationSerializer(
-        many=True,
-        read_only=True
-    )
+    political_affiliations = PoliticalAffiliationSerializer(many=True,
+                                                            read_only=True)
     is_alias_of = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True
+        queryset=Person.objects.all(),
     )
 
     class Meta:
@@ -103,7 +101,7 @@ class RetentionEventSerializer(DynamicFieldsModelSerializer,
     position = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='position-detail',
-        read_only=True,
+        queryset=Position.objects.all(),
     )
 
     class Meta:
@@ -124,9 +122,16 @@ class PositionSerializer(DynamicFieldsModelSerializer,
     appointer = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='position-detail',
-        read_only=True,
+        queryset=Position.objects.all(),
     )
 
     class Meta:
         model = Position
+        fields = '__all__'
+
+
+class PartySerializer(DynamicFieldsModelSerializer,
+                      serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = Party
         fields = '__all__'
