@@ -315,7 +315,7 @@ REST_FRAMEWORK = {
 
     # Filtering
     'DEFAULT_FILTER_BACKENDS': (
-        'django_filters.rest_framework.DjangoFilterBackend',
+        'cl.api.utils.DisabledHTMLFilterBackend',
         'rest_framework.filters.OrderingFilter',
     ),
 
@@ -324,6 +324,7 @@ REST_FRAMEWORK = {
     'URL_FIELD_NAME': 'resource_uri',
     'DEFAULT_METADATA_CLASS': 'cl.api.utils.SimpleMetadataWithFilters',
     'ORDERING_PARAM': 'order_by',
+    'HTML_SELECT_CUTOFF': 100,
 }
 
 if DEVELOPMENT:

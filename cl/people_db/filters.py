@@ -1,5 +1,5 @@
 import rest_framework_filters as filters
-from django_filters.rest_framework import FilterSet
+from rest_framework_filters import FilterSet
 
 from cl.api.utils import (
     DATETIME_LOOKUPS, DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, INTEGER_LOOKUPS,
@@ -50,10 +50,7 @@ class PoliticalAffiliationFilter(FilterSet):
 
 
 class SchoolFilter(FilterSet):
-    educations = filters.RelatedFilter(
-        'cl.people_db.filters.EducationFilter',
-        name='educations',
-    )
+    educations = filters.RelatedFilter('cl.people_db.filters.EducationFilter')
 
     class Meta:
         model = School
@@ -67,8 +64,8 @@ class SchoolFilter(FilterSet):
 
 
 class EducationFilter(FilterSet):
-    school = filters.RelatedFilter(SchoolFilter, name='school')
-    person = filters.RelatedFilter('cl.people_db.filters.PersonFilter', name='person')
+    school = filters.RelatedFilter(SchoolFilter)
+    person = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
 
     class Meta:
         model = Education
@@ -101,9 +98,8 @@ class RetentionEventFilter(FilterSet):
 
 
 class PositionFilter(FilterSet):
-    court = filters.RelatedFilter(CourtFilter, name='court')
-    retention_events = filters.RelatedFilter(
-            RetentionEventFilter, name='retention_events')
+    court = filters.RelatedFilter(CourtFilter)
+    retention_events = filters.RelatedFilter(RetentionEventFilter)
 
     class Meta:
         model = Position
@@ -140,12 +136,11 @@ class PositionFilter(FilterSet):
 
 class PersonFilter(FilterSet):
     # filter_overrides = default_filter_overrides
-    educations = filters.RelatedFilter(EducationFilter, name='educations')
-    political_affiliations = filters.RelatedFilter(
-            PoliticalAffiliationFilter, name='political_affiliations')
-    sources = filters.RelatedFilter(SourceFilter, name='sources')
-    aba_ratings = filters.RelatedFilter(ABARatingFilter, name='aba_ratings')
-    positions = filters.RelatedFilter(PositionFilter, name='positions')
+    educations = filters.RelatedFilter(EducationFilter)
+    political_affiliations = filters.RelatedFilter(PoliticalAffiliationFilter)
+    sources = filters.RelatedFilter(SourceFilter)
+    aba_ratings = filters.RelatedFilter(ABARatingFilter)
+    positions = filters.RelatedFilter(PositionFilter)
     opinion_clusters_participating_judges = filters.RelatedFilter(
         'cl.search.filters.OpinionClusterFilter',
         'opinion_clusters_participating_judges',

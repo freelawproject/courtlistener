@@ -16,6 +16,7 @@ from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import RelatedFilter
+from rest_framework_filters.backends import DjangoFilterBackend
 
 from cl.lib.utils import mkdir_p
 from cl.stats.models import Event
@@ -28,6 +29,17 @@ INTEGER_LOOKUPS = ['exact', 'gte', 'gt', 'lte', 'lt', 'range']
 BASIC_TEXT_LOOKUPS = ['exact', 'iexact', 'startswith', 'istartswith',
                       'endswith', 'iendswith']
 ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ['contains', 'icontains']
+
+
+class DisabledHTMLFilterBackend(DjangoFilterBackend):
+    """Disable showing filters in the browsable API. 
+    
+    Ideally, we'd want to show fields in the browsable API, but for related 
+    objects this loads every object into the HTML and it loads them from the DB
+    one query at a time. It's insanity, so it's gotta be disabled globally.
+    """
+    def to_html(self, request, queryset, view):
+        return ""
 
 
 class SimpleMetadataWithFilters(SimpleMetadata):

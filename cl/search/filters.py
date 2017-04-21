@@ -1,5 +1,5 @@
 import rest_framework_filters as filters
-from django_filters.rest_framework import FilterSet
+from rest_framework_filters import FilterSet
 
 from cl.api.utils import INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.search.models import (
@@ -9,13 +9,8 @@ from cl.search.models import (
 
 
 class CourtFilter(FilterSet):
-    dockets = filters.RelatedFilter(
-        'cl.search.filters.DocketFilter',
-        name='dockets',
-    )
-    jurisdiction = filters.MultipleChoiceFilter(
-        choices=JURISDICTIONS,
-    )
+    dockets = filters.RelatedFilter('cl.search.filters.DocketFilter')
+    jurisdiction = filters.MultipleChoiceFilter(choices=JURISDICTIONS)
 
     class Meta:
         model = Court
@@ -32,15 +27,9 @@ class CourtFilter(FilterSet):
 
 
 class DocketFilter(FilterSet):
-    court = filters.RelatedFilter(CourtFilter, name='court')
-    clusters = filters.RelatedFilter(
-        "cl.search.filters.OpinionClusterFilter",
-        name='clusters',
-    )
-    audio_files = filters.RelatedFilter(
-        'cl.audio.filters.AudioFilter',
-        name='audio_files',
-    )
+    court = filters.RelatedFilter(CourtFilter)
+    clusters = filters.RelatedFilter("cl.search.filters.OpinionClusterFilter")
+    audio_files = filters.RelatedFilter('cl.audio.filters.AudioFilter')
 
     class Meta:
         model = Docket
@@ -60,21 +49,10 @@ class DocketFilter(FilterSet):
 class OpinionFilter(FilterSet):
     # Cannot to reference to opinions_cited here, due to it being a self join,
     # which is not supported (possibly for good reasons?)
-    cluster = filters.RelatedFilter(
-        'cl.search.filters.OpinionClusterFilter',
-        name='cluster',
-    )
-    author = filters.RelatedFilter(
-        'cl.people_db.filters.PersonFilter',
-        name='author',
-    )
-    joined_by = filters.RelatedFilter(
-        'cl.people_db.filters.PersonFilter',
-        name='joined_by',
-    )
-    type = filters.MultipleChoiceFilter(
-        choices=Opinion.OPINION_TYPES,
-    )
+    cluster = filters.RelatedFilter('cl.search.filters.OpinionClusterFilter')
+    author = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    joined_by = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    type = filters.MultipleChoiceFilter(choices=Opinion.OPINION_TYPES)
 
     class Meta:
         model = Opinion
@@ -89,22 +67,13 @@ class OpinionFilter(FilterSet):
 
 
 class OpinionClusterFilter(FilterSet):
-    docket = filters.RelatedFilter(DocketFilter, name='docket')
+    docket = filters.RelatedFilter(DocketFilter)
     non_participating_judges = filters.RelatedFilter(
         'cl.people_db.filters.PersonFilter',
-        name='non_participating_judges',
     )
-    panel = filters.RelatedFilter(
-        'cl.people_db.filters.PersonFilter',
-        name='panel',
-    )
-    sub_opinions = filters.RelatedFilter(
-        OpinionFilter,
-        name='sub_opinions',
-    )
-    source = filters.MultipleChoiceFilter(
-        choices=SOURCES,
-    )
+    panel = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    sub_opinions = filters.RelatedFilter(OpinionFilter)
+    source = filters.MultipleChoiceFilter(choices=SOURCES)
 
     class Meta:
         model = OpinionCluster
@@ -138,14 +107,8 @@ class OpinionClusterFilter(FilterSet):
 
 
 class OpinionsCitedFilter(FilterSet):
-    citing_opinion = filters.RelatedFilter(
-            OpinionFilter,
-            name='citing_opinion',
-    )
-    cited_opinion = filters.RelatedFilter(
-            OpinionFilter,
-            name='cited_opinion',
-    )
+    citing_opinion = filters.RelatedFilter(OpinionFilter)
+    cited_opinion = filters.RelatedFilter(OpinionFilter)
 
     class Meta:
         model = OpinionsCited
