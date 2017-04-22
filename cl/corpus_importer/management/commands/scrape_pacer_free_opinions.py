@@ -139,16 +139,19 @@ def get_pdfs(options):
     """
     q = options['queue']
     cnt = CaseNameTweaker()
-    pacer_session = login('cand', PACER_USERNAME, PACER_PASSWORD)
     rows = PACERFreeDocumentRow.objects.filter(error_msg="").only('pk')
     throttle = CeleryThrottle(queue_name=q)
+    completed = 0
     for row in queryset_generator(rows):
         throttle.maybe_wait()
+        if completed % 30000 == 0:
+            pacer_session = login('cand', PACER_USERNAME, PACER_PASSWORD)
         chain(
             process_free_opinion_result.si(row.pk, cnt).set(queue=q),
             get_and_process_pdf.s(pacer_session, row.pk).set(queue=q),
             delete_pacer_row.si(row.pk).set(queue=q),
         ).apply_async()
+        completed += 1
 
 
 class Command(BaseCommand):
