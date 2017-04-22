@@ -6,14 +6,15 @@ from cl.people_db.api_serializers import (
     RetentionEventSerializer, EducationSerializer, SchoolSerializer,
     PoliticalAffiliationSerializer,
     ABARatingSerializer, SourceSerializer,
-    PartySerializer)
+    PartySerializer, AttorneySerializer)
 from cl.people_db.filters import (
     PersonFilter, PositionFilter, RetentionEventFilter,
     EducationFilter, SchoolFilter,
     PoliticalAffiliationFilter, ABARatingFilter, SourceFilter,
-    PartyFilter)
+    PartyFilter, AttorneyFilter)
 from cl.people_db.models import Person, Position, RetentionEvent, \
-    Education, School, PoliticalAffiliation, Source, ABARating, Party
+    Education, School, PoliticalAffiliation, Source, ABARating, Party, \
+    Attorney
 
 
 class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -89,4 +90,11 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Party.objects.all()
     serializer_class = PartySerializer
     filter_class = PartyFilter
+    ordering_fields = []
+
+
+class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
+    queryset = Attorney.objects.all()
+    serializer_class = AttorneySerializer
+    filter_class = AttorneyFilter
     ordering_fields = []

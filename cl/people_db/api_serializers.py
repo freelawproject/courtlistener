@@ -2,7 +2,8 @@ from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
 from cl.people_db.models import Person, Position, RetentionEvent, \
-    Education, School, PoliticalAffiliation, Source, ABARating, Party
+    Education, School, PoliticalAffiliation, Source, ABARating, Party, \
+    Attorney, Role
 from cl.search.api_serializers import CourtSerializer
 
 
@@ -139,8 +140,27 @@ class PositionSerializer(DynamicFieldsMixin,
         fields = '__all__'
 
 
+class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
+    role_name = serializers.ChoiceField(source='role',
+                                        choices=Role.ATTORNEY_ROLES)
+
+    class Meta:
+        model = Role
+        fields = ('role_name', 'docket', 'attorney')
+
+
 class PartySerializer(DynamicFieldsMixin,
                       serializers.HyperlinkedModelSerializer):
+    attorneys = AttorneyRoleSerializer(source='roles', many=True)
+
     class Meta:
         model = Party
         fields = '__all__'
+
+
+class AttorneySerializer(DynamicFieldsMixin,
+                         serializers.HyperlinkedModelSerializer):
+
+    class Meta:
+        model = Attorney
+        exclude = ('organizations',)

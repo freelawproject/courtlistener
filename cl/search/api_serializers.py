@@ -4,9 +4,18 @@ from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
 from cl.audio.models import Audio
-from cl.people_db.models import Person, Party
+from cl.people_db.models import Person, PartyType
 from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
     OpinionsCited, DocketEntry, RECAPDocument
+
+
+class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
+
+    party_type = serializers.CharField(source='name')
+
+    class Meta:
+        model = PartyType
+        fields = ('party', 'party_type',)
 
 
 class DocketSerializer(DynamicFieldsMixin,
@@ -29,23 +38,18 @@ class DocketSerializer(DynamicFieldsMixin,
         style={'base_template': 'input.html'},
     )
     assigned_to = serializers.HyperlinkedRelatedField(
-        many=True,
+        many=False,
         view_name='person-detail',
         queryset=Person.objects.all(),
         style={'base_template': 'input.html'},
     )
     referred_to = serializers.HyperlinkedRelatedField(
-        many=True,
+        many=False,
         view_name='person-detail',
         queryset=Person.objects.all(),
         style={'base_template': 'input.html'},
     )
-    parties = serializers.HyperlinkedRelatedField(
-        many=True,
-        view_name='party-detail',
-        queryset=Party.objects.all(),
-        style={'base_template': 'input.html'},
-    )
+    parties = PartyTypeSerializer(source='party_types', many=True)
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
 

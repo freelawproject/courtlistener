@@ -29,6 +29,7 @@ router.register(r'political-affiliations',
 router.register(r'sources', people_views.SourceViewSet)
 router.register(r'aba-ratings', people_views.ABARatingViewSet)
 router.register(r'parties', people_views.PartyViewSet)
+router.register(r'attorneys', people_views.AttorneyViewSet)
 
 API_TITLE = "CourtListener Legal Data API"
 core_api_schema_view = get_schema_view(
