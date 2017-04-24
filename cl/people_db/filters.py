@@ -7,7 +7,7 @@ from cl.api.utils import (
 )
 from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, \
-    Race, Party
+    Race, Party, Attorney
 from cl.search.filters import CourtFilter
 
 
@@ -161,7 +161,7 @@ class PersonFilter(FilterSet):
     race = filters.MultipleChoiceFilter(
         choices=Race.RACES,
         action=lambda queryset, value:
-            queryset.filter(race__race__in=value)
+        queryset.filter(race__race__in=value)
     )
 
     class Meta:
@@ -190,3 +190,8 @@ class PersonFilter(FilterSet):
 class PartyFilter(FilterSet):
     class Meta:
         model = Party
+
+
+class AttorneyFilter(FilterSet):
+    class Meta:
+        model = Attorney

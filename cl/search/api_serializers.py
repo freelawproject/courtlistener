@@ -10,7 +10,6 @@ from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
 
 
 class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
-
     party_type = serializers.CharField(source='name')
 
     class Meta:
@@ -62,7 +61,7 @@ class RECAPDocumentSerializer(DynamicFieldsMixin,
                               serializers.HyperlinkedModelSerializer):
     class Meta:
         model = RECAPDocument
-        fields = '__all__'
+        exclude = ('docket_entry',)
 
 
 class DocketEntrySerializer(DynamicFieldsMixin,

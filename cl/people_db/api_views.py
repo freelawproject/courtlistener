@@ -1,6 +1,6 @@
 from rest_framework import viewsets
 
-from cl.api.utils import LoggingMixin
+from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
 from cl.people_db.api_serializers import (
     PersonSerializer, PositionSerializer,
     RetentionEventSerializer, EducationSerializer, SchoolSerializer,
@@ -87,6 +87,7 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
+    permission_classes = (RECAPUsersReadOnly,)
     queryset = Party.objects.all()
     serializer_class = PartySerializer
     filter_class = PartyFilter
@@ -94,6 +95,7 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
+    permission_classes = (RECAPUsersReadOnly,)
     queryset = Attorney.objects.all()
     serializer_class = AttorneySerializer
     filter_class = AttorneyFilter

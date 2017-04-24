@@ -4,7 +4,7 @@ from rest_framework_filters import FilterSet
 from cl.api.utils import INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.search.models import (
     Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES,
-    JURISDICTIONS
+    JURISDICTIONS, DocketEntry, RECAPDocument
 )
 
 
@@ -30,6 +30,9 @@ class DocketFilter(FilterSet):
     court = filters.RelatedFilter(CourtFilter)
     clusters = filters.RelatedFilter("cl.search.filters.OpinionClusterFilter")
     audio_files = filters.RelatedFilter('cl.audio.filters.AudioFilter')
+    assigned_to = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    referred_to = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    parties = filters.RelatedFilter('cl.people_db.filters.PartyFilter')
 
     class Meta:
         model = Docket
@@ -37,10 +40,16 @@ class DocketFilter(FilterSet):
             'id': ['exact'],
             'date_modified': DATETIME_LOOKUPS,
             'date_created': DATETIME_LOOKUPS,
+            'date_cert_granted': DATE_LOOKUPS,
+            'date_cert_denied': DATE_LOOKUPS,
             'date_argued': DATE_LOOKUPS,
             'date_reargued': DATE_LOOKUPS,
             'date_reargument_denied': DATE_LOOKUPS,
+            'date_filed': DATE_LOOKUPS,
+            'date_terminated': DATE_LOOKUPS,
+            'date_last_filing': DATE_LOOKUPS,
             'docket_number': ['exact'],
+            'pacer_case_id': ['exact'],
             'date_blocked': DATE_LOOKUPS,
             'blocked': ['exact'],
         }
@@ -68,10 +77,10 @@ class OpinionFilter(FilterSet):
 
 class OpinionClusterFilter(FilterSet):
     docket = filters.RelatedFilter(DocketFilter)
+    panel = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
     non_participating_judges = filters.RelatedFilter(
         'cl.people_db.filters.PersonFilter',
     )
-    panel = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
     sub_opinions = filters.RelatedFilter(OpinionFilter)
     source = filters.MultipleChoiceFilter(choices=SOURCES)
 
@@ -114,4 +123,40 @@ class OpinionsCitedFilter(FilterSet):
         model = OpinionsCited
         fields = {
             'id': ['exact'],
+        }
+
+
+class DocketEntryFilter(FilterSet):
+    docket = filters.RelatedFilter(DocketFilter)
+    recap_documents = filters.RelatedFilter(
+        'cl.search.filters.RECAPDocumentFilter'
+    )
+
+    class Meta:
+        model = DocketEntry
+        fields = {
+            'id': ['exact'],
+            'date_created': DATETIME_LOOKUPS,
+            'date_modified': DATETIME_LOOKUPS,
+            'date_filed': DATE_LOOKUPS,
+        }
+
+
+class RECAPDocumentFilter(FilterSet):
+    docket_entry = filters.RelatedFilter(DocketEntryFilter)
+
+    class Meta:
+        model = RECAPDocument
+        fields = {
+            'id': ['exact'],
+            'date_created': DATETIME_LOOKUPS,
+            'date_modified': DATETIME_LOOKUPS,
+            'date_upload': DATETIME_LOOKUPS,
+            'document_type': ['exact'],
+            'document_number': ['exact', 'gte', 'gt', 'lte', 'lt'],
+            'pacer_doc_id': ['exact'],
+            'is_available': ['exact'],
+            'sha1': ['exact'],
+            'ocr_status': INTEGER_LOOKUPS,
+            'is_free_on_pacer': ['exact'],
         }

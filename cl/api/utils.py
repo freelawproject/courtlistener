@@ -203,10 +203,11 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         return self.throttle_success()
 
 
-class BetaUsersReadOnly(DjangoModelPermissions):
-    """Provides access beta access to users with the right permissions.
+class RECAPUsersReadOnly(DjangoModelPermissions):
+    """Provides access to users with the right permissions.
 
-    Such users must have the has_beta_api_access flag set on their account.
+    Such users must have the has_recap_api_access flag set on their account for
+    this object type.
     """
 
     perms_map = {
