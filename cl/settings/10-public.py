@@ -81,7 +81,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_swagger',
-    'crispy_forms',  # For DRF HTML site.
     'django_filters',
 
     # CourtListener Apps
