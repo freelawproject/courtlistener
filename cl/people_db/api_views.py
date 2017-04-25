@@ -91,7 +91,9 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Party.objects.all()
     serializer_class = PartySerializer
     filter_class = PartyFilter
-    ordering_fields = []
+    ordering_fields = (
+        'date_created', 'date_modified',
+    )
 
 
 class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -99,4 +101,6 @@ class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Attorney.objects.all()
     serializer_class = AttorneySerializer
     filter_class = AttorneyFilter
-    ordering_fields = []
+    ordering_fields = (
+        'date_created', 'date_modified',
+    )

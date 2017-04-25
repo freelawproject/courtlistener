@@ -48,13 +48,12 @@ class DocketSerializer(DynamicFieldsMixin,
         queryset=Person.objects.all(),
         style={'base_template': 'input.html'},
     )
-    parties = PartyTypeSerializer(source='party_types', many=True)
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
 
     class Meta:
         model = Docket
-        exclude = ('view_count',)
+        exclude = ('view_count', 'parties')
 
 
 class RECAPDocumentSerializer(DynamicFieldsMixin,

@@ -9,6 +9,7 @@ from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, \
     Race, Party, Attorney
 from cl.search.filters import CourtFilter
+from cl.search.models import Docket
 
 
 class SourceFilter(FilterSet):
@@ -188,10 +189,40 @@ class PersonFilter(FilterSet):
 
 
 class PartyFilter(FilterSet):
+    docket = filters.RelatedFilter(
+        'cl.search.filters.DocketFilter',
+        name='dockets',
+        queryset=Docket.objects.all(),
+    )
+    attorney = filters.RelatedFilter('cl.people_db.filters.AttorneyFilter')
+
     class Meta:
         model = Party
+        fields = {
+            'id': ['exact'],
+            'date_created': DATETIME_LOOKUPS,
+            'date_modified': DATETIME_LOOKUPS,
+            'name': ALL_TEXT_LOOKUPS,
+        }
 
 
 class AttorneyFilter(FilterSet):
+    docket = filters.RelatedFilter(
+        'cl.search.filters.DocketFilter',
+        name='roles__docket',
+        queryset=Docket.objects.all(),
+    )
+    parties_represented = filters.RelatedFilter(
+        PartyFilter,
+        name='parties',
+        queryset=Party.objects.all(),
+    )
+
     class Meta:
         model = Attorney
+        fields = {
+            'id': ['exact'],
+            'date_created': DATETIME_LOOKUPS,
+            'date_modified': DATETIME_LOOKUPS,
+            'name': ALL_TEXT_LOOKUPS,
+        }

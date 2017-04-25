@@ -141,12 +141,19 @@ class PositionSerializer(DynamicFieldsMixin,
 
 
 class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
-    role_name = serializers.ChoiceField(source='role',
-                                        choices=Role.ATTORNEY_ROLES)
+    role = serializers.ChoiceField(choices=Role.ATTORNEY_ROLES)
 
     class Meta:
         model = Role
-        fields = ('role_name', 'docket', 'attorney')
+        fields = ('role', 'docket', 'attorney')
+
+
+class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
+    role = serializers.ChoiceField(choices=Role.ATTORNEY_ROLES)
+
+    class Meta:
+        model = Role
+        fields = ('role', 'docket', 'party')
 
 
 class PartySerializer(DynamicFieldsMixin,
@@ -160,6 +167,7 @@ class PartySerializer(DynamicFieldsMixin,
 
 class AttorneySerializer(DynamicFieldsMixin,
                          serializers.HyperlinkedModelSerializer):
+    parties_represented = PartyRoleSerializer(source='roles', many=True)
 
     class Meta:
         model = Attorney

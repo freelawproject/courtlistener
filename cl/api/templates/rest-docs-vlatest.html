@@ -413,7 +413,7 @@
         <h3 id="docket-endpoint">{% url "docket-list" version="v3" %}</h3>
         <p><code>Docket</code> objects link <code>Opinion Cluster</code>, <code>Audio</code>, and <code>Docket Entry</code> objects together, following the conventional definition of a docket. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
         </p>
-        <p>Docket Entry objects are <em>not</em> listed on docket instances due to performance reasons. Some dockets have tens of thousands of docket entries, and listing them all in a single JSON or XML object is impractical. To get the docket entries for a specific docket, you can use the docket entry endpoint and filter by docket ID. This will present the results in a more practical paginated format.
+        <p>Docket Entry, Party, and Attorney objects are <em>not</em> listed on docket instances due to performance reasons. Some dockets have tens of thousands of docket entries and hundreds of parties. Listing all of these values in a single JSON or XML object is impractical. To get the docket entries, parties, or attorneys for a specific docket, you can use the docket entry, party, or attorney endpoints and filter by docket ID. This will present the results in a more practical paginated format.
         </p>
         <pre class="pre-scrollable">curl {% get_full_host %}{% url "docketentry-list" version="v3" %}?docket__id=XXX</pre>
 
@@ -424,6 +424,19 @@
         <p>The field, filtering, and ordering parameters for <code>Docket Entry</code> and <code>RECAP Document</code> objects can be found via an <code>OPTIONS</code> request.
         </p>
         <p>These endpoints are only available to select users. Please <a href="{% url "contact" %}">get in touch</a> if you would like to access this endpoint.
+        </p>
+
+
+        <h3 id="party-and-attorney-endpoints">{% url "party-list" version="v3" %} <span class="alt">&amp;</span> {% url "attorney-list" version="v3" %}</h3>
+        <p>The <code>Party</code> and <code>Attorney</code> endpoints provide details about parties and attorneys that have been involved in federal cases in PACER. Each endpoint can be filtered by docket ID as described above, and lists the relationship of parties to attorneys according to the <code>role</code> field.
+        </p>
+        <p>As with all other endpoints, you can look up the field descriptions,
+            filtering options, ordering options, and rendering options by making
+            an OPTIONS request.
+        </p>
+        <p>These endpoints are only available to select users. Please <a
+                href="{% url "contact" %}">get in touch</a> if you would like to
+            access this endpoint.
         </p>
 
 
