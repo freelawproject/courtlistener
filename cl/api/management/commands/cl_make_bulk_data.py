@@ -25,7 +25,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         courts = Court.objects.all()
 
-        # Make the main bulk files
         kwargs_list = [
             {
                 'obj_type_str': 'clusters',
@@ -95,18 +94,18 @@ class Command(BaseCommand):
             },
         ]
 
-        print 'Starting bulk file creation with %s celery tasks...' % \
-              len(kwargs_list)
+        print('Starting bulk file creation with %s celery tasks...' %
+              len(kwargs_list))
         for kwargs in kwargs_list:
-            make_bulk_data_and_swap_it_in.delay(courts, kwargs)
+            make_bulk_data_and_swap_it_in(courts, kwargs)
 
         # Make the citation bulk data
         obj_type_str = 'citations'
-        print ' - Creating bulk data CSV for citations...'
+        print(' - Creating bulk data CSV for citations...')
         tmp_destination = join(settings.BULK_DATA_DIR, 'tmp', obj_type_str)
         final_destination = join(settings.BULK_DATA_DIR, obj_type_str)
-        self.make_citation_data(tmp_destination, obj_type_str)
-        print "   - Swapping in the new citation archives..."
+        self.make_citation_data(tmp_destination)
+        print("   - Swapping in the new citation archives...")
 
         mkdir_p(join(settings.BULK_DATA_DIR, obj_type_str))
         shutil.move(
@@ -114,10 +113,10 @@ class Command(BaseCommand):
             join(final_destination, 'all.csv.gz'),
         )
 
-        print 'Done.\n'
+        print('Done.\n')
 
     @staticmethod
-    def make_citation_data(tmp_destination, obj_type_str):
+    def make_citation_data(tmp_destination):
         """Because citations are paginated and because as of this moment there
         are 11M citations in the database, we cannot provide users with a bulk
         data file containing the complete objects for every citation.
@@ -127,7 +126,7 @@ class Command(BaseCommand):
         """
         mkdir_p(tmp_destination)
 
-        print '   - Copying the citations table to disk...'
+        print('   - Copying the citations table to disk...')
 
         # This command calls the psql COPY command and requests that it dump
         # the citation table to disk as a compressed CSV.
@@ -139,4 +138,4 @@ class Command(BaseCommand):
                 destination=join(tmp_destination, 'all.csv.gz'),
             )
         )
-        print '   - Table created successfully.'
+        print('   - Table created successfully.')

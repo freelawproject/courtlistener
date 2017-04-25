@@ -21,14 +21,16 @@ from cl.lib.utils import deepgetattr, mkdir_p
 def make_bulk_data_and_swap_it_in(courts, kwargs):
     """We can't wrap the handle() function, but we can wrap this one."""
 
-    print ' - Creating bulk %s files...' % kwargs['obj_type_str']
+    print(' - Creating bulk %s files...' % kwargs['obj_type_str'])
     num_written = write_json_to_disk(courts, **kwargs)
 
     if num_written > 0:
-        print '   - Tarring and compressing all %s files...' % kwargs['obj_type_str']
+        print('   - Tarring and compressing all %s files...' %
+              kwargs['obj_type_str'])
         targz_json_files(courts, kwargs['obj_type_str'], kwargs['court_attr'])
 
-        print '   - Swapping in the new %s archives...' % kwargs['obj_type_str']
+        print('   - Swapping in the new %s archives...' %
+              kwargs['obj_type_str'])
         swap_archives(kwargs['obj_type_str'])
 
 
@@ -127,14 +129,15 @@ def write_json_to_disk(courts, obj_type_str, obj_type, court_attr,
             ))
 
     if last_good_date is not None:
-        print "   - Incremental data found. Assuming it's good and using it..."
+        print("   - Incremental data found. Assuming it's good and using it...")
         qs = obj_type.objects.filter(date_modified__gte=last_good_date)
     else:
-        print "   - Incremental data not found. Working from scratch..."
+        print("   - Incremental data not found. Working from scratch...")
         qs = obj_type.objects.all()
 
     if qs.count() == 0:
-        print "   - No %s-type items in the DB or none that have changed. All done here." % obj_type_str
+        print("   - No %s-type items in the DB or none that have changed. All "
+              "done here." % obj_type_str)
         history.mark_success_and_save()
         return 0
     else:
@@ -169,7 +172,7 @@ def write_json_to_disk(courts, obj_type_str, obj_type, court_attr,
                 f.write(json_str)
             i += 1
 
-        print '   - %s %s json files created.' % (i, obj_type_str)
+        print ('   - %s %s json files created.' % (i, obj_type_str))
 
         history.mark_success_and_save()
         return i
