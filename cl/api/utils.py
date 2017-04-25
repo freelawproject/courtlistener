@@ -211,9 +211,9 @@ class RECAPUsersReadOnly(DjangoModelPermissions):
     """
 
     perms_map = {
-        'GET': ['%(app_label)s.has_beta_api_access'],
-        'OPTIONS': ['%(app_label)s.has_beta_api_access'],
-        'HEAD': ['%(app_label)s.has_beta_api_access'],
+        'GET': ['%(app_label)s.has_recap_api_access'],
+        'OPTIONS': ['%(app_label)s.has_recap_api_access'],
+        'HEAD': ['%(app_label)s.has_recap_api_access'],
         'POST': ['%(app_label)s.add_%(model_name)s'],
         'PUT': ['%(app_label)s.change_%(model_name)s'],
         'PATCH': ['%(app_label)s.change_%(model_name)s'],

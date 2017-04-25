@@ -1,11 +1,15 @@
+# coding=utf-8
+from __future__ import print_function
 import json
 import shutil
 from datetime import timedelta, date
 
+from django.contrib.auth.models import User, Permission
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest, JsonResponse
 from django.test import Client, TestCase, override_settings
 from django.utils.timezone import now
+from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 
 from cl.api.management.commands.cl_make_bulk_data import Command
 from cl.api.utils import BulkJsonHistory
@@ -489,6 +493,41 @@ class DRFFieldSelectionTest(TestCase):
         r = self.client.get(path, q)
         self.assertEqual(len(r.data['results'][0].keys()),
                          len(fields_to_return))
+
+
+class DRFRECAPPermissionTest(TestCase):
+    fixtures = ['user_with_recap_api_access.json', 'authtest_data.json']
+
+    def setUp(self):
+        # Add the permissions to the user.
+        u = User.objects.get(pk=6)
+        ps = Permission.objects.filter(codename='has_recap_api_access')
+        u.user_permissions.add(*ps)
+
+        self.paths = [reverse(path, kwargs={'version': 'v3'}) for path in [
+            'recapdocument-list',
+            'docketentry-list',
+            'attorney-list',
+            'party-list',
+        ]]
+
+    def test_has_access(self):
+        """Does the RECAP user have access to all of the RECAP endpoints?"""
+        self.client.login(username='recap-user', password='password')
+        for path in self.paths:
+            print("Access allowed to recap user at: %s... " % path, end='')
+            r = self.client.get(path)
+            self.assertEqual(r.status_code, HTTP_200_OK)
+            print("✓")
+
+    def test_lacks_access(self):
+        """Does a normal user lack access to the RECPAP endpoints?"""
+        self.client.login(username='pandora', password='password')
+        for path in self.paths:
+            print("Access denied to non-recap user at: %s... " % path, end='')
+            r = self.client.get(path)
+            self.assertEqual(r.status_code, HTTP_403_FORBIDDEN)
+            print("✓")
 
 
 class BulkJsonHistoryTest(TestCase):
