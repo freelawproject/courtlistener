@@ -336,6 +336,9 @@ class DRFJudgeApiFilterTests(TestCase):
         assertCount(self, path, q, 1)   # Bill
 
 
+class DRFRecapApiFilterTests(TestCase):
+
+
 class DRFSearchAndAudioAppsApiFilterTest(TestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json',
                 'test_objects_audio.json', 'court_data.json',
@@ -495,7 +498,7 @@ class DRFFieldSelectionTest(TestCase):
                          len(fields_to_return))
 
 
-class DRFRECAPPermissionTest(TestCase):
+class DRFRecapPermissionTest(TestCase):
     fixtures = ['user_with_recap_api_access.json', 'authtest_data.json']
 
     def setUp(self):
