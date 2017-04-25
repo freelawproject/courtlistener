@@ -15,67 +15,8 @@ from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
     Command as OralArgumentCommand
 from cl.scrapers.test_assets import test_oral_arg_scraper
-from cl.search.models import \
-    Docket, Court, Opinion, OpinionCluster, OpinionsCited
-
-
-class BulkDataTest(TestCase):
-    fixtures = ['court_data.json']
-    tmp_data_dir = '/tmp/bulk-dir/'
-
-    def setUp(self):
-        docket = Docket(
-            case_name=u'foo',
-            court=Court.objects.get(pk='test'),
-            source=Docket.DEFAULT
-        )
-        docket.save()
-        # Must be more than a year old for all tests to be runnable.
-        last_month = now().date() - timedelta(days=400)
-        self.doc_cluster = OpinionCluster(
-            case_name=u"foo",
-            docket=docket,
-            date_filed=last_month
-        )
-        self.doc_cluster.save(index=False)
-        opinion = Opinion(cluster=self.doc_cluster, type='Lead Opinion')
-        opinion.save(index=False)
-
-        opinion2 = Opinion(cluster=self.doc_cluster, type='Concurrence')
-        opinion2.save(index=False)
-
-        OpinionsCited.objects.create(
-            citing_opinion=opinion2,
-            cited_opinion=opinion
-        )
-
-        # Scrape the audio "site" and add its contents
-        site = test_oral_arg_scraper.Site().parse()
-        OralArgumentCommand().scrape_court(site, full_crawl=True)
-
-    def tearDown(self):
-        OpinionCluster.objects.all().delete()
-        Docket.objects.all().delete()
-        Audio.objects.all().delete()
-        try:
-            shutil.rmtree(self.tmp_data_dir)
-        except OSError:
-            pass
-
-    @override_settings(BULK_DATA_DIR=tmp_data_dir)
-    def test_make_all_bulk_files(self):
-        """Can we successfully generate all bulk files?"""
-        Command().execute()
-
-    def test_database_has_objects_for_bulk_export(self):
-        self.assertTrue(Opinion.objects.count() > 0, 'Opinions exist')
-        self.assertTrue(Audio.objects.count() > 0, 'Audio exist')
-        self.assertTrue(Docket.objects.count() > 0, 'Docket exist')
-        self.assertTrue(Court.objects.count() > 0, 'Court exist')
-        self.assertEqual(
-            Court.objects.get(pk='test').full_name,
-            'Testing Supreme Court'
-        )
+from cl.search.models import Docket, Court, Opinion, OpinionCluster, \
+    OpinionsCited
 
 
 class BasicAPIPageTest(TestCase):
@@ -179,7 +120,7 @@ def assertCount(cls, path, q, expected_count):
 
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
-    fixtures = ['judge_judy.json', 'user_with_judge_access.json',
+    fixtures = ['judge_judy.json', 'authtest_data.json',
                 'court_data.json', 'test_objects_search.json']
 
     def test_position_ordering(self):
@@ -203,7 +144,7 @@ class DRFOrderingTests(TestCase):
 
 class DRFJudgeApiFilterTests(TestCase):
     """Do the filters work properly?"""
-    fixtures = ['judge_judy.json', 'user_with_judge_access.json',
+    fixtures = ['judge_judy.json', 'authtest_data.json',
                 'court_data.json']
 
     def test_judge_filtering_by_first_name(self):
@@ -394,7 +335,7 @@ class DRFJudgeApiFilterTests(TestCase):
 class DRFSearchAndAudioAppsApiFilterTest(TestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json',
                 'test_objects_audio.json', 'court_data.json',
-                'user_with_judge_access.json']
+                'authtest_data.json']
 
     def test_cluster_filters(self):
         """Do a variety of cluster filters work?"""
@@ -528,7 +469,7 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
 
 class DRFFieldSelectionTest(TestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json',
-                'user_with_judge_access.json', 'court_data.json']
+                'authtest_data.json', 'court_data.json']
 
     def test_only_some_fields_returned(self):
         """Can we return only some of the fields?"""
@@ -587,4 +528,63 @@ class BulkJsonHistoryTest(TestCase):
             d,
             now(),
             delta=timedelta(seconds=10)
+        )
+
+
+class BulkDataTest(TestCase):
+    fixtures = ['court_data.json']
+    tmp_data_dir = '/tmp/bulk-dir/'
+
+    def setUp(self):
+        docket = Docket(
+            case_name=u'foo',
+            court=Court.objects.get(pk='test'),
+            source=Docket.DEFAULT
+        )
+        docket.save()
+        # Must be more than a year old for all tests to be runnable.
+        last_month = now().date() - timedelta(days=400)
+        self.doc_cluster = OpinionCluster(
+            case_name=u"foo",
+            docket=docket,
+            date_filed=last_month
+        )
+        self.doc_cluster.save(index=False)
+        opinion = Opinion(cluster=self.doc_cluster, type='Lead Opinion')
+        opinion.save(index=False)
+
+        opinion2 = Opinion(cluster=self.doc_cluster, type='Concurrence')
+        opinion2.save(index=False)
+
+        OpinionsCited.objects.create(
+            citing_opinion=opinion2,
+            cited_opinion=opinion
+        )
+
+        # Scrape the audio "site" and add its contents
+        site = test_oral_arg_scraper.Site().parse()
+        OralArgumentCommand().scrape_court(site, full_crawl=True)
+
+    def tearDown(self):
+        OpinionCluster.objects.all().delete()
+        Docket.objects.all().delete()
+        Audio.objects.all().delete()
+        try:
+            shutil.rmtree(self.tmp_data_dir)
+        except OSError:
+            pass
+
+    @override_settings(BULK_DATA_DIR=tmp_data_dir)
+    def test_make_all_bulk_files(self):
+        """Can we successfully generate all bulk files?"""
+        Command().execute()
+
+    def test_database_has_objects_for_bulk_export(self):
+        self.assertTrue(Opinion.objects.count() > 0, 'Opinions exist')
+        self.assertTrue(Audio.objects.count() > 0, 'Audio exist')
+        self.assertTrue(Docket.objects.count() > 0, 'Docket exist')
+        self.assertTrue(Court.objects.count() > 0, 'Court exist')
+        self.assertEqual(
+            Court.objects.get(pk='test').full_name,
+            'Testing Supreme Court'
         )
