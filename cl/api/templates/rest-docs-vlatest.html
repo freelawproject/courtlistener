@@ -538,16 +538,23 @@
             <li><strong>Ordering</strong>: Instead of using a minus sign to flip
                 ordering, it uses <code>asc</code> and <code>desc</code>.
             </li>
-            <li><strong>Filtering</strong>: Instead of using the Django lookup fields, it uses Solr syntax.To filter on this endpoint, we recommend identifying an effective query on the front end that generates the results you desire and then using that query (and variations thereof) to query the API. On the backend, the same code serves both the API and the front end.
+            <li><strong>Filtering</strong>: Instead of using the Django lookup fields, it uses Solr syntax.To filter on this endpoint, we recommend identifying an effective query on the front end that generates the results you desire and then using that query (and variations thereof) to query the API. On the backend, the same code serves both the API and the front end. <code>GET</code> parameters from the front end can be copy pasted to the API endpoint.
             </li>
             <li>
                 <p><strong>Fields</strong>: The fields on this endpoint often differ slightly from those in the other endpoints. Both their names and their values may be different. For example, instead of having a field called <code>nature_of_suit</code>, this endpoint has a field called <code>suitNature</code>. Instead of having a number of citation fields (<code>federal_cite_one</code>, <code>state_cite_two</code>, etc.), this endpoint just has all the citations in a single field called <code>citations</code>, which provides the same values as a list.
                 </p>
                 <p>These changes are all necessary to make this endpoint a powerful and user friendly search engine. For example, users can query natures of suit using a query like <code>suitNature:foo</code> instead of having to write underscores. Users can search all citations at once, not having to think about whether it's a federal citation or a state one or something else.
                 </p>
-                <p>You can see the field definitions on the <a href="{% url "advanced_search" %}">Advanced Search Help Page</a>.</p>
+                <p>You can see the field definitions on the <a href="{% url "advanced_search" %}#fielded-queries-fieldname-term">Advanced Search Help Page</a>.
+                </p>
             </li>
-            <li>This endpoint can return different kinds of objects, depending on the <code>type</code> parameter. If it's set to <code>o</code>, you'll get opinions. If it's set to <code>oa</code>, you'll get back oral arguments. We'll add more <code>types</code> in the future too.
+            <li>This endpoint can return different kinds of objects, depending on the <code>type</code> parameter. Currently supported parameters are:
+                <ul>
+                    <li><code>o</code> &mdash; Opinions</li>
+                    <li><code>r</code> &mdash; The RECAP Archive (this endpoint in beta)</li>
+                    <li><code>p</code> &mdash; Judges</li>
+                    <li><code>oa</code> &mdash; Oral Arguments</li>
+                </ul>
             </li>
             <li>Like the front end, when the <code>type</code> is set to return opinions, only precedential results are returned by default. To get other precedential statuses, you need to explicitly request them.
             </li>
@@ -583,7 +590,10 @@
         </ul>
 
         <h2 id="tips">Tips <span class="alt">&amp;</span> Tricks</h2>
-        <p>The SSL certificate issued by identrust.com, or <i>Let’s Encrypt</i>, which is used by CourtListener.com, has not been added to the Java JVM list of trusted Certificate Authorities as of version 8u74. There is a discussion on <i>Let's Encrypt</i> about thier progress getting their certificate trusted by various organizations at &quot;<a href="https://community.letsencrypt.org/t/inclusion-of-isrg-root/9002">Inclusion of ISRG Root.</a>&quot; For now, this causes an error when using Java libraries to access the REST api. The error shown is &quot;<pre>PKIX path  building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target.</pre>&quot; A workaround has been posted on StackOverflow under <a href="http://stackoverflow.com/questions/2893819/telling-java-to-accept-self-signed-ssl-certificate/36707080#36707080">telling java to accept self-signed ssl certificate</a>, which is pretty easy to implement.
+        <p>The SSL certificate issued by identrust.com, or <i>Let’s Encrypt</i>, which is used by CourtListener.com, has not been added to the Java JVM list of trusted Certificate Authorities as of version 8u74. There is a discussion on <i>Let's Encrypt</i> about their progress getting their certificate trusted by various organizations at &quot;<a href="https://community.letsencrypt.org/t/inclusion-of-isrg-root/9002">Inclusion of ISRG Root.</a>&quot; For now, this causes an error when using Java libraries to access the REST api. The error shown is:
+        </p>
+        <pre>PKIX path  building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target.</pre>
+        <p>A workaround has been posted on StackOverflow under <a href="http://stackoverflow.com/questions/2893819/telling-java-to-accept-self-signed-ssl-certificate/36707080#36707080">telling java to accept self-signed ssl certificate</a>.
         </p>
 
         <h2>Footnotes</h2>
