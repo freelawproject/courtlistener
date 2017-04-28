@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from django.conf import settings
 from juriscraper.OralArgumentSite import OralArgumentSite
@@ -13,7 +14,8 @@ class Site(OralArgumentSite):
 
     def _get_download_urls(self):
         path = '//url/text()'
-        return ['test/audio/%s' % url for url in self.html.xpath(path)]
+        return [os.path.join(settings.MEDIA_ROOT, 'test', 'audio', url) for url
+                in self.html.xpath(path)]
 
     def _get_case_names(self):
         path = '//name/text()'
