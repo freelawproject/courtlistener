@@ -69,6 +69,7 @@ class DocketEntrySerializer(DynamicFieldsMixin,
         many=False,
         view_name='docket-detail',
         queryset=Docket.objects.all(),
+        style={'base_template': 'input.html'},
     )
     recap_documents = RECAPDocumentSerializer(many=True, read_only=True)
 
