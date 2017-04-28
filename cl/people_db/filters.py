@@ -194,7 +194,11 @@ class PartyFilter(FilterSet):
         name='dockets',
         queryset=Docket.objects.all(),
     )
-    attorney = filters.RelatedFilter('cl.people_db.filters.AttorneyFilter')
+    attorney = filters.RelatedFilter(
+        'cl.people_db.filters.AttorneyFilter',
+        name='attorneys',
+        queryset=Attorney.objects.all(),
+    )
 
     class Meta:
         model = Party

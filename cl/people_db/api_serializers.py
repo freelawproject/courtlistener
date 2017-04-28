@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, Party, \
-    Attorney, Role
+    Attorney, Role, PartyType
 from cl.search.api_serializers import CourtSerializer
 
 
@@ -140,6 +140,12 @@ class PositionSerializer(DynamicFieldsMixin,
         fields = '__all__'
 
 
+class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = PartyType
+        fields = ('docket', 'name')
+
+
 class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
     role = serializers.ChoiceField(choices=Role.ATTORNEY_ROLES)
 
@@ -159,6 +165,7 @@ class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
 class PartySerializer(DynamicFieldsMixin,
                       serializers.HyperlinkedModelSerializer):
     attorneys = AttorneyRoleSerializer(source='roles', many=True)
+    party_types = PartyTypeSerializer(many=True)
 
     class Meta:
         model = Party
