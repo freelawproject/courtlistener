@@ -21,10 +21,10 @@ def get_object_list(request=None, **kwargs):
             facet=False,
         ))
         sl = SolrList(
-                main_query=main_query,
-                offset=offset,
-                limit=limit,
-                type=kwargs['cd']['type'],
+            main_query=main_query,
+            offset=offset,
+            limit=limit,
+            type=kwargs['cd']['type'],
         )
     except KeyError:
         sf = forms.SearchForm({'q': '*'})
@@ -35,9 +35,9 @@ def get_object_list(request=None, **kwargs):
                 facet=False,
             ))
         sl = SolrList(
-                main_query=main_query,
-                offset=offset,
-                limit=limit,
+            main_query=main_query,
+            offset=offset,
+            limit=limit,
         )
     return sl
 

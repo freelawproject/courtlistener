@@ -451,6 +451,9 @@ class DocketEntry(models.Model):
         unique_together = ('docket', 'entry_number')
         verbose_name_plural = 'Docket Entries'
         ordering = ('entry_number',)
+        permissions = (
+            ("has_recap_api_access", "Can work with RECAP API"),
+        )
 
     def __unicode__(self):
         return "<DocketEntry:%s ---> %s >" % (
@@ -579,6 +582,9 @@ class RECAPDocument(models.Model):
         unique_together = ('docket_entry', 'document_number',
                            'attachment_number')
         ordering = ('document_number', 'attachment_number')
+        permissions = (
+            ("has_recap_api_access", "Can work with RECAP API"),
+        )
 
     def __unicode__(self):
         return "%s: Docket_%s , document_number_%s , attachment_number_%s" % (

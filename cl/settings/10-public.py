@@ -1,8 +1,8 @@
 import datetime
-import os
 import re
 import sys
 
+import os
 from django.contrib.messages import constants as message_constants
 from judge_pics import judge_root
 
@@ -80,7 +80,7 @@ INSTALLED_APPS = [
     'mathfilters',
     'rest_framework',
     'rest_framework.authtoken',
-    'crispy_forms',  # For DRF HTML site.
+    'rest_framework_swagger',
     'django_filters',
 
     # CourtListener Apps
@@ -314,7 +314,7 @@ REST_FRAMEWORK = {
 
     # Filtering
     'DEFAULT_FILTER_BACKENDS': (
-        'rest_framework.filters.DjangoFilterBackend',
+        'cl.api.utils.DisabledHTMLFilterBackend',
         'rest_framework.filters.OrderingFilter',
     ),
 
@@ -323,6 +323,7 @@ REST_FRAMEWORK = {
     'URL_FIELD_NAME': 'resource_uri',
     'DEFAULT_METADATA_CLASS': 'cl.api.utils.SimpleMetadataWithFilters',
     'ORDERING_PARAM': 'order_by',
+    'HTML_SELECT_CUTOFF': 100,
 }
 
 if DEVELOPMENT:

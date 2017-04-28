@@ -1,73 +1,84 @@
+from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
-from cl.api.utils import DynamicFieldsModelSerializer
 from cl.people_db.models import Person, Position, RetentionEvent, \
-    Education, School, PoliticalAffiliation, Source, ABARating
+    Education, School, PoliticalAffiliation, Source, ABARating, Party, \
+    Attorney, Role, PartyType
 from cl.search.api_serializers import CourtSerializer
 
 
-class SchoolSerializer(DynamicFieldsModelSerializer,
+class SchoolSerializer(DynamicFieldsMixin,
                        serializers.HyperlinkedModelSerializer):
     is_alias_of = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='school-detail',
-        read_only=True
+        queryset=School.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = School
+        fields = '__all__'
 
 
-class EducationSerializer(DynamicFieldsModelSerializer,
+class EducationSerializer(DynamicFieldsMixin,
                           serializers.HyperlinkedModelSerializer):
     school = SchoolSerializer(many=False, read_only=True)
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = Education
+        fields = '__all__'
 
 
-class PoliticalAffiliationSerializer(DynamicFieldsModelSerializer,
+class PoliticalAffiliationSerializer(DynamicFieldsMixin,
                                      serializers.HyperlinkedModelSerializer):
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = PoliticalAffiliation
+        fields = '__all__'
 
 
-class SourceSerializer(DynamicFieldsModelSerializer,
+class SourceSerializer(DynamicFieldsMixin,
                        serializers.HyperlinkedModelSerializer):
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = Source
+        fields = '__all__'
 
 
-class ABARatingSerializer(DynamicFieldsModelSerializer,
+class ABARatingSerializer(DynamicFieldsMixin,
                           serializers.HyperlinkedModelSerializer):
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = ABARating
+        fields = '__all__'
 
 
-class PersonSerializer(DynamicFieldsModelSerializer,
+class PersonSerializer(DynamicFieldsMixin,
                        serializers.HyperlinkedModelSerializer):
     race = serializers.StringRelatedField(many=True)
     sources = SourceSerializer(many=True, read_only=True)
@@ -76,35 +87,38 @@ class PersonSerializer(DynamicFieldsModelSerializer,
     positions = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='position-detail',
-        read_only=True,
+        queryset=Position.objects.all(),
+        style={'base_template': 'input.html'},
     )
-    political_affiliations = PoliticalAffiliationSerializer(
-        many=True,
-        read_only=True
-    )
+    political_affiliations = PoliticalAffiliationSerializer(many=True,
+                                                            read_only=True)
     is_alias_of = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = Person
+        fields = '__all__'
 
 
-class RetentionEventSerializer(DynamicFieldsModelSerializer,
+class RetentionEventSerializer(DynamicFieldsMixin,
                                serializers.HyperlinkedModelSerializer):
     position = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='position-detail',
-        read_only=True,
+        queryset=Position.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = RetentionEvent
+        fields = '__all__'
 
 
-class PositionSerializer(DynamicFieldsModelSerializer,
+class PositionSerializer(DynamicFieldsMixin,
                          serializers.HyperlinkedModelSerializer):
     retention_events = RetentionEventSerializer(many=True, read_only=True)
     person = PersonSerializer(many=False, read_only=True)
@@ -117,8 +131,51 @@ class PositionSerializer(DynamicFieldsModelSerializer,
     appointer = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='position-detail',
-        read_only=True,
+        queryset=Position.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = Position
+        fields = '__all__'
+
+
+class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = PartyType
+        fields = ('docket', 'name')
+
+
+class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
+    role = serializers.ChoiceField(choices=Role.ATTORNEY_ROLES)
+
+    class Meta:
+        model = Role
+        fields = ('role', 'docket', 'attorney')
+
+
+class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
+    role = serializers.ChoiceField(choices=Role.ATTORNEY_ROLES)
+
+    class Meta:
+        model = Role
+        fields = ('role', 'docket', 'party')
+
+
+class PartySerializer(DynamicFieldsMixin,
+                      serializers.HyperlinkedModelSerializer):
+    attorneys = AttorneyRoleSerializer(source='roles', many=True)
+    party_types = PartyTypeSerializer(many=True)
+
+    class Meta:
+        model = Party
+        fields = '__all__'
+
+
+class AttorneySerializer(DynamicFieldsMixin,
+                         serializers.HyperlinkedModelSerializer):
+    parties_represented = PartyRoleSerializer(source='roles', many=True)
+
+    class Meta:
+        model = Attorney
+        exclude = ('organizations',)

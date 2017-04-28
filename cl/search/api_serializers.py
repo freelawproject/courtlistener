@@ -1,68 +1,119 @@
 from collections import OrderedDict
 
+from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
-from cl.api.utils import DynamicFieldsModelSerializer
+from cl.audio.models import Audio
+from cl.people_db.models import Person, PartyType
 from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
-    OpinionsCited
+    OpinionsCited, DocketEntry, RECAPDocument
 
 
-class DocketSerializer(DynamicFieldsModelSerializer,
+class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
+    party_type = serializers.CharField(source='name')
+
+    class Meta:
+        model = PartyType
+        fields = ('party', 'party_type',)
+
+
+class DocketSerializer(DynamicFieldsMixin,
                        serializers.HyperlinkedModelSerializer):
     court = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='court-detail',
-        read_only=True,
+        queryset=Court.objects.exclude(jurisdiction='T'),
     )
     clusters = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='opinioncluster-detail',
-        read_only=True,
+        queryset=OpinionCluster.objects.all(),
+        style={'base_template': 'input.html'},
     )
     audio_files = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='audio-detail',
-        read_only=True,
+        queryset=Audio.objects.all(),
+        style={'base_template': 'input.html'},
+    )
+    assigned_to = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='person-detail',
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
+    )
+    referred_to = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='person-detail',
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
 
     class Meta:
         model = Docket
+        exclude = ('view_count', 'parties')
 
 
-class CourtSerializer(DynamicFieldsModelSerializer,
+class RECAPDocumentSerializer(DynamicFieldsMixin,
+                              serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = RECAPDocument
+        exclude = ('docket_entry',)
+
+
+class DocketEntrySerializer(DynamicFieldsMixin,
+                            serializers.HyperlinkedModelSerializer):
+    docket = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='docket-detail',
+        queryset=Docket.objects.all(),
+        style={'base_template': 'input.html'},
+    )
+    recap_documents = RECAPDocumentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DocketEntry
+        fields = '__all__'
+
+
+class CourtSerializer(DynamicFieldsMixin,
                       serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Court
         exclude = ('notes',)
 
 
-class OpinionSerializer(DynamicFieldsModelSerializer,
+class OpinionSerializer(DynamicFieldsMixin,
                         serializers.HyperlinkedModelSerializer):
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
     cluster = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='opinioncluster-detail',
-        read_only=True,
+        queryset=OpinionCluster.objects.all(),
+        style={'base_template': 'input.html'},
     )
     author = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
     joined_by = serializers.HyperlinkedRelatedField(
-            many=True,
-            view_name='person-detail',
-            read_only=True,
+        many=True,
+        view_name='person-detail',
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = Opinion
+        fields = '__all__'
 
 
-class OpinionsCitedSerializer(DynamicFieldsModelSerializer,
+class OpinionsCitedSerializer(DynamicFieldsMixin,
                               serializers.HyperlinkedModelSerializer):
     # These attributes seem unnecessary and this endpoint serializes the same
     # data without them, but when they're not here the API does a query that
@@ -70,46 +121,53 @@ class OpinionsCitedSerializer(DynamicFieldsModelSerializer,
     citing_opinion = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='opinion-detail',
-        read_only=True,
+        queryset=Opinion.objects.all(),
+        style={'base_template': 'input.html'},
     )
     cited_opinion = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='opinion-detail',
-        read_only=True,
+        queryset=Opinion.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = OpinionsCited
+        fields = '__all__'
 
 
-class OpinionClusterSerializer(DynamicFieldsModelSerializer,
+class OpinionClusterSerializer(DynamicFieldsMixin,
                                serializers.HyperlinkedModelSerializer):
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
     panel = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
     non_participating_judges = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='person-detail',
-        read_only=True,
+        queryset=Person.objects.all(),
+        style={'base_template': 'input.html'},
     )
     docket = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='docket-detail',
-        read_only=True,
+        queryset=Docket.objects.all(),
+        style={'base_template': 'input.html'},
     )
-
     sub_opinions = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='opinion-detail',
-        read_only=True,
+        queryset=Opinion.objects.all(),
+        style={'base_template': 'input.html'},
     )
 
     class Meta:
         model = OpinionCluster
+        fields = '__all__'
 
 
 class SearchResultSerializer(serializers.Serializer):

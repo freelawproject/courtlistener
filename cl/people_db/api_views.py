@@ -1,19 +1,20 @@
 from rest_framework import viewsets
 
-from cl.api.utils import LoggingMixin
+from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
 from cl.people_db.api_serializers import (
     PersonSerializer, PositionSerializer,
     RetentionEventSerializer, EducationSerializer, SchoolSerializer,
     PoliticalAffiliationSerializer,
     ABARatingSerializer, SourceSerializer,
-)
+    PartySerializer, AttorneySerializer)
 from cl.people_db.filters import (
     PersonFilter, PositionFilter, RetentionEventFilter,
     EducationFilter, SchoolFilter,
     PoliticalAffiliationFilter, ABARatingFilter, SourceFilter,
-)
+    PartyFilter, AttorneyFilter)
 from cl.people_db.models import Person, Position, RetentionEvent, \
-    Education, School, PoliticalAffiliation, Source, ABARating
+    Education, School, PoliticalAffiliation, Source, ABARating, Party, \
+    Attorney
 
 
 class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -82,4 +83,24 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
     filter_class = ABARatingFilter
     ordering_fields = (
         'date_created', 'date_modified', 'year_rated',
+    )
+
+
+class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
+    permission_classes = (RECAPUsersReadOnly,)
+    queryset = Party.objects.all()
+    serializer_class = PartySerializer
+    filter_class = PartyFilter
+    ordering_fields = (
+        'date_created', 'date_modified',
+    )
+
+
+class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
+    permission_classes = (RECAPUsersReadOnly,)
+    queryset = Attorney.objects.all()
+    serializer_class = AttorneySerializer
+    filter_class = AttorneyFilter
+    ordering_fields = (
+        'date_created', 'date_modified',
     )

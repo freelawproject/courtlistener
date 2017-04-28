@@ -1,17 +1,17 @@
 from rest_framework import status, pagination, viewsets, permissions, response
 
-from cl.api.utils import LoggingMixin
+from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
 from cl.search import api_utils
 from cl.search.api_serializers import (
     DocketSerializer, CourtSerializer, OpinionClusterSerializer,
     OpinionSerializer, SearchResultSerializer,
-    OpinionsCitedSerializer)
+    OpinionsCitedSerializer, DocketEntrySerializer, RECAPDocumentSerializer)
 from cl.search.filters import (
     DocketFilter, CourtFilter, OpinionClusterFilter, OpinionFilter,
-    OpinionsCitedFilter)
+    OpinionsCitedFilter, DocketEntryFilter, RECAPDocumentFilter)
 from cl.search.forms import SearchForm
 from cl.search.models import Docket, Court, OpinionCluster, Opinion, \
-    OpinionsCited
+    OpinionsCited, DocketEntry, RECAPDocument
 
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -20,8 +20,25 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     filter_class = DocketFilter
     ordering_fields = (
         'date_created', 'date_modified', 'date_argued', 'date_reargued',
-        'date_reargument_denied', 'date_blocked',
+        'date_reargument_denied', 'date_blocked', 'date_cert_granted',
+        'date_cert_denied', 'date_filed', 'date_terminated', 'date_last_filing',
     )
+
+
+class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
+    permission_classes = (RECAPUsersReadOnly,)
+    queryset = DocketEntry.objects.all()
+    serializer_class = DocketEntrySerializer
+    filter_class = DocketEntryFilter
+    ordering_fields = ('date_created', 'date_modified', 'date_filed')
+
+
+class RECAPDocumentViewSet(LoggingMixin, viewsets.ModelViewSet):
+    permission_classes = (RECAPUsersReadOnly,)
+    queryset = RECAPDocument.objects.all()
+    serializer_class = RECAPDocumentSerializer
+    filter_class = RECAPDocumentFilter
+    ordering_fields = ('date_created', 'date_modified', 'date_upload')
 
 
 class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):

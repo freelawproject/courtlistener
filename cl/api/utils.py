@@ -1,8 +1,8 @@
 import json
-import os
 from collections import OrderedDict, defaultdict
 from datetime import date
 
+import os
 import redis
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
@@ -12,11 +12,11 @@ from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.mail import send_mail
 from django.utils.encoding import force_text
 from django.utils.timezone import now
-from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import RelatedFilter
+from rest_framework_filters.backends import DjangoFilterBackend
 
 from cl.lib.utils import mkdir_p
 from cl.stats.models import Event
@@ -31,26 +31,15 @@ BASIC_TEXT_LOOKUPS = ['exact', 'iexact', 'startswith', 'istartswith',
 ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ['contains', 'icontains']
 
 
-class DynamicFieldsModelSerializer(serializers.ModelSerializer):
+class DisabledHTMLFilterBackend(DjangoFilterBackend):
+    """Disable showing filters in the browsable API. 
+    
+    Ideally, we'd want to show fields in the browsable API, but for related 
+    objects this loads every object into the HTML and it loads them from the DB
+    one query at a time. It's insanity, so it's gotta be disabled globally.
     """
-    A ModelSerializer that takes an additional `fields` argument that
-    controls which fields should be displayed.
-    """
-
-    def __init__(self, *args, **kwargs):
-        # Instantiate the superclass normally
-        super(DynamicFieldsModelSerializer, self).__init__(*args, **kwargs)
-        if not self.context or not self.context.get('request'):
-            # This happens during initialization.
-            return
-        fields = getattr(self.context['request'], 'query_params', {}).get('fields')
-        if fields is not None:
-            fields = fields.split(',')
-            # Drop any fields that are not specified in the `fields` argument.
-            allowed = set(fields)
-            existing = set(self.fields.keys())
-            for field_name in existing - allowed:
-                self.fields.pop(field_name)
+    def to_html(self, request, queryset, view):
+        return ""
 
 
 class SimpleMetadataWithFilters(SimpleMetadata):
@@ -214,16 +203,17 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         return self.throttle_success()
 
 
-class BetaUsersReadOnly(DjangoModelPermissions):
-    """Provides access beta access to users with the right permissions.
+class RECAPUsersReadOnly(DjangoModelPermissions):
+    """Provides access to users with the right permissions.
 
-    Such users must have the has_beta_api_access flag set on their account.
+    Such users must have the has_recap_api_access flag set on their account for
+    this object type.
     """
 
     perms_map = {
-        'GET': ['%(app_label)s.has_beta_api_access'],
-        'OPTIONS': ['%(app_label)s.has_beta_api_access'],
-        'HEAD': ['%(app_label)s.has_beta_api_access'],
+        'GET': ['%(app_label)s.has_recap_api_access'],
+        'OPTIONS': ['%(app_label)s.has_recap_api_access'],
+        'HEAD': ['%(app_label)s.has_recap_api_access'],
         'POST': ['%(app_label)s.add_%(model_name)s'],
         'PUT': ['%(app_label)s.change_%(model_name)s'],
         'PATCH': ['%(app_label)s.change_%(model_name)s'],

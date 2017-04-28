@@ -1255,6 +1255,9 @@ class Party(models.Model):
     class Meta:
         unique_together = ('name', 'extra_info')
         verbose_name_plural = "Parties"
+        permissions = (
+            ("has_recap_api_access", "Can work with RECAP API"),
+        )
 
     def __unicode__(self):
         return u'%s: %s' % (self.pk, self.name)
@@ -1362,6 +1365,9 @@ class Attorney(models.Model):
 
     class Meta:
         unique_together = ('name', 'contact_raw')
+        permissions = (
+            ("has_recap_api_access", "Can work with RECAP API"),
+        )
 
     def __unicode__(self):
         return u'%s: %s' % (self.pk, self.name)

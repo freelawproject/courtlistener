@@ -1,19 +1,16 @@
 import rest_framework_filters as filters
+from rest_framework_filters import FilterSet
 
 from cl.api.utils import INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.search.models import (
     Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES,
-    JURISDICTIONS)
+    JURISDICTIONS, DocketEntry, RECAPDocument
+)
 
 
-class CourtFilter(filters.FilterSet):
-    dockets = filters.RelatedFilter(
-        'cl.search.filters.DocketFilter',
-        name='dockets',
-    )
-    jurisdiction = filters.MultipleChoiceFilter(
-        choices=JURISDICTIONS,
-    )
+class CourtFilter(FilterSet):
+    dockets = filters.RelatedFilter('cl.search.filters.DocketFilter')
+    jurisdiction = filters.MultipleChoiceFilter(choices=JURISDICTIONS)
 
     class Meta:
         model = Court
@@ -29,16 +26,13 @@ class CourtFilter(filters.FilterSet):
         }
 
 
-class DocketFilter(filters.FilterSet):
-    court = filters.RelatedFilter(CourtFilter, name='court')
-    clusters = filters.RelatedFilter(
-        "cl.search.filters.OpinionClusterFilter",
-        name='clusters',
-    )
-    audio_files = filters.RelatedFilter(
-        'cl.audio.filters.AudioFilter',
-        name='audio_files',
-    )
+class DocketFilter(FilterSet):
+    court = filters.RelatedFilter(CourtFilter)
+    clusters = filters.RelatedFilter("cl.search.filters.OpinionClusterFilter")
+    audio_files = filters.RelatedFilter('cl.audio.filters.AudioFilter')
+    assigned_to = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    referred_to = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    parties = filters.RelatedFilter('cl.people_db.filters.PartyFilter')
 
     class Meta:
         model = Docket
@@ -46,63 +40,49 @@ class DocketFilter(filters.FilterSet):
             'id': ['exact'],
             'date_modified': DATETIME_LOOKUPS,
             'date_created': DATETIME_LOOKUPS,
+            'date_cert_granted': DATE_LOOKUPS,
+            'date_cert_denied': DATE_LOOKUPS,
             'date_argued': DATE_LOOKUPS,
             'date_reargued': DATE_LOOKUPS,
             'date_reargument_denied': DATE_LOOKUPS,
+            'date_filed': DATE_LOOKUPS,
+            'date_terminated': DATE_LOOKUPS,
+            'date_last_filing': DATE_LOOKUPS,
             'docket_number': ['exact'],
+            'pacer_case_id': ['exact'],
             'date_blocked': DATE_LOOKUPS,
             'blocked': ['exact'],
         }
 
 
-class OpinionFilter(filters.FilterSet):
+class OpinionFilter(FilterSet):
     # Cannot to reference to opinions_cited here, due to it being a self join,
     # which is not supported (possibly for good reasons?)
-    cluster = filters.RelatedFilter(
-        'cl.search.filters.OpinionClusterFilter',
-        name='cluster',
-    )
-    author = filters.RelatedFilter(
-        'cl.people_db.filters.PersonFilter',
-        name='author',
-    )
-    joined_by = filters.RelatedFilter(
-        'cl.people_db.filters.PersonFilter',
-        name='joined_by',
-    )
-    type = filters.MultipleChoiceFilter(
-        choices=Opinion.OPINION_TYPES,
-    )
+    cluster = filters.RelatedFilter('cl.search.filters.OpinionClusterFilter')
+    author = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    joined_by = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    type = filters.MultipleChoiceFilter(choices=Opinion.OPINION_TYPES)
 
     class Meta:
         model = Opinion
         fields = {
             'id': INTEGER_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
-            'date_created': DATETIME_LOOKUPS,            
+            'date_created': DATETIME_LOOKUPS,
             'sha1': ['exact'],
             'extracted_by_ocr': ['exact'],
             'per_curiam': ['exact'],
         }
 
 
-class OpinionClusterFilter(filters.FilterSet):
-    docket = filters.RelatedFilter(DocketFilter, name='docket')
+class OpinionClusterFilter(FilterSet):
+    docket = filters.RelatedFilter(DocketFilter)
+    panel = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
     non_participating_judges = filters.RelatedFilter(
         'cl.people_db.filters.PersonFilter',
-        name='non_participating_judges',
     )
-    panel = filters.RelatedFilter(
-        'cl.people_db.filters.PersonFilter',
-        name='panel',
-    )
-    sub_opinions = filters.RelatedFilter(
-        OpinionFilter,
-        name='sub_opinions',
-    )
-    source = filters.MultipleChoiceFilter(
-        choices=SOURCES,
-    )
+    sub_opinions = filters.RelatedFilter(OpinionFilter)
+    source = filters.MultipleChoiceFilter(choices=SOURCES)
 
     class Meta:
         model = OpinionCluster
@@ -135,18 +115,48 @@ class OpinionClusterFilter(filters.FilterSet):
         }
 
 
-class OpinionsCitedFilter(filters.FilterSet):
-    citing_opinion = filters.RelatedFilter(
-            OpinionFilter,
-            name='citing_opinion',
-    )
-    cited_opinion = filters.RelatedFilter(
-            OpinionFilter,
-            name='cited_opinion',
-    )
+class OpinionsCitedFilter(FilterSet):
+    citing_opinion = filters.RelatedFilter(OpinionFilter)
+    cited_opinion = filters.RelatedFilter(OpinionFilter)
 
     class Meta:
         model = OpinionsCited
         fields = {
             'id': ['exact'],
+        }
+
+
+class DocketEntryFilter(FilterSet):
+    docket = filters.RelatedFilter(DocketFilter)
+    recap_documents = filters.RelatedFilter(
+        'cl.search.filters.RECAPDocumentFilter'
+    )
+
+    class Meta:
+        model = DocketEntry
+        fields = {
+            'id': ['exact'],
+            'date_created': DATETIME_LOOKUPS,
+            'date_modified': DATETIME_LOOKUPS,
+            'date_filed': DATE_LOOKUPS,
+        }
+
+
+class RECAPDocumentFilter(FilterSet):
+    docket_entry = filters.RelatedFilter(DocketEntryFilter)
+
+    class Meta:
+        model = RECAPDocument
+        fields = {
+            'id': ['exact'],
+            'date_created': DATETIME_LOOKUPS,
+            'date_modified': DATETIME_LOOKUPS,
+            'date_upload': DATETIME_LOOKUPS,
+            'document_type': ['exact'],
+            'document_number': ['exact', 'gte', 'gt', 'lte', 'lt'],
+            'pacer_doc_id': ['exact'],
+            'is_available': ['exact'],
+            'sha1': ['exact'],
+            'ocr_status': INTEGER_LOOKUPS,
+            'is_free_on_pacer': ['exact'],
         }

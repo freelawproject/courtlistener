@@ -47,8 +47,12 @@ def mkdir_p(path):
     try:
         os.makedirs(path)
     except OSError as exc:
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
+        if exc.errno == errno.EEXIST:
+            if os.path.isdir(path):
+                pass
+            else:
+                raise OSError("Cannot create directory. Location already "
+                              "exists, but is not a directory: %s" % path)
         else:
             raise
 

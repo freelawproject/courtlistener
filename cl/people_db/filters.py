@@ -1,4 +1,5 @@
 import rest_framework_filters as filters
+from rest_framework_filters import FilterSet
 
 from cl.api.utils import (
     DATETIME_LOOKUPS, DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, INTEGER_LOOKUPS,
@@ -6,11 +7,12 @@ from cl.api.utils import (
 )
 from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, \
-    Race
+    Race, Party, Attorney
 from cl.search.filters import CourtFilter
+from cl.search.models import Docket
 
 
-class SourceFilter(filters.FilterSet):
+class SourceFilter(FilterSet):
     class Meta:
         model = Source
         fields = {
@@ -20,7 +22,7 @@ class SourceFilter(filters.FilterSet):
         }
 
 
-class ABARatingFilter(filters.FilterSet):
+class ABARatingFilter(FilterSet):
     class Meta:
         model = ABARating
         fields = {
@@ -33,7 +35,7 @@ class ABARatingFilter(filters.FilterSet):
         }
 
 
-class PoliticalAffiliationFilter(filters.FilterSet):
+class PoliticalAffiliationFilter(FilterSet):
     class Meta:
         model = PoliticalAffiliation
         fields = {
@@ -48,11 +50,8 @@ class PoliticalAffiliationFilter(filters.FilterSet):
         }
 
 
-class SchoolFilter(filters.FilterSet):
-    educations = filters.RelatedFilter(
-        'cl.people_db.filters.EducationFilter',
-        name='educations',
-    )
+class SchoolFilter(FilterSet):
+    educations = filters.RelatedFilter('cl.people_db.filters.EducationFilter')
 
     class Meta:
         model = School
@@ -65,9 +64,9 @@ class SchoolFilter(filters.FilterSet):
         }
 
 
-class EducationFilter(filters.FilterSet):
-    school = filters.RelatedFilter(SchoolFilter, name='school')
-    person = filters.RelatedFilter('cl.people_db.filters.PersonFilter', name='person')
+class EducationFilter(FilterSet):
+    school = filters.RelatedFilter(SchoolFilter)
+    person = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
 
     class Meta:
         model = Education
@@ -82,7 +81,7 @@ class EducationFilter(filters.FilterSet):
         }
 
 
-class RetentionEventFilter(filters.FilterSet):
+class RetentionEventFilter(FilterSet):
     class Meta:
         model = RetentionEvent
         fields = {
@@ -99,10 +98,9 @@ class RetentionEventFilter(filters.FilterSet):
         }
 
 
-class PositionFilter(filters.FilterSet):
-    court = filters.RelatedFilter(CourtFilter, name='court')
-    retention_events = filters.RelatedFilter(
-            RetentionEventFilter, name='retention_events')
+class PositionFilter(FilterSet):
+    court = filters.RelatedFilter(CourtFilter)
+    retention_events = filters.RelatedFilter(RetentionEventFilter)
 
     class Meta:
         model = Position
@@ -137,14 +135,13 @@ class PositionFilter(filters.FilterSet):
         }
 
 
-class PersonFilter(filters.FilterSet):
+class PersonFilter(FilterSet):
     # filter_overrides = default_filter_overrides
-    educations = filters.RelatedFilter(EducationFilter, name='educations')
-    political_affiliations = filters.RelatedFilter(
-            PoliticalAffiliationFilter, name='political_affiliations')
-    sources = filters.RelatedFilter(SourceFilter, name='sources')
-    aba_ratings = filters.RelatedFilter(ABARatingFilter, name='aba_ratings')
-    positions = filters.RelatedFilter(PositionFilter, name='positions')
+    educations = filters.RelatedFilter(EducationFilter)
+    political_affiliations = filters.RelatedFilter(PoliticalAffiliationFilter)
+    sources = filters.RelatedFilter(SourceFilter)
+    aba_ratings = filters.RelatedFilter(ABARatingFilter)
+    positions = filters.RelatedFilter(PositionFilter)
     opinion_clusters_participating_judges = filters.RelatedFilter(
         'cl.search.filters.OpinionClusterFilter',
         'opinion_clusters_participating_judges',
@@ -165,7 +162,7 @@ class PersonFilter(filters.FilterSet):
     race = filters.MultipleChoiceFilter(
         choices=Race.RACES,
         action=lambda queryset, value:
-            queryset.filter(race__race__in=value)
+        queryset.filter(race__race__in=value)
     )
 
     class Meta:
@@ -188,4 +185,48 @@ class PersonFilter(filters.FilterSet):
             'dod_city': BASIC_TEXT_LOOKUPS,
             'dod_state': BASIC_TEXT_LOOKUPS,
             'gender': ['exact'],
+        }
+
+
+class PartyFilter(FilterSet):
+    docket = filters.RelatedFilter(
+        'cl.search.filters.DocketFilter',
+        name='dockets',
+        queryset=Docket.objects.all(),
+    )
+    attorney = filters.RelatedFilter(
+        'cl.people_db.filters.AttorneyFilter',
+        name='attorneys',
+        queryset=Attorney.objects.all(),
+    )
+
+    class Meta:
+        model = Party
+        fields = {
+            'id': ['exact'],
+            'date_created': DATETIME_LOOKUPS,
+            'date_modified': DATETIME_LOOKUPS,
+            'name': ALL_TEXT_LOOKUPS,
+        }
+
+
+class AttorneyFilter(FilterSet):
+    docket = filters.RelatedFilter(
+        'cl.search.filters.DocketFilter',
+        name='roles__docket',
+        queryset=Docket.objects.all(),
+    )
+    parties_represented = filters.RelatedFilter(
+        PartyFilter,
+        name='parties',
+        queryset=Party.objects.all(),
+    )
+
+    class Meta:
+        model = Attorney
+        fields = {
+            'id': ['exact'],
+            'date_created': DATETIME_LOOKUPS,
+            'date_modified': DATETIME_LOOKUPS,
+            'name': ALL_TEXT_LOOKUPS,
         }
