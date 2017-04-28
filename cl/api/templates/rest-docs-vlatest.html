@@ -148,6 +148,8 @@
         {% if user.is_authenticated %}
             <p>Your permanent token for use with this API is being used in the examples above, is at the top of this page, and is:</p>
             <pre class="scrollable">{{ user.auth_token }}</pre>
+            <p>Do not share this value publically via code checkins, emails, etc. Treat this value as you would a password.
+            </p>
         {% else %}
             <p><a href="{% url "sign-in" %}?next={{ request.path }}#token-auth">Sign in to see your permanent token in these examples and at the top of this page.</a>
             </p>
@@ -611,6 +613,8 @@
             {% if user.is_authenticated %}
                 <p>Your permanent token for use with this API is:</p>
                 <h4><code>{{ user.auth_token }}</code></h4>
+                <p>Do not share your API token. Keep it private like a password.
+                </p>
             {% else %}
                 <p><a href="{% url "sign-in" %}?next={{ request.path }}"
                         class="btn btn-primary btn-lg">Sign In To See Your Token</a>
