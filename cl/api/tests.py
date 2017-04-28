@@ -411,6 +411,52 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
 
         self.q['id'] = 1
         self.assertCountInResults(1)
+        self.q['id'] = 2
+        self.assertCountInResults(0)
+
+        self.q = {'docket__id': 1}
+        self.assertCountInResults(1)
+        self.q = {'docket__id': 2}
+        self.assertCountInResults(0)
+
+        self.q = {'parties_represented__id': 1}
+        self.assertCountInResults(1)
+        self.q = {'parties_represented__id': 2}
+        self.assertCountInResults(0)
+        self.q = {'parties_represented__name__contains': 'Honker'}
+        self.assertCountInResults(1)
+        self.q = {'parties_represented__name__contains': 'Honker-Nope'}
+        self.assertCountInResults(0)
+
+    def test_party_filters(self):
+        self.path = reverse('party-list', kwargs={'version': 'v3'})
+
+        self.q['id'] = 1
+        self.assertCountInResults(1)
+        self.q['id'] = 2
+        self.assertCountInResults(0)
+
+        # This represents dockets that the party was a part of.
+        self.q = {'docket__id': 1}
+        self.assertCountInResults(1)
+        self.q = {'docket__id': 2}
+        self.assertCountInResults(0)
+
+        # Contrasted with this, which joins based on their attorney.
+        self.q = {'attorney__docket__id': 1}
+        self.assertCountInResults(1)
+        self.q = {'attorney__docket__id': 2}
+        self.assertCountInResults(0)
+
+        self.q = {'name': "Honker"}
+        self.assertCountInResults(1)
+        self.q = {'name': "Cardinal Bonds"}
+        self.assertCountInResults(0)
+
+        self.q = {'attorney__name__icontains': 'Juneau'}
+        self.assertCountInResults(1)
+        self.q = {'attorney__name__icontains': 'Juno'}
+        self.assertCountInResults(0)
 
 
 class DRFSearchAndAudioAppsApiFilterTest(TestCase, FilteringCountTestCase):

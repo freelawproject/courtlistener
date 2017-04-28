@@ -1,0 +1,78 @@
+[
+  {
+    "fields": {
+      "filepath_local": "",
+      "date_terminated": null,
+      "date_blocked": null,
+      "case_name_full": "",
+      "case_name_short": "Curlin",
+      "jurisdiction_type": "",
+      "blocked": false,
+      "view_count": 0,
+      "assigned_to_str": "",
+      "court": "txnd",
+      "pacer_case_id": "28766",
+      "date_filed": null,
+      "referred_to": null,
+      "source": 1,
+      "filepath_ia": "",
+      "jury_demand": "",
+      "cause": "",
+      "nature_of_suit": "",
+      "case_name": "United States v. Curlin",
+      "date_cert_denied": null,
+      "docket_number": "3:92-cr-00139-T",
+      "slug": "united-states-v-curlin",
+      "referred_to_str": "",
+      "date_last_filing": null,
+      "date_reargument_denied": null,
+      "date_modified": "2017-04-14T23:24:59.311Z",
+      "date_reargued": null,
+      "date_cert_granted": null,
+      "assigned_to": null,
+      "date_created": "2017-04-14T23:24:59.305Z",
+      "date_argued": null
+    },
+    "model": "search.docket",
+    "pk": 1
+  },
+
+
+  {
+    "fields": {
+      "description": " Memorandum Opinion and Order as to Albert Evans Curlin: Clerk is directed to file a copy of this opinion in the criminal action - Petition in 3:01cv429, filed pursuant to 28:2241, is properly construed as a motion to vacate pursuant to 28:2255 and is denied for failure of pet to file it within the statutory period of limitations.  (Signed by Judge Jerry Buchmeyer on 7/12/2002) (lrl, )",
+      "date_modified": "2017-04-14T23:24:59.316Z",
+      "date_filed": "2002-07-15",
+      "entry_number": 1,
+      "date_created": "2017-04-14T23:24:59.316Z",
+      "docket": 1
+    },
+    "model": "search.docketentry",
+    "pk": 1
+  },
+
+
+  {
+    "fields": {
+      "filepath_local": "recap/dev.gov.uscourts.txnd.28766/gov.uscourts.txnd.28766.1.0.pdf",
+      "is_free_on_pacer": true,
+      "date_upload": null,
+      "description": "",
+      "date_modified": "2017-04-14T23:25:05.761Z",
+      "document_number": "1",
+      "page_count": 17,
+      "plain_text": "",
+      "pacer_doc_id": "17711118263",
+      "sha1": "913724aa2d067fa1069cedce592c18f8a006a9fc",
+      "attachment_number": null,
+      "docket_entry": 1,
+      "is_available": true,
+      "filepath_ia": "",
+      "date_created": "2017-04-14T23:24:59.323Z",
+      "document_type": 1,
+      "ocr_status": 4
+    },
+    "model": "search.recapdocument",
+    "pk": 1
+  }
+]
