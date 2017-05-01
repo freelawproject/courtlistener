@@ -29,6 +29,7 @@ djangorestframework-filters==0.9.1
 django-rest-swagger==2.1.2
 djangorestframework-xml==1.3.0
 docutils==0.12
+drf-dynamic-fields
 enum34==1.1.2
 eyeD3==0.7.8
 feedparser==5.2.1
