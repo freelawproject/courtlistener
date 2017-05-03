@@ -149,7 +149,6 @@ def update_document(self, opinion, index=True):
 
 
 @app.task(ignore_result=True)
-def update_document_by_id(opinion_id):
-    """This is not an OK way to do id-based tasks. Needs to be refactored."""
+def update_document_by_id(opinion_id, index=True):
     op = Opinion.objects.get(pk=opinion_id)
-    update_document(op)
+    update_document(op, index=index)
