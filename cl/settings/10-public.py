@@ -324,6 +324,7 @@ REST_FRAMEWORK = {
     'DEFAULT_METADATA_CLASS': 'cl.api.utils.SimpleMetadataWithFilters',
     'ORDERING_PARAM': 'order_by',
     'HTML_SELECT_CUTOFF': 100,
+    'UPLOADED_FILES_USE_URL': False,
 }
 
 if DEVELOPMENT:
