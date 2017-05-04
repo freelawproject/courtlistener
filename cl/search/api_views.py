@@ -27,7 +27,7 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = DocketEntry.objects.all()
+    queryset = DocketEntry.objects.all().order_by()
     serializer_class = DocketEntrySerializer
     filter_class = DocketEntryFilter
     ordering_fields = ('date_created', 'date_modified', 'date_filed')
