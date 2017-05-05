@@ -1,3 +1,6 @@
+from __future__ import print_function
+from __future__ import print_function
+from __future__ import print_function
 import scorched
 import socket
 
@@ -42,15 +45,15 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
             elif type(item) == Person:
                 search_item_list.append(item.as_search_dict())
         except AttributeError as e:
-            print "AttributeError trying to add: %s\n  %s" % (item, e)
+            print("AttributeError trying to add: %s\n  %s" % (item, e))
         except ValueError as e:
-            print "ValueError trying to add: %s\n  %s" % (item, e)
+            print("ValueError trying to add: %s\n  %s" % (item, e))
         except InvalidDocumentError:
-            print "Unable to parse: %s" % item
+            print("Unable to parse: %s" % item)
 
     try:
         si.add(search_item_list)
-    except socket.error, exc:
+    except socket.error as exc:
         add_or_update_items.retry(exc=exc, countdown=120)
 
 
@@ -62,7 +65,7 @@ def add_or_update_opinions(item_pks, force_commit=False):
                 Opinion.objects.filter(pk__in=item_pks)])
         if force_commit:
             si.commit()
-    except SolrError, exc:
+    except SolrError as exc:
         add_or_update_opinions.retry(exc=exc, countdown=30)
 
 
@@ -74,7 +77,7 @@ def add_or_update_audio_files(item_pks, force_commit=False):
                 Audio.objects.filter(pk__in=item_pks)])
         if force_commit:
             si.commit()
-    except SolrError, exc:
+    except SolrError as exc:
         add_or_update_audio_files.retry(exc=exc, countdown=30)
 
 
@@ -86,7 +89,7 @@ def add_or_update_people(item_pks, force_commit=False):
                 Person.objects.filter(pk__in=item_pks)])
         if force_commit:
             si.commit()
-    except SolrError, exc:
+    except SolrError as exc:
         add_or_update_people.retry(exc=exc, countdown=30)
 
 
@@ -121,7 +124,7 @@ def add_or_update_recap_document(item_pks, coalesce_docket=False,
         si.add([item.as_search_dict(docket_metadata=metadata) for item in rds])
         if force_commit:
             si.commit()
-    except SolrError, exc:
+    except SolrError as exc:
         add_or_update_recap_document.retry(exc=exc, countdown=30)
 
 
@@ -132,7 +135,7 @@ def delete_items(items, solr_url, force_commit=False):
         si.delete_by_ids(list(items))
         if force_commit:
             si.commit()
-    except SolrError, exc:
+    except SolrError as exc:
         delete_items.retry(exc=exc, countdown=30)
 
 
@@ -144,5 +147,5 @@ def add_or_update_cluster(pk, force_commit=False):
                 OpinionCluster.objects.get(pk=pk).sub_opinions.all()])
         if force_commit:
             si.commit()
-    except SolrError, exc:
+    except SolrError as exc:
         add_or_update_cluster.retry(exc=exc, countdown=30)
