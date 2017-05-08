@@ -54,8 +54,8 @@ def get_local_document_url_from_path(path, document_number, attachment_number):
     bucket = '.'.join(filename.split('.')[0:4])
     return "{bucket}.{doc_num}.{att_num}.pdf".format(
         bucket=bucket,
-        att_num=attachment_number,
         doc_num=document_number,
+        att_num=attachment_number,
     )
 
 

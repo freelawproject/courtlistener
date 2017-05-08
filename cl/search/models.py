@@ -1,4 +1,5 @@
 # coding=utf-8
+import os
 import re
 from datetime import datetime, time
 
@@ -623,11 +624,12 @@ class RECAPDocument(models.Model):
         """Does the item need extraction and does it have all the right
         fields?
         """
-        return bool(all([
+        return all([
             self.ocr_status is None,
             self.is_available is True,
-            bool(self.filepath_local.name),  # Just in case
-        ]))
+            # Has a value in filepath field, which points to a file.
+            self.filepath_local and os.path.isfile(self.filepath_local.path),
+        ])
 
     def save(self, do_extraction=False, index=False, *args, **kwargs):
         if self.document_type == self.ATTACHMENT:

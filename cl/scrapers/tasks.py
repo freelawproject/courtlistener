@@ -192,6 +192,13 @@ def get_page_count(path, extension):
 
 
 @app.task
+def get_recap_page_count(rd_pk):
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
+    return rd.pk
+
+
+@app.task
 def extract_doc_content(pk, callback=None, citation_countdown=0):
     """
     Given a document, we extract it, sniffing its extension, then store its

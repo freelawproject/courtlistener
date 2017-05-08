@@ -2,6 +2,8 @@ import calendar
 import logging
 import os
 
+from datetime import timedelta
+
 import requests
 from celery.canvas import chain, chord
 from django.conf import settings
@@ -13,7 +15,8 @@ from cl.lib.recap_utils import get_docketxml_url, get_docket_filename, \
     get_document_filename, get_pdf_url
 from cl.lib.utils import previous_and_next
 from cl.scrapers.models import RECAPLog
-from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.tasks import extract_recap_pdf, get_recap_page_count
+from cl.search.models import RECAPDocument
 from cl.search.tasks import add_or_update_recap_document
 
 RECAP_MOD_URL = "http://recapextension.org/recap/get_updated_cases/"
@@ -100,6 +103,33 @@ def get_and_merge_items(items, log):
     logger.info("Finished queueing new cases.")
 
 
+def sweep_missing_downloads():
+    """
+    Get any documents that somehow are missing.
+    
+    This function attempts to address issue #671 by checking for any missing
+    documents, downloading and parsing them. Hopefully this is a temporary 
+    hack that we can soon remove when we deprecate the old RECAP server.
+    
+    :return: None 
+    """
+    rds = RECAPDocument.objects.filter(
+        is_available=True,
+        page_count=None,
+        date_created__gt=now() - timedelta(hours=2),
+    ).order_by()
+    for rd in rds:
+        # Download the item to the correct location if it doesn't exist
+        if not os.path.isfile(rd.filepath_local.path):
+            filename = rd.filepath_local.name.rsplit('/', 1)[-1]
+            chain(
+                download_recap_item.si(rd.filepath_ia, filename),
+                get_recap_page_count.si(rd.pk),
+                extract_recap_pdf.s(check_if_needed=False).set(priority=5),
+                add_or_update_recap_document.s(coalesce_docket=True),
+            ).apply_async()
+
+
 class Command(BaseCommand):
     help = ("Get all the latest content from the RECAP Server. In theory, this "
             "is only temporary until the recap server can be decommissioned.")
@@ -110,3 +140,5 @@ class Command(BaseCommand):
         log.status = RECAPLog.SCRAPE_SUCCESSFUL
         log.date_completed = now()
         log.save()
+
+        sweep_missing_downloads()
