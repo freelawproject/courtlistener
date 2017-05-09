@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import pkg_resources
 from juriscraper.lib import importer
 from operator import itemgetter
 from django.utils.timezone import now
@@ -158,12 +159,14 @@ def generate_report():
     """
     most_recent_opinions, recently_dying_courts = calculate_counts()
     errors = tally_errors()
+    js_version = pkg_resources.get_distribution("juriscraper").version
 
     html_template = loader.get_template('report.html')
     context = {
         'most_recent_opinions': most_recent_opinions,
         'recently_dying_courts': recently_dying_courts,
         'errors': errors,
+        'js_version': js_version,
     }
     report = html_template.render(context)
 
