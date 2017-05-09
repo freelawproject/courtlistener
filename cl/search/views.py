@@ -76,7 +76,7 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
             except EmptyPage:
                 # Page is out of range (e.g. 9999), deliver last page.
                 paged_results = paginator.page(paginator.num_pages)
-        except Exception, e:
+        except Exception as e:
             # Catches any Solr errors, and aborts.
             logger.warning("Error loading pagination on search page with "
                            "request: %s" % request.GET)
