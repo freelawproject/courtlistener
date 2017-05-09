@@ -8,6 +8,7 @@ import requests
 from celery.canvas import chain, chord
 from django.conf import settings
 from django.core.management import BaseCommand
+from django.db.models import Q
 from django.utils.timezone import now
 
 from cl.corpus_importer.tasks import download_recap_item, parse_recap_docket
@@ -15,7 +16,7 @@ from cl.lib.recap_utils import get_docketxml_url, get_docket_filename, \
     get_document_filename, get_pdf_url
 from cl.lib.utils import previous_and_next
 from cl.scrapers.models import RECAPLog
-from cl.scrapers.tasks import extract_recap_pdf, get_recap_page_count
+from cl.scrapers.tasks import extract_recap_pdf, set_recap_page_count
 from cl.search.models import RECAPDocument
 from cl.search.tasks import add_or_update_recap_document
 
@@ -113,10 +114,11 @@ def sweep_missing_downloads():
     
     :return: None 
     """
+    two_hours_ago = now() - timedelta(hours=2)
     rds = RECAPDocument.objects.filter(
+        Q(date_created__gt=two_hours_ago) | Q(date_modified__gt=two_hours_ago),
         is_available=True,
         page_count=None,
-        date_created__gt=now() - timedelta(hours=2),
     ).order_by()
     for rd in rds:
         # Download the item to the correct location if it doesn't exist
@@ -124,7 +126,7 @@ def sweep_missing_downloads():
             filename = rd.filepath_local.name.rsplit('/', 1)[-1]
             chain(
                 download_recap_item.si(rd.filepath_ia, filename),
-                get_recap_page_count.si(rd.pk),
+                set_recap_page_count.si(rd.pk),
                 extract_recap_pdf.s(check_if_needed=False).set(priority=5),
                 add_or_update_recap_document.s(coalesce_docket=True),
             ).apply_async()
