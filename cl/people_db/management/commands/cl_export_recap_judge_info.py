@@ -1,3 +1,4 @@
+from __future__ import print_function
 from collections import Counter, OrderedDict
 
 import pandas
@@ -183,7 +184,7 @@ class Command(BaseCommand):
                        .filter(source__in=Docket.RECAP_SOURCES)
                        .only('assigned_to_str', 'referred_to_str',
                              'date_filed'))
-            print "Processing %s dockets in %s" % (dockets.count(), court.pk)
+            print("Processing %s dockets in %s" % (dockets.count(), court.pk))
             for docket in dockets:
                 for judge_type in ['assigned', 'referred']:
                     judge = getattr(docket, '%s_to_str' % judge_type)

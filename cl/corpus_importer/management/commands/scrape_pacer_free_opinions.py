@@ -1,7 +1,6 @@
 import argparse
 import logging
 import os
-import sys
 from datetime import timedelta
 
 from celery.canvas import chain
@@ -168,15 +167,11 @@ def do_ocr(options):
     for i, pk in enumerate(rds):
         throttle.maybe_wait()
         chain(
-            extract_recap_pdf.si(pk, skip_ocr=False).set(priority=5, queue=q),
-            add_or_update_recap_document.s(coalesce_docket=True).set(priority=5,
-                                                                     queue=q),
+            extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q),
+            add_or_update_recap_document.s(coalesce_docket=True).set(queue=q),
         ).apply_async()
         if i % 1000 == 0:
-            msg = "Sent %s/%s tasks to celery so far." % (i + 1, count)
-            logger.info(msg)
-            sys.stdout.write("\r%s" % msg)
-            sys.stdout.flush()
+            logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
 
 
 class Command(BaseCommand):

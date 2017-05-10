@@ -28,6 +28,11 @@ class CeleryThrottle(object):
     def __init__(self, min_items=100, queue_name='celery'):
         """Create a throttle to prevent celery run aways.
         
+        !!
+        !! Note: This does not work on prioritized tasks due to 
+        !! https://github.com/celery/kombu/issues/422
+        !! 
+        
         :param min_items: The minimum number of items that should be enqueued. 
         A maximum of 2× this number may be created. This minimum value is not 
         guaranteed and so a number slightly higher than your max concurrency 
