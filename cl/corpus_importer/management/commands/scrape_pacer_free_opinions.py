@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import sys
 from datetime import timedelta
 
 from celery.canvas import chain
@@ -10,7 +11,7 @@ from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer.http import login
 
-from cl.search.models import Court
+from cl.search.models import Court, RECAPDocument
 from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     get_and_save_free_document_report,
@@ -19,6 +20,8 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.db_tools import queryset_generator
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.search.tasks import add_or_update_recap_document
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
@@ -154,6 +157,28 @@ def get_pdfs(options):
         completed += 1
 
 
+def do_ocr(options):
+    """Do the OCR for any items that need it, then save to the solr index."""
+    q = options['queue']
+    rds = RECAPDocument.objects.filter(
+        ocr_status=RECAPDocument.OCR_NEEDED,
+    ).values_list('pk', flat=True).order_by()
+    count = rds.count()
+    throttle = CeleryThrottle(queue_name=q)
+    for i, pk in enumerate(rds):
+        throttle.maybe_wait()
+        chain(
+            extract_recap_pdf.si(pk, skip_ocr=False).set(priority=5, queue=q),
+            add_or_update_recap_document.s(coalesce_docket=True).set(priority=5,
+                                                                     queue=q),
+        ).apply_async()
+        if i % 1000 == 0:
+            msg = "Sent %s/%s tasks to celery so far." % (i + 1, count)
+            logger.info(msg)
+            sys.stdout.write("\r%s" % msg)
+            sys.stdout.flush()
+
+
 class Command(BaseCommand):
     help = "Get all the free content from PACER. There are three modes."
 
@@ -188,5 +213,6 @@ class Command(BaseCommand):
     VALID_ACTIONS = {
         'get-report-results': get_and_save_free_document_reports,
         'get-pdfs': get_pdfs,
+        'do-ocr': do_ocr,
     }
 
