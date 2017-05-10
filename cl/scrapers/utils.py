@@ -4,13 +4,14 @@ import traceback
 from urlparse import urljoin
 
 import requests
-from celery.canvas import group
+import sys
 from django.conf import settings
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 
 from cl.lib import magic
+from cl.lib.celery_utils import CeleryThrottle
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
 
@@ -150,8 +151,7 @@ def signal_handler(signal, frame):
     die_now = True
 
 
-def extract_recap_documents(docs, skip_ocr=False, order_by=None, queue=None,
-                            queue_length=100):
+def extract_recap_documents(docs, skip_ocr=False, order_by=None, queue=None):
     """Loop over RECAPDocuments and extract their contents. Use OCR if requested.
 
     :param docs: A queryset containing the RECAPDocuments to be processed.
@@ -164,8 +164,6 @@ def extract_recap_documents(docs, skip_ocr=False, order_by=None, queue=None,
     :type order_by: str
     :param queue: The celery queue to send the content to.
     :type queue: str
-    :param queue_length: The number of items to send to the queue at a time.
-    :type queue_length: int
     """
     docs = docs.exclude(filepath_local='')
     if skip_ocr:
@@ -181,22 +179,13 @@ def extract_recap_documents(docs, skip_ocr=False, order_by=None, queue=None,
         elif order_by == 'big-first':
             docs = docs.order_by('-page_count')
 
-    tasks = []
-    completed = 0
     count = docs.count()
-    logger.info("There are %s documents to process." % count)
-    for pk in docs.values_list('pk', flat=True):
-        # Send the items off for processing.
-        last_item = (count == completed + 1)
-        tasks.append(extract_recap_pdf.s(pk, skip_ocr).set(priority=5,
-                                                           queue=queue))
-
-        # Every enqueue_length items, send the tasks to Celery.
-        if (len(tasks) >= queue_length) or last_item:
-            logger.info("Sent %s tasks to celery. We have sent %s "
-                        "items so far." % (len(tasks), completed + 1))
-            job = group(*tasks)
-            job.apply_async().join()
-            tasks = []
-
-        completed += 1
+    throttle = CeleryThrottle(queue_name=queue)
+    for i, pk in enumerate(docs.values_list('pk', flat=True)):
+        throttle.maybe_wait()
+        extract_recap_pdf.apply_async((pk, skip_ocr), priority=5, queue=queue)
+        if i % 1000 == 0:
+            msg = "Sent %s/%s tasks to celery so far." % (i + 1, count)
+            logger.info(msg)
+            sys.stdout.write("\r%s" % msg)
+            sys.stdout.flush()

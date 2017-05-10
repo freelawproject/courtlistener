@@ -10,8 +10,7 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     help = ('Iterate over all of the RECAPDocuments and extract their '
-            'content. This should later be modified to only do certain docs, '
-            'since doing all of them should be rare.')
+            'content.')
 
     def add_arguments(self, parser):
         # Global args.
@@ -33,15 +32,9 @@ class Command(BaseCommand):
             default='celery',
             help="Which queue should the items be sent to? (default: 'celery')",
         )
-        parser.add_argument(
-            '--queue-length',
-            type=int,
-            default=100,
-            help="How many items should be enqueued at a time? (default: 100)",
-        )
 
     def handle(self, *args, **options):
-        docs = RECAPDocument.objects.all()
+        docs = RECAPDocument.objects.all().order_by()
         extract_recap_documents(docs, options['skip_ocr'], options.get('order'),
-                                options['queue'], options['queue_length'])
+                                options['queue'])
 

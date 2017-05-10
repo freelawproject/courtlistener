@@ -622,10 +622,10 @@ class RECAPDocument(models.Model):
     @property
     def needs_extraction(self):
         """Does the item need extraction and does it have all the right
-        fields?
+        fields? Items needing OCR still need extraction.
         """
         return all([
-            self.ocr_status is None,
+            self.ocr_status is None or self.ocr_status == self.OCR_NEEDED,
             self.is_available is True,
             # Has a value in filepath field, which points to a file.
             self.filepath_local and os.path.isfile(self.filepath_local.path),
