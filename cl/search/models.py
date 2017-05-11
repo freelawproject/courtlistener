@@ -19,10 +19,10 @@ from cl.lib.model_helpers import make_upload_path, make_recap_path, \
 from cl.lib.search_index_utils import InvalidDocumentError, null_map, normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
+from cl.people_db.models import Attorney, AttorneyOrganization
 
 # changes here need to be mirrored in the coverage page view and Solr configs
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
-from people_db.models import Attorney, AttorneyOrganization
 
 JURISDICTIONS = (
     ('F',   'Federal Appellate'),
