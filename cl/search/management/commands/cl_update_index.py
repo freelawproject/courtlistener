@@ -1,9 +1,9 @@
 import ast
 import sys
 
-from celery.task.sets import TaskSet
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from six.moves import input
 
 from cl.audio.models import Audio
 from cl.lib.argparse_types import valid_date_time, valid_obj_type
@@ -11,7 +11,6 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.db_tools import queryset_generator
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timer import print_timing
-from cl.lib.utils import chunks
 from cl.people_db.models import Person
 from cl.search.models import Opinion, RECAPDocument, Docket
 from cl.search.tasks import (delete_items, add_or_update_audio_files,
@@ -30,8 +29,8 @@ def proceed_with_deletion(out, count, noinput):
 
     proceed = True
     out.write("\n")
-    yes_or_no = raw_input('WARNING: Are you **sure** you want to delete all '
-                          '%s items? [y/N] ' % count)
+    yes_or_no = input('WARNING: Are you **sure** you want to delete all %s '
+                      'items? [y/N] ' % count)
     out.write('\n')
     if not yes_or_no.lower().startswith('y'):
         out.write("No action taken.\n")
@@ -39,8 +38,8 @@ def proceed_with_deletion(out, count, noinput):
 
     if count > 10000 and proceed is True:
         # Double check...something might be off.
-        yes_or_no = raw_input('Are you double-plus sure? There are an awful '
-                              'lot of items here? [y/N] ')
+        yes_or_no = input('Are you sure? There are an awful lot of items here? '
+                          '[y/N] ')
         if not yes_or_no.lower().startswith('y'):
             out.write("No action taken.\n")
             proceed = False
@@ -81,6 +80,11 @@ class Command(BaseCommand):
             action='store_true',
             help="Do NOT prompt the user for input of any kind. Useful in "
                  "tests, but can disable important warnings."
+        )
+        parser.add_argument(
+            '--queue',
+            default='batch3',
+            help="The celery queue where the tasks should be processed.",
         )
 
         actions_group = parser.add_mutually_exclusive_group()
@@ -205,13 +209,14 @@ class Command(BaseCommand):
                               'index.\n')
             sys.exit(1)
 
-    def _chunk_queryset_into_tasks(self, items, count, chunksize=50,
-                                   start_at=0):
+    def process_queryset(self, items, count, chunksize=50,):
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
         """
+        queue = self.options['queue']
+        start_at = self.options['start_at']
+        throttle = CeleryThrottle(min_items=50, queue_name=queue)
         processed_count = 0
-        throttle = CeleryThrottle(min_items=50)
         chunk = []
         for item in items:
             processed_count += 1
@@ -221,7 +226,8 @@ class Command(BaseCommand):
             throttle.maybe_wait()
             chunk.append(item)
             if processed_count % chunksize == 0 or last_item:
-                add_or_update_items.delay(chunk, self.solr_url)
+                add_or_update_items.apply_async(args=(chunk, self.solr_url),
+                                                queue=queue)
                 chunk = []
                 sys.stdout.write("\rProcessed {}/{} ({:.0%})".format(
                     processed_count,
@@ -313,7 +319,7 @@ class Command(BaseCommand):
         qs = self.type.objects.filter(date_created__gte=dt)
         items = queryset_generator(qs, chunksize=5000)
         count = qs.count()
-        self._chunk_queryset_into_tasks(items, count)
+        self.process_queryset(items, count)
 
     @print_timing
     def add_or_update_all(self):
@@ -324,7 +330,6 @@ class Command(BaseCommand):
         If run on an existing index, existing items will be updated.
         """
         self.stdout.write("Adding or updating all items...\n")
-        bundle_size = 250
         if self.type == Person:
             q = self.type.objects.filter(
                 is_alias_of=None
@@ -436,13 +441,11 @@ class Command(BaseCommand):
             )
             count = q.count()
             q = queryset_generator(q, chunksize=5000)
-            bundle_size = 10  # Too big and things start dropping/failing.
         else:
             q = self.type.objects.all()
             count = q.count()
             q = queryset_generator(q, chunksize=5000)
-        self._chunk_queryset_into_tasks(q, count,
-                                        start_at=self.options['start_at'])
+        self.process_queryset(q, count)
 
     @print_timing
     def optimize(self):

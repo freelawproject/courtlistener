@@ -1,3 +1,4 @@
+from __future__ import print_function
 import time
 
 
@@ -9,6 +10,6 @@ def print_timing(func):
         t1 = time.time()
         res = func(*arg)
         t2 = time.time()
-        print 'Completed in %0.1f seconds.' % ((t2 - t1))
+        print('Completed in %0.1f seconds.' % ((t2 - t1)))
         return res
     return wrapper
