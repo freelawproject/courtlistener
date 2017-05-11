@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 import glob
 import logging
@@ -125,11 +126,11 @@ class Command(BaseCommand):
             try:
                 values = tree.xpath(self.options['xpath'])
             except XPathEvalError:
-                print "ERROR: Invalid XPath expression."
+                print("ERROR: Invalid XPath expression.")
                 exit(1)
 
             if values:
-                print "%s: %s" % (completed, values)
+                print("%s: %s" % (completed, values))
                 c.update([str(v) for v in values])
                 completed += 1
             else:
@@ -140,8 +141,8 @@ class Command(BaseCommand):
 
         with open('sample.pkl', 'wb') as f:
             pickle.dump(c, f)
-        print '\n%s items had no value. %s errors. Sample saved at ' \
-              '"sample.pkl"' % (no_value, errors)
+        print('\n%s items had no value. %s errors. Sample saved at "sample.pkl"'
+              % (no_value, errors))
 
     def parse_items(self):
         """For every item in the directory, send it to Celery for processing"""
@@ -172,7 +173,7 @@ class Command(BaseCommand):
 
                 max_items = self.options['max_items']
                 if completed >= max_items != -1:
-                    print "\n\nCompleted %s items. Aborting early." % max_items
+                    print("\n\nCompleted %s items. Aborting early." % max_items)
                     break
 
     VALID_ACTIONS = {

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
+from django.db.models import Prefetch
 from django.template import loader
 from django.utils.encoding import smart_unicode
 from django.utils.text import slugify
@@ -21,6 +22,8 @@ from cl.lib.string_utils import trunc
 
 # changes here need to be mirrored in the coverage page view and Solr configs
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
+from people_db.models import Attorney, AttorneyOrganization
+
 JURISDICTIONS = (
     ('F',   'Federal Appellate'),
     ('FD',  'Federal District'),
@@ -744,14 +747,24 @@ class RECAPDocument(models.Model):
             'firm_id': set(),
             'firm': set(),
         })
-        for p in docket.parties.prefetch_related('attorneys',
-                                                 'attorneys__organizations'):
+        parties = docket.parties.prefetch_related(
+            Prefetch('attorneys',
+                     queryset=Attorney.objects.filter(
+                         roles__docket=docket
+                     ).distinct().only('pk', 'name'),
+                     to_attr='attys_in_docket'),
+            Prefetch('attys_in_docket__organizations',
+                     queryset=AttorneyOrganization.objects.filter(
+                         attorney_organization_associations__docket=docket
+                     ).distinct().only('pk', 'name'),
+                     to_attr='firms_in_docket'))
+        for p in parties:
             out['party_id'].add(p.pk)
             out['party'].add(p.name)
-            for a in p.attorneys.all():
+            for a in p.attys_in_docket:
                 out['attorney_id'].add(a.pk)
                 out['attorney'].add(a.name)
-                for f in a.organizations.all():
+                for f in a.firms_in_docket:
                     out['firm_id'].add(f.pk)
                     out['firm'].add(f.name)
 
