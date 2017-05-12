@@ -232,18 +232,3 @@ def make_choices_group_lookup(c):
         else:
             d[choice] = value
     return d
-
-
-def disable_auto_now_fields(*models):
-    """Turns off the auto_now and auto_now_add attributes on a Model's fields,
-    so that an instance of the Model can be saved with a custom value.
-
-    Based on: https://stackoverflow.com/questions/7499767/temporarily-disable-auto-now-auto-now-add
-    """
-    for model in models:
-        # noinspection PyProtectedMember
-        for field in model._meta.local_fields:
-            if hasattr(field, 'auto_now'):
-                field.auto_now = False
-            if hasattr(field, 'auto_now_add'):
-                field.auto_now_add = False
