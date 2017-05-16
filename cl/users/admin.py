@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.models import Permission, User
+from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline
 from cl.favorites.admin import FavoriteInline
@@ -16,6 +17,9 @@ def get_stub_account(obj):
 get_stub_account.short_description = "Stub Account?"
 
 
+class TokenInline(admin.StackedInline):
+    model = Token
+
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
 
@@ -25,6 +29,7 @@ class UserAdmin(admin.ModelAdmin):
         UserProfileInline,
         AlertInline,
         FavoriteInline,
+        TokenInline,
     )
     list_display = (
         'username',
