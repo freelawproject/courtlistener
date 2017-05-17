@@ -27,7 +27,6 @@ def remove_citations_from_imported_fixtures():
 
 
 class CiteTest(TestCase):
-    fixtures = ['court_data.json']
 
     def test_reporter_tokenizer(self):
         """Do we tokenize correctly?"""

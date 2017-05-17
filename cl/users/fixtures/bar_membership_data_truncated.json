@@ -1,0 +1,9 @@
+[
+  {
+    "pk": 2,
+    "model": "users.barmembership",
+    "fields": {
+      "barMembership": "AK"
+    }
+  }
+]

@@ -1,6 +1,6 @@
 [
     {
-        "pk": 1,
+        "pk": 2001,
         "model": "auth.user",
         "fields": {
             "username": "pandora",
@@ -18,7 +18,7 @@
         }
     },
     {
-        "pk": 2,
+        "pk": 2002,
         "model": "users.userprofile",
         "fields": {
             "barmembership": [],
@@ -33,7 +33,7 @@
             "plaintext_preferred": false,
             "wants_newsletter": true,
             "state": "",
-            "user": 1,
+            "user": 2001,
             "email_confirmed": true,
             "zip_code": ""
         }
@@ -42,7 +42,7 @@
         "pk": 1,
         "model": "donate.donation",
         "fields": {
-            "donor": 1,
+            "donor": 2001,
             "payment_id": "c830e335-da96-498f-a706-d4e9c70b2a3c",
             "status": 4,
             "payment_provider": "paypal",

@@ -58,7 +58,7 @@ class UserTest(LiveServerTestCase):
         with a single account.
         """
         # Update the expiration since the fixture has one some time ago.
-        u = UserProfile.objects.get(pk=2)
+        u = UserProfile.objects.get(pk=1002)
         u.key_expires = now() + timedelta(days=2)
         u.save()
 
@@ -76,7 +76,7 @@ class UserTest(LiveServerTestCase):
         """Test the trickier case when an email is associated with many accounts"""
         # Update the accounts to have keys that are not expired.
         (UserProfile.objects
-             .filter(pk__in=[3, 4, 5])
+             .filter(pk__in=[1003, 1004, 1005])
              .update(key_expires=now() + timedelta(days=2)))
         r = self.client.get(reverse(
             'email_confirm',
@@ -125,7 +125,7 @@ class LiveUserTest(BaseSeleniumTest):
     def test_set_password_using_the_HTML(self):
         """Can we reset our password after generating a confirmation link?"""
         # Generate a token and use it to visit a generated reset URL
-        up = UserProfile.objects.get(pk=1)
+        up = UserProfile.objects.get(pk=1001)
         token = default_token_generator.make_token(up.user)
         url = '{host}{path}'.format(
             host=self.live_server_url,

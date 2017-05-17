@@ -25,8 +25,7 @@ from cl.search.models import Docket, Court, Opinion, OpinionCluster, \
 
 class BasicAPIPageTest(TestCase):
     """Test the basic views"""
-    fixtures = ['court_data.json', 'judge_judy.json',
-                'test_objects_search.json']
+    fixtures = ['judge_judy.json', 'test_objects_search.json']
 
     def setUp(self):
         self.client = Client()
@@ -58,13 +57,13 @@ class BasicAPIPageTest(TestCase):
 
     def test_coverage_api(self):
         r = self.client.get(reverse('coverage_data',
-                                    kwargs={'version': 2, 'court': 'ca9'}))
+                                    kwargs={'version': 2, 'court': 'ca1'}))
         self.assertEqual(r.status_code, 200)
 
     def test_coverage_api_via_url(self):
         # Should hit something like:
-        #  https://www.courtlistener.com/api/rest/v2/coverage/ca2/
-        r = self.client.get('/api/rest/v2/coverage/ca2/')
+        #  https://www.courtlistener.com/api/rest/v2/coverage/ca1/
+        r = self.client.get('/api/rest/v2/coverage/ca1/')
         self.assertEqual(r.status_code, 200)
 
     def test_api_info_page_displays_latest_rest_docs_by_default(self):
@@ -84,7 +83,7 @@ class BasicAPIPageTest(TestCase):
 class CoverageTests(IndexedSolrTestCase):
 
     def test_coverage_data_view_provides_court_data(self):
-        response = coverage_data(HttpRequest(), 'v2', 'ca9')
+        response = coverage_data(HttpRequest(), 'v2', 'ca1')
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response, JsonResponse)
         self.assertContains(response, 'annual_counts')
@@ -129,7 +128,7 @@ class FilteringCountTestCase(object):
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
     fixtures = ['judge_judy.json', 'authtest_data.json',
-                'court_data.json', 'test_objects_search.json']
+                'test_objects_search.json']
 
     def test_position_ordering(self):
         path = reverse('position-list', kwargs={'version': 'v3'})
@@ -152,8 +151,7 @@ class DRFOrderingTests(TestCase):
 
 class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
     """Do the filters work properly?"""
-    fixtures = ['judge_judy.json', 'authtest_data.json',
-                'court_data.json']
+    fixtures = ['judge_judy.json', 'authtest_data.json']
 
     def setUp(self):
         self.client.login(username='pandora', password='password')
@@ -339,7 +337,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
 
 
 class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
-    fixtures = ['recap_docs.json', 'court_data.json', 'attorney_party.json',
+    fixtures = ['recap_docs.json', 'attorney_party.json',
                 'user_with_recap_api_access.json']
 
     def setUp(self):
@@ -367,7 +365,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.path = reverse('docketentry-list', kwargs={'version': 'v3'})
 
         # Across docket to court...
-        self.q['docket__court__id'] = 'txnd'
+        self.q['docket__court__id'] = 'ca1'
         self.assertCountInResults(1)
         self.q['docket__court__id'] = 'foo'
         self.assertCountInResults(0)
@@ -461,8 +459,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
 
 class DRFSearchAndAudioAppsApiFilterTest(TestCase, FilteringCountTestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json',
-                'test_objects_audio.json', 'court_data.json',
-                'authtest_data.json']
+                'test_objects_audio.json', 'authtest_data.json']
 
     def setUp(self):
         self.client.login(username='recap-user', password='password')
@@ -595,7 +592,7 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase, FilteringCountTestCase):
 
 class DRFFieldSelectionTest(TestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json',
-                'authtest_data.json', 'court_data.json']
+                'authtest_data.json']
 
     def test_only_some_fields_returned(self):
         """Can we return only some of the fields?"""
@@ -693,7 +690,6 @@ class BulkJsonHistoryTest(TestCase):
 
 
 class BulkDataTest(TestCase):
-    fixtures = ['court_data.json']
     tmp_data_dir = '/tmp/bulk-dir/'
 
     def setUp(self):

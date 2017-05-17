@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+
+import sys
 from django.core.management import call_command
 from django.db import models, migrations
 
-fixture = 'court_data'
 
 def load_fixture(apps, schema_editor):
+    if 'test' in sys.argv:
+        fixture = 'court_data_truncated'
+    else:
+        fixture = 'court_data'
     call_command('loaddata', fixture, app_label='search')
 
 

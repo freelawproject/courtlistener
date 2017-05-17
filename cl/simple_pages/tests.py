@@ -134,8 +134,6 @@ class SimplePagesTest(TestCase):
     MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
 )
 class StaticFilesTest(TestCase):
-    fixtures = ['court_data.json']
-
     good_mp3_path = 'mp3/2014/06/09/ander_v._leo.mp3'
     good_txt_path = 'txt/2015/12/28/opinion_text.txt'
     good_pdf_path = 'pdf/2013/06/12/' + \

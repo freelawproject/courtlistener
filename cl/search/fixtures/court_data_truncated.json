@@ -1,0 +1,97 @@
+[
+{
+  "fields": {
+    "jurisdiction": "F",
+    "end_date": null,
+    "short_name": "Supreme Court",
+    "citation_string": "SCOTUS",
+    "in_use": true,
+    "url": "http://supremecourt.gov/",
+    "notes": "",
+    "date_modified": "2014-10-31T01:59:15.952Z",
+    "has_oral_argument_scraper": true,
+    "full_name": "Supreme Court of the United States",
+    "position": 1.0,
+    "has_opinion_scraper": true,
+    "start_date": "1789-09-24"
+  },
+  "model": "search.court",
+  "pk": "scotus"
+},
+{
+  "fields": {
+    "jurisdiction": "F",
+    "end_date": null,
+    "short_name": "First Circuit",
+    "citation_string": "1st Cir.",
+    "in_use": true,
+    "url": "http://www.ca1.uscourts.gov/",
+    "notes": "",
+    "date_modified": "2014-10-31T01:57:47.787Z",
+    "has_oral_argument_scraper": true,
+    "full_name": "Court of Appeals for the First Circuit",
+    "position": 101.0,
+    "has_opinion_scraper": true,
+    "start_date": "1891-03-03"
+  },
+  "model": "search.court",
+  "pk": "ca1"
+},
+{
+  "fields": {
+    "jurisdiction": "F",
+    "end_date": null,
+    "short_name": "Fourth Circuit",
+    "citation_string": "4th Cir.",
+    "in_use": true,
+    "url": "http://www.ca4.uscourts.gov/",
+    "notes": " - From beginning of f2 coverage to 1996-01-01, we have only precedential cases (f2 and f3).\r\n - From 1996-01-01 to 2007-07-31 we have f3 cases and scraped non-precedential ones. Merging the scraped precedential cases with the f3 corpus was too difficult and provided no new opinions. Unfortunately, it appears that we have a lot of duplicates from f3 and scraping in 1996. This can be seen as a bump in the coverage page.\r\n - From 2007-08-01 onwards, we have scraped cases.",
+    "date_modified": "2014-10-31T01:58:02.297Z",
+    "has_oral_argument_scraper": true,
+    "full_name": "Court of Appeals for the Fourth Circuit",
+    "position": 104.0,
+    "has_opinion_scraper": true,
+    "start_date": "1891-03-03"
+  },
+  "model": "search.court",
+  "pk": "ca4"
+},
+{
+  "fields": {
+    "jurisdiction": "FD",
+    "end_date": null,
+    "short_name": "D. Alaska",
+    "citation_string": "D. Alaska",
+    "in_use": true,
+    "url": "http://www.akd.uscourts.gov/",
+    "notes": "Lawbox",
+    "date_modified": "2013-08-15T17:49:55Z",
+    "has_oral_argument_scraper": false,
+    "full_name": "District Court, D. Alaska",
+    "position": 202.5,
+    "has_opinion_scraper": false,
+    "start_date": null
+  },
+  "model": "search.court",
+  "pk": "akd"
+},
+{
+  "fields": {
+    "jurisdiction": "T",
+    "end_date": null,
+    "short_name": "Testing Supreme Court",
+    "citation_string": "Test.",
+    "in_use": false,
+    "url": "http://www.example.com/",
+    "notes": "This court is used for tests, and should not appear in the UI.",
+    "date_modified": "2013-08-14T22:38:31Z",
+    "has_oral_argument_scraper": false,
+    "full_name": "Testing Supreme Court",
+    "position": 999.0,
+    "has_opinion_scraper": false,
+    "start_date": null
+  },
+  "model": "search.court",
+  "pk": "test"
+}
+]

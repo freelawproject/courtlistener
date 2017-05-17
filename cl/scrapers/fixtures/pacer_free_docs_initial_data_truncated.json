@@ -1,0 +1,13 @@
+[
+  {
+    "fields": {
+      "status": 1,
+      "court": "ca1",
+      "date_started": "2017-03-01T01:11:06.058Z",
+      "date_completed": "2017-02-28T08:00:00Z",
+      "date_queried": "1990-01-01"
+    },
+    "model": "scrapers.pacerfreedocumentlog",
+    "pk": 1
+  }
+]

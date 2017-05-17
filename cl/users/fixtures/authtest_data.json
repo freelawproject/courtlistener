@@ -1,6 +1,6 @@
 [
     {
-        "pk": "1",
+        "pk": "1001",
         "model": "auth.user",
         "fields": {
             "username": "pandora",
@@ -18,7 +18,7 @@
         }
     },
     {
-        "pk": 1,
+        "pk": 1001,
         "model": "users.userprofile",
         "fields": {
             "barmembership": [],
@@ -33,13 +33,13 @@
             "plaintext_preferred": false,
             "wants_newsletter": false,
             "state": "CA",
-            "user": 1,
+            "user": 1001,
             "email_confirmed": true,
             "zip_code": null
         }
     },
     {
-        "pk": "2",
+        "pk": "1002",
         "model": "auth.user",
         "fields": {
             "username": "unconfirmed_email",
@@ -57,7 +57,7 @@
         }
     },
     {
-        "pk": 2,
+        "pk": 1002,
         "model": "users.userprofile",
         "fields": {
             "barmembership": [],
@@ -72,13 +72,13 @@
             "plaintext_preferred": false,
             "wants_newsletter": false,
             "state": "CA",
-            "user": 2,
+            "user": 1002,
             "email_confirmed": false,
             "zip_code": null
         }
     },
     {
-        "pk": "3",
+        "pk": "1003",
         "model": "auth.user",
         "fields": {
             "username": "unconfirmed_email2",
@@ -96,7 +96,7 @@
         }
     },
     {
-        "pk": 3,
+        "pk": 1003,
         "model": "users.userprofile",
         "fields": {
             "barmembership": [],
@@ -111,13 +111,13 @@
             "plaintext_preferred": false,
             "wants_newsletter": false,
             "state": "CA",
-            "user": 3,
+            "user": 1003,
             "email_confirmed": false,
             "zip_code": null
         }
     },
     {
-        "pk": "4",
+        "pk": "1004",
         "model": "auth.user",
         "fields": {
             "username": "unconfirmed_email3",
@@ -135,7 +135,7 @@
         }
     },
     {
-        "pk": 4,
+        "pk": 1004,
         "model": "users.userprofile",
         "fields": {
             "barmembership": [],
@@ -150,12 +150,14 @@
             "plaintext_preferred": false,
             "wants_newsletter": false,
             "state": "CA",
-            "user": 4,
+            "user": 1004,
             "email_confirmed": false,
             "zip_code": null
         }
     },
     {
+        "pk": 1005,
+        "model": "auth.user",
         "fields": {
           "username": "admin",
           "first_name": "Admin",
@@ -169,12 +171,10 @@
           "password": "pbkdf2_sha256$20000$DwYV02x33AMD$lniavPf2laatGuJgs7CBZxZfaN4InUysvcEsGmu4Rvg=",
           "email": "",
           "date_joined": "2015-12-18T20:05:45.160Z"
-        },
-        "model": "auth.user",
-        "pk": 5
+        }
     },
     {
-        "pk": 5,
+        "pk": 1005,
         "model": "users.userprofile",
         "fields": {
             "barmembership": [],
@@ -189,7 +189,7 @@
             "plaintext_preferred": false,
             "wants_newsletter": false,
             "state": "CA",
-            "user": 5,
+            "user": 1005,
             "email_confirmed": true,
             "zip_code": null
         }

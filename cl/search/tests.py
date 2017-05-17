@@ -517,8 +517,6 @@ class FeedTest(IndexedSolrTestCase):
 )
 class JurisdictionFeedTest(TestCase):
 
-    fixtures = ['court_data.json']
-
     def setUp(self):
         self.good_item = {
             'title': 'Opinion Title',
