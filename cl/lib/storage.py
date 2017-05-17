@@ -1,3 +1,5 @@
+import uuid
+
 import os
 from django.core.files.storage import FileSystemStorage
 import itertools
@@ -35,3 +37,16 @@ class IncrementingFileSystemStorage(FileSystemStorage):
                                 "%s_%s%s" % (file_root, next(count), file_ext))
 
         return name
+
+
+class UUIDFileSystemStorage(FileSystemStorage):
+    """Implements a simple UUID file system storage.
+    
+    Useful when you don't care what the name of the file is, but you want it to
+    be unique. Keeps the path from upload_to param and the extension of the
+    original file.
+    """
+    def get_available_name(self, name, max_length=None):
+        dir_name, file_name = os.path.split(name)
+        _, file_ext = os.path.splitext(file_name)
+        return os.path.join(dir_name, uuid.uuid4().hex + file_ext)

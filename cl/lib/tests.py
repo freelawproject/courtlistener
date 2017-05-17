@@ -1,11 +1,15 @@
 # coding=utf8
-"""
-Unit tests for lib
-"""
-import datetime
+from __future__ import print_function
 
+import datetime
+import re
+
+import os
+import tempfile
+
+from django.core.files.base import ContentFile
 from django.core.urlresolvers import reverse
-from django.test import TestCase
+from django.test import TestCase, SimpleTestCase
 from django.test import override_settings
 from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 
@@ -15,6 +19,7 @@ from cl.lib.model_helpers import make_upload_path
 from cl.lib.pacer import normalize_party_types, normalize_attorney_role, \
     normalize_attorney_contact, normalize_us_state, make_address_lookup_key
 from cl.lib.search_utils import make_fq
+from cl.lib.storage import UUIDFileSystemStorage
 from cl.lib.string_utils import trunc
 from cl.people_db.models import Role
 from cl.scrapers.models import UrlHash
@@ -37,43 +42,43 @@ class TestDBTools(TestCase):
              'count': 2},
         ]
         for test in tests:
-            print "Testing queryset_generator with %s expected results..." % \
-                  test['count'],
+            print("Testing queryset_generator with %s expected results..." %
+                  test['count'], end='')
             count = 0
             for _ in queryset_generator(test['query']):
                 count += 1
             self.assertEqual(count, test['count'])
-            print '✓'
+            print('✓')
 
     def test_queryset_generator_values_query(self):
         """Do values queries work?"""
-        print "Testing raising an error when we can't get a PK in a values " \
-              "query...",
+        print("Testing raising an error when we can't get a PK in a values "
+              "query...", end='')
         self.assertRaises(
             Exception,
             queryset_generator(UrlHash.objects.values('sha1')),
             msg="Values query did not fail when pk was not provided."
         )
-        print '✓'
+        print('✓')
 
-        print "Testing a good values query...",
+        print("Testing a good values query...", end='')
         self.assertEqual(
             sum(1 for _ in queryset_generator(UrlHash.objects.values())),
             2,
         )
-        print '✓'
+        print('✓')
 
     def test_queryset_generator_chunking(self):
         """Does chunking work properly without duplicates or omissions?"""
-        print "Testing if queryset_iterator chunking returns the right " \
-              "number of results...",
+        print("Testing if queryset_iterator chunking returns the right "
+              "number of results...", end='')
         expected_count = 2
         results = queryset_generator(UrlHash.objects.all(), chunksize=1)
         self.assertEqual(
             expected_count,
             sum(1 for _ in results),
         )
-        print '✓'
+        print('✓')
 
 
 class TestStringUtils(TestCase):
@@ -160,6 +165,28 @@ class TestModelHelpers(TestCase):
         self.opinion.file_with_date = datetime.date(2015, 12, 14)
         path = make_upload_path(self.opinion, 'hotline_bling.mp3')
         self.assertEqual(expected, path)
+
+
+class UUIDFileSystemStorageTest(SimpleTestCase):
+    # Borrows from https://github.com/django/django/blob/9cbf48693dcd8df6cb22c183dcc94e7ce62b2921/tests/file_storage/tests.py#L89
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.storage = UUIDFileSystemStorage(location=self.temp_dir,
+                                             base_url='test_uuid_storage')
+
+    def test_file_save_with_path(self):
+        """Does saving a pathname create directories and filenames correctly?"""
+        self.assertFalse(self.storage.exists('path/to'))
+        file_name = 'filename'
+        extension = 'ext'
+        f = self.storage.save('path/to/%s.%s' % (file_name, extension),
+                              ContentFile('file with path'))
+        self.assertTrue(self.storage.exists('path/to'))
+        dir_name_created, file_name_created = os.path.split(f)
+        file_root_created, extension_created = file_name_created.split('.', 1)
+        self.assertEqual(extension_created, extension)
+        self.assertTrue(re.match('[a-f0-9]{32}', file_root_created))
 
 
 class TestMimeLookup(TestCase):
@@ -267,11 +294,11 @@ class TestPACERPartyParsing(TestCase):
             'a': 'Intervenor Defendant',
         }]
         for pair in pairs:
-            print "Normalizing PACER type of '%s' to '%s'..." % \
-                  (pair['q'], pair['a']),
+            print("Normalizing PACER type of '%s' to '%s'..." %
+                  (pair['q'], pair['a']), end='')
             result = normalize_party_types(pair['q'])
             self.assertEqual(result, pair['a'])
-            print '✓'
+            print('✓')
 
     def test_attorney_role_normalization(self):
         """Can we normalize the attorney roles into a small number of roles?"""
@@ -314,11 +341,11 @@ class TestPACERPartyParsing(TestCase):
                   'date_action': datetime.date(2007, 1, 1)},
         }]
         for pair in pairs:
-            print "Normalizing PACER role of '%s' to '%s'..." % \
-                  (pair['q'], pair['a']),
+            print("Normalizing PACER role of '%s' to '%s'..." %
+                  (pair['q'], pair['a']), end='')
             result = normalize_attorney_role(pair['q'])
             self.assertEqual(result, pair['a'])
-            print '✓'
+            print('✓')
         with self.assertRaises(ValueError):
             normalize_attorney_role('this is an unknown role')
 
@@ -337,11 +364,11 @@ class TestPACERPartyParsing(TestCase):
             'a': 'CA',
         }]
         for pair in pairs:
-            print "Normalizing state of '%s' to '%s'..." % \
-                  (pair['q'], pair['a']),
+            print("Normalizing state of '%s' to '%s'..." %
+                  (pair['q'], pair['a']), end='')
             result = normalize_us_state(pair['q'])
             self.assertEqual(result, pair['a'])
-            print '✓'
+            print('✓')
 
     def test_normalize_atty_contact(self):
         pairs = [{
@@ -577,11 +604,11 @@ class TestPACERPartyParsing(TestCase):
             })
         }]
         for i, pair in enumerate(pairs):
-            print "Normalizing address %s..." % i,
+            print("Normalizing address %s..." % i, end='')
             result = normalize_attorney_contact(pair['q'])
             self.maxDiff = None
             self.assertEqual(result, pair['a'])
-            print '✓'
+            print('✓')
 
     def test_making_a_lookup_key(self):
         self.assertEqual(
