@@ -6,6 +6,7 @@ from rest_framework_swagger.renderers import OpenAPIRenderer, SwaggerUIRenderer
 from cl.api import views
 from cl.audio import api_views as audio_views
 from cl.people_db import api_views as people_views
+from cl.recap import views as recap_views
 from cl.search import api_views as search_views
 
 router = DefaultRouter()
@@ -32,6 +33,9 @@ router.register(r'sources', people_views.SourceViewSet)
 router.register(r'aba-ratings', people_views.ABARatingViewSet)
 router.register(r'parties', people_views.PartyViewSet)
 router.register(r'attorneys', people_views.AttorneyViewSet)
+
+# RECAP
+router.register(r'recap', recap_views.PacerProcessingQueueViewSet)
 
 API_TITLE = "CourtListener Legal Data API"
 core_api_schema_view = get_schema_view(

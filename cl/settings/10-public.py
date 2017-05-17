@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     'cl.people_db',
     'cl.lib',
     'cl.opinion_page',
+    'cl.recap',
     'cl.scrapers',
     'cl.search',
     'cl.simple_pages',

@@ -209,7 +209,6 @@ class RECAPUsersReadOnly(DjangoModelPermissions):
     Such users must have the has_recap_api_access flag set on their account for
     this object type.
     """
-
     perms_map = {
         'GET': ['%(app_label)s.has_recap_api_access'],
         'OPTIONS': ['%(app_label)s.has_recap_api_access'],
@@ -217,6 +216,22 @@ class RECAPUsersReadOnly(DjangoModelPermissions):
         'POST': ['%(app_label)s.add_%(model_name)s'],
         'PUT': ['%(app_label)s.change_%(model_name)s'],
         'PATCH': ['%(app_label)s.change_%(model_name)s'],
+        'DELETE': ['%(app_label)s.delete_%(model_name)s'],
+    }
+
+
+class RECAPUploaders(DjangoModelPermissions):
+    """Provides some users upload permissions in RECAP
+    
+    Such users must have the has_recap_upload_access flag set on their account
+    """
+    perms_map = {
+        'GET': ['%(app_label)s.has_recap_upload_access'],
+        'OPTIONS': ['%(app_label)s.has_recap_upload_access'],
+        'HEAD': ['%(app_label)s.has_recap_upload_access'],
+        'POST': ['%(app_label)s.has_recap_upload_access'],
+        'PUT': ['%(app_label)s.has_recap_upload_access'],
+        'PATCH': ['%(app_label)s.has_recap_upload_access'],
         'DELETE': ['%(app_label)s.delete_%(model_name)s'],
     }
 
