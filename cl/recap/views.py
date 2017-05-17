@@ -1,11 +1,11 @@
 from rest_framework.viewsets import ModelViewSet
 
-from cl.api.utils import RECAPUploaders
+from cl.api.utils import RECAPUploaders, LoggingMixin
 from cl.recap.api_serializers import ProcessingQueueSerializer
 from cl.recap.models import ProcessingQueue
 
 
-class PacerProcessingQueueViewSet(ModelViewSet):
+class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     permission_classes = (RECAPUploaders,)
     queryset = ProcessingQueue.objects.all()
     serializer_class = ProcessingQueueSerializer
