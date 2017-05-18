@@ -75,7 +75,8 @@ def get_docket_filename(court, pacer_case_id):
 def get_document_filename(court, pacer_case_id, document_number,
                           attachment_number):
     return ".".join(["gov", "uscourts", unicode(court), unicode(pacer_case_id),
-                     unicode(document_number), unicode(attachment_number), "pdf"])
+                     unicode(document_number), unicode(attachment_number or 0),
+                     "pdf"])
 
 
 def needs_ocr(content):
