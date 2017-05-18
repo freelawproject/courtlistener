@@ -49,6 +49,7 @@ logilab-common==0.63.2
 lxml==3.4.4
 Markdown
 markdown2==2.3.0
+mock
 ndg-httpsclient==0.4.0
 networkx==1.10
 nose

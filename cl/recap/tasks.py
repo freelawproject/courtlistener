@@ -1,17 +1,144 @@
-import re
+import hashlib
 import logging
+import os
 
-from django.utils import simplejson
-#
-#
-# def is_pdf(mimetype):
-#     return mimetype == "application/pdf"
-#
-#
-# def is_html(mimetype):
-#     return mimetype.find("text/html") >= 0
-#
-#
+from django.core.files.base import ContentFile
+from django.utils import timezone
+
+from cl.celery import app
+from cl.lib.recap_utils import get_document_filename
+from cl.recap.models import ProcessingQueue
+from cl.scrapers.tasks import get_page_count, extract_recap_pdf
+from cl.search.models import Docket, RECAPDocument, DocketEntry
+from cl.search.tasks import add_or_update_recap_document
+
+logger = logging.getLogger(__name__)
+
+
+def process_recap_upload(pq):
+    """Process an item uploaded from an extension or API user.
+    
+    Uploaded objects can take a variety of forms, and we'll need to process them
+    accordingly.
+    """
+    if pq.upload_type == pq.DOCKET:
+        pass
+    elif pq.upload_type == pq.ATTACHMENT_PAGE:
+        pass
+    elif pq.upload_type == pq.PDF:
+        process_recap_pdf.delay(pq.pk)
+
+
+@app.task(bind=True, max_retries=2, interval_start=5 * 60,
+          interval_step=10 * 60)
+def process_recap_pdf(self, pk):
+    """Save a RECAP PDF to the database."""
+    pq = ProcessingQueue.objects.get(pk=pk)
+    pq.status = pq.PROCESSING_IN_PROGRESS
+    pq.save()
+    try:
+        rd = RECAPDocument.objects.get(
+            docket_entry__docket__pacer_case_id=pq.pacer_case_id,
+            pacer_doc_id=pq.pacer_doc_id,
+        )
+    except RECAPDocument.DoesNotExist:
+        try:
+            d = Docket.objects.get(pacer_case_id=pq.pacer_case_id,
+                                   court_id=pq.court_id)
+        except Docket.DoesNotExist as exc:
+            # No Docket and no RECAPDocument. Do a retry. Hopefully the docket
+            # will be in place soon (it could be in a different upload task that
+            # hasn't yet been processed).
+            logger.warning("Unable to find docket for processing queue '%s'. "
+                           "Retrying if max_retries is not exceeded." % pq)
+            pq.error_message = "Unable to find docket for item."
+            if self.request.retries == self.max_retries:
+                pq.status = pq.PROCESSING_FAILED
+            else:
+                pq.status = pq.QUEUED_FOR_RETRY
+            pq.save()
+            raise self.retry(exc=exc)
+        except Docket.MultipleObjectsReturned:
+            msg = "Too many dockets found when trying to save '%s'" % pq
+            logger.error(msg)
+            pq.error_message = msg
+            pq.status = pq.PROCESSING_FAILED
+            pq.save()
+        else:
+            # Got the Docket, attempt to get/create the DocketEntry, and then
+            # create the RECAPDocument
+            try:
+                de = DocketEntry.objects.get(
+                    docket=d,
+                    entry_number=pq.document_number
+                )
+            except DocketEntry.DoesNotExist as exc:
+                logger.warning("Unable to find docket entry for processing "
+                               "queue '%s'. Retrying if max_retries is not "
+                               "exceeded." % pq)
+                pq.error_message = "Unable to find docket entry for item."
+                if self.request.retries == self.max_retries:
+                    pq.status = pq.PROCESSING_FAILED
+                else:
+                    pq.status = pq.QUEUED_FOR_RETRY
+                pq.save()
+                raise self.retry(exc=exc)
+
+        # All objects accounted for. Make some data.
+        rd = RECAPDocument(
+            docket_entry=de,
+            pacer_doc_id=pq.pacer_doc_id,
+            date_upload=timezone.now(),
+        )
+        if pq.attachment_number is None:
+            rd.document_type = RECAPDocument.PACER_DOCUMENT
+        else:
+            rd.document_type = RECAPDocument.ATTACHMENT
+
+    rd.document_number = pq.document_number
+    rd.attachment_number = pq.attachment_number
+
+    # Do the file, finally.
+    content = pq.filepath_local.read()
+    new_sha1 = hashlib.sha1(content).hexdigest()
+    if all([rd.sha1 == new_sha1,
+            rd.is_available,
+            rd.filepath_local and os.path.isfile(rd.filepath_local.path)]):
+        # All good. Press on.
+        new_document = False
+    else:
+        # Different sha1, it wasn't available, or it's missing from disk. Move
+        # the new file over from the processing queue storage.
+        new_document = True
+        cf = ContentFile(content)
+        file_name = get_document_filename(
+            rd.docket_entry.docket.court_id,
+            rd.docket_entry.docket.pacer_case_id,
+            rd.document_number,
+            rd.attachment_number
+        )
+        rd.filepath_local.save(file_name, cf, save=False)
+        rd.is_available = True
+        rd.sha1 = new_sha1
+
+        # Do page count and extraction
+        extension = rd.filepath_local.path.split('.')[-1]
+        rd.page_count = get_page_count(rd.filepath_local.path, extension)
+        rd.ocr_status = None
+
+    # Ditch the original file
+    pq.filepath_local.delete(save=False)
+    pq.error_message = ''  # Clear out errors b/c successful
+    pq.status = pq.PROCESSING_SUCCESSFUL
+    pq.save()
+
+    rd.save()
+    if new_document:
+        extract_recap_pdf(rd.pk)
+        add_or_update_recap_document([rd.pk], force_commit=False)
+
+    return rd
+
 # doc_re = ParsePacer.doc_re
 # ca_doc_re = ParsePacer.ca_doc_re
 #

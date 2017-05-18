@@ -16,10 +16,22 @@ class ProcessingQueue(models.Model):
     AWAITING_PROCESSING = 1
     PROCESSING_SUCCESSFUL = 2
     PROCESSING_FAILED = 3
+    PROCESSING_IN_PROGRESS = 4
+    QUEUED_FOR_RETRY = 5
     PROCESSING_STATUSES = (
-        (AWAITING_PROCESSING, 'Awaiting processing by celery task.'),
+        (AWAITING_PROCESSING, 'Awaiting processing in queue.'),
         (PROCESSING_SUCCESSFUL, 'Item processed successfully.'),
         (PROCESSING_FAILED, 'Item encountered an error while processing.'),
+        (PROCESSING_IN_PROGRESS, 'Item is currently being processed.'),
+        (QUEUED_FOR_RETRY, 'Item failed processing, but will be retried.'),
+    )
+    DOCKET = 1
+    ATTACHMENT_PAGE = 2
+    PDF = 3
+    UPLOAD_TYPES = (
+        (DOCKET, 'HTML docket source'),
+        (ATTACHMENT_PAGE, 'HTML attachment page'),
+        (PDF, 'PACER PDF'),
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -45,6 +57,13 @@ class ProcessingQueue(models.Model):
         help_text="The cased ID provided by PACER.",
         max_length=100,
     )
+    pacer_doc_id = models.CharField(
+        help_text="The ID of the document in PACER. This information is "
+                  "provided by RECAP.",
+        max_length=32,  # Same as in RECAP
+        unique=True,
+        blank=True,
+    )
     document_number = models.CharField(
         help_text="If the file is a document, the number is the "
                   "document_number in RECAP docket.",
@@ -61,12 +80,28 @@ class ProcessingQueue(models.Model):
         upload_to=make_recap_processing_queue_path,
         storage=UUIDFileSystemStorage(),
         max_length=1000,
-        blank=True,
     )
     status = models.SmallIntegerField(
         help_text="The current status of this upload.",
         choices=PROCESSING_STATUSES,
     )
+    upload_type = models.SmallIntegerField(
+        help_text="The type of object that is uploaded",
+        choices=UPLOAD_TYPES,
+    )
+    error_message = models.TextField(
+        help_text="Any errors that occurred while processing an item",
+        blank=True,
+    )
+
+    def __unicode__(self):
+        return u'ProcessingQueue %s: %s.%s.%s.%s' % (
+            self.pk,
+            self.court_id,
+            self.pacer_case_id,
+            self.document_number,
+            self.attachment_number
+        )
 
     class Meta:
         permissions = (
