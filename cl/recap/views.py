@@ -3,6 +3,7 @@ from rest_framework.viewsets import ModelViewSet
 from cl.api.utils import RECAPUploaders, LoggingMixin
 from cl.recap.api_serializers import ProcessingQueueSerializer
 from cl.recap.models import ProcessingQueue
+from cl.recap.tasks import process_recap_upload
 
 
 class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
@@ -11,104 +12,11 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     serializer_class = ProcessingQueueSerializer
 
     def perform_create(self, serializer):
-        serializer.save(uploader=self.request.user)
+        pq = serializer.save(uploader=self.request.user)
+        process_recap_upload(pq)
 
 
-def pacer_docket_upload(request):
-    """
-    This will accept a RECAP docket and will save it to a database table.
-     
-    The ID from the saved object will be passed to a celery task, which will 
-    pop the row from the database table, process it, and mark it as complete.
-     
-    A background script (if we want) can come through and clean up old items
-    that were processed long ago. 
-    
-    
-    :param request: 
-    :return: 
-    """
-    pass
 
-
-def pacer_pdf_upload(request):
-    pass
-
-
-def pacer_doc1_upload(request):
-    pass
-
-#
-# def upload(request):
-#     """ Public upload view for all incoming data. """
-#
-#     if request.method != "POST":
-#         message = "upload: Not a POST request."
-#         logging.error(message)
-#         return HttpResponse(message)
-#
-#     try:
-#         if not request.FILES:
-#             message = "upload: No request.FILES attribute."
-#             logging.error(message)
-#             return HttpResponse(message)
-#     except IOError:
-#         # Not something we can fix I don't think.  Client fails to send data.
-#         message = "Client read error (Timeout?)"
-#         logging.warning("upload: %s" % message)
-#         return HttpResponse(message)
-#     except SystemError:
-#         message = "Could not parse POST arguments."
-#         logging.warning("uploads: %s" % message)
-#         return HttpResponse(message)
-#
-#     try:
-#         data = request.FILES["data"]
-#     except KeyError:
-#         try:
-#             # TK: Only used in testing - get rid of me
-#             data = request.FILES["data_file"]
-#         except KeyError:
-#             message = "upload: No FILES 'data' attribute."
-#             logging.error(message)
-#             return HttpResponse(message)
-#
-#     try:
-#         court = request.POST["court"]
-#     except KeyError:
-#         message = "upload: No POST 'court' attribute."
-#         logging.error(message)
-#         return HttpResponse(message)
-#     else:
-#         court = court.strip()
-#
-#     if request.POST.get("casenum"):
-#         casenum = request.POST["casenum"].strip()
-#         casenum_re = re.compile(r'\d+(-\d+)?')
-#         if not casenum_re.match(casenum) or ":" in casenum:
-#             message = "upload: 'casenum' invalid: %s" % request.POST["casenum"]
-#             logging.error(message)
-#             return HttpResponse(message)
-#     else:
-#         casenum = None
-#
-#     try:
-#         mimetype = request.POST["mimetype"].strip()
-#     except KeyError:
-#         message = "upload: No POST 'mimetype' attribute."
-#         logging.error(message)
-#         return HttpResponse(message)
-#
-#     try:
-#         url = request.POST["url"].strip()
-#     except KeyError:
-#         url = None
-#
-#     message = UploadHandler.handle_upload(data, court, casenum, mimetype, url)
-#
-#     return HttpResponse(message)
-#
-#
 # def query(request):
 #     """  Query the database to check which PDF documents we have.
 #
