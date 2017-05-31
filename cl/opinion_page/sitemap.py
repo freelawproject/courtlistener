@@ -8,7 +8,7 @@ def opinion_sitemap_maker(request):
         request,
         settings.SOLR_OPINION_URL,
         make_sitemap_solr_params('dateFiled asc', 'o_sitemap'),
-        'yearly',
+        'monthly',
         ['pdf', 'doc', 'wpd'],
         'absolute_url',
     )

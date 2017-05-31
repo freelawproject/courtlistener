@@ -9,7 +9,7 @@ def oral_argument_sitemap_maker(request):
         settings.SOLR_AUDIO_URL,
         make_sitemap_solr_params('dateArgued asc',
                                  'oa_sitemap'),
-        'yearly',
+        'monthly',
         ['mp3'],
         'absolute_url',
     )

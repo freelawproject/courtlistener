@@ -63,8 +63,8 @@ def normalize_grouping(result):
         return result
 
 
-def make_solr_sitemap(request, solr_url, params, changefreq,
-                      low_priority_pages, url_field):
+def make_solr_sitemap(request, solr_url, params, changefreq, low_priority_pages,
+                      url_field):
     solr = ExtraSolrInterface(solr_url)
     page = int(request.GET.get('p', 1))
     params['start'] = (page - 1) * items_per_sitemap
