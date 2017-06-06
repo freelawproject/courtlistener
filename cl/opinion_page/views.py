@@ -158,10 +158,10 @@ def view_opinion(request, pk, _):
     """
     # Look up the court, cluster, title and favorite information
     cluster = get_object_or_404(OpinionCluster, pk=pk)
-    title = '%s, %s' % (
+    title = ', '.join([s for s in [
         trunc(best_case_name(cluster), 100),
         cluster.citation_string,
-    )
+    ] if s.strip()])
     has_downloads = False
     for sub_opinion in cluster.sub_opinions.all():
         if sub_opinion.local_path or sub_opinion.download_url:
