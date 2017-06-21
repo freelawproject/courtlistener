@@ -395,10 +395,6 @@ class Command(BaseCommand):
                 # Party, attorney, firm
                 'docket_entry__docket__parties__pk',
                 'docket_entry__docket__parties__name',
-                'docket_entry__docket__parties__attorneys__pk',
-                'docket_entry__docket__parties__attorneys__name',
-                'docket_entry__docket__parties__attorneys__organizations__pk',
-                'docket_entry__docket__parties__attorneys__organizations__name',
             )
             count = q.count()
             q = queryset_generator(q, chunksize=5000)
