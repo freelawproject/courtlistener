@@ -306,6 +306,28 @@ class Docket(models.Model):
             self.pacer_case_id,
         )
 
+    @property
+    def prefetched_parties(self):
+        """Prefetch the attorneys and firms associated with a docket and put 
+        those values into the `attys_in_docket` and `firms_in_docket` 
+        attributes.
+        
+        :return: A parties queryset with the correct values prefetched.
+        """
+        from cl.people_db.models import Attorney, AttorneyOrganization
+        return self.parties.prefetch_related(
+            Prefetch('attorneys',
+                     queryset=Attorney.objects.filter(
+                         roles__docket=self
+                     ).distinct().only('pk', 'name'),
+                     to_attr='attys_in_docket'),
+            Prefetch('attys_in_docket__organizations',
+                     queryset=AttorneyOrganization.objects.filter(
+                         attorney_organization_associations__docket=self
+                     ).distinct().only('pk', 'name'),
+                     to_attr='firms_in_docket')
+        )
+
     def as_search_list(self):
         """Create list of search dicts from a single docket. This should be
         faster than creating a search dict per document on the docket.
@@ -359,15 +381,15 @@ class Docket(models.Model):
             'firm_id': set(),
             'firm': set(),
         })
-        for p in self.parties.all():
+        for p in self.prefetched_parties:
             out['party_id'].add(p.pk)
             out['party'].add(p.name)
-            for a in p.attorneys.all():
+            for a in p.attys_in_docket:
                 out['attorney_id'].add(a.pk)
                 out['attorney'].add(a.name)
-                for org in a.organizations.all():
-                    out['firm_id'].add(org.pk)
-                    out['firm'].add(org.name)
+                for f in a.firms_in_docket:
+                    out['firm_id'].add(f.pk)
+                    out['firm'].add(f.name)
 
         # Do RECAPDocument and Docket Entries in a nested loop
         for de in self.docket_entries.all():
@@ -746,19 +768,7 @@ class RECAPDocument(models.Model):
             'firm_id': set(),
             'firm': set(),
         })
-        from cl.people_db.models import Attorney, AttorneyOrganization
-        parties = docket.parties.prefetch_related(
-            Prefetch('attorneys',
-                     queryset=Attorney.objects.filter(
-                         roles__docket=docket
-                     ).distinct().only('pk', 'name'),
-                     to_attr='attys_in_docket'),
-            Prefetch('attys_in_docket__organizations',
-                     queryset=AttorneyOrganization.objects.filter(
-                         attorney_organization_associations__docket=docket
-                     ).distinct().only('pk', 'name'),
-                     to_attr='firms_in_docket'))
-        for p in parties:
+        for p in docket.prefetched_parties:
             out['party_id'].add(p.pk)
             out['party'].add(p.name)
             for a in p.attys_in_docket:
