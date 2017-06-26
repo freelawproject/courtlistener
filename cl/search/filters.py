@@ -48,7 +48,7 @@ class DocketFilter(FilterSet):
             'date_filed': DATE_LOOKUPS,
             'date_terminated': DATE_LOOKUPS,
             'date_last_filing': DATE_LOOKUPS,
-            'docket_number': ['exact'],
+            'docket_number': ['exact', 'startswith'],
             'pacer_case_id': ['exact'],
             'date_blocked': DATE_LOOKUPS,
             'blocked': ['exact'],
