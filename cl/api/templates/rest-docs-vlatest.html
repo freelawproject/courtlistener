@@ -139,7 +139,7 @@
 
 
         <h4 id="token-auth">Token Authentication</h4>
-        <p>To use your token, use the <code>Authentication</code> HTTP Header. The key should be prefixed by the string literal <code>Token</code>, with whitespace separating the two strings. For example:
+        <p>To use your token, use the <code>Authorization</code> HTTP Header. The key should be prefixed by the string literal <code>Token</code>, with whitespace separating the two strings. For example:
         </p>
         <pre class="scrollable">Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</pre>
         <p>Using curl, this looks like:</p>
