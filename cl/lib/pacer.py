@@ -13,6 +13,8 @@ from django.db import IntegrityError
 from django.db import transaction
 from django.db.models import Q
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
+from juriscraper.lib.exceptions import ParsingException
+from juriscraper.pacer.docket_utils import normalize_party_types
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 from lxml import etree
@@ -124,10 +126,6 @@ def get_blocked_status(docket, count_override=None):
     if all([small_case, docket.court.is_bankruptcy]):
         return True, date.today()
     return False, None
-
-
-class ParsingException(Exception):
-    pass
 
 
 class PacerXMLParser(object):
@@ -595,32 +593,6 @@ class PacerXMLParser(object):
             elif len(judges) > 1:
                 logger.info("Too many judges found: %s" % len(judges))
                 return None, s
-
-
-def normalize_party_types(t):
-    """Normalize various party types to as few as possible."""
-    t = t.lower()
-
-    # Numerical types
-    t = re.sub(r'defendant\s+\(\d+\)', r'defendant', t)
-    t = re.sub(r'debtor\s+\d+', 'debtor', t)
-
-    # Assorted other
-    t = re.sub(r'(thirdparty|3rd pty|3rd party)', r'third party', t)
-    t = re.sub(r'(fourthparty|4th pty|4th party)', r'fourth party', t)
-    t = re.sub(r'counter-(defendant|claimaint)', r'counter \1', t)
-    t = re.sub(r'\bus\b', 'u.s.', t)
-    t = re.sub(r'u\. s\.', 'u.s.', t)
-    t = re.sub(r'united states', 'u.s.', t)
-    t = re.sub(r'jointadmin', 'jointly administered', t)
-    t = re.sub(r'consolidated-debtor', 'consolidated debtor', t)
-    t = re.sub(r'plaintiff-? consolidated', 'consolidated plaintiff', t)
-    t = re.sub(r'defendant-? consolidated', 'consolidated defendant', t)
-    t = re.sub(r'intervenor-plaintiff', 'intervenor plaintiff', t)
-    t = re.sub(r'intervenor pla\b', 'intervenor plaintiff', t)
-    t = re.sub(r'intervenor dft\b', 'intervenor defendant', t)
-
-    return titlecase(t)
 
 
 def normalize_attorney_role(r):
