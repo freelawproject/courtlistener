@@ -215,7 +215,8 @@ class Command(BaseCommand):
         """
         queue = self.options['queue']
         start_at = self.options['start_at']
-        throttle = CeleryThrottle(min_items=50, queue_name=queue)
+        # Set low throttle. Higher values risk crashing Redis.
+        throttle = CeleryThrottle(min_items=30, queue_name=queue)
         processed_count = 0
         chunk = []
         for item in items:
@@ -223,9 +224,9 @@ class Command(BaseCommand):
             last_item = (count == processed_count)
             if processed_count < start_at:
                 continue
-            throttle.maybe_wait()
             chunk.append(item)
             if processed_count % chunksize == 0 or last_item:
+                throttle.maybe_wait()
                 add_or_update_items.apply_async(args=(chunk, self.solr_url),
                                                 queue=queue)
                 chunk = []
@@ -233,7 +234,7 @@ class Command(BaseCommand):
                     processed_count,
                     count,
                     processed_count * 1.0 / count,
-                ))
+                    ))
                 self.stdout.flush()
         self.stdout.write('\n')
 
@@ -349,92 +350,11 @@ class Command(BaseCommand):
             q = [item for item in q if item.is_judge]
             count = len(q)
         elif self.type == RECAPDocument:
-            q = self.type.objects.all().prefetch_related(
-                # IDs
-                'docket_entry__pk',
-                'docket_entry__docket__pk',
-                'docket_entry__docket__court__pk',
-                'docket_entry__docket__assigned_to__pk',
-                'docket_entry__docket__referred_to__pk',
-
-                # Docket Entry
-                'docket_entry__description',
-                'docket_entry__entry_number',
-                'docket_entry__date_filed',
-
-                # Docket
-                'docket_entry__docket__date_argued',
-                'docket_entry__docket__date_filed',
-                'docket_entry__docket__date_terminated',
-                'docket_entry__docket__docket_number',
-                'docket_entry__docket__case_name_short',
-                'docket_entry__docket__case_name',
-                'docket_entry__docket__case_name_full',
-                'docket_entry__docket__nature_of_suit',
-                'docket_entry__docket__cause',
-                'docket_entry__docket__jury_demand',
-                'docket_entry__docket__jurisdiction_type',
-                'docket_entry__docket__slug',
-
-                # Judges
-                'docket_entry__docket__assigned_to__name_first',
-                'docket_entry__docket__assigned_to__name_middle',
-                'docket_entry__docket__assigned_to__name_last',
-                'docket_entry__docket__assigned_to__name_suffix',
-                'docket_entry__docket__assigned_to_str',
-                'docket_entry__docket__referred_to__name_first',
-                'docket_entry__docket__referred_to__name_middle',
-                'docket_entry__docket__referred_to__name_last',
-                'docket_entry__docket__referred_to__name_suffix',
-                'docket_entry__docket__referred_to_str',
-
-                # Court
-                'docket_entry__docket__court__full_name',
-                'docket_entry__docket__court__citation_string',
-
-                # Party, attorney, firm
-                'docket_entry__docket__parties__pk',
-                'docket_entry__docket__parties__name',
-            )
+            q = self.type.objects.all()
             count = q.count()
             q = queryset_generator(q, chunksize=5000)
         elif self.type == Docket:
-            q = Docket.objects.filter(
-                source__in=Docket.RECAP_SOURCES
-            ).prefetch_related(
-                # IDs
-                'docket_entries__pk',
-                'assigned_to__pk',
-                'referred_to__pk',
-
-                # Court
-                'court__full_name',
-                'court__citation_string',
-                'court__id',
-
-                # Judges
-                'assigned_to__name_first',
-                'assigned_to__name_middle',
-                'assigned_to__name_last',
-                'assigned_to__name_suffix',
-                'referred_to__name_first',
-                'referred_to__name_middle',
-                'referred_to__name_last',
-                'referred_to__name_suffix',
-
-                # Docket entries
-                'docket_entries__description',
-                'docket_entries__entry_number',
-                'docket_entries__date_filed',
-
-                # Parties, attorneys, firms
-                'parties__pk',
-                'parties__name',
-                'parties__attorneys__pk',
-                'parties__attorneys__name',
-                'parties__attorneys__organizations__pk',
-                'parties__attorneys__organizations__name',
-            )
+            q = Docket.objects.filter(source__in=Docket.RECAP_SOURCES)
             count = q.count()
             q = queryset_generator(q, chunksize=5000)
         else:
