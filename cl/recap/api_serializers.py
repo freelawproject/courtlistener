@@ -16,4 +16,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProcessingQueue
-        exclude = ('uploader',)
+        exclude = (
+            'uploader',        # Private
+        )
+        extra_kwargs = {'filepath_local': {'write_only': True}}
