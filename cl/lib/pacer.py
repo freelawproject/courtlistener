@@ -19,8 +19,7 @@ from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 from lxml import etree
 
-from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
-from cl.lib.import_lib import find_person
+from cl.lib.import_lib import get_candidate_judges
 from cl.lib.recap_utils import (
     get_docketxml_url_from_path, get_ia_document_url_from_path,
     get_local_document_url_from_path,
@@ -117,6 +116,11 @@ def get_blocked_status(docket, count_override=None):
     whether the item should be private. The second is the date of the privacy
     decision (today) or None if the item should not be private.
     """
+    if getattr(docket, 'blocked', False):
+        # Short circuit. This function can only make things blocked that were
+        # previously public.
+        return docket.blocked, docket.date_blocked
+
     bankruptcy_privacy_threshold = 500
     if count_override is not None:
         count = count_override
@@ -577,21 +581,12 @@ class PacerXMLParser(object):
             logger.info("Couldn't get judge for node: %s" % node)
             return None, ''
         else:
-            judge_names = find_judge_names(s)
-            judges = []
-            for judge_name in judge_names:
-                judges.append(find_person(judge_name, self.court.pk,
-                                          case_date=self.date_filed))
-            judges = [c for c in judges if c is not None]
+            judges = get_candidate_judges(s, self.court.pk, self.date_filed)
             if len(judges) == 0:
-                logger.info("No judge for: %s" % (
-                    (s, self.court.pk, self.date_filed),
-                ))
                 return None, s
             elif len(judges) == 1:
                 return judges[0], s
-            elif len(judges) > 1:
-                logger.info("Too many judges found: %s" % len(judges))
+            else:
                 return None, s
 
 
