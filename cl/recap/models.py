@@ -29,9 +29,9 @@ class ProcessingQueue(models.Model):
     ATTACHMENT_PAGE = 2
     PDF = 3
     UPLOAD_TYPES = (
-        (DOCKET, 'HTML docket source'),
+        (DOCKET, 'HTML Docket'),
         (ATTACHMENT_PAGE, 'HTML attachment page'),
-        (PDF, 'PACER PDF'),
+        (PDF, 'PDF'),
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -95,13 +95,22 @@ class ProcessingQueue(models.Model):
     )
 
     def __unicode__(self):
-        return u'ProcessingQueue %s: %s.%s.%s.%s' % (
-            self.pk,
-            self.court_id,
-            self.pacer_case_id,
-            self.document_number,
-            self.attachment_number
-        )
+        if self.upload_type == self.DOCKET:
+            return u'ProcessingQueue %s: %s case #%s (%s)' % (
+                self.pk,
+                self.court_id,
+                self.pacer_case_id,
+                self.get_upload_type_display(),
+            )
+        elif self.upload_type == self.PDF:
+            return u'ProcessingQueue %s: %s.%s.%s.%s (%s)' % (
+                self.pk,
+                self.court_id,
+                self.pacer_case_id or None,
+                self.document_number or None,
+                self.attachment_number or 0,
+                self.get_upload_type_display(),
+            )
 
     class Meta:
         permissions = (
