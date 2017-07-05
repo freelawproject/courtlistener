@@ -15,7 +15,7 @@ from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.alerts.models import RealTimeQueue
-from cl.lib.import_lib import get_candidate_judge_objects
+from cl.lib.import_lib import get_candidate_judges
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import ErrorLog
@@ -147,7 +147,7 @@ class Command(BaseCommand):
         cluster.docket = docket
         cluster.save(index=False)  # Index only when the opinion is associated.
         if cluster.judges:
-            candidate_judges = get_candidate_judge_objects(
+            candidate_judges = get_candidate_judges(
                 cluster.judges,
                 docket.court.pk,
                 cluster.date_filed,

@@ -9,7 +9,7 @@ from juriscraper.AbstractSite import logger
 
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
-from cl.lib.import_lib import get_candidate_judge_objects, get_scotus_judges
+from cl.lib.import_lib import get_candidate_judges, get_scotus_judges
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
@@ -81,7 +81,7 @@ class Command(cl_scrape_opinions.Command):
         candidate_judges = []
         if af.docket.court_id != 'scotus':
             if af.judges:
-                candidate_judges = get_candidate_judge_objects(
+                candidate_judges = get_candidate_judges(
                     af.judges,
                     docket.court.pk,
                     af.docket.date_argued,
