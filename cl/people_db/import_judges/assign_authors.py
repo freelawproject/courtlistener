@@ -8,7 +8,7 @@ Created on Fri Mar 18 18:27:09 2016
 from unidecode import unidecode
 
 from cl.audio.models import Audio
-from cl.lib.import_lib import get_candidate_judge_objects
+from cl.lib.import_lib import get_candidate_judges
 from cl.search.models import OpinionCluster
 
 
@@ -39,9 +39,9 @@ def assign_authors_to_opinions(jurisdictions=None, testing=False):
                 opinion.save(index=False)
             continue
 
-        candidates = get_candidate_judge_objects(judge_str,
-                                                 cluster.docket.court_id,
-                                                 cluster.date_filed)
+        candidates = get_candidate_judges(judge_str,
+                                          cluster.docket.court_id,
+                                          cluster.date_filed)
         if len(candidates) < 1:
             # No DB matches
             print u'  No match.'
@@ -70,8 +70,8 @@ def assign_authors_to_oral_arguments(testing=False):
         judge_str = unidecode(af.judges)
         print "  Judge string: %s" % judge_str
 
-        candidates = get_candidate_judge_objects(judge_str, af.docket.court_id,
-                                                 af.docket.date_argued)
+        candidates = get_candidate_judges(judge_str, af.docket.court_id,
+                                          af.docket.date_argued)
         for candidate in candidates:
             if not testing:
                 af.panel.add(candidate)
