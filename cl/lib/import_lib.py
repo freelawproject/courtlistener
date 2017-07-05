@@ -124,10 +124,19 @@ def find_person(name_last, court_id, name_first=None, case_date=None,
         )
 
 
-def get_candidate_judge_objects(judge_str, court_id, event_date):
-    """Take a string of text in a time and place and figure out which judges
-    match up to it.
+def get_candidate_judges(judge_str, court_id, event_date):
+    """Figure out who a judge is from a string and some metadata.
+
+    :param judge_str: A string containing the judge's name.
+    :param court_id: A CL Court ID where the case occurred.
+    :param event_date: The date of the case.
+    :return: Tuple consisting of (Judge, judge_str), where Judge is a judge 
+    object or None if a judge cannot be identified, and s is the original string 
+    passed in.
     """
+    if not judge_str:
+        return None
+
     judges = find_judge_names(judge_str)
 
     if len(judges) == 0:
