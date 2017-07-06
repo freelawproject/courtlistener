@@ -3,16 +3,26 @@ import logging
 import os
 
 from django.core.files.base import ContentFile
+from django.db.models import Q
 from django.utils import timezone
+from juriscraper.lib.string_utils import CaseNameTweaker
+from juriscraper.pacer import DocketReport
 
 from cl.celery import app
+from cl.lib.import_lib import get_candidate_judges
+from cl.lib.pacer import map_cl_to_pacer_id, normalize_attorney_contact, \
+    normalize_attorney_role, get_blocked_status
 from cl.lib.recap_utils import get_document_filename
+from cl.lib.utils import remove_duplicate_dicts
+from cl.people_db.models import Party, PartyType, Attorney, \
+    AttorneyOrganization, AttorneyOrganizationAssociation, Role
 from cl.recap.models import ProcessingQueue
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import Docket, RECAPDocument, DocketEntry
 from cl.search.tasks import add_or_update_recap_document
 
 logger = logging.getLogger(__name__)
+cnt = CaseNameTweaker()
 
 
 def process_recap_upload(pq):
@@ -22,7 +32,7 @@ def process_recap_upload(pq):
     accordingly.
     """
     if pq.upload_type == pq.DOCKET:
-        pass
+        process_recap_docket.delay(pq.pk)
     elif pq.upload_type == pq.ATTACHMENT_PAGE:
         pass
     elif pq.upload_type == pq.PDF:
@@ -36,6 +46,7 @@ def process_recap_pdf(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     pq.status = pq.PROCESSING_IN_PROGRESS
     pq.save()
+    logger.info("Processing RECAP item: %s" % pq)
     try:
         rd = RECAPDocument.objects.get(
             docket_entry__docket__pacer_case_id=pq.pacer_case_id,
@@ -64,14 +75,13 @@ def process_recap_pdf(self, pk):
             pq.error_message = msg
             pq.status = pq.PROCESSING_FAILED
             pq.save()
+            return None
         else:
             # Got the Docket, attempt to get/create the DocketEntry, and then
             # create the RECAPDocument
             try:
-                de = DocketEntry.objects.get(
-                    docket=d,
-                    entry_number=pq.document_number
-                )
+                de = DocketEntry.objects.get(docket=d,
+                                             entry_number=pq.document_number)
             except DocketEntry.DoesNotExist as exc:
                 logger.warning("Unable to find docket entry for processing "
                                "queue '%s'. Retrying if max_retries is not "
@@ -115,7 +125,7 @@ def process_recap_pdf(self, pk):
             rd.docket_entry.docket.court_id,
             rd.docket_entry.docket.pacer_case_id,
             rd.document_number,
-            rd.attachment_number
+            rd.attachment_number,
         )
         rd.filepath_local.save(file_name, cf, save=False)
         rd.is_available = True
@@ -139,417 +149,242 @@ def process_recap_pdf(self, pk):
 
     return rd
 
-# doc_re = ParsePacer.doc_re
-# ca_doc_re = ParsePacer.ca_doc_re
-#
-#
-# def is_doc1_path(path):
-#     """ Returns true if path is exactly a doc1 path.
-#           e.g. /doc1/1234567890
-#     """
-#     return bool(doc_re.search(path) or ca_doc_re.search(path))
-#
-#
-# def is_doc1_html(filename, mimetype, url, casenum):
-#     """ Returns true if the metadata indicates a doc1 HTML file. """
-#     return all([
-#         is_doc1_path(filename),
-#         is_html(mimetype),
-#         url is None,
-#         casenum is None,
-#     ])
-#
-#
-# def docid_from_url_name(url):
-#     """ Extract the docid from a PACER URL name.
-#
-#     CA sometimes have: /cmecf/servlet/TransportRoom?servlet=ShowDoc&dls_id=00404800657&caseId=124912&dktType=dktPublic
-#     """
-#     if doc_re.search(url):
-#         return ParsePacer.coerce_docid(doc_re.search(url).group(1))
-#     if ca_doc_re.search(url):
-#         return ca_doc_re.search(url).group(1) or ca_doc_re.search(url).group(2)
-#     raise ValueError('docid_from_url_name')
-#
-#
-# def handle_upload(data, court, casenum, mimetype, url, team_name):
-#     """ Main handler for uploaded data. """
-#
-#     logging.debug('handle_upload %s %s %s %s', court, casenum, mimetype, url)
-#
-#     try:
-#         filename = data['filename']
-#         filebits = data['content']
-#     except KeyError:
-#         message = "No data 'filename' or 'content' attribute."
-#         logging.error("handle_upload: %s" % message)
-#         return "upload: %s" % message
-#
-#     if is_pdf(mimetype):
-#         message = handle_pdf(filebits, court, url, team_name)
-#
-#     elif is_doc1_html(filename, mimetype, url, casenum):
-#         message = handle_doc1(filebits, court, filename, team_name)
-#
-#     elif is_html(mimetype):
-#         message = handle_docket(filebits, court, casenum, filename, team_name)
-#
-#     else:
-#         message = "couldn't recognize file type %s" % (mimetype)
-#         logging.error("handle_upload: %s" % message)
-#         return "upload: %s" % message
-#
-#     return message
-#
-#
-# def handle_pdf(filebits, court, url, team_name):
-#     """ Write PDF file metadata into the database. """
-#
-#     # Parse coerced docid out of url
-#     try:
-#         docid = docid_from_url_name(url)
-#     except ValueError:
-#         logging.warning("handle_pdf: no url available to get docid")
-#         return "upload: pdf failed. no url supplied."
-#
-#     # Lookup based on docid b/c it's the only metadata we have
-#     # Document exists if we've previously parsed the case's docket
-#     query = Document.objects.filter(docid=docid)
-#     try:
-#         doc = query[0]
-#     except IndexError:
-#         logging.info("handle_pdf: haven't yet seen docket %s" % docid)
-#         return "upload: pdf ignored because we don't have docket %s" % docid
-#     else:
-#         # Sanity check
-#         if doc.court != court:
-#             logging.error("handle_pdf: court mismatch (%s, %s) %s" %
-#                           (court, doc.court, url))
-#             return "upload: pdf metadata mismatch."
-#
-#         casenum = doc.casenum
-#         docnum = doc.docnum
-#         subdocnum = doc.subdocnum
-#         sha1 = doc.sha1
-#
-#     # Docket with updated sha1, available, and upload_date
-#     docket = DocketXML.make_docket_for_pdf(filebits, court, casenum,
-#                                            docnum, subdocnum, available=0)
-#     DocumentManager.update_local_db(docket, team_name=team_name)
-#
-#     if docket.get_document_sha1(docnum, subdocnum) != sha1:
-#
-#         # Upload the file -- either doesn't exist on IA or has different sha1
-#
-#         # Gather all the additional metadata we have
-#         #   - from the docket we just made
-#         doc_meta = docket.get_document_metadict(docnum, subdocnum)
-#         #   - from the database, if available
-#         if doc.docid:
-#             doc_meta["pacer_doc_id"] = doc.docid
-#         if doc.de_seq_num:
-#             doc_meta["pacer_de_seq_num"] = doc.de_seq_num
-#         if doc.dm_id:
-#             doc_meta["pacer_dm_id"] = doc.dm_id
-#
-#         # Push the file to IA
-#         IA.put_file(filebits, court, casenum, docnum, subdocnum, doc_meta)
-#
-#     # Whether we uploaded the file, push the docket update to IA.
-#     do_me_up(docket)
-#
-#     logging.info("handle_pdf: uploaded %s.%s.%s.%s.pdf" % (court, casenum,
-#                                                            docnum, subdocnum))
-#     message = "pdf uploaded."
-#
-#     response = {"message": message}
-#
-#     return simplejson.dumps(response)
-#
-#
-# def handle_docket(filebits, court, casenum, filename, team_name):
-#     """ Parse HistDocQry and DktRpt HTML files for metadata."""
-#
-#     logging.debug('handle_docket: %s %s %s', court, casenum, filename)
-#
-#     histdocqry_re = re.compile(r"HistDocQry_?\d*\.html$")
-#     dktrpt_re = re.compile(r".*DktRpt_?\d*\.html$")
-#
-#     if histdocqry_re.match(filename):
-#         if casenum:
-#             return handle_histdocqry(filebits, court, casenum, team_name)
-#         else:
-#             message = "docket has no casenum."
-#             logging.error("handle_upload: %s" % message)
-#             return "upload: %s" % message
-#     elif dktrpt_re.match(filename):
-#         if casenum:
-#             return handle_dktrpt(filebits, court, casenum, team_name)
-#         else:
-#             message = "docket has no casenum."
-#             logging.error("handle_upload: %s" % message)
-#             return "upload: %s" % message
-#     elif filename == 'Summary':
-#         return handle_cadkt(filebits, court, casenum, team_name)
-#     elif filename == 'FullDocketReport':
-#         return handle_cadkt(filebits, court, casenum, team_name, is_full=True)
-#
-#     message = "unrecognized docket file."
-#     logging.error("handle_docket: %s %s" % (message, filename))
-#     return "upload: %s" % message
-#
-#
-# def handle_cadkt(filebits, court, casenum, team_name, is_full=False):
-#     docket = ParsePacer.parse_cadkt(filebits, court, casenum, is_full)
-#
-#     if not docket:
-#         return "upload: could not parse docket."
-#
-#     # Merge the docket with IA
-#     do_me_up(docket)
-#
-#     # Update the local DB
-#     DocumentManager.update_local_db(docket, team_name=team_name)
-#
-#     response = {"cases": _get_cases_dict(casenum, docket),
-#                 "documents": _get_documents_dict(court, casenum),
-#                 "message": "DktRpt successfully parsed."}
-#     message = simplejson.dumps(response)
-#
-#     return message
-#
-#
-# def handle_dktrpt(filebits, court, casenum, team_name):
-#     if config.DUMP_DOCKETS and re.search(config.DUMP_DOCKETS_COURT_REGEX,
-#                                          court):
-#         logging.info("handle_dktrpt: Dumping docket %s.%s for debugging" % (
-#             court, casenum))
-#         _dump_docket_for_debugging(filebits, court, casenum)
-#
-#     docket = ParsePacer.parse_dktrpt(filebits, court, casenum)
-#
-#     if not docket:
-#         return "upload: could not parse docket."
-#
-#     # Merge the docket with IA
-#     do_me_up(docket)
-#
-#     # Update the local DB
-#     DocumentManager.update_local_db(docket, team_name=team_name)
-#
-#     response = {"cases": _get_cases_dict(casenum, docket),
-#                 "documents": _get_documents_dict(court, casenum),
-#                 "message": "DktRpt successfully parsed."}
-#     message = simplejson.dumps(response)
-#
-#     return message
-#
-#
-# def handle_histdocqry(filebits, court, casenum, team_name):
-#     docket = ParsePacer.parse_histdocqry(filebits, court, casenum)
-#
-#     if not docket:
-#         return "upload: could not parse docket."
-#
-#     # Merge the docket with IA
-#     do_me_up(docket)
-#
-#     # Update the local DB
-#     DocumentManager.update_local_db(docket, team_name=team_name)
-#
-#     response = {"cases": _get_cases_dict(casenum, docket),
-#                 "documents": _get_documents_dict(court, casenum),
-#                 "message": "HistDocQry successfully parsed."}
-#
-#     message = simplejson.dumps(response)
-#
-#     return message
-#
-#
-# def handle_doc1(filebits, court, filename, team_name):
-#     """ Write HTML (doc1) file metadata into the database. """
-#
-#     logging.debug('handle_doc1 %s %s', court, filename)
-#
-#     docid = docid_from_url_name(filename)
-#
-#     query = Document.objects.filter(docid=docid)
-#
-#     try:
-#         main_doc = query[0]
-#     except IndexError:
-#         logging.info("handle_doc1: unknown docid %s" % (docid))
-#         return "upload: doc1 ignored."
-#     else:
-#         casenum = main_doc.casenum
-#         main_docnum = main_doc.docnum
-#
-#         # Sanity check
-#         if court != main_doc.court:
-#             logging.error("handle_doc1: court mismatch (%s, %s) %s" %
-#                           (court, main_doc.court, docid))
-#             return "upload: doc1 metadata mismatch."
-#
-#     if ParsePacer.is_appellate(court):
-#         docket = ParsePacer.parse_ca_doc1(filebits, court, casenum,
-#                                           main_docnum)
-#     else:
-#         docket = ParsePacer.parse_doc1(filebits, court, casenum, main_docnum)
-#
-#     if docket:
-#         # Merge the docket with IA
-#         do_me_up(docket)
-#         # Update the local DB
-#         DocumentManager.update_local_db(docket, team_name=team_name)
-#
-#     response = {"cases": _get_cases_dict(casenum, docket),
-#                 "documents": _get_documents_dict(court, casenum),
-#                 "message": "doc1 successfully parsed."}
-#     message = simplejson.dumps(response)
-#     return message
-#
-#
-# def do_me_up(docket):
-#     """ Download, merge and update the docket with IA. """
-#     # Pickle this object for do_me_up by the cron process.
-#
-#     court = docket.get_court()
-#     casenum = docket.get_casenum()
-#
-#     docketname = IACommon.get_docketxml_name(court, casenum)
-#
-#     # Check if this docket is already scheduled to be processed.
-#     query = PickledPut.objects.filter(filename=docketname)
-#
-#     try:
-#         ppentry = query[0]
-#     except IndexError:
-#         # Not already scheduled, so schedule it now.
-#         ppentry = PickledPut(filename=docketname, docket=1)
-#
-#         try:
-#             ppentry.save()
-#         except IntegrityError:
-#             # Try again.
-#             do_me_up(docket)
-#         else:
-#             # Pickle this object.
-#             pickle_success, msg = IA.pickle_object(docket, docketname)
-#
-#             if pickle_success:
-#                 # Ready for processing.
-#                 ppentry.ready = 1
-#                 ppentry.save()
-#
-#                 logging.info("do_me_up: ready. %s" % (docketname))
-#             else:
-#                 # Pickle failed, remove from DB.
-#                 ppentry.delete()
-#                 logging.error("do_me_up: %s %s" % (msg, docketname))
-#
-#     else:
-#         # Already scheduled.
-#         # If there is a lock for this case, it's being uploaded. Don't merge now
-#         locked = BucketLockManager.lock_exists(court, casenum)
-#         if ppentry.ready and not locked:
-#             # Docket is waiting to be processed by cron job.
-#
-#             # Revert state back to 'not ready' so we can do local merge.
-#             ppentry.ready = 0
-#             ppentry.save()
-#
-#             # Fetch and unpickle the waiting docket.
-#             prev_docket, unpickle_msg = IA.unpickle_object(docketname)
-#
-#             if prev_docket:
-#
-#                 # Do the local merge.
-#                 prev_docket.merge_docket(docket)
-#
-#                 # Pickle it back
-#                 pickle_success, pickle_msg = \
-#                     IA.pickle_object(prev_docket, docketname)
-#
-#                 if pickle_success:
-#                     # Merged and ready.
-#                     ppentry.ready = 1
-#                     ppentry.save()
-#                     logging.info(
-#                         "do_me_up: merged and ready. %s" % (docketname))
-#                 else:
-#                     # Re-pickle failed, delete.
-#                     ppentry.delete()
-#                     logging.error("do_me_up: re-%s %s" % (pickle_msg,
-#                                                           docketname))
-#
-#             else:
-#                 # Unpickle failed
-#                 ppentry.delete()
-#                 IA.delete_pickle(docketname)
-#                 logging.error("do_me_up: %s %s" % (unpickle_msg, docketname))
-#
-#
-#         # Ignore if in any of the other three possible state...
-#         # because another cron job is already doing work on this entity
-#         # Don't delete DB entry or pickle file.
-#         elif ppentry.ready and locked:
-#             pass
-#             #logging.debug("do_me_up: %s discarded, processing conflict." %
-#             #              (docketname))
-#         elif not ppentry.ready and not locked:
-#             pass
-#             #logging.debug("do_me_up: %s discarded, preparation conflict." %
-#             #              (docketname))
-#         else:
-#             logging.error("do_me_up: %s discarded, inconsistent state." %
-#                           (docketname))
-#
-#
-# def _get_cases_dict(casenum, docket):
-#     """ Create a dict containing the info for the case specified """
-#     cases = {casenum: {}}
-#     try:
-#         docketnum = docket.casemeta["docket_num"]
-#     except (KeyError, AttributeError):
-#         docketnum = ""
-#
-#     cases[casenum]["officialcasenum"] = docketnum
-#
-#     return cases
-#
-#
-# def _get_documents_dict(court, casenum):
-#     """ Create a dict containing the info for the docs specified """
-#     documents = {}
-#
-#     query = Document.objects.filter(court=court, casenum=casenum)
-#     if query:
-#         for document in query:
-#             if document.docid:
-#                 docmeta = {"casenum": document.casenum,
-#                            "docnum": document.docnum,
-#                            "subdocnum": document.subdocnum}
-#
-#                 if document.available:
-#                     docmeta.update(
-#                         {"filename": IACommon.get_pdf_url(document.court,
-#                                                           document.casenum,
-#                                                           document.docnum,
-#                                                           document.subdocnum),
-#                          "timestamp": document.lastdate.strftime("%m/%d/%y")})
-#                 documents[document.docid] = docmeta
-#     return documents
-#
-#
-# def _dump_docket_for_debugging(filebits, court, casenum):
-#     docketdump_dir = ROOT_PATH + '/debugdockets/'
-#
-#     if len(os.listdir(docketdump_dir)) > config['MAX_NUM_DUMP_DOCKETS']:
-#         return
-#
-#     dumpfilename = ".".join([court, casenum, "html"])
-#
-#     f = open(docketdump_dir + dumpfilename, 'w')
-#     f.write(filebits)
-#     f.close()
-#
+
+def add_attorney(atty, p, d):
+    """Add/update an attorney.
+     
+    Given an attorney node, and a party and a docket object, add the attorney
+    to the database or link the attorney to the new docket. Also add/update the
+    attorney organization, and the attorney's role in the case.
+    
+    :param atty: A dict representing an attorney, as provided by Juriscraper.
+    :param p: A Party object
+    :param d: A Docket object
+    :return: None if there's an error, or an Attorney object if not.
+    """
+    newest_docket_date = max([dt for dt in [d.date_filed, d.date_terminated,
+                                            d.date_last_filing] if dt])
+    atty_org_info, atty_info = normalize_attorney_contact(
+        atty['contact'],
+        fallback_name=atty['name'],
+    )
+    try:
+        q = Q()
+        fields = {
+            ('phone', atty_info['phone']),
+            ('fax', atty_info['fax']),
+            ('email', atty_info['email']),
+            ('contact_raw', atty['contact']),
+            ('organizations__lookup_key', atty_org_info.get('lookup_key')),
+        }
+        for field, lookup in fields:
+            if lookup:
+                q |= Q(**{field: lookup})
+        a, created = Attorney.objects.filter(
+            Q(name=atty['name']) & q,
+        ).get_or_create(
+            defaults={
+                'name': atty['name'],
+                'date_sourced': newest_docket_date,
+                'contact_raw': atty['contact'],
+            },
+        )
+    except Attorney.MultipleObjectsReturned:
+        logger.info("Got too many results for attorney: '%s'. Punting." % atty)
+        return None
+
+    # Associate the attorney with an org and update their contact info.
+    if atty['contact']:
+        if atty_org_info:
+            logger.info("Adding organization information to '%s': '%s'" %
+                        (atty['name'], atty_org_info))
+            try:
+                org = AttorneyOrganization.objects.get(
+                    lookup_key=atty_org_info['lookup_key'],
+                )
+            except AttorneyOrganization.DoesNotExist:
+                org = AttorneyOrganization.objects.create(**atty_org_info)
+
+            # Add the attorney to the organization
+            AttorneyOrganizationAssociation.objects.get_or_create(
+                attorney=a,
+                attorney_organization=org,
+                docket=d,
+            )
+
+        docket_info_is_newer = (a.date_sourced <= newest_docket_date)
+        if atty_info and docket_info_is_newer:
+            logger.info("Updating atty info because %s is more recent than %s."
+                        % (newest_docket_date, a.date_sourced))
+            a.date_sourced = newest_docket_date
+            a.contact_raw = atty['contact']
+            a.email = atty_info['email']
+            a.phone = atty_info['phone']
+            a.fax = atty_info['fax']
+            a.save()
+
+    # Do roles
+    atty_roles = [normalize_attorney_role(r) for r in atty['roles']]
+    atty_roles = filter(lambda r: r['role'] is not None, atty_roles)
+    atty_roles = remove_duplicate_dicts(atty_roles)
+    if len(atty_roles) > 0:
+        logger.info("Linking attorney '%s' to party '%s' via %s roles: %s" %
+                    (atty['name'], p.name, len(atty_roles), atty_roles))
+    else:
+        logger.info("No role data parsed. Linking via 'UNKNOWN' role.")
+        atty_roles = [{'role': Role.UNKNOWN, 'date_action': None}]
+
+    # Delete the old roles, replace with new.
+    Role.objects.filter(attorney=a, party=p, docket=d).delete()
+    Role.objects.bulk_create([
+        Role(attorney=a, party=p, docket=d, **atty_role) for
+        atty_role in atty_roles
+    ])
+    return a
+
+
+def update_docket_metadata(d, docket_data):
+    """Update the Docket object with the data from Juriscraper"""
+    d.docket_number = d.docket_number or docket_data['docket_number']
+    d.pacer_case_id = d.pacer_case_id or docket_data['pacer_case_id']
+    d.date_filed = d.date_filed or docket_data['date_filed']
+    d.date_terminated = d.date_terminated or docket_data['date_terminated']
+    d.case_name = d.case_name or docket_data['case_name']
+    d.case_name_short = d.case_name_short or cnt.make_case_name_short(d.case_name)
+    d.cause = d.cause or docket_data['cause']
+    d.nature_of_suit = d.nature_of_suit or docket_data['nature_of_suit']
+    d.jury_demand = d.jury_demand or docket_data['jury_demand']
+    d.jurisdiction_type = d.jurisdiction_type or docket_data['jurisdiction']
+    judges = get_candidate_judges(docket_data.get('assigned_to_str'), d.court_id,
+                                  docket_data['date_filed'])
+    if judges is not None and len(judges) == 1:
+        d.assigned_to = judges[0]
+    d.assigned_to_str = docket_data.get('assigned_to_str') or ''
+    judges = get_candidate_judges(docket_data.get('referred_to_str'), d.court_id,
+                                  docket_data['date_filed'])
+    if judges is not None and len(judges) == 1:
+        d.referred_to = judges[0]
+    d.referred_to_str = docket_data.get('referred_to_str') or ''
+    d.blocked, d.date_blocked = get_blocked_status(d)
+    return d
+
+
+@app.task
+def process_recap_docket(pk):
+    pq = ProcessingQueue.objects.get(pk=pk)
+    pq.status = pq.PROCESSING_IN_PROGRESS
+    pq.save()
+    logger.info("Processing RECAP item: %s" % pq)
+
+    report = DocketReport(map_cl_to_pacer_id(pq.court_id))
+    text = pq.filepath_local.read().decode('utf-8')
+    report.parse_text(text)
+    docket_data = report.data
+    logger.info("Parsing completed of item %s" % pq)
+
+    # Merge the contents of the docket into CL
+    try:
+        d = Docket.objects.get(
+            Q(pacer_case_id=pq.pacer_case_id) |
+            Q(docket_number=docket_data['docket_number']),
+            court_id=pq.court_id,
+        )
+        # Add RECAP as a source if it's not already.
+        if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
+            d.source = Docket.RECAP_AND_SCRAPER
+        elif d.source == Docket.COLUMBIA:
+            d.source = Docket.COLUMBIA_AND_RECAP
+        elif d.source == Docket.COLUMBIA_AND_SCRAPER:
+            d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
+    except Docket.DoesNotExist:
+        d = Docket(
+            source=Docket.RECAP,
+            pacer_case_id=pq.pacer_case_id,
+            court_id=pq.court_id
+        )
+    except Docket.MultipleObjectsReturned:
+        msg = "Too many dockets found when trying to look up '%s'" % pq
+        logger.error(msg)
+        pq.error_message = msg
+        pq.status = pq.PROCESSING_FAILED
+        pq.save()
+        return None
+
+    update_docket_metadata(d, docket_data)
+    d.save()
+
+    # Docket entries
+    for docket_entry in docket_data['docket_entries']:
+        try:
+            de, created = DocketEntry.objects.update_or_create(
+                docket=d,
+                entry_number=docket_entry['document_number'],
+                defaults={
+                    'description': docket_entry['description'],
+                    'date_filed': docket_entry['date_filed'],
+                }
+            )
+        except DocketEntry.MultipleObjectsReturned:
+            logger.error(
+                "Multiple docket entries found for document entry number '%s' "
+                "while processing '%s'" % (docket_entry['document_number'], pq)
+            )
+            continue
+
+        # Then make the RECAPDocument object. Try to find it. If we do, update
+        # the pacer_doc_id field if it's blank. If we can't find it, create it
+        # or throw an error.
+        try:
+            rd = RECAPDocument.objects.get(
+                docket_entry=de,
+                # No attachments when uploading dockets.
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                document_number=docket_entry['document_number'],
+            )
+        except RECAPDocument.DoesNotExist:
+            RECAPDocument.objects.create(
+                docket_entry=de,
+                # No attachments when uploading dockets.
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                document_number=docket_entry['document_number'],
+                pacer_doc_id=docket_entry['pacer_doc_id'],
+                is_available=False,
+            )
+        except RECAPDocument.MultipleObjectsReturned:
+            logger.error(
+                "Multiple recap documents found for document entry number'%s' "
+                "while processing '%s'" % (docket_entry['document_number'], pq)
+            )
+            continue
+        else:
+            rd.pacer_doc_id = rd.pacer_doc_id or docket_entry.pacer_doc_id
+
+    # Parties
+    for party in docket_data['parties']:
+        try:
+            p = Party.objects.get(name=party['name'])
+        except Party.DoesNotExist:
+            p = Party.objects.create(
+                name=party['name'],
+                extra_info=party['extra_info'],
+            )
+        except Party.MultipleObjectsReturned:
+            continue
+        else:
+            if party['extra_info']:
+                p.extra_info = party['extra_info']
+                p.save()
+
+        # If the party type doesn't exist, make a new one.
+        if not p.party_types.filter(docket=d, name=party['type']).exists():
+            PartyType.objects.create(docket=d, party=p, name=party['type'])
+
+        # Attorneys
+        for atty in party.get('attorneys', []):
+            add_attorney(atty, p, d)
+
+    pq.error_message = ''  # Clear out errors b/c successful
+    pq.status = pq.PROCESSING_SUCCESSFUL
+    pq.save()
+
+    return d

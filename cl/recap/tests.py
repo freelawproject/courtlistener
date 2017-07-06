@@ -1,7 +1,11 @@
 # coding=utf-8
 import json
+import os
 
 import mock
+from datetime import date
+
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -11,8 +15,10 @@ from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_201_CREATED, \
     HTTP_401_UNAUTHORIZED
 from rest_framework.test import APIClient
 
+from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
+    Attorney, Role
 from cl.recap.models import ProcessingQueue
-from cl.recap.tasks import process_recap_pdf
+from cl.recap.tasks import process_recap_pdf, add_attorney, process_recap_docket
 from cl.search.models import Docket, RECAPDocument, DocketEntry
 
 
@@ -49,7 +55,7 @@ class RecapUploadsTest(TestCase):
 
     def test_uploading_non_ascii(self, mock):
         """Can we handle it if a client sends non-ascii strings?"""
-        self.data['document_number'] = '☠☠☠'
+        self.data['document_number'] = u'☠☠☠'
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         mock.assert_called()
@@ -193,6 +199,177 @@ class RecapPdfTaskTest(TestCase):
         # working, the correct status is self.pq.PROCESSING_FAILED.
         self.assertEqual(self.pq.status, self.pq.QUEUED_FOR_RETRY)
         self.assertIn('Unable to find docket', self.pq.error_message)
+
+
+class RecapAddAttorneyTest(TestCase):
+
+    def setUp(self):
+        self.atty_org_name = "Lane Powell LLC"
+        self.atty_phone = "907-276-2631"
+        self.atty_email = "jamiesonb@lanepowell.com"
+        self.atty_name = "Brewster H. Jamieson"
+        self.atty = {
+            "contact": "{org_name}\n"
+                       "301 W. Nothern Lights Blvd., Suite 301\n"
+                       "Anchorage, AK 99503-2648\n"
+                       "{phone}\n"
+                       "Fax: 907-276-2631\n"
+                       "Email: {email}\n".format(org_name=self.atty_org_name,
+                                                 phone=self.atty_phone,
+                                                 email=self.atty_email),
+            "name": self.atty_name,
+            "roles": [
+                "LEAD ATTORNEY",
+                "ATTORNEY TO BE NOTICED"
+            ]
+        }
+        self.d = Docket.objects.create(source=0, court_id='scotus',
+                                       pacer_case_id='asdf',
+                                       date_filed=date(2017, 1, 1))
+        self.p = Party.objects.create(name="John Wesley Powell")
+
+    def test_new_atty_to_db(self):
+        """Can we add a new atty to the DB when none exist?"""
+        a = add_attorney(self.atty, self.p, self.d)
+        self.assertEqual(a.contact_raw, self.atty['contact'])
+        self.assertEqual(a.name, self.atty['name'])
+        self.assertTrue(
+            AttorneyOrganizationAssociation.objects.filter(
+                attorney=a,
+                attorney_organization__name=self.atty_org_name,
+                docket=self.d,
+            ).exists(),
+            msg="Unable to find attorney organization association."
+        )
+        self.assertEqual(a.email, self.atty_email)
+        self.assertEqual(a.roles.all().count(), 2)
+
+    def test_docket_is_newer(self):
+        """If the atty already exists, but with older data than the docket, do 
+        we update the old data?
+        """
+        a_orig = Attorney.objects.create(name=self.atty_name,
+                                         email=self.atty_email,
+                                         date_sourced=date(2016, 12, 31))
+        a_from_docket = add_attorney(self.atty, self.p, self.d)
+        self.assertEqual(a_orig.pk, a_from_docket.pk)
+        # Phone updated? (Adding newly sourced docket should update old info)
+        self.assertNotEqual(a_orig.phone, a_from_docket.phone)
+        self.assertEqual(a_from_docket.roles.all().count(), 2)
+
+    def test_docket_is_older(self):
+        """If the atty already exists, but with newer data than the docket, do 
+        we avoid updating the better data?
+        """
+        a_orig = Attorney.objects.create(name=self.atty_name,
+                                         email=self.atty_email,
+                                         date_sourced=date(2017, 1, 2))
+        a_from_docket = add_attorney(self.atty, self.p, self.d)
+        self.assertEqual(a_orig.pk, a_from_docket.pk)
+        # No updates?
+        self.assertEqual(a_orig.phone, a_from_docket.phone)
+        self.assertEqual(a_from_docket.roles.all().count(), 2)
+
+    def test_no_contact_info(self):
+        """Do things work properly when we lack contact information?"""
+        self.atty['contact'] = ""
+        a = add_attorney(self.atty, self.p, self.d)
+        # No org info added because none provided:
+        self.assertEqual(a.organizations.all().count(), 0)
+        # But roles still get done.
+        self.assertEqual(a.roles.all().count(), 2)
+
+    def test_no_contact_info_another_already_exists(self):
+        """If we lack contact info, and such a atty already exists (without 
+        contact info), do we properly consider them the same person?
+        """
+        new_a = Attorney.objects.create(name=self.atty_name,
+                                        date_sourced=date(2016, 12, 31))
+        self.atty['contact'] = ''
+        a = add_attorney(self.atty, self.p, self.d)
+        self.assertEqual(a.pk, new_a.pk)
+
+    def test_existing_roles_get_overwritten(self):
+        """Do existing roles get overwritten with latest data?"""
+        new_a = Attorney.objects.create(name=self.atty_name,
+                                        email=self.atty_email,
+                                        date_sourced=date(2017, 1, 2))
+        r = Role.objects.create(attorney=new_a, party=self.p, docket=self.d,
+                                role=Role.DISBARRED)
+        a = add_attorney(self.atty, self.p, self.d)
+        self.assertEqual(new_a.pk, a.pk)
+        roles = a.roles.all()
+        self.assertEqual(roles.count(), 2)
+        self.assertNotIn(r, roles)
+
+
+@mock.patch('cl.recap.tasks.add_attorney')
+class RecapDocketTaskTest(TestCase):
+    def setUp(self):
+        user = User.objects.get(username='recap')
+        self.filename = 'cand.html'
+        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets',
+                            self.filename)
+        with open(path, 'r') as f:
+            f = SimpleUploadedFile(self.filename, f.read())
+        self.pq = ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=user,
+            pacer_case_id='asdf',
+            filepath_local=f,
+            status=ProcessingQueue.AWAITING_PROCESSING,
+            upload_type=ProcessingQueue.DOCKET,
+        )
+
+    def tearDown(self):
+        self.pq.filepath_local.delete()
+        self.pq.delete()
+        Docket.objects.all().delete()
+
+    def test_parsing_docket_does_not_exist(self, add_atty_mock):
+        """Can we parse an HTML docket we have never seen before?"""
+        d = process_recap_docket(self.pq.pk)
+        pass
+
+    def test_parsing_docket_already_exists(self, add_atty_mock):
+        """Can we parse an HTML docket for a docket we have in the DB?"""
+        existing_d = Docket.objects.create(
+            source=Docket.DEFAULT,
+            pacer_case_id='asdf',
+            court_id='scotus',
+        )
+        d = process_recap_docket(self.pq.pk)
+        self.assertEqual(d.source, Docket.RECAP_AND_SCRAPER)
+        self.assertTrue(d.case_name)
+        self.assertEqual(existing_d.pacer_case_id, d.pacer_case_id)
+
+    def test_docket_and_de_already_exist(self, add_atty_mock):
+        """Can we parse if the docket and the docket entry already exist?"""
+        existing_d = Docket.objects.create(
+            source=Docket.DEFAULT,
+            pacer_case_id='asdf',
+            court_id='scotus',
+        )
+        existing_de = DocketEntry.objects.create(
+            docket=existing_d,
+            entry_number='1',
+            date_filed=date(2008, 1, 1),
+        )
+        d = process_recap_docket(self.pq.pk)
+        de = d.docket_entries.get(pk=existing_de.pk)
+        self.assertNotEqual(
+            existing_de.description,
+            de.description,
+            msg="Description field did not get updated during import.",
+        )
+        self.assertTrue(
+            de.recap_documents.filter(is_available=False).exists(),
+            msg="Recap document didn't get created properly.",
+        )
+        self.assertTrue(
+            d.docket_entries.filter(entry_number='2').exists(),
+            msg="New docket entry didn't get created."
+        )
 
 
 class RecapUploadAuthenticationTest(TestCase):
