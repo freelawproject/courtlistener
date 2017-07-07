@@ -6,7 +6,7 @@ try:
     import mx.DateTime
 except ImportError:
     warnings.warn(
-        "mx.DateTime not found, retricted to Python datetime objects",
+        "mx.DateTime not found, restricted to Python datetime objects",
         ImportWarning)
     mx = None
 
