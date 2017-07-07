@@ -963,7 +963,7 @@ def main():
                 log_print(
                     "Hit the endpoint after importing number %s. Breaking." % i)
                 break
-        except Exception, err:
+        except Exception:
             log_print(traceback.format_exc())
             exit(1)
 

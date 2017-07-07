@@ -258,8 +258,7 @@ class PacerXMLParser(object):
                 try:
                     if not debug:
                         docket_entry.save()
-                except (IntegrityError,
-                        DocketEntry.MultipleObjectsReturned):
+                except (IntegrityError, DocketEntry.MultipleObjectsReturned):
                     logger.error("Unable to create docket entry for docket "
                                  "#%s, on entry: %s." % (docket, entry_number))
                     continue

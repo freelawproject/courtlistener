@@ -87,7 +87,7 @@ def encode_as_linear16(path, tmp):
             avconv_command,
             stderr=subprocess.STDOUT,
         )
-    except subprocess.CalledProcessError, e:
+    except subprocess.CalledProcessError as e:
         print('avconv failed command: %s\n'
               'error code: %s\n'
               'output: %s\n' % (avconv_command, e.returncode, e.output))

@@ -291,7 +291,7 @@ class Command(BaseCommand):
             # noinspection PyBroadException
             try:
                 self.parse_and_scrape_site(mod, options['full_crawl'])
-            except Exception, e:
+            except Exception as e:
                 # noinspection PyBroadException
                 try:
                     msg = ('********!! CRAWLER DOWN !!***********\n'
@@ -308,7 +308,7 @@ class Command(BaseCommand):
                         court=court,
                         message=msg
                     ).save()
-                except Exception, e:
+                except Exception as e:
                     # This is very important. Without this, an exception
                     # above will crash the caller.
                     pass

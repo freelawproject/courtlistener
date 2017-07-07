@@ -351,7 +351,7 @@ def scrape_and_parse():
                         date_text = rawDate.text
                     try:
                         caseDate = datetime.datetime(*time.strptime(date_text, "%B, %Y")[0:5])
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         caseDate = datetime.datetime(*time.strptime(date_text, "%B %d, %Y")[0:5])
                 else:
                     # No value was found. Throw an exception.

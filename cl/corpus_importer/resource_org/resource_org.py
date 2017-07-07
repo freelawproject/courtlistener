@@ -100,7 +100,7 @@ class Case(object):
                 try:
                     case_date = datetime.datetime(
                         *time.strptime(date_text, "%B, %Y")[0:5])
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     case_date = datetime.datetime(
                         *time.strptime(date_text, "%B %d, %Y")[0:5])
             else:

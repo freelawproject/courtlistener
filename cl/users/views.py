@@ -194,7 +194,7 @@ def delete_account(request):
             send_mail(email['subject'], email['body'] % request.user,
                       email['from'], email['to'])
 
-        except Exception, e:
+        except Exception as e:
             logger.critical("User was unable to delete account. %s" % e)
 
         return HttpResponseRedirect(reverse('delete_profile_done'))

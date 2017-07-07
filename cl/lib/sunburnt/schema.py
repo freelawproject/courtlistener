@@ -34,7 +34,7 @@ class solr_date(object):
         elif isinstance(v, basestring):
             try:
                 self._dt_obj = datetime_from_w3_datestring(v)
-            except ValueError, e:
+            except ValueError as e:
                 raise SolrError(*e.args)
         elif hasattr(v, "strftime"):
             self._dt_obj = self.from_date(v)
@@ -418,7 +418,7 @@ class SolrSchema(object):
     def schema_parse(self, f):
         try:
             schemadoc = lxml.etree.parse(f)
-        except lxml.etree.XMLSyntaxError, e:
+        except lxml.etree.XMLSyntaxError as e:
             raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
 
         field_type_classes = {}
@@ -446,7 +446,7 @@ class SolrSchema(object):
     def field_type_factory(self, field_type_node):
         try:
             name, class_name = field_type_node.attrib['name'], field_type_node.attrib['class']
-        except KeyError, e:
+        except KeyError as e:
             raise SolrError("Invalid schema.xml: missing %s attribute on fieldType" % e.args[0])
         # Sets the default to SolrField for any unknown field classes.
         field_class = self.solr_data_types.get(class_name, SolrField)
@@ -456,11 +456,11 @@ class SolrSchema(object):
     def field_factory(self, field_node, field_type_classes, dynamic):
         try:
             name, field_type = field_node.attrib['name'], field_node.attrib['type']
-        except KeyError, e:
+        except KeyError as e:
             raise SolrError("Invalid schema.xml: missing %s attribute on field" % e.args[0])
         try:
             field_type_class = field_type_classes[field_type]
-        except KeyError, e:
+        except KeyError as e:
             raise SolrError("Invalid schema.xml: %s field_type undefined" % field_type)
         return name, field_type_class(dynamic=dynamic,
             **self.translate_attributes(field_node.attrib))

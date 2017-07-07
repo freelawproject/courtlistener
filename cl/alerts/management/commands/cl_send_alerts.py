@@ -192,7 +192,7 @@ class Command(BaseCommand):
                         hits.append([alert, alert_type, results])
                         alert.date_last_hit = now()
                         alert.save()
-                except Exception, e:
+                except Exception as e:
                     traceback.print_exc()
                     logger.info("  Search failed on this alert: %s\n%s\n" %
                                 (alert.query, e))

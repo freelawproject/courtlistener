@@ -558,5 +558,5 @@ def make_federal_judge(item, testing=False):
         if not testing:
             try:
                 position.save()
-            except Exception, e:
+            except Exception:
                 continue
