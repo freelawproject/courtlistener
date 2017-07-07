@@ -286,9 +286,26 @@ class Docket(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        if self.source == 1 and not self.pacer_case_id:
-            raise ValidationError("pacer_case_id cannot be Null or empty in "
-                                  "RECAP documents.")
+        if self.source in self.RECAP_SOURCES:
+            for field in ['pacer_case_id', 'docket_number']:
+                if not getattr(self, field, None):
+                    raise ValidationError("'%s' cannot be Null or empty in "
+                                          "RECAP documents." % field)
+
+        if self.source in self.RECAP_SOURCES:
+            # Check if we already have it, to prevent race conditions caused by
+            # transactions.
+            conflicting_instance = Docket.objects.filter(
+                # These are all required fields in RECAP content
+                pacer_case_id=self.pacer_case_id,
+                docket_number=self.docket_number,
+                court_id=self.court_id
+            )
+            if self.pk:
+                conflicting_instance = conflicting_instance.exclude(pk=self.pk)
+            if conflicting_instance.exists():
+                raise ValidationError("Got conflicting instance of Docket "
+                                      "while saving %s" % self)
 
         super(Docket, self).save(*args, **kwargs)
 

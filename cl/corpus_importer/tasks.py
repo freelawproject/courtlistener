@@ -8,6 +8,7 @@ from tempfile import NamedTemporaryFile
 import internetarchive as ia
 import requests
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction, DatabaseError
 from django.utils.encoding import force_bytes
@@ -206,6 +207,7 @@ def process_free_opinion_result(self, row_pk, cnt):
                 defaults={
                     'pacer_doc_id': result.pacer_doc_id,
                     'document_type': RECAPDocument.PACER_DOCUMENT,
+                    'is_free_on_pacer': True,
                 }
             )
     except DatabaseError as e:
@@ -215,6 +217,13 @@ def process_free_opinion_result(self, row_pk, cnt):
         result.save()
         self.request.callbacks = None
         return
+    except ValidationError as e:
+        msg = "Raised validation error: %s" % e
+        logger.error(msg)
+        if self.request.retries == self.max_retries:
+            result.error_msg = msg
+            result.save()
+        raise self.retry(exc=e)
 
     if not rd_created and rd.is_available:
         msg = ("Found the item already in the DB with document_number: %s "

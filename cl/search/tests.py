@@ -4,6 +4,7 @@ import datetime
 import os
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.urlresolvers import reverse
@@ -133,9 +134,8 @@ class ModelTest(TestCase):
 
     def test_save_old_opinion(self):
         """Can we save opinions older than 1900?"""
-        court = Court.objects.get(pk='test')
-
-        docket = Docket(case_name=u"Blah", court=court, source=Docket.DEFAULT)
+        docket = Docket(case_name=u"Blah", court_id='test',
+                        source=Docket.DEFAULT)
         docket.save()
         oc = OpinionCluster(
             case_name=u"Blah",
@@ -153,6 +153,31 @@ class ModelTest(TestCase):
         except ValueError as e:
             raise ValueError("Unable to save a case older than 1900. Did you "
                              "try to use `strftime`...again?")
+
+
+class DocketValidationTest(TestCase):
+    fixtures = ['test_court.json']
+
+    def test_creating_a_recap_docket_with_blanks(self):
+        """Are blank values denied?"""
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(source=Docket.RECAP)
+
+    def test_cannot_create_duplicate(self):
+        """Do duplicate values throw an error?"""
+        Docket.objects.create(
+            source=Docket.RECAP,
+            docket_number='asdf',
+            pacer_case_id='asdf',
+            court_id='test',
+        )
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(
+                source=Docket.RECAP_AND_SCRAPER,
+                docket_number='asdf',
+                pacer_case_id='asdf',
+                court_id='test',
+            )
 
 
 class SearchTest(IndexedSolrTestCase):
