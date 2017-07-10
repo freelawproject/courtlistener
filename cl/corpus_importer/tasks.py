@@ -226,11 +226,11 @@ def process_free_opinion_result(self, row_pk, cnt):
         raise self.retry(exc=e)
 
     if not rd_created and rd.is_available:
-        msg = ("Found the item already in the DB with document_number: %s "
-               "and docket_entry: %s!" % (result.document_number, de))
-        logger.info(msg)
-        result.error_msg = msg
-        result.save()
+        # The item already exists and is available. Fantastic, mark it as free,
+        # and call it a day.
+        rd.is_free_on_pacer = True
+        rd.save()
+        result.delete()
         self.request.callbacks = None
         return
 
