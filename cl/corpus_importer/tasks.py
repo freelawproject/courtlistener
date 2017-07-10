@@ -266,7 +266,8 @@ def get_and_process_pdf(self, data, session, row_pk):
             return
 
     if r is None:
-        msg = "Unable to get PDF for %s" % result
+        msg = "Unable to get PDF for %s at %s with doc id %s" % \
+              (result, result.court_id, result.pacer_doc_id)
         logger.error(msg)
         PACERFreeDocumentRow.objects.filter(pk=row_pk).update(error_msg=msg)
         self.request.callbacks = None
