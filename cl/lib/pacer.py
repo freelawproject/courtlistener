@@ -72,15 +72,32 @@ def lookup_and_save(new, debug=False):
         d = None
 
     if d is None:
-        try:
-            d = Docket.objects.get(docket_number=new.docket_number,
-                                   court=new.court)
-        except Docket.DoesNotExist:
+        ds = Docket.objects.filter(docket_number=new.docket_number,
+                                   court=new.court).order_by('-date_filed')
+        count = ds.count()
+        if count < 1:
             # Can't find it by pacer_case_id or docket_number. Make a new item.
             d = Docket(source=Docket.RECAP)
-        except Docket.MultipleObjectsReturned:
+        elif count == 1:
+            # Nailed it!
+            d = ds[0]
+        elif count > 1:
+            # Too many dockets returned. Disambiguate.
             logger.error("Got multiple results while attempting save.")
-            return None
+
+            def is_different(x):
+                return x.pacer_case_id and x.pacer_case_id != new.pacer_case_id
+            if all([is_different(d) for d in ds]):
+                # All the dockets found match on docket number, but have
+                # different pacer_case_ids. This means that the docket has
+                # multiple pacer_case_ids in PACER, and we should mirror that
+                # in CL by creating a new docket for the new item.
+                d = Docket(source=Docket.RECAP)
+            else:
+                # Just use the most recent docket. Looking at the data, this is
+                # OK. Nearly all of these are dockets associated with clusters
+                # that can be merged (however, that's a project for clusters).
+                d = ds[0]
 
     # Add RECAP as a source if it's not already.
     if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
