@@ -66,23 +66,29 @@ def lookup_and_save(new, debug=False):
     Returns None if an error occurs, else, return the new or updated Docket.
     """
     try:
-        d = Docket.objects.get(
-            Q(pacer_case_id=new.pacer_case_id) |
-            Q(docket_number=new.docket_number),
-            court=new.court,
-        )
-        # Add RECAP as a source if it's not already.
-        if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
-            d.source = Docket.RECAP_AND_SCRAPER
-        elif d.source == Docket.COLUMBIA:
-            d.source = Docket.COLUMBIA_AND_RECAP
-        elif d.source == Docket.COLUMBIA_AND_SCRAPER:
-            d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
-    except Docket.DoesNotExist:
-        d = Docket(source=Docket.RECAP)
-    except Docket.MultipleObjectsReturned:
-        logger.error("Got multiple results while attempting save.")
-        return None
+        d = Docket.objects.get(pacer_case_id=new.pacer_case_id,
+                               court=new.court)
+    except (Docket.DoesNotExist, Docket.MultipleObjectsReturned):
+        d = None
+
+    if d is None:
+        try:
+            d = Docket.objects.get(docket_number=new.docket_number,
+                                   court=new.court)
+        except Docket.DoesNotExist:
+            # Can't find it by pacer_case_id or docket_number. Make a new item.
+            d = Docket(source=Docket.RECAP)
+        except Docket.MultipleObjectsReturned:
+            logger.error("Got multiple results while attempting save.")
+            return None
+
+    # Add RECAP as a source if it's not already.
+    if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
+        d.source = Docket.RECAP_AND_SCRAPER
+    elif d.source == Docket.COLUMBIA:
+        d.source = Docket.COLUMBIA_AND_RECAP
+    elif d.source == Docket.COLUMBIA_AND_SCRAPER:
+        d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
 
     for attr, v in new.__dict__.items():
         setattr(d, attr, v)
