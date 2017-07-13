@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 import logging
 import os
@@ -46,7 +47,7 @@ def get_next_date_range(court_id, span=7):
             court_id=court_id,
         ).latest('date_queried')
     except PACERFreeDocumentLog.DoesNotExist:
-        print "FAILED ON: %s" % court_id
+        print("FAILED ON: %s" % court_id)
         raise
 
     if last_completion_log.status == PACERFreeDocumentLog.SCRAPE_IN_PROGRESS:
@@ -176,6 +177,12 @@ def do_ocr(options):
             logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
 
 
+def do_everything(options):
+    get_and_save_free_document_reports(options)
+    get_pdfs(options)
+    do_ocr(options)
+
+
 class Command(BaseCommand):
     help = "Get all the free content from PACER. There are three modes."
 
@@ -211,5 +218,6 @@ class Command(BaseCommand):
         'get-report-results': get_and_save_free_document_reports,
         'get-pdfs': get_pdfs,
         'do-ocr': do_ocr,
+        'do-everything': do_everything,
     }
 
