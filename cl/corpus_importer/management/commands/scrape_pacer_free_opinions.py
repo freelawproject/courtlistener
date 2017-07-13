@@ -83,6 +83,7 @@ def get_and_save_free_document_reports(options):
     }
     pacer_session = PacerSession(username=PACER_USERNAME,
                                  password=PACER_PASSWORD)
+    pacer_session.login()
 
     # Iterate over every court, X days at a time. As courts are completed,
     # remove them from the list of courts to process until none are left
