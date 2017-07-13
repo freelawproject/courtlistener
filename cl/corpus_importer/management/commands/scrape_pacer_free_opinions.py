@@ -142,6 +142,7 @@ def get_pdfs(options):
     :return: None
     """
     q = options['queue']
+    index = options['index']
     cnt = CaseNameTweaker()
     rows = PACERFreeDocumentRow.objects.filter(error_msg="").only('pk')
     throttle = CeleryThrottle(queue_name=q)
@@ -153,7 +154,7 @@ def get_pdfs(options):
                                          password=PACER_PASSWORD)
         chain(
             process_free_opinion_result.si(row.pk, cnt).set(queue=q),
-            get_and_process_pdf.s(pacer_session, row.pk).set(queue=q),
+            get_and_process_pdf.s(pacer_session, row.pk, index=index).set(queue=q),
             delete_pacer_row.si(row.pk).set(queue=q),
         ).apply_async()
         completed += 1
@@ -169,17 +170,23 @@ def do_ocr(options):
     throttle = CeleryThrottle(queue_name=q)
     for i, pk in enumerate(rds):
         throttle.maybe_wait()
-        chain(
-            extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q),
-            add_or_update_recap_document.s(coalesce_docket=True).set(queue=q),
-        ).apply_async()
+        if options['index']:
+            extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q).apply_async()
+        else:
+            chain(
+                extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q),
+                add_or_update_recap_document.s(coalesce_docket=True).set(queue=q),
+            ).apply_async()
         if i % 1000 == 0:
             logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
 
 
 def do_everything(options):
+    logger.info("Running and compiling free document reports.")
     get_and_save_free_document_reports(options)
+    logger.info("Getting PDFs from free document reports")
     get_pdfs(options)
+    logger.info("Doing OCR and saving items to Solr.")
     do_ocr(options)
 
 
@@ -209,6 +216,12 @@ class Command(BaseCommand):
             '--queue',
             default='batch1',
             help="The celery queue where the tasks should be processed.",
+        )
+        parser.add_argument(
+            '--index',
+            action='store_true',
+            default=False,
+            help='Do we index as we go, or leave that to be done later?'
         )
 
     def handle(self, *args, **options):

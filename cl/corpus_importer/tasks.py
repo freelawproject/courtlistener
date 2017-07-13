@@ -239,7 +239,7 @@ def process_free_opinion_result(self, row_pk, cnt):
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5,
           ignore_result=True)
-def get_and_process_pdf(self, data, session, row_pk):
+def get_and_process_pdf(self, data, session, row_pk, index=False):
     if data is None:
         return
     result = data['result']
@@ -290,7 +290,7 @@ def get_and_process_pdf(self, data, session, row_pk):
     rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
 
     # Save and extract, skipping OCR.
-    rd.save(do_extraction=False, index=False)
+    rd.save(do_extraction=False, index=index)
     extract_recap_pdf(rd.pk, skip_ocr=True, check_if_needed=False)
     return {'result': result, 'rd_pk': rd.pk}
 
