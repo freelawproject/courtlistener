@@ -8,7 +8,7 @@ from django.conf import settings
 from django.core.management import BaseCommand
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer.http import login
+from juriscraper.pacer.http import PacerSession
 
 from cl.search.models import Court, RECAPDocument
 from cl.corpus_importer.tasks import (
@@ -80,7 +80,8 @@ def get_and_save_free_document_reports(options):
                 'pk', flat=True
             )
     }
-    pacer_session = login('cand', PACER_USERNAME, PACER_PASSWORD)
+    pacer_session = PacerSession(username=PACER_USERNAME,
+                                 password=PACER_PASSWORD)
 
     # Iterate over every court, X days at a time. As courts are completed,
     # remove them from the list of courts to process until none are left
@@ -147,7 +148,8 @@ def get_pdfs(options):
     for row in queryset_generator(rows):
         throttle.maybe_wait()
         if completed % 30000 == 0:
-            pacer_session = login('cand', PACER_USERNAME, PACER_PASSWORD)
+            pacer_session = PacerSession(username=PACER_USERNAME,
+                                         password=PACER_PASSWORD)
         chain(
             process_free_opinion_result.si(row.pk, cnt).set(queue=q),
             get_and_process_pdf.s(pacer_session, row.pk).set(queue=q),
