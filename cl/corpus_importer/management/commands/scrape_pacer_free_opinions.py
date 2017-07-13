@@ -153,6 +153,7 @@ def get_pdfs(options):
         if completed % 30000 == 0:
             pacer_session = PacerSession(username=PACER_USERNAME,
                                          password=PACER_PASSWORD)
+            pacer_session.login()
         chain(
             process_free_opinion_result.si(row.pk, cnt).set(queue=q),
             get_and_process_pdf.s(pacer_session, row.pk, index=index).set(queue=q),
