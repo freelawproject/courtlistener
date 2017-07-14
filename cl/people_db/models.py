@@ -529,6 +529,7 @@ class Position(models.Model):
         ('abolished', 'Court Abolished'),
         ('bad_judge', 'Impeached and Convicted'),
         ('recess_not_confirmed', 'Recess Appointment Not Confirmed'),
+        ('termed_out', 'Term Limit Reached'),
     )
     position_type = models.CharField(
         help_text="If this is a judicial position, this indicates the role the "
