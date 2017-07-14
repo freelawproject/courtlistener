@@ -29,5 +29,9 @@ class PACERFreeDocumentLogAdmin(admin.ModelAdmin):
     ordering = ('-date_started',)
 
 
-admin.site.register(PACERFreeDocumentRow)
+@admin.register(PACERFreeDocumentRow)
+class PACERFreeDocumentRowAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'court_id', 'docket_number', 'error_msg')
+    list_filter = ('court_id',)
+
 admin.site.register(UrlHash)
