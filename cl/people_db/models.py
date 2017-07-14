@@ -514,6 +514,8 @@ class Position(models.Model):
             ('a_pres', 'Appointment (President)'),
             ('a_gov', 'Appointment (Governor)'),
             ('a_legis', 'Appointment (Legislature)'),
+            # FISC appointments are made by the chief justice of SCOTUS
+            ('a_judge', 'Appointment (Judge)'),
         )),
     )
     SELECTION_METHOD_GROUPS = make_choices_group_lookup(SELECTION_METHODS)
