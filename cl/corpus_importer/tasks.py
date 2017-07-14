@@ -223,6 +223,7 @@ def process_free_opinion_result(self, row_pk, cnt):
         if self.request.retries == self.max_retries:
             result.error_msg = msg
             result.save()
+            return
         raise self.retry(exc=e)
 
     if not rd_created and rd.is_available:
