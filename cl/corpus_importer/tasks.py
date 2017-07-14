@@ -210,6 +210,14 @@ def process_free_opinion_result(self, row_pk, cnt):
                     'is_free_on_pacer': True,
                 }
             )
+    except IntegrityError as e:
+        msg = "Raised IntegrityError: %s" % e
+        logger.error(msg)
+        if self.request.retries == self.max_retries:
+            result.error_msg = msg
+            result.save()
+            return
+        raise self.retry(exc=e)
     except DatabaseError as e:
         msg = "Unable to complete database transaction:\n%s" % e
         logger.error(msg)
@@ -217,14 +225,6 @@ def process_free_opinion_result(self, row_pk, cnt):
         result.save()
         self.request.callbacks = None
         return
-    except ValidationError as e:
-        msg = "Raised validation error: %s" % e
-        logger.error(msg)
-        if self.request.retries == self.max_retries:
-            result.error_msg = msg
-            result.save()
-            return
-        raise self.retry(exc=e)
 
     if not rd_created and rd.is_available:
         # The item already exists and is available. Fantastic, mark it as free,

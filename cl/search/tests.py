@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.urlresolvers import reverse
+from django.db import IntegrityError
 from django.http import HttpRequest
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
@@ -171,7 +172,7 @@ class DocketValidationTest(TestCase):
             pacer_case_id='asdf',
             court_id='test',
         )
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(IntegrityError):
             Docket.objects.create(
                 source=Docket.RECAP_AND_SCRAPER,
                 docket_number='asdf',

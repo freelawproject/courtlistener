@@ -14,6 +14,7 @@ from django.utils.encoding import smart_unicode
 from django.utils.text import slugify
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib import fields
 from cl.lib.model_helpers import make_upload_path, make_recap_path, \
     make_recap_pdf_path
 from cl.lib.search_index_utils import InvalidDocumentError, null_map, normalize_search_dicts
@@ -214,17 +215,19 @@ class Docket(models.Model):
         db_index=False,
         blank=True,
     )
-    docket_number = models.CharField(
+    docket_number = fields.CharNullField(
         help_text="The docket numbers of a case, can be consolidated and "
                   "quite long",
         max_length=5000,  # was 50, 100, 300, 1000
         blank=True,
+        null=True,
         db_index=True,
     )
-    pacer_case_id = models.CharField(
+    pacer_case_id = fields.CharNullField(
         help_text="The cased ID provided by PACER.",
         max_length=100,
         blank=True,
+        null=True,
         db_index=True,
     )
     cause = models.CharField(
@@ -278,6 +281,9 @@ class Docket(models.Model):
         default=False,
     )
 
+    class Meta:
+        unique_together = ('docket_number', 'pacer_case_id', 'court')
+
     def __unicode__(self):
         if self.case_name:
             return smart_unicode('%s: %s' % (self.pk, self.case_name))
@@ -291,21 +297,6 @@ class Docket(models.Model):
                 if not getattr(self, field, None):
                     raise ValidationError("'%s' cannot be Null or empty in "
                                           "RECAP documents." % field)
-
-        if self.source in self.RECAP_SOURCES:
-            # Check if we already have it, to prevent race conditions caused by
-            # transactions.
-            conflicting_instance = Docket.objects.filter(
-                # These are all required fields in RECAP content
-                pacer_case_id=self.pacer_case_id,
-                docket_number=self.docket_number,
-                court_id=self.court_id
-            )
-            if self.pk:
-                conflicting_instance = conflicting_instance.exclude(pk=self.pk)
-            if conflicting_instance.exists():
-                raise ValidationError("Got conflicting instance of Docket "
-                                      "while saving %s" % self)
 
         super(Docket, self).save(*args, **kwargs)
 
