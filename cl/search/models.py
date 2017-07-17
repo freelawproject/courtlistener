@@ -430,7 +430,7 @@ class Docket(models.Model):
                     'page_count': rd.page_count,
                 })
                 if hasattr(rd.filepath_local, 'path'):
-                    out['filepath_local'] = self.filepath_local.path
+                    out['filepath_local'] = rd.filepath_local.path
                 try:
                     out['absolute_url'] = rd.get_absolute_url()
                 except NoReverseMatch:

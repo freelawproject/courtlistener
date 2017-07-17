@@ -221,9 +221,9 @@ class Command(BaseCommand):
         chunk = []
         for item in items:
             processed_count += 1
-            last_item = (count == processed_count)
             if processed_count < start_at:
                 continue
+            last_item = (count == processed_count)
             chunk.append(item)
             if processed_count % chunksize == 0 or last_item:
                 throttle.maybe_wait()
