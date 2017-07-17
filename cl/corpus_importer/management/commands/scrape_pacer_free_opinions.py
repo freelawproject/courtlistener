@@ -45,6 +45,8 @@ def get_next_date_range(court_id, span=7):
     try:
         last_completion_log = PACERFreeDocumentLog.objects.filter(
             court_id=court_id,
+        ).exclude(
+            status=PACERFreeDocumentLog.SCRAPE_FAILED,
         ).latest('date_queried')
     except PACERFreeDocumentLog.DoesNotExist:
         print("FAILED ON: %s" % court_id)
@@ -68,8 +70,20 @@ def mark_court_in_progress(court_id, d):
 
 
 def get_and_save_free_document_reports(options):
+    """Query the Free Doc Reports on PACER and get a list of all the free 
+    documents. Do not download those items, as that step is done later.
+    """
+    # Kill any *old* logs that report they're in progress. (They've failed.)
+    twelve_hrs_ago = now() - timedelta(hours=12)
+    PACERFreeDocumentLog.objects.filter(
+        date_started__lt=twelve_hrs_ago,
+        status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
+    ).update(
+        status=PACERFreeDocumentLog.SCRAPE_FAILED,
+    )
+
     pacer_court_ids = {
-        map_cl_to_pacer_id(v): {'until': now(), 'count': 1} for v in
+        map_cl_to_pacer_id(v): {'until': now(), 'count': 1, 'result': None} for v in
             Court.objects.filter(
                 jurisdiction__in=['FD', 'FB'],
                 in_use=True,
@@ -97,37 +111,42 @@ def get_and_save_free_document_reports(options):
                 continue
 
             next_start_date, next_end_date = get_next_date_range(pacer_court_id)
-            if next_start_date is None:
-                next_delay = min(delay['count'] * 5, 30)  # backoff w/cap
-                logger.info("Court %s still in progress. Delaying at least "
-                            "%ss." % (pacer_court_id, next_delay))
-                pacer_court_ids[pacer_court_id]['until'] = now() + timedelta(
-                    seconds=next_delay)
-                pacer_court_ids[pacer_court_id]['count'] += 1
-                continue
-            elif next_start_date >= tomorrow.date():
-                logger.info("Finished '%s'. Marking it complete." %
-                            pacer_court_id)
-                pacer_court_ids.pop(pacer_court_id, None)
-                continue
+            if delay['result'] is not None:
+                if delay['result'].ready():
+                    result = delay['result'].get()
+                    if result == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
+                        if next_start_date >= tomorrow.date():
+                            logger.info("Finished '%s'. Marking it complete." %
+                                        pacer_court_id)
+                            pacer_court_ids.pop(pacer_court_id, None)
+                            continue
 
-            try:
-                court = Court.objects.get(pk=map_pacer_to_cl_id(pacer_court_id))
-            except Court.DoesNotExist:
-                logger.error("Could not find court with pk: %s" % pacer_court_id)
-                continue
+                    elif result == PACERFreeDocumentLog.SCRAPE_FAILED:
+                        logger.error("Encountered critical error on %s "
+                                     "(network error?). Marking as failed and "
+                                     "pressing on." % pacer_court_id)
+                        pacer_court_ids.pop(pacer_court_id, None)
+                        continue
+                else:
+                    next_delay = min(delay['count'] * 5, 30)  # backoff w/cap
+                    logger.info("Court %s still in progress. Delaying at least "
+                                "%ss." % (pacer_court_id, next_delay))
+                    pacer_court_ids[pacer_court_id]['until'] = now() + timedelta(
+                        seconds=next_delay)
+                    pacer_court_ids[pacer_court_id]['count'] += 1
+                    continue
 
             mark_court_in_progress(pacer_court_id, next_end_date)
             pacer_court_ids[pacer_court_id]['count'] = 1  # Reset
-            chain(
+            delay['result'] = chain(
                 get_and_save_free_document_report.si(
                     pacer_court_id,
                     next_start_date,
                     next_end_date,
                     pacer_session
                 ),
-                mark_court_done_on_date.si(pacer_court_id, next_end_date),
-            )()
+                mark_court_done_on_date.s(pacer_court_id, next_end_date),
+            ).apply_async()
 
 
 def get_pdfs(options):

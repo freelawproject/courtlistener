@@ -8,7 +8,6 @@ from tempfile import NamedTemporaryFile
 import internetarchive as ia
 import requests
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction, DatabaseError
 from django.utils.encoding import force_bytes
@@ -136,6 +135,8 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
             ReadTimeout, ConnectTimeout) as exc:
         logger.warning("Unable to get free document report results from %s "
                        "(%s to %s). Trying again." % (court_id, start, end))
+        if self.request.retries == self.max_retries:
+            return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=10)
 
     try:
@@ -143,6 +144,8 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
     except (IndexError, HTTPError) as exc:
         # IndexError: When the page isn't downloaded properly.
         # HTTPError: raise_for_status in parse hit bad status.
+        if self.request.retries == self.max_retries:
+            return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=10)
 
     for row in results:
@@ -162,6 +165,8 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
         except IntegrityError:
             # Duplicate for whatever reason.
             continue
+
+    return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
@@ -398,8 +403,8 @@ def upload_to_ia(identifier, files, metadata=None):
     return responses
 
 
-@app.task(ignore_result=True)
-def mark_court_done_on_date(court_id, d):
+@app.task
+def mark_court_done_on_date(status, court_id, d):
     court_id = map_pacer_to_cl_id(court_id)
     try:
         doc_log = PACERFreeDocumentLog.objects.filter(
@@ -410,9 +415,11 @@ def mark_court_done_on_date(court_id, d):
         return
     else:
         doc_log.date_queried = d
-        doc_log.status = PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+        doc_log.status = status
         doc_log.date_completed = now()
         doc_log.save()
+
+    return status
 
 
 @app.task(ignore_result=True)
