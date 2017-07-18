@@ -25,6 +25,7 @@ from rest_framework.status import (
 )
 
 from cl.celery import app
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
@@ -307,27 +308,25 @@ class OverloadedException(Exception):
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5,
           ignore_result=True)
-def upload_free_opinion_to_ia(self, data):
-    if data is None:
-        return
-    result = data['result']
-    rd = RECAPDocument.objects.get(pk=data['rd_pk'])
+def upload_free_opinion_to_ia(self, rd_pk):
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    d = rd.docket_entry.docket
     file_name = get_document_filename(
-        result.court.pk,
-        result.pacer_case_id,
-        result.document_number,
+        d.court_id,
+        d.pacer_case_id,
+        rd.document_number,
         0,  # Attachment number is zero for all free opinions.
     )
-    bucket_name = get_bucket_name(result.court.pk, result.pacer_case_id)
+    bucket_name = get_bucket_name(d.court_id, d.pacer_case_id)
     try:
         responses = upload_to_ia(
             identifier=bucket_name,
             files=rd.filepath_local.path,
             metadata={
-                'title': result.case_name,
+                'title': best_case_name(d),
                 'collection': settings.IA_COLLECTIONS,
                 'contributor': '<a href="https://free.law">Free Law Project</a>',
-                'court': result.court.pk,
+                'court': d.court_id,
                 'language': 'eng',
                 'mediatype': 'texts',
                 'description': "This item represents a case in PACER, "

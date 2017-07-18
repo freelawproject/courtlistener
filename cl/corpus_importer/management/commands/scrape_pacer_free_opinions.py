@@ -15,7 +15,8 @@ from cl.search.models import Court, RECAPDocument
 from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     get_and_save_free_document_report,
-    process_free_opinion_result, get_and_process_pdf, delete_pacer_row)
+    process_free_opinion_result, get_and_process_pdf, delete_pacer_row,
+    upload_free_opinion_to_ia)
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.db_tools import queryset_generator
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
@@ -165,6 +166,11 @@ def get_pdfs(options):
     index = options['index']
     cnt = CaseNameTweaker()
     rows = PACERFreeDocumentRow.objects.filter(error_msg="").only('pk')
+    count = rows.count()
+    task_name = "downloading"
+    if index:
+        task_name += " and indexing"
+    logger.info("%s %s items from PACER." % (task_name, count))
     throttle = CeleryThrottle(queue_name=q)
     completed = 0
     for row in queryset_generator(rows):
@@ -179,6 +185,9 @@ def get_pdfs(options):
             delete_pacer_row.si(row.pk).set(queue=q),
         ).apply_async()
         completed += 1
+        if completed % 1000 == 0:
+            logger.info("Sent %s/%s tasks to celery for %s so "
+                        "far." % (completed, count, task_name))
 
 
 def do_ocr(options):
@@ -202,6 +211,29 @@ def do_ocr(options):
             logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
 
 
+def upload_to_internet_archive(options):
+    """Upload items to the Internet Archive."""
+    q = options['queue']
+    rds = RECAPDocument.objects.filter(
+        is_free_on_pacer=True,
+        is_available=True,
+        filepath_ia='',
+    ).exclude(
+        filepath_local='',
+    ).values_list(
+        'pk',
+        flat=True,
+    ).order_by()
+    count = rds.count()
+    logger.info("Sending %s items to Internet Archive." % count)
+    throttle = CeleryThrottle(queue_name=q)
+    for i, rd in enumerate(rds):
+        throttle.maybe_wait()
+        upload_free_opinion_to_ia.si(rd).set(queue=q).apply_async()
+        if i % 1000 == 0:
+            logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
+
+
 def do_everything(options):
     logger.info("Running and compiling free document reports.")
     get_and_save_free_document_reports(options)
@@ -209,6 +241,8 @@ def do_everything(options):
     get_pdfs(options)
     logger.info("Doing OCR and saving items to Solr.")
     do_ocr(options)
+    logger.info("Uploading to Internet Archive.")
+    upload_to_internet_archive(options)
 
 
 class Command(BaseCommand):
@@ -253,5 +287,6 @@ class Command(BaseCommand):
         'get-pdfs': get_pdfs,
         'do-ocr': do_ocr,
         'do-everything': do_everything,
+        'upload-to-ia': upload_to_internet_archive,
     }
 
