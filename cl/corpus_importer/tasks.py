@@ -14,6 +14,7 @@ from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import FreeOpinionReport
+from pyexpat import ExpatError
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -337,10 +338,10 @@ def upload_free_opinion_to_ia(self, rd_pk):
                 'licenseurl': 'https://www.usa.gov/government-works',
             },
         )
-    except (OverloadedException, SyntaxError) as exc:
+    except (OverloadedException, ExpatError) as exc:
         # Overloaded: IA wants us to slow down.
-        # SyntaxError: The syntax of the XML file that's supposed to be returned
-        # by IA is bad.
+        # ExpatError: The syntax of the XML file that's supposed to be returned
+        # by IA is bad (or something).
         raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response.status_code in [
