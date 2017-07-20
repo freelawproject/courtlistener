@@ -845,6 +845,12 @@ class Court(models.Model):
         max_length=15,  # Changes here will require updates in urls.py
         primary_key=True
     )
+    pacer_court_id = models.PositiveSmallIntegerField(
+        help_text="The numeric ID for the court in PACER. This can be found by "
+                  "looking at the first three digits of any doc1 URL in PACER.",
+        null=True,
+        blank=True,
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified",
         auto_now=True,
