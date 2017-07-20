@@ -337,7 +337,10 @@ def upload_free_opinion_to_ia(self, rd_pk):
                 'licenseurl': 'https://www.usa.gov/government-works',
             },
         )
-    except OverloadedException as exc:
+    except (OverloadedException, SyntaxError) as exc:
+        # Overloaded: IA wants us to slow down.
+        # SyntaxError: The syntax of the XML file that's supposed to be returned
+        # by IA is bad.
         raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response.status_code in [
