@@ -341,7 +341,7 @@ def upload_free_opinion_to_ia(self, rd_pk):
     except (OverloadedException, ExpatError) as exc:
         # Overloaded: IA wants us to slow down.
         # ExpatError: The syntax of the XML file that's supposed to be returned
-        # by IA is bad (or something).
+        #             by IA is bad (or something).
         raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response.status_code in [
@@ -349,6 +349,10 @@ def upload_free_opinion_to_ia(self, rd_pk):
             HTTP_400_BAD_REQUEST,  # Corrupt PDF, typically.
         ]:
             return [exc.response]
+        raise self.retry(exc=exc)
+    except (requests.Timeout, requests.RequestException) as exc:
+        logger.warning("Timeout or unknown RequestException. Unable to upload "
+                       "to IA. Trying again if retries not exceeded: %s" % rd)
         raise self.retry(exc=exc)
     if all(r.ok for r in responses):
         rd.filepath_ia = "https://archive.org/download/%s/%s" % (
