@@ -342,6 +342,9 @@ def upload_free_opinion_to_ia(self, rd_pk):
         # Overloaded: IA wants us to slow down.
         # ExpatError: The syntax of the XML file that's supposed to be returned
         #             by IA is bad (or something).
+        if self.request.retries == self.max_retries:
+            # Give up for now. It'll get done next time cron is run.
+            return
         raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response.status_code in [
@@ -349,10 +352,18 @@ def upload_free_opinion_to_ia(self, rd_pk):
             HTTP_400_BAD_REQUEST,  # Corrupt PDF, typically.
         ]:
             return [exc.response]
+        if self.request.retries == self.max_retries:
+            # This exception is also raised when the endpoint is overloaded, but
+            # doesn't get caught in the OverloadedException below due to
+            # multiple processes running at the same time. Just give up for now.
+            return
         raise self.retry(exc=exc)
     except (requests.Timeout, requests.RequestException) as exc:
         logger.warning("Timeout or unknown RequestException. Unable to upload "
                        "to IA. Trying again if retries not exceeded: %s" % rd)
+        if self.request.retries == self.max_retries:
+            # Give up for now. It'll get done next time cron is run.
+            return
         raise self.retry(exc=exc)
     if all(r.ok for r in responses):
         rd.filepath_ia = "https://archive.org/download/%s/%s" % (
