@@ -307,8 +307,7 @@ class OverloadedException(Exception):
     pass
 
 
-@app.task(bind=True, max_retries=15, interval_start=5, interval_step=5,
-          ignore_result=True)
+@app.task(bind=True, max_retries=15, interval_start=5, interval_step=5)
 def upload_free_opinion_to_ia(self, rd_pk):
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
