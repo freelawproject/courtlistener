@@ -229,9 +229,9 @@ def upload_to_internet_archive(options):
     throttle = CeleryThrottle(queue_name=q)
     for i, rd in enumerate(rds):
         throttle.maybe_wait()
+        if i > 0 and i % 1000 == 0:
+            logger.info("Sent %s/%s tasks to celery so far." % (i, count))
         upload_free_opinion_to_ia.si(rd).set(queue=q).apply_async()
-        if i % 1000 == 0:
-            logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
 
 
 def do_everything(options):
