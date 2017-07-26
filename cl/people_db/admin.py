@@ -1,11 +1,13 @@
 from django.conf import settings
 from django.contrib import admin
 
+from cl.lib.admin import CSSAdminMixin
 from cl.people_db.models import (
     Education, School, Person, Position, RetentionEvent, Race,
     PoliticalAffiliation, Source, ABARating, PartyType,
     Party, Role, Attorney, AttorneyOrganization,
-    AttorneyOrganizationAssociation)
+    AttorneyOrganizationAssociation
+)
 
 
 class RetentionEventInline(admin.TabularInline):
@@ -93,7 +95,7 @@ class ABARatingInline(admin.TabularInline):
 
 
 @admin.register(Person)
-class PersonAdmin(admin.ModelAdmin):
+class PersonAdmin(admin.ModelAdmin, CSSAdminMixin):
     prepopulated_fields = {"slug": ['name_first', 'name_middle', 'name_last',
                                     'name_suffix']}
     inlines = (

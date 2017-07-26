@@ -4,6 +4,7 @@ from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline
 from cl.favorites.admin import FavoriteInline
+from cl.lib.admin import CSSAdminMixin
 from cl.users.models import UserProfile, BarMembership
 
 
@@ -20,11 +21,12 @@ get_stub_account.short_description = "Stub Account?"
 class TokenInline(admin.StackedInline):
     model = Token
 
+
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
 
 
-class UserAdmin(admin.ModelAdmin):
+class UserAdmin(admin.ModelAdmin, CSSAdminMixin):
     inlines = (
         UserProfileInline,
         AlertInline,
@@ -42,6 +44,7 @@ class UserAdmin(admin.ModelAdmin):
         'last_name',
         'email',
     )
+
 
 # Replace the normal User admin with our better one.
 admin.site.unregister(User)
