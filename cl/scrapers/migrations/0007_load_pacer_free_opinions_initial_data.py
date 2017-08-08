@@ -2,8 +2,9 @@
 from __future__ import unicode_literals
 
 import sys
-from django.core.management import call_command
 from django.db import migrations, models
+
+from cl.lib.migration_utils import load_migration_fixture
 
 
 def load_fixture(apps, schema_editor):
@@ -11,7 +12,7 @@ def load_fixture(apps, schema_editor):
         fixture = 'pacer_free_docs_initial_data_truncated'
     else:
         fixture = 'pacer_free_docs_initial_data'
-    call_command('loaddata', fixture, app_label='scrapers')
+    load_migration_fixture(apps, schema_editor, fixture, 'scrapers')
 
 
 def unload_fixture(apps, schema_editor):
