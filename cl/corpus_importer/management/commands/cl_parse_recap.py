@@ -1,20 +1,17 @@
 from __future__ import print_function
 import argparse
 import glob
-import logging
 import os
 import pickle
 import random
 from collections import Counter
 
 from django.conf import settings
-from django.core.management import BaseCommand
 from lxml import etree
 from lxml.etree import XMLSyntaxError, XPathEvalError
 
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import PacerXMLParser, lookup_and_save
-
-logger = logging.getLogger(__name__)
 
 
 def get_docket_list(path=None):
@@ -28,7 +25,7 @@ def get_docket_list(path=None):
     return sorted(glob.glob(path))
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = ('Go through every item downloaded from RECAP, parse it, and add it '
             'to the database.')
 
@@ -91,6 +88,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.debug = options['debug']
         self.options = options
 
@@ -126,11 +124,11 @@ class Command(BaseCommand):
             try:
                 values = tree.xpath(self.options['xpath'])
             except XPathEvalError:
-                print("ERROR: Invalid XPath expression.")
+                logger.error("Invalid XPath expression.")
                 exit(1)
 
             if values:
-                print("%s: %s" % (completed, values))
+                logger.info("%s: %s" % (completed, values))
                 c.update([str(v) for v in values])
                 completed += 1
             else:
@@ -141,8 +139,8 @@ class Command(BaseCommand):
 
         with open('sample.pkl', 'wb') as f:
             pickle.dump(c, f)
-        print('\n%s items had no value. %s errors. Sample saved at "sample.pkl"'
-              % (no_value, errors))
+        logger.info('\n%s items had no value. %s errors. Sample saved at '
+                    '"sample.pkl"' % (no_value, errors))
 
     def parse_items(self):
         """For every item in the directory, send it to Celery for processing"""
@@ -173,7 +171,8 @@ class Command(BaseCommand):
 
                 max_items = self.options['max_items']
                 if completed >= max_items != -1:
-                    print("\n\nCompleted %s items. Aborting early." % max_items)
+                    logger.info("\n\nCompleted %s items. Aborting early." %
+                                max_items)
                     break
 
     VALID_ACTIONS = {

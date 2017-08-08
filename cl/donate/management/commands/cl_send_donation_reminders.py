@@ -2,17 +2,17 @@ from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
-from django.core.management.base import BaseCommand
 from django.db.models import Sum
 from django.template import loader
 from django.utils.timezone import now
 
 from cl.donate.models import Donation
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Opinion, Court
 from cl.stats.models import Stat
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = ('Sends the annual reminders to people that donated and wanted a '
             'reminder.')
 
@@ -74,7 +74,8 @@ class Command(BaseCommand):
         msg.send(fail_silently=False)
 
     def handle(self, *args, **options):
-        self.verbosity = int(options.get('verbosity', 1))
+        super(Command, self).handle(*args, **options)
+        self.verbosity = options.get('verbosity', 1)
         self.gather_stats_and_users()
         for user in self.users:
             # Iterate over the people and send them emails

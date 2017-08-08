@@ -1,6 +1,6 @@
 import pandas as pd
-from django.core.management import BaseCommand
 
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import OpinionsCited, Opinion
 from cl.search.tasks import add_or_update_opinions
 
@@ -18,8 +18,8 @@ def process_citations(data, debug):
     """
     updated_ids = set()
     for index, item in data.iterrows():
-        print("\nAdding citation from %s to %s" % (item['citing'],
-                                                   item['cited']))
+        logger.info("\nAdding citation from %s to %s" % (item['citing'],
+                                                         item['cited']))
         try:
             cite = OpinionsCited.objects.get(
                 citing_opinion_id=item['citing'],
@@ -34,7 +34,7 @@ def process_citations(data, debug):
                 cite.save()
                 updated_ids.add(cite.citing_opinion.pk)
         try:
-            print(
+            logger.info(
                 "  %s"
                 "    %s: %s\n"
                 "    From: %s\n"
@@ -42,16 +42,16 @@ def process_citations(data, debug):
                                     cite.cited_opinion)
             )
         except Opinion.DoesNotExist:
-            print("  Unable to create citation. Underlying Opinion doesn't "
-                  "exist.")
+            logger.warn("  Unable to create citation. Underlying Opinion doesn't "
+                        "exist.")
 
-    print("\nUpdating Solr...")
+    logger.info("\nUpdating Solr...")
     if not debug:
         add_or_update_opinions(updated_ids)
-    print("Done.")
+    logger.info("Done.")
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Add the citations in the manual citations csv, if they do not ' \
            'already exist.'
 
@@ -70,6 +70,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         data, length = load_csv(options['csv'])
-        print("Found %s citations to add." % length)
+        logger.info("Found %s citations to add." % length)
         process_citations(data, options['debug'])

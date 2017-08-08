@@ -1,18 +1,17 @@
-from __future__ import print_function
 from collections import Counter, OrderedDict
 
 import pandas
-from django.core.management import BaseCommand
 from django.db.models import Q
 
 from pandas import to_pickle
 from unidecode import unidecode
 from juriscraper.lib.judge_parsers import normalize_judge_string
 
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Court, Docket
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Export a CSV of RECAP judges.'
 
     def add_arguments(self, parser):
@@ -24,6 +23,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.debug = options['debug']
         self.options = options
         self.generate_data()
@@ -58,7 +58,8 @@ class Command(BaseCommand):
                        .filter(source__in=Docket.RECAP_SOURCES)
                        .only('assigned_to_str', 'referred_to_str',
                              'date_filed'))
-            print("Processing %s dockets in %s" % (dockets.count(), court.pk))
+            logger.info("Processing %s dockets in %s" % (dockets.count(),
+                                                         court.pk))
             for docket in dockets:
                 for judge_type in ['assigned', 'referred']:
                     judge = getattr(docket, '%s_to_str' % judge_type)

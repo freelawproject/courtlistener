@@ -20,10 +20,10 @@ import csv
 import string
 from datetime import datetime
 
-from django.core.management import BaseCommand
 from django.core.management import CommandError
 from django.db.models import Q
 
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import gen_diff_ratio
 from cl.search.models import OpinionCluster
 
@@ -32,7 +32,7 @@ from cl.search.models import OpinionCluster
 #  - 7907: After this point we don't seem to have any citations for items.
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Import data from the SCDB Case Centered CSV.'
 
     def add_arguments(self, parser):
@@ -63,6 +63,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.debug = options['debug']
         self.file = options['file']
         self.skip_human_review = options['skip_human_review']
@@ -79,8 +80,8 @@ class Command(BaseCommand):
         )
 
         if self.skip_human_review:
-            print("\nSkipped %s items in SCDB which came up for human review." %
-                  self.skipped_count)
+            logger.info("\nSkipped %s items in SCDB which came up for human "
+                        "review." % self.skipped_count)
 
     @staticmethod
     def set_if_falsy(obj, attribute, new_value):
@@ -97,7 +98,8 @@ class Command(BaseCommand):
         error = False
         if all([does_not_currently_have_a_value, current_value_not_zero,
                 new_value_not_blank]):
-            print("      Updating %s with %s." % (attribute, new_value.encode('utf-8')))
+            logger.info("      Updating %s with %s." %
+                        (attribute, new_value.encode('utf-8')))
             setattr(obj, attribute, new_value)
         else:
             # Report if there's a difference -- that might spell trouble.
@@ -113,20 +115,21 @@ class Command(BaseCommand):
                 values_differ = True
 
             if values_differ:
-                print ("      WARNING: Didn't set '{attr}' attribute on obj "
-                       "{obj_id} because it already had a value, but the new "
-                       "value ('{new}') differs from current value "
-                       "('{current}')".format(
-                            attr=attribute,
-                            obj_id=obj.pk,
-                            new=new_value,
-                            current=current_value.encode('utf-8'),
-                        ))
+                logger.warn(
+                    "WARNING: Didn't set '{attr}' attribute on obj {obj_id} "
+                    "because it already had a value, but the new value "
+                    "('{new}') differs from current value ('{current}')".format(
+                        attr=attribute,
+                        obj_id=obj.pk,
+                        new=new_value,
+                        current=current_value.encode('utf-8'),
+                    )
+                )
                 error = True
             else:
                 # The values were the same.
-                print "      '%s' field unchanged -- old and new values were " \
-                      "the same: %s" % (attribute, new_value)
+                logger.info("'%s' field unchanged -- old and new values were "  
+                            "the same: %s" % (attribute, new_value))
         return error
 
     def do_federal_citations(self, cluster, scdb_info):
@@ -161,7 +164,7 @@ class Command(BaseCommand):
                 error = self.set_if_falsy(cluster, field, scdb_info['ledCite'])
                 led_done = True
             else:
-                print("      WARNING: Fell through search for citation.")
+                logger.warn("      WARNING: Fell through search for citation.")
                 save = False
         if error:
             save = False
@@ -169,8 +172,9 @@ class Command(BaseCommand):
         num_undone_fields = sum([f for f in [us_done, sct_done, led_done] if
                                  f is False])
         if num_undone_fields > len(available_fields):
-            print "       WARNING: More values were found than there were " \
-                  "slots to put them in. Time to create federal_cite_four?"
+            logger.warn("WARNING: More values were found than there were "   
+                        "slots to put them in. Time to create "
+                        "federal_cite_four?")
             save = False
         else:
             # Save undone values into available fields. Any value that wasn't
@@ -201,10 +205,10 @@ class Command(BaseCommand):
 
         Take that item and enhance it with the SCDB content.
         """
-        print ('    --> Enhancing cluster {id} with data from SCDB ('
-               'https://www.courtlistener.com{path}).'.format(
-                id=cluster.pk,
-                path=cluster.get_absolute_url(),
+        logger.info('Enhancing cluster {id} with data from SCDB ('
+                    'https://www.courtlistener.com{path}).'.format(
+            id=cluster.pk,
+            path=cluster.get_absolute_url(),
         ))
         attribute_pairs = [
             ('scdb_votes_majority', 'majVotes'),
@@ -220,13 +224,13 @@ class Command(BaseCommand):
         lexis_ok = self.set_if_falsy(cluster, 'lexis_cite', 'lexisCite')
 
         if all([federal_ok, scdb_ok, lexis_ok]):
-            print("      Saving to database (or faking if debug=True)")
+            logger.info("      Saving to database (or faking if debug=True)")
             if not self.debug:
                 cluster.docket.save()
                 cluster.save()
         else:
-            print("      Item not saved due to collision or error. Please "
-                  "edit by hand.")
+            logger.info("      Item not saved due to collision or error. "
+                        "Please edit by hand.")
 
     @staticmethod
     def winnow_by_docket_number(clusters, d):
@@ -283,27 +287,29 @@ class Command(BaseCommand):
 
     def get_human_review(self, clusters, d):
         for i, cluster in enumerate(clusters):
-            print '    %s: Cluster %s (%0.3f sim):' % (
+            logger.info('%s: Cluster %s (%0.3f sim):' % (
                 i,
                 cluster.pk,
                 gen_diff_ratio(
                     cluster.case_name.lower(),
                     d['caseName'].lower()
                 ),
-            )
-            print '      https://www.courtlistener.com%s' % cluster.get_absolute_url()
-            print '      %s' % cluster.case_name.encode('utf-8')
+            ))
+            logger.info('https://www.courtlistener.com%s' %
+                        cluster.get_absolute_url())
+            logger.info('      %s' % cluster.case_name.encode('utf-8'))
             if cluster.docket.docket_number:
-                print '      %s' % cluster.docket.docket_number.encode('utf-8')
-            print '      %s' % cluster.date_filed
-        print '  SCDB info:'
-        print '    %s' % d['caseName']
+                logger.info(cluster.docket.docket_number.encode('utf-8'))
+            logger.info(cluster.date_filed)
+        logger.info('SCDB info:')
+        logger.info(d['caseName'])
         if d['docket']:
-            print '    %s' % d['docket']
-        print '    %s' % d['dateDecision']
+            logger.info(d['docket'])
+        logger.info(d['dateDecision'])
 
         if self.skip_human_review:
-            print('  Skipping human review and just returning the first item.')
+            logger.info('Skipping human review and just returning the first '
+                        'item.')
             self.skipped_count += 1
             return clusters[0]
         else:
@@ -347,36 +353,36 @@ class Command(BaseCommand):
                 # Iterate over every item, looking for matches in various ways.
                 if i < start_row:
                     continue
-                print "\nRow is: %s. ID is: %s (%s)" % (i, d['caseId'],
-                                                        d['caseName'])
+                logger.info("\nRow is: %s. ID is: %s (%s)" % (i, d['caseId'],
+                                                              d['caseName']))
 
                 clusters = OpinionCluster.objects.none()
                 if len(clusters) == 0:
-                    print "  Checking scdb_id for SCDB field 'caseID'...",
+                    logger.info("Checking scdb_id for SCDB field 'caseID'...")
                     clusters = (OpinionCluster.objects
                                 .filter(scdb_id=d['caseId']))
-                    print "%s matches found." % clusters.count()
+                    logger.info("%s matches found." % clusters.count())
                 if d['usCite'].strip():
                     # Only do these lookups if there is in fact a usCite value.
                     # Newer additions don't yet have citations.
                     if clusters.count() == 0:
                         # None found by scdb_id. Try by citation number
-                        print "  Checking by federal_cite_one, _two, or " \
-                              "_three...",
+                        logger.info("  Checking by federal_cite_one, _two, or "
+                                    "_three...")
                         clusters = OpinionCluster.objects.filter(
                             Q(federal_cite_one=d['usCite']) |
                             Q(federal_cite_two=d['usCite']) |
                             Q(federal_cite_three=d['usCite']),
                             scdb_id='',
                         )
-                        print "%s matches found." % clusters.count()
+                        logger.info("%s matches found." % clusters.count())
 
                 # At this point, we need to start getting more experimental b/c
                 # the easy ways to find items did not work. Items matched here
                 # are ones that lack citations.
                 if clusters.count() == 0:
                     # try by date and then winnow by docket number
-                    print "  Checking by date...",
+                    logger.info("  Checking by date...")
                     clusters = OpinionCluster.objects.filter(
                         date_filed=datetime.strptime(
                             d['dateDecision'], '%m/%d/%Y'
@@ -384,35 +390,35 @@ class Command(BaseCommand):
                         docket__court_id='scotus',
                         scdb_id='',
                     )
-                    print "%s matches found." % clusters.count()
+                    logger.info("%s matches found." % clusters.count())
 
                 if clusters.count() > 1:
                     if d['docket']:
-                        print "    Winnowing by docket number...",
+                        logger.info("Winnowing by docket number...")
                         clusters = self.winnow_by_docket_number(clusters, d)
-                        print "%s matches found." % clusters.count()
+                        logger.info("%s matches found." % clusters.count())
                     else:
-                        print "    Cannot winnow by docket number -- there " \
-                              "isn't one."
+                        logger.info("Cannot winnow by docket number -- there "
+                                    "isn't one.")
 
                 if clusters.count() > 1:
-                    print "    Winnowing by case name...",
+                    logger.info("Winnowing by case name...")
                     clusters = self.winnow_by_case_name(clusters, d)
-                    print "%s matches found." % clusters.count()
+                    logger.info("%s matches found." % clusters.count())
 
                 # Searching complete, run actions.
                 if clusters.count() == 0:
-                    print '  No items found.'
+                    logger.info('No items found.')
                     cluster = action_zero(d)
                 elif clusters.count() == 1:
-                    print '  Exactly one match found.'
+                    logger.info('Exactly one match found.')
                     cluster = clusters[0]
                 else:
-                    print '  %s items found:' % clusters.count()
+                    logger.info('%s items found:' % clusters.count())
                     cluster = action_many(clusters, d)
 
                 if cluster is not None:
                     action_one(cluster, d)
                 else:
-                    print '  OK. No changes will be made.'
+                    logger.info('OK. No changes will be made.')
 

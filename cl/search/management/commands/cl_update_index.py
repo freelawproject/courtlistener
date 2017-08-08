@@ -2,10 +2,10 @@ import ast
 import sys
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
 from six.moves import input
 
 from cl.audio.models import Audio
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.argparse_types import valid_date_time, valid_obj_type
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.db_tools import queryset_generator
@@ -47,7 +47,7 @@ def proceed_with_deletion(out, count, noinput):
     return proceed
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = ('Adds, updates, deletes items in an index, committing changes and '
             'optimizing it, if requested.')
 
@@ -159,6 +159,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.verbosity = int(options.get('verbosity', 1))
         self.options = options
         self.noinput = options['noinput']

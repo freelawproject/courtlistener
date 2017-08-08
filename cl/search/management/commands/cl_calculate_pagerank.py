@@ -5,14 +5,12 @@ import shutil
 
 import igraph
 from django.conf import settings
-from django.core.management.base import BaseCommand
 
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.solr_core_admin import get_data_dir, \
     reload_pagerank_external_file_cache
 from cl.lib.utils import mkdir_p
 from cl.search.models import Opinion, OpinionsCited
-
-logger = logging.getLogger(__name__)
 
 
 def make_and_populate_nx_graph():
@@ -82,7 +80,7 @@ def cp_pr_file_to_bulk_dir(result_file_path, chown):
         )
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     args = '<args>'
     help = 'Calculate pagerank value for every case'
     RESULT_FILE_PATH = get_data_dir('collection1') + "external_pagerank"
@@ -95,4 +93,5 @@ class Command(BaseCommand):
         cp_pr_file_to_bulk_dir(self.RESULT_FILE_PATH, chown)
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.do_pagerank()

@@ -1,15 +1,16 @@
 from collections import Counter
 
-from django.core.management.base import BaseCommand
 
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import get_page_count
 from cl.search.models import RECAPDocument
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Calculate page counts for items in RECAP'
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         raw_input(
             "This is a very primitive script that has serious performance "
             "issues with large datasets. Press any key to proceed anyway. "
@@ -30,4 +31,4 @@ class Command(BaseCommand):
                 if count is not None:
                     cnt['total_pages'] += count
 
-        print cnt
+        logger.info(cnt)

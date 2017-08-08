@@ -1,14 +1,9 @@
-import logging
-
-from django.core.management import BaseCommand
-
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.utils import extract_recap_documents
 from cl.search.models import RECAPDocument
 
-logger = logging.getLogger(__name__)
 
-
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = ('Iterate over all of the RECAPDocuments and extract their '
             'content.')
 
@@ -34,6 +29,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         docs = RECAPDocument.objects.all().order_by()
         extract_recap_documents(docs, options['skip_ocr'], options.get('order'),
                                 options['queue'])

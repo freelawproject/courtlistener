@@ -1,8 +1,10 @@
-from django.core.management.base import BaseCommand
 from django.core.cache import cache
 
+from cl.lib.command_utils import VerboseCommand, logger
 
-class Command(BaseCommand):
-    def handle(self, *args, **kwargs):
+
+class Command(VerboseCommand):
+    def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         cache.clear()
-        self.stdout.write('Cleared cache\n')
+        logger.info('Cleared cache')

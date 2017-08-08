@@ -1,15 +1,16 @@
 import datetime
 import hashlib
 import random
-from cl.users.models import UserProfile
-from cl.users.utils import emails
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
-from django.core.management import BaseCommand
 from django.utils.timezone import now
 
+from cl.lib.command_utils import VerboseCommand, logger
+from cl.users.models import UserProfile
+from cl.users.utils import emails
 
-class Command(BaseCommand):
+
+class Command(VerboseCommand):
     help = ('Notify users of unconfirmed accounts and delete accounts that '
             'were never confirmed')
 
@@ -42,6 +43,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.options = options
         if options['delete']:
             self.delete_old_accounts()

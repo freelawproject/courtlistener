@@ -1,11 +1,10 @@
 # coding=utf-8
-import logging
 import networkx as nx
 import sys
 
-from celery import group
+from celery.canvas import group
 from django.conf import settings
-from django.core.management import BaseCommand, call_command, CommandError
+from django.core.management import call_command, CommandError
 from reporters_db import REPORTERS
 
 from cl.citations.find_citations import Citation
@@ -13,11 +12,10 @@ from cl.citations.match_citations import get_years_from_reporter, \
     build_date_range
 from cl.citations.tasks import get_document_citations, \
     identify_parallel_citations
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.db_tools import queryset_generator
 from cl.lib.sunburnt import sunburnt
 from cl.search.models import Opinion, OpinionCluster
-
-logger = logging.getLogger(__name__)
 
 # Parallel citations need to be identified this many times before they should be
 # added to the database.
@@ -41,7 +39,7 @@ def make_edge_list(group):
     return out
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = ('Parse the entire corpus, identifying parallel citations. Add them '
             'to the database if sufficiently accurate and requested by the '
             'user.')
@@ -308,6 +306,7 @@ class Command(BaseCommand):
         with actual items in the database and then updating them with parallel
         citations that are sufficiently likely to be good.
         """
+        super(Command, self).handle(*args, **options)
         no_option = (not any([options.get('doc_id'), options.get('all')]))
         if no_option:
             raise CommandError("Please specify if you want all items or a "

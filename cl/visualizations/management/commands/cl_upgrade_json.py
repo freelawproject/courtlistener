@@ -1,12 +1,11 @@
 import json
 
-from django.core.management import BaseCommand
-
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import OpinionCluster
 from cl.visualizations.models import JSONVersion
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = "Upgrade JSON data from old format to new."
 
     def __init__(self, *args, **kwargs):
@@ -28,10 +27,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.options = options
         self.json_objects = JSONVersion.objects.all()
         self.num_objects = self.json_objects.count()
-        print "Acting on %s objects" % self.num_objects
+        logger.info("Acting on %s objects" % self.num_objects)
         self.upgrade_json(
             start=options['start'],
             end=options['end'],
@@ -50,7 +50,7 @@ class Command(BaseCommand):
         Throw an exception of the version types mismatch.
         """
         for obj in json_objects:
-            print "  Reworking %s" % obj
+            logger.info("Reworking %s" % obj)
             if start == 1.0 and end == 1.1:
                 j = json.loads(obj.json_data)
                 j = self._upgrade_version_number(j, end)

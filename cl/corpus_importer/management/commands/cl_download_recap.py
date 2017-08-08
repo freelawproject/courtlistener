@@ -1,15 +1,11 @@
-import logging
-
 import pandas as pd
 from celery.task import TaskSet
-from django.core.management import BaseCommand
 
 from cl.corpus_importer.tasks import download_recap_item
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.recap_utils import (
     get_docketxml_url, get_pdf_url, get_document_filename, get_docket_filename
 )
-
-logger = logging.getLogger(__name__)
 
 
 def load_csv(csv_location):
@@ -75,7 +71,6 @@ def make_download_tasks(data, line_count, start_line):
             msg = ("Sent %s subtasks to celery. We have processed %s "
                    "rows so far." % (len(subtasks), completed + 1))
             logger.info(msg)
-            print msg
             job = TaskSet(tasks=subtasks)
             job.apply_async().join()
             subtasks = []
@@ -83,7 +78,7 @@ def make_download_tasks(data, line_count, start_line):
         completed += 1
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = ('Using a local CSV, download the XML data for RECAP content. '
             'Output is sent to the log.')
 
@@ -102,5 +97,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         data, line_count = load_csv(options['download_csv'])
         make_download_tasks(data, line_count, options['start_line'])

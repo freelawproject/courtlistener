@@ -3,11 +3,11 @@ import shutil
 from os.path import join
 
 from django.conf import settings
-from django.core.management import BaseCommand
 
 from cl.api.tasks import make_bulk_data_and_swap_it_in
 from cl.audio.api_serializers import AudioSerializer
 from cl.audio.models import Audio
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.utils import mkdir_p
 from cl.people_db.api_serializers import PersonSerializer, PositionSerializer, \
     RetentionEventSerializer, EducationSerializer, SchoolSerializer, \
@@ -19,10 +19,11 @@ from cl.search.api_serializers import OpinionClusterSerializer, \
 from cl.search.models import Court, Docket, OpinionCluster, Opinion
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Create the bulk files for all jurisdictions and for "all".'
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         courts = Court.objects.all()
 
         kwargs_list = [
@@ -94,18 +95,18 @@ class Command(BaseCommand):
             },
         ]
 
-        print('Starting bulk file creation with %s celery tasks...' %
-              len(kwargs_list))
+        logger.info('Starting bulk file creation with %s celery tasks...' %
+                    len(kwargs_list))
         for kwargs in kwargs_list:
             make_bulk_data_and_swap_it_in(courts, kwargs)
 
         # Make the citation bulk data
         obj_type_str = 'citations'
-        print(' - Creating bulk data CSV for citations...')
+        logger.info(' - Creating bulk data CSV for citations...')
         tmp_destination = join(settings.BULK_DATA_DIR, 'tmp', obj_type_str)
         final_destination = join(settings.BULK_DATA_DIR, obj_type_str)
         self.make_citation_data(tmp_destination)
-        print("   - Swapping in the new citation archives...")
+        logger.info("   - Swapping in the new citation archives...")
 
         mkdir_p(join(settings.BULK_DATA_DIR, obj_type_str))
         shutil.move(
@@ -113,7 +114,7 @@ class Command(BaseCommand):
             join(final_destination, 'all.csv.gz'),
         )
 
-        print('Done.\n')
+        logger.info('Done.\n')
 
     @staticmethod
     def make_citation_data(tmp_destination):
@@ -126,7 +127,7 @@ class Command(BaseCommand):
         """
         mkdir_p(tmp_destination)
 
-        print('   - Copying the citations table to disk...')
+        logger.info('   - Copying the citations table to disk...')
 
         # This command calls the psql COPY command and requests that it dump
         # the citation table to disk as a compressed CSV.
@@ -138,4 +139,4 @@ class Command(BaseCommand):
                 destination=join(tmp_destination, 'all.csv.gz'),
             )
         )
-        print('   - Table created successfully.')
+        logger.info('   - Table created successfully.')

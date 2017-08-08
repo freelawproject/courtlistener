@@ -1,18 +1,15 @@
 # https://github.com/freelawproject/courtlistener/issues/636
-import logging
 import os
 
-from django.core.management import BaseCommand
 from django.db import IntegrityError
 
 from cl.corpus_importer.tasks import download_recap_item
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import PacerXMLParser
 from cl.lib.recap_utils import get_ia_document_url_from_path, \
     get_local_document_url_from_path
 from cl.search.models import RECAPDocument, Docket
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
-
-logger = logging.getLogger(__name__)
 
 
 class CleanupPacerXMLParser(PacerXMLParser):
@@ -94,7 +91,7 @@ class CleanupPacerXMLParser(PacerXMLParser):
         return rd
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = "Fix issues identified in 636."
 
     def add_arguments(self, parser):
@@ -102,8 +99,10 @@ class Command(BaseCommand):
         parser.set_defaults(debug=False)
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         dockets = Docket.objects.filter(
-            docket_entries__recap_documents__ocr_status=RECAPDocument.OCR_FAILED).distinct()
+            docket_entries__recap_documents__ocr_status=RECAPDocument.OCR_FAILED
+        ).distinct()
         for docket in dockets:
             docket_path = docket.filepath_local.path
             try:

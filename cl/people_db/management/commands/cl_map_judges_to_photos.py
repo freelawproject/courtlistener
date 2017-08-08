@@ -1,14 +1,14 @@
 import os
 
-from django.core.management import BaseCommand
 from django.utils.text import slugify
 from judge_pics import judge_root
 
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.models import Person
 from cl.custom_filters.templatetags.extras import granular_date
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = ('Run through the judges and see which have pictures in the '
             'judge-pics project.')
 
@@ -21,6 +21,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.debug = options['debug']
         self.options = options
 
@@ -73,24 +74,24 @@ class Command(BaseCommand):
         multi = 0
         for path, people in judge_map.items():
             if len(people) == 0:
-                print "WARNING: Did not find a judge for %s" % path
+                logger.warn("Did not find a judge for %s" % path)
                 missed += 1
             if len(people) == 1:
                 person = people[0]
                 found += 1
                 if not self.debug:
-                    print "INFO: Updating judge %s" % person
+                    logger.info("Updating judge %s" % person)
                     person.has_photo = True
                     person.save()
             if len(people) > 1:
-                print "WARNING: Found more than one match for %s\nFound:" % path
+                logger.warn("Found more than one match for %s:" % path)
                 for person in people:
-                    print "    %s - %s" % (person, granular_date(
+                    logger.warn("Found: %s - %s" % (person, granular_date(
                         person,
                         'date_dob',
                         iso=True,
-                    ))
+                    )))
                 multi += 1
 
-        print "\n\n%s Matches\n%s Missed\n%s Multiple results" % (found, missed,
-                                                              multi)
+        logger.info("\n\n%s Matches\n%s Missed\n%s Multiple results" %
+                    (found, missed, multi))

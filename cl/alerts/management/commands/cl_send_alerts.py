@@ -1,22 +1,19 @@
 import datetime
-import logging
 import traceback
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
-from django.core.management.base import BaseCommand
 from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import FREQUENCY, RealTimeQueue, ITEM_TYPES
 from cl.lib import search_utils
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import regroup_snippets
 from cl.search.forms import SearchForm
 from cl.stats.utils import tally_stat
-
-logger = logging.getLogger(__name__)
 
 
 class InvalidDateError(Exception):
@@ -65,7 +62,7 @@ def send_alert(user_profile, hits, simulate):
         msg.send(fail_silently=False)
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Sends the alert emails on a real time, daily, weekly or monthly ' \
            'basis.'
 
@@ -261,6 +258,7 @@ class Command(BaseCommand):
         return valid_ids
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.options = options
         if options['rate'] == 'rt':
             self.remove_stale_rt_items()

@@ -2,10 +2,11 @@ import argparse
 
 import numpy as np
 import pandas as pd
-from django.core.management import BaseCommand
 
-from cl.people_db.import_judges.assign_authors import assign_authors_to_opinions, \
-    assign_authors_to_oral_arguments
+from cl.lib.command_utils import VerboseCommand, logger
+from cl.people_db.import_judges.assign_authors import (
+    assign_authors_to_opinions,  assign_authors_to_oral_arguments,
+)
 from cl.people_db.import_judges.judge_utils import process_date_string
 from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge, \
     get_fed_court_object, add_positions_from_row, \
@@ -17,7 +18,7 @@ from cl.search.models import Court, JURISDICTIONS
 from cl.search.tasks import add_or_update_people
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Import judge data from various files.'
 
     def valid_actions(self, s):
@@ -65,6 +66,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.debug = options['debug']
         self.options = options
 
@@ -81,7 +83,8 @@ class Command(BaseCommand):
         df = pd.read_excel(infile, 0)
         for x in textfields:
             df[x] = df[x].replace(np.nan, '', regex=True)
-        df['Employment text field'].replace(to_replace=r';\sno', value=r', no', inplace=True, regex=True)
+        df['Employment text field'].replace(to_replace=r';\sno', value=r', no',
+                                            inplace=True, regex=True)
         for i, row in df.iterrows():
             make_federal_judge(dict(row), testing=self.debug)
 
@@ -118,27 +121,27 @@ class Command(BaseCommand):
 
     def import_all(self):
         datadir = self.options['input_file']
-        print('importing presidents...')
+        logger.info('importing presidents...')
         self.import_presidents(infile=datadir+'/presidents.xlsx')
-        print('importing FJC judges...')
+        logger.info('importing FJC judges...')
         self.import_fjc_judges(infile=datadir+'/fjc-data.xlsx')
-        print('importing state supreme court judges...')
+        logger.info('importing state supreme court judges...')
         self.import_state_judges(infile=datadir+'/state-supreme-court-bios-2016-04-06.xlsx')
-        print('importing state IAC judges...')
+        logger.info('importing state IAC judges...')
         self.import_state_judges(infile=datadir+'/state-iac-bios-2016-04-06.xlsx')
 
     def assign_judges_to_opinions(self):
-        print('Assigning authors...')
+        logger.info('Assigning authors...')
         assign_authors_to_opinions(jurisdictions=self.options['jurisdictions'],
                                    testing=self.debug)
 
     def assign_judges_to_oral_arguments(self):
-        print("Assigning panel members to oral arguments...")
+        logger.info("Assigning panel members to oral arguments...")
         assign_authors_to_oral_arguments(testing=self.debug)
 
     def assign_bankruptcy_fjc(self):
         """update FJC judges with bankruptcy positions"""
-        print('Assigning bankruptcy courtids...')
+        logger.info('Assigning bankruptcy courtids...')
         update_bankruptcy_and_magistrate(testing=self.debug)
 
     def fix_fjc_positions(self, infile=None):
@@ -167,10 +170,9 @@ class Command(BaseCommand):
         for i, item in df.iterrows():
             fjc_id = item['Judge Identification Number']
             p = Person.objects.get(fjc_id=fjc_id)
-            print(
-                "Doing person with FJC ID: %s, https://courtlistener.com%s" %
-                  (fjc_id, p.get_absolute_url())
-            )
+            logger.info("Doing person with FJC ID: %s, "
+                        "https://courtlistener.com%s" % (fjc_id,
+                                                         p.get_absolute_url()))
 
             exclusions = []
             for posnum in range(1, 7):
@@ -203,8 +205,9 @@ class Command(BaseCommand):
                                 .exclude(pk__in=exclusions))
                 position_count = positions.count()
                 if position_count < 1:
-                    print "Couldn't find position to match '%s' on '%s' with " \
-                          "exclusions: %s" % (p, date_start, exclusions)
+                    logger.info("Couldn't find position to match '%s' on '%s' "
+                                "with exclusions: %s" % (p, date_start,
+                                                         exclusions))
                     add_positions_from_row(item, p, self.debug,
                                            fix_nums=[posnum])
                     if not self.debug:
@@ -215,15 +218,16 @@ class Command(BaseCommand):
                     position = positions[0]
                     exclusions.append(position.pk)
                 elif position_count > 1:
-                    print "Got too many results for '%s' on '%s'. Got %s" % \
-                          (p, date_start, position_count)
+                    logger.info("Got too many results for '%s' on '%s'. Got %s"
+                                % (p, date_start, position_count))
                     continue
 
                 if position.court.pk == courtid:
-                    print "Court IDs are both '%s'. No changes made." % courtid
+                    logger.info("Court IDs are both '%s'. No changes made." %
+                                courtid)
                 else:
-                    print "Court IDs are different! Old: %s, New: %s" % (
-                        position.court.pk, courtid)
+                    logger.info("Court IDs are different! Old: %s, New: %s" %
+                                (position.court.pk, courtid))
                     court = Court.objects.get(pk=courtid)
                     position.court = court
 

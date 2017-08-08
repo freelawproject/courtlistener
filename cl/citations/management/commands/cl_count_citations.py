@@ -1,13 +1,14 @@
 # coding=utf-8
 import sys
 from django.conf import settings
-from django.core.management import BaseCommand, call_command
+from django.core.management import call_command
 
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.db_tools import queryset_generator
 from cl.search.models import OpinionCluster
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Update the citation counts of all items, if they are wrong.'
 
     def add_arguments(self, parser):
@@ -59,6 +60,7 @@ class Command(BaseCommand):
         For any item that has a citation count > 0, update the citation
         count based on the DB.
         """
+        super(Command, self).handle(*args, **options)
         index_during_processing = False
         if options['index'] == 'concurrently':
             index_during_processing = True

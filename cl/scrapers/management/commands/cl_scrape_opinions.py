@@ -8,13 +8,13 @@ from datetime import date
 
 from celery.task.sets import subtask
 from django.core.files.base import ContentFile
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from django.utils.encoding import force_bytes
-from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.alerts.models import RealTimeQueue
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.import_lib import get_candidate_judges
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
@@ -32,7 +32,7 @@ from cl.search.models import OpinionCluster
 die_now = False
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Runs the Juriscraper toolkit against one or many jurisdictions.'
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
@@ -260,6 +260,7 @@ class Command(BaseCommand):
         self.scrape_court(site, full_crawl)
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         global die_now
 
         # this line is used for handling SIGTERM (CTRL+4), so things can die

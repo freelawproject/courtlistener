@@ -1,12 +1,9 @@
-from __future__ import print_function
 import argparse
-import logging
 import os
 from datetime import timedelta
 
 from celery.canvas import chain
 from django.conf import settings
-from django.core.management import BaseCommand
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer.http import PacerSession
@@ -16,8 +13,10 @@ from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     get_and_save_free_document_report,
     process_free_opinion_result, get_and_process_pdf, delete_pacer_row,
-    upload_free_opinion_to_ia)
+    upload_free_opinion_to_ia,
+)
 from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.db_tools import queryset_generator
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
@@ -26,8 +25,6 @@ from cl.search.tasks import add_or_update_recap_document
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
-
-logger = logging.getLogger(__name__)
 
 
 def get_next_date_range(court_id, span=7):
@@ -50,7 +47,7 @@ def get_next_date_range(court_id, span=7):
             status=PACERFreeDocumentLog.SCRAPE_FAILED,
         ).latest('date_queried')
     except PACERFreeDocumentLog.DoesNotExist:
-        print("FAILED ON: %s" % court_id)
+        logger.warn("FAILED ON: %s" % court_id)
         raise
 
     if last_completion_log.status == PACERFreeDocumentLog.SCRAPE_IN_PROGRESS:
@@ -245,7 +242,7 @@ def do_everything(options):
     upload_to_internet_archive(options)
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = "Get all the free content from PACER. There are three modes."
 
     def valid_actions(self, s):
@@ -280,6 +277,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         options['action'](options)
 
     VALID_ACTIONS = {

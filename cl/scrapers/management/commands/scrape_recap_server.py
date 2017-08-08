@@ -1,5 +1,4 @@
 import calendar
-import logging
 import os
 
 from datetime import timedelta
@@ -7,10 +6,10 @@ from datetime import timedelta
 import requests
 from celery.canvas import chain, chord
 from django.conf import settings
-from django.core.management import BaseCommand
 from django.db.models import Q
 from django.utils.timezone import now
 
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.corpus_importer.tasks import download_recap_item, parse_recap_docket
 from cl.lib.recap_utils import get_docketxml_url, get_docket_filename, \
     get_document_filename, get_pdf_url
@@ -21,7 +20,6 @@ from cl.search.models import RECAPDocument
 from cl.search.tasks import add_or_update_recap_document
 
 RECAP_MOD_URL = "http://recapextension.org/recap/get_updated_cases/"
-logger = logging.getLogger(__name__)
 
 
 def update_log_status(log, status):
@@ -132,11 +130,12 @@ def sweep_missing_downloads():
             ).apply_async()
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = ("Get all the latest content from the RECAP Server. In theory, this "
             "is only temporary until the recap server can be decommissioned.")
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         items, log = get_new_content_from_recap()
         get_and_merge_items(items, log)
         log.status = RECAPLog.SCRAPE_SUCCESSFUL

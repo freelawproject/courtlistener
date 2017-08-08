@@ -6,10 +6,10 @@ import random
 import time
 import traceback
 from django.core import serializers
-from django.core.management.base import BaseCommand
 from django.db.models.query_utils import Q
-from cl.search.models import Docket, OpinionCluster, Opinion, OpinionsCited
 
+from cl.lib.command_utils import VerboseCommand, logger
+from cl.search.models import Docket, OpinionCluster, Opinion, OpinionsCited
 
 SUPPORTED_MODELS = (
     Docket,
@@ -19,7 +19,7 @@ SUPPORTED_MODELS = (
 )
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = ('CL-specific data dumper for making fixtures from production')
 
     def __init__(self, *args, **kwargs):
@@ -40,6 +40,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         n = options['n']
         fmt = options['format']
 

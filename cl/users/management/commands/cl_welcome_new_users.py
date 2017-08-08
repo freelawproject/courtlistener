@@ -1,17 +1,15 @@
-import logging
 import sys
 from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
 from django.core.mail import send_mass_mail
-from django.core.management.base import BaseCommand
 from django.template import loader
 from django.utils.timezone import utc, make_aware
 
-logger = logging.getLogger(__name__)
+from cl.lib.command_utils import VerboseCommand, logger
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     """Note that this entire command can be replaced with scheduled celery
     tasks. Instead of running this once daily, you just schedule a task for
     later when somebody signs up.
@@ -28,6 +26,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.options = options
         yesterday = make_aware(datetime.now(), utc) - timedelta(days=1)
         recipients = User.objects.filter(date_joined__gt=yesterday,

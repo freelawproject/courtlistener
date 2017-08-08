@@ -6,14 +6,15 @@ from cl.citations.tasks import update_document
 from cl.lib import sunburnt
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.db_tools import queryset_generator
 from cl.search.models import Opinion
 from django.conf import settings
 from django.core.management import call_command
-from django.core.management import BaseCommand, CommandError
+from django.core.management import CommandError
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Parse citations out of documents.'
 
     def add_arguments(self, parser):
@@ -74,6 +75,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         both_list_and_endpoints = (options.get('doc_id') is not None and
                                    (options.get('start_id') is not None or
                                     options.get('end_id') is not None or

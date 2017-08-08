@@ -5,10 +5,10 @@ from datetime import date
 
 from django.core.files.base import ContentFile
 from django.utils.encoding import force_bytes
-from juriscraper.AbstractSite import logger
 
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
+from cl.lib.command_utils import logger
 from cl.lib.import_lib import get_candidate_judges, get_scotus_judges
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker

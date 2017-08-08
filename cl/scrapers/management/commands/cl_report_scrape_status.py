@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 import pkg_resources
-from juriscraper.lib import importer
-from operator import itemgetter
-from django.utils.timezone import now
-
-from cl.scrapers.models import ErrorLog
-from cl.search.models import Court, OpinionCluster
 from datetime import date, timedelta
+from operator import itemgetter
 from django.conf import settings
 from django.core import mail
 from django.core.mail import EmailMessage
-from django.core.management.base import BaseCommand
-from django.template import loader
 from django.db.models import Count
+from django.template import loader
+from django.utils.timezone import now
+from juriscraper.lib import importer
+
+from cl.lib.command_utils import VerboseCommand, logger
+from cl.scrapers.models import ErrorLog
+from cl.search.models import Court, OpinionCluster
 
 
 def _make_query_dict(query_list):
@@ -170,7 +170,8 @@ def generate_report():
     }
     report = html_template.render(context)
 
-    subject = '[juriscraper-notification] CourtListener status email for {date}'.format(
+    subject = '[juriscraper-notification] CourtListener status email for ' \
+              '{date}'.format(
         date=date.strftime(now(), '%Y-%m-%d')
     )
 
@@ -183,7 +184,7 @@ def truncate_database_logs():
     ErrorLog.objects.filter(log_time__lt=thirty_days_ago).delete()
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Generates a report and sends it to the administrators.'
 
     def add_arguments(self, parser):
@@ -197,6 +198,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         report, subject = generate_report()
         send_report(report, subject, options['debug'])
         truncate_database_logs()

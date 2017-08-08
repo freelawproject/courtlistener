@@ -1,23 +1,21 @@
 import ast
-import logging
 import sys
 import time
 
 from django.conf import settings
 from django.core.mail import send_mass_mail
-from django.core.management.base import BaseCommand
 from django.template import loader
 
 from cl.lib.argparse_types import csv_list
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.utils import chunks
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
-logger = logging.getLogger(__name__)
 CHUNK_SIZE = 50
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = ('Sends a PR email to the people listed in recipients field and/or '
             'that are subscribed to the CL newsletter')
 
@@ -86,7 +84,7 @@ class Command(BaseCommand):
                              'emails!\n' % emails_sent_count)
 
     def handle(self, *args, **options):
-        self.verbosity = int(options.get('verbosity', 1))
+        super(Command, self).handle(*args, **options)
         self.options = options
 
         recipients = set()

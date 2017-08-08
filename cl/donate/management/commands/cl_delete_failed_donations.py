@@ -1,14 +1,14 @@
 from datetime import timedelta
 
-from django.core.management.base import BaseCommand
 from django.utils.timezone import now
 
 from cl.donate.models import Donation
+from cl.lib.command_utils import VerboseCommand, logger
 
 TOO_MANY_DAYS_AGO = now() - timedelta(days=7)
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = 'Deletes donations that never went through so they are not in ' \
            'the database forever.'
 
@@ -22,6 +22,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
         self.stdout.write('%s\n' % '#' * 25)
         if options['simulate']:
             self.stdout.write('# SIMULATE MODE IS ON.  #\n')
