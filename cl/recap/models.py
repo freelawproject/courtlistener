@@ -58,20 +58,19 @@ class ProcessingQueue(models.Model):
         max_length=100,
     )
     pacer_doc_id = models.CharField(
-        help_text="The ID of the document in PACER. This information is "
-                  "provided by RECAP.",
+        help_text="The ID of the document in PACER.",
         max_length=32,  # Same as in RECAP
         unique=True,
         blank=True,
     )
     document_number = models.CharField(
-        help_text="If the file is a document, the number is the "
-                  "document_number in RECAP docket.",
+        help_text="The docket entry number for the document.",
         max_length=32,
+        blank=True,
     )
     attachment_number = models.SmallIntegerField(
         help_text="If the file is an attachment, the number is the attachment "
-                  "number in RECAP docket.",
+                  "number on the docket.",
         blank=True,
         null=True,
     )
@@ -82,7 +81,10 @@ class ProcessingQueue(models.Model):
         max_length=1000,
     )
     status = models.SmallIntegerField(
-        help_text="The current status of this upload.",
+        help_text="The current status of this upload. Possible values are: %s" %
+                  ', '.join(['(%s): %s' % (t[0], t[1]) for t in
+                             PROCESSING_STATUSES]),
+        default=AWAITING_PROCESSING,
         choices=PROCESSING_STATUSES,
     )
     upload_type = models.SmallIntegerField(

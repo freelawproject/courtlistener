@@ -11,8 +11,11 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.urlresolvers import reverse
 from django.test import TestCase
-from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_201_CREATED, \
-    HTTP_401_UNAUTHORIZED
+from rest_framework.status import (
+    HTTP_201_CREATED,
+    HTTP_400_BAD_REQUEST,
+    HTTP_401_UNAUTHORIZED,
+)
 from rest_framework.test import APIClient
 
 from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
@@ -38,8 +41,7 @@ class RecapUploadsTest(TestCase):
             'pacer_case_id': 'asdf',
             'document_number': 'asdf',
             'filepath_local': f,
-            'status': 1,
-            'upload_type': 3,
+            'upload_type': ProcessingQueue.PDF,
         }
 
     def test_uploading_a_pdf(self, mock):
@@ -52,6 +54,35 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(j['document_number'], 'asdf')
         self.assertEqual(j['pacer_case_id'], 'asdf')
         mock.assert_called()
+
+    def test_uploading_a_docket(self, mock):
+        """Can we upload a docket and have it be saved correctly?
+        
+        Note that this works fine even though we're not actually uploading a 
+        docket due to the mock.
+        """
+        self.data.update({
+            'upload_type': ProcessingQueue.DOCKET,
+            'document_number': '',
+        })
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+    def test_numbers_in_docket_uploads_fail(self, mock):
+        """Are invalid uploads denied?
+        
+        For example, if you're uploading a Docket, you shouldn't be providing a
+        document number.
+        """
+        self.data['upload_type'] = ProcessingQueue.DOCKET
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+
+    def test_no_numbers_in_docket_uploads_work(self, mock):
+        self.data['upload_type'] = ProcessingQueue.DOCKET
+        self.data['document_number'] = ''
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
 
     def test_uploading_non_ascii(self, mock):
         """Can we handle it if a client sends non-ascii strings?"""
@@ -106,7 +137,6 @@ class RecapPdfTaskTest(TestCase):
             pacer_doc_id='asdf',
             document_number='1',
             filepath_local=f,
-            status=ProcessingQueue.AWAITING_PROCESSING,
             upload_type=ProcessingQueue.PDF,
         )
         self.docket = Docket.objects.create(source=0, court_id='scotus',
@@ -127,6 +157,9 @@ class RecapPdfTaskTest(TestCase):
             self.docket.delete()  # This cascades to self.de and self.rd
         except (Docket.DoesNotExist, AssertionError):
             pass
+
+    def test_pq_has_default_status(self):
+        self.assertTrue(self.pq.status == ProcessingQueue.AWAITING_PROCESSING)
 
     @mock.patch('cl.recap.tasks.extract_recap_pdf')
     def test_recap_document_already_exists(self, mock):
@@ -317,7 +350,6 @@ class RecapDocketTaskTest(TestCase):
             uploader=user,
             pacer_case_id='asdf',
             filepath_local=f,
-            status=ProcessingQueue.AWAITING_PROCESSING,
             upload_type=ProcessingQueue.DOCKET,
         )
 
@@ -329,6 +361,7 @@ class RecapDocketTaskTest(TestCase):
     def test_parsing_docket_does_not_exist(self, add_atty_mock):
         """Can we parse an HTML docket we have never seen before?"""
         d = process_recap_docket(self.pq.pk)
+        # XXX
         pass
 
     def test_parsing_docket_already_exists(self, add_atty_mock):
