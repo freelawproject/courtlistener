@@ -361,8 +361,9 @@ class RecapDocketTaskTest(TestCase):
     def test_parsing_docket_does_not_exist(self, add_atty_mock):
         """Can we parse an HTML docket we have never seen before?"""
         d = process_recap_docket(self.pq.pk)
-        # XXX
-        pass
+        self.assertEqual(d.source, Docket.RECAP)
+        self.assertTrue(d.case_name)
+        self.assertEqual(d.jury_demand, "None")
 
     def test_parsing_docket_already_exists(self, add_atty_mock):
         """Can we parse an HTML docket for a docket we have in the DB?"""
