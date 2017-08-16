@@ -13,7 +13,6 @@ from django.views.decorators.cache import cache_page
 
 from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
-from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib import magic
 from cl.lib.bot_detector import is_bot
 from cl.people_db.models import Person
@@ -38,10 +37,9 @@ def faq(request):
         'total_opinion_count': OpinionCluster.objects.all().count(),
         'total_recap_count': RECAPDocument.objects.filter(
             is_available=True).count(),
-        'total_oa_minutes': naturalduration(
-            Audio.objects.aggregate(Sum('duration'))['duration__sum'],
-            as_dict=True
-        )['m'],
+        'total_oa_minutes': Audio.objects.aggregate(
+            Sum('duration')
+        )['duration__sum'] or 0 / 60,
         'total_judge_count': Person.objects.all().count(),
     }
 
