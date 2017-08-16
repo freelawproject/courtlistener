@@ -37,9 +37,9 @@ def faq(request):
         'total_opinion_count': OpinionCluster.objects.all().count(),
         'total_recap_count': RECAPDocument.objects.filter(
             is_available=True).count(),
-        'total_oa_minutes': Audio.objects.aggregate(
+        'total_oa_minutes': (Audio.objects.aggregate(
             Sum('duration')
-        )['duration__sum'] or 0 / 60,
+        )['duration__sum'] or 0) / 60,
         'total_judge_count': Person.objects.all().count(),
     }
 
