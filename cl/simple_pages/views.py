@@ -1,3 +1,4 @@
+# coding=utf-8
 import json
 import os
 
@@ -190,14 +191,14 @@ def advanced_search(request):
 
 def old_terms(request, v):
     return render(request, 'terms/%s.html' % v, {
-        'title': 'Archived Terms of Service and Policies, v%s - CourtListener.com' % v,
+        'title': 'Archived Terms of Service and Policies, v%s – CourtListener.com' % v,
         'private': True
     })
 
 
 def latest_terms(request):
     return render(request, 'terms/latest.html', {
-        'title': 'Terms of Service and Policies - CourtListener.com',
+        'title': 'Terms of Service and Policies – CourtListener.com',
         'private': False
     })
 
