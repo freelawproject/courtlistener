@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.urlresolvers import reverse
-from django.test import LiveServerTestCase
+from django.test import LiveServerTestCase, Client, TestCase
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from timeout_decorator import timeout_decorator
@@ -90,6 +90,49 @@ class UserTest(LiveServerTestCase):
         ups = UserProfile.objects.filter(pk__in=(3, 4, 5))
         for up in ups:
             self.assertTrue(up.email_confirmed)
+
+
+class DisposableEmailTest(TestCase):
+    fixtures = ['authtest_data.json']
+    """
+    Tests for issue #724 to block people with bad disposable email addresses.
+
+    https://github.com/freelawproject/courtlistener/issues/724
+    """
+
+    bad_domain = 'yopmail.com'
+    user = 'Aamon'
+    bad_email = '%s@%s' % (user, bad_domain)
+
+    def setUp(self):
+        self.client = Client()
+
+    def test_can_i_create_account_with_bad_email_address(self):
+        """Is an error thrown if we try to use a banned email address?"""
+        r = self.client.post(reverse('register'), {
+            'username': 'aamon',
+            'email': self.bad_email,
+            'password1': 'a',
+            'password2': 'a',
+            'first_name': 'Aamon',
+            'last_name': 'Marquis of Hell',
+            'skip_me_if_alive': '',
+        })
+        self.assertIn(
+            '%s is a blocked email provider' % self.bad_domain,
+            r.content,
+        )
+
+    def test_can_i_change_to_bad_email_address(self):
+        """Is an error thrown if we try to change to a bad email address?"""
+        self.client.login(username="pandora", password="password")
+        r = self.client.post(reverse('view_settings'), {
+            'email': self.bad_email,
+        }, follow=True)
+        self.assertIn(
+            '%s is a blocked email provider' % self.bad_domain,
+            r.content,
+        )
 
 
 class LiveUserTest(BaseSeleniumTest):

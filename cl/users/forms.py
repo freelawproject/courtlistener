@@ -1,3 +1,4 @@
+from disposable_email_domains import blacklist
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm, \
     PasswordResetForm, SetPasswordForm
@@ -100,14 +101,25 @@ class UserForm(ModelForm):
             }),
         }
 
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        user_part, domain_part = email.rsplit('@', 1)
+        if domain_part in blacklist:
+            raise forms.ValidationError(
+                '%s is a blocked email provider' % domain_part,
+                code="bad_email_domain"
+            )
+        return email
+
 
 class UserCreationFormExtended(UserCreationForm):
+    """A bit of an unusual form because instead of creating it ourselves,
+    we are overriding the one from Django. Thus, instead of declaring
+    everything explicitly like we normally do, we just override the
+    specific parts we want to, after calling the super class's __init__().
+    """
     def __init__(self, *args, **kwargs):
-        """A bit of an unusual form because instead of creating it ourselves,
-        we are overriding the one from Django. Thus, instead of declaring
-        everything explicitly like we normally do, we just override the
-        specific parts we want to, after calling the super class's __init__().
-        """
+
         super(UserCreationFormExtended, self).__init__(*args, **kwargs)
 
         self.fields['username'].label = 'User Name*'
@@ -150,6 +162,16 @@ class UserCreationFormExtended(UserCreationForm):
             'first_name',
             'last_name',
         )
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        user_part, domain_part = email.rsplit('@', 1)
+        if domain_part in blacklist:
+            raise forms.ValidationError(
+                '%s is a blocked email provider' % domain_part,
+                code="bad_email_domain"
+            )
+        return email
 
 
 class EmailConfirmationForm(forms.Form):
