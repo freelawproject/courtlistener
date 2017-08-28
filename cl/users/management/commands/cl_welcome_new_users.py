@@ -44,7 +44,7 @@ class Command(VerboseCommand):
         """Send the emails using the templates and contexts requested."""
         messages = []
         email_subject = 'Hi from CourtListener and Free Law Project'
-        email_sender = 'Brian Carver <bcarver@courtListener.com>'
+        email_sender = 'Michael Lissner <mlissner@courtListener.com>'
         txt_template = loader.get_template('emails/welcome_email.txt')
         for recipient in recipients:
             context = {'name': recipient.first_name}
