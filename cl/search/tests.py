@@ -189,43 +189,59 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_a_simple_text_query(self):
         """Does typing into the main query box work?"""
-        r = self.client.get('/', {'q': 'supreme'})
+        r = self.client.get(reverse('show_results'), {'q': 'supreme'})
         self.assertIn('Honda', r.content)
         self.assertIn('1 Opinion', r.content)
 
     def test_a_case_name_query(self):
         """Does querying by case name work?"""
-        r = self.client.get('/', {'q': '*', 'case_name': 'honda'})
+        r = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'case_name': 'honda',
+        })
         self.assertIn('Honda', r.content)
 
     def test_a_query_with_white_space_only(self):
         """Does everything work when whitespace is in various fields?"""
-        r = self.client.get('/', {'q': ' ',
-                                  'judge': ' ',
-                                  'case_name': ' '})
+        r = self.client.get(reverse('show_results'), {
+            'q': ' ',
+            'judge': ' ',
+            'case_name': ' ',
+        })
         self.assertIn('Honda', r.content)
         self.assertNotIn('an error', r.content)
 
     def test_a_query_with_a_date(self):
         """Does querying by date work?"""
-        response = self.client.get('/', {'q': '*',
-                                         'filed_after': '1795-06',
-                                         'filed_before': '1796-01'})
+        response = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'filed_after': '1795-06',
+            'filed_before': '1796-01',
+        })
         self.assertIn('Honda', response.content)
 
     def test_faceted_queries(self):
         """Does querying in a given court return the document? Does querying
         the wrong facets exclude it?
         """
-        r = self.client.get('/', {'q': '*', 'court_test': 'on'})
+        r = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'court_test': 'on',
+        })
         self.assertIn('Honda', r.content)
-        r = self.client.get('/', {'q': '*', 'stat_Errata': 'on'})
+        r = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'stat_Errata': 'on',
+        })
         self.assertNotIn('Honda', r.content)
         self.assertIn("Debbas", r.content)
 
     def test_a_docket_number_query(self):
         """Can we query by docket number?"""
-        r = self.client.get('/', {'q': '*', 'docket_number': '2'})
+        r = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'docket_number': '2',
+        })
         self.assertIn(
             'Honda',
             r.content,
@@ -237,35 +253,52 @@ class SearchTest(IndexedSolrTestCase):
         get_dicts = [{'q': '*', 'citation': '33'},
                      {'q': 'citation:33'}]
         for get_dict in get_dicts:
-            r = self.client.get('/', get_dict)
+            r = self.client.get(reverse('show_results'), get_dict)
             self.assertIn('Honda', r.content)
 
     def test_a_neutral_citation_query(self):
         """Can we query by neutral citation numbers?"""
-        r = self.client.get('/', {'q': '*', 'neutral_cite': '22'})
+        r = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'neutral_cite': '22',
+        })
         self.assertIn('Honda', r.content)
 
     def test_a_query_with_a_old_date(self):
         """Do we have any recurrent issues with old dates and strftime (issue
         220)?"""
-        r = self.client.get('/', {'q': '*', 'filed_after': '1890'})
+        r = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'filed_after': '1890',
+        })
         self.assertEqual(200, r.status_code)
 
     def test_a_judge_query(self):
         """Can we query by judge name?"""
-        r = self.client.get('/', {'q': '*', 'judge': 'david'})
+        r = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'judge': 'david'
+        })
         self.assertIn('Honda', r.content)
-        r = self.client.get('/', {'q': 'judge:david'})
+        r = self.client.get(reverse('show_results'), {
+            'q': 'judge:david',
+        })
         self.assertIn('Honda', r.content)
 
     def test_a_nature_of_suit_query(self):
         """Can we query by nature of suit?"""
-        r = self.client.get('/', {'q': 'suitNature:"copyright"'})
+        r = self.client.get(reverse('show_results'), {
+            'q': 'suitNature:"copyright"',
+        })
         self.assertIn('Honda', r.content)
 
     def test_citation_filtering(self):
         """Can we find Documents by citation filtering?"""
-        r = self.client.get('/', {'q': '*', 'cited_lt': 7, 'cited_gt': 5})
+        r = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'cited_lt': 7,
+            'cited_gt': 5,
+        })
         self.assertIn(
             'Honda',
             r.content,
@@ -280,7 +313,10 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_citation_ordering(self):
         """Can the results be re-ordered by citation count?"""
-        r = self.client.get('/', {'q': '*', 'order_by': 'citeCount desc'})
+        r = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'order_by': 'citeCount desc',
+        })
         most_cited_name = 'case name cluster 3'
         less_cited_name = 'Howard v. Honda'
         self.assertTrue(
@@ -295,24 +331,33 @@ class SearchTest(IndexedSolrTestCase):
                 "citeCount." % (most_cited_name, less_cited_name))
 
     def test_oa_results_basic(self):
-        r = self.client.get('/', {'type': 'oa'})
+        r = self.client.get(reverse('show_results'), {'type': 'oa'})
         self.assertIn('Jose', r.content)
 
     def test_oa_results_date_argued_ordering(self):
-        r = self.client.get('/', {'type': 'oa', 'order_by': 'dateArgued desc'})
+        r = self.client.get(reverse('show_results'), {
+            'type': 'oa',
+            'order_by': 'dateArgued desc'
+        })
         self.assertTrue(
             r.content.index('SEC') < r.content.index('Jose'),
             msg="'SEC' should come BEFORE 'Jose' when order_by desc."
         )
 
-        r = self.client.get('/', {'type': 'oa', 'order_by': 'dateArgued asc'})
+        r = self.client.get(reverse('show_results'), {
+            'type': 'oa',
+            'order_by': 'dateArgued asc'
+        })
         self.assertTrue(
             r.content.index('Jose') < r.content.index('SEC'),
             msg="'Jose' should come AFTER 'SEC' when order_by asc."
         )
 
     def test_oa_case_name_filtering(self):
-        r = self.client.get('/', {'type': 'oa', 'case_name': 'jose'})
+        r = self.client.get(reverse('show_results'), {
+            'type': 'oa',
+            'case_name': 'jose'
+        })
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(
@@ -323,7 +368,10 @@ class SearchTest(IndexedSolrTestCase):
         )
 
     def test_oa_jurisdiction_filtering(self):
-        r = self.client.get('/', {'type': 'oa', 'court': 'test'})
+        r = self.client.get(reverse('show_results'), {
+            'type': 'oa',
+            'court': 'test'
+        })
         actual = self.get_article_count(r)
         expected = 2
         self.assertEqual(
@@ -334,7 +382,10 @@ class SearchTest(IndexedSolrTestCase):
         )
 
     def test_oa_date_argued_filtering(self):
-        r = self.client.get('/', {'type': 'oa', 'argued_after': '2014-10-01'})
+        r = self.client.get(reverse('show_results'), {
+            'type': 'oa',
+            'argued_after': '2014-10-01'
+        })
         self.assertNotIn(
             "an error",
             r.content,
@@ -345,7 +396,7 @@ class SearchTest(IndexedSolrTestCase):
         """Can we get oa results on the search endpoint?"""
         r = self.client.get(
             reverse('search-list', kwargs={'version': 'v3'}),
-            {'type': 'oa'}
+            {'type': 'oa'},
         )
         self.assertEqual(
             r.status_code,
@@ -355,25 +406,48 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_homepage(self):
         """Is the homepage loaded when no GET parameters are provided?"""
-        response = self.client.get('/')
+        response = self.client.get(reverse('show_results'))
         self.assertIn('id="homepage"', response.content,
                       msg="Did not find the #homepage id when attempting to "
                           "load the homepage")
 
     def test_fail_gracefully(self):
         """Do we fail gracefully when an invalid search is created?"""
-        response = self.client.get('/?neutral_cite=-')
+        response = self.client.get(reverse('show_results'), {
+            'neutral_cite': '-',
+        })
         self.assertEqual(response.status_code, 200)
         self.assertIn('an error', response.content,
                       msg="Invalid search did not result in an error.")
 
     def test_issue_635_leading_zeros(self):
         """Do queries with leading zeros work equal to ones without?"""
-        r = self.client.get('/?docket_number=005&stat_Errata=on')
+        r = self.client.get(reverse('show_results'), {
+            'docket_number': '005',
+            'stat_Errata': 'on',
+        })
         expected = 1
         self.assertEqual(expected, self.get_article_count(r))
-        r = self.client.get('/?docket_number=5&stat_Errata=on')
+        r = self.client.get(reverse('show_results'), {
+            'docket_number': '5',
+            'stat_Errata': 'on',
+        })
         self.assertEqual(expected, self.get_article_count(r))
+
+    def test_issue_727_doc_att_numbers(self):
+        """Can we send integers to the document number and attachment number
+        fields?
+        """
+        r = self.client.get(reverse('show_results'), {
+            'type': 'r',
+            'document_number': '1',
+        })
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        r = self.client.get(reverse('show_results'), {
+            'type': 'r',
+            'attachment_number': '1',
+        })
+        self.assertEqual(r.status_code, HTTP_200_OK)
 
 
 class GroupedSearchTest(EmptySolrTestCase):

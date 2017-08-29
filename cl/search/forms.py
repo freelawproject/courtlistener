@@ -173,7 +173,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
-    document_number = forms.IntegerField(
+    document_number = forms.CharField(
         required=False,
         label="Document #",
         widget=forms.TextInput(
@@ -181,7 +181,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
-    attachment_number = forms.IntegerField(
+    attachment_number = forms.CharField(
         required=False,
         label="Attachment #",
         widget=forms.TextInput(
