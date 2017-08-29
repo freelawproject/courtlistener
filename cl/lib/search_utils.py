@@ -587,7 +587,7 @@ def add_grouping(main_params, cd):
         group_params = {
             'group': 'true',
             'group.ngroups': 'true',
-            'group.limit': 5 if not docket_query else 100,
+            'group.limit': 5 if not docket_query else 500,
             'group.field': 'docket_id',
             'group.sort': 'score desc',
         }
