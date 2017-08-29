@@ -534,13 +534,17 @@
 
 
         <h3 id="search-endpoint">{% url "search-list" version="v3" %}</h3>
-        <p>This endpoint allows you to query our search engine in a similar manner as is possible in our front end. Because this endpoint does not use the Django models directly, this endpoint is quite different than any other. Unfortunately, unlike other endpoints, it does not support <code>OPTIONS</code> requests and thus is not self-documenting. Several Additional differences should also be noted:
+        <p>This endpoint allows you to query our search engine in a similar manner to our front end. Because this endpoint does not use the Django models directly, this endpoint is quite different than any other. Unlike other endpoints, it does not support <code>OPTIONS</code> requests and thus is not self-documenting. Several Additional differences should also be noted:
         </p>
         <ul>
             <li><strong>Ordering</strong>: Instead of using a minus sign to flip
                 ordering, it uses <code>asc</code> and <code>desc</code>.
             </li>
-            <li><strong>Filtering</strong>: Instead of using the Django lookup fields, it uses Solr syntax.To filter on this endpoint, we recommend identifying an effective query on the front end that generates the results you desire and then using that query (and variations thereof) to query the API. On the backend, the same code serves both the API and the front end. <code>GET</code> parameters from the front end can be copy pasted to the API endpoint.
+            <li>
+                <p><strong>Filtering</strong>: Instead of using the Django lookup fields, it uses Solr syntax. To filter on this endpoint, we recommend identifying an effective query on the front end that generates the results you want and then using that query (and variations thereof) to query the API. On the backend, very similar code serves both the API and the front end.
+                </p>
+                <p><code>GET</code> parameters from the front end can be copy-pasted to the API endpoint.
+                </p>
             </li>
             <li>
                 <p><strong>Fields</strong>: The fields on this endpoint often differ slightly from those in the other endpoints. Both their names and their values may be different. For example, instead of having a field called <code>nature_of_suit</code>, this endpoint has a field called <code>suitNature</code>. Instead of having a number of citation fields (<code>federal_cite_one</code>, <code>state_cite_two</code>, etc.), this endpoint just has all the citations in a single field called <code>citations</code>, which provides the same values as a list.
@@ -558,7 +562,9 @@
                     <li><code>oa</code> &mdash; Oral Arguments</li>
                 </ul>
             </li>
-            <li>Like the front end, when the <code>type</code> is set to return opinions, only precedential results are returned by default. To get other precedential statuses, you need to explicitly request them.
+            <li>As in the front end, when the <code>type</code> is set to return opinions, only precedential results are returned by default. To get other precedential statuses, you need to explicitly request them.
+            </li>
+            <li>The RECAP <code>type</code> returns a flat list of results, unlike as is done in the front end. This is to simplify the backend and to aid in performance of API requests. We hope to add nested results to a future version of the API.
             </li>
         </ul>
         <p>Some fields warrant more details:

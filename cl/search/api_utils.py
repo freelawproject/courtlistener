@@ -13,13 +13,14 @@ def get_object_list(request=None, **kwargs):
     # Assume page_size = 20, then: 1 --> 0, 2 --> 19, 3 --> 39
     offset = max(0, (page_number - 1) * paginator.page_size - 1)
     limit = 20
-    main_query = {'caller': 'api_search'}
     try:
-        main_query.update(search_utils.build_main_query(
+        main_query = search_utils.build_main_query(
             kwargs['cd'],
             highlight='text',
             facet=False,
-        ))
+            group=False,
+        )
+        main_query['caller'] = 'api_search'
         sl = SolrList(
             main_query=main_query,
             offset=offset,
@@ -29,11 +30,13 @@ def get_object_list(request=None, **kwargs):
     except KeyError:
         sf = forms.SearchForm({'q': '*'})
         if sf.is_valid():
-            main_query.update(search_utils.build_main_query(
+            main_query = search_utils.build_main_query(
                 sf.cleaned_data,
                 highlight='text',
                 facet=False,
-            ))
+                group=False,
+            )
+            main_query['caller'] = 'api_search'
         sl = SolrList(
             main_query=main_query,
             offset=offset,
@@ -102,17 +105,12 @@ class SolrList(object):
                         result['solr_highlights']['text'])
                 self._item_cache.append(SolrObject(initial=result))
         else:
-            # Grouped results
+            # Flatten group results, and pull up the text snippet as above.
             for group in getattr(r.groups, r.group_field)['groups']:
-                snippets = []
                 for doc in group['doclist']['docs']:
-                    for snippet in doc['solr_highlights']['text']:
-                        if snippet not in snippets:
-                            snippets.append(snippet)
-
-                doc0 = group['doclist']['docs'][0]
-                doc0['snippet'] = '&hellip;'.join(snippets)
-                self._item_cache.append(SolrObject(initial=doc0))
+                    doc['snippet'] = '&hellip;'.join(
+                        doc['solr_highlights']['text'])
+                    self._item_cache.append(SolrObject(initial=doc))
 
         # Now, assuming our _item_cache is all set, we just get the item.
         if isinstance(item, slice):

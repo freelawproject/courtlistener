@@ -570,19 +570,19 @@ def add_filter_queries(main_params, cd):
             main_params['fq'] = main_fq
 
 
-def add_grouping(main_params, cd):
+def add_grouping(main_params, cd, group):
     """Add any grouping parameters."""
     if cd['type'] == 'o':
-        # Because this uses faceting, we use the collapse query parser here
-        # instead of the usual result grouping. Faceting with grouping has
-        # terrible performance.
+        # Group clusters. Because this uses faceting, we use the collapse query
+        # parser here instead of the usual result grouping. Faceting with
+        # grouping has terrible performance.
         group_fq = "{!collapse field=cluster_id sort='type asc'}"
         if 'fq' in main_params:
             main_params['fq'].append(group_fq)
         else:
             main_params['fq'] = group_fq
 
-    elif cd['type'] == 'r':
+    elif cd['type'] == 'r' and group is True:
         docket_query = re.match('docket_id:\d+', cd['q'])
         group_params = {
             'group': 'true',
@@ -632,13 +632,13 @@ def regroup_snippets(results):
 
 def print_params(params):
     if settings.DEBUG:
-        print "Params sent to search are:\n%s" % ' &\n'.join(
+        print("Params sent to search are:\n%s" % ' &\n'.join(
             ['  %s = %s' % (k, v) for k, v in params.items()]
-        )
+        ))
         # print results_si.execute()
 
 
-def build_main_query(cd, highlight='all', order_by='', facet=True):
+def build_main_query(cd, highlight='all', order_by='', facet=True, group=True):
     main_params = {
         'q': cd['q'] or '*',
         'sort': cd.get('order_by', order_by),
@@ -648,7 +648,7 @@ def build_main_query(cd, highlight='all', order_by='', facet=True):
     add_boosts(main_params, cd)
     add_highlighting(main_params, cd, highlight)
     add_filter_queries(main_params, cd)
-    add_grouping(main_params, cd)
+    add_grouping(main_params, cd, group)
 
     print_params(main_params)
     return main_params
