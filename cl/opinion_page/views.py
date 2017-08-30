@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
+from rest_framework.status import HTTP_404_NOT_FOUND
 
 from cl.citations.find_citations import get_citations
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -296,11 +297,16 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
             # Show the correct page....
             if clusters.count() == 0:
                 # No results for an otherwise valid citation.
-                return render(request, 'citation_redirect_info_page.html', {
-                    'none_found': True,
-                    'citation_str': citation_str,
-                    'private': True,
-                })
+                return render(
+                    request,
+                    'citation_redirect_info_page.html',
+                    {
+                        'none_found': True,
+                        'citation_str': citation_str,
+                        'private': True,
+                    },
+                    status=HTTP_404_NOT_FOUND,
+                )
 
             elif clusters.count() == 1:
                 # Total success. Redirect to correct location.

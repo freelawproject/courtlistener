@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.test import TestCase, override_settings
-from django.test.client import Client
+from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND, \
+    HTTP_302_FOUND
 
 from cl.lib import sunburnt
 from cl.lib.test_helpers import SitemapTest
@@ -22,19 +23,18 @@ class CitationRedirectorTest(TestCase):
     """Tests to make sure that the basic citation redirector is working."""
     fixtures = ['test_objects_search.json', 'judge_judy.json']
 
-    def _200_status(self, r):
+    def assertStatus(self, r, status):
         self.assertEqual(
             r.status_code,
-            200,
-            msg="Didn't get a 200 status code. Got {code} "
-                "instead.".format(
-                    code=r.status_code,
-                ))
+            status,
+            msg="Didn't get a {expected} status code. Got {got} "
+                "instead.".format(expected=status, got=r.status_code)
+        )
 
     def test_with_and_without_a_citation(self):
         """Make sure that the url paths are working properly."""
         r = self.client.get(reverse('citation_redirector'))
-        self._200_status(r)
+        self.assertStatus(r, HTTP_200_OK)
 
         citation = {'reporter': 'F.2d', 'volume': '56', 'page': '9'}
 
@@ -43,14 +43,36 @@ class CitationRedirectorTest(TestCase):
             reverse('citation_redirector', kwargs=citation),
             follow=True,
         )
-        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
         r = self.client.post(
             reverse('citation_redirector'),
             citation,
             follow=True,
         )
-        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+
+    def test_unknown_citation(self):
+        """Do we get a 404 message if we don't know the citation?"""
+        r = self.client.get(
+            reverse('citation_redirector', kwargs={
+                'reporter': 'bad-reporter',
+                'volume': '1',
+                'page': '1',
+            }),
+        )
+        self.assertStatus(r, HTTP_404_NOT_FOUND)
+
+    def test_long_numbers(self):
+        """Do really long WL citations work?"""
+        r = self.client.get(
+            reverse('citation_redirector', kwargs={
+                'reporter': 'WL',
+                'volume': '2012',
+                'page': '2995064'
+            }),
+        )
+        self.assertStatus(r, HTTP_404_NOT_FOUND)
 
 
 @override_settings(

@@ -44,7 +44,7 @@ urlpatterns = [
         name="ajax_get_recap_documents_and_attachments"
     ),
     url(
-        r'^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,4})/(?P<page>\d{1,4})/)?$',
+        r'^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,4})/(?P<page>\d{1,8})/)?$',
         citation_redirector,
         name="citation_redirector",
     ),
