@@ -331,7 +331,7 @@
                             data-target="#actions-picker"
                             id="entry-{{ entry.entry_number }}">
                             <td class="text-center">{{ entry.entry_number }}</td>
-                            <td>{{ entry.date_filed|date:"DATE_FORMAT"|nbsp|default:"Unknown" }}</td>
+                            <td>{{ entry.date_filed|date:"d / M / Y"|nbsp|default:"Unknown" }}</td>
                             <td>{{ entry.description|safe|default:"Unknown Description" }}</td>
                             <td>
                                 <a href="#entry-{{ entry.entry_number }}"
