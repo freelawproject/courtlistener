@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.urlresolvers import reverse
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
@@ -21,7 +21,9 @@ from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase, \
     EmptySolrTestCase
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
-from cl.search.models import Court, Docket, Opinion, OpinionCluster
+from cl.search.models import Court, Docket, Opinion, OpinionCluster, \
+    RECAPDocument, DocketEntry
+from cl.search.tasks import add_or_update_recap_document
 from cl.search.views import do_search
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
@@ -159,6 +161,9 @@ class ModelTest(TestCase):
 class DocketValidationTest(TestCase):
     fixtures = ['test_court.json']
 
+    def tearDown(self):
+        Docket.objects.all().delete()
+
     def test_creating_a_recap_docket_with_blanks(self):
         """Are blank values denied?"""
         with self.assertRaises(ValidationError):
@@ -172,13 +177,65 @@ class DocketValidationTest(TestCase):
             pacer_case_id='asdf',
             court_id='test',
         )
-        with self.assertRaises(IntegrityError):
-            Docket.objects.create(
-                source=Docket.RECAP_AND_SCRAPER,
-                docket_number='asdf',
-                pacer_case_id='asdf',
-                court_id='test',
-            )
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                Docket.objects.create(
+                    source=Docket.RECAP_AND_SCRAPER,
+                    docket_number='asdf',
+                    pacer_case_id='asdf',
+                    court_id='test',
+                )
+
+
+class IndexingTest(EmptySolrTestCase):
+    """Are things indexed properly?"""
+    fixtures = ['test_court.json']
+
+    def tearDown(self):
+        super(EmptySolrTestCase, self).tearDown()
+        Docket.objects.all().delete()
+        DocketEntry.objects.all().delete()
+        RECAPDocument.objects.all().delete()
+
+    def test_issue_729_url_coalescing(self):
+        """Are URL's coalesced properly?"""
+        # Save a docket to the backend using coalescing
+        d = Docket.objects.create(
+            source=Docket.RECAP,
+            docket_number='asdf',
+            pacer_case_id='asdf',
+            court_id='test',
+        )
+        de = DocketEntry.objects.create(
+            docket=d,
+            entry_number=1,
+        )
+        rd1 = RECAPDocument.objects.create(
+            docket_entry=de,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            document_number='1',
+            pacer_doc_id='1',
+        )
+        rd2 = RECAPDocument.objects.create(
+            docket_entry=de,
+            document_type=RECAPDocument.ATTACHMENT,
+            document_number='1',
+            attachment_number=1,
+            pacer_doc_id='2',
+        )
+        # Do the absolute URLs differ when pulled from the DB?
+        self.assertNotEqual(rd1.get_absolute_url(), rd2.get_absolute_url())
+
+        add_or_update_recap_document([rd1.pk, rd2.pk], coalesce_docket=True,
+                                     force_commit=True)
+
+        # Do the absolute URLs differ when pulled from Solr?
+        r1 = self.si_recap.get(rd1.pk)
+        r2 = self.si_recap.get(rd2.pk)
+        self.assertNotEqual(
+            r1.result.docs[0]['absolute_url'],
+            r2.result.docs[0]['absolute_url'],
+        )
 
 
 class SearchTest(IndexedSolrTestCase):

@@ -316,10 +316,10 @@ class Docket(models.Model):
 
     @property
     def prefetched_parties(self):
-        """Prefetch the attorneys and firms associated with a docket and put 
-        those values into the `attys_in_docket` and `firms_in_docket` 
+        """Prefetch the attorneys and firms associated with a docket and put
+        those values into the `attys_in_docket` and `firms_in_docket`
         attributes.
-        
+
         :return: A parties queryset with the correct values prefetched.
         """
         from cl.people_db.models import Attorney, AttorneyOrganization
@@ -742,7 +742,6 @@ class RECAPDocument(models.Model):
             out['dateTerminated'] = datetime.combine(docket.date_terminated,
                                                      time())
         try:
-            out['absolute_url'] = self.get_absolute_url()
             out['docket_absolute_url'] = docket.get_absolute_url()
         except NoReverseMatch:
             raise InvalidDocumentError(
@@ -794,8 +793,8 @@ class RECAPDocument(models.Model):
         Search results are presented as Dockets, but they're indexed as
         RECAPDocument's, which are then grouped back together in search results
         to form Dockets.
-        
-        Since it's common to update an entire docket, there's a shortcut, 
+
+        Since it's common to update an entire docket, there's a shortcut,
         get_docket_metadata that lets you query that information first and then
         pass it in as an argument so that it doesn't have to be queried for
         every RECAPDocument on the docket. This can provide big performance
@@ -820,6 +819,14 @@ class RECAPDocument(models.Model):
         })
         if hasattr(self.filepath_local, 'path'):
             out['filepath_local'] = self.filepath_local.path
+
+        try:
+            out['absolute_url'] = self.get_absolute_url()
+        except NoReverseMatch:
+            raise InvalidDocumentError(
+                "Unable to save to index due to missing absolute_url: %s"
+                % self.pk
+            )
 
         # Docket Entry
         out['description'] = self.docket_entry.description

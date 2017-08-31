@@ -1,5 +1,6 @@
 import os
 
+import scorched
 from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase
@@ -15,6 +16,7 @@ from cl.search.models import Court
     SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
     SOLR_PEOPLE_URL=settings.SOLR_PEOPLE_TEST_URL,
+    SOLR_RECAP_URL=settings.SOLR_RECAP_TEST_URL,
 )
 class EmptySolrTestCase(TestCase):
     """Sets up an empty Solr index for tests that need to set up data manually.
@@ -28,6 +30,7 @@ class EmptySolrTestCase(TestCase):
         self.core_name_opinion = settings.SOLR_OPINION_TEST_CORE_NAME
         self.core_name_audio = settings.SOLR_AUDIO_TEST_CORE_NAME
         self.core_name_people = settings.SOLR_PEOPLE_TEST_CORE_NAME
+        self.core_name_recap = settings.SOLR_RECAP_TEST_CORE_NAME
         root = settings.INSTALL_ROOT
         create_temp_solr_core(
             self.core_name_opinion,
@@ -41,17 +44,27 @@ class EmptySolrTestCase(TestCase):
             self.core_name_people,
             os.path.join(root, 'Solr', 'conf', 'person_schema.xml'),
         )
+        create_temp_solr_core(
+            self.core_name_recap,
+            os.path.join(root, 'Solr', 'conf', 'recap_schema.xml')
+        )
         self.si_opinion = sunburnt.SolrInterface(
             settings.SOLR_OPINION_URL, mode='rw')
         self.si_audio = sunburnt.SolrInterface(
             settings.SOLR_AUDIO_URL, mode='rw')
         self.si_people = sunburnt.SolrInterface(
             settings.SOLR_PEOPLE_URL, mode='rw')
+        # This will cause headaches, but it follows in the mission to slowly
+        # migrate off of sunburnt. This was added after the items above, and so
+        # uses scorched, not sunburnt.
+        self.si_recap = scorched.SolrInterface(
+            settings.SOLR_RECAP_URL, mode='rw')
 
     def tearDown(self):
         delete_solr_core(self.core_name_opinion)
         delete_solr_core(self.core_name_audio)
         delete_solr_core(self.core_name_people)
+        delete_solr_core(self.core_name_recap)
 
 
 class SolrTestCase(EmptySolrTestCase):
