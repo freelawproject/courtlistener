@@ -3,7 +3,7 @@ from django.db import models
 from django.utils.timezone import now
 
 from cl.lib.storage import UUIDFileSystemStorage
-from cl.search.models import Court
+from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 
 
 def make_recap_processing_queue_path(instance, filename):
@@ -60,13 +60,12 @@ class ProcessingQueue(models.Model):
     pacer_doc_id = models.CharField(
         help_text="The ID of the document in PACER.",
         max_length=32,  # Same as in RECAP
-        unique=True,
         blank=True,
     )
-    document_number = models.CharField(
+    document_number = models.BigIntegerField(
         help_text="The docket entry number for the document.",
-        max_length=32,
         blank=True,
+        null=True,
     )
     attachment_number = models.SmallIntegerField(
         help_text="If the file is an attachment, the number is the attachment "
@@ -94,6 +93,25 @@ class ProcessingQueue(models.Model):
     error_message = models.TextField(
         help_text="Any errors that occurred while processing an item",
         blank=True,
+    )
+
+    # Post process fields
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket that was created or updated by this request.",
+        null=True,
+    )
+    docket_entry = models.ForeignKey(
+        DocketEntry,
+        help_text="The docket entry that was created or updated by this "
+                  "request, if applicable. Only applies to PDFs uploads.",
+        null=True,
+    )
+    recap_document = models.ForeignKey(
+        RECAPDocument,
+        help_text="The document that was created or updated by this request, "
+                  "if applicable. Only applies to PDFs uploads.",
+        null=True,
     )
 
     def __unicode__(self):

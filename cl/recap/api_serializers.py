@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from cl.recap.models import ProcessingQueue
-from cl.search.models import Court
+from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 
 
 class ProcessingQueueSerializer(serializers.ModelSerializer):
@@ -14,6 +14,24 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                                                         'FS']),
         html_cutoff=500,  # Show all values in HTML view.
     )
+    docket = serializers.HyperlinkedRelatedField(
+        many=False,
+        read_only=True,
+        view_name='docket-detail',
+        style={'base_template': 'input.html'},
+    )
+    docket_entry = serializers.HyperlinkedRelatedField(
+        many=False,
+        read_only=True,
+        view_name='docketentry-detail',
+        style={'base_template': 'input.html'}
+    )
+    recap_document = serializers.HyperlinkedRelatedField(
+        many=False,
+        read_only=True,
+        view_name='recapdocument-detail',
+        style={'base_template': 'input.html'}
+    )
 
     class Meta:
         model = ProcessingQueue
@@ -23,7 +41,9 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'error_message',
             'status',
-            'uploader',
+            'docket',
+            'docket_entry',
+            'recap_document',
         )
         extra_kwargs = {'filepath_local': {'write_only': True}}
 

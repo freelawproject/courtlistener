@@ -27,7 +27,7 @@ cnt = CaseNameTweaker()
 
 def process_recap_upload(pq):
     """Process an item uploaded from an extension or API user.
-    
+
     Uploaded objects can take a variety of forms, and we'll need to process them
     accordingly.
     """
@@ -65,10 +65,12 @@ def process_recap_pdf(self, pk):
             pq.error_message = "Unable to find docket for item."
             if self.request.retries == self.max_retries:
                 pq.status = pq.PROCESSING_FAILED
+                pq.save()
+                return None
             else:
                 pq.status = pq.QUEUED_FOR_RETRY
-            pq.save()
-            raise self.retry(exc=exc)
+                pq.save()
+                raise self.retry(exc=exc)
         except Docket.MultipleObjectsReturned:
             msg = "Too many dockets found when trying to save '%s'" % pq
             logger.error(msg)
@@ -89,10 +91,12 @@ def process_recap_pdf(self, pk):
                 pq.error_message = "Unable to find docket entry for item."
                 if self.request.retries == self.max_retries:
                     pq.status = pq.PROCESSING_FAILED
+                    pq.save()
+                    return None
                 else:
                     pq.status = pq.QUEUED_FOR_RETRY
-                pq.save()
-                raise self.retry(exc=exc)
+                    pq.save()
+                    raise self.retry(exc=exc)
 
         # All objects accounted for. Make some data.
         rd = RECAPDocument(
@@ -135,28 +139,30 @@ def process_recap_pdf(self, pk):
         extension = rd.filepath_local.path.split('.')[-1]
         rd.page_count = get_page_count(rd.filepath_local.path, extension)
         rd.ocr_status = None
-
-    # Ditch the original file
-    pq.filepath_local.delete(save=False)
-    pq.error_message = ''  # Clear out errors b/c successful
-    pq.status = pq.PROCESSING_SUCCESSFUL
-    pq.save()
-
     rd.save()
     if new_document:
         extract_recap_pdf(rd.pk)
         add_or_update_recap_document([rd.pk], force_commit=False)
+
+    # Ditch the original file
+    pq.filepath_local.delete(save=False)
+    pq.error_message = 'Success! Nice work.'
+    pq.status = pq.PROCESSING_SUCCESSFUL
+    pq.docket_id = rd.docket_entry.docket_id
+    pq.docket_entry_id = rd.docket_entry_id
+    pq.recap_document_id = rd.pk
+    pq.save()
 
     return rd
 
 
 def add_attorney(atty, p, d):
     """Add/update an attorney.
-     
+
     Given an attorney node, and a party and a docket object, add the attorney
     to the database or link the attorney to the new docket. Also add/update the
     attorney organization, and the attorney's role in the case.
-    
+
     :param atty: A dict representing an attorney, as provided by Juriscraper.
     :param p: A Party object
     :param d: A Docket object
@@ -357,7 +363,7 @@ def process_recap_docket(pk):
             )
             continue
         else:
-            rd.pacer_doc_id = rd.pacer_doc_id or docket_entry.pacer_doc_id
+            rd.pacer_doc_id = rd.pacer_doc_id or pq.pacer_doc_id
 
     # Parties
     for party in docket_data['parties']:
@@ -385,6 +391,7 @@ def process_recap_docket(pk):
 
     pq.error_message = ''  # Clear out errors b/c successful
     pq.status = pq.PROCESSING_SUCCESSFUL
+    pq.docket = d
     pq.save()
 
     return d

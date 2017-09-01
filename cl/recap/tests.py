@@ -12,6 +12,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.urlresolvers import reverse
 from django.test import TestCase
 from rest_framework.status import (
+    HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
@@ -39,7 +40,7 @@ class RecapUploadsTest(TestCase):
         self.data = {
             'court': 'scotus',
             'pacer_case_id': 'asdf',
-            'document_number': 'asdf',
+            'document_number': 1,
             'filepath_local': f,
             'upload_type': ProcessingQueue.PDF,
         }
@@ -51,14 +52,14 @@ class RecapUploadsTest(TestCase):
 
         j = json.loads(r.content)
         self.assertEqual(j['court'], 'scotus')
-        self.assertEqual(j['document_number'], 'asdf')
+        self.assertEqual(j['document_number'], 1)
         self.assertEqual(j['pacer_case_id'], 'asdf')
         mock.assert_called()
 
     def test_uploading_a_docket(self, mock):
         """Can we upload a docket and have it be saved correctly?
-        
-        Note that this works fine even though we're not actually uploading a 
+
+        Note that this works fine even though we're not actually uploading a
         docket due to the mock.
         """
         self.data.update({
@@ -68,13 +69,24 @@ class RecapUploadsTest(TestCase):
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
+        j = json.loads(r.content)
+        path = reverse('processingqueue-detail',
+                       kwargs={'version': 'v3', 'pk': j['id']})
+        r = self.client.get(path)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
     def test_numbers_in_docket_uploads_fail(self, mock):
         """Are invalid uploads denied?
-        
+
         For example, if you're uploading a Docket, you shouldn't be providing a
         document number.
         """
         self.data['upload_type'] = ProcessingQueue.DOCKET
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+
+    def test_string_for_document_number_fails(self, mock):
+        self.data['document_number'] = 'asdf'  # Not an int.
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
@@ -86,7 +98,7 @@ class RecapUploadsTest(TestCase):
 
     def test_uploading_non_ascii(self, mock):
         """Can we handle it if a client sends non-ascii strings?"""
-        self.data['document_number'] = u'☠☠☠'
+        self.data['pacer_case_id'] = u'☠☠☠'
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         mock.assert_called()
@@ -112,7 +124,7 @@ class RecapUploadsTest(TestCase):
         mock.assert_called()
 
     def test_ensure_no_users_in_response(self, mock):
-        """Are users excluded from the response?"""
+        """Is all user information excluded from the processing queue?"""
         r = self.client.post(self.path, self.data)
         j = json.loads(r.content)
         for bad_key in ['uploader', 'user']:
@@ -179,15 +191,18 @@ class RecapPdfTaskTest(TestCase):
         # Did we update pq appropriately?
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, self.pq.PROCESSING_SUCCESSFUL)
-        self.assertFalse(self.pq.error_message)
+        self.assertEqual(self.pq.error_message, 'Success! Nice work.')
         self.assertFalse(self.pq.filepath_local)
+        self.assertEqual(self.pq.docket_id, self.docket.pk)
+        self.assertEqual(self.pq.docket_entry_id, self.de.pk)
+        self.assertEqual(self.pq.recap_document_id, self.rd.pk)
 
         # Did we correctly avoid running document extraction?
         mock.assert_not_called()
 
     def test_only_the_docket_already_exists(self):
-        """Never seen this docket entry before? 
-        
+        """Never seen this docket entry before?
+
         Alas, we fail. In theory, this shouldn't happen.
         """
         self.de.delete()
@@ -202,7 +217,7 @@ class RecapPdfTaskTest(TestCase):
     @mock.patch('cl.recap.tasks.extract_recap_pdf')
     def test_docket_and_docket_entry_already_exist(self, mock):
         """What happens if we have everything but the PDF?
-        
+
         This is the good case. We simply create a new item.
         """
         self.rd.delete()
@@ -215,13 +230,13 @@ class RecapPdfTaskTest(TestCase):
 
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, self.pq.PROCESSING_SUCCESSFUL)
-        self.assertFalse(self.pq.error_message)
+        self.assertEqual(self.pq.error_message, "Success! Nice work.")
         self.assertFalse(self.pq.filepath_local)
 
     def test_nothing_already_exists(self):
-        """If a PDF is uploaded but there's no recap document and no docket do 
+        """If a PDF is uploaded but there's no recap document and no docket do
         we fail?
-        
+
         In practice, this shouldn't happen.
         """
         self.docket.delete()
@@ -278,7 +293,7 @@ class RecapAddAttorneyTest(TestCase):
         self.assertEqual(a.roles.all().count(), 2)
 
     def test_docket_is_newer(self):
-        """If the atty already exists, but with older data than the docket, do 
+        """If the atty already exists, but with older data than the docket, do
         we update the old data?
         """
         a_orig = Attorney.objects.create(name=self.atty_name,
@@ -291,7 +306,7 @@ class RecapAddAttorneyTest(TestCase):
         self.assertEqual(a_from_docket.roles.all().count(), 2)
 
     def test_docket_is_older(self):
-        """If the atty already exists, but with newer data than the docket, do 
+        """If the atty already exists, but with newer data than the docket, do
         we avoid updating the better data?
         """
         a_orig = Attorney.objects.create(name=self.atty_name,
@@ -313,7 +328,7 @@ class RecapAddAttorneyTest(TestCase):
         self.assertEqual(a.roles.all().count(), 2)
 
     def test_no_contact_info_another_already_exists(self):
-        """If we lack contact info, and such a atty already exists (without 
+        """If we lack contact info, and such a atty already exists (without
         contact info), do we properly consider them the same person?
         """
         new_a = Attorney.objects.create(name=self.atty_name,

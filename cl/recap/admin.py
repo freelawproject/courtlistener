@@ -25,5 +25,8 @@ class ProcessingQueueAdmin(admin.ModelAdmin):
     )
     raw_id_fields = (
         'uploader',
+        'docket',
+        'docket_entry',
+        'recap_document',
     )
 
