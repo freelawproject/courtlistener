@@ -3,8 +3,8 @@
 <div class="sidebar-section hidden-xs">
     {% if user.profile.total_donated_last_year > 0 %}
         <h3><span>Thank You! <i class="fa fa-heart-o red"></i></span></h3>
-        <p>Last year you donated <strong>${{ user.profile.total_donated_last_year|intcomma }}</strong>. This support allows us to begin new initiatives and support users like
-            you.
+        <p>During the last year you donated <strong>${{ user.profile.total_donated_last_year|intcomma }}</strong>. This support allows us to begin new initiatives and support users like
+            you. Thank you!
         </p>
         <p>
             <a href="{% url "donate" %}?referrer={{ referrer }}"
