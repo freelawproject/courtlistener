@@ -179,6 +179,12 @@ $(document).ready(function() {
         t.addClass('hidden');
     });
 
+    ///////////////////
+    // Docket page: Change sort order when the asc/desc buttons are clicked.
+    ///////////////////
+    $("#sort-buttons :input").change(function () {
+        this.closest("form").submit();
+    });
 
     ///////////////////
     // Banner Cookie //

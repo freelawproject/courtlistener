@@ -26,11 +26,14 @@ header {
     padding-bottom: 13px;
 }
 
-.navbar-default .navbar-nav > .active > a,
-.navbar-default .navbar-nav > .active > a:hover,
-.navbar-default .navbar-nav > .active > a:focus {
+.navbar-default .navbar-nav > li.active a {
     background-color: transparent;
     border-bottom: 3px solid #AE0B0B;
+}
+
+.navbar-default .navbar-nav > li a {
+    /* Layout fix. */
+    border-bottom: 3px solid transparent;
 }
 .subnav {
     min-height: 0;
@@ -559,6 +562,14 @@ input.court-checkbox, input.status-checkbox {
 }
 #id_filed_after, #id_filed_before {
     width: 120px;
+}
+#docket-entry-table .row {
+    padding-top: 8px;
+    border-bottom: 1px solid #dddddd;
+}
+
+.odd {
+    background-color: #f5f5f5;
 }
 
 /* Donations page */

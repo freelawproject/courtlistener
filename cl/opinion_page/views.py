@@ -42,7 +42,7 @@ def view_docket(request, pk, _):
     else:
         favorite_form = FavoriteForm(instance=fave)
 
-    de_list = docket.docket_entries.all()
+    de_list = docket.docket_entries.all().prefetch_related('recap_documents')
     form = DocketEntryFilterForm(request.GET)
     if form.is_valid():
         cd = form.cleaned_data
@@ -57,7 +57,7 @@ def view_docket(request, pk, _):
         if cd.get('order_by') == DocketEntryFilterForm.DESCENDING:
             de_list = de_list.order_by('-entry_number')
 
-    paginator = Paginator(de_list, 500, orphans=25)
+    paginator = Paginator(de_list, 100, orphans=5)
     page = request.GET.get('page')
     try:
         docket_entries = paginator.page(page)
@@ -111,41 +111,6 @@ def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
         'favorite_form': favorite_form,
         'private': True,  # Always True for RECAP docs.
     })
-
-
-def ajax_get_recap_documents_and_attachments(request, pk):
-    """This is the ajax view that powers the modals on the docket
-    page when a docket entry is clicked.
-    """
-    docs = DocketEntry.objects.get(pk=pk).recap_documents.all()
-
-    j = {'attachments': [], 'documents': [], 'item_count': 0}
-    for doc in docs:
-        date_upload = getattr(doc, 'date_upload', "")
-        if date_upload:
-            date_upload = date_upload.isoformat()
-
-        d = {
-            'date_upload': date_upload,
-            'document_number': doc.document_number,
-            'attachment_number': doc.attachment_number,
-            'is_available': doc.is_available,
-            'pacer_url': doc.pacer_url or '',
-            'filepath_local': doc.filepath_local.name,
-            'absolute_url': doc.get_absolute_url(),
-            'description': doc.description,
-        }
-
-        if doc.document_type == RECAPDocument.PACER_DOCUMENT:
-            j['documents'].append(d)
-        elif doc.document_type == RECAPDocument.ATTACHMENT:
-            j['attachments'].append(d)
-        j['item_count'] += 1
-
-    return JsonResponse(
-        j,
-        safe=False,
-    )
 
 
 @never_cache

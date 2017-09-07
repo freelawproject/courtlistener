@@ -614,7 +614,7 @@ class RECAPDocument(models.Model):
     class Meta:
         unique_together = ('docket_entry', 'document_number',
                            'attachment_number')
-        ordering = ('document_number', 'attachment_number')
+        ordering = ("document_type", 'document_number', 'attachment_number')
         permissions = (
             ("has_recap_api_access", "Can work with RECAP API"),
         )

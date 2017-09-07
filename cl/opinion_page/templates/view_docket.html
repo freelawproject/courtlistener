@@ -15,8 +15,6 @@
 
 {% block footer-scripts %}
     <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/docket-utils.js"></script>
-    <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/save-favorites.js"></script>
@@ -248,7 +246,7 @@
                     {% endif %}
                 </h3>
                 <div class="well well-sm">
-                    <form action="" method="get">
+                    <form action="">
                     <div class="row">
                         <div class="form-inline">
                             {% if form.errors %}
@@ -313,83 +311,103 @@
                     </form>
                 </div>
 
-                <table class="table table-responsive table-hover">
-                    <thead>
-                        <tr>
-                            <th class="text-center">Document Number</th>
-                            <th>Date&nbsp;Filed</th>
-                            <th colspan="2">Description</th>
-                            {% if perms.search.change_docketentry %}
-                                <th class="text-center">Admin</th>
-                            {% endif %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for entry in docket_entries %}
-                        <tr class="cursor docket-entry" data-toggle="modal"
-                            data-docket-entry="{{ entry.pk }}"
-                            data-target="#actions-picker"
-                            id="entry-{{ entry.entry_number }}">
-                            <td class="text-center">{{ entry.entry_number }}</td>
-                            <td>{{ entry.date_filed|date:"M j, Y"|nbsp|default:"Unknown" }}</td>
-                            <td>{{ entry.description|safe|default:"Unknown Description" }}</td>
-                            <td>
-                                <a href="#entry-{{ entry.entry_number }}"
-                                   data-toggle="tooltip"
-                                   data-placement="left"
-                                   title="Get direct link to this row"><i class="fa fa-share-alt gray"></i></a>
-                            </td>
-                            {% if perms.search.change_docketentry %}
-                                <td>
-                                <a href="{% url 'admin:search_docketentry_change' entry.pk %}"
-                                   class="btn btn-primary btn-xs">Edit DocketEntry&nbsp;<i class="fa fa-pencil"></i></a>
-                                </td>
-                            {% endif %}
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <div class="fake-table" id="docket-entry-table">
+                <div class="row bold">
+                    <div class="col-xs-1 text-center">
+                        <p>Document Number</p>
+                    </div>
+                    <div class="col-xs-1">Date&nbsp;Filed</div>
+                    <div class="col-xs-9">Description</div>
+                    {% if perms.search.change_docketentry %}
+                        <div class="col-xs-1 text-center">Admin</div>
+                    {% endif %}
+                </div>
+                {% for de in docket_entries %}
+                    <div class="row {% cycle "odd" "even" %}"
+                         id="entry-{{ de.entry_number }}">
+                        <div class="col-xs-1 text-center"><p>{{ de.entry_number }}</p></div>
+                        <div class="col-xs-3 col-sm-2 col-md-1"><p>{{ de.date_filed|date:"M j, Y"|nbsp|default:'<em class="gray">Unknown</em>' }}</p></div>
+                        <div class="col-xs-8 col-sm-6 col-md-8"><p>{{ de.description|safe|default:'<em class="gray">Unknown docket entry description</em>' }}</p></div>
+                        <div class="hidden-xs col-sm-3 col-md-2">
+                            <p class="right"><a href="#entry-{{ de.entry_number }}"
+                               data-toggle="tooltip"
+                               data-placement="left"
+                               title="Get direct link to this row">
+                                <i class="fa fa-share-alt gray"></i>
+                            </a>
+                            </p>
+                        </div>
+                        <div class="clearfix"></div>
+                        {% if de.recap_documents.count %}
+                            <div id="recap-documents">
+                            {% for rd in de.recap_documents.all %}
+                            <div class="col-xs-1 col-md-2"></div>
+                            <div class="col-xs-3 col-sm-2 col-md-2 col-lg-1">
+                                <p>
+                                {% if rd.document_type == rd.ATTACHMENT %}
+                                    {% if rd.filepath_local.name %}
+                                        <a href="{{ rd.get_absolute_url }}">Attachment&nbsp;{{ rd.attachment_number }}</a>
+                                    {% else %}
+                                        Attachment&nbsp;{{ rd.attachment_number }}
+                                    {% endif %}
+                                {% else %}
+                                    {% if rd.filepath_local.name %}
+                                        <a href="{{ rd.get_absolute_url }}">Main&nbsp;Document</a>
+                                    {% else %}
+                                        Main&nbsp;Document
+                                    {% endif %}
+                                {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-xs-8 col-sm-6 col-md-4 col-lg-3">
+                                <p>{{ rd.description|safe|default:'<em class="gray">Unknown document description</em>' }}</p>
+                            </div>
+                            <div class="clearfix visible-xs"></div>
+                            <div class="visible-xs col-xs-4">&nbsp;</div>
+                            <div class="btn-group col-xs-8 col-sm-3">
+                                {% if rd.filepath_local %}
+                                    <a href="/{{ rd.filepath_local }}"
+                                       role="button"
+                                       class="btn btn-primary btn-xs"
+                                       {% if rd.date_upload %}
+                                          title="Uploaded {{ rd.date_upload }}"
+                                       {% endif %}>
+                                        Download PDF
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-primary btn-xs dropdown-toggle"
+                                            data-toggle="dropdown"
+                                            aria-haspopup="true"
+                                            aria-expanded="false">
+                                        <span class="caret"></span>
+                                        <span class="sr-only">Toggle Dropdown</span>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        {% if rd.filepath_ia %}
+                                        <li><a href="{{ rd.filepath_ia }}">From
+                                            Internet Archive</a></li>
+                                        <li role="separator" class="divider"></li>
+                                        {% endif %}
+                                        <li><a href="{{ rd.pacer_url }}">Buy on
+                                            PACER</a></li>
+                                    </ul>
+                                {% else %}
+                                    {# We don't have it #}
+                                    <a href="{{ rd.pacer_url }}"
+                                       class="btn btn-primary btn-xs">Buy on PACER</a>
+                                {% endif %}
+                            </div>
+                            <div class="clearfix"></div>
+                            {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                </div>
 
                 {% if docket_entries.paginator.num_pages > 1 %}
                     {% include "includes/pagination.html" with results=docket_entries %}
                 {% endif %}
-
-                {# Modal at the bottom #}
-                <div class="modal" id="actions-picker" tabindex="-1" role="dialog"
-                     aria-hidden="true">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <button type="button" class="close"
-                                        data-dismiss="modal" aria-label="Close">
-                                    <span aria-hidden="true" class="large">&times;</span>
-                                </button>
-                                <h3 class="modal-title">Entries</h3>
-                            </div>
-                            <div class="modal-body">
-                                <div class="row">
-                                    <div class="col-xs-12">
-                                        <table class="table table-responsive" id="document-table">
-                                            <thead>
-                                            <tr>
-                                                <th>Number</th>
-                                                <th colspan="2">Description</th>
-                                            </tr>
-                                            </thead>
-                                            <tbody id="tablebody">
-
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <button type="button"
-                                            class="btn btn-default float-right"
-                                            data-dismiss="modal">Close
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
         {% endif %}
