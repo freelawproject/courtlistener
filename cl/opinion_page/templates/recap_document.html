@@ -48,23 +48,6 @@
             </div>
         {% endif %}
 
-
-        {# Download #}
-        <div class="sidebar-section">
-            <h3><span>Download Original PDF&nbsp;<i class="fa fa-file-pdf-o"></i></span></h3>
-            <p>
-                {% if document.is_available %}
-                    <a href="/{{ document.filepath_local }}"
-                       class="btn btn-primary btn-block"><i class="fa fa-download"></i>&nbsp;From CourtListener</a>
-                    <a href="{{ document.filepath_ia }}"
-                       class="btn btn-primary btn-block"><i class="fa fa-cloud-download"></i>&nbsp;From Internet Archive</a>
-                {% elif document.pacer_url %}
-                    <a href="{{ document.pacer_url }}"
-                       class="btn btn-primary btn-block>"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
-                {% endif %}
-            </p>
-        </div>
-
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not favorite_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
              id="sidebar-notes">
@@ -122,6 +105,45 @@
             </span>
         </p>
         {% endif %}
+
+        <div class="btn-group v-offset-below-3 v-offset-above-1">
+            {% if document.is_available %}
+                <a href="/{{ document.filepath_local }}"
+                   role="button"
+                   class="btn btn-primary">Download PDF&nbsp;<i class="fa fa-file-pdf-o"></i>
+                </a>
+                <button type="button"
+                        class="btn btn-primary dropdown-toggle"
+                        data-toggle="dropdown"
+                        aria-haspopup="true"
+                        aria-expanded="false">
+                    <span class="caret"></span>
+                    <span class="sr-only">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <a href="/{{ document.filepath_local }}">From
+                            CourtListener</a>
+                    </li>
+                    {% if document.filepath_ia %}
+                        <li>
+                            <a href="{{ document.filepath_ia }}">From
+                                Internet Archive</a>
+                        </li>
+                        <li role="separator" class="divider"></li>
+                    {% endif %}
+                    <li>
+                        <a href="{{ document.pacer_url }}">Buy on
+                            PACER</a>
+                    </li>
+                </ul>
+            {% else %}
+                {# We don't have it #}
+                <a href="{{ document.pacer_url }}"
+                   class="btn btn-primary btn-xs">Buy on PACER</a>
+            {% endif %}
+        </div>
+
         <br>
 
 

@@ -314,20 +314,17 @@
                 <div class="fake-table" id="docket-entry-table">
                 <div class="row bold">
                     <div class="col-xs-1 text-center">
-                        <p>Document Number</p>
+                        <p class="hidden-xs">Document Number</p>
                     </div>
-                    <div class="col-xs-1">Date&nbsp;Filed</div>
-                    <div class="col-xs-9">Description</div>
-                    {% if perms.search.change_docketentry %}
-                        <div class="col-xs-1 text-center">Admin</div>
-                    {% endif %}
+                    <div class="col-xs-3 col-sm-2 col-md-1">Date&nbsp;Filed</div>
+                    <div class="col-xs-7 col-sm-6 col-md-2">Description</div>
                 </div>
                 {% for de in docket_entries %}
                     <div class="row {% cycle "odd" "even" %}"
                          id="entry-{{ de.entry_number }}">
                         <div class="col-xs-1 text-center"><p>{{ de.entry_number }}</p></div>
-                        <div class="col-xs-3 col-sm-2 col-md-1"><p>{{ de.date_filed|date:"M j, Y"|nbsp|default:'<em class="gray">Unknown</em>' }}</p></div>
-                        <div class="col-xs-8 col-sm-6 col-md-8"><p>{{ de.description|safe|default:'<em class="gray">Unknown docket entry description</em>' }}</p></div>
+                        <div class="col-xs-3 col-sm-2 col-md-1"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
+                        <div class="col-xs-7 col-sm-6 col-md-8"><p>{{ de.description|safe|default:'<em class="gray">Unknown docket entry description</em>' }}</p></div>
                         <div class="hidden-xs col-sm-3 col-md-2">
                             <p class="right"><a href="#entry-{{ de.entry_number }}"
                                data-toggle="tooltip"
@@ -342,29 +339,28 @@
                             <div id="recap-documents">
                             {% for rd in de.recap_documents.all %}
                             <div class="col-xs-1 col-md-2"></div>
-                            <div class="col-xs-3 col-sm-2 col-md-2 col-lg-1">
+                            <div class="col-xs-3 col-sm-2">
                                 <p>
                                 {% if rd.document_type == rd.ATTACHMENT %}
                                     {% if rd.filepath_local.name %}
-                                        <a href="{{ rd.get_absolute_url }}">Attachment&nbsp;{{ rd.attachment_number }}</a>
+                                        <a href="{{ rd.get_absolute_url }}">Attach&shy;ment&nbsp;{{ rd.attachment_number }}</a>
                                     {% else %}
-                                        Attachment&nbsp;{{ rd.attachment_number }}
+                                        Attach&shy;ment&nbsp;{{ rd.attachment_number }}
                                     {% endif %}
                                 {% else %}
                                     {% if rd.filepath_local.name %}
-                                        <a href="{{ rd.get_absolute_url }}">Main&nbsp;Document</a>
+                                        <a href="{{ rd.get_absolute_url }}">Main Doc&shy;ument</a>
                                     {% else %}
-                                        Main&nbsp;Document
+                                        Main Doc&shy;ument
                                     {% endif %}
                                 {% endif %}
                                 </p>
                             </div>
-                            <div class="col-xs-8 col-sm-6 col-md-4 col-lg-3">
+                            <div class="hidden-xs col-sm-6 col-md-4 col-lg-3">
                                 <p>{{ rd.description|safe|default:'<em class="gray">Unknown document description</em>' }}</p>
                             </div>
-                            <div class="clearfix visible-xs"></div>
-                            <div class="visible-xs col-xs-4">&nbsp;</div>
-                            <div class="btn-group col-xs-8 col-sm-3">
+
+                            <div class="btn-group col-xs-7 col-sm-3">
                                 {% if rd.filepath_local %}
                                     <a href="/{{ rd.filepath_local }}"
                                        role="button"
