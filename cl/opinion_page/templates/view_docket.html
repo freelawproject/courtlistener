@@ -383,13 +383,20 @@
                                         <span class="sr-only">Toggle Dropdown</span>
                                     </button>
                                     <ul class="dropdown-menu">
+                                        <li>
+                                            <a href="/{{ rd.filepath_local }}">From CourtListener</a>
+                                        </li>
                                         {% if rd.filepath_ia %}
-                                        <li><a href="{{ rd.filepath_ia }}">From
-                                            Internet Archive</a></li>
+                                        <li>
+                                            <a href="{{ rd.filepath_ia }}">From
+                                            Internet Archive</a>
+                                        </li>
                                         <li role="separator" class="divider"></li>
                                         {% endif %}
-                                        <li><a href="{{ rd.pacer_url }}">Buy on
-                                            PACER</a></li>
+                                        <li>
+                                            <a href="{{ rd.pacer_url }}">Buy on
+                                            PACER</a>
+                                        </li>
                                     </ul>
                                 {% else %}
                                     {# We don't have it #}
