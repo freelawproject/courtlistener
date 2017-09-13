@@ -5,13 +5,15 @@ from cl.search import api_utils
 from cl.search.api_serializers import (
     DocketSerializer, CourtSerializer, OpinionClusterSerializer,
     OpinionSerializer, SearchResultSerializer,
-    OpinionsCitedSerializer, DocketEntrySerializer, RECAPDocumentSerializer)
+    OpinionsCitedSerializer, DocketEntrySerializer, RECAPDocumentSerializer,
+    TagSerializer,
+)
 from cl.search.filters import (
     DocketFilter, CourtFilter, OpinionClusterFilter, OpinionFilter,
     OpinionsCitedFilter, DocketEntryFilter, RECAPDocumentFilter)
 from cl.search.forms import SearchForm
 from cl.search.models import Docket, Court, OpinionCluster, Opinion, \
-    OpinionsCited, DocketEntry, RECAPDocument
+    OpinionsCited, DocketEntry, RECAPDocument, Tag
 
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -73,6 +75,12 @@ class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = OpinionsCited.objects.all()
     serializer_class = OpinionsCitedSerializer
     filter_class = OpinionsCitedFilter
+
+
+class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
+    permission_classes = (RECAPUsersReadOnly,)
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
 
 
 class SearchViewSet(LoggingMixin, viewsets.ViewSet):

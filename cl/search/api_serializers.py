@@ -6,7 +6,7 @@ from rest_framework import serializers
 from cl.audio.models import Audio
 from cl.people_db.models import Person, PartyType
 from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
-    OpinionsCited, DocketEntry, RECAPDocument
+    OpinionsCited, DocketEntry, RECAPDocument, Tag
 
 
 class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
@@ -58,6 +58,13 @@ class DocketSerializer(DynamicFieldsMixin,
 
 class RECAPDocumentSerializer(DynamicFieldsMixin,
                               serializers.HyperlinkedModelSerializer):
+    tags = serializers.HyperlinkedRelatedField(
+        many=True,
+        view_name='tag-detail',
+        queryset=Tag.objects.all(),
+        style={'base_template': 'input.html'},
+    )
+
     class Meta:
         model = RECAPDocument
         exclude = ('docket_entry',)
@@ -167,6 +174,13 @@ class OpinionClusterSerializer(DynamicFieldsMixin,
 
     class Meta:
         model = OpinionCluster
+        fields = '__all__'
+
+
+class TagSerializer(DynamicFieldsMixin,
+                    serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = Tag
         fields = '__all__'
 
 

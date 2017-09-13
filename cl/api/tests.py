@@ -361,6 +361,15 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {'docket__id!': 100000000}
         self.assertCountInResults(1)
 
+    def test_docket_tag_filters(self):
+        """Can we filter dockets by tags?"""
+        self.path = reverse('docket-list', kwargs={'version': 'v3'})
+
+        self.q = {'docket_entries__recap_documents__tags': 1}
+        self.assertCountInResults(1)
+        self.q = {'docket_entries__recap_documents__tags': 2}
+        self.assertCountInResults(0)
+
     def test_docket_entry_docket_court_filters(self):
         self.path = reverse('docketentry-list', kwargs={'version': 'v3'})
 
@@ -378,6 +387,11 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {'recap_documents__id': 1}
         self.assertCountInResults(1)
         self.q = {'recap_documents__id': 2}
+        self.assertCountInResults(0)
+
+        self.q = {'recap_documents__tags': 1}
+        self.assertCountInResults(1)
+        self.q = {'recap_documents__tags': 2}
         self.assertCountInResults(0)
 
         # Something wacky...
@@ -402,6 +416,15 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {'docket_entry__id': 1}
         self.assertCountInResults(1)
         self.q = {'docket_entry__id': 2}
+        self.assertCountInResults(0)
+
+        self.q = {'tags': 1}
+        self.assertCountInResults(1)
+        self.q = {'tags': 2}
+        self.assertCountInResults(0)
+        self.q = {'tags__name': 'test'}
+        self.assertCountInResults(1)
+        self.q = {'tags__name': 'test2'}
         self.assertCountInResults(0)
 
     def test_attorney_filters(self):
@@ -591,6 +614,7 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase, FilteringCountTestCase):
 
 
 class DRFFieldSelectionTest(TestCase):
+    """Test selecting only certain fields"""
     fixtures = ['judge_judy.json', 'test_objects_search.json',
                 'authtest_data.json']
 

@@ -20,6 +20,7 @@ router.register(r'clusters', search_views.OpinionClusterViewSet)
 router.register(r'opinions', search_views.OpinionViewSet)
 router.register(r'opinions-cited', search_views.OpinionsCitedViewSet)
 router.register(r'search', search_views.SearchViewSet, base_name='search')
+router.register(r'tag', search_views.TagViewSet)
 
 # People & Entities
 router.register(r'people', people_views.PersonViewSet)

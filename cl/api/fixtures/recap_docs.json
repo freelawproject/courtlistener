@@ -70,9 +70,21 @@
       "filepath_ia": "",
       "date_created": "2017-04-14T23:24:59.323Z",
       "document_type": 1,
-      "ocr_status": 4
+      "ocr_status": 4,
+      "tags": [
+        1
+      ]
     },
     "model": "search.recapdocument",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_created": "2017-09-12T22:50:51.507Z",
+      "name": "test",
+      "date_modified": "2017-09-12T22:50:51.507Z"
+    },
+    "model": "search.tag",
     "pk": 1
   }
 ]

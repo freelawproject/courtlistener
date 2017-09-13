@@ -522,6 +522,12 @@ class RECAPDocument(models.Model):
                   "(Attachments and Documents together)",
         related_name="recap_documents",
     )
+    tags = models.ManyToManyField(
+        'search.Tag',
+        help_text="The tags associated with the document.",
+        related_name="recap_documents",
+        blank=True,
+    )
     date_created = models.DateTimeField(
         help_text="The date the file was imported to Local Storage.",
         auto_now_add=True,
@@ -1578,6 +1584,29 @@ class OpinionsCited(models.Model):
     class Meta:
         verbose_name_plural = 'Opinions cited'
         unique_together = ("citing_opinion", "cited_opinion")
+
+
+class Tag(models.Model):
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified. A value in "
+                  "year 1750 indicates the value is unknown",
+        auto_now=True,
+        db_index=True,
+    )
+    name = models.CharField(
+        help_text="The name of the tag.",
+        max_length=50,
+        db_index=True,
+        unique=True,
+    )
+
+    def __unicode__(self):
+        return u'%s: %s' % (self.pk, self.name)
 
 #class AppellateReview(models.Model):
 #    REVIEW_STANDARDS = (

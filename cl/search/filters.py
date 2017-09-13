@@ -4,7 +4,7 @@ from rest_framework_filters import FilterSet
 from cl.api.utils import INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.search.models import (
     Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES,
-    JURISDICTIONS, DocketEntry, RECAPDocument
+    JURISDICTIONS, DocketEntry, RECAPDocument, Tag,
 )
 
 
@@ -29,6 +29,7 @@ class CourtFilter(FilterSet):
 class DocketFilter(FilterSet):
     court = filters.RelatedFilter(CourtFilter)
     clusters = filters.RelatedFilter("cl.search.filters.OpinionClusterFilter")
+    docket_entries = filters.RelatedFilter("cl.search.filters.DocketEntryFilter")
     audio_files = filters.RelatedFilter('cl.audio.filters.AudioFilter')
     assigned_to = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
     referred_to = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
@@ -142,8 +143,18 @@ class DocketEntryFilter(FilterSet):
         }
 
 
+class TagFilter(FilterSet):
+    class Meta:
+        model = Tag
+        fields = {
+            'id': ['exact'],
+            'name': ['exact'],
+        }
+
+
 class RECAPDocumentFilter(FilterSet):
     docket_entry = filters.RelatedFilter(DocketEntryFilter)
+    tags = filters.RelatedFilter(TagFilter)
 
     class Meta:
         model = RECAPDocument
