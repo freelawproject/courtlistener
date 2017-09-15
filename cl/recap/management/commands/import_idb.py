@@ -37,6 +37,12 @@ class Command(VerboseCommand):
             required=True,
             type=int,
         )
+        parser.add_argument(
+            '--start-line',
+            help="The line to start on. Useful for crashed scripts.",
+            default=-1,
+            type=int,
+        )
 
     @staticmethod
     def ensure_file_ok(file_path):
@@ -52,6 +58,52 @@ class Command(VerboseCommand):
             raise CommandError("%s not a valid filetype. Valid types are: %s" %
                                (filetype, allowed_types))
 
+    def make_csv_row_dict(self, line, col_headers):
+        """Because the PACER data is so nasty, we need our own CSV parser. I
+        guess this is how we learn, by doing things at lower and lower levels.
+        For that, I thank PACER. In any case, this little guy takes in a line of
+        text from a PACER file, and makes it into a nice dict of data.
+
+        Along the way, it:
+         1. Removes bad characters, like null values, information separators,
+         and tabs
+         2. Handles splitting on the tab character with quotechar = '"'
+        """
+        line = self.BAD_CHARS.sub('', line)
+        row_values = line.strip().split('\t')
+
+        # Take care of quoted characters like:
+        #   col1\t"\tcol2"\tcol3
+        #   col1\t"col2start\tcol2more\t"\tcol3
+        row = []
+        merged_contents = ''
+        merging_cells = False
+        for value in row_values:
+            if merging_cells:
+                if value.endswith('"'):
+                    merging_cells = False
+                    merged_contents += value
+                    row.append(merged_contents.strip('"'))
+                else:
+                    merged_contents += value
+            elif value.startswith('"'):
+                if value.endswith('"') and len(value) > 1:
+                    # Just a value in quotes, like "TOYS 'R US". And not just
+                    # the " character.
+                    row.append(value)
+                else:
+                    merging_cells = True
+                    merged_contents = value
+            else:
+                row.append(value)
+
+        # Convert to dict with column headers as keys.
+        row_dict = {}
+        for row_value, col_header in zip(row, col_headers):
+            row_dict[col_header] = row_value
+
+        return row_dict
+
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
 
@@ -63,16 +115,12 @@ class Command(VerboseCommand):
                     newline="\r\n")
         col_headers = f.next().strip().split('\t')
         for i, line in enumerate(f):
-            line = self.BAD_CHARS.sub('', line)
-            row_values = line.strip().split('\t')
-
-            row = {}
-            for row_value, col_header in zip(row_values, col_headers):
-                row[col_header] = row_value
-
-            sys.stdout.write('\rDid: %s rows' % i)
+            sys.stdout.write('\rDoing line: %s' % i)
             sys.stdout.flush()
+            if i < options['start_line']:
+                continue
 
+            row = self.make_csv_row_dict(line, col_headers)
             self.normalize_nulls(row)
             self.normalize_court_fields(row)
             self.normalize_booleans(row)

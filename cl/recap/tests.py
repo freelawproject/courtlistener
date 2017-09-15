@@ -24,6 +24,7 @@ from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
 from cl.recap.models import ProcessingQueue
 from cl.recap.tasks import process_recap_pdf, add_attorney, process_recap_docket
 from cl.search.models import Docket, RECAPDocument, DocketEntry
+from cl.recap.management.commands.import_idb import Command
 
 
 @mock.patch('cl.recap.views.process_recap_upload')
@@ -444,3 +445,28 @@ class RecapUploadAuthenticationTest(TestCase):
 
         r = self.client.get(self.path)
         self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
+
+
+class IdbImportTest(TestCase):
+    """Assorted tests for the IDB importer."""
+    cmd = Command()
+
+    def test_csv_parsing(self):
+        qa = (
+            ('asdf\tasdf', {'1': 'asdf', '2': 'asdf'}),
+            ('asdf\t"toyrus"\tasdf', {'1': 'asdf', '2': '"toyrus"',
+                                      '3': 'asdf'}),
+            ('asdf\t"\ttoyrus"\tasdf', {'1': 'asdf', '2': 'toyrus',
+                                        '3': 'asdf'}),
+            ('asdf\t"\tto\tyrus"\tasdf',
+             {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
+            ('asdf\t"\tto\tyrus\t"\tasdf',
+             {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
+        )
+        for qa in qa:
+            print("Testing CSV parser on: %s" % qa[0])
+            self.assertEqual(
+                self.cmd.make_csv_row_dict(qa[0], ['1', '2', '3']),
+                qa[1],
+            )
+
