@@ -32,7 +32,8 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             '--filetype',
-            help="The type of file from FJC. One of: %s" % DATASET_SOURCES,
+            help="The type of file from FJC. One of: %s" % '\n '.join(
+                '%s: %s' % (t[0], t[1]) for t in DATASET_SOURCES),
             required=True,
             type=int,
         )
