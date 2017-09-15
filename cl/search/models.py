@@ -864,6 +864,11 @@ class Court(models.Model):
         null=True,
         blank=True,
     )
+    fjc_court_id = models.CharField(
+        help_text="The ID used by FJC in the Integrated Database",
+        max_length=3,
+        blank=True,
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified",
         auto_now=True,
