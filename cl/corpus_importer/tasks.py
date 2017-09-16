@@ -13,7 +13,7 @@ from django.db import IntegrityError, transaction, DatabaseError
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import harmonize
-from juriscraper.pacer import FreeOpinionReport
+from juriscraper.pacer import FreeOpinionReport, PossibleCaseNumberApi
 from pyexpat import ExpatError
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
@@ -28,8 +28,9 @@ from rest_framework.status import (
 from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
-    map_pacer_to_cl_id
+    map_pacer_to_cl_id, map_cl_to_pacer_id
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
+from cl.recap.models import FjcIntegratedDatabase
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument, Court
@@ -122,7 +123,7 @@ def get_free_document_report(self, court_id, start, end, session):
 @app.task(bind=True, max_retries=20)
 def get_and_save_free_document_report(self, court_id, start, end, session):
     """Download the Free document report and save it to the DB.
-    
+
     :param self: The Celery task.
     :param court_id: A pacer court id.
     :param start: a date object representing the first day to get results.
@@ -442,3 +443,22 @@ def mark_court_done_on_date(status, court_id, d):
 @app.task(ignore_result=True)
 def delete_pacer_row(pk):
     PACERFreeDocumentRow.objects.get(pk=pk).delete()
+
+
+@app.task(bind=True, max_retries=2, interval_start=5 * 60,
+          interval_step=10 * 60, ignore_result=True)
+def get_pacer_case_id_for_idb_row(self, pk, session):
+    """Populate the pacer_case_id field for an item in the IDB table"""
+    logger.info("Getting pacer_case_id for IDB item with pk %s" % pk)
+    item = FjcIntegratedDatabase.objects.get(pk=pk)
+    pcn = PossibleCaseNumberApi(session)
+    r = pcn.query(item.docket_number, map_cl_to_pacer_id(item.district_id))
+    pcn.parse_response(r)
+    d = pcn.data
+    if d is not None:
+        item.pacer_case_id = d['pacer_case_id']
+        item.case_name = d['title']
+    else:
+        # Hack. Storying the error in here will bite us later.
+        item.pacer_case_id = "Error"
+    item.save()
