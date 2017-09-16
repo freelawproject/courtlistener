@@ -17,9 +17,9 @@ class Command(VerboseCommand):
     help = 'Import a tab-separated file as produced by FJC for their IDB'
     BAD_CHARS = re.compile(u'[\u0000\u001E]')
 
-    INT_FIELDS = ['DOCKET', 'ORIGIN', 'JURIS', 'NOS', 'RESIDENC', 'DEMANDED',
-                  'COUNTY', 'TRCLACT', 'PROCPROG', 'DISP', 'NOJ', 'AMTREC',
-                  'JUDGMENT', 'PROSE', 'TAPEYEAR']
+    INT_FIELDS = ['ORIGIN', 'JURIS', 'NOS', 'RESIDENC', 'DEMANDED', 'COUNTY',
+                  'TRCLACT', 'PROCPROG', 'DISP', 'NOJ', 'AMTREC', 'JUDGMENT',
+                  'PROSE', 'TAPEYEAR']
     DATE_FIELDS = ['FILEDATE', 'TRANSDAT', 'TERMDATE']
     BOOL_FIELDS = ['CLASSACT']
     NULLABLE_FIELDS = INT_FIELDS + DATE_FIELDS + BOOL_FIELDS

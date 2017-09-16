@@ -380,12 +380,13 @@ class FjcIntegratedDatabase(models.Model):
         max_length=3,
         blank=True,
     )
-    docket_number = models.IntegerField(
+    docket_number = models.CharField(
+        # use a char field here because we need preceding zeros.
         help_text='The number assigned by the Clerks\' office; consists of 2 '
                   'digit Docket Year (usually calendar year in which the case '
                   'was filed) and 5 digit sequence number.',
         blank=True,
-        null=True,
+        max_length=7,
     )
     origin = models.SmallIntegerField(
         help_text="A single digit code describing the manner in which the case "
