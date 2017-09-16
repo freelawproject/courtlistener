@@ -12,16 +12,11 @@ PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 
-def get_pacer_case_ids(options):
+def get_pacer_case_ids(options, row_pks):
     """Get the PACER case IDs for the given items."""
     q = options['queue']
-    rows = FjcIntegratedDatabase.objects.filter(
-        nature_of_suit=FAIR_LABOR_STANDARDS_ACT,
-        pacer_case_id='',
-        #date_filed__gt="2017-01-01",
-    ).values_list('pk', flat=True)
     throttle = CeleryThrottle(queue_name=q)
-    for i, row_pk in enumerate(rows):
+    for i, row_pk in enumerate(row_pks):
         throttle.maybe_wait()
         if i % 10000 == 0:
             pacer_session = PacerSession(username=PACER_USERNAME,
@@ -45,4 +40,12 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        get_pacer_case_ids(options)
+        row_pks = self.get_komply_ids()
+        get_pacer_case_ids(options, row_pks)
+
+    def get_komply_ids(self):
+        return FjcIntegratedDatabase.objects.filter(
+            nature_of_suit=FAIR_LABOR_STANDARDS_ACT,
+            pacer_case_id='',
+            # date_filed__gt="2017-01-01",
+        ).values_list('pk', flat=True)
