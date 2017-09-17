@@ -1,11 +1,13 @@
 import os
 from django.conf import settings
+from django.db.models import Q
 from juriscraper.pacer.http import PacerSession
 
 from cl.corpus_importer.tasks import get_pacer_case_id_for_idb_row
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT
+from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT_CR,\
+    FAIR_LABOR_STANDARDS_ACT_CV
 from cl.recap.models import FjcIntegratedDatabase
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
@@ -45,7 +47,8 @@ class Command(VerboseCommand):
 
     def get_komply_ids(self):
         return FjcIntegratedDatabase.objects.filter(
-            nature_of_suit=FAIR_LABOR_STANDARDS_ACT,
+            Q(nature_of_suit=FAIR_LABOR_STANDARDS_ACT_CV) |
+            Q(nature_of_offense=FAIR_LABOR_STANDARDS_ACT_CR),
             pacer_case_id='',
             # date_filed__gt="2017-01-01",
         ).values_list('pk', flat=True)
