@@ -3,7 +3,7 @@ from django.db import models
 from django.utils.timezone import now
 
 from cl.lib.storage import UUIDFileSystemStorage
-from cl.recap.constants import NOS_CODES, DATASET_SOURCES
+from cl.recap.constants import NOS_CODES, DATASET_SOURCES, NOO_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 
 
@@ -452,7 +452,8 @@ class FjcIntegratedDatabase(models.Model):
     )
     county_of_residence = models.IntegerField(
         help_text="The code for the county of residence of the first listed "
-                  "plaintiff (see notes in codebook).",
+                  "plaintiff (see notes in codebook). Appears to use FIPS "
+                  "code.",
         null=True,
         blank=True,
     )
@@ -558,4 +559,20 @@ class FjcIntegratedDatabase(models.Model):
                   "pending case records.",
         blank=True,
         null=True,
+    )
+
+    # Criminal fields
+    nature_of_offense = models.CharField(
+        help_text="The four digit D2 offense code associated with the filing "
+                  "title/secion 1. These codes were created in FY2005 to "
+                  "replace the AO offense codes.",
+        max_length=4,
+        choices=NOO_CODES,
+        blank=True,
+    )
+    version = models.IntegerField(
+        help_text="This field was created in FY 2012. It increments with each "
+                  "update received to a defendant record.",
+        null=True,
+        blank=True,
     )
