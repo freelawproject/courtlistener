@@ -275,6 +275,38 @@ def update_docket_metadata(d, docket_data):
     return d
 
 
+def add_parties_and_attorneys(d, parties):
+    """Add parties and attorneys from the docket data to the docket.
+
+    :param d: The docket to update
+    :param parties: The parties to update the docket with, with their associated
+    attorney objects. This is typically the docket_data['parties'] field.
+    :return: None
+    """
+    for party in parties:
+        try:
+            p = Party.objects.get(name=party['name'])
+        except Party.DoesNotExist:
+            p = Party.objects.create(
+                name=party['name'],
+                extra_info=party['extra_info'],
+            )
+        except Party.MultipleObjectsReturned:
+            continue
+        else:
+            if party['extra_info']:
+                p.extra_info = party['extra_info']
+                p.save()
+
+        # If the party type doesn't exist, make a new one.
+        if not p.party_types.filter(docket=d, name=party['type']).exists():
+            PartyType.objects.create(docket=d, party=p, name=party['type'])
+
+        # Attorneys
+        for atty in party.get('attorneys', []):
+            add_attorney(atty, p, d)
+
+
 @app.task
 def process_recap_docket(pk):
     pq = ProcessingQueue.objects.get(pk=pk)
@@ -365,29 +397,7 @@ def process_recap_docket(pk):
         else:
             rd.pacer_doc_id = rd.pacer_doc_id or pq.pacer_doc_id
 
-    # Parties
-    for party in docket_data['parties']:
-        try:
-            p = Party.objects.get(name=party['name'])
-        except Party.DoesNotExist:
-            p = Party.objects.create(
-                name=party['name'],
-                extra_info=party['extra_info'],
-            )
-        except Party.MultipleObjectsReturned:
-            continue
-        else:
-            if party['extra_info']:
-                p.extra_info = party['extra_info']
-                p.save()
-
-        # If the party type doesn't exist, make a new one.
-        if not p.party_types.filter(docket=d, name=party['type']).exists():
-            PartyType.objects.create(docket=d, party=p, name=party['type'])
-
-        # Attorneys
-        for atty in party.get('attorneys', []):
-            add_attorney(atty, p, d)
+    add_parties_and_attorneys(d, docket_data['parties'])
 
     pq.error_message = ''  # Clear out errors b/c successful
     pq.status = pq.PROCESSING_SUCCESSFUL

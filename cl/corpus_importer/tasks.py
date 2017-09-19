@@ -10,10 +10,12 @@ import requests
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction, DatabaseError
+from django.db.models import Q
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import harmonize
-from juriscraper.pacer import FreeOpinionReport, PossibleCaseNumberApi
+from juriscraper.pacer import FreeOpinionReport, PossibleCaseNumberApi, \
+    DocketReport
 from pyexpat import ExpatError
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
@@ -31,9 +33,10 @@ from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id, map_cl_to_pacer_id
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
 from cl.recap.models import FjcIntegratedDatabase
+from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
-from cl.search.models import DocketEntry, RECAPDocument, Court
+from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -459,6 +462,87 @@ def get_pacer_case_id_for_idb_row(self, pk, session):
         item.pacer_case_id = d['pacer_case_id']
         item.case_name = d['title']
     else:
-        # Hack. Storying the error in here will bite us later.
+        # Hack. Storing the error in here will bite us later.
         item.pacer_case_id = "Error"
     item.save()
+
+
+@app.task(bind=True, max_retries=5, interval_start=5 * 60,
+          interval_step=10 * 60, ignore_result=True)
+def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
+                                tag=None, **kwargs):
+    """Get a docket by PACER case id, CL court ID, and a collection of kwargs
+    that can be passed to the DocketReport query.
+
+    For details of acceptable parameters, see DocketReport.query()
+
+    :param pacer_case_id: The internal case ID of the item in PACER.
+    :param court_id: A courtlistener court ID.
+    :param tag: The tag that should be stored with the item in the DB.
+    :param session: A valid PacerSession object.
+    :param kwargs: A variety of keyword args to pass to DocketReport.query().
+    """
+    report = DocketReport(map_cl_to_pacer_id(court_id), session)
+    logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
+    response = report.query(pacer_case_id, **kwargs)
+    report.parse_response(response)
+    docket_data = report.data
+    logger.info("Querying and parsing complete for %s.%s" % (court_id,
+                                                             pacer_case_id))
+
+    # Merge the contents into CL.
+    try:
+        d = Docket.objects.get(
+            Q(pacer_case_id=pacer_case_id) |
+            Q(docket_number=docket_data['docket_number']),
+            court_id=court_id,
+        )
+        # Add RECAP as a source if it's not already.
+        if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
+            d.source = Docket.RECAP_AND_SCRAPER
+        elif d.source == Docket.COLUMBIA:
+            d.source = Docket.COLUMBIA_AND_RECAP
+        elif d.source == Docket.COLUMBIA_AND_SCRAPER:
+            d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
+    except Docket.DoesNotExist:
+        d = Docket(
+            source=Docket.RECAP,
+            pacer_case_id=pacer_case_id,
+            court_id=court_id
+        )
+    except Docket.MultipleObjectsReturned:
+        logger.error("Too many dockets returned when trying to look up '%s.%s'" %
+                     (court_id, pacer_case_id))
+        return None
+
+    update_docket_metadata(d, docket_data)
+    d.save()
+    if tag is not None:
+        tag, _ = Tag.objects.get_or_create(name=tag)
+        d.tags.add(tag)
+
+    for docket_entry in docket_data['docket_entries']:
+        try:
+            de, created = DocketEntry.objects.update_or_create(
+                docket=d,
+                entry_number=docket_entry['document_number'],
+                defaults={
+                    'description': docket_entry['description'],
+                    'date_filed': docket_entry['date_filed'],
+                }
+            )
+        except DocketEntry.MultipleObjectsReturned:
+            logger.error(
+                "Multiple docket entries found for document entry number '%s' "
+                "while processing '%s.%s'" % (docket_entry['document_number'],
+                                              court_id, pacer_case_id)
+            )
+            continue
+        else:
+            if tag is not None:
+                de.tags.add(tag)
+
+    add_parties_and_attorneys(d, docket_data['parties'])
+    logger.info("Created/updated docket: %s" % d)
+
+    return d
