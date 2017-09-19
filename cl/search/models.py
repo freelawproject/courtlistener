@@ -111,6 +111,12 @@ class Docket(models.Model):
         db_index=True,
         related_name='dockets',
     )
+    tags = models.ManyToManyField(
+        'search.Tag',
+        help_text="The tags associated with the docket.",
+        related_name="dockets",
+        blank=True,
+    )
     assigned_to = models.ForeignKey(
         'people_db.Person',
         related_name='assigning',
@@ -455,6 +461,12 @@ class DocketEntry(models.Model):
         help_text="Foreign key as a relation to the corresponding Docket "
                   "object. Specifies which docket the docket entry belongs to.",
         related_name="docket_entries",
+    )
+    tags = models.ManyToManyField(
+        'search.Tag',
+        help_text="The tags associated with the docket entry.",
+        related_name="docket_entries",
+        blank=True,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created.",
