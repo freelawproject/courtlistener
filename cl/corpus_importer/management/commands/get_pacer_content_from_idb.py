@@ -109,6 +109,10 @@ class Command(VerboseCommand):
             Q(nature_of_suit=FAIR_LABOR_STANDARDS_ACT_CV) |
             Q(nature_of_offense=FAIR_LABOR_STANDARDS_ACT_CR),
             date_filed__gte="2017-01-01",
+        ).distinct(
+            # Avoid duplicates.
+            'pacer_case_id',
+            'district_id',
         ).values_list('pk', flat=True)
         get_pacer_dockets(self.options, row_pks, tag='QAV5K6HU93A67WS6')
 
