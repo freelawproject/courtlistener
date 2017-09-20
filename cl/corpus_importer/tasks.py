@@ -457,7 +457,7 @@ def get_pacer_case_id_for_idb_row(self, pk, session):
     pcn = PossibleCaseNumberApi(session)
     r = pcn.query(item.docket_number, map_cl_to_pacer_id(item.district_id))
     pcn.parse_response(r)
-    d = pcn.data
+    d = pcn.data(case_name='%s v. %s' % (item.plaintiff, item.defendant))
     if d is not None:
         item.pacer_case_id = d['pacer_case_id']
         item.case_name = d['title']

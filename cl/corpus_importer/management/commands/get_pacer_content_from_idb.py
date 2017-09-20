@@ -97,8 +97,6 @@ class Command(VerboseCommand):
         row_pks = FjcIntegratedDatabase.objects.filter(
             Q(nature_of_suit=FAIR_LABOR_STANDARDS_ACT_CV) |
             Q(nature_of_offense=FAIR_LABOR_STANDARDS_ACT_CR),
-            pacer_case_id='',
-            # date_filed__gt="2017-01-01",
         ).values_list('pk', flat=True)
         get_pacer_case_ids(self.options, row_pks)
 
