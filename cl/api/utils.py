@@ -14,6 +14,7 @@ from django.utils.encoding import force_text
 from django.utils.timezone import now
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
+from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import RelatedFilter
 from rest_framework_filters.backends import DjangoFilterBackend
@@ -32,9 +33,9 @@ ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ['contains', 'icontains']
 
 
 class DisabledHTMLFilterBackend(DjangoFilterBackend):
-    """Disable showing filters in the browsable API. 
-    
-    Ideally, we'd want to show fields in the browsable API, but for related 
+    """Disable showing filters in the browsable API.
+
+    Ideally, we'd want to show fields in the browsable API, but for related
     objects this loads every object into the HTML and it loads them from the DB
     one query at a time. It's insanity, so it's gotta be disabled globally.
     """
@@ -99,6 +100,23 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         if hasattr(view, 'ordering_fields'):
             metadata['ordering'] = view.ordering_fields
         return metadata
+
+    def determine_actions(self, request, view):
+        """Simple override to always show the field information even for people
+        that don't have POST access.
+
+        Fixes issue #732.
+        """
+        actions = {}
+        for method in {'PUT', 'POST'} & set(view.allowed_methods):
+            view.request = clone_request(request, method)
+            if method == 'PUT' and hasattr(view, 'get_object'):
+                view.get_object()
+            serializer = view.get_serializer()
+            actions[method] = self.get_serializer_info(serializer)
+            view.request = request
+
+        return actions
 
 
 class LoggingMixin(object):
@@ -222,7 +240,7 @@ class RECAPUsersReadOnly(DjangoModelPermissions):
 
 class RECAPUploaders(DjangoModelPermissions):
     """Provides some users upload permissions in RECAP
-    
+
     Such users must have the has_recap_upload_access flag set on their account
     """
     perms_map = {
