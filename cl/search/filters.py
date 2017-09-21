@@ -26,6 +26,15 @@ class CourtFilter(FilterSet):
         }
 
 
+class TagFilter(FilterSet):
+    class Meta:
+        model = Tag
+        fields = {
+            'id': ['exact'],
+            'name': ['exact'],
+        }
+
+
 class DocketFilter(FilterSet):
     court = filters.RelatedFilter(CourtFilter)
     clusters = filters.RelatedFilter("cl.search.filters.OpinionClusterFilter")
@@ -34,6 +43,7 @@ class DocketFilter(FilterSet):
     assigned_to = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
     referred_to = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
     parties = filters.RelatedFilter('cl.people_db.filters.PartyFilter')
+    tags = filters.RelatedFilter(TagFilter)
 
     class Meta:
         model = Docket
@@ -132,6 +142,7 @@ class DocketEntryFilter(FilterSet):
     recap_documents = filters.RelatedFilter(
         'cl.search.filters.RECAPDocumentFilter'
     )
+    tags = filters.RelatedFilter(TagFilter)
 
     class Meta:
         model = DocketEntry
@@ -140,15 +151,6 @@ class DocketEntryFilter(FilterSet):
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_filed': DATE_LOOKUPS,
-        }
-
-
-class TagFilter(FilterSet):
-    class Meta:
-        model = Tag
-        fields = {
-            'id': ['exact'],
-            'name': ['exact'],
         }
 
 
