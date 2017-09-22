@@ -109,7 +109,7 @@ def get_free_document_report(self, court_id, start, end, session):
     """Get structured results from the PACER free document report"""
     report = FreeOpinionReport(court_id, session)
     try:
-        responses = report.query(start, end, sort='case_number')
+        report.query(start, end, sort='case_number')
     except (ConnectionError, ChunkedEncodingError, ReadTimeoutError,
             ConnectTimeout) as exc:
         logger.warning("Unable to get free document report results from %s "
@@ -117,7 +117,7 @@ def get_free_document_report(self, court_id, start, end, session):
         raise self.retry(exc=exc, countdown=5)
 
     try:
-        return report.parse(responses)
+        return report.data
     except IndexError as exc:
         # Happens when the page isn't downloaded properly, ugh.
         raise self.retry(exc=exc, countdown=15)
@@ -136,7 +136,7 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
     """
     report = FreeOpinionReport(court_id, session)
     try:
-        responses = report.query(start, end, sort='case_number')
+        report.query(start, end, sort='case_number')
     except (ConnectionError, ChunkedEncodingError, ReadTimeoutError,
             ReadTimeout, ConnectTimeout) as exc:
         logger.warning("Unable to get free document report results from %s "
@@ -146,7 +146,7 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
         raise self.retry(exc=exc, countdown=10)
 
     try:
-        results = report.parse(responses)
+        results = report.data
     except (IndexError, HTTPError) as exc:
         # IndexError: When the page isn't downloaded properly.
         # HTTPError: raise_for_status in parse hit bad status.
@@ -454,9 +454,8 @@ def get_pacer_case_id_for_idb_row(self, pk, session):
     """Populate the pacer_case_id field for an item in the IDB table"""
     logger.info("Getting pacer_case_id for IDB item with pk %s" % pk)
     item = FjcIntegratedDatabase.objects.get(pk=pk)
-    pcn = PossibleCaseNumberApi(session)
-    r = pcn.query(item.docket_number, map_cl_to_pacer_id(item.district_id))
-    pcn.parse_response(r)
+    pcn = PossibleCaseNumberApi(map_cl_to_pacer_id(item.district_id), session)
+    pcn.query(item.docket_number)
     d = pcn.data(case_name='%s v. %s' % (item.plaintiff, item.defendant))
     if d is not None:
         item.pacer_case_id = d['pacer_case_id']
@@ -478,14 +477,13 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
 
     :param pacer_case_id: The internal case ID of the item in PACER.
     :param court_id: A courtlistener court ID.
-    :param tag: The tag that should be stored with the item in the DB.
     :param session: A valid PacerSession object.
+    :param tag: The tag that should be stored with the item in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     """
     report = DocketReport(map_cl_to_pacer_id(court_id), session)
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
-    response = report.query(pacer_case_id, **kwargs)
-    report.parse_response(response)
+    report.query(pacer_case_id, **kwargs)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s.%s" % (court_id,
                                                              pacer_case_id))

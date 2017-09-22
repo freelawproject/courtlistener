@@ -316,7 +316,7 @@ def process_recap_docket(pk):
 
     report = DocketReport(map_cl_to_pacer_id(pq.court_id))
     text = pq.filepath_local.read().decode('utf-8')
-    report.parse_text(text)
+    report._parse_text(text)
     docket_data = report.data
     logger.info("Parsing completed of item %s" % pq)
 

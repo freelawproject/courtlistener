@@ -9,12 +9,15 @@ from cl.corpus_importer.tasks import get_pacer_case_id_for_idb_row, \
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
+from cl.search.models import Docket
 from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT_CR,\
     FAIR_LABOR_STANDARDS_ACT_CV
 from cl.recap.models import FjcIntegratedDatabase
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
+
+KOMPLY_TAG = 'QAV5K6HU93A67WS6'
 
 
 def get_pacer_case_ids(options, row_pks):
@@ -58,6 +61,20 @@ def get_pacer_dockets(options, row_pks, tag=None):
             },
             queue=q,
         )
+
+
+def get_cover_sheets_for_docket(options, docket_pks, tag=None):
+    """Get civil cover sheets for dockets in our system."""
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q)
+    for i, docket_pk in enumerate(docket_pks):
+        throttle.maybe_wait()
+        if i % 1000 == 0:
+            pacer_session = PacerSession(username=PACER_USERNAME,
+                                         password=PACER_PASSWORD)
+            pacer_session.login()
+            logger.info("Sent %s tasks to celery so far." % i)
+        pacer_doc_id = Docket.objects.get(pk=docket_pk)
 
 
 class Command(VerboseCommand):
@@ -112,9 +129,19 @@ class Command(VerboseCommand):
             'pacer_case_id',
             'district_id',
         ).values_list('pk', flat=True)
-        get_pacer_dockets(self.options, row_pks, tag='QAV5K6HU93A67WS6')
+        get_pacer_dockets(self.options, row_pks, tag=KOMPLY_TAG)
+
+    def get_komply_cover_sheets(self):
+        """Once we have all the dockets, our next step is to get the cover
+        sheets from each of those cases.
+        """
+        docket_pks = Docket.objects.filter(
+            tags__name=KOMPLY_TAG,
+        ).values_list('pk', flat=True)
+        get_cover_sheets_for_docket(self.options, docket_pks, tag=KOMPLY_TAG)
 
     VALID_ACTIONS = {
         'get-komply-pacer-ids': get_komply_ids,
         'get-komply-dockets': get_komply_dockets,
+        'get-komply-cover-sheets': get_komply_cover_sheets,
     }
