@@ -71,7 +71,9 @@
                 {% if docket.source in docket.RECAP_SOURCES %}
                 <p>
                     {% if docket.pacer_url %}
-                        <a href="{{ docket.pacer_url }}" class="btn btn-primary btn-xs">View on PACER</a>
+                        <a href="{{ docket.pacer_url }}"
+                           class="btn btn-primary btn-xs"
+                           target="_blank">View on PACER</a>
                     {% endif %}
                     <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}" class="btn btn-primary btn-xs">Search this Docket</a>
                 </p>
@@ -390,14 +392,16 @@
                                         <li role="separator" class="divider"></li>
                                         {% endif %}
                                         <li>
-                                            <a href="{{ rd.pacer_url }}">Buy on
+                                            <a href="{{ rd.pacer_url }}"
+                                               target="_blank">Buy on
                                             PACER</a>
                                         </li>
                                     </ul>
                                 {% else %}
                                     {# We don't have it #}
                                     <a href="{{ rd.pacer_url }}"
-                                       class="btn btn-primary btn-xs">Buy on PACER</a>
+                                       class="btn btn-primary btn-xs"
+                                       target="_blank">Buy on PACER</a>
                                 {% endif %}
                             </div>
                             <div class="clearfix"></div>
