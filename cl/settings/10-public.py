@@ -292,6 +292,7 @@ REST_FRAMEWORK = {
         'gpilapil': '10000/hour',
         'peidelman': '20000/hour',
         'waldo': '10000/hour',
+        'hdave4': '15000/hour',  # GSU
     },
 
     # Auth
