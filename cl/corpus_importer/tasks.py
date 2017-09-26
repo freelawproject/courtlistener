@@ -618,6 +618,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
     for attachment in att_report.data['attachments']:
         if description_re.search(attachment['description']):
             att_found = attachment.copy()
+            break
 
     if not att_found:
         msg = "Aborting. Did not find civil cover sheet for %s." % rd
@@ -688,5 +689,5 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
 
     # Save, extract, then save to Solr. Skip OCR for now. Don't do these async.
     rd.save(do_extraction=False, index=False)
-    extract_recap_pdf(rd.pk, skip_ocr=True, index=True)
-    add_or_update_recap_document([self.pk])
+    extract_recap_pdf(rd.pk, skip_ocr=True)
+    add_or_update_recap_document([rd.pk])
