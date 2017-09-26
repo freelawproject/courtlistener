@@ -1,15 +1,17 @@
 import argparse
 import os
+import re
+
 from django.conf import settings
 from django.db.models import Q
 from juriscraper.pacer.http import PacerSession
 
 from cl.corpus_importer.tasks import get_pacer_case_id_for_idb_row, \
-    get_docket_by_pacer_case_id
+    get_docket_by_pacer_case_id, get_pacer_doc_by_rd_and_description
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.search.models import Docket
+from cl.search.models import Docket, RECAPDocument
 from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT_CR,\
     FAIR_LABOR_STANDARDS_ACT_CV
 from cl.recap.models import FjcIntegratedDatabase
@@ -67,6 +69,7 @@ def get_cover_sheets_for_docket(options, docket_pks, tag=None):
     """Get civil cover sheets for dockets in our system."""
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
+    cover_sheet_re = re.compile(r'cover\s*sheet', re.IGNORECASE)
     for i, docket_pk in enumerate(docket_pks):
         throttle.maybe_wait()
         if i % 1000 == 0:
@@ -74,7 +77,27 @@ def get_cover_sheets_for_docket(options, docket_pks, tag=None):
                                          password=PACER_PASSWORD)
             pacer_session.login()
             logger.info("Sent %s tasks to celery so far." % i)
-        pacer_doc_id = Docket.objects.get(pk=docket_pk)
+        try:
+            rd_pk = RECAPDocument.objects.get(
+                document_number=1,
+                docket_entry__docket_id=docket_pk,
+            ).values_list()
+        except (RECAPDocument.MultipleObjectsReturned,
+                RECAPDocument.DoesNotExist) as e:
+            logger.warn("Unable to get document 1 for docket_pk: %s" %
+                        docket_pk)
+        else:
+            get_pacer_doc_by_rd_and_description.apply_async(
+                args=(
+                    rd_pk,
+                    cover_sheet_re,
+                    pacer_session,
+                ),
+                kwargs={
+                    'tag': tag,
+                },
+                queue=q,
+            )
 
 
 class Command(VerboseCommand):

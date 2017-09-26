@@ -305,6 +305,7 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
             rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
 
         rd.plain_text, _ = anonymize(content)
+        # Do not do indexing here. Creates race condition in celery.
         rd.save(index=False, do_extraction=False)
         processed.append(pk)
 

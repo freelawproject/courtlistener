@@ -15,7 +15,7 @@ from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import FreeOpinionReport, PossibleCaseNumberApi, \
-    DocketReport
+    DocketReport, AttachmentPage
 from pyexpat import ExpatError
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
@@ -36,6 +36,7 @@ from cl.recap.models import FjcIntegratedDatabase
 from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
+from cl.search.tasks import add_or_update_recap_document
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
 
 logger = logging.getLogger(__name__)
@@ -540,7 +541,152 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
             if tag is not None:
                 de.tags.add(tag)
 
+        try:
+            rd = RECAPDocument.objects.get(
+                docket_entry=de,
+                # No attachments when uploading dockets.
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                document_number=docket_entry['document_number'],
+            )
+        except RECAPDocument.DoesNotExist:
+            RECAPDocument.objects.create(
+                docket_entry=de,
+                # No attachments when uploading dockets.
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                document_number=docket_entry['document_number'],
+                pacer_doc_id=docket_entry['pacer_doc_id'],
+                is_available=False,
+            )
+        except RECAPDocument.MultipleObjectsReturned:
+            logger.error(
+                "Multiple recap documents found for document entry "
+                "number: '%s', docket: %s" % (docket_entry['document_number'], d)
+            )
+            continue
+        else:
+            rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
+            if tag is not None:
+                rd.tags.add(tag)
+
     add_parties_and_attorneys(d, docket_data['parties'])
     logger.info("Created/updated docket: %s" % d)
 
     return d
+
+
+@app.task(bind=True, max_retries=15, interval_start=5,
+          interval_step=5, ignore_result=True)
+def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
+                                        tag=None):
+    """Using a docket entry object ID and a description of a document, get the
+    document.
+
+    This function was originally meant to get civil cover sheets, but can be
+    repurposed as needed.
+
+    :param rd_pk: The PK of a DocketEntry object to use as a source.
+    :param description_re: A compiled regular expression to search against the
+    description provided by the attachment page.
+    :param session: The PACER session object to use.
+    :param tag: A tag to apply to any downloaded content.
+    :return: None
+    """
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    d = rd.docket_entry.docket
+    pacer_court_id = map_cl_to_pacer_id(d.court_id)
+    att_report = AttachmentPage(pacer_court_id, session)
+    try:
+        att_report.query(rd.pacer_doc_id)
+    except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
+            ChunkedEncodingError) as exc:
+        logger.warning("Unable to get PDF for %s" % rd)
+        raise self.retry(exc=exc)
+    except HTTPError as exc:
+        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
+                                        HTTP_504_GATEWAY_TIMEOUT]:
+            logger.warning("Ran into HTTPError: %s. Retrying." %
+                           exc.response.status_code)
+            raise self.retry(exc)
+        else:
+            msg = "Ran into unknown HTTPError. %s. Aborting." % \
+                  exc.response.status_code
+            logger.error(msg)
+            self.request.callbacks = None
+            return
+
+    att_found = None
+    for attachment in att_report.data['attachments']:
+        if description_re.search(attachment['description']):
+            att_found = attachment.copy()
+
+    if not att_found:
+        msg = "Aborting. Did not find civil cover sheet for %s." % rd
+        logger.error(msg)
+        self.request.callbacks = None
+        return
+
+    # Try to find the item already in the collection
+    rd, _ = RECAPDocument.objects.get_or_create(
+        docket_entry=rd.docket_entry,
+        document_number=1,
+        attachment_number=att_found['attachment_number'],
+        pacer_doc_id=att_found['pacer_doc_id'],
+        document_type=RECAPDocument.ATTACHMENT,
+        defaults={
+            'date_upload': now(),
+        },
+    )
+    if tag is not None:
+        rd.tags.add(tag)
+
+    if rd.is_available:
+        # Great. Call it a day.
+        return
+
+    # Not available. Go get it.
+    try:
+        pacer_case_id = rd.docket_entry.docket.pacer_case_id
+        r = att_report.download_pdf(pacer_case_id, att_found['pacer_doc_id'])
+    except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
+            ChunkedEncodingError) as exc:
+        logger.warning("Unable to get PDF for %s" % att_found['pacer_doc_id'])
+        raise self.retry(exc=exc)
+    except HTTPError as exc:
+        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
+                                        HTTP_504_GATEWAY_TIMEOUT]:
+            logger.warning("Ran into HTTPError: %s. Retrying." %
+                           exc.response.status_code)
+            raise self.retry(exc)
+        else:
+            msg = "Ran into unknown HTTPError. %s. Aborting." % \
+                  exc.response.status_code
+            logger.error(msg)
+            self.request.callbacks = None
+            return
+
+    if r is None:
+        msg = "Unable to get PDF for %s at PACER court '%s' with doc id %s" % \
+              (rd, pacer_court_id, rd.pacer_doc_id)
+        logger.error(msg)
+        self.request.callbacks = None
+        return
+
+    file_name = get_document_filename(
+        d.court_id,
+        pacer_case_id,
+        rd.document_number,
+        rd.attachment_number,
+    )
+    cf = ContentFile(r.content)
+    rd.filepath_local.save(file_name, cf, save=False)
+    rd.is_available = True  # We've got the PDF.
+
+    # request.content is sometimes a str, sometimes unicode, force it all to be
+    # bytes, pleasing hashlib.
+    rd.sha1 = hashlib.sha1(force_bytes(r.content)).hexdigest()
+    rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
+
+    # Save, extract, then save to Solr. Skip OCR for now. Don't do these async.
+    rd.save(do_extraction=False, index=False)
+    extract_recap_pdf(rd.pk, skip_ocr=True, index=True)
+    add_or_update_recap_document([self.pk])
