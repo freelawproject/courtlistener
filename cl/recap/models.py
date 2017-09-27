@@ -1,4 +1,7 @@
+import os
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils.timezone import now
 
@@ -7,10 +10,52 @@ from cl.recap.constants import NOS_CODES, DATASET_SOURCES, NOO_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 
 
-def make_recap_processing_queue_path(instance, filename):
+def make_path(root, filename):
     d = now()
-    return 'recap_processing_queue/%s/%02d/%02d/%s' % (d.year, d.month, d.day,
-                                                       filename)
+    return os.path.join(
+        root,
+        '%s' % d.year,
+        '%02d' % d.month,
+        '%02d' % d.day,
+        filename,
+    )
+
+
+def make_recap_processing_queue_path(instance, filename):
+    return make_path('recap_processing_queue', filename)
+
+
+def make_recap_data_path(instance, filename):
+    return make_path('recap-data', filename)
+
+
+class PacerHtmlFiles(models.Model):
+    """This is a simple object for holding original HTML content from PACER
+
+    We use this object to make sure that for every item we receive from users,
+    we can go back and re-parse it one day if we have to. This becomes essential
+    as we do more and more data work where we're purchasing content. If we don't
+    keep an original copy, a bug could be devastating.
+    """
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    filepath = models.FileField(
+        help_text="The path of the original data from PACER.",
+        upload_to=make_recap_data_path,
+        storage=UUIDFileSystemStorage(),
+        max_length=150,
+    )
+    content_type = models.ForeignKey(ContentType)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
 
 
 class ProcessingQueue(models.Model):

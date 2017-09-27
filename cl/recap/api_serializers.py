@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from cl.recap.models import ProcessingQueue
-from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
+from cl.search.models import Court
 
 
 class ProcessingQueueSerializer(serializers.ModelSerializer):

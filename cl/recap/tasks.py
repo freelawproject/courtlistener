@@ -16,7 +16,7 @@ from cl.lib.recap_utils import get_document_filename
 from cl.lib.utils import remove_duplicate_dicts
 from cl.people_db.models import Party, PartyType, Attorney, \
     AttorneyOrganization, AttorneyOrganizationAssociation, Role
-from cl.recap.models import ProcessingQueue
+from cl.recap.models import ProcessingQueue, PacerHtmlFiles
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import Docket, RECAPDocument, DocketEntry
 from cl.search.tasks import add_or_update_recap_document
@@ -115,15 +115,14 @@ def process_recap_pdf(self, pk):
     # Do the file, finally.
     content = pq.filepath_local.read()
     new_sha1 = hashlib.sha1(content).hexdigest()
-    if all([rd.sha1 == new_sha1,
-            rd.is_available,
-            rd.filepath_local and os.path.isfile(rd.filepath_local.path)]):
-        # All good. Press on.
-        new_document = False
-    else:
+    existing_document = all([
+        rd.sha1 == new_sha1,
+        rd.is_available,
+        rd.filepath_local and os.path.isfile(rd.filepath_local.path)
+    ])
+    if not existing_document:
         # Different sha1, it wasn't available, or it's missing from disk. Move
         # the new file over from the processing queue storage.
-        new_document = True
         cf = ContentFile(content)
         file_name = get_document_filename(
             rd.docket_entry.docket.court_id,
@@ -139,8 +138,9 @@ def process_recap_pdf(self, pk):
         extension = rd.filepath_local.path.split('.')[-1]
         rd.page_count = get_page_count(rd.filepath_local.path, extension)
         rd.ocr_status = None
+
     rd.save()
-    if new_document:
+    if not existing_document:
         extract_recap_pdf(rd.pk)
         add_or_update_recap_document([rd.pk], force_commit=False)
 
@@ -309,6 +309,10 @@ def add_parties_and_attorneys(d, parties):
 
 @app.task
 def process_recap_docket(pk):
+    """Process an uploaded docket from the RECAP API endpoint.
+
+    param pk: The primary key of the processing queue item you want to work on.
+    """
     pq = ProcessingQueue.objects.get(pk=pk)
     pq.status = pq.PROCESSING_IN_PROGRESS
     pq.save()
@@ -350,6 +354,13 @@ def process_recap_docket(pk):
 
     update_docket_metadata(d, docket_data)
     d.save()
+
+    # Add the HTML to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles(content_object=d)
+    pacer_file.filepath.save(
+        'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(text),
+    )
 
     # Docket entries
     for docket_entry in docket_data['docket_entries']:
@@ -399,6 +410,8 @@ def process_recap_docket(pk):
 
     add_parties_and_attorneys(d, docket_data['parties'])
 
+    # Ditch the original file (it's associated with the Docket now)
+    pq.filepath_local.delete(save=False)
     pq.error_message = ''  # Clear out errors b/c successful
     pq.status = pq.PROCESSING_SUCCESSFUL
     pq.docket = d

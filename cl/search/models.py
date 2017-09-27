@@ -5,6 +5,7 @@ from datetime import datetime, time
 
 from celery.canvas import chain
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
@@ -17,7 +18,8 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.model_helpers import make_upload_path, make_recap_path, \
     make_recap_pdf_path
-from cl.lib.search_index_utils import InvalidDocumentError, null_map, normalize_search_dicts
+from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
+    normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
 
@@ -115,6 +117,13 @@ class Docket(models.Model):
         'search.Tag',
         help_text="The tags associated with the docket.",
         related_name="dockets",
+        blank=True,
+    )
+    html_documents = GenericRelation(
+        'recap.PacerHtmlFiles',
+        help_text="Original HTML files collected from PACER.",
+        related_query_name='dockets',
+        null=True,
         blank=True,
     )
     assigned_to = models.ForeignKey(
