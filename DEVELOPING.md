@@ -82,7 +82,7 @@ Solr/search tests should derive from `cl.search.tests.EmptySolrTestCase` and use
 Selenium tests should derive from `cl.tests.base.BaseSeleniumTest`, which automatically handles the setup and teardown of a Selenium webdriver instance available at `self.browser` from within your test code.
 
 There are some helper methods provided via `BaseSeleniumTest` as well:
-* `reset_browser(width, height)` - start a new browser session with the window set to a particular width and height (in pixels)
+* `reset_browser()` - start a new browser session
 * `click_link_for_new_page(link_text, timeout)` - a wrapper around the Selenium functions for finding an anchor based on the anchor text and calling click(), but also does an explicit wait up until _timeout_ seconds for the browser page to change. Use when expecting a navigation event.
 * `attempt_sign_in(username, password)` - from a given CL page, will attempt to use the _Sign in / Register_ link and input the given username and password.
 * `get_url_and_wait(url, timeout)` - will input the given url into the browser's address bar, submit, and wait until _timeout_ seconds for the given url to load.

@@ -25,10 +25,6 @@ if 'SELENIUM_TIMEOUT' in os.environ:
     except ValueError:
         pass
 
-DESKTOP_WINDOW = (1024, 768)
-MOBILE_WINDOW = (500, 120)
-
-
 @override_settings(
     SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
@@ -46,6 +42,8 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     def _create_browser(options=None):
         if options is None:
             options = webdriver.ChromeOptions()
+            options.add_argument('headless')
+            options.binary_location = '/usr/bin/google-chrome'
             options.add_argument("silent")
 
         if 'SELENIUM_REMOTE_ADDRESS' in os.environ:
@@ -72,7 +70,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self._initialize_test_solr()
         self._update_index()
 
-    def reset_browser(self, width=DESKTOP_WINDOW[0], height=DESKTOP_WINDOW[1]):
+    def reset_browser(self):
         try:
             self.browser.quit()
         except AttributeError:
@@ -80,7 +78,8 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             pass
         finally:
             options = webdriver.ChromeOptions()
-            options.add_argument('window-size=%s,%s' % (width, height))
+            options.binary_location = '/usr/bin/google-chrome'
+            options.add_argument('headless')
             self.browser = self._create_browser(options)
 
         self.browser.implicitly_wait(15)
@@ -88,7 +87,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     def tearDown(self):
         if self.screenshot:
             filename = type(self).__name__ + '.png'
-            print '\nSaving screenshot: %s' % (filename,)
+            print('\nSaving screenshot: %s' % (filename,))
             self.browser.save_screenshot(type(self).__name__ + '.png')
         self.browser.quit()
         self._teardown_test_solr()

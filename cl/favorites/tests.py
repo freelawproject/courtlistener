@@ -5,7 +5,7 @@ from django.test import Client, TestCase
 from timeout_decorator import timeout_decorator
 
 from cl.favorites.models import Favorite
-from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW, SELENIUM_TIMEOUT
+from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
 
 class FavoriteTest(TestCase):
