@@ -19,17 +19,19 @@ from cl.favorites.models import Favorite
 from cl.lib import search_utils, sunburnt
 from cl.lib.bot_detector import is_bot
 from cl.lib.import_lib import map_citations_to_models
+from cl.lib.model_helpers import suppress_autotime
 from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
-from cl.search.models import Docket, OpinionCluster, DocketEntry, RECAPDocument
+from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
 def view_docket(request, pk, _):
     docket = get_object_or_404(Docket, pk=pk)
     if not is_bot(request):
-        docket.view_count = F('view_count') + 1
-        docket.save()
+        with suppress_autotime(docket, ['date_modified']):
+            docket.view_count = F('view_count') + 1
+            docket.save()
 
     try:
         fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)

@@ -16,6 +16,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
 
 from cl.lib.bot_detector import is_bot
+from cl.lib.model_helpers import suppress_autotime
 from cl.stats.utils import tally_stat
 from cl.visualizations.forms import VizForm, VizEditForm
 from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
@@ -30,8 +31,11 @@ def render_visualization_page(request, pk, embed):
 
     if not is_bot(request):
         cached_value = viz.view_count
-        viz.view_count = F('view_count') + 1
-        viz.save()
+
+        with suppress_autotime(viz, ['date_modified']):
+            viz.view_count = F('view_count') + 1
+            viz.save()
+
         # To get the new value, you either need to get the item from the DB a
         # second time, or just manipulate it manually....
         viz.view_count = cached_value + 1

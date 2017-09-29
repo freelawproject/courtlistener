@@ -174,17 +174,28 @@ class TestViews(TestCase):
         self.assertNotIn(b'My Private Visualization', response.context)
 
     def test_view_counts_increment_by_one(self):
-        """ Test the view count for a Visualization increments on page view """
+        """ Test the view count for a Visualization increments on page view
+
+        Ensure that the date_modified does not change.
+        """
         viz = SCOTUSMap.objects.get(pk=1)
         old_view_count = viz.view_count
+        old_date_modified = viz.date_modified
 
         self.client.login(username='user', password='password')
         response = self.client.get(viz.get_absolute_url())
 
+        viz.refresh_from_db(fields=['view_count', 'date_modified'])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             old_view_count + 1,
-            SCOTUSMap.objects.get(pk=1).view_count
+            viz.view_count,
+        )
+
+        self.assertEqual(
+            old_date_modified,
+            viz.date_modified,
+            msg="date_modified changed when the page was loaded!",
         )
 
 

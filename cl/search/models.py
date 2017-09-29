@@ -207,7 +207,8 @@ class Docket(models.Model):
         null=True,
     )
     date_last_filing = models.DateField(
-        help_text="The date the case was last updated in the docket. ",
+        help_text="The date the case was last updated in the docket, as shown "
+                  "in PACER's Docket History report.",
         blank=True,
         null=True,
     )
