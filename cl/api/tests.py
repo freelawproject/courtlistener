@@ -7,7 +7,7 @@ from datetime import timedelta, date
 from django.contrib.auth.models import User, Permission
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest, JsonResponse
-from django.test import Client, TestCase, override_settings
+from django.test import Client, TestCase, override_settings, TransactionTestCase
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 
@@ -108,21 +108,66 @@ class CoverageTests(IndexedSolrTestCase):
         self.assertIn('total', j)
 
 
-class FilteringCountTestCase(object):
-    """Mixin for adding an additional test assertion."""
+class ApiQueryCountTests(TransactionTestCase):
+    """Check that the number of queries for an API doesn't explode
 
-    # noinspection PyPep8Naming
-    def assertCountInResults(self, expected_count):
-        print("Path and q are: %s, %s" % (self.path, self.q))
-        r = self.client.get(self.path, self.q)
-        self.assertLess(r.status_code, 400)  # A valid status code?
-        got = len(r.data['results'])
-        self.assertEqual(
-            got,
-            expected_count,
-            msg="Expected %s, but got %s.\n\n"
-                "r.data was: %s" % (expected_count, got, r.data)
-        )
+    I expect these tests to regularly need updating as new features are added to
+    the APIs, but in the meantime, they're important checks because of how easy
+    it is to explode the APIs. The issue that happens here is that if you're not
+    careful, adding a related field to a model will add at least 20 queries to
+    each API request, one per returned item. This *kills* performance.
+    """
+    fixtures = ['test_objects_query_counts.json', 'attorney_party.json',
+                'user_with_recap_api_access.json', 'test_objects_audio.json',
+                'recap_processing_queue_query_counts.json']
+
+    def setUp(self):
+        # Add the permissions to the user.
+        u = User.objects.get(pk=6)
+        ps = Permission.objects.filter(codename='has_recap_api_access')
+        u.user_permissions.add(*ps)
+
+        self.client.login(username='recap-user', password='password')
+
+    def test_audio_api_query_counts(self):
+        with self.assertNumQueries(4):
+            path = reverse('audio-list', kwargs={'version': 'v3'})
+            self.client.get(path)
+
+    def test_search_api_query_counts(self):
+        with self.assertNumQueries(6):
+            path = reverse('docket-list', kwargs={'version': 'v3'})
+            self.client.get(path)
+
+        with self.assertNumQueries(8):
+            path = reverse('docketentry-list', kwargs={'version': 'v3'})
+            self.client.get(path)
+
+        with self.assertNumQueries(6):
+            path = reverse('recapdocument-list', kwargs={'version': 'v3'})
+            self.client.get(path)
+
+        with self.assertNumQueries(6):
+            path = reverse('opinioncluster-list', kwargs={'version': 'v3'})
+            self.client.get(path)
+
+        with self.assertNumQueries(5):
+            path = reverse('opinion-list', kwargs={'version': 'v3'})
+            self.client.get(path)
+
+    def test_party_api_query_counts(self):
+        with self.assertNumQueries(7):
+            path = reverse('party-list', kwargs={'version': 'v3'})
+            self.client.get(path)
+
+        with self.assertNumQueries(6):
+            path = reverse('attorney-list', kwargs={'version': 'v3'})
+            self.client.get(path)
+
+    def test_recap_upload_api_query_counts(self):
+        with self.assertNumQueries(3):
+            path = reverse('processingqueue-list', kwargs={'version': 'v3'})
+            self.client.get(path)
 
 
 class DRFOrderingTests(TestCase):
@@ -147,6 +192,23 @@ class DRFOrderingTests(TestCase):
         r = self.client.get(path, {'order_by': '-id'})
         self.assertGreater(r.data['results'][0]['resource_uri'],
                            r.data['results'][-1]['resource_uri'])
+
+
+class FilteringCountTestCase(object):
+    """Mixin for adding an additional test assertion."""
+
+    # noinspection PyPep8Naming
+    def assertCountInResults(self, expected_count):
+        print("Path and q are: %s, %s" % (self.path, self.q))
+        r = self.client.get(self.path, self.q)
+        self.assertLess(r.status_code, 400)  # A valid status code?
+        got = len(r.data['results'])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Expected %s, but got %s.\n\n"
+                "r.data was: %s" % (expected_count, got, r.data)
+        )
 
 
 class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):

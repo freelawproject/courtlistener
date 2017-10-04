@@ -17,7 +17,15 @@ from cl.search.models import Docket, Court, OpinionCluster, Opinion, \
 
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Docket.objects.all()
+    queryset = Docket.objects.select_related(
+        'court',
+        'assigned_to',
+        'referred_to',
+    ).prefetch_related(
+        'clusters',
+        'audio_files',
+        'tags',
+    )
     serializer_class = DocketSerializer
     filter_class = DocketFilter
     ordering_fields = (
@@ -28,8 +36,15 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
+    queryset = DocketEntry.objects.select_related(
+        'docket',   # For links back to dockets
+    ).prefetch_related(
+        'recap_documents',        # Sub items
+        'recap_documents__tags',  # Sub-sub items
+        'tags',                   # Tags on docket entries
+    ).order_by()
+
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = DocketEntry.objects.all().order_by()
     serializer_class = DocketEntrySerializer
     filter_class = DocketEntryFilter
     ordering_fields = ('date_created', 'date_modified', 'date_filed')
@@ -37,7 +52,12 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 class RECAPDocumentViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = RECAPDocument.objects.all()
+    queryset = RECAPDocument.objects.select_related(
+        'docket_entry',
+        'docket_entry__docket',
+    ).prefetch_related(
+        'tags',
+    ).order_by()
     serializer_class = RECAPDocumentSerializer
     filter_class = RECAPDocumentFilter
     ordering_fields = ('date_created', 'date_modified', 'date_upload')
@@ -53,7 +73,11 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = OpinionCluster.objects.all()
+    queryset = OpinionCluster.objects.prefetch_related(
+        'sub_opinions',
+        'panel',
+        'non_participating_judges',
+    )
     serializer_class = OpinionClusterSerializer
     filter_class = OpinionClusterFilter
     ordering_fields = (
@@ -63,7 +87,13 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Opinion.objects.all()
+    queryset = Opinion.objects.select_related(
+        'cluster',
+        'author',
+    ).prefetch_related(
+        'opinions_cited',
+        'joined_by',
+    )
     serializer_class = OpinionSerializer
     filter_class = OpinionFilter
     ordering_fields = (

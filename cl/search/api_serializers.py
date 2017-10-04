@@ -64,6 +64,8 @@ class RECAPDocumentSerializer(DynamicFieldsMixin,
         queryset=Tag.objects.all(),
         style={'base_template': 'input.html'},
     )
+    absolute_url = serializers.CharField(source='get_absolute_url',
+                                         read_only=True)
 
     class Meta:
         model = RECAPDocument

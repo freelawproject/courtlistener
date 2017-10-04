@@ -7,7 +7,11 @@ from cl.audio.models import Audio
 
 
 class AudioViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Audio.objects.all()
+    queryset = Audio.objects.select_related(
+        'docket',
+    ).prefetch_related(
+        'panel',
+    ).order_by()
     serializer_class = AudioSerializer
     filter_class = AudioFilter
     ordering_fields = (

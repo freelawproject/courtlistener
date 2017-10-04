@@ -88,7 +88,10 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = Party.objects.all()
+    queryset = Party.objects.prefetch_related(
+        'party_types',
+        'roles',
+    )
     serializer_class = PartySerializer
     filter_class = PartyFilter
     ordering_fields = (
@@ -98,7 +101,9 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = Attorney.objects.all()
+    queryset = Attorney.objects.prefetch_related(
+        'roles',
+    )
     serializer_class = AttorneySerializer
     filter_class = AttorneyFilter
     ordering_fields = (
