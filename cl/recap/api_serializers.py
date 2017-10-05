@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from cl.recap.models import ProcessingQueue
-from cl.search.models import Court
+from cl.search.models import Court, RECAPDocument
 
 
 class ProcessingQueueSerializer(serializers.ModelSerializer):
@@ -58,3 +58,9 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                                       "attachment number must be blank for "
                                       "docket uploads.")
         return attrs
+
+
+class PacerDocIdLookUpSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = RECAPDocument
+        fields = ('pacer_doc_id', 'filepath_local', 'id',)

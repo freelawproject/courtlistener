@@ -13,6 +13,7 @@ from django.core.mail import send_mail
 from django.utils.encoding import force_text
 from django.utils.timezone import now
 from rest_framework.metadata import SimpleMetadata
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
@@ -252,6 +253,10 @@ class RECAPUploaders(DjangoModelPermissions):
         'PATCH': ['%(app_label)s.has_recap_upload_access'],
         'DELETE': ['%(app_label)s.delete_%(model_name)s'],
     }
+
+
+class BigPagination(PageNumberPagination):
+    page_size = 500
 
 
 class BulkJsonHistory(object):

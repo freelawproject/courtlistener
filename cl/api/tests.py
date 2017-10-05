@@ -169,6 +169,10 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse('processingqueue-list', kwargs={'version': 'v3'})
             self.client.get(path)
 
+        with self.assertNumQueries(5):
+            path = reverse('fast-recapdocument-list', kwargs={'version': 'v3'})
+            self.client.get(path)
+
 
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
