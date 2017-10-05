@@ -22,7 +22,9 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = RECAPDocument.objects.only(
+    queryset = RECAPDocument.objects.filter(
+        is_available=True,
+    ).only(
         'pk',
         'filepath_local',
         'pacer_doc_id',

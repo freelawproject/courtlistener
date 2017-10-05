@@ -256,7 +256,7 @@ class RECAPUploaders(DjangoModelPermissions):
 
 
 class BigPagination(PageNumberPagination):
-    page_size = 500
+    page_size = 300
 
 
 class BulkJsonHistory(object):
