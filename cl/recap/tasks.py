@@ -39,6 +39,29 @@ def process_recap_upload(pq):
         process_recap_pdf.delay(pq.pk)
 
 
+def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
+    """Mark the processing queue item as successfully completed.
+
+    :param d_id: The docket PK to associate with this upload. Either the docket
+    that the RECAPDocument is associated with, or the docket that was uploaded.
+    :param de_id: The docket entry to associate with this upload. Only applies
+    to document uploads, which are associated with docket entries.
+    :param rd_id: The RECAPDocument PK to associate with this upload. Only
+    applies to document uploads (obviously).
+    """
+    # Ditch the original file
+    pq.filepath_local.delete(save=False)
+    if pq.debug:
+        pq.error_message = 'Successful debugging upload! Nice work.'
+    else:
+        pq.error_message = 'Successful upload! Nice work.'
+    pq.status = pq.PROCESSING_SUCCESSFUL
+    pq.docket_id = d_id
+    pq.docket_entry_id = de_id
+    pq.recap_document_id = rd_id
+    pq.save()
+
+
 @app.task(bind=True, max_retries=2, interval_start=5 * 60,
           interval_step=10 * 60)
 def process_recap_pdf(self, pk):
@@ -46,7 +69,7 @@ def process_recap_pdf(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     pq.status = pq.PROCESSING_IN_PROGRESS
     pq.save()
-    logger.info("Processing RECAP item: %s" % pq)
+    logger.info("Processing RECAP item (debug is: %s): %s " % (pq.debug, pq))
     try:
         rd = RECAPDocument.objects.get(
             docket_entry__docket__pacer_case_id=pq.pacer_case_id,
@@ -63,7 +86,7 @@ def process_recap_pdf(self, pk):
             logger.warning("Unable to find docket for processing queue '%s'. "
                            "Retrying if max_retries is not exceeded." % pq)
             pq.error_message = "Unable to find docket for item."
-            if self.request.retries == self.max_retries:
+            if (self.request.retries == self.max_retries) or pq.debug:
                 pq.status = pq.PROCESSING_FAILED
                 pq.save()
                 return None
@@ -89,7 +112,7 @@ def process_recap_pdf(self, pk):
                                "queue '%s'. Retrying if max_retries is not "
                                "exceeded." % pq)
                 pq.error_message = "Unable to find docket entry for item."
-                if self.request.retries == self.max_retries:
+                if (self.request.retries == self.max_retries) or pq.debug:
                     pq.status = pq.PROCESSING_FAILED
                     pq.save()
                     return None
@@ -139,20 +162,15 @@ def process_recap_pdf(self, pk):
         rd.page_count = get_page_count(rd.filepath_local.path, extension)
         rd.ocr_status = None
 
-    rd.save()
-    if not existing_document:
+    if not pq.debug:
+        rd.save()
+
+    if not existing_document and not pq.debug:
         extract_recap_pdf(rd.pk)
         add_or_update_recap_document([rd.pk], force_commit=False)
 
-    # Ditch the original file
-    pq.filepath_local.delete(save=False)
-    pq.error_message = 'Success! Nice work.'
-    pq.status = pq.PROCESSING_SUCCESSFUL
-    pq.docket_id = rd.docket_entry.docket_id
-    pq.docket_entry_id = rd.docket_entry_id
-    pq.recap_document_id = rd.pk
-    pq.save()
-
+    mark_pq_successful(pq, d_id=rd.docket_entry.docket_id,
+                       de_id=rd.docket_entry_id, rd_id=rd.pk)
     return rd
 
 
@@ -316,7 +334,7 @@ def process_recap_docket(pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     pq.status = pq.PROCESSING_IN_PROGRESS
     pq.save()
-    logger.info("Processing RECAP item: %s" % pq)
+    logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
     report = DocketReport(map_cl_to_pacer_id(pq.court_id))
     text = pq.filepath_local.read().decode('utf-8')
@@ -353,6 +371,11 @@ def process_recap_docket(pk):
         return None
 
     update_docket_metadata(d, docket_data)
+
+    if pq.debug:
+        mark_pq_successful(pq, d_id=d.pk)
+        return d
+
     d.save()
 
     # Add the HTML to the docket in case we need it someday.
@@ -409,12 +432,5 @@ def process_recap_docket(pk):
             rd.pacer_doc_id = rd.pacer_doc_id or pq.pacer_doc_id
 
     add_parties_and_attorneys(d, docket_data['parties'])
-
-    # Ditch the original file (it's associated with the Docket now)
-    pq.filepath_local.delete(save=False)
-    pq.error_message = ''  # Clear out errors b/c successful
-    pq.status = pq.PROCESSING_SUCCESSFUL
-    pq.docket = d
-    pq.save()
-
+    mark_pq_successful(pq, d_id=d.pk)
     return d

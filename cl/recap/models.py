@@ -140,6 +140,11 @@ class ProcessingQueue(models.Model):
         help_text="Any errors that occurred while processing an item",
         blank=True,
     )
+    debug = models.BooleanField(
+        help_text="Are you debugging? Debugging uploads will be validated, but "
+                  "not saved to the database.",
+        default=False,
+    )
 
     # Post process fields
     docket = models.ForeignKey(

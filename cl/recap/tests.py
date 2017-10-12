@@ -135,6 +135,64 @@ class RecapUploadsTest(TestCase):
         mock.assert_called()
 
 
+class DebugRecapUploadtest(TestCase):
+    """Test uploads with debug set to True. Do these uploads avoid causing
+    problems?
+    """
+    def setUp(self):
+        self.user = User.objects.get(username='recap')
+        self.pdf = SimpleUploadedFile(
+            'file.pdf',
+            b"file content more content",
+        )
+        self.d_filename = 'cand.html'
+        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets',
+                            self.d_filename)
+        with open(path, 'r') as f:
+            self.docket = SimpleUploadedFile(self.d_filename, f.read())
+
+    def tearDown(self):
+        ProcessingQueue.objects.all().delete()
+        Docket.objects.all().delete()
+        DocketEntry.objects.all().delete()
+        RECAPDocument.objects.all().delete()
+
+    @mock.patch('cl.recap.tasks.extract_recap_pdf')
+    def test_debug_does_not_create_rd(self, mock):
+        """If debug is passed, do we avoid creating recap documents?"""
+        docket = Docket.objects.create(source=0, court_id='scotus',
+                                       pacer_case_id='asdf')
+        DocketEntry.objects.create(docket=docket, entry_number=1)
+        pq = ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=self.user,
+            pacer_case_id='asdf',
+            pacer_doc_id='asdf',
+            document_number='1',
+            filepath_local=self.pdf,
+            upload_type=ProcessingQueue.PDF,
+            debug=True,
+        )
+        _ = process_recap_pdf(pq.pk)
+        self.assertEqual(RECAPDocument.objects.count(), 0)
+        mock.assert_not_called()
+
+    @mock.patch('cl.recap.tasks.add_attorney')
+    def test_debug_does_not_create_docket(self, add_atty_mock):
+        """If debug is passed, do we avoid creating a docket?"""
+        _ = ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=self.user,
+            pacer_case_id='asdf',
+            filepath_local=self.docket,
+            upload_type=ProcessingQueue.DOCKET,
+            debug=True,
+        )
+        self.assertEqual(Docket.objects.count(), 0)
+        self.assertEqual(DocketEntry.objects.count(), 0)
+        self.assertEqual(RECAPDocument.objects.count(), 0)
+
+
 class RecapPdfTaskTest(TestCase):
 
     def setUp(self):
@@ -192,7 +250,7 @@ class RecapPdfTaskTest(TestCase):
         # Did we update pq appropriately?
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, self.pq.PROCESSING_SUCCESSFUL)
-        self.assertEqual(self.pq.error_message, 'Success! Nice work.')
+        self.assertEqual(self.pq.error_message, 'Successful upload! Nice work.')
         self.assertFalse(self.pq.filepath_local)
         self.assertEqual(self.pq.docket_id, self.docket.pk)
         self.assertEqual(self.pq.docket_entry_id, self.de.pk)
@@ -231,7 +289,7 @@ class RecapPdfTaskTest(TestCase):
 
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, self.pq.PROCESSING_SUCCESSFUL)
-        self.assertEqual(self.pq.error_message, "Success! Nice work.")
+        self.assertEqual(self.pq.error_message, "Successful upload! Nice work.")
         self.assertFalse(self.pq.filepath_local)
 
     def test_nothing_already_exists(self):
