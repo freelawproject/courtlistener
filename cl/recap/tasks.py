@@ -1,3 +1,4 @@
+# coding=utf-8
 import hashlib
 import logging
 import os
@@ -6,7 +7,7 @@ from django.core.files.base import ContentFile
 from django.db.models import Q
 from django.utils import timezone
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer import DocketReport
+from juriscraper.pacer import DocketReport, AttachmentPage
 
 from cl.celery import app
 from cl.lib.import_lib import get_candidate_judges
@@ -34,7 +35,7 @@ def process_recap_upload(pq):
     if pq.upload_type == pq.DOCKET:
         process_recap_docket.delay(pq.pk)
     elif pq.upload_type == pq.ATTACHMENT_PAGE:
-        pass
+        process_recap_attachment.delay(pq.pk)
     elif pq.upload_type == pq.PDF:
         process_recap_pdf.delay(pq.pk)
 
@@ -65,6 +66,11 @@ def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
 @app.task(bind=True, max_retries=2, interval_start=5 * 60,
           interval_step=10 * 60)
 def process_recap_pdf(self, pk):
+    """Process an uploaded PDF from the RECAP API endpoint.
+
+    :param pk: The PK of the processing queue item you want to work on.
+    :return: A RECAPDocument object that was created or updated.
+    """
     """Save a RECAP PDF to the database."""
     pq = ProcessingQueue.objects.get(pk=pk)
     pq.status = pq.PROCESSING_IN_PROGRESS
@@ -329,7 +335,8 @@ def add_parties_and_attorneys(d, parties):
 def process_recap_docket(pk):
     """Process an uploaded docket from the RECAP API endpoint.
 
-    param pk: The primary key of the processing queue item you want to work on.
+    :param pk: The primary key of the processing queue item you want to work on.
+    :return: The docket that's created or updated.
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     pq.status = pq.PROCESSING_IN_PROGRESS
@@ -434,3 +441,74 @@ def process_recap_docket(pk):
     add_parties_and_attorneys(d, docket_data['parties'])
     mark_pq_successful(pq, d_id=d.pk)
     return d
+
+
+@app.task(bind=True, max_retries=3, interval_start=5 * 60,
+          interval_step=5 * 60)
+def process_recap_attachment(self, pk):
+    """Process an uploaded attachment page from the RECAP API endpoint.
+
+    :param pk: The primary key of the processing queue item you want to work on
+    :return: None
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    pq.status = pq.PROCESSING_IN_PROGRESS
+    pq.save()
+    logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
+
+    att_page = AttachmentPage(map_cl_to_pacer_id(pq.court_id))
+    text = pq.filepath_local.read().decode('utf-8')
+    att_page._parse_text(text)
+    att_data = att_page.data
+    logger.info("Parsing completed for item %s" % pq)
+
+    # Merge the contents of the data into CL.
+    try:
+        rd = RECAPDocument.objects.get(
+            pacer_doc_id=att_data['pacer_doc_id'],
+            document_number=att_data['document_number'],
+            docket_entry__docket__court=pq.court,
+        )
+    except RECAPDocument.DoesNotExist as exc:
+        msg = "Could not find docket to associate with attachment metadata"
+        logger.error(msg)
+        pq.error_message = msg
+        if (self.request.retries == self.max_retries) or pq.debug:
+            pq.status = pq.PROCESSING_FAILED
+            pq.save()
+            return None
+        else:
+            pq.status = pq.QUEUED_FOR_RETRY
+            pq.save()
+            raise self.retry(exc=exc)
+
+    # We got the right item. Update/create all the attachments for
+    # the docket entry.
+    de = rd.docket_entry
+
+    if not pq.debug:
+        # Save the old HTML to the docket entry.
+        pacer_file = PacerHtmlFiles(content_object=de)
+        pacer_file.filepath.save(
+            'attachment_page.html',  # Irrelevant b/c UUIDFileSystemStorage
+            ContentFile(text),
+        )
+
+        # Create/update the attachment items.
+        for attachment in att_data['attachments']:
+            if all([attachment['attachment_number'], attachment['pacer_doc_id'],
+                    attachment['description']]):
+                rd, created = RECAPDocument.objects.update_or_create(
+                    docket_entry=de,
+                    document_number=att_data['document_number'],
+                    attachment_number=attachment['attachment_number'],
+                    pacer_doc_id=attachment['pacer_doc_id'],
+                    document_type=RECAPDocument.ATTACHMENT,
+                )
+                if attachment['description']:
+                    rd.description = attachment['description']
+                    rd.save()
+                # Do *not* do this async — that can cause race conditions.
+                add_or_update_recap_document([rd.pk], force_commit=False)
+
+    mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)

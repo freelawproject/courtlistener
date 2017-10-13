@@ -182,6 +182,10 @@ class ProcessingQueue(models.Model):
                 self.attachment_number or 0,
                 self.get_upload_type_display(),
             )
+        elif self.upload_type == self.ATTACHMENT_PAGE:
+            return u'ProcessingQueue (%s)' % self.get_upload_type_display()
+        else:
+            raise NotImplementedError
 
     class Meta:
         permissions = (

@@ -478,6 +478,13 @@ class DocketEntry(models.Model):
         related_name="docket_entries",
         blank=True,
     )
+    html_documents = GenericRelation(
+        'recap.PacerHtmlFiles',
+        help_text="HTML attachment files collected from PACER.",
+        related_query_name='docket_entries',
+        null=True,
+        blank=True,
+    )
     date_created = models.DateTimeField(
         help_text="The time when this item was created.",
         auto_now_add=True,

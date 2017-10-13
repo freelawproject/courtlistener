@@ -22,7 +22,8 @@ from rest_framework.test import APIClient
 from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
     Attorney, Role
 from cl.recap.models import ProcessingQueue
-from cl.recap.tasks import process_recap_pdf, add_attorney, process_recap_docket
+from cl.recap.tasks import process_recap_pdf, add_attorney, \
+    process_recap_docket, process_recap_attachment
 from cl.search.models import Docket, RECAPDocument, DocketEntry
 from cl.recap.management.commands.import_idb import Command
 
@@ -65,6 +66,21 @@ class RecapUploadsTest(TestCase):
         """
         self.data.update({
             'upload_type': ProcessingQueue.DOCKET,
+            'document_number': '',
+        })
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        j = json.loads(r.content)
+        path = reverse('processingqueue-detail',
+                       kwargs={'version': 'v3', 'pk': j['id']})
+        r = self.client.get(path)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_uploading_an_attachment_page(self, mock):
+        """Can we upload an attachment page and have it be saved correctly?"""
+        self.data.update({
+            'upload_type': ProcessingQueue.ATTACHMENT_PAGE,
             'document_number': '',
         })
         r = self.client.post(self.path, self.data)
@@ -145,11 +161,17 @@ class DebugRecapUploadtest(TestCase):
             'file.pdf',
             b"file content more content",
         )
+        test_dir = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                                'test_assets')
         self.d_filename = 'cand.html'
-        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets',
-                            self.d_filename)
-        with open(path, 'r') as f:
+        d_path = os.path.join(test_dir, self.d_filename)
+        with open(d_path, 'r') as f:
             self.docket = SimpleUploadedFile(self.d_filename, f.read())
+
+        self.att_filename = 'dcd_04505578698.html'
+        att_path = os.path.join(test_dir, self.att_filename)
+        with open(att_path, 'r') as f:
+            self.att = SimpleUploadedFile(self.att_filename, f.read())
 
     def tearDown(self):
         ProcessingQueue.objects.all().delete()
@@ -180,7 +202,7 @@ class DebugRecapUploadtest(TestCase):
     @mock.patch('cl.recap.tasks.add_attorney')
     def test_debug_does_not_create_docket(self, add_atty_mock):
         """If debug is passed, do we avoid creating a docket?"""
-        _ = ProcessingQueue.objects.create(
+        pq = ProcessingQueue.objects.create(
             court_id='scotus',
             uploader=self.user,
             pacer_case_id='asdf',
@@ -188,9 +210,35 @@ class DebugRecapUploadtest(TestCase):
             upload_type=ProcessingQueue.DOCKET,
             debug=True,
         )
+        _ = process_recap_docket(pq.pk)
         self.assertEqual(Docket.objects.count(), 0)
         self.assertEqual(DocketEntry.objects.count(), 0)
         self.assertEqual(RECAPDocument.objects.count(), 0)
+
+    @mock.patch('cl.recap.tasks.add_or_update_recap_document')
+    def test_debug_does_not_create_recap_documents(self, mock):
+        """If debug is passed, do we avoid creating recap documents?"""
+        d = Docket.objects.create(source=0, court_id='scotus',
+                                  pacer_case_id='asdf')
+        de = DocketEntry.objects.create(docket=d, entry_number=1)
+        rd = RECAPDocument.objects.create(
+            docket_entry=de,
+            document_number='1',
+            pacer_doc_id='04505578698',
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        pq = ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=self.user,
+            upload_type=ProcessingQueue.ATTACHMENT_PAGE,
+            filepath_local=self.att,
+            debug=True,
+        )
+        process_recap_attachment(pq.pk)
+        self.assertEqual(Docket.objects.count(), 1)
+        self.assertEqual(DocketEntry.objects.count(), 1)
+        self.assertEqual(RECAPDocument.objects.count(), 1)
+        mock.assert_not_called()
 
 
 class RecapPdfTaskTest(TestCase):
@@ -478,6 +526,61 @@ class RecapDocketTaskTest(TestCase):
             d.docket_entries.filter(entry_number='2').exists(),
             msg="New docket entry didn't get created."
         )
+
+
+@mock.patch('cl.recap.tasks.add_or_update_recap_document')
+class RecapAttachmentPageTaskTest(TestCase):
+    def setUp(self):
+        user = User.objects.get(username='recap')
+        self.filename = 'cand.html'
+        test_dir = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets')
+        self.att_filename = 'dcd_04505578698.html'
+        att_path = os.path.join(test_dir, self.att_filename)
+        with open(att_path, 'r') as f:
+            self.att = SimpleUploadedFile(self.att_filename, f.read())
+        d = Docket.objects.create(source=0, court_id='scotus',
+                                  pacer_case_id='asdf')
+        de = DocketEntry.objects.create(docket=d, entry_number=1)
+        rd = RECAPDocument.objects.create(
+            docket_entry=de,
+            document_number='1',
+            pacer_doc_id='04505578698',
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        self.pq = ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=user,
+            upload_type=ProcessingQueue.ATTACHMENT_PAGE,
+            filepath_local=self.att,
+        )
+
+    def tearDown(self):
+        RECAPDocument.objects.filter(
+            document_type=RECAPDocument.ATTACHMENT,
+        ).delete()
+
+    def test_attachments_get_created(self, mock):
+        """Do attachments get created if we have a RECAPDocument to match on?"""
+        process_recap_attachment(self.pq.pk)
+        num_attachments_to_create = 3
+        self.assertEqual(
+            RECAPDocument.objects.filter(
+                document_type=RECAPDocument.ATTACHMENT
+            ).count(),
+            num_attachments_to_create,
+        )
+        self.pq.refresh_from_db()
+        self.assertEqual(self.pq.status, ProcessingQueue.PROCESSING_SUCCESSFUL)
+
+    def test_no_rd_match(self, mock):
+        """If there's no RECAPDocument to match on, do we fail gracefully?"""
+        RECAPDocument.objects.all().delete()
+        with self.assertRaises(RECAPDocument.DoesNotExist):
+            process_recap_attachment(self.pq.pk)
+        self.pq.refresh_from_db()
+        # This doesn't do the celery retries, unfortunately. If we get that
+        # working, the correct status is self.pq.PROCESSING_FAILED.
+        self.assertEqual(self.pq.status, self.pq.QUEUED_FOR_RETRY)
 
 
 class RecapUploadAuthenticationTest(TestCase):
