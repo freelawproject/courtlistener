@@ -68,7 +68,7 @@ def mark_court_in_progress(court_id, d):
 
 
 def get_and_save_free_document_reports(options):
-    """Query the Free Doc Reports on PACER and get a list of all the free 
+    """Query the Free Doc Reports on PACER and get a list of all the free
     documents. Do not download those items, as that step is done later.
     """
     # Kill any *old* logs that report they're in progress. (They've failed.)
@@ -83,7 +83,8 @@ def get_and_save_free_document_reports(options):
     pacer_court_ids = {
         map_cl_to_pacer_id(v): {'until': now(), 'count': 1, 'result': None} for v in
             Court.objects.filter(
-                jurisdiction__in=['FD', 'FB'],
+                jurisdiction__in=[Court.FEDERAL_DISTRICT,
+                                  Court.FEDERAL_BANKRUPTCY],
                 in_use=True,
                 end_date=None,
             ).exclude(
@@ -150,11 +151,11 @@ def get_and_save_free_document_reports(options):
 def get_pdfs(options):
     """Get PDFs for the results of the Free Document Report queries.
 
-    At this stage, we have rows in the PACERFreeDocumentRow table, each of 
-    which represents a PDF we need to download and merge into our normal 
+    At this stage, we have rows in the PACERFreeDocumentRow table, each of
+    which represents a PDF we need to download and merge into our normal
     tables: Docket, DocketEntry, and RECAPDocument.
 
-    In this function, we iterate over the entire table of results, merge it 
+    In this function, we iterate over the entire table of results, merge it
     into our normal tables, and then download and extract the PDF.
 
     :return: None

@@ -10,8 +10,9 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         default=serializers.CurrentUserDefault(),
     )
     court = serializers.PrimaryKeyRelatedField(
-        queryset=Court.objects.filter(jurisdiction__in=['FB', 'FD', 'F', 'FBP',
-                                                        'FS']),
+        queryset=Court.objects.filter(
+            jurisdiction__in=Court.FEDERAL_JURISDICTIONS
+        ),
         html_cutoff=500,  # Show all values in HTML view.
     )
     docket = serializers.HyperlinkedRelatedField(

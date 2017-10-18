@@ -4,13 +4,13 @@ from rest_framework_filters import FilterSet
 from cl.api.utils import INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.search.models import (
     Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES,
-    JURISDICTIONS, DocketEntry, RECAPDocument, Tag,
+    DocketEntry, RECAPDocument, Tag,
 )
 
 
 class CourtFilter(FilterSet):
     dockets = filters.RelatedFilter('cl.search.filters.DocketFilter')
-    jurisdiction = filters.MultipleChoiceFilter(choices=JURISDICTIONS)
+    jurisdiction = filters.MultipleChoiceFilter(choices=Court.JURISDICTIONS)
 
     class Meta:
         model = Court

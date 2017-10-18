@@ -6,6 +6,7 @@ from django.conf import settings
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
+from cl.search.models import Court
 
 boosts = {
     'qf': {
@@ -215,19 +216,19 @@ def merge_form_with_courts(courts, search_form):
     state_bundle = []
     state_bundles = []
     for court in courts:
-        if court.jurisdiction == 'F':
+        if court.jurisdiction == Court.FEDERAL_APPELLATE:
             court_tabs['federal'].append(court)
-        elif court.jurisdiction == 'FD':
+        elif court.jurisdiction == Court.FEDERAL_DISTRICT:
             court_tabs['district'].append(court)
-        elif court.jurisdiction in ['FB', 'FBP']:
+        elif court.jurisdiction in Court.BANKRUPTCY_JURISDICTIONS:
             # Bankruptcy gets bundled into BAPs and regular courts.
-            if court.jurisdiction == 'FBP':
+            if court.jurisdiction == Court.FEDERAL_BANKRUPTCY_PANEL:
                 bap_bundle.append(court)
             else:
                 b_bundle.append(court)
-        elif court.jurisdiction.startswith('S'):
+        elif court.jurisdiction in Court.STATE_JURISDICTIONS:
             # State courts get bundled by supreme courts
-            if court.jurisdiction == 'S':
+            if court.jurisdiction == Court.STATE_SUPREME:
                 # Whenever we hit a state supreme court, we append the
                 # previous bundle and start a new one.
                 if state_bundle:
@@ -235,7 +236,8 @@ def merge_form_with_courts(courts, search_form):
                 state_bundle = [court]
             else:
                 state_bundle.append(court)
-        elif court.jurisdiction in ['FS', 'C', 'I']:
+        elif court.jurisdiction in [Court.FEDERAL_SPECIAL, Court.COMMITTEE,
+                                    Court.INTERNATIONAL]:
             court_tabs['special'].append(court)
     state_bundles.append(state_bundle)  # append the final state bundle after the loop ends. Hack?
 

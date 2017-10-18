@@ -23,24 +23,6 @@ from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
 
-# changes here need to be mirrored in the coverage page view and Solr configs
-# Note that spaces cannot be used in the keys, or else the SearchForm won't work
-
-JURISDICTIONS = (
-    ('F',   'Federal Appellate'),
-    ('FD',  'Federal District'),
-    ('FB',  'Federal Bankruptcy'),
-    ('FBP', 'Federal Bankruptcy Panel'),
-    ('FS',  'Federal Special'),
-    ('S',   'State Supreme'),
-    ('SA',  'State Appellate'),
-    ('ST',  'State Trial'),
-    ('SS',  'State Special'),
-    ('SAG', 'State Attorney General'),
-    ('C',   'Committee'),
-    ('I',   'International'),
-    ('T',   'Testing'),
-)
 
 DOCUMENT_STATUSES = (
     ('Published', 'Precedential'),
@@ -325,10 +307,20 @@ class Docket(models.Model):
             return None
         from cl.lib.pacer import map_cl_to_pacer_id
         court_id = map_cl_to_pacer_id(self.court.pk)
-        return u"https://ecf.%s.uscourts.gov/cgi-bin/DktRpt.pl?%s" % (
-            court_id,
-            self.pacer_case_id,
-        )
+        if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
+            return (u'https://ecf.%s.uscourts.gov/n/beam/servlet/TransportRoom?'
+                    u'servlet=CaseSummary.jsp&'
+                    u'caseNum=%s&'
+                    u'incOrigDkt=Y&' 
+                    u'incDktEntries=Y') % (
+                court_id,
+                self.pacer_case_id,
+            )
+        else:
+            return u"https://ecf.%s.uscourts.gov/cgi-bin/DktRpt.pl?%s" % (
+                court_id,
+                self.pacer_case_id,
+            )
 
     @property
     def prefetched_parties(self):
@@ -882,6 +874,54 @@ class RECAPDocument(models.Model):
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
+    # Note that spaces cannot be used in the keys, or else the SearchForm won't
+    # work
+    FEDERAL_APPELLATE = 'F'
+    FEDERAL_DISTRICT = 'FD'
+    FEDERAL_BANKRUPTCY = 'FB'
+    FEDERAL_BANKRUPTCY_PANEL = 'FBP'
+    FEDERAL_SPECIAL = 'FS'
+    STATE_SUPREME = 'S'
+    STATE_APPELLATE = 'SA'
+    STATE_TRIAL = 'ST'
+    STATE_SPECIAL = 'SS'
+    STATE_ATTORNEY_GENERAL = 'SAG'
+    COMMITTEE = 'C'
+    INTERNATIONAL = 'I'
+    TESTING_COURT = 'T'
+    JURISDICTIONS = (
+        (FEDERAL_APPELLATE, 'Federal Appellate'),
+        (FEDERAL_DISTRICT, 'Federal District'),
+        (FEDERAL_BANKRUPTCY, 'Federal Bankruptcy'),
+        (FEDERAL_BANKRUPTCY_PANEL, 'Federal Bankruptcy Panel'),
+        (FEDERAL_SPECIAL, 'Federal Special'),
+        (STATE_SUPREME, 'State Supreme'),
+        (STATE_APPELLATE, 'State Appellate'),
+        (STATE_TRIAL, 'State Trial'),
+        (STATE_SPECIAL, 'State Special'),
+        (STATE_ATTORNEY_GENERAL, 'State Attorney General'),
+        (COMMITTEE, 'Committee'),
+        (INTERNATIONAL, 'International'),
+        (TESTING_COURT, 'Testing'),
+    )
+    FEDERAL_JURISDICTIONS = [
+        FEDERAL_APPELLATE,
+        FEDERAL_DISTRICT,
+        FEDERAL_SPECIAL,
+        FEDERAL_BANKRUPTCY,
+        FEDERAL_BANKRUPTCY_PANEL,
+    ]
+    STATE_JURISDICTIONS = [
+        STATE_SUPREME,
+        STATE_APPELLATE,
+        STATE_TRIAL,
+        STATE_SPECIAL,
+        STATE_ATTORNEY_GENERAL,
+    ]
+    BANKRUPTCY_JURISDICTIONS = [
+        FEDERAL_BANKRUPTCY,
+        FEDERAL_BANKRUPTCY_PANEL,
+    ]
     id = models.CharField(
         help_text='a unique ID for each court as used in URLs',
         max_length=15,  # Changes here will require updates in urls.py
@@ -973,12 +1013,6 @@ class Court(models.Model):
     @property
     def is_terminated(self):
         if self.end_date:
-            return True
-        return False
-
-    @property
-    def is_bankruptcy(self):
-        if self.jurisdiction in ['FB', 'FBP']:
             return True
         return False
 

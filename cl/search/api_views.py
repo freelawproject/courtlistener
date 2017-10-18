@@ -64,7 +64,7 @@ class RECAPDocumentViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Court.objects.exclude(jurisdiction='T')
+    queryset = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
     serializer_class = CourtSerializer
     filter_class = CourtFilter
     ordering_fields = (

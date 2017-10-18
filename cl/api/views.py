@@ -34,7 +34,7 @@ def annotate_courts_with_counts(courts, court_count_tuples):
 
 
 def make_court_variable():
-    courts = Court.objects.exclude(jurisdiction='T')  # Non-testing courts
+    courts = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     response = conn.raw_query(**build_court_count_query()).execute()
     court_count_tuples = response.facet_counts.facet_fields['court_exact']
@@ -66,8 +66,8 @@ def rest_docs(request, version):
 
 def api_index(request):
     court_count = Court.objects.exclude(
-        jurisdiction='T'
-    ).count()  # Non-testing courts
+        jurisdiction=Court.TESTING_COURT
+    ).count()
     return render(request, 'docs.html', {
         'court_count': court_count,
         'private': False

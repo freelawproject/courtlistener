@@ -22,7 +22,7 @@ class DocketSerializer(DynamicFieldsMixin,
     court = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='court-detail',
-        queryset=Court.objects.exclude(jurisdiction='T'),
+        queryset=Court.objects.exclude(jurisdiction=Court.TESTING_COURT),
     )
     clusters = serializers.HyperlinkedRelatedField(
         many=True,

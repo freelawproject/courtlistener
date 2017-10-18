@@ -14,7 +14,7 @@ from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge, \
 from cl.people_db.import_judges.populate_presidents import make_president
 from cl.people_db.import_judges.populate_state_judges import make_state_judge
 from cl.people_db.models import Person, Position
-from cl.search.models import Court, JURISDICTIONS
+from cl.search.models import Court
 from cl.search.tasks import add_or_update_people
 
 
@@ -61,7 +61,8 @@ class Command(VerboseCommand):
             help='A list of jurisdiction abbreviations for use with the '
                  'assign-authors command. If no value is provided it will '
                  'default to all jurisdictions. Valid options are:\n%s' %
-                 ', '.join(['%s (%s)' % (j[0], j[1]) for j in JURISDICTIONS]),
+                 ', '.join(['%s (%s)' % (j[0], j[1]) for j in
+                            Court.JURISDICTIONS]),
             nargs='*',
         )
 
