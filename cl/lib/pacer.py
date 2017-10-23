@@ -117,6 +117,36 @@ def lookup_and_save(new, debug=False):
     return d
 
 
+def get_first_missing_de_number(d):
+    """When buying dockets use this function to figure out which docket entries
+    we already have, starting at the first item. Since PACER only allows you to
+    do a range of docket entries, this allows us to figure out a later starting
+    point for our query.
+
+    For example, if we have documents 1-32 already in the DB, we can save some
+    money by only getting items 33 and on.
+
+    :param d: The Docket object to check.
+    :returns int: The starting point that should be used in your query. If the
+    docket has no entries, returns 1. If the docket has entries, returns the
+    value of the lowest missing item.
+    """
+    de_numbers = list(d.docket_entries.all().order_by(
+        'entry_number'
+    ).values_list('entry_number', flat=True))
+
+    if len(de_numbers) > 0:
+        # Get the earliest missing item
+        end = de_numbers[-1]
+        missing_items = sorted(set(range(1, end + 1)).difference(de_numbers))
+        if missing_items:
+            return missing_items[0]
+        else:
+            # None missing, but we can start after the highest de we know.
+            return end + 1
+    return 1
+
+
 def get_blocked_status(docket, count_override=None):
     """Set the blocked status for the Docket.
 

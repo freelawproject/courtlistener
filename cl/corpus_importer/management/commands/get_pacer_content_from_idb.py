@@ -10,7 +10,6 @@ from cl.corpus_importer.tasks import get_pacer_case_id_for_idb_row, \
     get_docket_by_pacer_case_id, get_pacer_doc_by_rd_and_description
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer import map_cl_to_pacer_id
 from cl.search.models import Docket, RECAPDocument
 from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT_CR,\
     FAIR_LABOR_STANDARDS_ACT_CV
@@ -52,7 +51,7 @@ def get_pacer_dockets(options, row_pks, tag=None):
         get_docket_by_pacer_case_id.apply_async(
             args=(
                 row.pacer_case_id,
-                map_cl_to_pacer_id(row.district_id),
+                row.district_id,
                 pacer_session,
             ),
             kwargs={
@@ -134,6 +133,7 @@ class Command(VerboseCommand):
         self.options['action'](self)
 
     def get_komply_ids(self):
+        """Get pacer_case_id values for every item relevant to Komply's work."""
         row_pks = FjcIntegratedDatabase.objects.filter(
             Q(nature_of_suit=FAIR_LABOR_STANDARDS_ACT_CV) |
             Q(nature_of_offense=FAIR_LABOR_STANDARDS_ACT_CR),

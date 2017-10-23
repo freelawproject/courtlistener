@@ -30,7 +30,7 @@ from rest_framework.status import (
 from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
-    map_pacer_to_cl_id, map_cl_to_pacer_id
+    map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_number
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
 from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles
 from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys
@@ -452,7 +452,9 @@ def delete_pacer_row(pk):
 @app.task(bind=True, max_retries=2, interval_start=5 * 60,
           interval_step=10 * 60, ignore_result=True)
 def get_pacer_case_id_for_idb_row(self, pk, session):
-    """Populate the pacer_case_id field for an item in the IDB table"""
+    """Populate the pacer_case_id field in the FJC IDB table for an item in the
+    IDB table
+    """
     logger.info("Getting pacer_case_id for IDB item with pk %s" % pk)
     item = FjcIntegratedDatabase.objects.get(pk=pk)
     pcn = PossibleCaseNumberApi(map_cl_to_pacer_id(item.district_id), session)
@@ -484,6 +486,22 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
     """
     report = DocketReport(map_cl_to_pacer_id(court_id), session)
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
+    try:
+        d = Docket.objects.get(
+            pacer_case_id=pacer_case_id,
+            court_id=court_id,
+        )
+    except Docket.DoesNotExist:
+        d = None
+    except Docket.MultipleObjectsReturned:
+        d = None
+
+    if d is not None:
+        first_missing_id = get_first_missing_de_number(d)
+        if d is not None and first_missing_id > 1:
+            # We don't have to get the whole thing!
+            kwargs.setdefault('doc_num_start', first_missing_id)
+
     report.query(pacer_case_id, **kwargs)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s.%s" % (court_id,
@@ -491,11 +509,12 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
 
     # Merge the contents into CL.
     try:
-        d = Docket.objects.get(
-            Q(pacer_case_id=pacer_case_id) |
-            Q(docket_number=docket_data['docket_number']),
-            court_id=court_id,
-        )
+        if d is None:
+            d = Docket.objects.get(
+                Q(pacer_case_id=pacer_case_id) |
+                Q(docket_number=docket_data['docket_number']),
+                court_id=court_id,
+            )
         # Add RECAP as a source if it's not already.
         if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
             d.source = Docket.RECAP_AND_SCRAPER
@@ -585,13 +604,13 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
           interval_step=5, ignore_result=True)
 def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
                                         tag=None):
-    """Using a docket entry object ID and a description of a document, get the
-    document.
+    """Using a RECAPDocument object ID and a description of a document, get the
+    document from PACER.
 
     This function was originally meant to get civil cover sheets, but can be
     repurposed as needed.
 
-    :param rd_pk: The PK of a DocketEntry object to use as a source.
+    :param rd_pk: The PK of a RECAPDocument object to use as a source.
     :param description_re: A compiled regular expression to search against the
     description provided by the attachment page.
     :param session: The PACER session object to use.
