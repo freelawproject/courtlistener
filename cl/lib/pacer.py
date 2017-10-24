@@ -408,11 +408,14 @@ class PacerXMLParser(object):
                     extra_info=party_extra_info,
                 )
                 if not debug:
-                    party.save()
-            else:
-                if party_extra_info and not debug:
-                    party.extra_info = party_extra_info
-                    party.save()
+                    try:
+                        party.save()
+                    except IntegrityError:
+                        party = Party.objects.get(name=party_name)
+
+            if party_extra_info and not debug:
+                party.extra_info = party_extra_info
+                party.save()
 
             # If the party type doesn't exist, make a new one.
             if not party.party_types.filter(docket=docket,

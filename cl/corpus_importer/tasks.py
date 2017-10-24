@@ -650,7 +650,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
             return
 
     att_found = None
-    for attachment in att_report.data['attachments']:
+    for attachment in att_report.data.get('attachments', []):
         if description_re.search(attachment['description']):
             att_found = attachment.copy()
             break
