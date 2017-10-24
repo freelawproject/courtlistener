@@ -79,6 +79,7 @@ def get_cover_sheets_for_docket(options, docket_pks, tag=None):
         try:
             rd_pk = RECAPDocument.objects.get(
                 document_number=1,
+                document_type=RECAPDocument.PACER_DOCUMENT,
                 docket_entry__docket_id=docket_pk,
             ).pk
         except (RECAPDocument.MultipleObjectsReturned,

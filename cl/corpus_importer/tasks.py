@@ -672,12 +672,14 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
             'date_upload': now(),
         },
     )
+    rd.description = att_found['description']
     if tag is not None:
         tag, _ = Tag.objects.get_or_create(name=tag)
         rd.tags.add(tag)
 
     if rd.is_available:
         # Great. Call it a day.
+        rd.save(do_extraction=False, index=False)
         return
 
     # Not available. Go get it.
