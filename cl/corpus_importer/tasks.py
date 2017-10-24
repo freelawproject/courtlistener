@@ -481,7 +481,7 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
     :param pacer_case_id: The internal case ID of the item in PACER.
     :param court_id: A courtlistener court ID.
     :param session: A valid PacerSession object.
-    :param tag: The tag that should be stored with the item in the DB.
+    :param tag: The tag name that should be stored with the item in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     """
     report = DocketReport(map_cl_to_pacer_id(court_id), session)
@@ -623,7 +623,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
     :param description_re: A compiled regular expression to search against the
     description provided by the attachment page.
     :param session: The PACER session object to use.
-    :param tag: A tag to apply to any downloaded content.
+    :param tag: A tag name to apply to any downloaded content.
     :return: None
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
@@ -673,6 +673,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
         },
     )
     if tag is not None:
+        tag, _ = Tag.objects.get_or_create(name=tag)
         rd.tags.add(tag)
 
     if rd.is_available:

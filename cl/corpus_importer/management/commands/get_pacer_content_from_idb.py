@@ -80,9 +80,9 @@ def get_cover_sheets_for_docket(options, docket_pks, tag=None):
             rd_pk = RECAPDocument.objects.get(
                 document_number=1,
                 docket_entry__docket_id=docket_pk,
-            ).values_list()
+            ).pk
         except (RECAPDocument.MultipleObjectsReturned,
-                RECAPDocument.DoesNotExist) as e:
+                RECAPDocument.DoesNotExist):
             logger.warn("Unable to get document 1 for docket_pk: %s" %
                         docket_pk)
         else:
