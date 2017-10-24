@@ -575,24 +575,33 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
                 document_number=docket_entry['document_number'],
             )
         except RECAPDocument.DoesNotExist:
-            RECAPDocument.objects.create(
-                docket_entry=de,
-                # No attachments when uploading dockets.
-                document_type=RECAPDocument.PACER_DOCUMENT,
-                document_number=docket_entry['document_number'],
-                pacer_doc_id=docket_entry['pacer_doc_id'],
-                is_available=False,
-            )
+            try:
+                rd = RECAPDocument.objects.create(
+                    docket_entry=de,
+                    # No attachments when uploading dockets.
+                    document_type=RECAPDocument.PACER_DOCUMENT,
+                    document_number=docket_entry['document_number'],
+                    pacer_doc_id=docket_entry['pacer_doc_id'],
+                    is_available=False,
+                )
+            except IntegrityError:
+                # Race condition. The item was created after our get failed.
+                rd = RECAPDocument.objects.get(
+                    docket_entry=de,
+                    # No attachments when uploading dockets.
+                    document_type=RECAPDocument.PACER_DOCUMENT,
+                    document_number=docket_entry['document_number'],
+                )
         except RECAPDocument.MultipleObjectsReturned:
             logger.error(
                 "Multiple recap documents found for document entry "
                 "number: '%s', docket: %s" % (docket_entry['document_number'], d)
             )
             continue
-        else:
-            rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
-            if tag is not None:
-                rd.tags.add(tag)
+
+        rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
+        if tag is not None:
+            rd.tags.add(tag)
 
     add_parties_and_attorneys(d, docket_data['parties'])
     logger.info("Created/updated docket: %s" % d)

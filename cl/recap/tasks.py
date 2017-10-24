@@ -4,6 +4,7 @@ import logging
 import os
 
 from django.core.files.base import ContentFile
+from django.db import IntegrityError
 from django.db.models import Q
 from django.utils import timezone
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -233,7 +234,13 @@ def add_attorney(atty, p, d):
                     lookup_key=atty_org_info['lookup_key'],
                 )
             except AttorneyOrganization.DoesNotExist:
-                org = AttorneyOrganization.objects.create(**atty_org_info)
+                try:
+                    org = AttorneyOrganization.objects.create(**atty_org_info)
+                except IntegrityError:
+                    # Race condition. Item was created after get. Try again.
+                    org = AttorneyOrganization.objects.get(
+                        lookup_key=atty_org_info['lookup_key'],
+                    )
 
             # Add the attorney to the organization
             AttorneyOrganizationAssociation.objects.get_or_create(
@@ -311,10 +318,18 @@ def add_parties_and_attorneys(d, parties):
         try:
             p = Party.objects.get(name=party['name'])
         except Party.DoesNotExist:
-            p = Party.objects.create(
-                name=party['name'],
-                extra_info=party['extra_info'],
-            )
+            try:
+                p = Party.objects.create(
+                    name=party['name'],
+                    extra_info=party['extra_info'],
+                )
+            except IntegrityError:
+                # Race condition. Object was created after our get and before
+                # our create. Try to get it again.
+                p = Party.objects.get(
+                    name=party['name'],
+                    extra_info=party['extra_info'],
+                )
         except Party.MultipleObjectsReturned:
             continue
         else:
