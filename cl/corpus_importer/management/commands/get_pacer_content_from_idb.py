@@ -26,6 +26,8 @@ def get_pacer_case_ids(options, row_pks):
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
     for i, row_pk in enumerate(row_pks):
+        if i >= options['count'] > 0:
+            break
         throttle.maybe_wait()
         if i % 10000 == 0:
             pacer_session = PacerSession(username=PACER_USERNAME,
@@ -41,6 +43,8 @@ def get_pacer_dockets(options, row_pks, tag=None):
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
     for i, row_pk in enumerate(row_pks):
+        if i >= options['count'] > 0:
+            break
         throttle.maybe_wait()
         if i % 1000 == 0:
             pacer_session = PacerSession(username=PACER_USERNAME,
@@ -70,6 +74,8 @@ def get_cover_sheets_for_docket(options, docket_pks, tag=None):
     throttle = CeleryThrottle(queue_name=q)
     cover_sheet_re = re.compile(r'cover\s*sheet', re.IGNORECASE)
     for i, docket_pk in enumerate(docket_pks):
+        if i >= options['count'] > 0:
+            break
         throttle.maybe_wait()
         if i % 1000 == 0:
             pacer_session = PacerSession(username=PACER_USERNAME,
@@ -127,6 +133,12 @@ class Command(VerboseCommand):
             help="The action you wish to take. Valid choices are: %s" % (
                 ', '.join(self.VALID_ACTIONS.keys())
             )
+        )
+        parser.add_argument(
+            '--count',
+            type=int,
+            default=0,
+            help="The number of items to do. Default is to do all of them.",
         )
 
     def handle(self, *args, **options):
