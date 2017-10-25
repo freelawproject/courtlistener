@@ -77,27 +77,28 @@ def get_cover_sheets_for_docket(options, docket_pks, tag=None):
             pacer_session.login()
             logger.info("Sent %s tasks to celery so far." % i)
         try:
-            rd_pk = RECAPDocument.objects.get(
-                document_number=1,
+            rds = RECAPDocument.objects.filter(
+                document_number__in=[1, 2],
                 document_type=RECAPDocument.PACER_DOCUMENT,
                 docket_entry__docket_id=docket_pk,
-            ).pk
+            )
         except (RECAPDocument.MultipleObjectsReturned,
                 RECAPDocument.DoesNotExist):
             logger.warn("Unable to get document 1 for docket_pk: %s" %
                         docket_pk)
         else:
-            get_pacer_doc_by_rd_and_description.apply_async(
-                args=(
-                    rd_pk,
-                    cover_sheet_re,
-                    pacer_session,
-                ),
-                kwargs={
-                    'tag': tag,
-                },
-                queue=q,
-            )
+            for rd in rds:
+                get_pacer_doc_by_rd_and_description.apply_async(
+                    args=(
+                        rd.pk,
+                        cover_sheet_re,
+                        pacer_session,
+                    ),
+                    kwargs={
+                        'tag': tag,
+                    },
+                    queue=q,
+                )
 
 
 class Command(VerboseCommand):
