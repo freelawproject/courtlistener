@@ -661,10 +661,11 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
         self.request.callbacks = None
         return
 
-    # Try to find the item already in the collection
+    # Try to find the attachment already in the collection
     rd, _ = RECAPDocument.objects.get_or_create(
         docket_entry=rd.docket_entry,
         attachment_number=att_found['attachment_number'],
+        document_number=rd.document_number,
         pacer_doc_id=att_found['pacer_doc_id'],
         document_type=RECAPDocument.ATTACHMENT,
         defaults={
