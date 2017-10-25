@@ -627,6 +627,10 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
     :return: None
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
+    if not rd.pacer_doc_id:
+        # Some docket entries are just text/don't have a pacer_doc_id.
+        return
+
     d = rd.docket_entry.docket
     pacer_court_id = map_cl_to_pacer_id(d.court_id)
     att_report = AttachmentPage(pacer_court_id, session)
