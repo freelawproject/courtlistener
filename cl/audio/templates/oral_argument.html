@@ -146,7 +146,8 @@
                 <p class="bottom">This file has not yet completed processing on
                     our server. Please try again in a few moments or if you
                     prefer not to wait you may download the audio <a
-                            href="{{ af.download_url }}">directly from the
+                            href="{{ af.download_url }}"
+                            rel="nofollow">directly from the
                         court website</a>.
                 </p>
             </div>
@@ -212,6 +213,7 @@
             <p>
                 {% if af.download_url and not af.local_path_mp3 %}
                     <a href="{{ af.download_url }}"
+                       rel="nofollow"
                        class="btn btn-sm btn-primary">Download MP3</a>
                 {% elif not af.download_url and af.local_path_mp3 %}
                     <a href="/{{ af.local_path_mp3 }}"
@@ -230,7 +232,8 @@
                                 <span class="caret"></span>
                             </button>
                             <ul class="dropdown-menu">
-                                <li><a href="{{ af.download_url }}">Download
+                                <li><a href="{{ af.download_url }}"
+                                       rel="nofollow">Download
                                     Original from Court</a></li>
                             </ul>
                         </div>
