@@ -68,11 +68,23 @@ def get_pacer_dockets(options, row_pks, tag=None):
         )
 
 
-def get_cover_sheets_for_docket(options, docket_pks, tag=None):
-    """Get civil cover sheets for dockets in our system."""
+def get_doc_by_re_and_de_nums_for_dockets(options, docket_pks, regex, de_nums,
+                                          fallback=False, tag=None):
+    """Get civil cover sheets for dockets in our system.
+
+    :param options: The options sent on the command line as a dict.
+    :param docket_pks: A list of docket pks to iterate over.
+    :param regex: A regex to match on the document description on the attachment
+    page. For example, to get initial complaints, set this to
+    r'initial\s*complaints'.
+    :param de_nums: The docket entry numbers to use when looking for items, as a
+    list.
+    :param fallback: After loading the attachment page, if we don't find
+    something that matches `regex`, should we just grab the main document?
+    :param tag: A tag to add to any modified content.
+    """
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
-    cover_sheet_re = re.compile(r'cover\s*sheet', re.IGNORECASE)
     for i, docket_pk in enumerate(docket_pks):
         if i >= options['count'] > 0:
             break
@@ -84,7 +96,7 @@ def get_cover_sheets_for_docket(options, docket_pks, tag=None):
             logger.info("Sent %s tasks to celery so far." % i)
         try:
             rds = RECAPDocument.objects.filter(
-                document_number__in=[1, 2],
+                document_number__in=de_nums,
                 document_type=RECAPDocument.PACER_DOCUMENT,
                 docket_entry__docket_id=docket_pk,
             )
@@ -97,10 +109,11 @@ def get_cover_sheets_for_docket(options, docket_pks, tag=None):
                 get_pacer_doc_by_rd_and_description.apply_async(
                     args=(
                         rd.pk,
-                        cover_sheet_re,
+                        regex,
                         pacer_session,
                     ),
                     kwargs={
+                        'fallback_to_main_doc': fallback,
                         'tag': tag,
                     },
                     queue=q,
@@ -175,10 +188,27 @@ class Command(VerboseCommand):
         docket_pks = Docket.objects.filter(
             tags__name=KOMPLY_TAG,
         ).values_list('pk', flat=True)
-        get_cover_sheets_for_docket(self.options, docket_pks, tag=KOMPLY_TAG)
+        cover_sheet_re = re.compile(r'cover\s*sheet', re.IGNORECASE)
+        get_doc_by_re_and_de_nums_for_dockets(
+            self.options, docket_pks, cover_sheet_re, [1, 2], tag=KOMPLY_TAG)
+
+    def get_komply_initial_complaints(self):
+        docket_pks = Docket.objects.filter(
+            tags__name=KOMPLY_TAG,
+        ).values_list('pk', flat=True)
+        initial_complaint_re = re.compile(r'initial\s+complaint', re.IGNORECASE)
+        get_doc_by_re_and_de_nums_for_dockets(
+            self.options,
+            docket_pks,
+            initial_complaint_re,
+            [1],  # Only want to look for initial complaints on DE #1.
+            fallback=True,  # If we don't find it, grab the main doc.
+            tag=KOMPLY_TAG,
+        )
 
     VALID_ACTIONS = {
         'get-komply-pacer-ids': get_komply_ids,
         'get-komply-dockets': get_komply_dockets,
         'get-komply-cover-sheets': get_komply_cover_sheets,
+        'get-komply-initial-complaints': get_komply_initial_complaints,
     }

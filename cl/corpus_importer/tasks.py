@@ -612,7 +612,7 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
 @app.task(bind=True, max_retries=15, interval_start=5,
           interval_step=5, ignore_result=True)
 def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
-                                        tag=None):
+                                        fallback_to_main_doc=False, tag=None):
     """Using a RECAPDocument object ID and a description of a document, get the
     document from PACER.
 
@@ -623,6 +623,8 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
     :param description_re: A compiled regular expression to search against the
     description provided by the attachment page.
     :param session: The PACER session object to use.
+    :param fallback_to_main_doc: Should we grab the main doc if none of the
+    attachments match the regex?
     :param tag: A tag name to apply to any downloaded content.
     :return: None
     """
@@ -660,15 +662,20 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
             break
 
     if not att_found:
-        msg = "Aborting. Did not find civil cover sheet for %s." % rd
-        logger.error(msg)
-        self.request.callbacks = None
-        return
+        if fallback_to_main_doc:
+            logger.info("Falling back to main document for pacer_doc_id: %s" %
+                        rd.pacer_doc_id)
+            att_found = att_report.data
+        else:
+            msg = "Aborting. Did not find civil cover sheet for %s." % rd
+            logger.error(msg)
+            self.request.callbacks = None
+            return
 
     # Try to find the attachment already in the collection
     rd, _ = RECAPDocument.objects.get_or_create(
         docket_entry=rd.docket_entry,
-        attachment_number=att_found['attachment_number'],
+        attachment_number=att_found.get('attachment_number'),
         document_number=rd.document_number,
         pacer_doc_id=att_found['pacer_doc_id'],
         document_type=RECAPDocument.ATTACHMENT,
@@ -676,7 +683,8 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
             'date_upload': now(),
         },
     )
-    rd.description = att_found['description']
+    # Replace the description if we have description data. Else fallback on old.
+    rd.description = att_found.get('description', '') or rd.description
     if tag is not None:
         tag, _ = Tag.objects.get_or_create(name=tag)
         rd.tags.add(tag)
