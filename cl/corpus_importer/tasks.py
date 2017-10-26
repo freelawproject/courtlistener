@@ -631,6 +631,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if not rd.pacer_doc_id:
         # Some docket entries are just text/don't have a pacer_doc_id.
+        self.request.callbacks = None
         return
 
     d = rd.docket_entry.docket
@@ -673,6 +674,11 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
             logger.error(msg)
             self.request.callbacks = None
             return
+
+    if not att_found.get('pacer_doc_id'):
+        logger.warn("No pacer_doc_id for document (is it sealed?)")
+        self.request.callbacks = None
+        return
 
     # Try to find the attachment already in the collection
     rd, _ = RECAPDocument.objects.get_or_create(
