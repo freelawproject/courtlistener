@@ -659,6 +659,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
     for attachment in att_report.data.get('attachments', []):
         if description_re.search(attachment['description']):
             att_found = attachment.copy()
+            document_type = RECAPDocument.ATTACHMENT
             break
 
     if not att_found:
@@ -666,6 +667,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
             logger.info("Falling back to main document for pacer_doc_id: %s" %
                         rd.pacer_doc_id)
             att_found = att_report.data
+            document_type = RECAPDocument.PACER_DOCUMENT
         else:
             msg = "Aborting. Did not find civil cover sheet for %s." % rd
             logger.error(msg)
@@ -678,7 +680,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
         attachment_number=att_found.get('attachment_number'),
         document_number=rd.document_number,
         pacer_doc_id=att_found['pacer_doc_id'],
-        document_type=RECAPDocument.ATTACHMENT,
+        document_type=document_type,
         defaults={
             'date_upload': now(),
         },
