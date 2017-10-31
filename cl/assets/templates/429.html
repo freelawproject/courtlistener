@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block head %}
+    <meta name="robots" content="noindex, noodp, noarchive, noimageindex"/>
+{% endblock %}
+
+{% block privacy %}{% endblock %}
+
+{% block title %}Server Error 429 – CourtListener.com{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="hidden-xs col-sm-2 col-md-3"></div>
+    <div class="col-xs-12 col-sm-8 col-md-6">
+        <h2>429 Too Many Requests</h2>
+        <p>It appears that you are using the site too quickly and have exceeded our allowed usage. This usually means that you're a bot.
+        </p>
+        <p>If you are a bot, please use our API.</p>
+        <p>If you are not a bot, we are sorry you're getting this error. Please
+            <a href="{% url "contact" %}">get in touch</a> and we will be pleased to work with you to resolve the issue.
+        </p>
+    </div>
+    <div class="hidden-xs col-sm-2 col-med-3"></div>
+{% endblock %}

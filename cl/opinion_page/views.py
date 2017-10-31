@@ -4,12 +4,12 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
 from django.db.models import F, Q
 from django.http import HttpResponseRedirect
-from django.http.response import JsonResponse, HttpResponse, \
-    HttpResponseNotAllowed
+from django.http.response import HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
+from ratelimit.decorators import ratelimit
 from rest_framework.status import HTTP_404_NOT_FOUND
 
 from cl.citations.find_citations import get_citations
@@ -26,6 +26,7 @@ from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
+@ratelimit(key='ip', rate='100/h', block=True)
 def view_docket(request, pk, _):
     docket = get_object_or_404(Docket, pk=pk)
     if not is_bot(request):
@@ -78,6 +79,7 @@ def view_docket(request, pk, _):
     })
 
 
+@ratelimit(key='ip', rate='100/h', block=True)
 def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
                         slug=''):
     """This view can either load an attachment or a regular document,

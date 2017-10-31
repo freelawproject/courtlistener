@@ -11,6 +11,7 @@ from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render, get_object_or_404
 from django.template import loader
 from django.views.decorators.cache import cache_page
+from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
@@ -243,6 +244,11 @@ def tools_page(request):
 
 def browser_warning(request):
     return render(request, 'browser_warning.html', {'private': True})
+
+
+def ratelimited(request, exception):
+    return render(request, '429.html', {'private': True},
+                  status=HTTP_429_TOO_MANY_REQUESTS)
 
 
 def serve_static_file(request, file_path=''):

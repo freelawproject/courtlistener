@@ -58,6 +58,7 @@ MIDDLEWARE_CLASSES = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'ratelimit.middleware.RatelimitMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'cl.lib.middleware.MaintenanceModeMiddleware',
 ]
@@ -375,6 +376,7 @@ SCDB_LATEST_CASE = datetime.datetime(2016, 6, 27)
 ######################
 # Various and Sundry #
 ######################
+RATELIMIT_VIEW = 'cl.simple_pages.views.ratelimited'
 if DEVELOPMENT:
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False

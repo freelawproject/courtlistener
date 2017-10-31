@@ -24,6 +24,7 @@ django-filter==0.15.3
 django-localflavor==1.1
 django-mathfilters
 django-markdown-deux
+django-ratelimit
 django-redis-cache==1.6.5
 djangorestframework==3.6.2
 djangorestframework-filters==0.9.1
