@@ -650,13 +650,14 @@ PACER_TO_CL_IDS = {
                 </p>
             </li>
         </ul>
-        <p>After you complete an upload the following fields will be populated:</p>
+        <p>When you complete your upload, you will create a <code>Processing Queue</code> object in the CourtListener database. This object will be returned in the HTTP response to your upload so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:
+        </p>
         <ul>
-            <li><code>status</code>:  When you upload an item, it is only placed into a queue until processing resources are available to merge it into the RECAP Archive. Use this field to determine where in that process your item is. To see the current values, place an <code>OPTIONS</code> request to this endpoint.
+            <li><code>status</code>: When you upload an item, it is only placed into a queue until processing resources are available to merge it into the RECAP Archive. Use this field to determine where in that process your item is. To see the possible values, place an <code>OPTIONS</code> request to this endpoint.
             </li>
-            <li><code>error_message</code>: This field will provide you information about whether your upload was processed successfully or will explain any errors that occured.
+            <li><code>error_message</code>: This field will provide you information about whether your upload was processed successfully or will explain any errors that occurred.
             </li>
-            <li><code>docket</code>, <code>docket_entry</code>, and <code>recap_document</code>: After an item is successfully processed, these fields will be populated with the IDs of the items that were created or updated. The <code>docket</code> field will be populated for dockets that were created or updated, and the <code>docket_entry</code> and <code>recap_document</code> fields will be populated for uploaded PDFs.
+            <li><code>docket</code>, <code>docket_entry</code>, and <code>recap_document</code>: After an item is successfully processed, these fields will be populated with the IDs of the items that were created or updated. The <code>docket</code> field will be populated for dockets that were created or updated, and all three fields will be populated for uploaded PDFs.
             </li>
             <li><code>date_created</code> and <code>date_modified</code></li>
         </ul>
@@ -668,7 +669,8 @@ PACER_TO_CL_IDS = {
     --form pacer_case_id=&lt;some-value&gt; \
     --form debug=true \
     '{% get_full_host %}{% url "processingqueue-list" version="v3" %}'</pre>
-
+        <p>And once you've completed your upload, you would have a <code>Processing Queue</code> object that you could monitor for completeness. Once its <code>status</code> field indicated that it was processed successfully, it would have  a link to the docket that was created or updated.
+        </p>
         <h4>{% url "fast-recapdocument-list" version="v3" %}</h4>
         <p>To check if a document is in RECAP, simply complete a query like so:
         </p>
