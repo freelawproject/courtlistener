@@ -597,6 +597,89 @@
             </li>
         </ul>
 
+        <h3 id="recap-endpoint">RECAP Endpoints</h3>
+        <p>The RECAP endpoints provide two high-level features. They allow you to check if a PACER item exists in CourtListener, and they allow you to upload items to CourtListener for processing and addition to the <a href="{% url "advanced_r" %}">RECAP Archive</a>.
+        </p>
+        <p>These endpoints require authentication with a CourtListener account that has special permissions. To obtain permission to use these endpoints, please <a href="{% url "contact" %}">get in touch</a>.
+        </p>
+        <p>The endpoints for RECAP are:</p>
+        <ul>
+            <li><code>{% url "processingqueue-list" version="v3" %}</code>: This endpoint can be used to upload items and to check on the progress of an upload.</li>
+            <li><code>{% url "fast-recapdocument-list" version="v3" %}</code>: This endpoint can be used to check if documents are in RECAP</li>
+        </ul>
+        <h4>{% url "processingqueue-list" version="v3" %}</h4>
+        <p>This endpoint can be used to upload PACER content to the RECAP Archive. We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/master/cl/recap/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using POST requests and multipart form data.
+        </p>
+        <p>The following parameters apply to all uploads:</p>
+        <ul>
+            <li><p><code>upload_type</code> <em>(required)</em>: Accepted values for this parameter are:
+                <code>1</code> for dockets, <code>2</code> for attachment pages,
+                and <code>3</code> for PDFs.
+            </p></li>
+            <li><p><code>filepath_local</code> <em>(required)</em>: Use this field to upload the binary data you are submitting, whether it's an HTML docket or attachment menu or a PDF file.
+            </p></li>
+            <li><p><code>court</code> <em>(required)</em>: The CourtListener court id, <a
+                    href="{% url "court_index" %}">as described here</a>. Note
+                that these are almost all identical to the subdomains of the
+                PACER websites with the exception of the following values:</p>
+                <pre>
+PACER_TO_CL_IDS = {
+    'azb': 'arb',         // Arizona Bankruptcy Court
+    'cofc': 'uscfc',      // Court of Federal Claims
+    'neb': 'nebraskab',   // Nebraska Bankruptcy
+    'nysb-mega': 'nysb'   // Remove the mega thing
+};</pre>
+            </li>
+            <li><p><code>debug</code> <em>(optional)</em>: While you are developing, use this field to test your work. When it is set to <code>true</code>, your uploads will not make changes to the RECAP Archive, but you will create processing requests which will be processed in debug mode.
+            </p></li>
+        </ul>
+        <p>The following three upload types are supported:</p>
+        <ul>
+            <li>
+                <p><code>Dockets</code>: Uploading a docket should be fairly easy. In addition to the required fields above, supply the <code>pacer_case_id</code> field.
+                </p>
+            </li>
+            <li>
+                <p><code>PDFs</code>: To upload PDFs, you must inlucde the <code>pacer_doc_id</code> and <code>document_number</code> fields. If you are uploading an attachment, you must also provide the <code>attachment_number</code> field. If at all possible, the <code>pacer_case_id</code> field should also be provided.
+                </p>
+                <p>Document uploads will only succeed when they can be associated with a docket. If the RECAP Archive does not already have a docket for the item you uploaded, your upload will be requeued and retried several times in the hopes that the docket was processed in the meantime. If, after retrying several times, the a docket cannot be found, your upload will be discarded as an orphan document. It is thus good practice to ensure that you upload a docket before you upload any documents from that docket.
+                </p>
+            </li>
+            <li>
+                <p><code>Attachment Menus</code>: These are the HTML pages that you will see that list the attachments for a docket entry. The only required field for this upload type is <code>pacer_case_id</code>.
+                </p>
+            </li>
+        </ul>
+        <p>After you complete an upload the following fields will be populated:</p>
+        <ul>
+            <li><code>status</code>:  When you upload an item, it is only placed into a queue until processing resources are available to merge it into the RECAP Archive. Use this field to determine where in that process your item is. To see the current values, place an <code>OPTIONS</code> request to this endpoint.
+            </li>
+            <li><code>error_message</code>: This field will provide you information about whether your upload was processed successfully or will explain any errors that occured.
+            </li>
+            <li><code>docket</code>, <code>docket_entry</code>, and <code>recap_document</code>: After an item is successfully processed, these fields will be populated with the IDs of the items that were created or updated. The <code>docket</code> field will be populated for dockets that were created or updated, and the <code>docket_entry</code> and <code>recap_document</code> fields will be populated for uploaded PDFs.
+            </li>
+            <li><code>date_created</code> and <code>date_modified</code></li>
+        </ul>
+        <p>Pulling this all together, a docket upload might look like:</p>
+        <pre class=scrollable">curl -v \
+    --form upload_type=1 \
+    --form "filepath_local=@docket.html" \
+    --form court=dcd \
+    --form pacer_case_id=&lt;some-value&gt; \
+    --form debug=true \
+    '{% get_full_host %}{% url "processingqueue-list" version="v3" %}'</pre>
+
+        <h4>{% url "fast-recapdocument-list" version="v3" %}</h4>
+        <p>To check if a document is in RECAP, simply complete a query like so:
+        </p>
+        <pre class="scrollable">curl '{% get_full_host %}{% url "fast-recapdocument-list" version="v3" %}?docket_entry__docket__court=dcd&pacer_doc_id__in=04505578698,04505578717' \
+    --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
+        <p>The ID fields in that query are the CourtListener court abbreviation and the document ID numbers as found in PACER. Several document ID numbers can be provided, separated by commas. A maximum of 300 items will be returned per page.
+        </p>
+        <p>To query whether a case is in the RECAP Archive, use the <code>Docket</code> endpoint described above.
+        </p>
+
+
         <h2 id="tips">Tips <span class="alt">&amp;</span> Tricks</h2>
         <p>The SSL certificate issued by identrust.com, or <i>Let’s Encrypt</i>, which is used by CourtListener.com, has not been added to the Java JVM list of trusted Certificate Authorities as of version 8u74. There is a discussion on <i>Let's Encrypt</i> about their progress getting their certificate trusted by various organizations at &quot;<a href="https://community.letsencrypt.org/t/inclusion-of-isrg-root/9002">Inclusion of ISRG Root.</a>&quot; For now, this causes an error when using Java libraries to access the REST api. The error shown is:
         </p>
