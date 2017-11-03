@@ -78,10 +78,17 @@ def process_recap_pdf(self, pk):
     pq.save()
     logger.info("Processing RECAP item (debug is: %s): %s " % (pq.debug, pq))
     try:
-        rd = RECAPDocument.objects.get(
-            docket_entry__docket__pacer_case_id=pq.pacer_case_id,
-            pacer_doc_id=pq.pacer_doc_id,
-        )
+        if pq.pacer_case_id:
+            rd = RECAPDocument.objects.get(
+                docket_entry__docket__pacer_case_id=pq.pacer_case_id,
+                pacer_doc_id=pq.pacer_doc_id,
+            )
+        else:
+            # Sometimes we don't have the case ID from PACER. Try to make this
+            # work anyway.
+            rd = RECAPDocument.objects.get(
+                pacer_doc_id=pq.pacer_doc_id,
+            )
     except RECAPDocument.DoesNotExist:
         try:
             d = Docket.objects.get(pacer_case_id=pq.pacer_case_id,
