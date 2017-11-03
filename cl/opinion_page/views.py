@@ -118,6 +118,7 @@ def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
 
 
 @never_cache
+@ratelimit(key='ip', rate='100/h', block=True)
 def view_opinion(request, pk, _):
     """Using the cluster ID, return the cluster of opinions.
 
@@ -177,6 +178,7 @@ def view_opinion(request, pk, _):
     })
 
 
+@ratelimit(key='ip', rate='100/h', block=True)
 def view_authorities(request, pk, slug):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
@@ -191,6 +193,7 @@ def view_authorities(request, pk, slug):
     })
 
 
+@ratelimit(key='ip', rate='100/h', block=True)
 def cluster_visualizations(request, pk, slug):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     return render(request, 'view_opinion_visualizations.html', {
