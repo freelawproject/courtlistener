@@ -42,6 +42,7 @@ class RecapUploadsTest(TestCase):
         self.data = {
             'court': 'scotus',
             'pacer_case_id': 'asdf',
+            'pacer_doc_id': 24,
             'document_number': 1,
             'filepath_local': f,
             'upload_type': ProcessingQueue.PDF,
@@ -68,6 +69,7 @@ class RecapUploadsTest(TestCase):
             'upload_type': ProcessingQueue.DOCKET,
             'document_number': '',
         })
+        del self.data['pacer_doc_id']
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
@@ -109,7 +111,8 @@ class RecapUploadsTest(TestCase):
 
     def test_no_numbers_in_docket_uploads_work(self, mock):
         self.data['upload_type'] = ProcessingQueue.DOCKET
-        self.data['document_number'] = ''
+        del self.data['pacer_doc_id']
+        del self.data['document_number']
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 

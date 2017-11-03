@@ -49,7 +49,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         extra_kwargs = {'filepath_local': {'write_only': True}}
 
     def validate(self, attrs):
-        # No numbers on Dockets
+        # Dockets shouldn't have these fields completed.
         if attrs['upload_type'] == ProcessingQueue.DOCKET:
             numbers_not_blank = any([attrs.get('pacer_doc_id'),
                                      attrs.get('document_number'),
@@ -58,6 +58,13 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                 raise ValidationError("PACER document ID, document number and "
                                       "attachment number must be blank for "
                                       "docket uploads.")
+        # PDFs require a pacer_doc_id value.
+        if attrs['upload_type'] == ProcessingQueue.PDF:
+            if not all([attrs.get('pacer_doc_id'),
+                        attrs.get('document_number')]):
+                raise ValidationError("Uploaded PDFs must have the "
+                                      "pacer_doc_id and document_number fields "
+                                      "completed.")
         return attrs
 
 
