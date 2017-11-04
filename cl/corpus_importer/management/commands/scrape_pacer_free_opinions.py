@@ -55,7 +55,7 @@ def get_next_date_range(court_id, span=7):
 
     last_complete_date = last_completion_log.date_queried
     next_start_date = last_complete_date + timedelta(days=1)
-    next_end_date = last_complete_date + timedelta(days=span)
+    next_end_date = min(now().date(), last_complete_date + timedelta(days=span))
     return next_start_date, next_end_date
 
 
@@ -80,19 +80,21 @@ def get_and_save_free_document_reports(options):
         status=PACERFreeDocumentLog.SCRAPE_FAILED,
     )
 
+    cl_court_ids = Court.objects.filter(
+        jurisdiction__in=[Court.FEDERAL_DISTRICT,
+                          Court.FEDERAL_BANKRUPTCY],
+        in_use=True,
+        end_date=None,
+    ).exclude(
+        pk__in=['casb', 'ganb', 'gub', 'innb', 'mieb', 'miwb', 'nmib', 'nvb',
+                'ohsb', 'prb', 'tnwb', 'vib'],
+    ).values_list(
+        'pk',
+        flat=True,
+    )
     pacer_court_ids = {
-        map_cl_to_pacer_id(v): {'until': now(), 'count': 1, 'result': None} for v in
-            Court.objects.filter(
-                jurisdiction__in=[Court.FEDERAL_DISTRICT,
-                                  Court.FEDERAL_BANKRUPTCY],
-                in_use=True,
-                end_date=None,
-            ).exclude(
-                pk__in=['casb', 'ganb', 'gub', 'innb', 'mieb', 'miwb', 'nmib',
-                        'nvb', 'ohsb', 'prb', 'tnwb', 'vib']
-            ).values_list(
-                'pk', flat=True
-            )
+        map_cl_to_pacer_id(v): {'until': now(), 'count': 1, 'result': None} for
+        v in cl_court_ids
     }
     pacer_session = PacerSession(username=PACER_USERNAME,
                                  password=PACER_PASSWORD)
