@@ -16,7 +16,7 @@ Look at using d3 maps and sets instead of some of the other datatypes:
  * @param {object} opinions the JSON object containing the data to work with
  * @param {string} chartType defaults to dos (Degrees of Separation), also [spaeth, genealogy]
  * @param {string} axisType controls X axis formatting as category or timeline
- * @param {string} height [description]
+ * @param {integer} height [description]
  * @param {integer} maxDoS a maximum degree of separation to show
  * @param {string} mode view or edit mode
  * @param {string} galleryId if in gallery mode is id of which chart to draw
@@ -1302,7 +1302,8 @@ $(document).ready(function () {
 			// 	maxDoS -- maximum degree of separation to show, is this only DoS
 			// )
 
-		used = drawGraph(chartTarget, opinions, chartType, axisType, height, maxDoS, params.mode, '');
+		used = drawGraph(chartTarget, opinions, chartType, axisType, height,
+			maxDoS, params.mode, '');
 		$(caseCountTarget).text(used.length);
 		citationTable(tableTarget, used,
 			[
