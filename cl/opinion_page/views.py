@@ -80,6 +80,18 @@ def view_docket(request, pk, slug):
 
 
 @ratelimit(key='ip', rate='100/h', block=True)
+def view_parties(request, docket_id, slug):
+    """Show the parties and attorneys tab on the docket."""
+    docket = get_object_or_404(Docket, pk=docket_id, slug=slug)
+
+    return render(request, 'docket_parties.html', {
+        'docket': docket,
+        'parties': 'xxx',
+        'private': docket.blocked,
+    })
+
+
+@ratelimit(key='ip', rate='100/h', block=True)
 def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
                         slug=''):
     """This view can either load an attachment or a regular document,

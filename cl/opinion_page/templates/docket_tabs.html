@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% load text_filters %}
+{% load humanize %}
+
+
+{% block sidebar %}{% endblock %}
+{% block content %}{% endblock %}
+
+{% block navbar-r %}active{% endblock %}
+
+
+{% block footer-scripts %}
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/save-favorites.js"></script>
+    {% if request.user.is_staff %}
+        <script defer type="text/javascript"
+                src="{{ STATIC_URL }}js/admin_tools.js"></script>
+        {% if DEBUG %}
+            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
+        {% else %}
+            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block nav %}
+    <div class="col-xs-12">
+        {% if perms.search.change_docket %}
+            <p class="float-right">
+                <a href="{% url 'admin:search_docket_change' docket.id %}"
+                   class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;<i
+                        class="fa fa-pencil"></i>
+                </a>
+                {% if request.user.is_superuser %}
+                    {% if private %}
+                        &nbsp;<span class="btn btn-danger btn-xs">Blocked <i
+                            class="fa fa-ban"></i></span>
+                    {% else %}
+                        <a class="btn btn-success btn-xs block-item"
+                           data-id="{{ docket.pk }}"
+                           data-type="docket">Block This Docket <i
+                                class="fa fa-ban"></i>
+                        </a>
+                    {% endif %}
+                {% endif %}
+            </p>
+        {% endif %}
+        <i id="favorites-star"
+           class="{% if favorite_form.instance.docket_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
+           data-toggle="modal"
+           data-target="#modal-save-favorite, #modal-logged-out"
+           title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
+
+        <h2 class="bottom inline">
+            {{ docket|best_case_name|safe|v_wrapper }}
+            {% if docket.docket_number %}
+                ({{ docket.docket_number }})
+            {% endif %}
+        </h2>
+        {% include "includes/favorites_modal.html" %}
+
+        {% if docket.source in docket.RECAP_SOURCES %}
+            <p>
+                {% if docket.pacer_url %}
+                    <a href="{{ docket.pacer_url }}"
+                       class="btn btn-primary btn-xs"
+                       target="_blank">View on PACER</a>
+                {% endif %}
+                <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+                   class="btn btn-primary btn-xs">Search this Docket</a>
+            </p>
+        {% endif %}
+
+        <h3>{{ docket.court }}</h3>
+
+
+        {% if docket.assigned_to or docket.assigned_to_str %}
+            <p class="bottom">
+                <span class="meta-data-header">Assigned To:</span>
+                <span class="meta-data-value">
+                    {% if docket.assigned_to %}
+                        <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
+                    {% elif docket.assigned_to_str %}
+                        <a href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;">{{ docket.assigned_to_str }}</a>
+                    {% endif %}
+                </span>
+            </p>
+        {% endif %}
+
+        {% if docket.referred_to or docket.referred_to_str %}
+            <p class="bottom">
+                <span class="meta-data-header">Referred To:</span>
+                <span class="meta-data-value">
+                    {% if docket.referred_to %}
+                        <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
+                    {% elif docket.referred_to_str %}
+                        <a href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;">{{ docket.referred_to_str }}</a>
+                    {% endif %}
+                </span>
+            </p>
+        {% endif %}
+
+        {% if docket.date_cert_granted %}
+            <p class="bottom">
+                <span class="meta-data-header">Date Certiorari Granted:</span>
+                <span class="meta-data-value">{{ docket.date_cert_granted }}</span>
+            </p>
+        {% endif %}
+
+        {% if docket.cert_denied %}
+            <p class="bottom">
+                <span class="meta-data-header">Date Certiorari Denied:</span>
+                <span class="meta-data-value">{{ docket.date_cert_denied }}</span>
+            </p>
+        {% endif %}
+
+        {% if docket.date_argued %}
+            <p class="bottom">
+                <span class="meta-data-header">Date Argued:</span>
+                <span class="meta-data-value">{{ docket.date_argued }}</span>
+            </p>
+        {% endif %}
+
+        {% if docket.date_reargued %}
+            <p class="bottom">
+                <span class="meta-data-header">Date Reargued:</span>
+                <span class="meta-data-value">{{ docket.date_reargued }}</span>
+            </p>
+        {% endif %}
+
+        {% if docket.date_reargument_denied %}
+            <p class="bottom">
+                <span class="meta-data-header">Date Reargument Denied:</span>
+                <span class="meta-data-value">{{ docket.date_reargument_denied }}</span>
+            </p>
+        {% endif %}
+
+        {% if docket.date_filed %}
+            <p class="bottom">
+                <span class="meta-data-header">Date Filed:</span>
+                <span class="meta-data-value">{{ docket.date_filed }}</span>
+            </p>
+        {% endif %}
+
+        {% if docket.date_terminated %}
+            <p class="bottom">
+                <span class="meta-data-header">Date Terminated:</span>
+                <span class="meta-data-value">{{ docket.date_terminated }}</span>
+            </p>
+        {% endif %}
+
+        {% if docket.date_last_filing %}
+            <p class="bottom">
+                <span class="meta-data-header">Date of Last Known Filing:</span>
+                <span class="meta-data-value">{{ docket.date_last_filing }}</span>
+            </p>
+        {% endif %}
+
+        {% if docket.cause %}
+            <p class="bottom">
+                <span class="meta-data-header">Cause:</span>
+                <span class="meta-data-value">
+                        <a href="/?type=r&amp;cause=&quot;{{ docket.cause }}&quot;">{{ docket.cause }}</a>
+                    </span>
+            </p>
+        {% endif %}
+
+        {% if docket.nature_of_suit %}
+            <p class="bottom">
+                <span class="meta-data-header">Nature of Suit:</span>
+                <span class="meta-data-value">
+                        <a href="/?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;">{{ docket.nature_of_suit }}</a>
+                    </span>
+            </p>
+        {% endif %}
+
+        {% if docket.jury_demand %}
+            <p class="bottom">
+                <span class="meta-data-header">Jury Demand:</span>
+                <span class="meta-data-value">
+                        <a href="/?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;">{{ docket.jury_demand }}</a>
+                    </span>
+            </p>
+        {% endif %}
+    </div>
+
+
+    {% if docket.clusters.count %}
+        <div class="col-xs-6">
+            <h3>Opinions Outside of RECAP Collection</h3>
+            <hr>
+            <ul>
+                {% for cluster in docket.clusters.all %}
+                    <li>
+                        <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                            {{ cluster.caption|safe|v_wrapper }}
+                        </a>
+                        {% if perms.search.change_document %}
+                            <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
+                               class="btn btn-primary btn-xs">Edit</a>
+                        {% endif %}
+                        <br/>
+                        {{ cluster.date_filed }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if docket.audio_files.count %}
+        <div class="col-xs-6">
+            <h3>Oral Argument Recordings</h3>
+            <hr>
+            <ul>
+                {% for af in docket.audio_files.all %}
+                    <li>
+                        <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                            {{ af|best_case_name|safe|v_wrapper }}
+                        </a>
+                        {% if perms.audio.change_audio %}
+                            <a href="{% url 'admin:audio_audio_change' af.pk %}"
+                               class="btn btn-primary btn-xs">Edit</a>
+                        {% endif %}
+                        <br/>
+                        {{ af.docket.date_argued|default_if_none:"" }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if docket_entries.paginator.count or parties %}
+        <div class="col-xs-12">
+            <ul class="nav nav-tabs v-offset-below-2 v-offset-above-3" role="tablist">
+                <li class="{% block nav-de %}inactive{% endblock %}"
+                    role="presentation">
+                    <a href="{{  docket.get_absolute_url }}"><i
+                            class="fa fa-th-list gray"></i>&nbsp;Docket Entries
+                        {% if docket_entries.paginator.num_pages > 1 %}
+                            (Page {{ docket_entries.number|intcomma }} of
+                            {{ docket_entries.paginator.num_pages|intcomma }})
+                        {% endif %}
+                    </a>
+                </li>
+
+                <li class="{% block nav-parties %}inactive{% endblock %}"
+                    role="presentation">
+                    <a href="{% url "docket_parties" docket_id=docket.pk slug=docket.slug %}"><i
+                            class="fa fa-users gray"></i>&nbsp;Parties and Attorneys</a>
+                </li>
+            </ul>
+            {% block tab-content %}{% endblock %}
+        </div>
+    {% endif %}
+{% endblock %}

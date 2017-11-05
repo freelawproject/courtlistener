@@ -1,6 +1,5 @@
-{% extends "base.html" %}
+{% extends "docket_tabs.html" %}
 {% load text_filters %}
-{% load humanize %}
 {% load extras %}
 {% load admin_urls %}
 
@@ -11,412 +10,175 @@
 {% block description %}Docket for {{ docket|best_case_name }}{% endblock %}
 {% block og_description %}Docket for {{ docket|best_case_name }}{% endblock %}
 
-{% block navbar-r %}active{% endblock %}
+{% block nav-de %}active{% endblock %}
 
-{% block footer-scripts %}
-    <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
-    <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/save-favorites.js"></script>
-    {% if request.user.is_staff %}
-        <script defer type="text/javascript"
-                src="{{ STATIC_URL }}js/admin_tools.js"></script>
-        {% if DEBUG %}
-            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
-        {% else %}
-            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
-        {% endif %}
-    {% endif %}
-{% endblock %}
-
-
-{% block content %}
-    <div class="col-xs-12">
-        <div class="row">
-            <div class="col-xs-12">
-                {% if perms.search.change_docket %}
-                    <p class="float-right">
-                        <a href="{% url 'admin:search_docket_change' docket.id %}"
-                           class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;<i
-                           class="fa fa-pencil"></i>
-                        </a>
-                        {% if request.user.is_superuser %}
-                            {% if private %}
-                               &nbsp;<span class="btn btn-danger btn-xs">Blocked <i
-                                    class="fa fa-ban"></i></span>
-                            {% else %}
-                                <a class="btn btn-success btn-xs block-item"
-                                     data-id="{{ docket.pk }}"
-                                     data-type="docket">Block This Docket <i
-                                        class="fa fa-ban"></i>
-                                </a>
-                            {% endif %}
-                        {% endif %}
+{% block tab-content %}
+<div class="well well-sm">
+    <form action="">
+    <div class="row">
+        <div class="form-inline">
+            {% if form.errors %}
+                <div class="col-xs-12">
+                    <p class="text-danger"><strong>There were errors applying your filters.</strong>
                     </p>
-                {% endif %}
-                <i id="favorites-star"
-                   class="{% if favorite_form.instance.docket_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
-                   data-toggle="modal"
-                   data-target="#modal-save-favorite, #modal-logged-out"
-                   title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
-
-                <h2 class="bottom inline">
-                    {{ docket|best_case_name|safe|v_wrapper }}
-                    {% if docket.docket_number %}
-                        ({{ docket.docket_number }})
-                    {% endif %}
-                </h2>
-                {% include "includes/favorites_modal.html" %}
-
-                {% if docket.source in docket.RECAP_SOURCES %}
-                <p>
-                    {% if docket.pacer_url %}
-                        <a href="{{ docket.pacer_url }}"
-                           class="btn btn-primary btn-xs"
-                           target="_blank">View on PACER</a>
-                    {% endif %}
-                    <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}" class="btn btn-primary btn-xs">Search this Docket</a>
-                </p>
-                {% endif %}
-
-                <h3>{{ docket.court }}</h3>
-
-
-                {% if docket.assigned_to or docket.assigned_to_str %}
-                <p class="bottom">
-                    <span class="meta-data-header">Assigned To:</span>
-                    <span class="meta-data-value">
-                        {% if docket.assigned_to %}
-                            <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
-                        {% elif docket.assigned_to_str %}
-                            <a href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;">{{ docket.assigned_to_str }}</a>
-                        {% endif %}
-                    </span>
-                </p>
-                {% endif %}
-
-                {% if docket.referred_to or docket.referred_to_str %}
-                <p class="bottom">
-                    <span class="meta-data-header">Referred To:</span>
-                    <span class="meta-data-value">
-                        {% if docket.referred_to %}
-                            <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
-                        {% elif docket.referred_to_str %}
-                            <a href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;">{{ docket.referred_to_str }}</a>
-                        {% endif %}
-                    </span>
-                </p>
-                {% endif %}
-
-                {% if docket.date_cert_granted %}
-                <p class="bottom">
-                    <span class="meta-data-header">Date Certiorari Granted:</span>
-                    <span class="meta-data-value">{{ docket.date_cert_granted }}</span>
-                </p>
-                {% endif %}
-
-                {% if docket.cert_denied %}
-                <p class="bottom">
-                    <span class="meta-data-header">Date Certiorari Denied:</span>
-                    <span class="meta-data-value">{{ docket.date_cert_denied }}</span>
-                </p>
-                {% endif %}
-
-                {% if docket.date_argued %}
-                <p class="bottom">
-                    <span class="meta-data-header">Date Argued:</span>
-                    <span class="meta-data-value">{{ docket.date_argued }}</span>
-                </p>
-                {% endif %}
-
-                {% if docket.date_reargued %}
-                    <p class="bottom">
-                        <span class="meta-data-header">Date Reargued:</span>
-                        <span class="meta-data-value">{{ docket.date_reargued }}</span>
-                    </p>
-                {% endif %}
-
-                {% if docket.date_reargument_denied %}
-                    <p class="bottom">
-                        <span class="meta-data-header">Date Reargument Denied:</span>
-                        <span class="meta-data-value">{{ docket.date_reargument_denied }}</span>
-                    </p>
-                {% endif %}
-
-                {% if docket.date_filed %}
-                    <p class="bottom">
-                        <span class="meta-data-header">Date Filed:</span>
-                        <span class="meta-data-value">{{ docket.date_filed }}</span>
-                    </p>
-                {% endif %}
-
-                {% if docket.date_terminated %}
-                    <p class="bottom">
-                        <span class="meta-data-header">Date Terminated:</span>
-                        <span class="meta-data-value">{{ docket.date_terminated }}</span>
-                    </p>
-                {% endif %}
-
-                {% if docket.date_last_filing %}
-                    <p class="bottom">
-                        <span class="meta-data-header">Date of Last Known Filing:</span>
-                        <span class="meta-data-value">{{ docket.date_last_filing }}</span>
-                    </p>
-                {% endif %}
-
-                {% if docket.cause %}
-                    <p class="bottom">
-                        <span class="meta-data-header">Cause:</span>
-                        <span class="meta-data-value">
-                            <a href="/?type=r&amp;cause=&quot;{{ docket.cause }}&quot;">{{ docket.cause }}</a>
-                        </span>
-                    </p>
-                {% endif %}
-
-                {% if docket.nature_of_suit %}
-                    <p class="bottom">
-                        <span class="meta-data-header">Nature of Suit:</span>
-                        <span class="meta-data-value">
-                            <a href="/?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;">{{ docket.nature_of_suit }}</a>
-                        </span>
-                    </p>
-                {% endif %}
-
-                {% if docket.jury_demand %}
-                    <p class="bottom">
-                        <span class="meta-data-header">Jury Demand:</span>
-                        <span class="meta-data-value">
-                            <a href="/?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;">{{ docket.jury_demand }}</a>
-                        </span>
-                    </p>
-                {% endif %}
-            </div>
-
-
-            {% if docket.clusters.count %}
-            <div class="col-xs-6">
-                <h3>Opinions Outside of RECAP Collection</h3>
-                <hr>
-                <ul>
-                    {% for cluster in docket.clusters.all %}
-                        <li>
-                            <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                                {{ cluster.caption|safe|v_wrapper }}
-                            </a>
-                            {% if perms.search.change_document %}
-                                <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
-                                   class="btn btn-primary btn-xs">Edit</a>
-                            {% endif %}
-                            <br/>
-                            {{ cluster.date_filed }}
-                        </li>
-                    {% endfor %}
-                </ul>
-            </div>
+                </div>
             {% endif %}
-
-            {% if docket.audio_files.count %}
-            <div class="col-xs-6">
-                <h3>Oral Argument Recordings</h3>
-                <hr>
-                <ul>
-                    {% for af in docket.audio_files.all %}
-                        <li>
-                            <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                                {{ af|best_case_name|safe|v_wrapper }}
-                            </a>
-                            {% if perms.audio.change_audio %}
-                                <a href="{% url 'admin:audio_audio_change' af.pk %}"
-                                   class="btn btn-primary btn-xs">Edit</a>
-                            {% endif %}
-                            <br/>
-                            {{ af.docket.date_argued|default_if_none:"" }}
-                        </li>
-                    {% endfor %}
-                </ul>
+            <div class="col-xs-12 col-sm-6 col-md-5">
+                <div class="form-group{% if form.filed_after.errors %} has-error{% endif %}">
+                    <label for="id_filed_after"
+                           class="control-label">Filed</label>
+                    {{ form.filed_after }}
+                </div>
+                <div class="form-group{% if form.filed_before.errors %} has-error{% endif %}">
+                    <label for="id_filed_before"
+                           class="control-label">to</label>
+                    {{ form.filed_before }}
+                </div>
             </div>
-            {% endif %}
+            <div class="col-xs-8 col-sm-4">
+                <div class="form-group{% if form.entry_gte.errors %} has-error{% endif %}">
+                    <label for="id_entry_gte"
+                           class="control-label">Documents</label>
+                    {{ form.entry_gte }}
+                </div>
+                <div class="form-group{% if form.entry_lte.errors %} has-error{% endif %}">
+                    <label for="id_entry_lte"
+                           class="control-label">to</label>
+                    {{ form.entry_lte }}
+                </div>
+            </div>
+            <div class="col-xs-4 col-sm-2 col-md-3">
+                <div id="sort-buttons"
+                     class="btn-group pull-right"
+                     data-toggle="buttons"
+                     role="group"
+                     aria-label="sorting buttons">
+                    {% with v=form.order_by.value %}
+                    <label for="id_order_by_0"
+                           class="btn btn-default {% if v == "asc" or not v %}active{% endif %}">
+                        <input type="radio"
+                               id="id_order_by_0"
+                               value="asc"
+                               name="order_by"
+                               {% if v == "asc" or not v %}checked="checked"{% endif %}/><i class="fa fa-sort-numeric-asc"></i>&nbsp;<span
+                            class="hidden-xs hidden-sm">Ascending</span></label>
+                    <label for="id_order_by_1"
+                           class="btn btn-default {% if v == "desc" %}active{% endif %}">
+                        <input type="radio"
+                               id="id_order_by_1"
+                               {% if v == "desc" %}checked=checked{% endif %}
+                               value="desc"
+                               name="order_by"/><i
+                            class="fa fa-sort-numeric-desc"></i>&nbsp;<span class="hidden-xs hidden-sm">Descending</span></label>
+                    {% endwith %}
+                </div>
+            </div>
+            <button type="submit" class="sr-only">Filter</button>
         </div>
+    </div>
+    </form>
+</div>
 
-        {% if docket_entries.paginator.count %}
-        <div class="row">
-            <div class="col-xs-12">
-                <h3>Docket Entries
-                    {% if docket_entries.paginator.num_pages > 1 %}
-                        (Page {{ docket_entries.number|intcomma }} of
-                        {{ docket_entries.paginator.num_pages|intcomma }})
-                    {% endif %}
-                </h3>
-                <div class="well well-sm">
-                    <form action="">
-                    <div class="row">
-                        <div class="form-inline">
-                            {% if form.errors %}
-                                <div class="col-xs-12">
-                                    <p class="text-danger"><strong>There were errors applying your filters.</strong>
-                                    </p>
-                                </div>
-                            {% endif %}
-                            <div class="col-xs-12 col-sm-6 col-md-5">
-                                <div class="form-group{% if form.filed_after.errors %} has-error{% endif %}">
-                                    <label for="id_filed_after"
-                                           class="control-label">Filed</label>
-                                    {{ form.filed_after }}
-                                </div>
-                                <div class="form-group{% if form.filed_before.errors %} has-error{% endif %}">
-                                    <label for="id_filed_before"
-                                           class="control-label">to</label>
-                                    {{ form.filed_before }}
-                                </div>
-                            </div>
-                            <div class="col-xs-8 col-sm-4">
-                                <div class="form-group{% if form.entry_gte.errors %} has-error{% endif %}">
-                                    <label for="id_entry_gte"
-                                           class="control-label">Documents</label>
-                                    {{ form.entry_gte }}
-                                </div>
-                                <div class="form-group{% if form.entry_lte.errors %} has-error{% endif %}">
-                                    <label for="id_entry_lte"
-                                           class="control-label">to</label>
-                                    {{ form.entry_lte }}
-                                </div>
-                            </div>
-                            <div class="col-xs-4 col-sm-2 col-md-3">
-                                <div id="sort-buttons"
-                                     class="btn-group pull-right"
-                                     data-toggle="buttons"
-                                     role="group"
-                                     aria-label="sorting buttons">
-                                    {% with v=form.order_by.value %}
-                                    <label for="id_order_by_0"
-                                           class="btn btn-default {% if v == "asc" or not v %}active{% endif %}">
-                                        <input type="radio"
-                                               id="id_order_by_0"
-                                               value="asc"
-                                               name="order_by"
-                                               {% if v == "asc" or not v %}checked="checked"{% endif %}/><i class="fa fa-sort-numeric-asc"></i>&nbsp;<span
-                                            class="hidden-xs hidden-sm">Ascending</span></label>
-                                    <label for="id_order_by_1"
-                                           class="btn btn-default {% if v == "desc" %}active{% endif %}">
-                                        <input type="radio"
-                                               id="id_order_by_1"
-                                               {% if v == "desc" %}checked=checked{% endif %}
-                                               value="desc"
-                                               name="order_by"/><i
-                                            class="fa fa-sort-numeric-desc"></i>&nbsp;<span class="hidden-xs hidden-sm">Descending</span></label>
-                                    {% endwith %}
-                                </div>
-                            </div>
-                            <button type="submit" class="sr-only">Filter</button>
-                        </div>
-                    </div>
-                    </form>
-                </div>
-
-                <div class="fake-table" id="docket-entry-table">
-                <div class="row bold">
-                    <div class="col-xs-1 text-center">
-                        <p class="hidden-xs">Document Number</p>
-                    </div>
-                    <div class="col-xs-3 col-sm-2 col-md-1">Date&nbsp;Filed</div>
-                    <div class="col-xs-7 col-sm-6 col-md-2">Description</div>
-                </div>
-                {% for de in docket_entries %}
-                    <div class="row {% cycle "odd" "even" %}"
-                         id="entry-{{ de.entry_number }}">
-                        <div class="col-xs-1 text-center"><p>{{ de.entry_number }}</p></div>
-                        <div class="col-xs-3 col-sm-2 col-md-1"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
-                        <div class="col-xs-7 col-sm-6 col-md-8"><p>{{ de.description|safe|default:'<em class="gray">Unknown docket entry description</em>' }}</p></div>
-                        <div class="hidden-xs col-sm-3 col-md-2">
-                            <p class="right"><a href="#entry-{{ de.entry_number }}"
-                               data-toggle="tooltip"
-                               data-placement="left"
-                               title="Get direct link to this row">
-                                <i class="fa fa-share-alt gray"></i>
-                            </a>
-                            </p>
-                        </div>
-                        <div class="clearfix"></div>
-                        {% if de.recap_documents.count %}
-                            <div id="recap-documents">
-                            {% for rd in de.recap_documents.all %}
-                            <div class="col-xs-1 col-md-2"></div>
-                            <div class="col-xs-3 col-sm-2">
-                                <p>
-                                {% if rd.document_type == rd.ATTACHMENT %}
-                                    {% if rd.filepath_local.name %}
-                                        <a href="{{ rd.get_absolute_url }}">Attach&shy;ment&nbsp;{{ rd.attachment_number }}</a>
-                                    {% else %}
-                                        Attach&shy;ment&nbsp;{{ rd.attachment_number }}
-                                    {% endif %}
-                                {% else %}
-                                    {% if rd.filepath_local.name %}
-                                        <a href="{{ rd.get_absolute_url }}">Main Doc&shy;ument</a>
-                                    {% else %}
-                                        Main Doc&shy;ument
-                                    {% endif %}
-                                {% endif %}
-                                </p>
-                            </div>
-                            <div class="hidden-xs col-sm-6 col-md-4 col-lg-3">
-                                <p>{{ rd.description|safe|default:'<em class="gray">Unknown document description</em>' }}</p>
-                            </div>
-
-                            <div class="btn-group col-xs-7 col-sm-3">
-                                {% if rd.filepath_local %}
-                                    <a href="/{{ rd.filepath_local }}"
-                                       role="button"
-                                       class="btn btn-primary btn-xs"
-                                       {% if rd.date_upload %}
-                                          title="Uploaded {{ rd.date_upload }}"
-                                       {% endif %}>
-                                        Download PDF
-                                    </a>
-                                    <button type="button"
-                                            class="btn btn-primary btn-xs dropdown-toggle"
-                                            data-toggle="dropdown"
-                                            aria-haspopup="true"
-                                            aria-expanded="false">
-                                        <span class="caret"></span>
-                                        <span class="sr-only">Toggle Dropdown</span>
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        <li>
-                                            <a href="/{{ rd.filepath_local }}">From CourtListener</a>
-                                        </li>
-                                        {% if rd.filepath_ia %}
-                                        <li>
-                                            <a href="{{ rd.filepath_ia }}">From
-                                            Internet Archive</a>
-                                        </li>
-                                        <li role="separator" class="divider"></li>
-                                        {% endif %}
-                                        <li>
-                                            <a href="{{ rd.pacer_url }}"
-                                               target="_blank">Buy on
-                                            PACER</a>
-                                        </li>
-                                    </ul>
-                                {% else %}
-                                    {# We don't have it #}
-                                    <a href="{{ rd.pacer_url }}"
-                                       class="btn btn-primary btn-xs"
-                                       target="_blank">Buy on PACER</a>
-                                {% endif %}
-                            </div>
-                            <div class="clearfix"></div>
-                            {% endfor %}
-                            </div>
+<div class="fake-table col-xs-12" id="docket-entry-table">
+    <div class="row bold">
+        <div class="col-xs-1 text-center">
+            <p class="hidden-xs">Document Number</p>
+        </div>
+        <div class="col-xs-3 col-sm-2 col-md-1">Date&nbsp;Filed</div>
+        <div class="col-xs-7 col-sm-6 col-md-2">Description</div>
+    </div>
+    {% for de in docket_entries %}
+        <div class="row {% cycle "odd" "even" %}"
+             id="entry-{{ de.entry_number }}">
+            <div class="col-xs-1 text-center"><p>{{ de.entry_number }}</p></div>
+            <div class="col-xs-3 col-sm-2 col-md-1"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
+            <div class="col-xs-7 col-sm-6 col-md-8"><p>{{ de.description|safe|default:'<em class="gray">Unknown docket entry description</em>' }}</p></div>
+            <div class="hidden-xs col-sm-3 col-md-2">
+                <p class="right"><a href="#entry-{{ de.entry_number }}"
+                   data-toggle="tooltip"
+                   data-placement="left"
+                   title="Get direct link to this row">
+                    <i class="fa fa-share-alt gray"></i>
+                </a>
+                </p>
+            </div>
+            <div class="clearfix"></div>
+            {% if de.recap_documents.count %}
+                <div id="recap-documents">
+                {% for rd in de.recap_documents.all %}
+                <div class="col-xs-1 col-md-2"></div>
+                <div class="col-xs-3 col-sm-2">
+                    <p>
+                    {% if rd.document_type == rd.ATTACHMENT %}
+                        {% if rd.filepath_local.name %}
+                            <a href="{{ rd.get_absolute_url }}">Attach&shy;ment&nbsp;{{ rd.attachment_number }}</a>
+                        {% else %}
+                            Attach&shy;ment&nbsp;{{ rd.attachment_number }}
                         {% endif %}
-                    </div>
+                    {% else %}
+                        {% if rd.filepath_local.name %}
+                            <a href="{{ rd.get_absolute_url }}">Main Doc&shy;ument</a>
+                        {% else %}
+                            Main Doc&shy;ument
+                        {% endif %}
+                    {% endif %}
+                    </p>
+                </div>
+                <div class="hidden-xs col-sm-6 col-md-4 col-lg-3">
+                    <p>{{ rd.description|safe|default:'<em class="gray">Unknown document description</em>' }}</p>
+                </div>
+
+                <div class="btn-group col-xs-7 col-sm-3">
+                    {% if rd.filepath_local %}
+                        <a href="/{{ rd.filepath_local }}"
+                           role="button"
+                           class="btn btn-primary btn-xs"
+                           {% if rd.date_upload %}
+                              title="Uploaded {{ rd.date_upload }}"
+                           {% endif %}>
+                            Download PDF
+                        </a>
+                        <button type="button"
+                                class="btn btn-primary btn-xs dropdown-toggle"
+                                data-toggle="dropdown"
+                                aria-haspopup="true"
+                                aria-expanded="false">
+                            <span class="caret"></span>
+                            <span class="sr-only">Toggle Dropdown</span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a href="/{{ rd.filepath_local }}">From CourtListener</a>
+                            </li>
+                            {% if rd.filepath_ia %}
+                            <li>
+                                <a href="{{ rd.filepath_ia }}">From
+                                Internet Archive</a>
+                            </li>
+                            <li role="separator" class="divider"></li>
+                            {% endif %}
+                            <li>
+                                <a href="{{ rd.pacer_url }}"
+                                   target="_blank">Buy on
+                                PACER</a>
+                            </li>
+                        </ul>
+                    {% else %}
+                        {# We don't have it #}
+                        <a href="{{ rd.pacer_url }}"
+                           class="btn btn-primary btn-xs"
+                           target="_blank">Buy on PACER</a>
+                    {% endif %}
+                </div>
+                <div class="clearfix"></div>
                 {% endfor %}
                 </div>
-
-                {% if docket_entries.paginator.num_pages > 1 %}
-                    {% include "includes/pagination.html" with results=docket_entries %}
-                {% endif %}
-            </div>
+            {% endif %}
         </div>
-        {% endif %}
-    </div>
+    {% endfor %}
+</div>
+
+{% if docket_entries.paginator.num_pages > 1 %}
+    {% include "includes/pagination.html" with results=docket_entries %}
+{% endif %}
 {% endblock %}
