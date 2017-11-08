@@ -152,7 +152,8 @@
                             </li>
                             {% if rd.filepath_ia %}
                             <li>
-                                <a href="{{ rd.filepath_ia }}">From
+                                <a href="{{ rd.filepath_ia }}"
+                                   rel="nofollow">From
                                 Internet Archive</a>
                             </li>
                             <li role="separator" class="divider"></li>
@@ -168,7 +169,8 @@
                         {# We don't have it #}
                         <a href="{{ rd.pacer_url }}"
                            class="btn btn-primary btn-xs"
-                           target="_blank">Buy on PACER</a>
+                           target="_blank"
+                           rel="nofollow">Buy on PACER</a>
                     {% endif %}
                 </div>
                 <div class="clearfix"></div>
