@@ -179,6 +179,8 @@
 </div>
 
 {% if docket_entries.paginator.num_pages > 1 %}
+    <div class="col-xs-12">
     {% include "includes/pagination.html" with results=docket_entries %}
+    </div>
 {% endif %}
 {% endblock %}
