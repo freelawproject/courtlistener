@@ -246,11 +246,13 @@
                     </a>
                 </li>
 
+                {% if parties %}
                 <li class="{% block nav-parties %}inactive{% endblock %}"
                     role="presentation">
                     <a href="{% url "docket_parties" docket_id=docket.pk slug=docket.slug %}"><i
                             class="fa fa-users gray"></i>&nbsp;Parties and Attorneys</a>
                 </li>
+                {% endif %}
             </ul>
             {% block tab-content %}{% endblock %}
         </div>
