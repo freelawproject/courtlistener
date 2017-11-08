@@ -1,8 +1,11 @@
+import json
+from itertools import groupby
+
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
-from django.db.models import F, Q
+from django.db.models import F, Q, Prefetch
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
@@ -22,7 +25,9 @@ from cl.lib.import_lib import map_citations_to_models
 from cl.lib.model_helpers import suppress_autotime
 from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
+from cl.people_db.models import Attorney, AttorneyOrganization
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
+from cl.opinion_page.sankey import make_sankey_json
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
@@ -83,10 +88,43 @@ def view_docket(request, pk, slug):
 def view_parties(request, docket_id, slug):
     """Show the parties and attorneys tab on the docket."""
     docket = get_object_or_404(Docket, pk=docket_id, slug=slug)
+    sankey_data = []
+    # We work with this data at the level of party_types so that we can group
+    # the parties by this field. From there, we do a whole mess of prefetching,
+    # which reduces the number of queries needed for this down to four instead
+    # of potentially thousands (good times!)
+    party_types = docket.party_types.prefetch_related(
+        Prefetch('party'),
+        Prefetch('party__attorneys',
+                 queryset=Attorney.objects.filter(
+                     roles__docket=docket
+                 ).distinct().order_by('name'),
+                 to_attr='attys_in_docket'),
+        Prefetch('party__attys_in_docket__organizations',
+                 queryset=AttorneyOrganization.objects.filter(
+                     attorney_organization_associations__docket=docket
+                 ).distinct().order_by('name'),
+                 to_attr='firms_in_docket'),
+    ).order_by('name', 'party__name')
+
+    parties = []
+    for party_type_name, party_types in groupby(party_types, lambda x: x.name):
+        party_types = list(party_types)
+        parties.append({
+            'party_type_name': party_type_name,
+            'party_type_objects': party_types
+        })
+        sankey_data.append({
+            'party_type_name': party_type_name,
+            'json': make_sankey_json(party_types)
+        })
+
+    sankey_json = json.dumps(sankey_data, indent=2 if settings.DEBUG else 0)
 
     return render(request, 'docket_parties.html', {
         'docket': docket,
-        'parties': 'xxx',
+        'sankey_json': sankey_json,
+        'parties': parties,
         'private': docket.blocked,
     })
 

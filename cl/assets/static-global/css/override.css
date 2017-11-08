@@ -567,6 +567,9 @@ input.court-checkbox, input.status-checkbox {
     padding-top: 8px;
     border-bottom: 1px solid #dddddd;
 }
+.representation {
+    margin-top: 8.5px;
+}
 
 .odd {
     background-color: #f5f5f5;

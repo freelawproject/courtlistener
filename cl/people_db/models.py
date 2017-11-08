@@ -1267,6 +1267,7 @@ class Party(models.Model):
 
 
 class Role(models.Model):
+    """Links together the party, the attorney, and the docket"""
     ATTORNEY_TO_BE_NOTICED = 1
     ATTORNEY_LEAD = 2
     ATTORNEY_IN_SEALED_GROUP = 3

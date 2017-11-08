@@ -11,6 +11,72 @@
 
 {% block nav-parties %}active{% endblock %}
 
-{% block tab-content %}
+{% block parties-json %}
+<script type="text/javascript">
+  var sankey_json = {{ sankey_json|safe }};
+</script>
+{% endblock %}
 
+{% block tab-content %}
+<div class="visible-md visible-lg col-md-1 col-lg-2"></div>
+<div class="col-xs-12 col-md-10 col-lg-8">
+    {% for party_dict in parties %}
+        <h3><i class="fa fa-user gray"></i>&nbsp;{{ party_dict.party_type_name }}</h3>
+        <hr class="top">
+        {% for party_type in party_dict.party_type_objects %}
+            <div class="row v-offset-above-2">
+                {% with party=party_type.party %}
+                <div class="col-xs-5">
+                    <h4>{{ party.name }}</h4>
+                </div>
+                {% if party.attys_in_docket %}
+                <div class="col-xs-3">
+                    <p class="alt text-uppercase right representation">Represented&nbsp;by</p>
+                </div>
+                <div class="col-xs-4">
+                    {% for a in party.attys_in_docket %}
+                        <div class="v-offset-below-1">
+                        <h4 class="bottom">{{ a.name }}</h4>
+                        {% if a.phone or a.fax %}
+                            <p class="bottom">
+                                {% if a.phone %}
+                                    <i class="fa fa-phone gray"
+                                       title="Phone"></i>&nbsp;&nbsp;{{ a.phone }}<br>
+                                {% endif %}
+                                {% if a.fax %}
+                                    <i class="fa fa-fax gray"
+                                       title="Fax"></i>&nbsp;{{ a.fax }}<br>
+                                {% endif %}
+                            </p>
+                        {% endif %}
+                        {% for f in a.firms_in_docket %}
+                            <p>
+                                {% if f.name %}
+                                    {{ f.name }}<br>
+                                {% endif %}
+                                {% if f.address1 %}
+                                    {{ f.address1 }}<br>
+                                {% endif %}
+                                {% if f.address2 %}
+                                    {{ f.address2 }}<br>
+                                {% endif %}
+                                {% if f.city or f.state or f.zip_code %}
+                                    {{ f.city }},&nbsp;{{ f.state }}&nbsp;{{ f.zip_code }}
+                                {% endif %}
+                            </p>
+                        {% endfor %}
+                        </div>
+                    {% empty %}
+
+                        <p>Pro se / Unknown</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="clearfix"></div>
+                {% endwith %}
+            <p></p>
+            </div>
+        {% endfor %}
+    {% endfor %}
+</div>
 {% endblock %}
