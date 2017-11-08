@@ -27,7 +27,6 @@ from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
 from cl.people_db.models import Attorney, AttorneyOrganization
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
-from cl.opinion_page.sankey import make_sankey_json
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
@@ -89,7 +88,6 @@ def view_docket(request, pk, slug):
 def view_parties(request, docket_id, slug):
     """Show the parties and attorneys tab on the docket."""
     docket = get_object_or_404(Docket, pk=docket_id, slug=slug)
-    sankey_data = []
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
     # which reduces the number of queries needed for this down to four instead
@@ -115,16 +113,9 @@ def view_parties(request, docket_id, slug):
             'party_type_name': party_type_name,
             'party_type_objects': party_types
         })
-        sankey_data.append({
-            'party_type_name': party_type_name,
-            'json': make_sankey_json(party_types)
-        })
-
-    sankey_json = json.dumps(sankey_data, indent=2 if settings.DEBUG else 0)
 
     return render(request, 'docket_parties.html', {
         'docket': docket,
-        'sankey_json': sankey_json,
         'parties': parties,
         'private': docket.blocked,
     })

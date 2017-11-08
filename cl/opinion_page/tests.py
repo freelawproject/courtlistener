@@ -7,7 +7,6 @@ from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND, \
 from cl.lib import sunburnt
 from cl.lib.test_helpers import SitemapTest
 from cl.sitemap import make_sitemap_solr_params
-from cl.opinion_page.sankey import add_and_link_node
 
 
 class ViewDocumentTest(TestCase):
@@ -111,54 +110,3 @@ class OpinionSitemapTest(SitemapTest):
         # Class attributes are set, just run the test in super.
         self.expected_item_count = self.get_expected_item_count()
         super(OpinionSitemapTest, self).does_the_sitemap_have_content()
-
-
-class TestSankeyDiagramUtils(TestCase):
-    """Test that we can do the right things when generating Sankey diagrams"""
-
-    def setUp(self):
-        self.nodes = []
-        self.links = []
-        self.simple_party = {
-            'type': 'party',
-            'name': 'Mmmmm......pizza!',
-            'id': 2,
-        }
-        self.simple_atty = {
-            'type': 'attorney',
-            'name': 'Bing Crosby',
-            'id': 3,
-        }
-
-    def test_add_link_node_type_is_party(self):
-        """When the type is party, do we simply add the node?"""
-        add_and_link_node(self.nodes, self.links, None, self.simple_party)
-        expected_node_count = 1
-        expected_link_count = 0
-        self.assertEqual(len(self.nodes), expected_node_count)
-        self.assertEqual(len(self.links), expected_link_count)
-
-    def test_add_atty_twice_only_adds_one_atty(self):
-        """If we add the same attorney twice, does it get merged?"""
-        party_location = add_and_link_node(self.nodes, self.links, None,
-                                           self.simple_party)
-        atty_location1 = add_and_link_node(self.nodes, self.links,
-                                           party_location, self.simple_atty)
-        expected_node_count = 2
-        expected_link_count = 1
-        self.assertEqual(len(self.nodes), expected_node_count)
-        self.assertEqual(len(self.links), expected_link_count)
-
-        # Add another party, but they have same atty
-        self.simple_party.update({'name': 'taco'})
-        party_location = add_and_link_node(self.nodes, self.links, None,
-                                           self.simple_party)
-        atty_location2 = add_and_link_node(self.nodes, self.links,
-                                           party_location, self.simple_atty)
-        expected_node_count = 3
-        expected_link_count = 2
-        self.assertEqual(atty_location1, atty_location2)
-        self.assertEqual(len(self.nodes), expected_node_count)
-        self.assertEqual(len(self.links), expected_link_count)
-
-
