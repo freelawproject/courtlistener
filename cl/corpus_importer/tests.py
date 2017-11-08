@@ -494,8 +494,8 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(floyd.roles.all().count(), self.NUM_FLOYD_ROLES)
         self.assertEqual(floyd.name, u'Floyd G. Short')
         self.assertEqual(floyd.email, u'fshort@susmangodfrey.com')
-        self.assertEqual(floyd.fax, u'206-516-3883')
-        self.assertEqual(floyd.phone, u'206-373-7381')
+        self.assertEqual(floyd.fax, u'(206) 516-3883')
+        self.assertEqual(floyd.phone, u'(206) 373-7381')
 
         godfrey_llp = floyd.organizations.all()[0]
         self.assertEqual(godfrey_llp.name, u'Susman Godfrey, LLP')

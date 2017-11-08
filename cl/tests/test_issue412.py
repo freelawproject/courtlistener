@@ -111,9 +111,15 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
             '%s%s' % (self.server_url, docket.get_absolute_url(),)
         )
 
-        # And sees a badge that lets her know it's blocked
-        sidebar = self.browser.find_element_by_id('sidebar')
-        self.assertNotIn(BLOCKED_MSG, sidebar.text)
+        # And does not see a badge indicating that it's blocked.
+        btns = self.browser.find_elements_by_css_selector('.btn.btn-danger')
+        expected_btn_count = 0
+        self.assertEqual(
+            len(btns),
+            expected_btn_count,
+            msg="Found button indicating the item is blocked, but user should "
+                "not have this access."
+        )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_admin_viewing_not_blocked_docket(self):
@@ -122,15 +128,15 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.browser.get(self.server_url)
         self.attempt_sign_in('admin', 'password')
 
-        # Pulls up a page for a Docket that is blocked to search engines
+        # Pulls up a page for a Docket that is not blocked to search engines
         docket = Docket.objects.get(pk=10)
         self.browser.get(
             '%s%s' % (self.server_url, docket.get_absolute_url(),)
         )
 
-        # And sees a badge that lets her know it's blocked
-        sidebar = self.browser.find_element_by_id('sidebar')
-        self.assertNotIn(BLOCKED_MSG, sidebar.text)
+        # And does not see a badge that lets her know it's blocked
+        btn = self.browser.find_element_by_css_selector('.btn.btn-success')
+        self.assertNotIn(BLOCKED_MSG, btn.text)
 
 
 class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
