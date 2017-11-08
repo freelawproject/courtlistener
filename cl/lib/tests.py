@@ -334,7 +334,7 @@ class TestPACERPartyParsing(TestCase):
                 'lookup_key': u'701westeighthavesuite1200anchoragelandyebennettblumsteinak99501',
             }, {
                 'email': u'brucem@lbblawyers.com',
-                'phone': u'907-276-5152',
+                'phone': u'(907) 276-5152',
                 'fax': u'',
             })
         }, {
@@ -351,7 +351,7 @@ class TestPACERPartyParsing(TestCase):
                 'zip_code': u'23218-2188',
                 'lookup_key': u'pobox2188richmondsandsandersonva232182188',
             }, {
-                'phone': u'804648-1636',
+                'phone': u'(804) 648-1636',
                 'fax': u'',
                 'email': u'',
             })
@@ -369,7 +369,7 @@ class TestPACERPartyParsing(TestCase):
                 'zip_code': u'23218-2188',
                 'lookup_key': u'pobox2188richmondsandsandersonva232182188',
             }, {
-                'phone': u"804648-1636",
+                'phone': u"(804) 648-1636",
                 'fax': u'',
                 'email': u'',
             })
@@ -390,8 +390,8 @@ class TestPACERPartyParsing(TestCase):
                 'zip_code': u'98101',
                 'lookup_key': u'1201thirdavesuite3800seattlesusmangodfreywa98101',
             }, {
-                'phone': u'206-373-7381',
-                'fax': u'206-516-3883',
+                'phone': u'(206) 373-7381',
+                'fax': u'(206) 516-3883',
                 'email': u'fshort@susmangodfrey.com',
             })
         }, {
@@ -407,7 +407,7 @@ class TestPACERPartyParsing(TestCase):
                 'zip_code': u'43215',
                 'lookup_key': u'211elivingstonavecolumbusoh43215',
             }, {
-                'phone': u'614228-3727',
+                'phone': u'(614) 228-3727',
                 'email': u'',
                 'fax': u'',
             }),
@@ -428,8 +428,8 @@ class TestPACERPartyParsing(TestCase):
                 'zip_code': u'25301',
                 'lookup_key': u'1018kanawhablvde1200blvdtowercharlestonwv25301',
             }, {
-                'phone': '304342-3174',
-                'fax': '304342-0448',
+                'phone': '(304) 342-3174',
+                'fax': '(304) 342-0448',
                 'email': 'caglelaw@aol.com',
             })
         }, {
@@ -449,7 +449,7 @@ class TestPACERPartyParsing(TestCase):
                 'zip_code': u'80203',
                 'lookup_key': u'303e17thavesuite300denverco80203',
             }, {
-                'phone': u'303-861-1764',
+                'phone': u'(303) 861-1764',
                 'fax': u'',
                 'email': u'jeff@dyerberens.com',
             })
@@ -472,7 +472,7 @@ class TestPACERPartyParsing(TestCase):
                 'lookup_key': u'106southmentorave150pasadenaguerrinilawfirmca91106',
             }, {
                 'phone': u'',
-                'fax': u'626-229-9615',
+                'fax': u'(626) 229-9615',
                 'email': u'guerrini@guerrinilaw.com',
             })
         }, {
@@ -505,7 +505,7 @@ class TestPACERPartyParsing(TestCase):
                     Email: darden@carverdarden.com
                 """,
             'a': ({}, {
-                'phone': u'504-585-3800',
+                'phone': u'(504) 585-3800',
                 'email': u'darden@carverdarden.com',
                 'fax': u'',
             })
@@ -544,8 +544,8 @@ class TestPACERPartyParsing(TestCase):
                 'state': u'',
                 'zip_code': u'19087'
             }, {
-                'phone': u'610667-7706',
-                'fax': u'610667-7056',
+                'phone': u'(610) 667-7706',
+                'fax': u'(610) 667-7056',
                 'email': u'jneumann@ktmc.com'
             })
         }]

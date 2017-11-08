@@ -685,6 +685,15 @@ def normalize_attorney_role(r):
         return role
 
 
+def normalize_us_phone_number(phone):
+    """Tidy up phone numbers so they're nice."""
+    phone = re.sub('(\(|\)|\s+)', '', phone)
+    m = phone_digits_re.search(phone)
+    if m:
+        return '(%s) %s-%s' % (m.group(1), m.group(2), m.group(3))
+    return ''
+
+
 def normalize_us_state(state):
     """Convert state values to valid state postal abbreviations
 
@@ -812,12 +821,12 @@ def normalize_attorney_contact(c, fallback_name=''):
             clean_line = re.sub('Fax:', '', clean_line)
             m = phone_digits_re.search(clean_line)
             if m:
-                atty_info['fax'] = clean_line
+                atty_info['fax'] = normalize_us_phone_number(clean_line)
             continue
         else:
             m = phone_digits_re.search(clean_line)
             if m:
-                atty_info['phone'] = clean_line
+                atty_info['phone'] = normalize_us_phone_number(clean_line)
                 continue
 
         # First line containing an ampersand? These are usually law firm names.
