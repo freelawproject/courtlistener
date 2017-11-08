@@ -76,6 +76,7 @@ def view_docket(request, pk, slug):
 
     return render(request, 'view_docket.html', {
         'docket': docket,
+        'parties': docket.parties.exists(),  # Needed to show/hide parties tab.
         'docket_entries': docket_entries,
         'form': form,
         'favorite_form': favorite_form,
