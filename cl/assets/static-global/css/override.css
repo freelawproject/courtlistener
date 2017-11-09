@@ -250,25 +250,6 @@ div.hopscotch-bubble .hopscotch-bubble-content {
     margin: 0;
 }
 
-.settings-nav-item a,
-.settings-nav-item a:hover,
-.settings-nav-item a:active,
-.settings-nav-item a:focus {
-    color: black;
-}
-
-.settings-nav-item {
-    margin-right: 1em;
-}
-
-.settings-nav-item:last-child {
-    margin-right: 0;
-}
-
-.settings-nav-item.active {
-    font-weight: bold;
-}
-
 /* General class shortcuts */
 .inline {
     display: inline;
@@ -291,6 +272,13 @@ div.hopscotch-bubble .hopscotch-bubble-content {
 .no-underline:active,
 .no-underline:focus {
     text-decoration: none;
+}
+
+a.black-link,
+a.black-link:hover,
+a.black-link:active,
+a.black-link:focus {
+    color: #333333;
 }
 
 .gray, .grey {

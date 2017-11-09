@@ -79,7 +79,9 @@
            data-toggle="modal"
            data-target="#modal-save-favorite, #modal-logged-out"
            title="{% if favorite_form.instance.recap_doc_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
-        <h2 class="inline">{{ document.docket_entry.docket|best_case_name|safe|v_wrapper }}</h2>
+        <h2 class="inline"><a
+                href="{{ document.docket_entry.docket.get_absolute_url }}"
+                class="no-underline black-link">{{ document.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
         {% include "includes/favorites_modal.html" %}
 
         <h3>
