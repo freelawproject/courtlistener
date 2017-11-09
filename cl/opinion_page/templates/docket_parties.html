@@ -23,27 +23,28 @@
                 <div class="col-xs-5">
                     <h4>{{ party.name }}</h4>
                 </div>
-                {% if party.attys_in_docket %}
+                {% regroup party_type.party.roles.all by attorney as attorney_list %}
+                {% if attorney_list %}
                 <div class="col-xs-3">
                     <p class="alt text-uppercase right representation">Represented&nbsp;by</p>
                 </div>
                 <div class="col-xs-4">
-                    {% for a in party.attys_in_docket %}
+                    {% for a in attorney_list %}
                         <div class="v-offset-below-1">
-                        <h4 class="bottom">{{ a.name }}</h4>
-                        {% if a.phone or a.fax %}
+                        <h4 class="bottom">{{ a.grouper.name }}</h4>
+                        {% if a.grouper.phone or a.grouper.fax %}
                             <p class="bottom">
-                                {% if a.phone %}
+                                {% if a.grouper.phone %}
                                     <i class="fa fa-phone gray"
-                                       title="Phone"></i>&nbsp;&nbsp;{{ a.phone }}<br>
+                                       title="Phone"></i>&nbsp;&nbsp;{{ a.grouper.phone }}<br>
                                 {% endif %}
-                                {% if a.fax %}
+                                {% if a.grouper.fax %}
                                     <i class="fa fa-fax gray"
-                                       title="Fax"></i>&nbsp;{{ a.fax }}<br>
+                                       title="Fax"></i>&nbsp;{{ a.grouper.fax }}<br>
                                 {% endif %}
                             </p>
                         {% endif %}
-                        {% for f in a.firms_in_docket %}
+                        {% for f in a.grouper.firms_in_docket %}
                             <p class="bottom">
                                 {% if f.name %}
                                     {{ f.name }}<br>
@@ -59,12 +60,12 @@
                                 {% endif %}
                             </p>
                         {% endfor %}
-                        {% for r in a.roles_in_docket %}
-                            {% ifequal r.party_id party.pk %}
-                                <p class="bottom"><em>
-                                    {{  r.get_role_display }}&nbsp;{% if r.date_action %}({{ r.date_action }}){% endif %}<br>
-                                </em></p>
-                            {% endifequal %}
+                        {% for role in a.list %}
+                            {% if role.role != role.UNKNOWN %}
+                            <p class="bottom"><em>
+                                {{  role.get_role_display }}&nbsp;{% if role.date_action %}({{ role.date_action }}){% endif %}<br>
+                            </em></p>
+                            {% endif %}
                         {% endfor %}
                         </div>
                     {% endfor %}
