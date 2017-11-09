@@ -15,6 +15,10 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     queryset = ProcessingQueue.objects.all()
     serializer_class = ProcessingQueueSerializer
 
+    ordering_fields = (
+        'date_created', 'date_modified',
+    )
+
     def perform_create(self, serializer):
         pq = serializer.save(uploader=self.request.user)
         process_recap_upload(pq)
