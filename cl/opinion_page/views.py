@@ -25,7 +25,7 @@ from cl.lib.import_lib import map_citations_to_models
 from cl.lib.model_helpers import suppress_autotime
 from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
-from cl.people_db.models import Attorney, AttorneyOrganization
+from cl.people_db.models import Attorney, AttorneyOrganization, Role
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
@@ -99,6 +99,13 @@ def view_parties(request, docket_id, slug):
                      roles__docket=docket
                  ).distinct().order_by('name'),
                  to_attr='attys_in_docket'),
+        Prefetch('party__attys_in_docket__roles',
+                 queryset=Role.objects.filter(
+                     docket=docket,
+                 ).exclude(
+                     role=Role.UNKNOWN,
+                 ).distinct().order_by('role', 'date_action'),
+                 to_attr='roles_in_docket'),
         Prefetch('party__attys_in_docket__organizations',
                  queryset=AttorneyOrganization.objects.filter(
                      attorney_organization_associations__docket=docket

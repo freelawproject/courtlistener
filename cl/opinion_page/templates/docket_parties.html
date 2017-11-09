@@ -44,7 +44,7 @@
                             </p>
                         {% endif %}
                         {% for f in a.firms_in_docket %}
-                            <p>
+                            <p class="bottom">
                                 {% if f.name %}
                                     {{ f.name }}<br>
                                 {% endif %}
@@ -59,16 +59,19 @@
                                 {% endif %}
                             </p>
                         {% endfor %}
+                        {% for r in a.roles_in_docket %}
+                            {% ifequal r.party_id party.pk %}
+                                <p class="bottom"><em>
+                                    {{  r.get_role_display }}&nbsp;{% if r.date_action %}({{ r.date_action }}){% endif %}<br>
+                                </em></p>
+                            {% endifequal %}
+                        {% endfor %}
                         </div>
-                    {% empty %}
-
-                        <p>Pro se / Unknown</p>
                     {% endfor %}
                 </div>
                 {% endif %}
                 <div class="clearfix"></div>
                 {% endwith %}
-            <p></p>
             </div>
         {% endfor %}
     {% endfor %}
