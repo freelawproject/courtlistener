@@ -162,14 +162,11 @@ class ProcessingQueueApiFilterTest(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=token)
         self.path = reverse('processingqueue-list',
                             kwargs={'version': 'v3'})
-
-    def test_status_filters(self):
-        """Can we filter by the status filters?"""
-        # Create two PQ objects with different statuses.
+        # Set up for making PQ objects.
         filename = 'file.pdf'
         file_content = b"file content more content"
         f = SimpleUploadedFile(filename, file_content)
-        params = {
+        self.params = {
             'court_id': 'scotus',
             'uploader': self.user,
             'pacer_case_id': 'asdf',
@@ -179,22 +176,34 @@ class ProcessingQueueApiFilterTest(TestCase):
             'status': ProcessingQueue.AWAITING_PROCESSING,
             'upload_type': ProcessingQueue.PDF,
         }
-        ProcessingQueue.objects.create(**params)
-        params['status'] = ProcessingQueue.PROCESSING_FAILED
-        ProcessingQueue.objects.create(**params)
+
+    def test_filters(self):
+        """Can we filter with the status and upload_type filters?"""
+        # Create two PQ objects with different values.
+        ProcessingQueue.objects.create(**self.params)
+        self.params['status'] = ProcessingQueue.PROCESSING_FAILED
+        self.params['upload_type'] = ProcessingQueue.ATTACHMENT_PAGE
+        ProcessingQueue.objects.create(**self.params)
 
         # Then try filtering.
-        r = self.client.get(self.path)
         total_number_results = 2
+        r = self.client.get(self.path)
         j = json.loads(r.content)
         self.assertEqual(j['count'], total_number_results)
 
-        r = self.client.get(self.path, {
-            'status': ProcessingQueue.AWAITING_PROCESSING
-        })
         total_awaiting_processing = 1
+        r = self.client.get(self.path, {
+            'status': ProcessingQueue.AWAITING_PROCESSING,
+        })
         j = json.loads(r.content)
         self.assertEqual(j['count'], total_awaiting_processing)
+
+        total_pdfs = 1
+        r = self.client.get(self.path, {
+            'upload_type': ProcessingQueue.PDF,
+        })
+        j = json.loads(r.content)
+        self.assertEqual(j['count'], total_pdfs)
 
 
 class DebugRecapUploadtest(TestCase):

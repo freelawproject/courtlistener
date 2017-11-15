@@ -8,4 +8,5 @@ class ProcessingQueueFilter(FilterSet):
         model = ProcessingQueue
         fields = {
             'status': ['exact', 'in'],
+            'upload_type': ['exact', 'in'],
         }
