@@ -154,6 +154,49 @@ class RecapUploadsTest(TestCase):
         mock.assert_called()
 
 
+class ProcessingQueueApiFilterTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.get(username='recap')
+        token = 'Token ' + self.user.auth_token.key
+        self.client.credentials(HTTP_AUTHORIZATION=token)
+        self.path = reverse('processingqueue-list',
+                            kwargs={'version': 'v3'})
+
+    def test_status_filters(self):
+        """Can we filter by the status filters?"""
+        # Create two PQ objects with different statuses.
+        filename = 'file.pdf'
+        file_content = b"file content more content"
+        f = SimpleUploadedFile(filename, file_content)
+        params = {
+            'court_id': 'scotus',
+            'uploader': self.user,
+            'pacer_case_id': 'asdf',
+            'pacer_doc_id': 'asdf',
+            'document_number': '1',
+            'filepath_local': f,
+            'status': ProcessingQueue.AWAITING_PROCESSING,
+            'upload_type': ProcessingQueue.PDF,
+        }
+        ProcessingQueue.objects.create(**params)
+        params['status'] = ProcessingQueue.PROCESSING_FAILED
+        ProcessingQueue.objects.create(**params)
+
+        # Then try filtering.
+        r = self.client.get(self.path)
+        total_number_results = 2
+        j = json.loads(r.content)
+        self.assertEqual(j['count'], total_number_results)
+
+        r = self.client.get(self.path, {
+            'status': ProcessingQueue.AWAITING_PROCESSING
+        })
+        total_awaiting_processing = 1
+        j = json.loads(r.content)
+        self.assertEqual(j['count'], total_awaiting_processing)
+
+
 class DebugRecapUploadtest(TestCase):
     """Test uploads with debug set to True. Do these uploads avoid causing
     problems?

@@ -4,6 +4,7 @@ from cl.api.utils import RECAPUploaders, LoggingMixin, RECAPUsersReadOnly, \
     BigPagination
 from cl.recap.api_serializers import ProcessingQueueSerializer, \
     PacerDocIdLookUpSerializer
+from cl.recap.filters import ProcessingQueueFilter
 from cl.recap.models import ProcessingQueue
 from cl.recap.tasks import process_recap_upload
 from cl.search.filters import RECAPDocumentFilter
@@ -14,7 +15,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     permission_classes = (RECAPUploaders,)
     queryset = ProcessingQueue.objects.all()
     serializer_class = ProcessingQueueSerializer
-
+    filter_class = ProcessingQueueFilter
     ordering_fields = (
         'date_created', 'date_modified',
     )
