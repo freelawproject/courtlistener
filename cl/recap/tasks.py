@@ -488,7 +488,6 @@ def process_recap_attachment(self, pk):
     try:
         rd = RECAPDocument.objects.get(
             pacer_doc_id=att_data['pacer_doc_id'],
-            document_number=att_data['document_number'],
             docket_entry__docket__court=pq.court,
         )
     except RECAPDocument.DoesNotExist as exc:
@@ -507,6 +506,9 @@ def process_recap_attachment(self, pk):
     # We got the right item. Update/create all the attachments for
     # the docket entry.
     de = rd.docket_entry
+    if att_data['document_number'] is None:
+        # Bankruptcy attachment page. Use the document number from the Main doc
+        att_data['document_number'] = rd.document_number
 
     if not pq.debug:
         # Save the old HTML to the docket entry.
