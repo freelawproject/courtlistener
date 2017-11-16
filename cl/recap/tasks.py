@@ -76,6 +76,12 @@ def process_recap_pdf(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     pq.status = pq.PROCESSING_IN_PROGRESS
     pq.save()
+
+    if pq.attachment_number is None:
+        document_type = RECAPDocument.PACER_DOCUMENT
+    else:
+        document_type = RECAPDocument.ATTACHMENT
+
     logger.info("Processing RECAP item (debug is: %s): %s " % (pq.debug, pq))
     try:
         if pq.pacer_case_id:
@@ -134,17 +140,27 @@ def process_recap_pdf(self, pk):
                     pq.status = pq.QUEUED_FOR_RETRY
                     pq.save()
                     raise self.retry(exc=exc)
-
-        # All objects accounted for. Make some data.
-        rd = RECAPDocument(
-            docket_entry=de,
-            pacer_doc_id=pq.pacer_doc_id,
-            date_upload=timezone.now(),
-        )
-        if pq.attachment_number is None:
-            rd.document_type = RECAPDocument.PACER_DOCUMENT
-        else:
-            rd.document_type = RECAPDocument.ATTACHMENT
+            else:
+                # If we're here, we've got the docket and docket entry, but
+                # were unable to find the document by pacer_doc_id. This happens
+                # when pacer_doc_id is missing, for example. ∴, try to get the
+                # document from the docket entry.
+                try:
+                    rd = RECAPDocument.objects.get(
+                        docket_entry=de,
+                        document_number=pq.document_number,
+                        attachment_number=pq.attachment_number,
+                        document_type=document_type,
+                    )
+                except (RECAPDocument.DoesNotExist,
+                        RECAPDocument.MultipleObjectsReturned):
+                    # Unable to find it. Make a new item.
+                    rd = RECAPDocument(
+                        docket_entry=de,
+                        pacer_doc_id=pq.pacer_doc_id,
+                        date_upload=timezone.now(),
+                        document_type=document_type,
+                    )
 
     rd.document_number = pq.document_number
     rd.attachment_number = pq.attachment_number
