@@ -530,12 +530,16 @@ def process_recap_attachment(self, pk):
                     docket_entry=de,
                     document_number=att_data['document_number'],
                     attachment_number=attachment['attachment_number'],
-                    pacer_doc_id=attachment['pacer_doc_id'],
                     document_type=RECAPDocument.ATTACHMENT,
                 )
-                if attachment['description']:
-                    rd.description = attachment['description']
+                needs_save = False
+                for field in ['description', 'pacer_doc_id']:
+                    if attachment[field]:
+                        setattr(rd, field, attachment[field])
+                        needs_save = True
+                if needs_save:
                     rd.save()
+
                 # Do *not* do this async — that can cause race conditions.
                 add_or_update_recap_document([rd.pk], force_commit=False)
 
