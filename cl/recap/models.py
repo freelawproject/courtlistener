@@ -174,7 +174,7 @@ class ProcessingQueue(models.Model):
                 self.get_upload_type_display(),
             )
         elif self.upload_type == self.PDF:
-            return u'ProcessingQueue %s: %s.%s.%s.%s (%s)' % (
+            return u'ProcessingQueue: %s: %s.%s.%s.%s (%s)' % (
                 self.pk,
                 self.court_id,
                 self.pacer_case_id or None,
@@ -183,7 +183,10 @@ class ProcessingQueue(models.Model):
                 self.get_upload_type_display(),
             )
         elif self.upload_type == self.ATTACHMENT_PAGE:
-            return u'ProcessingQueue (%s)' % self.get_upload_type_display()
+            return u'ProcessingQueue: %s (%s)' % (
+                self.pk,
+                self.get_upload_type_display(),
+            )
         else:
             raise NotImplementedError
 

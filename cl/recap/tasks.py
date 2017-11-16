@@ -521,7 +521,10 @@ def process_recap_attachment(self, pk):
         # Create/update the attachment items.
         for attachment in att_data['attachments']:
             if all([attachment['attachment_number'],
-                    attachment.get('pacer_doc_id', False),  # Missing on sealed items.
+                    # Missing on sealed items.
+                    attachment.get('pacer_doc_id', False),
+                    # Missing on some restricted docs (see Juriscraper)
+                    attachment['page_count'] is not None,
                     attachment['description']]):
                 rd, created = RECAPDocument.objects.update_or_create(
                     docket_entry=de,
