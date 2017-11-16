@@ -538,7 +538,12 @@ def process_recap_attachment(self, pk):
                         setattr(rd, field, attachment[field])
                         needs_save = True
                 if needs_save:
-                    rd.save()
+                    try:
+                        rd.save()
+                    except IntegrityError:
+                        # Happens when we hit courtlistener/issues#765, in which
+                        # we violate the unique constraint on pacer_doc_id.
+                        continue
 
                 # Do *not* do this async — that can cause race conditions.
                 add_or_update_recap_document([rd.pk], force_commit=False)
