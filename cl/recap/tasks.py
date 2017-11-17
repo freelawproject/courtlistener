@@ -193,7 +193,15 @@ def process_recap_pdf(self, pk):
         rd.ocr_status = None
 
     if not pq.debug:
-        rd.save()
+        try:
+            rd.save()
+        except IntegrityError:
+            msg = "Duplicate key on pacer_doc_id violates unique constraint"
+            logger.error(msg)
+            pq.error_message = msg
+            pq.status = pq.PROCESSING_FAILED
+            pq.save()
+            return None
 
     if not existing_document and not pq.debug:
         extract_recap_pdf(rd.pk)
