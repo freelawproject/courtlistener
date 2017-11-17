@@ -39,6 +39,8 @@ def process_recap_upload(pq):
         process_recap_attachment.delay(pq.pk)
     elif pq.upload_type == pq.PDF:
         process_recap_pdf.delay(pq.pk)
+    elif pq.upload_type == pq.DOCKET_HISTORY_REPORT:
+        process_recap_docket_history_report.delay(pq.pk)
 
 
 def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
@@ -581,3 +583,21 @@ def process_recap_attachment(self, pk):
                 add_or_update_recap_document([rd.pk], force_commit=False)
 
     mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
+
+
+@app.task(bind=True, max_retries=3, interval_start=5 * 60,
+          interval_step=5 * 60)
+def process_recap_docket_history_report(self, pk):
+    """Process the docket history report.
+
+    For now, this is a stub until we can get the parser working properly in
+    Juriscraper.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    msg = "Docket history reports not yet supported. Coming soon."
+    logger.error("Punting item. %s" % msg)
+    pq.error_message = msg
+    pq.status = pq.PROCESSING_FAILED
+    pq.save()
+    return None
+
