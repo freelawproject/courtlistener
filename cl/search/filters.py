@@ -1,7 +1,9 @@
 import rest_framework_filters as filters
 from rest_framework_filters import FilterSet
 
-from cl.api.utils import INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS
+from cl.api.utils import (
+    INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS, ALL_TEXT_LOOKUPS
+)
 from cl.search.models import (
     Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES,
     DocketEntry, RECAPDocument, Tag,
@@ -60,6 +62,7 @@ class DocketFilter(FilterSet):
             'date_terminated': DATE_LOOKUPS,
             'date_last_filing': DATE_LOOKUPS,
             'docket_number': ['exact', 'startswith'],
+            'nature_of_suit': ALL_TEXT_LOOKUPS,
             'pacer_case_id': ['exact'],
             'date_blocked': DATE_LOOKUPS,
             'blocked': ['exact'],
