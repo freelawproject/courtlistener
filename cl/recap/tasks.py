@@ -467,14 +467,22 @@ def process_recap_docket(pk):
                 document_number=docket_entry['document_number'],
             )
         except RECAPDocument.DoesNotExist:
-            RECAPDocument.objects.create(
-                docket_entry=de,
-                # No attachments when uploading dockets.
-                document_type=RECAPDocument.PACER_DOCUMENT,
-                document_number=docket_entry['document_number'],
-                pacer_doc_id=docket_entry['pacer_doc_id'],
-                is_available=False,
-            )
+            try:
+                RECAPDocument.objects.create(
+                    docket_entry=de,
+                    # No attachments when uploading dockets.
+                    document_type=RECAPDocument.PACER_DOCUMENT,
+                    document_number=docket_entry['document_number'],
+                    pacer_doc_id=docket_entry['pacer_doc_id'],
+                    is_available=False,
+                )
+            except IntegrityError:
+                logger.warn(
+                    "Creating new document with pacer_doc_id of '%s' violates "
+                    "unique constraint on pacer_doc_id field." %
+                    docket_entry['pacer_doc_id']
+                )
+                continue
         except RECAPDocument.MultipleObjectsReturned:
             logger.error(
                 "Multiple recap documents found for document entry number'%s' "
