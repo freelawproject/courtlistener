@@ -1,4 +1,3 @@
-import json
 from itertools import groupby
 
 from django.conf import settings
@@ -12,7 +11,6 @@ from django.shortcuts import get_object_or_404, render
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
-from ratelimit.decorators import ratelimit
 from rest_framework.status import HTTP_404_NOT_FOUND
 
 from cl.citations.find_citations import get_citations
@@ -23,14 +21,15 @@ from cl.lib import search_utils, sunburnt
 from cl.lib.bot_detector import is_bot
 from cl.lib.import_lib import map_citations_to_models
 from cl.lib.model_helpers import suppress_autotime
+from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
-from cl.people_db.models import Attorney, AttorneyOrganization, Role
+from cl.people_db.models import AttorneyOrganization, Role
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
-@ratelimit(key='ip', rate='100/h', block=True)
+@ratelimit_if_not_whitelisted
 def view_docket(request, pk, slug):
     docket = get_object_or_404(Docket, pk=pk, slug=slug)
     if not is_bot(request):
@@ -84,7 +83,7 @@ def view_docket(request, pk, slug):
     })
 
 
-@ratelimit(key='ip', rate='100/h', block=True)
+@ratelimit_if_not_whitelisted
 def view_parties(request, docket_id, slug):
     """Show the parties and attorneys tab on the docket."""
     docket = get_object_or_404(Docket, pk=docket_id, slug=slug)
@@ -123,7 +122,7 @@ def view_parties(request, docket_id, slug):
     })
 
 
-@ratelimit(key='ip', rate='100/h', block=True)
+@ratelimit_if_not_whitelisted
 def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
                         slug=''):
     """This view can either load an attachment or a regular document,
@@ -162,7 +161,7 @@ def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
 
 
 @never_cache
-@ratelimit(key='ip', rate='100/h', block=True)
+@ratelimit_if_not_whitelisted
 def view_opinion(request, pk, _):
     """Using the cluster ID, return the cluster of opinions.
 
@@ -222,7 +221,7 @@ def view_opinion(request, pk, _):
     })
 
 
-@ratelimit(key='ip', rate='100/h', block=True)
+@ratelimit_if_not_whitelisted
 def view_authorities(request, pk, slug):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
@@ -237,7 +236,7 @@ def view_authorities(request, pk, slug):
     })
 
 
-@ratelimit(key='ip', rate='100/h', block=True)
+@ratelimit_if_not_whitelisted
 def cluster_visualizations(request, pk, slug):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     return render(request, 'view_opinion_visualizations.html', {
