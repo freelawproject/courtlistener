@@ -397,33 +397,41 @@ def process_recap_docket(pk):
     docket_data = report.data
     logger.info("Parsing completed of item %s" % pq)
 
-    # Merge the contents of the docket into CL
-    try:
-        d = Docket.objects.get(
-            Q(pacer_case_id=pq.pacer_case_id) |
-            Q(docket_number=docket_data['docket_number']),
-            court_id=pq.court_id,
-        )
-        # Add RECAP as a source if it's not already.
-        if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
-            d.source = Docket.RECAP_AND_SCRAPER
-        elif d.source == Docket.COLUMBIA:
-            d.source = Docket.COLUMBIA_AND_RECAP
-        elif d.source == Docket.COLUMBIA_AND_SCRAPER:
-            d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
-    except Docket.DoesNotExist:
+    # Merge the contents of the docket into CL. Attempt several lookups of
+    # decreasing specificity.
+    d = None
+    for kwargs in [{'pacer_case_id': pq.pacer_case_id,
+                    'docket_number': docket_data['docket_number']},
+                   {'pacer_case_id': pq.pacer_case_id},
+                   {'docket_number': docket_data['docket_number']}]:
+        try:
+            d = Docket.objects.get(court_id=pq.court_id, **kwargs)
+            break
+        except Docket.DoesNotExist:
+            continue
+        except Docket.MultipleObjectsReturned:
+            msg = "Too many dockets found when trying to look up '%s'" % pq
+            logger.error(msg)
+            pq.error_message = msg
+            pq.status = pq.PROCESSING_FAILED
+            pq.save()
+            return None
+
+    if d is None:
+        # Couldn't find it. Make a new one.
         d = Docket(
             source=Docket.RECAP,
             pacer_case_id=pq.pacer_case_id,
             court_id=pq.court_id
         )
-    except Docket.MultipleObjectsReturned:
-        msg = "Too many dockets found when trying to look up '%s'" % pq
-        logger.error(msg)
-        pq.error_message = msg
-        pq.status = pq.PROCESSING_FAILED
-        pq.save()
-        return None
+
+    # Add RECAP as a source if it's not already.
+    if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
+        d.source = Docket.RECAP_AND_SCRAPER
+    elif d.source == Docket.COLUMBIA:
+        d.source = Docket.COLUMBIA_AND_RECAP
+    elif d.source == Docket.COLUMBIA_AND_SCRAPER:
+        d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
 
     update_docket_metadata(d, docket_data)
 
