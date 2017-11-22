@@ -406,6 +406,12 @@ def process_recap_docket(pk):
     docket_data = report.data
     logger.info("Parsing completed of item %s" % pq)
 
+    if docket_data == {}:
+        # Not really a docket. Some sort of invalid document (see Juriscraper).
+        msg = "Not a valid docket upload."
+        mark_pq_status(pq, msg, pq.INVALID_CONTENT)
+        return None
+
     # Merge the contents of the docket into CL. Attempt several lookups of
     # decreasing specificity.
     d = None

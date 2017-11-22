@@ -64,12 +64,14 @@ class ProcessingQueue(models.Model):
     PROCESSING_FAILED = 3
     PROCESSING_IN_PROGRESS = 4
     QUEUED_FOR_RETRY = 5
+    INVALID_CONTENT = 6
     PROCESSING_STATUSES = (
         (AWAITING_PROCESSING, 'Awaiting processing in queue.'),
         (PROCESSING_SUCCESSFUL, 'Item processed successfully.'),
         (PROCESSING_FAILED, 'Item encountered an error while processing.'),
         (PROCESSING_IN_PROGRESS, 'Item is currently being processed.'),
         (QUEUED_FOR_RETRY, 'Item failed processing, but will be retried.'),
+        (INVALID_CONTENT, 'Item failed validity tests.'),
     )
     DOCKET = 1
     ATTACHMENT_PAGE = 2
