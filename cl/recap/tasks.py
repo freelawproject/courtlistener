@@ -50,6 +50,7 @@ def process_recap_upload(pq):
 def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
     """Mark the processing queue item as successfully completed.
 
+    :param pq: The ProcessingQueue object to manipulate
     :param d_id: The docket PK to associate with this upload. Either the docket
     that the RECAPDocument is associated with, or the docket that was uploaded.
     :param de_id: The docket entry to associate with this upload. Only applies
@@ -70,6 +71,20 @@ def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
     pq.save()
 
 
+def mark_pq_status(pq, msg, status):
+    """Mark the processing queue item as some process, and log the message.
+
+    :param pq: The ProcessingQueue object to manipulate
+    :param msg: The message to log and to save to pq's error_message field.
+    :param status: A pq status code as defined on the ProcessingQueue model.
+    """
+    if msg:
+        logger.info(msg)
+    pq.error_message = msg
+    pq.status = status
+    pq.save()
+
+
 @app.task(bind=True, max_retries=2, interval_start=5 * 60,
           interval_step=10 * 60)
 def process_recap_pdf(self, pk):
@@ -80,8 +95,7 @@ def process_recap_pdf(self, pk):
     """
     """Save a RECAP PDF to the database."""
     pq = ProcessingQueue.objects.get(pk=pk)
-    pq.status = pq.PROCESSING_IN_PROGRESS
-    pq.save()
+    mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
 
     if pq.attachment_number is None:
         document_type = RECAPDocument.PACER_DOCUMENT
@@ -111,21 +125,16 @@ def process_recap_pdf(self, pk):
             # hasn't yet been processed).
             logger.warning("Unable to find docket for processing queue '%s'. "
                            "Retrying if max_retries is not exceeded." % pq)
-            pq.error_message = "Unable to find docket for item."
+            error_message = "Unable to find docket for item."
             if (self.request.retries == self.max_retries) or pq.debug:
-                pq.status = pq.PROCESSING_FAILED
-                pq.save()
+                mark_pq_status(pq, error_message, pq.PROCESSING_FAILED)
                 return None
             else:
-                pq.status = pq.QUEUED_FOR_RETRY
-                pq.save()
+                mark_pq_status(pq, error_message, pq.QUEUED_FOR_RETRY)
                 raise self.retry(exc=exc)
         except Docket.MultipleObjectsReturned:
             msg = "Too many dockets found when trying to save '%s'" % pq
-            logger.error(msg)
-            pq.error_message = msg
-            pq.status = pq.PROCESSING_FAILED
-            pq.save()
+            mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
             return None
         else:
             # Got the Docket, attempt to get/create the DocketEntry, and then
@@ -203,10 +212,7 @@ def process_recap_pdf(self, pk):
             rd.save()
         except IntegrityError:
             msg = "Duplicate key on pacer_doc_id violates unique constraint"
-            logger.error(msg)
-            pq.error_message = msg
-            pq.status = pq.PROCESSING_FAILED
-            pq.save()
+            mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
             return None
 
     if not existing_document and not pq.debug:
@@ -391,8 +397,7 @@ def process_recap_docket(pk):
     :return: The docket that's created or updated.
     """
     pq = ProcessingQueue.objects.get(pk=pk)
-    pq.status = pq.PROCESSING_IN_PROGRESS
-    pq.save()
+    mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
     report = DocketReport(map_cl_to_pacer_id(pq.court_id))
@@ -415,10 +420,7 @@ def process_recap_docket(pk):
             continue
         except Docket.MultipleObjectsReturned:
             msg = "Too many dockets found when trying to look up '%s'" % pq
-            logger.error(msg)
-            pq.error_message = msg
-            pq.status = pq.PROCESSING_FAILED
-            pq.save()
+            mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
             return None
 
     if d is None:
@@ -520,8 +522,7 @@ def process_recap_attachment(self, pk):
     :return: None
     """
     pq = ProcessingQueue.objects.get(pk=pk)
-    pq.status = pq.PROCESSING_IN_PROGRESS
-    pq.save()
+    mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
     att_page = AttachmentPage(map_cl_to_pacer_id(pq.court_id))
@@ -538,15 +539,11 @@ def process_recap_attachment(self, pk):
         )
     except RECAPDocument.DoesNotExist as exc:
         msg = "Could not find docket to associate with attachment metadata"
-        logger.error(msg)
-        pq.error_message = msg
         if (self.request.retries == self.max_retries) or pq.debug:
-            pq.status = pq.PROCESSING_FAILED
-            pq.save()
+            mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
             return None
         else:
-            pq.status = pq.QUEUED_FOR_RETRY
-            pq.save()
+            mark_pq_status(pq, msg, pq.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
     # We got the right item. Update/create all the attachments for
@@ -607,10 +604,7 @@ def process_recap_docket_history_report(self, pk):
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Docket history reports not yet supported. Coming soon."
-    logger.error("Punting item. %s" % msg)
-    pq.error_message = msg
-    pq.status = pq.PROCESSING_FAILED
-    pq.save()
+    mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
     return None
 
 
@@ -624,10 +618,7 @@ def process_recap_appellate_docket(self, pk):
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Appellate dockets not yet supported. Coming soon."
-    logger.error("Punting item. %s" % msg)
-    pq.error_message = msg
-    pq.status = pq.PROCESSING_FAILED
-    pq.save()
+    mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
     return None
 
 
@@ -641,8 +632,5 @@ def process_recap_appellate_attachment(self, pk):
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Appellate attachment pages not yet supported. Coming soon."
-    logger.error("Punting item. %s" % msg)
-    pq.error_message = msg
-    pq.status = pq.PROCESSING_FAILED
-    pq.save()
+    mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
     return None
