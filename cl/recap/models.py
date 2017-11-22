@@ -75,11 +75,15 @@ class ProcessingQueue(models.Model):
     ATTACHMENT_PAGE = 2
     PDF = 3
     DOCKET_HISTORY_REPORT = 4
+    APPELLATE_DOCKET = 5
+    APPELLATE_ATTACHMENT_PAGE = 6
     UPLOAD_TYPES = (
         (DOCKET, 'HTML Docket'),
         (ATTACHMENT_PAGE, 'HTML attachment page'),
         (PDF, 'PDF'),
         (DOCKET_HISTORY_REPORT, 'Docket history report'),
+        (APPELLATE_DOCKET, 'Appellate HTML docket'),
+        (APPELLATE_ATTACHMENT_PAGE, 'Appellate HTML attachment page'),
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",

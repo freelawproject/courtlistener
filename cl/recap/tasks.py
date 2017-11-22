@@ -41,6 +41,10 @@ def process_recap_upload(pq):
         process_recap_pdf.delay(pq.pk)
     elif pq.upload_type == pq.DOCKET_HISTORY_REPORT:
         process_recap_docket_history_report.delay(pq.pk)
+    elif pq.upload_type == pq.APPELLATE_DOCKET:
+        process_recap_appellate_docket.delay(pq.pk)
+    elif pq.upload_type == pq.APPELLATE_ATTACHMENT_PAGE:
+        process_recap_appellate_attachment.delay(pq.pk)
 
 
 def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
@@ -609,3 +613,36 @@ def process_recap_docket_history_report(self, pk):
     pq.save()
     return None
 
+
+@app.task(bind=True, max_retries=3, interval_start=5 * 60,
+          interval_step=5 * 60)
+def process_recap_appellate_docket(self, pk):
+    """Process the appellate docket.
+
+    For now, this is a stub until we can get the parser working properly in
+    Juriscraper.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    msg = "Appellate dockets not yet supported. Coming soon."
+    logger.error("Punting item. %s" % msg)
+    pq.error_message = msg
+    pq.status = pq.PROCESSING_FAILED
+    pq.save()
+    return None
+
+
+@app.task(bind=True, max_retries=3, interval_start=5 * 60,
+          interval_step=5 * 60)
+def process_recap_appellate_attachment(self, pk):
+    """Process the appellate attachment pages.
+
+    For now, this is a stub until we can get the parser working properly in
+    Juriscraper.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    msg = "Appellate attachment pages not yet supported. Coming soon."
+    logger.error("Punting item. %s" % msg)
+    pq.error_message = msg
+    pq.status = pq.PROCESSING_FAILED
+    pq.save()
+    return None
