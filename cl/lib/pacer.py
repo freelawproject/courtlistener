@@ -353,11 +353,13 @@ class PacerXMLParser(object):
         rd.date_upload = self.get_datetime_from_node(doc_node, 'upload_date')
         rd.document_type = document_type or rd.document_type
 
-        # If we can't parse the availability node (it returns None), default it
-        # to False.
-        availability = self.get_bool_from_node(doc_node, 'available')
-        rd.is_available = False if availability is None else availability
-        rd.sha1 = self.get_str_from_node(doc_node, 'sha1')
+        if not rd.is_available:
+            # If we can't parse the availability node (it returns None),
+            # default it to False.
+            availability = self.get_bool_from_node(doc_node, 'available')
+            rd.is_available = False if availability is None else availability
+        if not rd.sha1:
+            rd.sha1 = self.get_str_from_node(doc_node, 'sha1')
         rd.description = (self.get_str_from_node(doc_node, 'short_desc') or
                           rd.description)
         if rd.is_available:
