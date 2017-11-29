@@ -402,6 +402,16 @@ def process_recap_docket(pk):
 
     report = DocketReport(map_cl_to_pacer_id(pq.court_id))
     text = pq.filepath_local.read().decode('utf-8')
+
+    if 'History/Documents' in text:
+        # Prior to 1.1.8, we did not separate docket history reports into their
+        # own upload_type. Alas, we still have some old clients around, so we
+        # need to handle those clients here.
+        pq.upload_type = pq.DOCKET_HISTORY_REPORT
+        pq.save()
+        process_recap_docket_history_report(pk)
+        return None
+
     report._parse_text(text)
     docket_data = report.data
     logger.info("Parsing completed of item %s" % pq)
