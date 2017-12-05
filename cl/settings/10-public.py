@@ -370,7 +370,7 @@ MARKDOWN_DEUX_STYLES = {
 # SCDB #
 ########
 # SCOTUS cases after this date aren't expected to have SCDB data.
-SCDB_LATEST_CASE = datetime.datetime(2016, 6, 27)
+SCDB_LATEST_CASE = datetime.datetime(2017, 6, 26)
 
 
 ######################
