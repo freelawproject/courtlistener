@@ -221,8 +221,9 @@ class Command(VerboseCommand):
             self.set_if_falsy(*attribute_tuple)
 
         federal_ok = self.do_federal_citations(cluster, scdb_info)
-        scdb_ok = self.set_if_falsy(cluster, 'scdb_id', 'caseId')
-        lexis_ok = self.set_if_falsy(cluster, 'lexis_cite', 'lexisCite')
+        scdb_ok = self.set_if_falsy(cluster, 'scdb_id', scdb_info['caseId'])
+        lexis_ok = self.set_if_falsy(cluster, 'lexis_cite',
+                                     scdb_info['lexisCite'])
 
         if all([federal_ok, scdb_ok, lexis_ok]):
             logger.info("      Saving to database (or faking if debug=True)")
