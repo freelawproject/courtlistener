@@ -21,7 +21,7 @@ import string
 from datetime import datetime
 
 from django.core.management import CommandError
-from django.db.models import Q, force_bytes
+from django.db.models import Q, force_str
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import gen_diff_ratio
@@ -122,7 +122,7 @@ class Command(VerboseCommand):
                         attr=attribute,
                         obj_id=obj.pk,
                         new=new_value,
-                        current=force_bytes(current_value),
+                        current=force_str(current_value),
                     )
                 )
                 error = True
