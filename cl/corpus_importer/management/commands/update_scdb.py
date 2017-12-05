@@ -146,9 +146,8 @@ class Command(VerboseCommand):
         """
         save = True
         us_done, sct_done, led_done = False, False, False
-        us_ok, sct_ok, led_ok = False, False, False
+        us_ok, sct_ok, led_ok = True, True, True
         available_fields = []
-        error = False
         for field in ['federal_cite_one', 'federal_cite_two',
                       'federal_cite_three']:
             # Update the value in place (ie, replace the U.S. citation with a
