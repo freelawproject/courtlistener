@@ -99,7 +99,7 @@ class Command(VerboseCommand):
         error = False
         if all([does_not_currently_have_a_value, current_value_not_zero,
                 new_value_not_blank]):
-            logger.info("      Updating %s with %s." %
+            logger.info("Updating %s with %s." %
                         (attribute, new_value.encode('utf-8')))
             setattr(obj, attribute, new_value)
         else:
@@ -129,7 +129,7 @@ class Command(VerboseCommand):
                 error = True
             else:
                 # The values were the same.
-                logger.info("'%s' field unchanged -- old and new values were "  
+                logger.info("'%s' field unchanged -- old and new values were "
                             "the same: %s" % (attribute, new_value))
         return error
 
@@ -165,7 +165,7 @@ class Command(VerboseCommand):
                 error = self.set_if_falsy(cluster, field, scdb_info['ledCite'])
                 led_done = True
             else:
-                logger.warn("      WARNING: Fell through search for citation.")
+                logger.warn("WARNING: Fell through search for citation.")
                 save = False
         if error:
             save = False
@@ -173,7 +173,7 @@ class Command(VerboseCommand):
         num_undone_fields = sum([f for f in [us_done, sct_done, led_done] if
                                  f is False])
         if num_undone_fields > len(available_fields):
-            logger.warn("WARNING: More values were found than there were "   
+            logger.warn("WARNING: More values were found than there were "
                         "slots to put them in. Time to create "
                         "federal_cite_four?")
             save = False
@@ -226,13 +226,20 @@ class Command(VerboseCommand):
                                      scdb_info['lexisCite'])
 
         if all([federal_ok, scdb_ok, lexis_ok]):
-            logger.info("      Saving to database (or faking if debug=True)")
+            logger.info("Saving to database (or faking if debug=True)")
             if not self.debug:
                 cluster.docket.save()
                 cluster.save()
         else:
-            logger.info("      Item not saved due to collision or error. "
-                        "Please edit by hand.")
+            logger.info(
+                "Item not saved due to collision or error. Please edit by "
+                "hand: federal_ok: {federal}, scdb_ok: {scdb}, lexis_ok: "
+                "{lexis}".format(**{
+                    'federal': federal_ok,
+                    'scdb': scdb_ok,
+                    'lexis': lexis_ok,
+                })
+            )
 
     @staticmethod
     def winnow_by_docket_number(clusters, d):
@@ -299,7 +306,7 @@ class Command(VerboseCommand):
             ))
             logger.info('https://www.courtlistener.com%s' %
                         cluster.get_absolute_url())
-            logger.info('      %s' % cluster.case_name.encode('utf-8'))
+            logger.info('%s' % cluster.case_name.encode('utf-8'))
             if cluster.docket.docket_number:
                 logger.info(cluster.docket.docket_number.encode('utf-8'))
             logger.info(cluster.date_filed)
@@ -315,7 +322,7 @@ class Command(VerboseCommand):
             self.skipped_count += 1
             return clusters[0]
         else:
-            choice = raw_input('  Which item should we update? [0-%s] ' %
+            choice = raw_input('Which item should we update? [0-%s] ' %
                                (len(clusters) - 1))
 
             try:
@@ -368,7 +375,7 @@ class Command(VerboseCommand):
                 # None found by scdb_id. Try by citation number. Only do these
                 # lookups if there is a usCite value, as newer cases don't yet
                 # have citations.
-                logger.info("  Checking by federal_cite_one, _two, or "
+                logger.info("Checking by federal_cite_one, _two, or "
                             "_three...")
                 clusters = OpinionCluster.objects.filter(
                     Q(federal_cite_one=d['usCite']) |
@@ -383,7 +390,7 @@ class Command(VerboseCommand):
             # are ones that lack citations.
             if clusters.count() == 0:
                 # try by date and then winnow by docket number
-                logger.info("  Checking by date...")
+                logger.info("Checking by date...")
                 clusters = OpinionCluster.objects.filter(
                     date_filed=datetime.strptime(
                         d['dateDecision'], '%m/%d/%Y'
