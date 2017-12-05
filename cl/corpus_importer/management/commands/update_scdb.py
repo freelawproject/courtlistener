@@ -88,6 +88,8 @@ class Command(VerboseCommand):
     def set_if_falsy(obj, attribute, new_value):
         """Check if the value passed in is Falsy. If so, set it to the value of
         new_value.
+
+        return ok: Whether the item was set successfully
         """
         current_value = getattr(obj, attribute)
         if current_value is not None and isinstance(current_value, basestring):
@@ -96,7 +98,7 @@ class Command(VerboseCommand):
         does_not_currently_have_a_value = not current_value
         current_value_not_zero = current_value != 0
         new_value_not_blank = new_value.strip() != ''
-        error = False
+        ok = True
         if all([does_not_currently_have_a_value, current_value_not_zero,
                 new_value_not_blank]):
             logger.info("Updating %s with %s." %
@@ -126,12 +128,12 @@ class Command(VerboseCommand):
                         current=force_bytes(current_value),
                     )
                 )
-                error = True
+                ok = False
             else:
                 # The values were the same.
                 logger.info("'%s' field unchanged -- old and new values were "
                             "the same: %s" % (attribute, new_value))
-        return error
+        return ok
 
     def do_federal_citations(self, cluster, scdb_info):
         """
@@ -144,6 +146,7 @@ class Command(VerboseCommand):
         """
         save = True
         us_done, sct_done, led_done = False, False, False
+        us_ok, sct_ok, led_ok = False, False, False
         available_fields = []
         error = False
         for field in ['federal_cite_one', 'federal_cite_two',
@@ -156,18 +159,18 @@ class Command(VerboseCommand):
                 continue
 
             if "U.S." in value:
-                error = self.set_if_falsy(cluster, field, scdb_info['usCite'])
+                us_ok = self.set_if_falsy(cluster, field, scdb_info['usCite'])
                 us_done = True
             elif "S. Ct." in value:
-                error = self.set_if_falsy(cluster, field, scdb_info['sctCite'])
+                sct_ok = self.set_if_falsy(cluster, field, scdb_info['sctCite'])
                 sct_done = True
             elif "L. Ed." in value:
-                error = self.set_if_falsy(cluster, field, scdb_info['ledCite'])
+                led_ok = self.set_if_falsy(cluster, field, scdb_info['ledCite'])
                 led_done = True
             else:
                 logger.warn("WARNING: Fell through search for citation.")
                 save = False
-        if error:
+        if not all([us_ok, sct_ok, led_ok]):
             save = False
 
         num_undone_fields = sum([f for f in [us_done, sct_done, led_done] if
