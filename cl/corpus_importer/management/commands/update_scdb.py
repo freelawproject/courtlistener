@@ -211,10 +211,10 @@ class Command(VerboseCommand):
             path=cluster.get_absolute_url(),
         ))
         attribute_tuples = [
-            (cluster, 'scdb_votes_majority', 'majVotes'),
-            (cluster, 'scdb_votes_minority', 'minVotes'),
-            (cluster, 'scdb_decision_direction', 'decisionDirection'),
-            (cluster.docket, 'docket_number', 'docket'),
+            (cluster, 'scdb_votes_majority', scdb_info['majVotes']),
+            (cluster, 'scdb_votes_minority', scdb_info['minVotes']),
+            (cluster, 'scdb_decision_direction', scdb_info['decisionDirection']),
+            (cluster.docket, 'docket_number', scdb_info['docket']),
         ]
         for attribute_tuple in attribute_tuples:
             self.set_if_falsy(*attribute_tuple)
