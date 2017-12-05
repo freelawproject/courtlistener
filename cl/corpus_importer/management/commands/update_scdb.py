@@ -210,15 +210,15 @@ class Command(VerboseCommand):
             id=cluster.pk,
             path=cluster.get_absolute_url(),
         ))
-        attribute_pairs = [
-            ('scdb_votes_majority', 'majVotes'),
-            ('scdb_votes_minority', 'minVotes'),
-            ('scdb_decision_direction', 'decisionDirection'),
+        attribute_tuples = [
+            (cluster, 'scdb_votes_majority', 'majVotes'),
+            (cluster, 'scdb_votes_minority', 'minVotes'),
+            (cluster, 'scdb_decision_direction', 'decisionDirection'),
+            (cluster.docket, 'docket_number', 'docket'),
         ]
-        for attr, lookup_key in attribute_pairs:
-            self.set_if_falsy(cluster, attr, scdb_info[lookup_key])
+        for attribute_tuple in attribute_tuples:
+            self.set_if_falsy(*attribute_tuple)
 
-        self.set_if_falsy(cluster.docket, 'docket_number', scdb_info['docket'])
         federal_ok = self.do_federal_citations(cluster, scdb_info)
         scdb_ok = self.set_if_falsy(cluster, 'scdb_id', 'caseId')
         lexis_ok = self.set_if_falsy(cluster, 'lexis_cite', 'lexisCite')
@@ -345,80 +345,81 @@ class Command(VerboseCommand):
 
         If action_zero or action_many return None, no action is taken.
         """
-        with open(self.file) as f:
-            dialect = csv.Sniffer().sniff(f.read(1024))
-            f.seek(0)
-            reader = csv.DictReader(f, dialect=dialect)
-            for i, d in enumerate(reader):
-                # Iterate over every item, looking for matches in various ways.
-                if i < start_row:
-                    continue
-                logger.info("\nRow is: %s. ID is: %s (%s)" % (i, d['caseId'],
-                                                              d['caseName']))
+        f = open(self.file)
+        dialect = csv.Sniffer().sniff(f.read(1024))
+        f.seek(0)
+        reader = csv.DictReader(f, dialect=dialect)
+        for i, d in enumerate(reader):
+            # Iterate over every item, looking for matches in various ways.
+            if i < start_row:
+                continue
+            logger.info("\nRow is: %s. ID is: %s (%s)" % (i, d['caseId'],
+                                                          d['caseName']))
 
-                clusters = OpinionCluster.objects.none()
-                if len(clusters) == 0:
-                    logger.info("Checking scdb_id for SCDB field 'caseID'...")
-                    clusters = (OpinionCluster.objects
-                                .filter(scdb_id=d['caseId']))
+            clusters = OpinionCluster.objects.none()
+            if len(clusters) == 0:
+                logger.info("Checking scdb_id for SCDB field 'caseID'...")
+                clusters = (OpinionCluster.objects
+                            .filter(scdb_id=d['caseId']))
+                logger.info("%s matches found." % clusters.count())
+            if d['usCite'].strip() and clusters.count() == 0:
+                # None found by scdb_id. Try by citation number. Only do these
+                # lookups if there is a usCite value, as newer cases don't yet
+                # have citations.
+                logger.info("  Checking by federal_cite_one, _two, or "
+                            "_three...")
+                clusters = OpinionCluster.objects.filter(
+                    Q(federal_cite_one=d['usCite']) |
+                    Q(federal_cite_two=d['usCite']) |
+                    Q(federal_cite_three=d['usCite']),
+                    scdb_id='',
+                )
+                logger.info("%s matches found." % clusters.count())
+
+            # At this point, we need to start getting more experimental b/c
+            # the easy ways to find items did not work. Items matched here
+            # are ones that lack citations.
+            if clusters.count() == 0:
+                # try by date and then winnow by docket number
+                logger.info("  Checking by date...")
+                clusters = OpinionCluster.objects.filter(
+                    date_filed=datetime.strptime(
+                        d['dateDecision'], '%m/%d/%Y'
+                    ),
+                    docket__court_id='scotus',
+                    scdb_id='',
+                )
+                logger.info("%s matches found." % clusters.count())
+
+            if clusters.count() > 1:
+                if d['docket']:
+                    logger.info("Winnowing by docket number...")
+                    clusters = self.winnow_by_docket_number(clusters, d)
                     logger.info("%s matches found." % clusters.count())
-                if d['usCite'].strip():
-                    # Only do these lookups if there is in fact a usCite value.
-                    # Newer additions don't yet have citations.
-                    if clusters.count() == 0:
-                        # None found by scdb_id. Try by citation number
-                        logger.info("  Checking by federal_cite_one, _two, or "
-                                    "_three...")
-                        clusters = OpinionCluster.objects.filter(
-                            Q(federal_cite_one=d['usCite']) |
-                            Q(federal_cite_two=d['usCite']) |
-                            Q(federal_cite_three=d['usCite']),
-                            scdb_id='',
-                        )
-                        logger.info("%s matches found." % clusters.count())
-
-                # At this point, we need to start getting more experimental b/c
-                # the easy ways to find items did not work. Items matched here
-                # are ones that lack citations.
-                if clusters.count() == 0:
-                    # try by date and then winnow by docket number
-                    logger.info("  Checking by date...")
-                    clusters = OpinionCluster.objects.filter(
-                        date_filed=datetime.strptime(
-                            d['dateDecision'], '%m/%d/%Y'
-                        ),
-                        docket__court_id='scotus',
-                        scdb_id='',
-                    )
-                    logger.info("%s matches found." % clusters.count())
-
-                if clusters.count() > 1:
-                    if d['docket']:
-                        logger.info("Winnowing by docket number...")
-                        clusters = self.winnow_by_docket_number(clusters, d)
-                        logger.info("%s matches found." % clusters.count())
-                    else:
-                        logger.info("Cannot winnow by docket number -- there "
-                                    "isn't one.")
-
-                if clusters.count() > 1:
-                    logger.info("Winnowing by case name...")
-                    clusters = self.winnow_by_case_name(clusters, d)
-                    logger.info("%s matches found." % clusters.count())
-
-                # Searching complete, run actions.
-                if clusters.count() == 0:
-                    logger.info('No items found.')
-                    cluster = action_zero(d)
-                elif clusters.count() == 1:
-                    logger.info('Exactly one match found.')
-                    cluster = clusters[0]
                 else:
-                    logger.info('%s items found:' % clusters.count())
-                    cluster = action_many(clusters, d)
+                    logger.info("Cannot winnow by docket number -- there "
+                                "isn't one.")
 
-                if cluster is not None:
-                    action_one(cluster, d)
-                else:
-                    logger.info('OK. No changes will be made.')
+            if clusters.count() > 1:
+                logger.info("Winnowing by case name...")
+                clusters = self.winnow_by_case_name(clusters, d)
+                logger.info("%s matches found." % clusters.count())
+
+            # Searching complete, run actions.
+            if clusters.count() == 0:
+                logger.info('No items found.')
+                cluster = action_zero(d)
+            elif clusters.count() == 1:
+                logger.info('Exactly one match found.')
+                cluster = clusters[0]
+            else:
+                logger.info('%s items found:' % clusters.count())
+                cluster = action_many(clusters, d)
+
+            if cluster is not None:
+                action_one(cluster, d)
+            else:
+                logger.info('OK. No changes will be made.')
+
+        f.close()
 
