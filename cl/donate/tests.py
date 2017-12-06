@@ -1,3 +1,4 @@
+# coding=utf-8
 import json
 import stripe
 
@@ -8,6 +9,7 @@ from django.core import mail
 from django.core.urlresolvers import reverse
 from django.test import Client, TestCase
 from django.utils.timezone import now
+from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
 
 from cl.donate.management.commands.cl_send_donation_reminders import Command
 from cl.donate.models import Donation
@@ -73,7 +75,7 @@ class DonationFormSubmissionTest(TestCase):
             self.params,
             follow=True,
         )
-        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
     def test_paypal_with_regular_value_as_anonymous(self):
         """Can a stripe donation go through using the "Other" field?"""
@@ -85,7 +87,7 @@ class DonationFormSubmissionTest(TestCase):
             self.params,
             follow=True,
         )
-        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
 
 @skipIf(settings.STRIPE_SECRET_KEY is None or settings.STRIPE_SECRET_KEY == '',
@@ -153,7 +155,7 @@ class StripeTest(TestCase):
                              content_type='application/json')
 
         # Does it return properly?
-        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.status_code, HTTP_200_OK)
 
     def test_making_a_donation_and_getting_the_callback(self):
         """These two tests must live together because they need to be done
@@ -167,7 +169,7 @@ class StripeTest(TestCase):
             amount='25',
         )
 
-        self.assertEqual(r.status_code, 302)  # 302 (redirect after a post)
+        self.assertEqual(r.status_code, HTTP_302_FOUND)  # redirect after a post
         self.assertEventPostsCorrectly(token)
 
     def test_making_a_donation_with_a_bad_card(self):
@@ -192,5 +194,15 @@ class StripeTest(TestCase):
             amount='other',
             amount_other='10.00',
         )
-        self.assertEqual(r.status_code, 302)  # 302 (redirect after a post)
+        self.assertEqual(r.status_code, HTTP_302_FOUND)  # redirect after a post
         self.assertEventPostsCorrectly(token)
+
+    def test_making_a_donation_that_is_too_small(self):
+        """Donations less than 50¢ are no good."""
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        token, r = self.make_a_donation(
+            stripe_test_numbers['good']['visa'],
+            amount='other',
+            amount_other='0.40',
+        )
+        self.assertEqual(r.status_code, HTTP_200_OK)

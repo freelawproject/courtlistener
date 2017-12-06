@@ -99,8 +99,16 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
         logger.warn("Stripe was unable to process the payment: %s" % e)
         response = {
             'message': 'Oops, we had a problem processing your card: '
-                       '<strong>%s</strong>' %
-                       e.json_body['error']['message'],
+                       '<strong>%s</strong>' % e.json_body['error']['message'],
+            'status': Donation.UNKNOWN_ERROR,
+            'payment_id': None,
+            'redirect': None,
+        }
+    except stripe.error.InvalidRequestError as e:
+        logger.warn("Stripe was unable to process the payment: %s" % e)
+        response = {
+            'message': 'Oops, we had an error with your donation: '
+                       '<strong>%s</strong>' % e.json_body['error']['message'],
             'status': Donation.UNKNOWN_ERROR,
             'payment_id': None,
             'redirect': None,
