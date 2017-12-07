@@ -673,8 +673,11 @@ class RECAPDocument(models.Model):
         from cl.lib.pacer import map_cl_to_pacer_id
         if self.pacer_doc_id:
             court_id = map_cl_to_pacer_id(self.docket_entry.docket.court_id)
-            return "https://ecf.%s.uscourts.gov/doc1/%s" % (
-                court_id, self.pacer_doc_id)
+            return "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s" % (
+                court_id,
+                self.pacer_doc_id,
+                self.docket_entry.docket.pacer_case_id,
+            )
         else:
             return self.docket_entry.docket.pacer_url
 
