@@ -671,15 +671,26 @@ class RECAPDocument(models.Model):
     def pacer_url(self):
         """Construct a doc1 URL for any item, if we can. Else, return None."""
         from cl.lib.pacer import map_cl_to_pacer_id
+        court_id = map_cl_to_pacer_id(self.docket_entry.docket.court_id)
         if self.pacer_doc_id:
-            court_id = map_cl_to_pacer_id(self.docket_entry.docket.court_id)
             return "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s" % (
                 court_id,
                 self.pacer_doc_id,
                 self.docket_entry.docket.pacer_case_id,
             )
         else:
-            return self.docket_entry.docket.pacer_url
+            attachment_number = self.attachment_number or ''
+            return ('https://ecf.{court_id}.uscourts.gov/cgi-bin/show_case_doc?'
+                    '{document_number},'
+                    '{pacer_case_id},'
+                    '{attachment_number},'
+                    '{magic_number},'.format(
+                        court_id=court_id,
+                        document_number=self.document_number,
+                        pacer_case_id=self.docket_entry.docket.pacer_case_id,
+                        attachment_number=attachment_number,
+                        magic_number='',  # For future use.
+                    ))
 
     @property
     def needs_extraction(self):

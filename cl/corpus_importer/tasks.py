@@ -790,7 +790,7 @@ def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, session):
         rd.pacer_doc_id = pacer_doc_id
         try:
             rd.save()
-            logger.info("Successfully saved pacer_doc_id to %s" % rd_pk)
+            logger.info("Successfully saved pacer_doc_id to rd %s" % rd_pk)
         except IntegrityError:
             logger.error("Unable to save pacer_doc_id due to Integrity error "
                          "on '%s': %s" % (pacer_doc_id, rd))
