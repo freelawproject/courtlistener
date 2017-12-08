@@ -13,9 +13,10 @@ from django.db import IntegrityError, transaction, DatabaseError
 from django.db.models import Q
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
+from juriscraper.lib.exceptions import ParsingException
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import FreeOpinionReport, PossibleCaseNumberApi, \
-    DocketReport, AttachmentPage
+    DocketReport, AttachmentPage, ShowCaseDocApi
 from pyexpat import ExpatError
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
@@ -749,3 +750,47 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
     rd.save(do_extraction=False, index=False)
     extract_recap_pdf(rd.pk, skip_ocr=True)
     add_or_update_recap_document([rd.pk])
+
+
+@app.task(bind=True, max_retries=15, interval_start=5,
+          interval_step=5, ignore_result=True)
+def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, session):
+    """use the show_case_doc URL to get pacer_doc_id values."""
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    d = rd.docket_entry.docket
+    pacer_court_id = map_cl_to_pacer_id(d.court_id)
+    report = ShowCaseDocApi(pacer_court_id, session)
+    try:
+        if rd.document_type == rd.ATTACHMENT:
+            report.query(d.pacer_case_id, rd.document_number,
+                         rd.attachment_number)
+        else:
+            report.query(d.pacer_case_id, rd.document_number)
+    except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
+            ChunkedEncodingError) as exc:
+        logger.warning("Unable to get PDF for %s" % rd)
+        raise self.retry(exc=exc)
+    except HTTPError as exc:
+        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
+                                        HTTP_504_GATEWAY_TIMEOUT]:
+            logger.warning("Ran into HTTPError: %s. Retrying." %
+                           exc.response.status_code)
+            raise self.retry(exc)
+        else:
+            msg = "Ran into unknown HTTPError. %s. Aborting." % \
+                  exc.response.status_code
+            logger.error(msg)
+            return
+    try:
+        pacer_doc_id = report.data
+    except ParsingException:
+        logger.error("Unable to get redirect for %s" % rd)
+        return
+    else:
+        rd.pacer_doc_id = pacer_doc_id
+        try:
+            rd.save()
+            logger.info("Successfully saved pacer_doc_id to %s" % rd_pk)
+        except IntegrityError:
+            logger.error("Unable to save pacer_doc_id due to Integrity error "
+                         "on '%s': %s" % (pacer_doc_id, rd))
