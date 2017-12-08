@@ -33,7 +33,7 @@ djangorestframework-xml==1.3.0
 docutils==0.12
 drf-dynamic-fields
 enum34==1.1.2
-eyeD3==0.7.8
+eyeD3==0.7.11
 feedparser==5.2.1
 geonamescache==0.20
 google-cloud-storage==1.6.0
