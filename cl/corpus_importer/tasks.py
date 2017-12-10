@@ -760,6 +760,7 @@ def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, session):
     d = rd.docket_entry.docket
     pacer_court_id = map_cl_to_pacer_id(d.court_id)
     report = ShowCaseDocApi(pacer_court_id, session)
+    last_try = (self.request.retries == self.max_retries)
     try:
         if rd.document_type == rd.ATTACHMENT:
             report.query(d.pacer_case_id, rd.document_number,
@@ -769,13 +770,21 @@ def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, session):
     except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
             ChunkedEncodingError) as exc:
         logger.warning("Unable to get PDF for %s" % rd)
-        raise self.retry(exc=exc)
+        if last_try:
+            return
+        else:
+            raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
                                         HTTP_504_GATEWAY_TIMEOUT]:
-            logger.warning("Ran into HTTPError: %s. Retrying." %
-                           exc.response.status_code)
-            raise self.retry(exc)
+            if last_try:
+                logger.error("Ran into repeated HTTPErrors. No more retries. "
+                             "Aborting.")
+                return
+            else:
+                logger.warning("Ran into HTTPError: %s. Retrying." %
+                               exc.response.status_code)
+                raise self.retry(exc)
         else:
             msg = "Ran into unknown HTTPError. %s. Aborting." % \
                   exc.response.status_code
