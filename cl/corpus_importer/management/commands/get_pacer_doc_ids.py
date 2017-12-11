@@ -23,16 +23,19 @@ def get_pacer_doc_ids(options):
         docket_entry__docket__pacer_case_id=None
     ).exclude(
         docket_entry__docket__court__jurisdiction__in=Court.BANKRUPTCY_JURISDICTIONS,
-    ).order_by().values_list('pk', flat=True)
+    ).order_by('pk').values_list('pk', flat=True)
     for i, row_pk in enumerate(row_pks):
         if i >= options['count'] > 0:
             break
+        if row_pk < options['start_pk'] > 0:
+            continue
         throttle.maybe_wait()
         if i % 1000 == 0:
             session = PacerSession(username=PACER_USERNAME,
                                    password=PACER_PASSWORD)
             session.login()
-            logger.info("Sent %s tasks to celery so far." % i)
+            logger.info("Sent %s tasks to celery so far. Latest pk: %s" %
+                        (i, row_pk))
         get_pacer_doc_id_with_show_case_doc_url.apply_async(
             args=(row_pk, session),
             queue=q,
@@ -53,6 +56,13 @@ class Command(VerboseCommand):
             type=int,
             default=0,
             help="The number of items to do. Default is to do all of them.",
+        )
+        parser.add_argument(
+            '--start-pk',
+            type=int,
+            default=0,
+            help="Skip any primary keys lower than this value. (Useful for "
+                 "restarts.)",
         )
 
     def handle(self, *args, **options):
