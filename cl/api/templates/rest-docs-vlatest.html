@@ -613,8 +613,12 @@
         <p>The following parameters apply to all uploads:</p>
         <ul>
             <li><p><code>upload_type</code> <em>(required)</em>: Accepted values for this parameter are:
-                <code>1</code> for dockets, <code>2</code> for attachment pages,
-                and <code>3</code> for PDFs.
+                <code>1</code> for (district court) dockets,
+		<code>2</code> for (district court) attachment pages,
+                <code>3</code> for PDFs,
+		<code>4</code> for docket history reports (as of yet unimplemented),
+		<code>5</code> for appellate dockets,
+		and <code>6</code> for appeallate attachment pages.
             </p></li>
             <li><p><code>filepath_local</code> <em>(required)</em>: Use this field to upload the binary data you are submitting, whether it's an HTML docket or attachment menu or a PDF file.
             </p></li>
@@ -650,6 +654,10 @@ PACER_TO_CL_IDS = {
                 </p>
             </li>
         </ul>
+        <p>The following upload types are works in progress:</p>
+	<ul><li><code>DOCKET_HISTORY_REPORT</code></li>
+	    <li><code>APPELLATE_DOCKET</code></li>
+	    <li><code>APPELLATE_ATTACHMENT_PAGE</code></li></ul>
         <p>When you complete your upload, you will create a <code>Processing Queue</code> object in the CourtListener database. This object will be returned in the HTTP response to your upload so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:
         </p>
         <ul>
