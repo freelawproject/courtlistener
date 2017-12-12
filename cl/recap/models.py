@@ -111,6 +111,7 @@ class ProcessingQueue(models.Model):
         help_text="The cased ID provided by PACER.",
         max_length=100,
         db_index=True,
+        blank=True,
     )
     pacer_doc_id = models.CharField(
         help_text="The ID of the document in PACER.",

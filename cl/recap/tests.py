@@ -116,6 +116,12 @@ class RecapUploadsTest(TestCase):
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
+    def test_pdf_without_pacer_case_id_works(self, mock):
+        """Do we allow PDFs lacking a pacer_case_id value?"""
+        del self.data['pacer_case_id']
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
     def test_uploading_non_ascii(self, mock):
         """Can we handle it if a client sends non-ascii strings?"""
         self.data['pacer_case_id'] = u'☠☠☠'
