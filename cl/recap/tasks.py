@@ -408,7 +408,6 @@ def process_orphan_documents(rds_created, pacer_case_id, court_id, docket_date):
         cutoff_date = now() - timedelta(days=180)
     pqs = ProcessingQueue.objects.filter(
         pacer_doc_id__in=pacer_doc_ids,
-        pacer_case_id=pacer_case_id,
         court_id=court_id,
         status=ProcessingQueue.PROCESSING_FAILED,
         upload_type=ProcessingQueue.PDF,
