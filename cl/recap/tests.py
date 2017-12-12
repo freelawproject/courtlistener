@@ -516,7 +516,7 @@ class RecapAddAttorneyTest(TestCase):
 @mock.patch('cl.recap.tasks.add_attorney')
 class RecapDocketTaskTest(TestCase):
     def setUp(self):
-        user = User.objects.get(username='recap')
+        self.user = User.objects.get(username='recap')
         self.filename = 'cand.html'
         path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets',
                             self.filename)
@@ -524,7 +524,7 @@ class RecapDocketTaskTest(TestCase):
             f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
             court_id='scotus',
-            uploader=user,
+            uploader=self.user,
             pacer_case_id='asdf',
             filepath_local=f,
             upload_type=ProcessingQueue.DOCKET,
@@ -581,6 +581,27 @@ class RecapDocketTaskTest(TestCase):
             d.docket_entries.filter(entry_number='2').exists(),
             msg="New docket entry didn't get created."
         )
+
+    def test_orphan_documents_are_added(self, mock):
+        """If there's a pq that exists but previously wasn't processed, do we
+        clean it up after we finish adding the docket?
+        """
+        pq = ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=self.user,
+            pacer_case_id='asdf',
+            pacer_doc_id='03504231050',
+            document_number='1',
+            filepath_local=SimpleUploadedFile(
+                'file.pdf',
+                b"file content more content",
+            ),
+            upload_type=ProcessingQueue.PDF,
+            status=ProcessingQueue.PROCESSING_FAILED,
+        )
+        process_recap_docket(self.pq.pk)
+        pq.refresh_from_db()
+        self.assertEqual(pq.status, pq.PROCESSING_SUCCESSFUL)
 
 
 @mock.patch('cl.recap.tasks.add_or_update_recap_document')

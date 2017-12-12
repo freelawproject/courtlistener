@@ -2,11 +2,13 @@
 import hashlib
 import logging
 import os
+from datetime import timedelta
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import DocketReport, AttachmentPage
 
@@ -389,6 +391,34 @@ def add_parties_and_attorneys(d, parties):
             add_attorney(atty, p, d)
 
 
+def process_orphan_documents(rds_created, pacer_case_id, court_id, docket_date):
+    """After we finish processing a docket upload add any PDFs we already had
+    for that docket that were lingering in our processing queue. This addresses
+    the issue that arises when somebody (somehow) uploads a PDF without first
+    uploading a docket.
+    """
+    pacer_doc_ids = [rd.pacer_doc_id for rd in rds_created]
+    if docket_date:
+        # If we get a date from the docket, set the cutoff to 30 days prior for
+        # good measure.
+        cutoff_date = docket_date - timedelta(days=30)
+    else:
+        # No date from docket. Limit ourselves to the last 180 days. This will
+        # help prevent items with weird errors from plaguing us forever.
+        cutoff_date = now() - timedelta(days=180)
+    pqs = ProcessingQueue.objects.filter(
+        pacer_doc_id__in=pacer_doc_ids,
+        pacer_case_id=pacer_case_id,
+        court_id=court_id,
+        status=ProcessingQueue.PROCESSING_FAILED,
+        upload_type=ProcessingQueue.PDF,
+        debug=False,
+        date_modified__gt=cutoff_date,
+    ).values_list('pk', flat=True)
+    for pq in pqs:
+        process_recap_pdf(pq)
+
+
 @app.task
 def process_recap_docket(pk):
     """Process an uploaded docket from the RECAP API endpoint.
@@ -491,6 +521,7 @@ def process_recap_docket(pk):
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
         # or throw an error.
+        created = []
         try:
             rd = RECAPDocument.objects.get(
                 docket_entry=de,
@@ -500,7 +531,7 @@ def process_recap_docket(pk):
             )
         except RECAPDocument.DoesNotExist:
             try:
-                RECAPDocument.objects.create(
+                rd = RECAPDocument.objects.create(
                     docket_entry=de,
                     # No attachments when uploading dockets.
                     document_type=RECAPDocument.PACER_DOCUMENT,
@@ -508,6 +539,7 @@ def process_recap_docket(pk):
                     pacer_doc_id=docket_entry['pacer_doc_id'],
                     is_available=False,
                 )
+                created.append(rd)
             except IntegrityError:
                 logger.warn(
                     "Creating new document with pacer_doc_id of '%s' violates "
@@ -525,6 +557,8 @@ def process_recap_docket(pk):
             rd.pacer_doc_id = rd.pacer_doc_id or pq.pacer_doc_id
 
     add_parties_and_attorneys(d, docket_data['parties'])
+    process_orphan_documents(created, pq.pacer_case_id, pq.court_id,
+                             d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
     return d
 

@@ -110,11 +110,13 @@ class ProcessingQueue(models.Model):
     pacer_case_id = models.CharField(
         help_text="The cased ID provided by PACER.",
         max_length=100,
+        db_index=True,
     )
     pacer_doc_id = models.CharField(
         help_text="The ID of the document in PACER.",
         max_length=32,  # Same as in RECAP
         blank=True,
+        db_index=True,
     )
     document_number = models.BigIntegerField(
         help_text="The docket entry number for the document.",
@@ -139,6 +141,7 @@ class ProcessingQueue(models.Model):
                              PROCESSING_STATUSES]),
         default=AWAITING_PROCESSING,
         choices=PROCESSING_STATUSES,
+        db_index=True,
     )
     upload_type = models.SmallIntegerField(
         help_text="The type of object that is uploaded",
