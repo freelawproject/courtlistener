@@ -24,22 +24,24 @@ def get_pacer_doc_ids(options):
     ).exclude(
         docket_entry__docket__court__jurisdiction__in=Court.BANKRUPTCY_JURISDICTIONS,
     ).order_by('pk').values_list('pk', flat=True)
-    for i, row_pk in enumerate(row_pks):
-        if i >= options['count'] > 0:
+    completed = 0
+    for row_pk in row_pks:
+        if completed >= options['count'] > 0:
             break
         if row_pk < options['start_pk'] > 0:
             continue
         throttle.maybe_wait()
-        if i % 1000 == 0:
+        if completed % 1000 == 0:
             session = PacerSession(username=PACER_USERNAME,
                                    password=PACER_PASSWORD)
             session.login()
             logger.info("Sent %s tasks to celery so far. Latest pk: %s" %
-                        (i, row_pk))
+                        (completed, row_pk))
         get_pacer_doc_id_with_show_case_doc_url.apply_async(
             args=(row_pk, session),
             queue=q,
         )
+        completed += 1
 
 
 class Command(VerboseCommand):
