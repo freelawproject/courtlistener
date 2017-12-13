@@ -575,10 +575,16 @@ def process_recap_attachment(self, pk):
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
     att_page = AttachmentPage(map_cl_to_pacer_id(pq.court_id))
-    text = pq.filepath_local.read().decode('utf-8')
+    with open(pq.filepath_local.path) as f:
+        text = f.read().decode('utf-8')
     att_page._parse_text(text)
     att_data = att_page.data
     logger.info("Parsing completed for item %s" % pq)
+
+    if pq.pacer_case_id in ['undefined', 'null']:
+        # Bad data from the client. Fix it with parsed data.
+        pq.pacer_case_id = att_data.get('pacer_case_id')
+        pq.save()
 
     # Merge the contents of the data into CL.
     try:
