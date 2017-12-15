@@ -210,7 +210,12 @@ def process_recap_pdf(self, pk):
         rd.ocr_status = None
 
     if not pq.debug:
-        rd.save()
+        try:
+            rd.save()
+        except IntegrityError:
+            msg = "Duplicate key on unique_together constraint"
+            mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
+            return None
 
     if not existing_document and not pq.debug:
         extract_recap_pdf(rd.pk)
