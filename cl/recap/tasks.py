@@ -498,7 +498,7 @@ def process_recap_docket(pk):
     created = []
     for docket_entry in docket_data['docket_entries']:
         try:
-            de, created = DocketEntry.objects.update_or_create(
+            de, _ = DocketEntry.objects.update_or_create(
                 docket=d,
                 entry_number=docket_entry['document_number'],
                 defaults={
