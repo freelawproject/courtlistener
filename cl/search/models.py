@@ -586,8 +586,7 @@ class RECAPDocument(models.Model):
         help_text="The ID of the document in PACER. This information is "
                   "provided by RECAP.",
         max_length=32,  # Same as in RECAP
-        unique=True,
-        null=True,  # This is weird. See reasoning below.
+        blank=True,
     )
     is_available = models.NullBooleanField(
         help_text="True if the item is available in RECAP",
@@ -709,13 +708,10 @@ class RECAPDocument(models.Model):
             if self.attachment_number is None:
                 raise ValidationError('attachment_number cannot be null for an '
                                       'attachment.')
-        if self.pacer_doc_id == '':
-            # Normally a char field would be never have a null value, opting
-            # instead on having a blank value. However, blanks are not
-            # considered unique while nulls are, so for this field, we reset
-            # it to null whenever it would normally be blank.
-            # http://stackoverflow.com/a/3124586/64911
-            self.pacer_doc_id = None
+
+        if self.pacer_doc_id is None:
+            # Juriscraper returns these as null values. Instead we want blanks.
+            self.pacer_doc_id = ''
 
         if self.attachment_number is None:
             # Validate that we don't already have such an entry. This is needed

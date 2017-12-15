@@ -376,18 +376,7 @@ class PacerXMLParser(object):
         if document_type == RECAPDocument.ATTACHMENT:
             rd.attachment_number = attachment_number
         if not debug:
-            try:
-                rd.save(do_extraction=False, index=False)
-            except IntegrityError as e:
-                # This happens when a pacer_doc_id has been wrongly set as
-                # the document_number, see for example, document 19 and
-                # document 00405193374 here: https://ia802300.us.archive.org/23/items/gov.uscourts.ca4.14-1872/gov.uscourts.ca4.14-1872.docket.xml
-                logger.error("Unable to create RECAPDocument for document #%s, "
-                             "attachment #%s on entry: %s due to "
-                             "IntegrityError." % (rd.document_number,
-                                                  rd.attachment_number,
-                                                  rd.docket_entry))
-                return None
+            rd.save(do_extraction=False, index=False)
         return rd
 
     @transaction.atomic

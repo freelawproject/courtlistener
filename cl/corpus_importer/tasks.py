@@ -157,22 +157,18 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
         raise self.retry(exc=exc, countdown=10)
 
     for row in results:
-        try:
-            PACERFreeDocumentRow.objects.create(
-                court_id=row.court_id,
-                pacer_case_id=row.pacer_case_id,
-                docket_number=row.docket_number,
-                case_name=row.case_name,
-                date_filed=row.date_filed,
-                pacer_doc_id=row.pacer_doc_id,
-                document_number=row.document_number,
-                description=row.description,
-                nature_of_suit=row.nature_of_suit,
-                cause=row.cause,
-             )
-        except IntegrityError:
-            # Duplicate for whatever reason.
-            continue
+        PACERFreeDocumentRow.objects.create(
+            court_id=row.court_id,
+            pacer_case_id=row.pacer_case_id,
+            docket_number=row.docket_number,
+            case_name=row.case_name,
+            date_filed=row.date_filed,
+            pacer_doc_id=row.pacer_doc_id,
+            document_number=row.document_number,
+            description=row.description,
+            nature_of_suit=row.nature_of_suit,
+            cause=row.cause,
+         )
 
     return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
 
@@ -568,31 +564,24 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
             if tag is not None:
                 de.tags.add(tag)
 
+        get_params = {
+            'docket_entry': de,
+            # No attachments when uploading dockets.
+            'document_type': RECAPDocument.PACER_DOCUMENT,
+            'document_number': docket_entry['document_number'],
+        }
         try:
-            rd = RECAPDocument.objects.get(
-                docket_entry=de,
-                # No attachments when uploading dockets.
-                document_type=RECAPDocument.PACER_DOCUMENT,
-                document_number=docket_entry['document_number'],
-            )
+            rd = RECAPDocument.objects.get(**get_params)
         except RECAPDocument.DoesNotExist:
             try:
                 rd = RECAPDocument.objects.create(
-                    docket_entry=de,
-                    # No attachments when uploading dockets.
-                    document_type=RECAPDocument.PACER_DOCUMENT,
-                    document_number=docket_entry['document_number'],
                     pacer_doc_id=docket_entry['pacer_doc_id'],
                     is_available=False,
+                    **get_params
                 )
             except IntegrityError:
                 # Race condition. The item was created after our get failed.
-                rd = RECAPDocument.objects.get(
-                    docket_entry=de,
-                    # No attachments when uploading dockets.
-                    document_type=RECAPDocument.PACER_DOCUMENT,
-                    document_number=docket_entry['document_number'],
-                )
+                rd = RECAPDocument.objects.get(**get_params)
         except RECAPDocument.MultipleObjectsReturned:
             logger.error(
                 "Multiple recap documents found for document entry "
@@ -797,9 +786,6 @@ def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, session):
         return
     else:
         rd.pacer_doc_id = pacer_doc_id
-        try:
-            rd.save()
-            logger.info("Successfully saved pacer_doc_id to rd %s" % rd_pk)
-        except IntegrityError:
-            logger.error("Unable to save pacer_doc_id due to Integrity error "
-                         "on '%s': %s" % (pacer_doc_id, rd))
+        rd.save()
+        logger.info("Successfully saved pacer_doc_id to rd %s" % rd_pk)
+

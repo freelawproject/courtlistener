@@ -117,7 +117,7 @@ def process_recap_pdf(self, pk):
             rd = RECAPDocument.objects.get(
                 pacer_doc_id=pq.pacer_doc_id,
             )
-    except RECAPDocument.DoesNotExist:
+    except (RECAPDocument.DoesNotExist, RECAPDocument.MultipleObjectsReturned):
         try:
             d = Docket.objects.get(pacer_case_id=pq.pacer_case_id,
                                    court_id=pq.court_id)
@@ -210,12 +210,7 @@ def process_recap_pdf(self, pk):
         rd.ocr_status = None
 
     if not pq.debug:
-        try:
-            rd.save()
-        except IntegrityError:
-            msg = "Duplicate key on pacer_doc_id violates unique constraint"
-            mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
-            return None
+        rd.save()
 
     if not existing_document and not pq.debug:
         extract_recap_pdf(rd.pk)
@@ -391,7 +386,7 @@ def add_parties_and_attorneys(d, parties):
             add_attorney(atty, p, d)
 
 
-def process_orphan_documents(rds_created, pacer_case_id, court_id, docket_date):
+def process_orphan_documents(rds_created, court_id, docket_date):
     """After we finish processing a docket upload add any PDFs we already had
     for that docket that were lingering in our processing queue. This addresses
     the issue that arises when somebody (somehow) uploads a PDF without first
@@ -500,6 +495,7 @@ def process_recap_docket(pk):
     )
 
     # Docket entries
+    created = []
     for docket_entry in docket_data['docket_entries']:
         try:
             de, created = DocketEntry.objects.update_or_create(
@@ -520,32 +516,21 @@ def process_recap_docket(pk):
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
         # or throw an error.
-        created = []
+        params = {
+            'docket_entry': de,
+            # No attachments when uploading dockets.
+            'document_type': RECAPDocument.PACER_DOCUMENT,
+            'document_number': docket_entry['document_number'],
+        }
         try:
-            rd = RECAPDocument.objects.get(
-                docket_entry=de,
-                # No attachments when uploading dockets.
-                document_type=RECAPDocument.PACER_DOCUMENT,
-                document_number=docket_entry['document_number'],
-            )
+            rd = RECAPDocument.objects.get(**params)
         except RECAPDocument.DoesNotExist:
-            try:
-                rd = RECAPDocument.objects.create(
-                    docket_entry=de,
-                    # No attachments when uploading dockets.
-                    document_type=RECAPDocument.PACER_DOCUMENT,
-                    document_number=docket_entry['document_number'],
-                    pacer_doc_id=docket_entry['pacer_doc_id'],
-                    is_available=False,
-                )
-                created.append(rd)
-            except IntegrityError:
-                logger.warn(
-                    "Creating new document with pacer_doc_id of '%s' violates "
-                    "unique constraint on pacer_doc_id field." %
-                    docket_entry['pacer_doc_id']
-                )
-                continue
+            rd = RECAPDocument.objects.create(
+                pacer_doc_id=docket_entry['pacer_doc_id'],
+                is_available=False,
+                **params
+            )
+            created.append(rd)
         except RECAPDocument.MultipleObjectsReturned:
             logger.error(
                 "Multiple recap documents found for document entry number'%s' "
@@ -556,8 +541,7 @@ def process_recap_docket(pk):
             rd.pacer_doc_id = rd.pacer_doc_id or pq.pacer_doc_id
 
     add_parties_and_attorneys(d, docket_data['parties'])
-    process_orphan_documents(created, pq.pacer_case_id, pq.court_id,
-                             d.date_filed)
+    process_orphan_documents(created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
     return d
 
@@ -588,10 +572,20 @@ def process_recap_attachment(self, pk):
 
     # Merge the contents of the data into CL.
     try:
-        rd = RECAPDocument.objects.get(
-            pacer_doc_id=att_data['pacer_doc_id'],
-            docket_entry__docket__court=pq.court,
-        )
+        params = {
+            'pacer_doc_id': att_data['pacer_doc_id'],
+            'docket_entry__docket__court': pq.court,
+        }
+        if pq.pacer_case_id:
+            params['docket_entry__docket__pacer_case_id'] = pq.pacer_case_id
+        rd = RECAPDocument.objects.get(**params)
+    except RECAPDocument.MultipleObjectsReturned:
+        # Unclear how to proceed and we don't want to associate this data with
+        # the wrong case. We must punt.
+        msg = "Too many documents found when attempting to associate " \
+              "attachment data"
+        mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
+        return None
     except RECAPDocument.DoesNotExist as exc:
         msg = "Could not find docket to associate with attachment metadata"
         if (self.request.retries == self.max_retries) or pq.debug:
@@ -636,12 +630,7 @@ def process_recap_attachment(self, pk):
                         setattr(rd, field, attachment[field])
                         needs_save = True
                 if needs_save:
-                    try:
-                        rd.save()
-                    except IntegrityError:
-                        # Happens when we hit courtlistener/issues#765, in which
-                        # we violate the unique constraint on pacer_doc_id.
-                        continue
+                    rd.save()
 
                 # Do *not* do this async — that can cause race conditions.
                 add_or_update_recap_document([rd.pk], force_commit=False)

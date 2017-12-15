@@ -137,7 +137,6 @@ class PACERFreeDocumentRow(models.Model):
     date_filed = models.DateField()
     pacer_doc_id = models.CharField(
         max_length=32,
-        unique=True,
     )
     document_number = models.CharField(
         max_length=32,
