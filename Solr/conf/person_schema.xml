@@ -382,6 +382,9 @@
     -->
     <field name="timestamp" type="date" indexed="true" stored="true" default="NOW" multiValued="false"/>
 
+    <!-- Adds the ability to do pagination-stable random ordering -->
+    <dynamicField name="random*" type="random" indexed="true" stored="false"/>
+
     <!-- Field to use to determine and enforce document uniqueness.
          Unless this field is marked with required="false", it will be a required field
       -->

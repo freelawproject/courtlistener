@@ -387,6 +387,18 @@ class SearchTest(IndexedSolrTestCase):
             msg="'%s' should come AFTER '%s' when ordered by ascending "
                 "citeCount." % (most_cited_name, less_cited_name))
 
+    def test_random_ordering(self):
+        """Can the results be ordered randomly?
+
+        This test is difficult since we can't check that things actually get
+        ordered randomly, but we can at least make sure the query succeeds.
+        """
+        r = self.client.get(reverse('show_results'), {
+            'q': '*',
+            'order_by': 'random_123 desc',
+        })
+        self.assertNotIn('an error', r.content)
+
     def test_oa_results_basic(self):
         r = self.client.get(reverse('show_results'), {'type': 'oa'})
         self.assertIn('Jose', r.content)

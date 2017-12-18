@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.utils import formats
 from django.utils import six
 from django.utils.encoding import force_text
-from django.forms import DateField
+from django.forms import DateField, ChoiceField
 
 INPUT_FORMATS = (
     '%Y%m%d',    # '20061025'
@@ -122,3 +122,20 @@ class CeilingDateField(DateField):
                 return valid_date + datetime.timedelta(days=additional_days)
         raise ValidationError(self.error_messages['invalid'],
                               code='invalid')
+
+
+class RandomChoiceField(ChoiceField):
+    """A choice field, but it allows any value that starts with 'random_'"""
+
+    def validate(self, value):
+        super(ChoiceField, self).validate(value)
+        if value and not self.valid_value(value):
+            if value.startswith('random_'):
+                # Such values are OK. Just return.
+                return
+            else:
+                raise ValidationError(
+                    self.error_messages['invalid_choice'],
+                    code='invalid_choice',
+                    params={'value': value},
+                )

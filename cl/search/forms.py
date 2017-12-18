@@ -5,8 +5,7 @@ from django.forms import DateField
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.people_db.models import Position, PoliticalAffiliation
-from cl.search.fields import CeilingDateField
-from cl.search.fields import FloorDateField
+from cl.search.fields import CeilingDateField, FloorDateField, RandomChoiceField
 from cl.search.models import Court
 from cl.search.models import DOCUMENT_STATUSES
 
@@ -83,7 +82,7 @@ class SearchForm(forms.Form):
         required=False,
         widget=forms.HiddenInput()
     )
-    order_by = forms.ChoiceField(
+    order_by = RandomChoiceField(
         choices=OPINION_ORDER_BY_CHOICES,
         required=False,
         label='Result Ordering',

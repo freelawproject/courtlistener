@@ -305,7 +305,7 @@
     "date_termination"
 ]</pre>
         <p>Thus, you can order using any of these fields in conjunction with the <code>order_by</code> parameter.</p>
-        <p>Decending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Positions</code> ordered by the most recently modified, then by the most recently elected:
+        <p>Descending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Positions</code> ordered by the most recently modified, then by the most recently elected:
         </p>
         <pre class="scrollable">curl {% get_full_host %}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected</pre>
 
@@ -534,11 +534,22 @@
 
 
         <h3 id="search-endpoint">{% url "search-list" version="v3" %}</h3>
-        <p>This endpoint allows you to query our search engine in a similar manner to our front end. Because this endpoint does not use the Django models directly, this endpoint is quite different than any other. Unlike other endpoints, it does not support <code>OPTIONS</code> requests and thus is not self-documenting. Several Additional differences should also be noted:
+        <p>This endpoint allows you to query our search engine in a similar manner to our front end. Because this endpoint does not use the Django models directly, this endpoint is quite different than any other. Unlike other endpoints, it does not support <code>OPTIONS</code> requests and thus is not self-documenting, however this endpoint is easy to use because GET parameters from the front end can simply be copy-pasted onto this endpoint. For example, this URL on the front end:
         </p>
+        <pre class="pre-scrollable">{% get_full_host %}{% url "show_results" %}?q=foo</pre>
+        <p>Becomes this, on the API:</p>
+        <pre class="pre-scrollable">{% get_full_host %}{% url "search-list" version="v3" %}?q=foo</pre>
+
+        <p>Several Additional differences should also be noted:</p>
         <ul>
-            <li><strong>Ordering</strong>: Instead of using a minus sign to flip
-                ordering, it uses <code>asc</code> and <code>desc</code>.
+            <li>
+                <p><strong>Ordering</strong>: Instead of using a minus sign to flip ordering, it uses <code>asc</code> and <code>desc</code>.
+                </p>
+                <p>In addition, results may be sorted randomly by using <code>random_{your-seed} desc/asc</code> as your sort parameter. Substitute any value for <code>{your seed}</code> to get results that are consistent across pagination. For example:
+                </p>
+                <pre class="pre-scrollable">{% get_full_host %}{% url "search-list" version="v3" %}?q=foo&order_by=random_123+desc</pre>
+                <p>This way of sorting the results also works on the front end, but does not show up via the dropdowns.
+                </p>
             </li>
             <li>
                 <p><strong>Filtering</strong>: Instead of using the Django lookup fields, it uses Solr syntax. To filter on this endpoint, we recommend identifying an effective query on the front end that generates the results you want and then using that query (and variations thereof) to query the API. On the backend, very similar code serves both the API and the front end.
