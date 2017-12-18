@@ -415,7 +415,13 @@ def process_orphan_documents(rds_created, court_id, docket_date):
         date_modified__gt=cutoff_date,
     ).values_list('pk', flat=True)
     for pq in pqs:
-        process_recap_pdf(pq)
+        try:
+            process_recap_pdf(pq)
+        except:
+            # We can ignore this. If we don't, we get all of the exceptions that
+            # were previously raised for the processing queue items a second
+            # time.
+            pass
 
 
 @app.task
