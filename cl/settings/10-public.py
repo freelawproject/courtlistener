@@ -294,6 +294,7 @@ REST_FRAMEWORK = {
         'peidelman': '20000/hour',
         'waldo': '10000/hour',
         'hdave4': '15000/hour',  # GSU
+        'ellliottt': '15000/hour',
     },
 
     # Auth
