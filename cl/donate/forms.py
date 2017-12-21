@@ -107,7 +107,8 @@ class DonationForm(ModelForm):
     amount = DecimalOrOtherField(
         widget=forms.RadioSelect(
             choices=AMOUNTS,
-        )
+        ),
+        initial='50',
     )
 
     class Meta:
