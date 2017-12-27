@@ -29,11 +29,13 @@ class Donation(models.Model):
     PAYPAL = 'paypal'
     CREDIT_CARD = 'cc'
     CHECK = 'check'
+    BITCOIN = 'bitcoin'
     PROVIDERS = (
         (DWOLLA, 'Dwolla'),
         (PAYPAL, 'PayPal'),
         (CREDIT_CARD, 'Credit Card'),
         (CHECK, 'Check'),
+        (BITCOIN, 'Bitcoin'),
     )
     donor = models.ForeignKey(
         User,

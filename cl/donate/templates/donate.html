@@ -67,16 +67,19 @@
     var donor_info = $("#donor-info");
     var check_info = $("#check-info");
     var cc_info = $("#cc-info");
+    var bitcoin_info = $("#bitcoin-info");
 
     // Hide check and cc info by default
     check_info.hide();
     cc_info.hide();
+    bitcoin_info.hide();
 
     $("#id_payment_provider_0").parent("label").click(function(){
         // PayPal
         donor_info.show("fast");
         check_info.hide();
         cc_info.hide();
+        bitcoin_info.hide();
         payment_price.text("PayPal charges us 2.2% + 30¢ on all donations.")
     });
     $("#id_payment_provider_1").parent("label").click(function(){
@@ -84,6 +87,7 @@
         donor_info.show("fast");
         check_info.hide();
         cc_info.show();
+        bitcoin_info.hide();
         payment_price.text("We are charged 2.9% + 30¢ on all credit card donations.")
     });
     $("#id_payment_provider_2").parent("label").click(function(){
@@ -91,7 +95,16 @@
         donor_info.hide();
         check_info.show("fast");
         cc_info.hide();
+        bitcoin_info.hide();
         payment_price.text("Checks are free for us to process!")
+    });
+    $("#id_payment_provider_3").parent("label").click(function () {
+      // Bitcoin
+      donor_info.hide();
+      check_info.hide();
+      cc_info.hide();
+      bitcoin_info.show("fast");
+      payment_price.text("")
     });
     </script>
 {% endblock %}
@@ -169,6 +182,11 @@
                                id="id_payment_provider_2"
                                value="check"
                                name="payment_provider" />Check</label>
+                    <label for="id_payment_provider_3" class="btn btn-default">
+                        <input type="radio"
+                               id="id_payment_provider_3"
+                               value="bitcoin"
+                               name="payment_provider"/>Bitcoin</label>
                 </div>
                 <p class="small gray" id="payment-price">PayPal charges us 2.2%
                     + 30¢ on all donations.</p>
@@ -364,9 +382,19 @@
                 <p class="bold">We cannot accept starter checks, unnumbered checks
                     or non-personalized checks.
                 </p>
-
-                <p>Thanks so much for your donation.</p>
+                <p>Thank you for your donation.</p>
             {% endif %}
+        </div>
+        <div id="bitcoin-info">
+            <p>Bitcoin is an experimental, cryptographically secure,
+                semi-anonymous method of transferring value between parties.</p>
+            <p class="v-offset-below-2">To donate to Free Law Project using Bitcoin, please use the address or QR code below.</p>
+            <img src="{{ STATIC_PREFIX }}png/bitcoin-qr-code.png"
+                 width="200"
+                 height="200"
+                 class="img-responsive img-rounded center-block">
+            <p class="text-center"><a href="bitcoin:18zToeKZZyqMP39WiNpCd6V6c1Fc1MbR27">18zToeKZZyqMP39WiNpCd6V6c1Fc1MbR27</a></p>
+            <p class="text-center v-offset-above-2 lead">Thank you for your donation.</p>
         </div>
     </div>
 
