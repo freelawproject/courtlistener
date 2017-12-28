@@ -112,7 +112,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         )
 
         # And does not see a badge indicating that it's blocked.
-        btns = self.browser.find_elements_by_css_selector('.btn.btn-danger')
+        btns = self.browser.find_elements_by_css_selector('.content .btn.btn-danger')
         expected_btn_count = 0
         self.assertEqual(
             len(btns),
