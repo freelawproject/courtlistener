@@ -202,13 +202,14 @@ def process_recap_pdf(self, pk):
         )
         if not pq.debug:
             rd.filepath_local.save(file_name, cf, save=False)
+
+            # Do page count and extraction
+            extension = rd.filepath_local.path.split('.')[-1]
+            rd.page_count = get_page_count(rd.filepath_local.path, extension)
+
+        rd.ocr_status = None
         rd.is_available = True
         rd.sha1 = new_sha1
-
-        # Do page count and extraction
-        extension = rd.filepath_local.path.split('.')[-1]
-        rd.page_count = get_page_count(rd.filepath_local.path, extension)
-        rd.ocr_status = None
 
     if not pq.debug:
         try:
