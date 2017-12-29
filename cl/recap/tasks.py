@@ -461,12 +461,14 @@ def process_recap_docket(pk):
         return None
 
     # Merge the contents of the docket into CL. Attempt several lookups of
-    # decreasing specificity.
+    # decreasing specificity. Note that pacer_case_id is required for Docket
+    # uploads.
     d = None
     for kwargs in [{'pacer_case_id': pq.pacer_case_id,
                     'docket_number': docket_data['docket_number']},
                    {'pacer_case_id': pq.pacer_case_id},
-                   {'docket_number': docket_data['docket_number']}]:
+                   {'docket_number': docket_data['docket_number'],
+                    'pacer_case_id': None}]:
         try:
             d = Docket.objects.get(court_id=pq.court_id, **kwargs)
             break
