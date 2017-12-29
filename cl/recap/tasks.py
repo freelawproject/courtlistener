@@ -200,7 +200,8 @@ def process_recap_pdf(self, pk):
             rd.document_number,
             rd.attachment_number,
         )
-        rd.filepath_local.save(file_name, cf, save=False)
+        if not pq.debug:
+            rd.filepath_local.save(file_name, cf, save=False)
         rd.is_available = True
         rd.sha1 = new_sha1
 
@@ -215,6 +216,7 @@ def process_recap_pdf(self, pk):
         except IntegrityError:
             msg = "Duplicate key on unique_together constraint"
             mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
+            rd.filepath_local.delete(save=False)
             return None
 
     if not existing_document and not pq.debug:
