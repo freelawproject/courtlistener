@@ -151,6 +151,7 @@ class DocketEntryFilter(FilterSet):
         model = DocketEntry
         fields = {
             'id': ['exact'],
+            'entry_number': INTEGER_LOOKUPS,
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_filed': DATE_LOOKUPS,
