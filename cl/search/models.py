@@ -416,8 +416,15 @@ class Docket(models.Model):
             if de.date_filed is not None:
                 out['entry_date_filed'] = datetime.combine(de.date_filed,
                                                            time())
+            rds = de.recap_documents.all()
 
-            for rd in de.recap_documents.all():
+            if len(rds) == 0:
+                # Minute entry or other entry that lack sub-docs. See:
+                # https://github.com/freelawproject/courtlistener/issues/784
+                search_list.append(normalize_search_dicts(out))
+                continue
+
+            for rd in rds:
                 # IDs
                 out.update({
                     'id': rd.pk,
