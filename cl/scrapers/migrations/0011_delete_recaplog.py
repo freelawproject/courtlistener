@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('scrapers', '0009_pacerfreedocumentrow_error_msg'),
+        ('scrapers', '0010_allow_duplicate_pacer_doc_ids'),
     ]
 
     operations = [
