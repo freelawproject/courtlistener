@@ -1,4 +1,3 @@
-import contextlib
 import os
 
 from django.core.exceptions import ValidationError
@@ -233,45 +232,3 @@ def make_choices_group_lookup(c):
         else:
             d[choice] = value
     return d
-
-
-def disable_auto_now_fields(*models):
-    """Turns off the auto_now and auto_now_add attributes on a Model's fields,
-    so that an instance of the Model can be saved with a custom value.
-
-    Based on: https://stackoverflow.com/questions/7499767/temporarily-disable-auto-now-auto-now-add
-    """
-    for model in models:
-        # noinspection PyProtectedMember
-        for field in model._meta.local_fields:
-            if hasattr(field, 'auto_now'):
-                field.auto_now = False
-            if hasattr(field, 'auto_now_add'):
-                field.auto_now_add = False
-
-
-@contextlib.contextmanager
-def suppress_autotime(model, fields):
-    """Disable auto_now and auto_now_add fields
-
-    :param model: The model you wish to modify or an instance of it. All objects
-    of this type will be modified until the end of the managed context.
-    :param fields: The fields you wish to disable for the model.
-    """
-    _original_values = {}
-    for field in model._meta.local_fields:
-        if field.name in fields:
-            _original_values[field.name] = {
-                'auto_now': field.auto_now,
-                'auto_now_add': field.auto_now_add,
-            }
-            field.auto_now = False
-            field.auto_now_add = False
-    try:
-        yield
-    finally:
-        for field in model._meta.local_fields:
-            if field.name in fields:
-                field.auto_now = _original_values[field.name]['auto_now']
-                field.auto_now_add = _original_values[field.name][
-                    'auto_now_add']

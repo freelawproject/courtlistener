@@ -57,38 +57,6 @@ class ErrorLog(models.Model):
                                    self.message)
 
 
-class RECAPLog(models.Model):
-    """A class to keep track of data coming in from RECAP."""
-    SCRAPE_SUCCESSFUL = 1
-    SCRAPE_IN_PROGRESS = 2
-    SCRAPE_FAILED = 3
-    GETTING_CHANGELIST = 4
-    CHANGELIST_RECEIVED = 5
-    GETTING_AND_MERGING_ITEMS = 6
-    RECAP_STATUSES = (
-        (SCRAPE_SUCCESSFUL, "Scrape Completed Successfully"),
-        (SCRAPE_IN_PROGRESS, "Scrape currently in progress"),
-        (GETTING_CHANGELIST, "Getting list of new content from archive server"),
-        (CHANGELIST_RECEIVED, "Successfully got the change list."),
-        (GETTING_AND_MERGING_ITEMS, "Getting and merging items from server"),
-        (SCRAPE_FAILED, "Scrape Failed"),
-    )
-    date_started = models.DateTimeField(
-        help_text="The moment when the scrape of the RECAP content began.",
-        auto_now_add=True,
-    )
-    date_completed = models.DateTimeField(
-        help_text="The moment when the scrape of the RECAP content ended.",
-        null=True,
-        blank=True,
-        db_index=True,
-    )
-    status = models.SmallIntegerField(
-        help_text="The current status of the RECAP scrape.",
-        choices=RECAP_STATUSES,
-    )
-
-
 class PACERFreeDocumentLog(models.Model):
     SCRAPE_SUCCESSFUL = 1
     SCRAPE_IN_PROGRESS = 2
