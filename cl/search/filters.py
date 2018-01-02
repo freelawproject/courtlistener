@@ -64,6 +64,7 @@ class DocketFilter(FilterSet):
             'docket_number': ['exact', 'startswith'],
             'nature_of_suit': ALL_TEXT_LOOKUPS,
             'pacer_case_id': ['exact'],
+            'source': ['exact', 'in'],
             'date_blocked': DATE_LOOKUPS,
             'blocked': ['exact'],
         }
