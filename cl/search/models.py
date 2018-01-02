@@ -419,9 +419,8 @@ class Docket(models.Model):
             rds = de.recap_documents.all()
 
             if len(rds) == 0:
-                # Minute entry or other entry that lack sub-docs. See:
-                # https://github.com/freelawproject/courtlistener/issues/784
-                search_list.append(normalize_search_dicts(out))
+                # Minute entry or other entry that lacks docs. For now, we punt.
+                # See https://github.com/freelawproject/courtlistener/issues/784
                 continue
 
             for rd in rds:
