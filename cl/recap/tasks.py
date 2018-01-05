@@ -4,6 +4,7 @@ import logging
 import os
 from datetime import timedelta
 
+from celery.canvas import chain
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.db.models import Q
@@ -37,7 +38,8 @@ def process_recap_upload(pq):
     accordingly.
     """
     if pq.upload_type == pq.DOCKET:
-        process_recap_docket.delay(pq.pk)
+        chain(process_recap_docket.s(pq.pk),
+              add_or_update_recap_docket.s()).apply_asnyc()
     elif pq.upload_type == pq.ATTACHMENT_PAGE:
         process_recap_attachment.delay(pq.pk)
     elif pq.upload_type == pq.PDF:
