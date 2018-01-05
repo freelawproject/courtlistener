@@ -430,12 +430,12 @@ def process_orphan_documents(rds_created, court_id, docket_date):
             pass
 
 
-@app.task
-def process_recap_docket(pk):
+@app.task(bind=True, max_retries=5, ignore_result=True)
+def process_recap_docket(self, pk):
     """Process an uploaded docket from the RECAP API endpoint.
 
     :param pk: The primary key of the processing queue item you want to work on.
-    :return: A dict of the form:
+    :returns: A dict of the form:
 
         {
             // The PK of the docket that's created or updated
@@ -461,6 +461,7 @@ def process_recap_docket(pk):
         pq.upload_type = pq.DOCKET_HISTORY_REPORT
         pq.save()
         process_recap_docket_history_report(pk)
+        self.request.callbacks = None
         return None
 
     report._parse_text(text)
@@ -471,6 +472,7 @@ def process_recap_docket(pk):
         # Not really a docket. Some sort of invalid document (see Juriscraper).
         msg = "Not a valid docket upload."
         mark_pq_status(pq, msg, pq.INVALID_CONTENT)
+        self.request.callbacks = None
         return None
 
     # Merge the contents of the docket into CL. Attempt several lookups of
@@ -490,6 +492,7 @@ def process_recap_docket(pk):
         except Docket.MultipleObjectsReturned:
             msg = "Too many dockets found when trying to look up '%s'" % pq
             mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
+            self.request.callbacks = None
             return None
 
     if d is None:
@@ -512,7 +515,8 @@ def process_recap_docket(pk):
 
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
-        return d
+        self.request.callbacks = None
+        return {'docket_pk': d.pk, 'needs_solr_update': False}
 
     d.save()
 
