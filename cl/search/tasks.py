@@ -1,10 +1,11 @@
 from __future__ import print_function
-from __future__ import print_function
-from __future__ import print_function
-import scorched
-import socket
 
+import socket
+from datetime import timedelta
+
+import scorched
 from django.conf import settings
+from django.utils.timezone import now
 
 from cl.audio.models import Audio
 from cl.celery import app
@@ -55,6 +56,52 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
         si.add(search_item_list)
     except socket.error as exc:
         add_or_update_items.retry(exc=exc, countdown=120)
+
+
+@app.task
+def add_or_update_recap_docket(data, force_commit=False,
+                               update_threshold=60*60):
+    """Add an entire docket to Solr or update it if it's already there.
+
+    This is an expensive operation because to add or update a RECAP docket in
+    Solr means updating every document that's a part of it. So if a docket has
+    10,000 documents, we'll have to pull them *all* from the database, and
+    re-index them all. It'd be nice to not have to do this, but because Solr is
+    de-normalized, every document in the RECAP Solr index has a copy of every
+    field in Solr. For example, if the name of the case changes, that has to get
+    reflected in every document in the docket in Solr.
+
+    To deal with this mess, we have a field on the docket that says when we last
+    updated it in Solr. If that date is after a threshold, we just don't do the
+    update unless we know the docket has something new.
+
+    :param data: A dictionary containing the a key for 'docket_pk' and
+    'needs_solr_update'. 'docket_pk' will be used to find the docket to modify.
+    'needs_solr_update' is a boolean indicating whether the docket must be
+    updated.
+    :param force_commit: Whether to send a commit to Solr (this is usually not
+    needed).
+    :param update_threshold: Items staler than this number of seconds will be
+    updated. Items fresher than this number will be a no-op.
+    """
+    si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode='w')
+    some_time_ago = now() - timedelta(seconds=update_threshold)
+    d = Docket.objects.get(pk=data['docket_pk'])
+    too_fresh = d.date_last_index is not None and \
+                      (d.date_last_index > some_time_ago)
+    update_not_required = not data.get('needs_solr_update', False)
+    if all([too_fresh, update_not_required]):
+        return
+    else:
+        try:
+            si.add(d.as_search_list())
+            if force_commit:
+                si.commit()
+        except SolrError as exc:
+            add_or_update_recap_docket.retry(exc=exc, countdown=30)
+        else:
+            d.date_last_index = now()
+            d.save()
 
 
 @app.task

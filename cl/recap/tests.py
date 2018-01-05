@@ -271,7 +271,7 @@ class DebugRecapUploadtest(TestCase):
             upload_type=ProcessingQueue.DOCKET,
             debug=True,
         )
-        _ = process_recap_docket(pq.pk)
+        process_recap_docket(pq.pk)
         self.assertEqual(Docket.objects.count(), 0)
         self.assertEqual(DocketEntry.objects.count(), 0)
         self.assertEqual(RECAPDocument.objects.count(), 0)
@@ -543,7 +543,8 @@ class RecapDocketTaskTest(TestCase):
 
     def test_parsing_docket_does_not_exist(self, add_atty_mock):
         """Can we parse an HTML docket we have never seen before?"""
-        d = process_recap_docket(self.pq.pk)
+        returned_data = process_recap_docket(self.pq.pk)
+        d = Docket.objects.get(pk=returned_data['docket_pk'])
         self.assertEqual(d.source, Docket.RECAP)
         self.assertTrue(d.case_name)
         self.assertEqual(d.jury_demand, "None")
@@ -555,7 +556,8 @@ class RecapDocketTaskTest(TestCase):
             pacer_case_id='asdf',
             court_id='scotus',
         )
-        d = process_recap_docket(self.pq.pk)
+        returned_data = process_recap_docket(self.pq.pk)
+        d = Docket.objects.get(pk=returned_data['docket_pk'])
         self.assertEqual(d.source, Docket.RECAP_AND_SCRAPER)
         self.assertTrue(d.case_name)
         self.assertEqual(existing_d.pacer_case_id, d.pacer_case_id)
@@ -572,7 +574,8 @@ class RecapDocketTaskTest(TestCase):
             entry_number='1',
             date_filed=date(2008, 1, 1),
         )
-        d = process_recap_docket(self.pq.pk)
+        returned_data = process_recap_docket(self.pq.pk)
+        d = Docket.objects.get(pk=returned_data['docket_pk'])
         de = d.docket_entries.get(pk=existing_de.pk)
         self.assertNotEqual(
             existing_de.description,

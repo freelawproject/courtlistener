@@ -148,6 +148,11 @@ class Docket(models.Model):
         auto_now=True,
         db_index=True,
     )
+    date_last_index = models.DateTimeField(
+        help_text="The last moment that the item was indexed in Solr.",
+        null=True,
+        blank=True,
+    )
     date_cert_granted = models.DateField(
         help_text="date cert was granted for this case, if applicable",
         blank=True,

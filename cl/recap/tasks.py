@@ -23,7 +23,8 @@ from cl.people_db.models import Party, PartyType, Attorney, \
 from cl.recap.models import ProcessingQueue, PacerHtmlFiles
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import Docket, RECAPDocument, DocketEntry
-from cl.search.tasks import add_or_update_recap_document
+from cl.search.tasks import add_or_update_recap_document, \
+    add_or_update_recap_docket
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -432,7 +433,17 @@ def process_recap_docket(pk):
     """Process an uploaded docket from the RECAP API endpoint.
 
     :param pk: The primary key of the processing queue item you want to work on.
-    :return: The docket that's created or updated.
+    :return: A dict of the form:
+
+        {
+            // The PK of the docket that's created or updated
+            'docket_pk': 22,
+            // A boolean indicating whether a new docket entry or recap document
+            // was created (implying a Solr needs updating).
+            'needs_solr_update': True,
+        }
+
+    This value is a dict so that it can be ingested in a Celery chain.
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
@@ -510,11 +521,12 @@ def process_recap_docket(pk):
         ContentFile(text),
     )
 
-    # Docket entries
-    created = []
+    # Docket entries & documents
+    rds_created = []
+    needs_solr_update = False
     for docket_entry in docket_data['docket_entries']:
         try:
-            de, _ = DocketEntry.objects.update_or_create(
+            de, de_created = DocketEntry.objects.update_or_create(
                 docket=d,
                 entry_number=docket_entry['document_number'],
                 defaults={
@@ -528,6 +540,8 @@ def process_recap_docket(pk):
                 "while processing '%s'" % (docket_entry['document_number'], pq)
             )
             continue
+        if de_created:
+            needs_solr_update = True
 
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
@@ -546,7 +560,7 @@ def process_recap_docket(pk):
                 is_available=False,
                 **params
             )
-            created.append(rd)
+            rds_created.append(rd)
         except RECAPDocument.MultipleObjectsReturned:
             logger.error(
                 "Multiple recap documents found for document entry number'%s' "
@@ -557,9 +571,12 @@ def process_recap_docket(pk):
             rd.pacer_doc_id = rd.pacer_doc_id or pq.pacer_doc_id
 
     add_parties_and_attorneys(d, docket_data['parties'])
-    process_orphan_documents(created, pq.court_id, d.date_filed)
+    process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
-    return d
+    return {
+        'docket_pk': d.pk,
+        'needs_solr_update': bool(rds_created or needs_solr_update),
+    }
 
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60,
