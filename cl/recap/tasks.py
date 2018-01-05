@@ -39,7 +39,7 @@ def process_recap_upload(pq):
     """
     if pq.upload_type == pq.DOCKET:
         chain(process_recap_docket.s(pq.pk),
-              add_or_update_recap_docket.s()).apply_asnyc()
+              add_or_update_recap_docket.s()).apply_async()
     elif pq.upload_type == pq.ATTACHMENT_PAGE:
         process_recap_attachment.delay(pq.pk)
     elif pq.upload_type == pq.PDF:
