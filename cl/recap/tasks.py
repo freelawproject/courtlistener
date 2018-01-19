@@ -617,7 +617,7 @@ def process_recap_attachment(self, pk):
         }
         if pq.pacer_case_id:
             params['docket_entry__docket__pacer_case_id'] = pq.pacer_case_id
-        rd = RECAPDocument.objects.get(**params)
+        main_rd = RECAPDocument.objects.get(**params)
     except RECAPDocument.MultipleObjectsReturned:
         # Unclear how to proceed and we don't want to associate this data with
         # the wrong case. We must punt.
@@ -636,11 +636,12 @@ def process_recap_attachment(self, pk):
 
     # We got the right item. Update/create all the attachments for
     # the docket entry.
-    de = rd.docket_entry
+    de = main_rd.docket_entry
     if att_data['document_number'] is None:
         # Bankruptcy attachment page. Use the document number from the Main doc
-        att_data['document_number'] = rd.document_number
+        att_data['document_number'] = main_rd.document_number
 
+    rds_created = []
     if not pq.debug:
         # Save the old HTML to the docket entry.
         pacer_file = PacerHtmlFiles(content_object=de)
@@ -663,6 +664,8 @@ def process_recap_attachment(self, pk):
                     attachment_number=attachment['attachment_number'],
                     document_type=RECAPDocument.ATTACHMENT,
                 )
+                if created:
+                    rds_created.append(rd.pk)
                 needs_save = False
                 for field in ['description', 'pacer_doc_id']:
                     if attachment[field]:
@@ -675,6 +678,8 @@ def process_recap_attachment(self, pk):
                 add_or_update_recap_document([rd.pk], force_commit=False)
 
     mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
+    process_orphan_documents(rds_created, pq.court_id,
+                             main_rd.docket_entry.docket.date_filed)
 
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60,
