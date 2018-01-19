@@ -54,9 +54,8 @@ def get_next_date_range(court_id, span=7):
         return None, None
 
     last_complete_date = last_completion_log.date_queried
-    next_start_date = last_complete_date + timedelta(days=1)
     next_end_date = min(now().date(), last_complete_date + timedelta(days=span))
-    return next_start_date, next_end_date
+    return last_complete_date, next_end_date
 
 
 def mark_court_in_progress(court_id, d):
