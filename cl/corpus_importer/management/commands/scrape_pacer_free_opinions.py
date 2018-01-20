@@ -101,7 +101,7 @@ def get_and_save_free_document_reports(options):
 
     # Iterate over every court, X days at a time. As courts are completed,
     # remove them from the list of courts to process until none are left
-    tomorrow = now() + timedelta(days=1)
+    today = now()
     while len(pacer_court_ids) > 0:
         court_ids_copy = pacer_court_ids.copy()  # Make a copy of the list.
         for pacer_court_id, delay in court_ids_copy.items():
@@ -115,7 +115,7 @@ def get_and_save_free_document_reports(options):
                 if delay['result'].ready():
                     result = delay['result'].get()
                     if result == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
-                        if next_start_date >= tomorrow.date():
+                        if next_start_date >= today.date():
                             logger.info("Finished '%s'. Marking it complete." %
                                         pacer_court_id)
                             pacer_court_ids.pop(pacer_court_id, None)
