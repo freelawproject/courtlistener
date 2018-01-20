@@ -665,7 +665,7 @@ def process_recap_attachment(self, pk):
                     document_type=RECAPDocument.ATTACHMENT,
                 )
                 if created:
-                    rds_created.append(rd.pk)
+                    rds_created.append(rd)
                 needs_save = False
                 for field in ['description', 'pacer_doc_id']:
                     if attachment[field]:
