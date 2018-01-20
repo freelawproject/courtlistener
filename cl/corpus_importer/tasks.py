@@ -125,7 +125,7 @@ def get_free_document_report(self, court_id, start, end, session):
         raise self.retry(exc=exc, countdown=15)
 
 
-@app.task(bind=True, max_retries=20)
+@app.task(bind=True, max_retries=2)
 def get_and_save_free_document_report(self, court_id, start, end, session):
     """Download the Free document report and save it to the DB.
 
@@ -145,7 +145,7 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
                        "(%s to %s). Trying again." % (court_id, start, end))
         if self.request.retries == self.max_retries:
             return PACERFreeDocumentLog.SCRAPE_FAILED
-        raise self.retry(exc=exc, countdown=10)
+        raise self.retry(exc=exc, countdown=5)
 
     try:
         results = report.data
@@ -154,7 +154,7 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
         # HTTPError: raise_for_status in parse hit bad status.
         if self.request.retries == self.max_retries:
             return PACERFreeDocumentLog.SCRAPE_FAILED
-        raise self.retry(exc=exc, countdown=10)
+        raise self.retry(exc=exc, countdown=5)
 
     for row in results:
         PACERFreeDocumentRow.objects.create(
