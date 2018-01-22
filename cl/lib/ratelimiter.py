@@ -18,7 +18,7 @@ APPROVED_DOMAINS = [
 ]
 
 
-ratelimiter = ratelimit(key='ip', rate='100/h', block=True)
+ratelimiter = ratelimit(key='ip', rate='250/h', block=True)
 
 
 def ratelimit_if_not_whitelisted(view):
