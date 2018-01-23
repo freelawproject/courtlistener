@@ -119,7 +119,7 @@ def get_and_save_free_document_reports(options):
                 if delay['result'].ready():
                     result = delay['result'].get()
                     if result == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
-                        if next_start_date >= today.date():
+                        if next_end_date >= today.date():
                             logger.info("Finished '%s'. Marking it complete." %
                                         pacer_court_id)
                             pacer_court_ids.pop(pacer_court_id, None)
