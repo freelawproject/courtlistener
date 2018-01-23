@@ -53,9 +53,12 @@ def get_next_date_range(court_id, span=7):
     if last_completion_log.status == PACERFreeDocumentLog.SCRAPE_IN_PROGRESS:
         return None, None
 
-    # Ensure that we go back five days from the last time we had success.
-    last_complete_date = last_completion_log.date_queried - timedelta(days=5)
-    next_end_date = min(now().date(), last_complete_date + timedelta(days=span))
+    # Ensure that we go back five days from the last time we had success if that
+    # success was in the last few days.
+    last_complete_date = min(now().date() - timedelta(days=5),
+                             last_completion_log.date_queried)
+    next_end_date = min(now().date(),
+                        last_complete_date + timedelta(days=span))
     return last_complete_date, next_end_date
 
 
