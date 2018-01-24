@@ -7,6 +7,7 @@ from tempfile import NamedTemporaryFile
 
 import internetarchive as ia
 import requests
+from billiard import SoftTimeLimitExceeded
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction, DatabaseError
@@ -125,7 +126,7 @@ def get_free_document_report(self, court_id, start, end, session):
         raise self.retry(exc=exc, countdown=15)
 
 
-@app.task(bind=True, max_retries=2)
+@app.task(bind=True, max_retries=2, soft_time_limit=60)
 def get_and_save_free_document_report(self, court_id, start, end, session):
     """Download the Free document report and save it to the DB.
 
@@ -146,6 +147,8 @@ def get_and_save_free_document_report(self, court_id, start, end, session):
         if self.request.retries == self.max_retries:
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
+    except SoftTimeLimitExceeded:
+        return PACERFreeDocumentLog.SCRAPE_FAILED
 
     try:
         results = report.data
