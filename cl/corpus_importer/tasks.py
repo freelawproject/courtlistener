@@ -7,7 +7,7 @@ from tempfile import NamedTemporaryFile
 
 import internetarchive as ia
 import requests
-from billiard import SoftTimeLimitExceeded
+from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction, DatabaseError
