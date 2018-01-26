@@ -221,6 +221,7 @@ def upload_to_internet_archive(options):
         is_free_on_pacer=True,
         is_available=True,
         filepath_ia='',
+        ia_upload_failure_count__lt=3,
     ).exclude(
         filepath_local='',
     ).values_list(

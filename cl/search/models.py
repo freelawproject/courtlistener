@@ -627,6 +627,11 @@ class RECAPDocument(models.Model):
         max_length=1000,
         blank=True,
     )
+    ia_upload_failure_count = models.SmallIntegerField(
+        help_text="Number of times the upload to the Internet Archive failed.",
+        null=True,
+        blank=True,
+    )
     description = models.TextField(
         help_text="The short description of the docket entry that appears on "
                   "the attachments page.",

@@ -308,6 +308,14 @@ def get_and_process_pdf(self, data, session, row_pk, index=False):
     return {'result': result, 'rd_pk': rd.pk}
 
 
+def increment_failure_count(rd):
+    if rd.ia_upload_failure_count is None:
+        rd.ia_upload_failure_count = 1
+    else:
+        rd.ia_upload_failure_count += 1
+    rd.save()
+
+
 class OverloadedException(Exception):
     pass
 
@@ -348,6 +356,7 @@ def upload_free_opinion_to_ia(self, rd_pk):
         #             by IA is bad (or something).
         if self.request.retries == self.max_retries:
             # Give up for now. It'll get done next time cron is run.
+            increment_failure_count(rd)
             return
         raise self.retry(exc=exc)
     except HTTPError as exc:
@@ -355,11 +364,13 @@ def upload_free_opinion_to_ia(self, rd_pk):
             HTTP_403_FORBIDDEN,    # Can't access bucket, typically.
             HTTP_400_BAD_REQUEST,  # Corrupt PDF, typically.
         ]:
+            increment_failure_count(rd)
             return [exc.response]
         if self.request.retries == self.max_retries:
             # This exception is also raised when the endpoint is overloaded, but
             # doesn't get caught in the OverloadedException below due to
             # multiple processes running at the same time. Just give up for now.
+            increment_failure_count(rd)
             return
         raise self.retry(exc=exc)
     except (requests.Timeout, requests.RequestException) as exc:
@@ -367,12 +378,14 @@ def upload_free_opinion_to_ia(self, rd_pk):
                        "to IA. Trying again if retries not exceeded: %s" % rd)
         if self.request.retries == self.max_retries:
             # Give up for now. It'll get done next time cron is run.
+            increment_failure_count(rd)
             return
         raise self.retry(exc=exc)
     if all(r.ok for r in responses):
+        rd.ia_upload_failure_count = None
         rd.filepath_ia = "https://archive.org/download/%s/%s" % (
             bucket_name, file_name)
-        rd.save(do_extraction=False, index=False)
+        rd.save()
 
 
 access_key = settings.IA_ACCESS_KEY
