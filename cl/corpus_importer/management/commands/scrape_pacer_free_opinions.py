@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from celery.canvas import chain
 from django.conf import settings
+from django.db.models import Q
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer.http import PacerSession
@@ -218,10 +219,10 @@ def upload_to_internet_archive(options):
     """Upload items to the Internet Archive."""
     q = options['queue']
     rds = RECAPDocument.objects.filter(
+        Q(ia_upload_failure_count__lt=3) | Q(ia_upload_failure_count=None),
         is_free_on_pacer=True,
         is_available=True,
         filepath_ia='',
-        ia_upload_failure_count__lt=3,
     ).exclude(
         filepath_local='',
     ).values_list(
