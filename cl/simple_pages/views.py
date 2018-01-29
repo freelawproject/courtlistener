@@ -289,7 +289,7 @@ def serve_static_file(request, file_path=''):
     else:
         response['X-Sendfile'] = file_loc
     file_name = file_path.split('/')[-1]
-    response['Content-Disposition'] = 'attachment; filename="%s"' % \
+    response['Content-Disposition'] = 'inline; filename="%s"' % \
                                       file_name.encode('utf-8')
     response['Content-Type'] = mimetype
     if not is_bot(request):
