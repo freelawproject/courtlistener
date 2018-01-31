@@ -1,16 +1,17 @@
 <div class="sidebar-section">
-    <h3><span>Deprecated API Documentation</span></h3>
+    <h3><span>API Change Log</span></h3>
 
-    <p>If you are using an old version of the API and are looking for the notes
-        for that version, please see:
-
-    </p>
     <ul>
-        <li><strong>v1</strong> &ndash; <a
-                href="{% url "rest_docs" version="v1" %}">{% url "rest_docs" version="v1" %}</a>
-        </li>
+        <li><strong>v3.2</strong> &ndash; This version added the <code>id</code> field to many of the endpoints.</li>
+        <li><strong>v3.1</strong> &ndash; This version added experimental Swagger and Core API implementations.</li>
+        <li><strong>v3.0</strong> &ndash; Upgraded and overhauled the API to use the Django REST Framework.</li>
         <li><strong>v2</strong> &ndash; <a
-                href="{% url "rest_docs" version="v2" %}">{% url "rest_docs" version="v2" %}</a>
+                href="{% url "rest_docs" version="v2" %}">For original documentation, see: {% url "rest_docs" version="v2" %}</a>
         </li>
+        <li><strong>v1</strong> &ndash; <a
+                href="{% url "rest_docs" version="v1" %}">For original
+            documentation, see: {% url "rest_docs" version="v1" %}</a>
+        </li>
+
     </ul>
 </div>

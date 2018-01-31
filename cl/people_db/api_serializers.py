@@ -1,14 +1,14 @@
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
+from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, Party, \
     Attorney, Role, PartyType
 from cl.search.api_serializers import CourtSerializer
 
 
-class SchoolSerializer(DynamicFieldsMixin,
-                       serializers.HyperlinkedModelSerializer):
+class SchoolSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     is_alias_of = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='school-detail',
@@ -21,8 +21,7 @@ class SchoolSerializer(DynamicFieldsMixin,
         fields = '__all__'
 
 
-class EducationSerializer(DynamicFieldsMixin,
-                          serializers.HyperlinkedModelSerializer):
+class EducationSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     school = SchoolSerializer(many=False, read_only=True)
     person = serializers.HyperlinkedRelatedField(
         many=False,
@@ -37,7 +36,7 @@ class EducationSerializer(DynamicFieldsMixin,
 
 
 class PoliticalAffiliationSerializer(DynamicFieldsMixin,
-                                     serializers.HyperlinkedModelSerializer):
+                                     HyperlinkedModelSerializerWithId):
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
@@ -50,8 +49,7 @@ class PoliticalAffiliationSerializer(DynamicFieldsMixin,
         fields = '__all__'
 
 
-class SourceSerializer(DynamicFieldsMixin,
-                       serializers.HyperlinkedModelSerializer):
+class SourceSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
@@ -64,8 +62,7 @@ class SourceSerializer(DynamicFieldsMixin,
         fields = '__all__'
 
 
-class ABARatingSerializer(DynamicFieldsMixin,
-                          serializers.HyperlinkedModelSerializer):
+class ABARatingSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='person-detail',
@@ -78,8 +75,7 @@ class ABARatingSerializer(DynamicFieldsMixin,
         fields = '__all__'
 
 
-class PersonSerializer(DynamicFieldsMixin,
-                       serializers.HyperlinkedModelSerializer):
+class PersonSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     race = serializers.StringRelatedField(many=True)
     sources = SourceSerializer(many=True, read_only=True)
     aba_ratings = ABARatingSerializer(many=True, read_only=True)
@@ -105,7 +101,7 @@ class PersonSerializer(DynamicFieldsMixin,
 
 
 class RetentionEventSerializer(DynamicFieldsMixin,
-                               serializers.HyperlinkedModelSerializer):
+                               HyperlinkedModelSerializerWithId):
     position = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='position-detail',
@@ -118,8 +114,7 @@ class RetentionEventSerializer(DynamicFieldsMixin,
         fields = '__all__'
 
 
-class PositionSerializer(DynamicFieldsMixin,
-                         serializers.HyperlinkedModelSerializer):
+class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     retention_events = RetentionEventSerializer(many=True, read_only=True)
     person = PersonSerializer(many=False, read_only=True)
     supervisor = PersonSerializer(many=False, read_only=True)
@@ -162,8 +157,7 @@ class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('role', 'docket', 'party')
 
 
-class PartySerializer(DynamicFieldsMixin,
-                      serializers.HyperlinkedModelSerializer):
+class PartySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     attorneys = AttorneyRoleSerializer(source='roles', many=True)
     party_types = PartyTypeSerializer(many=True)
 
@@ -172,8 +166,7 @@ class PartySerializer(DynamicFieldsMixin,
         fields = '__all__'
 
 
-class AttorneySerializer(DynamicFieldsMixin,
-                         serializers.HyperlinkedModelSerializer):
+class AttorneySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     parties_represented = PartyRoleSerializer(source='roles', many=True)
 
     class Meta:

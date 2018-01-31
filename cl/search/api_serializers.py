@@ -3,13 +3,14 @@ from collections import OrderedDict
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
+from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
 from cl.people_db.models import Person, PartyType
 from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
     OpinionsCited, DocketEntry, RECAPDocument, Tag
 
 
-class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
+class PartyTypeSerializer(HyperlinkedModelSerializerWithId):
     party_type = serializers.CharField(source='name')
 
     class Meta:
@@ -18,7 +19,7 @@ class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class DocketSerializer(DynamicFieldsMixin,
-                       serializers.HyperlinkedModelSerializer):
+                       HyperlinkedModelSerializerWithId):
     court = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='court-detail',
@@ -57,7 +58,7 @@ class DocketSerializer(DynamicFieldsMixin,
 
 
 class RECAPDocumentSerializer(DynamicFieldsMixin,
-                              serializers.HyperlinkedModelSerializer):
+                              HyperlinkedModelSerializerWithId):
     tags = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='tag-detail',
@@ -73,7 +74,7 @@ class RECAPDocumentSerializer(DynamicFieldsMixin,
 
 
 class DocketEntrySerializer(DynamicFieldsMixin,
-                            serializers.HyperlinkedModelSerializer):
+                            HyperlinkedModelSerializerWithId):
     docket = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='docket-detail',
@@ -88,14 +89,14 @@ class DocketEntrySerializer(DynamicFieldsMixin,
 
 
 class CourtSerializer(DynamicFieldsMixin,
-                      serializers.HyperlinkedModelSerializer):
+                      HyperlinkedModelSerializerWithId):
     class Meta:
         model = Court
         exclude = ('notes',)
 
 
 class OpinionSerializer(DynamicFieldsMixin,
-                        serializers.HyperlinkedModelSerializer):
+                        HyperlinkedModelSerializerWithId):
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
     cluster = serializers.HyperlinkedRelatedField(
@@ -123,7 +124,7 @@ class OpinionSerializer(DynamicFieldsMixin,
 
 
 class OpinionsCitedSerializer(DynamicFieldsMixin,
-                              serializers.HyperlinkedModelSerializer):
+                              HyperlinkedModelSerializerWithId):
     # These attributes seem unnecessary and this endpoint serializes the same
     # data without them, but when they're not here the API does a query that
     # pulls back ALL Opinions.
@@ -146,7 +147,7 @@ class OpinionsCitedSerializer(DynamicFieldsMixin,
 
 
 class OpinionClusterSerializer(DynamicFieldsMixin,
-                               serializers.HyperlinkedModelSerializer):
+                               HyperlinkedModelSerializerWithId):
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
     panel = serializers.HyperlinkedRelatedField(
@@ -180,7 +181,7 @@ class OpinionClusterSerializer(DynamicFieldsMixin,
 
 
 class TagSerializer(DynamicFieldsMixin,
-                    serializers.HyperlinkedModelSerializer):
+                    HyperlinkedModelSerializerWithId):
     class Meta:
         model = Tag
         fields = '__all__'
