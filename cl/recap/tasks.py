@@ -451,6 +451,7 @@ def add_docket_entries(d, docket_entries, pq):
             continue
         else:
             rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
+            rd.description = docket_entry.get('short_description') or rd.description
 
     return rds_created, needs_solr_update
 
