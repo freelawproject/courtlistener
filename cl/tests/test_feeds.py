@@ -141,7 +141,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                     'GET %s should result in HTTP 200' %
                     entry.enclosures[0].href
                 )
-                self.assertIn('attachment;', r['Content-Disposition'])
+                self.assertIn('inline;', r['Content-Disposition'])
 
     def test_oral_argument_feeds_contain_valid_mp3_links(self):
         """

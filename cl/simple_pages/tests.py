@@ -181,14 +181,14 @@ class StaticFilesTest(TestCase):
         response = serve_static_file(request, file_path=self.good_mp3_path)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'audio/mpeg')
-        self.assertIn('attachment;', response['Content-Disposition'])
+        self.assertIn('inline;', response['Content-Disposition'])
 
     def test_serve_static_file_serves_txt(self):
         request = HttpRequest()
         response = serve_static_file(request, file_path=self.good_txt_path)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'text/plain')
-        self.assertIn('attachment;', response['Content-Disposition'])
+        self.assertIn('inline;', response['Content-Disposition'])
         self.assertIn(
             'FOR THE DISTRICT OF COLUMBIA CIRCUIT',
             response.content
@@ -199,4 +199,4 @@ class StaticFilesTest(TestCase):
         response = serve_static_file(request, file_path=self.good_pdf_path)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
-        self.assertIn('attachment;', response['Content-Disposition'])
+        self.assertIn('inline;', response['Content-Disposition'])
