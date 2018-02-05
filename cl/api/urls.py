@@ -41,13 +41,9 @@ router.register(r'recap-query', recap_views.PacerDocIdLookupViewSet,
                 base_name='fast-recapdocument')
 
 API_TITLE = "CourtListener Legal Data API"
-core_api_schema_view = get_schema_view(
-    title=API_TITLE,
-    url='https://www.courtlistener.com/api/',
-)
+core_api_schema_view = get_schema_view(title=API_TITLE)
 swagger_schema_view = get_schema_view(
     title=API_TITLE,
-    url='https://www.courtlistener.com/api/',
     renderer_classes=[OpenAPIRenderer, SwaggerUIRenderer],
 )
 
