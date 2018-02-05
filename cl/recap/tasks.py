@@ -11,7 +11,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer import DocketReport, AttachmentPage
+from juriscraper.pacer import DocketReport, AttachmentPage, DocketHistoryReport
 
 from cl.celery import app
 from cl.lib.import_lib import get_candidate_judges
@@ -45,7 +45,8 @@ def process_recap_upload(pq):
     elif pq.upload_type == pq.PDF:
         process_recap_pdf.delay(pq.pk)
     elif pq.upload_type == pq.DOCKET_HISTORY_REPORT:
-        process_recap_docket_history_report.delay(pq.pk)
+        chain(process_recap_docket_history_report.s(pq.pk),
+              add_or_update_recap_docket.s()).apply_async()
     elif pq.upload_type == pq.APPELLATE_DOCKET:
         process_recap_appellate_docket.delay(pq.pk)
     elif pq.upload_type == pq.APPELLATE_ATTACHMENT_PAGE:
@@ -331,18 +332,62 @@ def add_attorney(atty, p, d):
     return a
 
 
+def find_docket_from_pq(court_id, pacer_case_id, docket_number):
+    """Attempt to find the docket based on the uploaded data. If cannot be
+    found, create a new docket. If multiple are found, abort.
+    """
+    # Attempt several lookups of decreasing specificity. Note that pacer_case_id
+    # is required for Docket and Docket History uploads.
+    d = None
+    for kwargs in [{'pacer_case_id': pacer_case_id,
+                    'docket_number': docket_number},
+                   {'pacer_case_id': pacer_case_id},
+                   {'docket_number': docket_number,
+                    'pacer_case_id': None}]:
+        try:
+            d = Docket.objects.get(court_id=court_id, **kwargs)
+            break
+        except Docket.DoesNotExist:
+            continue
+        except Docket.MultipleObjectsReturned:
+            return None
+
+    if d is None:
+        # Couldn't find a docket. Make a new one.
+        d = Docket(
+            source=Docket.RECAP,
+            pacer_case_id=pacer_case_id,
+            court_id=court_id,
+        )
+
+    return d
+
+
+def add_recap_source(d):
+    # Add RECAP as a source if it's not already.
+    if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
+        d.source = Docket.RECAP_AND_SCRAPER
+    elif d.source == Docket.COLUMBIA:
+        d.source = Docket.COLUMBIA_AND_RECAP
+    elif d.source == Docket.COLUMBIA_AND_SCRAPER:
+        d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
+
+
 def update_docket_metadata(d, docket_data):
-    """Update the Docket object with the data from Juriscraper"""
-    d.docket_number = d.docket_number or docket_data['docket_number']
-    d.pacer_case_id = d.pacer_case_id or docket_data['pacer_case_id']
-    d.date_filed = d.date_filed or docket_data['date_filed']
-    d.date_terminated = d.date_terminated or docket_data['date_terminated']
-    d.case_name = d.case_name or docket_data['case_name']
-    d.case_name_short = d.case_name_short or cnt.make_case_name_short(d.case_name)
-    d.cause = d.cause or docket_data['cause']
-    d.nature_of_suit = d.nature_of_suit or docket_data['nature_of_suit']
-    d.jury_demand = d.jury_demand or docket_data['jury_demand']
-    d.jurisdiction_type = d.jurisdiction_type or docket_data['jurisdiction']
+    """Update the Docket object with the data from Juriscraper.
+
+    Works on either docket history report or docket report results.
+    """
+    d.docket_number = docket_data['docket_number'] or d.docket_number
+    d.date_filed = docket_data['date_filed'] or d.date_filed
+    d.date_last_filing = docket_data.get('date_last_filing') or d.date_last_filing
+    d.date_terminated = docket_data['date_terminated'] or d.date_terminated
+    d.case_name = docket_data['case_name'] or d.case_name
+    d.case_name_short = cnt.make_case_name_short(d.case_name) or d.case_name_short
+    d.cause = docket_data.get('cause') or d.cause
+    d.nature_of_suit = docket_data.get('nature_of_suit') or d.nature_of_suit
+    d.jury_demand = docket_data.get('jury_demand') or d.jury_demand
+    d.jurisdiction_type = docket_data.get('jurisdiction') or d.jurisdiction_type
     judges = get_candidate_judges(docket_data.get('assigned_to_str'), d.court_id,
                                   docket_data['date_filed'])
     if judges is not None and len(judges) == 1:
@@ -355,6 +400,59 @@ def update_docket_metadata(d, docket_data):
     d.referred_to_str = docket_data.get('referred_to_str') or ''
     d.blocked, d.date_blocked = get_blocked_status(d)
     return d
+
+
+def add_docket_entries(d, docket_entries, pq):
+    """Update or create the docket entries and documents."""
+    rds_created = []
+    needs_solr_update = False
+    for docket_entry in docket_entries:
+        try:
+            de, de_created = DocketEntry.objects.update_or_create(
+                docket=d,
+                entry_number=docket_entry['document_number'],
+                defaults={
+                    'description': docket_entry['description'],
+                    'date_filed': docket_entry['date_filed'],
+                }
+            )
+        except DocketEntry.MultipleObjectsReturned:
+            logger.error(
+                "Multiple docket entries found for document entry number '%s' "
+                "while processing '%s'" % (docket_entry['document_number'], pq)
+            )
+            continue
+        if de_created:
+            needs_solr_update = True
+
+        # Then make the RECAPDocument object. Try to find it. If we do, update
+        # the pacer_doc_id field if it's blank. If we can't find it, create it
+        # or throw an error.
+        params = {
+            'docket_entry': de,
+            # No attachments when uploading dockets.
+            'document_type': RECAPDocument.PACER_DOCUMENT,
+            'document_number': docket_entry['document_number'],
+        }
+        try:
+            rd = RECAPDocument.objects.get(**params)
+        except RECAPDocument.DoesNotExist:
+            rd = RECAPDocument.objects.create(
+                pacer_doc_id=docket_entry['pacer_doc_id'],
+                is_available=False,
+                **params
+            )
+            rds_created.append(rd)
+        except RECAPDocument.MultipleObjectsReturned:
+            logger.error(
+                "Multiple recap documents found for document entry number'%s' "
+                "while processing '%s'" % (docket_entry['document_number'], pq)
+            )
+            continue
+        else:
+            rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
+
+    return rds_created, needs_solr_update
 
 
 def add_parties_and_attorneys(d, parties):
@@ -465,53 +563,27 @@ def process_recap_docket(self, pk):
         return None
 
     report._parse_text(text)
-    docket_data = report.data
+    data = report.data
     logger.info("Parsing completed of item %s" % pq)
 
-    if docket_data == {}:
+    if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
         msg = "Not a valid docket upload."
         mark_pq_status(pq, msg, pq.INVALID_CONTENT)
         self.request.callbacks = None
         return None
 
-    # Merge the contents of the docket into CL. Attempt several lookups of
-    # decreasing specificity. Note that pacer_case_id is required for Docket
-    # uploads.
-    d = None
-    for kwargs in [{'pacer_case_id': pq.pacer_case_id,
-                    'docket_number': docket_data['docket_number']},
-                   {'pacer_case_id': pq.pacer_case_id},
-                   {'docket_number': docket_data['docket_number'],
-                    'pacer_case_id': None}]:
-        try:
-            d = Docket.objects.get(court_id=pq.court_id, **kwargs)
-            break
-        except Docket.DoesNotExist:
-            continue
-        except Docket.MultipleObjectsReturned:
-            msg = "Too many dockets found when trying to look up '%s'" % pq
-            mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
-            self.request.callbacks = None
-            return None
-
+    # Merge the contents of the docket into CL.
+    d = find_docket_from_pq(pq.court_id, pq.pacer_case_id,
+                            data['docket_number'])
     if d is None:
-        # Couldn't find it. Make a new one.
-        d = Docket(
-            source=Docket.RECAP,
-            pacer_case_id=pq.pacer_case_id,
-            court_id=pq.court_id
-        )
+        msg = "Too many dockets found when trying to look up '%s'" % pq
+        mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
+        self.request.callbacks = None
+        return None
 
-    # Add RECAP as a source if it's not already.
-    if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
-        d.source = Docket.RECAP_AND_SCRAPER
-    elif d.source == Docket.COLUMBIA:
-        d.source = Docket.COLUMBIA_AND_RECAP
-    elif d.source == Docket.COLUMBIA_AND_SCRAPER:
-        d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
-
-    update_docket_metadata(d, docket_data)
+    add_recap_source(d)
+    update_docket_metadata(d, data)
 
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
@@ -527,56 +599,8 @@ def process_recap_docket(self, pk):
         ContentFile(text),
     )
 
-    # Docket entries & documents
-    rds_created = []
-    needs_solr_update = False
-    for docket_entry in docket_data['docket_entries']:
-        try:
-            de, de_created = DocketEntry.objects.update_or_create(
-                docket=d,
-                entry_number=docket_entry['document_number'],
-                defaults={
-                    'description': docket_entry['description'],
-                    'date_filed': docket_entry['date_filed'],
-                }
-            )
-        except DocketEntry.MultipleObjectsReturned:
-            logger.error(
-                "Multiple docket entries found for document entry number '%s' "
-                "while processing '%s'" % (docket_entry['document_number'], pq)
-            )
-            continue
-        if de_created:
-            needs_solr_update = True
-
-        # Then make the RECAPDocument object. Try to find it. If we do, update
-        # the pacer_doc_id field if it's blank. If we can't find it, create it
-        # or throw an error.
-        params = {
-            'docket_entry': de,
-            # No attachments when uploading dockets.
-            'document_type': RECAPDocument.PACER_DOCUMENT,
-            'document_number': docket_entry['document_number'],
-        }
-        try:
-            rd = RECAPDocument.objects.get(**params)
-        except RECAPDocument.DoesNotExist:
-            rd = RECAPDocument.objects.create(
-                pacer_doc_id=docket_entry['pacer_doc_id'],
-                is_available=False,
-                **params
-            )
-            rds_created.append(rd)
-        except RECAPDocument.MultipleObjectsReturned:
-            logger.error(
-                "Multiple recap documents found for document entry number'%s' "
-                "while processing '%s'" % (docket_entry['document_number'], pq)
-            )
-            continue
-        else:
-            rd.pacer_doc_id = rd.pacer_doc_id or pq.pacer_doc_id
-
-    add_parties_and_attorneys(d, docket_data['parties'])
+    rds_created, needs_solr_update = add_docket_entries(d, data['docket_entries'], pq)
+    add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
     return {
@@ -687,13 +711,53 @@ def process_recap_attachment(self, pk):
 def process_recap_docket_history_report(self, pk):
     """Process the docket history report.
 
-    For now, this is a stub until we can get the parser working properly in
-    Juriscraper.
+    :param pk: The primary key of the processing queue item you want to work on
+    :returns: A dict indicating whether the docket needs Solr re-indexing.
     """
     pq = ProcessingQueue.objects.get(pk=pk)
-    msg = "Docket history reports not yet supported. Coming soon."
-    mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
-    return None
+    mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
+    logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
+
+    report = DocketHistoryReport(map_cl_to_pacer_id(pq.court_id))
+    with open(pq.filepath_local.path) as f:
+        text = f.read().decode('utf-8')
+    report._parse_text(text)
+    data = report.data
+    logger.info("Parsing completed for item %s" % pq)
+
+    # Merge the contents of the docket into CL.
+    d = find_docket_from_pq(pq.court_id, pq.pacer_case_id,
+                            data['docket_number'])
+    if d is None:
+        msg = "Too many dockets found when trying to look up '%s'" % pq
+        mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
+        self.request.callbacks = None
+        return None
+
+    add_recap_source(d)
+    update_docket_metadata(d, data)
+
+    if pq.debug:
+        mark_pq_successful(pq, d_id=d.pk)
+        self.request.callbacks = None
+        return {'docket_pk': d.pk, 'needs_solr_update': False}
+
+    d.save()
+
+    # Add the HTML to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles(content_object=d)
+    pacer_file.filepath.save(
+        'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(text),
+    )
+
+    rds_created, needs_solr_update = add_docket_entries(d, data['docket_entries'], pq)
+    process_orphan_documents(rds_created, pq.court_id, d.date_filed)
+    mark_pq_successful(pq, d_id=d.pk)
+    return {
+        'docket_pk': d.pk,
+        'needs_solr_update': bool(rds_created or needs_solr_update),
+    }
 
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60,
