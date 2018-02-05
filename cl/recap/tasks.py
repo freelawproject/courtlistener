@@ -5,6 +5,7 @@ import os
 from datetime import timedelta
 
 from celery.canvas import chain
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.db.models import Q
@@ -437,11 +438,15 @@ def add_docket_entries(d, docket_entries, pq):
         try:
             rd = RECAPDocument.objects.get(**params)
         except RECAPDocument.DoesNotExist:
-            rd = RECAPDocument.objects.create(
-                pacer_doc_id=docket_entry['pacer_doc_id'],
-                is_available=False,
-                **params
-            )
+            try:
+                rd = RECAPDocument.objects.create(
+                    pacer_doc_id=docket_entry['pacer_doc_id'],
+                    is_available=False,
+                    **params
+                )
+            except ValidationError:
+                # Happens from race conditions.
+                continue
             rds_created.append(rd)
         except RECAPDocument.MultipleObjectsReturned:
             logger.error(
