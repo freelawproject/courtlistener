@@ -178,7 +178,7 @@ class ProcessingQueue(models.Model):
     )
 
     def __unicode__(self):
-        if self.upload_type == self.DOCKET:
+        if self.upload_type in [self.DOCKET, self.DOCKET_HISTORY_REPORT]:
             return u'ProcessingQueue %s: %s case #%s (%s)' % (
                 self.pk,
                 self.court_id,
@@ -200,7 +200,10 @@ class ProcessingQueue(models.Model):
                 self.get_upload_type_display(),
             )
         else:
-            raise NotImplementedError
+            raise NotImplementedError(
+                "No __unicode__ method on ProcessingQueue model for upload_"
+                "type of %s" % self.upload_type
+            )
 
     class Meta:
         permissions = (
