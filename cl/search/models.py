@@ -1173,7 +1173,7 @@ class OpinionCluster(models.Model):
         blank=True,
     )
     lexis_cite = models.CharField(
-        help_text="Lexis Nexus citation (e.g. 1 LEXIS 38237)",
+        help_text="LexisNexis citation (e.g. 1 LEXIS 38237)",
         max_length=50,
         blank=True,
     )
