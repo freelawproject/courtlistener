@@ -30,7 +30,7 @@
         {% if perms.search.change_docket %}
             <p class="float-right">
                 <a href="{% url 'admin:search_docket_change' docket.id %}"
-                   class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;<i
+                   class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;({{ docket.view_count }} views)&nbsp;<i
                         class="fa fa-pencil"></i>
                 </a>
                 {% if request.user.is_superuser %}
