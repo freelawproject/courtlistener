@@ -748,7 +748,19 @@ def process_recap_docket_history_report(self, pk):
         self.request.callbacks = None
         return {'docket_pk': d.pk, 'needs_solr_update': False}
 
-    d.save()
+    try:
+        d.save()
+    except IntegrityError as exc:
+        logger.warning("Race condition experienced while attempting docket "
+                       "save.")
+        error_message = "Unable to save docket due to IntegrityError."
+        if self.request.retries == self.max_retries:
+            mark_pq_status(pq, error_message, pq.PROCESSING_FAILED)
+            self.request.callbacks = None
+            return None
+        else:
+            mark_pq_status(pq, error_message, pq.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(content_object=d)
