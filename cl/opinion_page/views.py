@@ -31,7 +31,7 @@ from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 @ratelimit_if_not_whitelisted
 def view_docket(request, pk, slug):
-    docket = get_object_or_404(Docket, pk=pk, slug=slug)
+    docket = get_object_or_404(Docket, pk=pk)
     if not is_bot(request):
         with suppress_autotime(docket, ['date_modified']):
             docket.view_count = F('view_count') + 1
