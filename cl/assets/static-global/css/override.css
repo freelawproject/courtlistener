@@ -98,6 +98,13 @@ header {
     text-transform: none;
 }
 
+.tooltip-inner a,
+.tooltip-inner a:focus,
+.tooltip-inner a:hover {
+    color: #ffffff;
+    text-decoration: underline;
+}
+
 a.button:active{
   background-color:#6299c5;
 /* border:1px solid #6299c5; */

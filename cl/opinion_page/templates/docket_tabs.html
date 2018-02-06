@@ -75,6 +75,18 @@
 
         <h3>{{ docket.court }}</h3>
 
+        {% if docket.source in docket.RECAP_SOURCES %}
+            <p class="bottom">
+                <span class="meta-data-header">Last updated:</span>
+                <span class="meta-data-value">{{ docket.date_modified }}&nbsp;<i
+                        class="fa fa-question-circle gray cursor-help"
+                        data-toggle="tooltip"
+                        data-placement="right"
+                        data-html="true"
+                        data-trigger="click focus"
+                        title="This docket was collected as part of the RECAP Project. Therefore, it is updated when users of the &lt;a href=&quot;https://free.law/recap/&quot;&gt;RECAP Extension&lt;/a&gt; download the docket from PACER. To see the most up to date version of this docket, click the button above to &quot;View on PACER&quot;."></i></span>
+            </p>
+        {% endif %}
 
         {% if docket.assigned_to or docket.assigned_to_str %}
             <p class="bottom">
