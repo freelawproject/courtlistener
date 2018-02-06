@@ -98,11 +98,8 @@ header {
     text-transform: none;
 }
 
-.tooltip-inner a,
-.tooltip-inner a:focus,
-.tooltip-inner a:hover {
-    color: #ffffff;
-    text-decoration: underline;
+.dotted {
+    text-decoration: dotted underline gray;
 }
 
 a.button:active{
