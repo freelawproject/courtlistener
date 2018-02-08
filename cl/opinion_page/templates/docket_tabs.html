@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load text_filters %}
 {% load humanize %}
+{% load tz %}
 
 
 {% block sidebar %}{% endblock %}
@@ -82,7 +83,7 @@
                       data-toggle="tooltip"
                       data-placement="right"
                       data-html="true"
-                      title="This docket was collected as part of the RECAP Project. Therefore, it is updated when users of the RECAP Extension download the docket from PACER. To see the most up to date version of this docket, click the button above to &quot;View on PACER.&quot;">{{ docket.date_modified }}</span>
+                      title="This docket was collected as part of the RECAP Project. Therefore, it is updated when users of the RECAP Extension download the docket from PACER. To see the most up to date version of this docket, click the button above to &quot;View on PACER.&quot;">{{ docket.date_modified|timezone:timezone }}</span>
             </p>
         {% endif %}
 

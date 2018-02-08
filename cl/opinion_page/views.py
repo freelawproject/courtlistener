@@ -26,6 +26,7 @@ from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
 from cl.people_db.models import AttorneyOrganization, Role
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
+from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
@@ -81,6 +82,7 @@ def view_docket(request, pk, slug):
         'form': form,
         'favorite_form': favorite_form,
         'get_string': make_get_string(request),
+        'timezone': COURT_TIMEZONES.get(docket.court_id, 'US/Eastern'),
         'private': docket.blocked,
     })
 
@@ -120,6 +122,7 @@ def view_parties(request, docket_id, slug):
     return render(request, 'docket_parties.html', {
         'docket': docket,
         'parties': parties,
+        'timezone': COURT_TIMEZONES.get(docket.court_id, 'US/Eastern'),
         'private': docket.blocked,
     })
 

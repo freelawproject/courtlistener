@@ -28,6 +28,7 @@ USE_I18N = False
 DEFAULT_CHARSET = 'utf-8'
 LANGUAGE_CODE = 'en-us'
 USE_TZ = True
+DATETIME_FORMAT = 'N j, Y, P e'
 
 TEMPLATES = [{
     'BACKEND': 'django.template.backends.django.DjangoTemplates',
