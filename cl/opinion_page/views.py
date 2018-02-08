@@ -91,6 +91,17 @@ def view_docket(request, pk, slug):
 def view_parties(request, docket_id, slug):
     """Show the parties and attorneys tab on the docket."""
     docket = get_object_or_404(Docket, pk=docket_id, slug=slug)
+    try:
+        fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
+    except (ObjectDoesNotExist, TypeError):
+        # Not favorited or anonymous user
+        favorite_form = FavoriteForm(initial={
+            'docket_id': docket.pk,
+            'name': trunc(best_case_name(docket), 100, ellipsis='...'),
+        })
+    else:
+        favorite_form = FavoriteForm(instance=fave)
+
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
     # which reduces the number of queries needed for this down to four instead
@@ -122,6 +133,7 @@ def view_parties(request, docket_id, slug):
     return render(request, 'docket_parties.html', {
         'docket': docket,
         'parties': parties,
+        'favorite_form': favorite_form,
         'timezone': COURT_TIMEZONES.get(docket.court_id, 'US/Eastern'),
         'private': docket.blocked,
     })
