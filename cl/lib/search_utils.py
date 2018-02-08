@@ -675,6 +675,7 @@ def build_coverage_query(court, q):
 def build_court_count_query():
     """Build a query that returns the count of cases for all courts"""
     params = {
+        'q': '*',
         'facet': 'true',
         'facet.field': 'court_exact',
         'facet.limit': -1,
