@@ -91,7 +91,7 @@ IDB_FIELD_DATA = {
         'field': 'nature_of_suit',
         'type': int,
     },
-    'TITLE': {
+    'TITL': {
         'sources': [CV_2017],
         'field': 'title',
         'type': str,
