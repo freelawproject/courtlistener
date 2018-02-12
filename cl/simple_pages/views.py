@@ -1,6 +1,8 @@
 # coding=utf-8
 import json
+import logging
 import os
+import re
 
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -22,6 +24,8 @@ from cl.search.forms import SearchForm
 from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument
 from cl.simple_pages.forms import ContactForm
 from cl.stats.utils import tally_stat
+
+logger = logging.getLogger(__name__)
 
 
 def about(request):
@@ -140,6 +144,9 @@ def contact(
     """This is a fairly run-of-the-mill contact form, except that it can be
     overridden in various ways so that its logic can be called from other
     functions.
+
+    We also use a field called phone_number in place of the subject field to
+    defeat spam.
     """
     if template_data is None:
         template_data = {}
@@ -150,16 +157,22 @@ def contact(
         form = ContactForm(request.POST)
         if form.is_valid():
             cd = form.cleaned_data
+            # Uses phone_number as Subject field to defeat spam. If this field
+            # begins with three digits, assume it's spam; fake success.
+            if re.match('\d{3}', cd['phone_number']):
+                logger.info("Detected spam message. Not sending email.")
+                return HttpResponseRedirect(reverse(u'contact_thanks'))
+
             default_from = settings.DEFAULT_FROM_EMAIL
             EmailMessage(
-                subject=u'[CourtListener] Contact form message: '
-                        u'{subject}'.format(**cd),
-                body=u'Subject: {subject}\n'
+                subject=u'[CourtListener] Contact: '
+                        u'{phone_number}'.format(**cd),
+                body=u'Subject: {phone_number}\n'
                      u'From: {name} ({email})\n'
-                     u'Browser: {browser}\n'
-                     u'Message: \n\n{message}'.format(
-                        browser=request.META.get(u'HTTP_USER_AGENT', u"Unknown"),
-                        **cd
+                     u'\n\n{message}\n\n'
+                     u'Browser: {browser}'.format(
+                         browser=request.META.get(u'HTTP_USER_AGENT', u"Unknown"),
+                         **cd
                      ),
                 to=[m[1] for m in settings.MANAGERS],
                 reply_to=[cd.get(u'email', default_from) or default_from],

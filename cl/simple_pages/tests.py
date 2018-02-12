@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core import mail
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest
-from django.test import TestCase, RequestFactory
+from django.test import TestCase
 from django.test.utils import override_settings
 from lxml.html import fromstring
 
@@ -19,7 +19,7 @@ class ContactTest(TestCase):
     fixtures = ['authtest_data.json']
     test_msg = {
         'name': "pandora",
-        'subject': "asdf",
+        'phone_number': "asdf",
         'message': '123456789012345678901',
         'email': 'pandora@box.com',
         'skip_me_if_alive': "",
@@ -64,6 +64,25 @@ class ContactTest(TestCase):
             'vocabulary. The problem in language is to express many ideas and '
             'thoughts with comparatively few words. — John Wesley Powell'
         )
+        response = self.client.post(reverse('contact'), msg)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_spam_message_is_rejected(self):
+        """Do we reject it if people put a phone number in the phone_number
+        field?
+
+        We should! The phone_number field is labeled as the Subject field in the
+        UI. Anything putting a phone number in here is a bot to be rejected.
+        """
+        msg = self.test_msg.copy()
+        msg['phone_number'] = '909-576-4123'
+        response = self.client.post(reverse('contact'), msg)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Number in middle of subject is OK!
+        msg['phone_number'] = 'asdf 909 asdf'
         response = self.client.post(reverse('contact'), msg)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)

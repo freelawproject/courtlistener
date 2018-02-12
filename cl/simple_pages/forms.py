@@ -15,10 +15,12 @@ class ContactForm(forms.Form):
         )
     )
 
-    subject = forms.CharField(
+    # This is actually the "Subject" field, but we call it the phone_number
+    # field to defeat spam.
+    phone_number = forms.CharField(
         max_length=150,
         widget=forms.TextInput(
-            attrs={'class': 'form-control'}
+            attrs={'class': 'form-control', 'autocomplete': 'off'}
         )
     )
 

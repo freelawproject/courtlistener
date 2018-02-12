@@ -41,12 +41,13 @@
                 {% endif %}
             </div>
 
+            {# We use the phone_number field as the subject field to defeat spam #}
             <div class="form-group">
-                <label for="id_subject">Subject</label>
-                {{ form.subject }}
-                {% if form.subject.errors %}
+                <label for="id_phone_number">Subject</label>
+                {{ form.phone_number }}
+                {% if form.phone_number.errors %}
                     <p class="help-block">
-                        {% for error in form.subject.errors %}
+                        {% for error in form.phone_number.errors %}
                             {{ error|escape }}
                         {% endfor %}
                     </p>
