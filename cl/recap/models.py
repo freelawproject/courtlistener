@@ -488,18 +488,23 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
         null=True,
     )
+    # Via email from FJC, title and section fields are alternative for "cause"
+    # field.
     title = models.TextField(
         help_text="No description provided by FJC.",
         blank=True,
+        db_index=True,
     )
     section = models.CharField(
         help_text="No description provided by FJC.",
         max_length=200,
+        db_index=True,
         blank=True,
     )
     subsection = models.CharField(
         help_text="No description provided by FJC.",
         max_length=200,
+        db_index=True,
         blank=True,
     )
     diversity_of_residence = models.SmallIntegerField(
