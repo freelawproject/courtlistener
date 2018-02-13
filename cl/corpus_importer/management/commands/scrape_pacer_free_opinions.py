@@ -14,7 +14,7 @@ from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     get_and_save_free_document_report,
     process_free_opinion_result, get_and_process_pdf, delete_pacer_row,
-    upload_free_opinion_to_ia,
+    upload_pdf_to_ia,
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
@@ -215,12 +215,15 @@ def do_ocr(options):
             logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
 
 
-def upload_to_internet_archive(options):
+def upload_non_free_pdfs_to_internet_archive(options):
+    upload_to_internet_archive(options, do_non_free=True)
+
+
+def upload_to_internet_archive(options, do_non_free=False):
     """Upload items to the Internet Archive."""
     q = options['queue']
     rds = RECAPDocument.objects.filter(
         Q(ia_upload_failure_count__lt=3) | Q(ia_upload_failure_count=None),
-        is_free_on_pacer=True,
         is_available=True,
         filepath_ia='',
     ).exclude(
@@ -229,6 +232,11 @@ def upload_to_internet_archive(options):
         'pk',
         flat=True,
     ).order_by()
+    if do_non_free:
+        rds = rds.filter(Q(is_free_on_pacer=False) | Q(is_free_on_pacer=None))
+    else:
+        rds = rds.filter(is_free_on_pacer=True)
+
     count = rds.count()
     logger.info("Sending %s items to Internet Archive." % count)
     throttle = CeleryThrottle(queue_name=q)
@@ -236,7 +244,7 @@ def upload_to_internet_archive(options):
         throttle.maybe_wait()
         if i > 0 and i % 1000 == 0:
             logger.info("Sent %s/%s tasks to celery so far." % (i, count))
-        upload_free_opinion_to_ia.si(rd).set(queue=q).apply_async()
+        upload_pdf_to_ia.si(rd).set(queue=q).apply_async()
 
 
 def do_everything(options):
@@ -246,8 +254,10 @@ def do_everything(options):
     get_pdfs(options)
     logger.info("Doing OCR and saving items to Solr.")
     do_ocr(options)
-    logger.info("Uploading to Internet Archive.")
+    logger.info("Uploading free opinions to Internet Archive.")
     upload_to_internet_archive(options)
+    logger.info("Uploading non-free PDFs to Internet Archive.")
+    upload_non_free_pdfs_to_internet_archive(options)
 
 
 class Command(VerboseCommand):
@@ -294,5 +304,6 @@ class Command(VerboseCommand):
         'do-ocr': do_ocr,
         'do-everything': do_everything,
         'upload-to-ia': upload_to_internet_archive,
+        'upload-non-free-pdfs-to-ia': upload_non_free_pdfs_to_internet_archive,
     }
 

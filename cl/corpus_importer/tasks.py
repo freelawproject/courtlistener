@@ -321,14 +321,14 @@ class OverloadedException(Exception):
 
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5)
-def upload_free_opinion_to_ia(self, rd_pk):
+def upload_pdf_to_ia(self, rd_pk):
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
     file_name = get_document_filename(
         d.court_id,
         d.pacer_case_id,
         rd.document_number,
-        0,  # Attachment number is zero for all free opinions.
+        rd.attachment_number or 0,
     )
     bucket_name = get_bucket_name(d.court_id, d.pacer_case_id)
     try:
