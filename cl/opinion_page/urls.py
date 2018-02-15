@@ -31,7 +31,7 @@ urlpatterns = [
     url(
         r'^recap/gov.uscourts'
         r'\.(?P<court>[^\./]+)'
-        r'\.(?P<pacer_case_id>[^\./]+)/$',
+        r'\.(?P<pacer_case_id>[^\./]+)/?$',
         redirect_docket_recap,
         name="redirect_docket_recap",
     ),
