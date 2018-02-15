@@ -2,8 +2,8 @@ from django.conf.urls import url
 
 from cl.opinion_page.sitemap import opinion_sitemap_maker, recap_sitemap_maker
 from cl.opinion_page.views import (
-    view_opinion, view_authorities, view_docket, cluster_visualizations,
-    citation_redirector, view_recap_document, block_item, view_parties,
+    block_item, cluster_visualizations, view_opinion, citation_redirector,
+    view_authorities, view_docket, view_docket_recap, view_parties,
 )
 
 urlpatterns = [
