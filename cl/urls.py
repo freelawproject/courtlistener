@@ -2,6 +2,7 @@ from django.conf.urls import include, url
 from django.contrib import admin
 from django.views.generic import RedirectView
 from cl.sitemap import index_sitemap_maker
+from cl.simple_pages.views import serve_static_file
 
 urlpatterns = [
     # Admin docs and site
@@ -44,4 +45,9 @@ urlpatterns = [
         url='https://github.com/freelawproject/related-literature/raw/master/CourtListener%20Studies/Sarah%20Tyler/sarah_tyler_dissertation.pdf',  # noqa: E501
         permanent=True,
     )),
+
+    # Catch-alls that could conflict with other regexps -- place them last
+    #   Serve a static file
+    url(r'^(?P<file_path>(?:pdf|wpd|txt|doc|html|mp3|recap)/.+)$',
+        serve_static_file),
 ]
