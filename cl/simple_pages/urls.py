@@ -3,10 +3,11 @@ from django.views.generic import RedirectView
 
 from cl.simple_pages.sitemap import sitemap_maker
 from cl.simple_pages.views import (
-    tools_page, validate_for_google, validate_for_google2, validate_for_wot,
-    validate_for_bing, robots, advanced_search, contact_thanks, contact, feeds,
-    coverage_graph, faq, about, browser_warning, old_terms,
-    latest_terms, contribute, markdown_help, humans, podcasts
+    about, advanced_search, browser_warning, contact, contact_thanks,
+    contribute, coverage_graph, faq, feeds, humans, latest_terms,
+    markdown_help, old_terms, podcasts, robots, tools_page,
+    validate_for_bing, validate_for_google, validate_for_google2,
+    validate_for_wot,
 )
 
 
