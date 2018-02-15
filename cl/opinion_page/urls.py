@@ -37,14 +37,6 @@ urlpatterns = [
         name="view_docket_recap",
     ),
     url(
-        r'''(?x)
-            ^recap/gov.uscourts\.
-            (?P<court>[^\./]+)\.
-            (?P<pacer_case_id>[^\./]+)$''',
-        view_docket_recap,
-        name="view_docket_recap_noslash",
-    ),
-    url(
         r'^docket/(?P<docket_id>\d*)/parties/(?P<slug>[^/]*)/$',
         view_parties,
         name="docket_parties",
