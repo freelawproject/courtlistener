@@ -13,6 +13,7 @@
       "case_name_short": "case name short docket 1",
       "docket_number": "docket number 1 005",
       "slug": "case-name",
+      "pacer_case_id": "666666",
       "blocked": false,
       "source": 0
     },

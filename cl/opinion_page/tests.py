@@ -76,25 +76,22 @@ class CitationRedirectorTest(TestCase):
 
 
 class ViewRecapDocketTest(TestCase):
-    def test_recap_vs_docket(self):
-        """Does the Waymo v. Uber page return the same thing via both routes?
+    fixtures = ['test_objects_search.json', 'judge_judy.json']
 
-        Also, is that thing itself sane?
+    def test_regular_docket_url(self):
+        """Can we load a regular docket sheet?"""
+        r = self.client.get(reverse('view_docket', args=[1, 'case-name']))
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_recap_docket_url(self):
+        """Can we redirect to a regular docket URL from a recap/uscourts.*
+        URL?
         """
-
-        r0 = self.client.get(
-            '/docket/4609586/waymo-llc-v-uber-technologies-inc/')
-        r1 = self.client.get(
-            '/recap/gov.uscourts.cand.308136/')
-        self.assertEqual(r1, r0)
-        self.assertEqual(r1.status_code, 200)
-
-    def test_redirect(self):
-        """Confirm redirects redirect...somwhere."""
-
-        r = self.client.get('/recap/gov.uscourts.cand.308136',
-                            follow=True)
-        self.assertStatus(r, HTTP_302_FOUND)
+        r = self.client.get(reverse('redirect_docket_recap', kwargs={
+            'court': 'test',
+            'pacer_case_id': '666666',
+        }), follow=True)
+        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
 
 @override_settings(
