@@ -30,9 +30,19 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
-@ratelimit_if_not_whitelisted
 def view_docket(request, pk, slug):
     docket = get_object_or_404(Docket, pk=pk)
+    return view_docket_subr(request, docket)
+
+
+def view_docket_recap(request, court, pacer_case_id):
+    docket = get_object_or_404(Docket, pacer_case_id=pacer_case_id,
+                               court=court)
+    return view_docket_subr(request, docket)
+
+
+@ratelimit_if_not_whitelisted
+def view_docket_subr(request, docket):
     if not is_bot(request):
         with suppress_autotime(docket, ['date_modified']):
             cached_count = docket.view_count

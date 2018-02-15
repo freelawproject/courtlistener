@@ -75,6 +75,28 @@ class CitationRedirectorTest(TestCase):
         self.assertStatus(r, HTTP_404_NOT_FOUND)
 
 
+class ViewRecapDocketTest(TestCase):
+    def test_recap_vs_docket(self):
+        """Does the Waymo v. Uber page return the same thing via both routes?
+
+        Also, is that thing itself sane?
+        """
+
+        r0 = self.client.get(
+            '/docket/4609586/waymo-llc-v-uber-technologies-inc/')
+        r1 = self.client.get(
+            '/recap/gov.uscourts.cand.308136/')
+        self.assertEqual(r1, r0)
+        self.assertEqual(r1.status_code, 200)
+
+    def test_redirect(self):
+        """Confirm redirects redirect...somwhere."""
+
+        r = self.client.get('/recap/gov.uscourts.cand.308136',
+                            follow=True)
+        self.assertStatus(r, HTTP_302_FOUND)
+
+
 @override_settings(
     SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
