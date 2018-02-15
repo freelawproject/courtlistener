@@ -4,6 +4,7 @@ from cl.opinion_page.sitemap import opinion_sitemap_maker, recap_sitemap_maker
 from cl.opinion_page.views import (
     block_item, cluster_visualizations, view_opinion, citation_redirector,
     view_authorities, view_docket, view_docket_recap, view_parties,
+    view_recap_document,
 )
 
 urlpatterns = [
@@ -26,6 +27,22 @@ urlpatterns = [
         r'^docket/(\d*)/([^/]*)/$',
         view_docket,
         name="view_docket"
+    ),
+    url(
+        r'''(?x)
+            ^recap/gov.uscourts\.
+            (?P<court>[^\./]+)\.
+            (?P<pacer_case_id>[^\./]+)/$''',
+        view_docket_recap,
+        name="view_docket_recap",
+    ),
+    url(
+        r'''(?x)
+            ^recap/gov.uscourts\.
+            (?P<court>[^\./]+)\.
+            (?P<pacer_case_id>[^\./]+)$''',
+        view_docket_recap,
+        name="view_docket_recap_noslash",
     ),
     url(
         r'^docket/(?P<docket_id>\d*)/parties/(?P<slug>[^/]*)/$',
