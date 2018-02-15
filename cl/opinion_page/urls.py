@@ -46,7 +46,10 @@ urlpatterns = [
         name='view_recap_document',
     ),
     url(
-        r'^docket/(?P<docket_id>\d*)/(?P<doc_num>\d*)/(?P<att_num>\d*)/(?P<slug>[^/]*)/$',
+        r'^docket/(?P<docket_id>\d*)/'
+        r'(?P<doc_num>\d*)/'
+        r'(?P<att_num>\d*)/'
+        r'(?P<slug>[^/]*)/$',
         view_recap_document,
         name='view_recap_attachment',
     ),
