@@ -10,8 +10,6 @@ from cl.simple_pages.views import (
     podcasts
 )
 
-mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3', 'recap')
-
 
 urlpatterns = [
     # Footer stuff
@@ -26,7 +24,7 @@ urlpatterns = [
     url(r'^help/markdown/$', markdown_help, name="markdown_help"),
 
     # Serve a static file
-    url(r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.+)$',
+    url(r'^(?P<file_path>(?:pdf|wpd|txt|doc|html|mp3|recap)/.+)$',
         serve_static_file),
 
     # Advanced search page
