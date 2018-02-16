@@ -3,14 +3,12 @@ from django.views.generic import RedirectView
 
 from cl.simple_pages.sitemap import sitemap_maker
 from cl.simple_pages.views import (
-    tools_page, validate_for_google, validate_for_google2, validate_for_wot,
-    validate_for_bing, robots, advanced_search, contact_thanks, contact, feeds,
-    coverage_graph, faq, about, browser_warning, serve_static_file, old_terms,
-    latest_terms, contribute, markdown_help, humans,
-    podcasts
+    about, advanced_search, browser_warning, contact, contact_thanks,
+    contribute, coverage_graph, faq, feeds, humans, latest_terms,
+    markdown_help, old_terms, podcasts, robots, tools_page,
+    validate_for_bing, validate_for_google, validate_for_google2,
+    validate_for_wot,
 )
-
-mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3', 'recap')
 
 
 urlpatterns = [
@@ -24,10 +22,6 @@ urlpatterns = [
     url(r'^contact/$', contact, name="contact"),
     url(r'^contact/thanks/$', contact_thanks, name='contact_thanks'),
     url(r'^help/markdown/$', markdown_help, name="markdown_help"),
-
-    # Serve a static file
-    url(r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.+)$',
-        serve_static_file),
 
     # Advanced search page
     url(
