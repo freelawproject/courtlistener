@@ -76,3 +76,17 @@ def view_person(request, pk, slug):
         'ftm_last_updated': settings.FTM_LAST_UPDATED,
         'private': False
     })
+
+
+def financial_disclosures_home(request):
+    """The home page for financial disclosures
+
+    This page shows:
+     - A brief introduction to financial disclosure reports
+     - A list of all the people we have reports for
+     - A simple JS filter to find specific judges
+    """
+    return render(request, 'financial_disclosures_home.html', {
+        'disclosure_count': 900000,
+        'private': False,
+    })
