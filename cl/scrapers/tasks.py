@@ -329,13 +329,13 @@ def rasterize_pdf(path, destination):
     # https://github.com/tesseract-ocr/tesseract/issues/431#issuecomment-250549208
     gs = [
         'gs',
-        '-dQUIET',
-        '-dSAFER',
-        '-dBATCH',
-        '-dNOPAUSE',
+        '-dQUIET',  # Suppress printing routine info
+        '-dSAFER',  # Lock down the filesystem to only files on command line
+        '-dBATCH',  # Exit after finishing file. Don't wait for more commands.
+        '-dNOPAUSE',  # Don't pause after each page
         '-sDEVICE=tiffgray',
         '-sCompression=lzw',
-        '-r300x300',
+        '-r300x300',  # Set the resolution to 300 DPI.
         '-o', destination,
         path,
     ]
