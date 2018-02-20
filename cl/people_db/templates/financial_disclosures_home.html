@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load partition_util %}
+{% load cache %}
 
 {% block title %}
     Judicial Financial Disclosures Database – CourtListener.com
@@ -8,17 +10,21 @@
     Judicial Financial Disclosures Database – CourtListener.com
 {% endblock %}
 {% block description %}
-    The Judicial Financial Disclosures database at CourtListener.com contains {{ disclosure_count|intcomma }} financial disclosure forms, and is the largest collection online. A collaboration of Demand Progress, Fix the Court, Free Law Project, and MuckRock.
+    The Judicial Financial Disclosures Database at CourtListener.com contains {{ disclosure_count|intcomma }} financial disclosure forms, and is the largest collection online. A collaboration of Demand Progress, Fix the Court, Free Law Project, and MuckRock.
 {% endblock %}
 {% block og_description %}
-    The Judicial Financial Disclosures database at CourtListener.com contains {{ disclosure_count|intcomma }} financial disclosure forms, and is the largest collection online. A collaboration of Demand Progress, Fix the Court, Free    Law Project, and MuckRock.
+    The Judicial Financial Disclosures Database at CourtListener.com contains {{ disclosure_count|intcomma }} financial disclosure forms, and is the largest collection online. A collaboration of Demand Progress, Fix the Court, Free    Law Project, and MuckRock.
 {% endblock %}
 
 {% block navbar-p %}active{% endblock %}
 
 {% block footer-scripts %}
     <script type="text/javascript">
-        // Filter stuff in the input box.
+        var judge_filter = function(){
+          var judges = $('.judge-name:contains(' + this.value + ')');
+          matches.hide();
+        };
+        $('#id_disclosures_filter').keyup(judge_filter).change(judge_filter);
     </script>
 {% endblock %}
 
@@ -84,13 +90,19 @@
         </div>
         <div class="row">
             <div class="col-xs-12">
-                <h3 class="gray">We currently have {{ disclosure_count|intcomma }} financial disclosure forms in our collection.</h3>
+                <h3 class="gray">We currently have {{ disclosure_count|intcomma }} financial disclosure forms for {{ people_count|intcomma }} judge{{ people_count|pluralize }}.</h3>
             </div>
-            <div class="col-xs-12 col-sm-6"></div>
-            <div class="col-xs-12 col-sm-6"></div>
+            {% cache 6000 financial_disclosures_home_listing %}
+            {% for row in people|rows:4 %}
+                <div class="col-sm-3">
+                    {% for person in row %}
+                        <h4 class="judge-name"><a href="{% url "financial_disclosures_for_somebody" pk=person.pk slug=person.slug %}">{{ person.name_full }}</a> ({{ person.financial_disclosures.count }} form{{ person.financial_disclosures.count|pluralize }})
+                        </h4>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+            {% endcache %}
         </div>
     </div>
-
-
 {% endblock %}
 

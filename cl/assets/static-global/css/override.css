@@ -107,6 +107,9 @@ a.button:active{
 /* border:1px solid #6299c5; */
   color:#fff;
 }
+.shadow {
+    box-shadow: 2px 2px 5px #000000;
+}
 
 #main-query-box {
     /* margin: 0 auto; */

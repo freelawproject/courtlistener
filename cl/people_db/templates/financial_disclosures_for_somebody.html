@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load static %}{% get_static_prefix as STATIC_PREFIX %}
+
+{% block title %}
+    Judicial Financial Disclosure Forms for {{ title }} – CourtListener.com
+{% endblock %}
+{% block og_title %}
+    Judicial Financial Disclosure Forms for {{ title }} – CourtListener.com
+{% endblock %}
+{% block description %}
+    Judicial Financial Disclosure Forms for {{ title }} at the Judicial Financial Disclosures Database. A collaboration of Demand Progress, Fix the Court, Free Law Project, and MuckRock, containing thousands of judicial financial disclosure forms.
+{% endblock %}
+{% block og_description %}
+    Judicial Financial Disclosure Forms for {{ title }} at the Judicial Financial Disclosures Database. A collaboration of Demand Progress, Fix the Court, Free Law Project, and MuckRock, containing thousands of judicial financial disclosure forms.
+{% endblock %}
+
+{% block navbar-p %}active{% endblock %}
+
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+        <div class="sidebar-section">
+            <h4 class="bottom">
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="{% url "financial_disclosures_home" %}">Go to disclosure database</a>
+            </h4>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div id="financial_disclosures_for_somebody" class="col-sm-9">
+        <h2 class="bottom">Financial Disclosure Forms for {{ title }}</h2>
+        <p class="top v-offset-below-3"><a href="{{ person.get_absolute_url }}">View profile</a></p>
+
+        {% for disclosure in person.financial_disclosures.all %}
+        <div class="row v-offset-below-2">
+            <div class="col-xs-5 col-md-4 col-lg-3">
+                <h3>Disclosure for {{ disclosure.year }}</h3>
+                <h4>{{ disclosure.page_count }} page{{ disclosure.page_count|pluralize }}</h4>
+                <a href="{{ disclosure.person.get_absolute_url }}{{ disclosure.filepath }}" class="btn btn-lg btn-primary"><i class="fa fa-download"></i>&nbsp;Download</a>
+            </div>
+            <div class="col-xs-7 col-md-8 col-lg-9 v-offset-above-1">
+                <a href="{{ disclosure.person.get_absolute_url }}{{ disclosure.filepath }}">
+                    <img src="{{ disclosure.person.get_absolute_url }}{{ disclosure.thumbnail }}"
+                         alt="Thumbnail of disclosure form"
+                         width="350"
+                         class="img-responsive thumbnail shadow"
+                    >
+                </a>
+            </div>
+            {% if not forloop.last %}
+                <div class="row">
+                    <div class="col-xs-12"><hr></div>
+                </div>
+            {% endif %}
+        </div>
+        {% empty %}
+            <h4>No disclosure forms found.</h4>
+        {% endfor %}
+    </div>
+{% endblock %}
+

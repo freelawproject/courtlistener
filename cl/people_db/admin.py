@@ -6,8 +6,8 @@ from cl.people_db.models import (
     Education, School, Person, Position, RetentionEvent, Race,
     PoliticalAffiliation, Source, ABARating, PartyType,
     Party, Role, Attorney, AttorneyOrganization,
-    AttorneyOrganizationAssociation
-)
+    AttorneyOrganizationAssociation,
+    FinancialDisclosure)
 
 
 class RetentionEventInline(admin.TabularInline):
@@ -92,6 +92,18 @@ class SourceInline(admin.TabularInline):
 class ABARatingInline(admin.TabularInline):
     model = ABARating
     extra = 1
+
+
+@admin.register(FinancialDisclosure)
+class FinancialDisclosureAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'person',
+    )
+
+    def save_model(self, request, obj, form, change):
+        obj.save()
+        from cl.people_db.tasks import make_png_thumbnail_from_pdf
+        make_png_thumbnail_from_pdf.delay(obj.pk)
 
 
 @admin.register(Person)
