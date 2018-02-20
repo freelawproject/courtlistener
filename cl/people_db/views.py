@@ -1,10 +1,25 @@
+import os
 from django.conf import settings
 from django.core.urlresolvers import reverse
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import get_object_or_404, render
 
+from cl.lib import magic
+from cl.lib.bot_detector import is_bot
 from cl.lib.sunburnt import SolrInterface
-from cl.people_db.models import Person
+from cl.people_db.models import Person, FinancialDisclosure
+from cl.stats.utils import tally_stat
+
+
+def make_title_str(person):
+    """Make a nice title for somebody."""
+    locations = ', '.join(
+        {p.court.short_name for p in person.positions.all() if p.court}
+    )
+    title = person.name_full
+    if locations:
+        title = "%s (%s)" % (title, locations)
+    return title
 
 
 def view_person(request, pk, slug):
@@ -17,12 +32,7 @@ def view_person(request, pk, slug):
         ]))
 
     # Make the title string.
-    locations = ', '.join(
-        {p.court.short_name for p in person.positions.all() if p.court}
-    )
-    title = person.name_full
-    if locations:
-        title = "Judge %s (%s)" % (title, locations)
+    title = "Judge %s" % make_title_str(person)
 
     # Regroup the positions by whether they're judgeships or other. This allows
     # us to use the {% ifchanged %} template tags to have two groups in the
@@ -86,7 +96,46 @@ def financial_disclosures_home(request):
      - A list of all the people we have reports for
      - A simple JS filter to find specific judges
     """
+    people_with_disclosures = Person.objects.filter(
+        financial_disclosures__isnull=False,
+    ).distinct()
+    disclosure_count = FinancialDisclosure.objects.all().count()
+    people_count = people_with_disclosures.count()
     return render(request, 'financial_disclosures_home.html', {
-        'disclosure_count': 900000,
+        'people': people_with_disclosures,
+        'disclosure_count': disclosure_count,
+        'people_count': people_count,
         'private': False,
     })
+
+
+def financial_disclosures_for_somebody(request, pk, slug):
+    """Show the financial disclosures for a particular person"""
+    person = get_object_or_404(Person, pk=pk)
+    title = make_title_str(person)
+    return render(request, 'financial_disclosures_for_somebody.html', {
+        'person': person,
+        'title': title,
+        'private': False,
+    })
+
+
+def financial_disclosures_fileserver(request, pk, slug, filepath):
+    """Serve up the financial disclosure files."""
+    response = HttpResponse()
+    file_loc = os.path.join(settings.MEDIA_ROOT, filepath.encode('utf-8'))
+    if settings.DEVELOPMENT:
+        # X-Sendfile will only confuse you in a dev env.
+        response.content = open(file_loc, 'r').read()
+    else:
+        response['X-Sendfile'] = file_loc
+    filename = filepath.split('/')[-1]
+    response['Content-Disposition'] = 'inline; filename="%s"' % \
+                                      filename.encode('utf-8')
+    response['Content-Type'] = magic.from_file(file_loc, mime=True)
+    if not is_bot(request):
+        tally_stat('financial_reports.static_file.served')
+    return response
+
+
+
