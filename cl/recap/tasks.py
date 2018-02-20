@@ -410,13 +410,9 @@ def add_docket_entries(d, docket_entries, pq):
     needs_solr_update = False
     for docket_entry in docket_entries:
         try:
-            de, de_created = DocketEntry.objects.update_or_create(
+            de, de_created = DocketEntry.objects.get_or_create(
                 docket=d,
                 entry_number=docket_entry['document_number'],
-                defaults={
-                    'description': docket_entry['description'],
-                    'date_filed': docket_entry['date_filed'],
-                }
             )
         except DocketEntry.MultipleObjectsReturned:
             logger.error(
@@ -424,6 +420,11 @@ def add_docket_entries(d, docket_entries, pq):
                 "while processing '%s'" % (docket_entry['document_number'], pq)
             )
             continue
+
+        de.description = docket_entry['description'] or de.description
+        de.date_filed = docket_entry['date_filed'] or de.date_filed
+        de.save()
+
         if de_created:
             needs_solr_update = True
 
