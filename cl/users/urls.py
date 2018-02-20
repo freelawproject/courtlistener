@@ -72,8 +72,14 @@ urlpatterns = [
         views.view_settings,
         name='view_settings'
     ),
-    url(r'^profile/favorites/$', views.view_favorites, name='profile_favorites'),
-    url(r'^profile/alerts/$', views.view_alerts, name='profile_alerts'),
+    url(
+        r'^profile/favorites/$',
+        views.view_favorites,
+        name='profile_favorites'),
+    url(
+        r'^profile/alerts/$',
+        views.view_alerts,
+        name='profile_alerts'),
     url(
         r'^profile/visualizations/$',
         views.view_visualizations,
