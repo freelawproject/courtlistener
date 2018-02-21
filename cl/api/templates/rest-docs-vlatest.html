@@ -648,10 +648,14 @@ PACER_TO_CL_IDS = {
             <li><p><code>debug</code> <em>(optional)</em>: While you are developing, use this field to test your work. When it is set to <code>true</code>, your uploads will not make changes to the RECAP Archive, but you will create processing requests which will be processed in debug mode.
             </p></li>
         </ul>
-        <p>The following three upload types are supported:</p>
+        <p>The following four upload types are supported:</p>
         <ul>
             <li>
                 <p><code>Dockets</code>: Uploading a docket should be fairly easy. In addition to the required fields above, supply the <code>pacer_case_id</code> field.
+                </p>
+            </li>
+            <li>
+                <p><code>Docket history reports</code>: Upload these similar to how you upload Dockets.
                 </p>
             </li>
             <li>
@@ -666,9 +670,10 @@ PACER_TO_CL_IDS = {
             </li>
         </ul>
         <p>The following upload types are works in progress:</p>
-	<ul><li><code>DOCKET_HISTORY_REPORT</code></li>
-	    <li><code>APPELLATE_DOCKET</code></li>
-	    <li><code>APPELLATE_ATTACHMENT_PAGE</code></li></ul>
+        <ul>
+            <li><code>APPELLATE_DOCKET</code></li>
+            <li><code>APPELLATE_ATTACHMENT_PAGE</code></li>
+        </ul>
         <p>When you complete your upload, you will create a <code>Processing Queue</code> object in the CourtListener database. This object will be returned in the HTTP response to your upload so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:
         </p>
         <ul>
