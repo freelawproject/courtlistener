@@ -266,7 +266,7 @@ def add_attorney(atty, p, d):
                 q |= Q(**{field: lookup})
         a, created = Attorney.objects.filter(
             Q(name=atty['name']) & q,
-        ).get_or_create(
+        ).distinct().get_or_create(
             defaults={
                 'name': atty['name'],
                 'date_sourced': newest_docket_date,
