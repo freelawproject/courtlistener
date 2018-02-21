@@ -97,7 +97,7 @@ def view_docket(request, pk, slug):
 @ratelimit_if_not_whitelisted
 def view_parties(request, docket_id, slug):
     """Show the parties and attorneys tab on the docket."""
-    docket = get_object_or_404(Docket, pk=docket_id, slug=slug)
+    docket = get_object_or_404(Docket, pk=docket_id)
     try:
         fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
