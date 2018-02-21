@@ -22,7 +22,9 @@ from cl.lib.recap_utils import get_document_filename
 from cl.lib.utils import remove_duplicate_dicts
 from cl.people_db.models import Party, PartyType, Attorney, \
     AttorneyOrganization, AttorneyOrganizationAssociation, Role
-from cl.recap.models import ProcessingQueue, PacerHtmlFiles
+from cl.recap.models import ProcessingQueue, PacerHtmlFiles, APPELLATE_DOCKET, \
+    APPELLATE_ATTACHMENT_PAGE, DOCKET_HISTORY_REPORT, PDF, ATTACHMENT_PAGE, \
+    DOCKET
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import Docket, RECAPDocument, DocketEntry
 from cl.search.tasks import add_or_update_recap_document, \
@@ -38,19 +40,19 @@ def process_recap_upload(pq):
     Uploaded objects can take a variety of forms, and we'll need to process them
     accordingly.
     """
-    if pq.upload_type == pq.DOCKET:
+    if pq.upload_type == DOCKET:
         chain(process_recap_docket.s(pq.pk),
               add_or_update_recap_docket.s()).apply_async()
-    elif pq.upload_type == pq.ATTACHMENT_PAGE:
+    elif pq.upload_type == ATTACHMENT_PAGE:
         process_recap_attachment.delay(pq.pk)
-    elif pq.upload_type == pq.PDF:
+    elif pq.upload_type == PDF:
         process_recap_pdf.delay(pq.pk)
-    elif pq.upload_type == pq.DOCKET_HISTORY_REPORT:
+    elif pq.upload_type == DOCKET_HISTORY_REPORT:
         chain(process_recap_docket_history_report.s(pq.pk),
               add_or_update_recap_docket.s()).apply_async()
-    elif pq.upload_type == pq.APPELLATE_DOCKET:
+    elif pq.upload_type == APPELLATE_DOCKET:
         process_recap_appellate_docket.delay(pq.pk)
-    elif pq.upload_type == pq.APPELLATE_ATTACHMENT_PAGE:
+    elif pq.upload_type == APPELLATE_ATTACHMENT_PAGE:
         process_recap_appellate_attachment.delay(pq.pk)
 
 
@@ -522,7 +524,7 @@ def process_orphan_documents(rds_created, court_id, docket_date):
         pacer_doc_id__in=pacer_doc_ids,
         court_id=court_id,
         status=ProcessingQueue.PROCESSING_FAILED,
-        upload_type=ProcessingQueue.PDF,
+        upload_type=PDF,
         debug=False,
         date_modified__gt=cutoff_date,
     ).values_list('pk', flat=True)
@@ -564,7 +566,7 @@ def process_recap_docket(self, pk):
         # Prior to 1.1.8, we did not separate docket history reports into their
         # own upload_type. Alas, we still have some old clients around, so we
         # need to handle those clients here.
-        pq.upload_type = pq.DOCKET_HISTORY_REPORT
+        pq.upload_type = DOCKET_HISTORY_REPORT
         pq.save()
         process_recap_docket_history_report(pk)
         self.request.callbacks = None

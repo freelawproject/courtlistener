@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from cl.recap.models import ProcessingQueue
+from cl.recap.models import ProcessingQueue, PDF, DOCKET
 from cl.search.models import Court, RECAPDocument
 
 
@@ -49,7 +49,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         extra_kwargs = {'filepath_local': {'write_only': True}}
 
     def validate(self, attrs):
-        if attrs['upload_type'] == ProcessingQueue.DOCKET:
+        if attrs['upload_type'] == DOCKET:
             # Dockets shouldn't have these fields completed.
             numbers_not_blank = any([attrs.get('pacer_doc_id'),
                                      attrs.get('document_number'),
@@ -58,7 +58,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                 raise ValidationError("PACER document ID, document number and "
                                       "attachment number must be blank for "
                                       "docket uploads.")
-        elif attrs['upload_type'] == ProcessingQueue.PDF:
+        elif attrs['upload_type'] == PDF:
             # PDFs require pacer_doc_id and document_number values.
             if not all([attrs.get('pacer_doc_id'),
                         attrs.get('document_number')]):
@@ -66,7 +66,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                                       "pacer_doc_id and document_number fields "
                                       "completed.")
 
-        if attrs['upload_type'] != ProcessingQueue.PDF:
+        if attrs['upload_type'] != PDF:
             # Everything but PDFs require the case ID.
             if not attrs.get('pacer_case_id'):
                 raise ValidationError("PACER case ID is required for for all "
