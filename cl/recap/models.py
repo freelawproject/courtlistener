@@ -71,7 +71,6 @@ class PacerHtmlFiles(models.Model):
     upload_type = models.SmallIntegerField(
         help_text="The type of object that is uploaded",
         choices=UPLOAD_TYPES,
-        null=True,
     )
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
