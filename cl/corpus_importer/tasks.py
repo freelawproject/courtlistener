@@ -34,7 +34,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_number
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
-from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles
+from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles, DOCKET
 from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
@@ -553,7 +553,7 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
         d.tags.add(tag)
 
     # Add the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(content_object=d)
+    pacer_file = PacerHtmlFiles(content_object=d, upload_type=DOCKET)
     pacer_file.filepath.save(
         'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(report.response.text),

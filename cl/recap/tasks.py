@@ -603,7 +603,7 @@ def process_recap_docket(self, pk):
     d.save()
 
     # Add the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(content_object=d)
+    pacer_file = PacerHtmlFiles(content_object=d, upload_type=DOCKET)
     pacer_file.filepath.save(
         'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(text),
@@ -678,7 +678,8 @@ def process_recap_attachment(self, pk):
     rds_created = []
     if not pq.debug:
         # Save the old HTML to the docket entry.
-        pacer_file = PacerHtmlFiles(content_object=de)
+        pacer_file = PacerHtmlFiles(content_object=de,
+                                    upload_type=ATTACHMENT_PAGE)
         pacer_file.filepath.save(
             'attachment_page.html',  # Irrelevant b/c UUIDFileSystemStorage
             ContentFile(text),
@@ -767,9 +768,10 @@ def process_recap_docket_history_report(self, pk):
             raise self.retry(exc=exc)
 
     # Add the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(content_object=d)
+    pacer_file = PacerHtmlFiles(content_object=d,
+                                upload_type=DOCKET_HISTORY_REPORT)
     pacer_file.filepath.save(
-        'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
+        'docket_history.html',  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(text),
     )
 
