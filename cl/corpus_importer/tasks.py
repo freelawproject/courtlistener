@@ -11,7 +11,6 @@ from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction, DatabaseError
-from django.db.models import Q
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import ParsingException
@@ -35,7 +34,9 @@ from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_number
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
 from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles, DOCKET
-from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys
+from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
+    find_docket_object, add_recap_source, add_docket_entries, \
+    process_orphan_documents
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.tasks import add_or_update_recap_document
@@ -511,7 +512,7 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
 
     if d is not None:
         first_missing_id = get_first_missing_de_number(d)
-        if d is not None and first_missing_id > 1:
+        if first_missing_id > 1:
             # We don't have to get the whole thing!
             kwargs.setdefault('doc_num_start', first_missing_id)
 
@@ -521,31 +522,13 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
                                                              pacer_case_id))
 
     # Merge the contents into CL.
-    try:
-        if d is None:
-            d = Docket.objects.get(
-                Q(pacer_case_id=pacer_case_id) |
-                Q(docket_number=docket_data['docket_number']),
-                court_id=court_id,
-            )
-        # Add RECAP as a source if it's not already.
-        if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
-            d.source = Docket.RECAP_AND_SCRAPER
-        elif d.source == Docket.COLUMBIA:
-            d.source = Docket.COLUMBIA_AND_RECAP
-        elif d.source == Docket.COLUMBIA_AND_SCRAPER:
-            d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
-    except Docket.DoesNotExist:
-        d = Docket(
-            source=Docket.RECAP,
-            pacer_case_id=pacer_case_id,
-            court_id=court_id
-        )
-    except Docket.MultipleObjectsReturned:
-        logger.error("Too many dockets returned when trying to look up '%s.%s'" %
-                     (court_id, pacer_case_id))
-        return None
+    if d is None:
+        d, count = find_docket_object(court_id, pacer_case_id,
+                                      docket_data['docket_number'])
+        if count > 1:
+            d = d.earliest('date_created')
 
+    add_recap_source(d)
     update_docket_metadata(d, docket_data)
     d.save()
     if tag is not None:
@@ -559,60 +542,15 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
         ContentFile(report.response.text),
     )
 
-    for docket_entry in docket_data['docket_entries']:
-        try:
-            de, created = DocketEntry.objects.update_or_create(
-                docket=d,
-                entry_number=docket_entry['document_number'],
-                defaults={
-                    'description': docket_entry['description'],
-                    'date_filed': docket_entry['date_filed'],
-                }
-            )
-        except DocketEntry.MultipleObjectsReturned:
-            logger.error(
-                "Multiple docket entries found for document entry number '%s' "
-                "while processing '%s.%s'" % (docket_entry['document_number'],
-                                              court_id, pacer_case_id)
-            )
-            continue
-        else:
-            if tag is not None:
-                de.tags.add(tag)
-
-        get_params = {
-            'docket_entry': de,
-            # No attachments when uploading dockets.
-            'document_type': RECAPDocument.PACER_DOCUMENT,
-            'document_number': docket_entry['document_number'],
-        }
-        try:
-            rd = RECAPDocument.objects.get(**get_params)
-        except RECAPDocument.DoesNotExist:
-            try:
-                rd = RECAPDocument.objects.create(
-                    pacer_doc_id=docket_entry['pacer_doc_id'],
-                    is_available=False,
-                    **get_params
-                )
-            except IntegrityError:
-                # Race condition. The item was created after our get failed.
-                rd = RECAPDocument.objects.get(**get_params)
-        except RECAPDocument.MultipleObjectsReturned:
-            logger.error(
-                "Multiple recap documents found for document entry "
-                "number: '%s', docket: %s" % (docket_entry['document_number'], d)
-            )
-            continue
-
-        rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
-        if tag is not None:
-            rd.tags.add(tag)
-
+    rds_created, needs_solr_update = add_docket_entries(
+        d, docket_data['docket_entries'], tag=tag)
     add_parties_and_attorneys(d, docket_data['parties'])
+    process_orphan_documents(rds_created, d.court_id, d.date_filed)
     logger.info("Created/updated docket: %s" % d)
-
-    return d
+    return {
+        'docket_pk': d.pk,
+        'needs_solr_update': bool(rds_created or needs_solr_update),
+    }
 
 
 @app.task(bind=True, max_retries=15, interval_start=5,
