@@ -11,14 +11,19 @@ from cl.corpus_importer.tasks import get_pacer_case_id_for_idb_row, \
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Docket, RECAPDocument
-from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT_CR,\
-    FAIR_LABOR_STANDARDS_ACT_CV
+from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT_CR, \
+    FAIR_LABOR_STANDARDS_ACT_CV, BANKRUPTCY_APPEALS, BANKRUPTCY_WITHDRAWAL, \
+    PRISONER_PETITIONS_VACATE_SENTENCE, PRISONER_PETITIONS_HABEAS_CORPUS, \
+    PRISONER_PETITIONS_MANDAMUS_AND_OTHER, PRISONER_CIVIL_RIGHTS, \
+    PRISONER_PRISON_CONDITION, IMMIGRATION_ACTIONS_OTHER, \
+    FORFEITURE_AND_PENALTY_SUITS_OTHER, SOCIAL_SECURITY, TAX_SUITS
 from cl.recap.models import FjcIntegratedDatabase
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 KOMPLY_TAG = 'QAV5K6HU93A67WS6'
+GAVELYTICS_TAG = 'FFQBCCFSBJSULNBS'
 
 
 def get_pacer_case_ids(options, row_pks):
@@ -167,6 +172,28 @@ class Command(VerboseCommand):
         ).values_list('pk', flat=True)
         get_pacer_case_ids(self.options, row_pks)
 
+    def get_gavelytics_ids(self):
+        """Get the pacer_case_id values for every item relevant to Gavelytics"""
+        row_pks = FjcIntegratedDatabase.objects.exclude(
+            nature_of_suit__in=[
+                BANKRUPTCY_APPEALS,
+                BANKRUPTCY_WITHDRAWAL,
+                PRISONER_PETITIONS_VACATE_SENTENCE,
+                PRISONER_PETITIONS_HABEAS_CORPUS,
+                PRISONER_PETITIONS_MANDAMUS_AND_OTHER,
+                PRISONER_CIVIL_RIGHTS,
+                PRISONER_PRISON_CONDITION,
+                IMMIGRATION_ACTIONS_OTHER,
+                FORFEITURE_AND_PENALTY_SUITS_OTHER,
+                SOCIAL_SECURITY,
+                TAX_SUITS,
+            ],
+        ).filter(
+            district_id__in=['cand', 'casd', 'cacd', 'caed'],
+            date_filed__gte='2012-01-01',
+        ).values_list('pk', flat=True)
+        get_pacer_case_ids(self.options, row_pks)
+
     def get_komply_dockets(self):
         row_pks = FjcIntegratedDatabase.objects.exclude(
             Q(pacer_case_id='') | Q(pacer_case_id='Error')
@@ -208,7 +235,9 @@ class Command(VerboseCommand):
 
     VALID_ACTIONS = {
         'get-komply-pacer-ids': get_komply_ids,
+        'get-gavelytics-pacer-ids': get_gavelytics_ids,
         'get-komply-dockets': get_komply_dockets,
         'get-komply-cover-sheets': get_komply_cover_sheets,
         'get-komply-initial-complaints': get_komply_initial_complaints,
+
     }
