@@ -1,7 +1,6 @@
 import argparse
 import os
 import re
-from copy import copy
 
 from celery.canvas import chain
 from django.conf import settings
@@ -43,7 +42,7 @@ def get_pacer_case_ids(options, row_pks):
             pacer_session.login()
             logger.info("Sent %s tasks to celery so far." % i)
         get_pacer_case_id_for_idb_row.apply_async(
-            args=(row_pk, copy(pacer_session)),
+            args=(row_pk, pacer_session),
             queue=q,
         )
 
