@@ -335,7 +335,7 @@ def add_attorney(atty, p, d):
     return a
 
 
-def find_docket_from_pq(court_id, pacer_case_id, docket_number):
+def find_docket_object(court_id, pacer_case_id, docket_number):
     """Attempt to find the docket based on the uploaded data. If cannot be
     found, create a new docket. If multiple are found, abort.
     """
@@ -584,8 +584,8 @@ def process_recap_docket(self, pk):
         return None
 
     # Merge the contents of the docket into CL.
-    d = find_docket_from_pq(pq.court_id, pq.pacer_case_id,
-                            data['docket_number'])
+    d = find_docket_object(pq.court_id, pq.pacer_case_id,
+                           data['docket_number'])
     if d is None:
         msg = "Too many dockets found when trying to look up '%s'" % pq
         mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
@@ -737,8 +737,8 @@ def process_recap_docket_history_report(self, pk):
     logger.info("Parsing completed for item %s" % pq)
 
     # Merge the contents of the docket into CL.
-    d = find_docket_from_pq(pq.court_id, pq.pacer_case_id,
-                            data['docket_number'])
+    d = find_docket_object(pq.court_id, pq.pacer_case_id,
+                           data['docket_number'])
     if d is None:
         msg = "Too many dockets found when trying to look up '%s'" % pq
         mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
