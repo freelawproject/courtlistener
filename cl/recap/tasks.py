@@ -337,7 +337,7 @@ def add_attorney(atty, p, d):
 
 def find_docket_object(court_id, pacer_case_id, docket_number):
     """Attempt to find the docket based on the uploaded data. If cannot be
-    found, create a new docket. If multiple are found, abort.
+    found, create a new docket. If multiple are found, return all of them.
     """
     # Attempt several lookups of decreasing specificity. Note that pacer_case_id
     # is required for Docket and Docket History uploads.
@@ -347,13 +347,15 @@ def find_docket_object(court_id, pacer_case_id, docket_number):
                    {'pacer_case_id': pacer_case_id},
                    {'docket_number': docket_number,
                     'pacer_case_id': None}]:
-        try:
-            d = Docket.objects.get(court_id=court_id, **kwargs)
-            break
-        except Docket.DoesNotExist:
-            continue
-        except Docket.MultipleObjectsReturned:
-            return None
+        ds = Docket.objects.filter(court_id=court_id, **kwargs)
+        count = ds.count()
+        if count == 0:
+            continue  # Try a looser lookup.
+        if count == 1:
+            d = ds[0]
+            break  # Nailed it!
+        elif count > 1:
+            return ds, count  # Problems. Let caller decide what to do.
 
     if d is None:
         # Couldn't find a docket. Make a new one.
@@ -363,7 +365,7 @@ def find_docket_object(court_id, pacer_case_id, docket_number):
             court_id=court_id,
         )
 
-    return d
+    return d, 1
 
 
 def add_recap_source(d):
@@ -406,7 +408,7 @@ def update_docket_metadata(d, docket_data):
     return d
 
 
-def add_docket_entries(d, docket_entries, pq):
+def add_docket_entries(d, docket_entries, tag=None):
     """Update or create the docket entries and documents."""
     rds_created = []
     needs_solr_update = False
@@ -419,13 +421,15 @@ def add_docket_entries(d, docket_entries, pq):
         except DocketEntry.MultipleObjectsReturned:
             logger.error(
                 "Multiple docket entries found for document entry number '%s' "
-                "while processing '%s'" % (docket_entry['document_number'], pq)
+                "while processing '%s'" % (docket_entry['document_number'], d)
             )
             continue
 
         de.description = docket_entry['description'] or de.description
         de.date_filed = docket_entry['date_filed'] or de.date_filed
         de.save()
+        if tag is not None:
+            de.tags.add(tag)
 
         if de_created:
             needs_solr_update = True
@@ -455,12 +459,14 @@ def add_docket_entries(d, docket_entries, pq):
         except RECAPDocument.MultipleObjectsReturned:
             logger.error(
                 "Multiple recap documents found for document entry number'%s' "
-                "while processing '%s'" % (docket_entry['document_number'], pq)
+                "while processing '%s'" % (docket_entry['document_number'], d)
             )
             continue
         else:
             rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
             rd.description = docket_entry.get('short_description') or rd.description
+            if tag is not None:
+                rd.tags.add(tag)
 
     return rds_created, needs_solr_update
 
@@ -584,13 +590,11 @@ def process_recap_docket(self, pk):
         return None
 
     # Merge the contents of the docket into CL.
-    d = find_docket_object(pq.court_id, pq.pacer_case_id,
-                           data['docket_number'])
-    if d is None:
-        msg = "Too many dockets found when trying to look up '%s'" % pq
-        mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
-        self.request.callbacks = None
-        return None
+    d, count = find_docket_object(pq.court_id, pq.pacer_case_id,
+                                  data['docket_number'])
+    if count > 1:
+        logger.info("Found %s dockets during lookup. Choosing oldest." % count)
+        d = d.earliest('date_created')
 
     add_recap_source(d)
     update_docket_metadata(d, data)
@@ -609,7 +613,7 @@ def process_recap_docket(self, pk):
         ContentFile(text),
     )
 
-    rds_created, needs_solr_update = add_docket_entries(d, data['docket_entries'], pq)
+    rds_created, needs_solr_update = add_docket_entries(d, data['docket_entries'])
     add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
@@ -737,13 +741,11 @@ def process_recap_docket_history_report(self, pk):
     logger.info("Parsing completed for item %s" % pq)
 
     # Merge the contents of the docket into CL.
-    d = find_docket_object(pq.court_id, pq.pacer_case_id,
+    d, count = find_docket_object(pq.court_id, pq.pacer_case_id,
                            data['docket_number'])
-    if d is None:
-        msg = "Too many dockets found when trying to look up '%s'" % pq
-        mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
-        self.request.callbacks = None
-        return None
+    if count > 1:
+        logger.info("Found %s dockets during lookup. Choosing oldest." % count)
+        d = d.earliest('date_created')
 
     add_recap_source(d)
     update_docket_metadata(d, data)
@@ -775,7 +777,7 @@ def process_recap_docket_history_report(self, pk):
         ContentFile(text),
     )
 
-    rds_created, needs_solr_update = add_docket_entries(d, data['docket_entries'], pq)
+    rds_created, needs_solr_update = add_docket_entries(d, data['docket_entries'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
     return {
