@@ -41,6 +41,7 @@ from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.tasks import add_or_update_recap_document
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
+from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 
 logger = logging.getLogger(__name__)
 
@@ -478,13 +479,18 @@ def get_pacer_case_id_for_idb_row(self, pk, session):
     }
     if item.plaintiff or item.defendant:
         params['case_name'] = '%s v. %s' % (item.plaintiff, item.defendant)
-    d = pcn.data(**params)
-    if d is not None:
-        item.pacer_case_id = d['pacer_case_id']
-        item.case_name = d['title']
-    else:
+    if item.dataset_source in [CR_2017, CR_OLD]:
+        params['criminal_or_civil'] = 'cr'
+    elif item.dataset_source in [CV_2017, CV_OLD]:
+        params['criminal_or_civil'] = 'cv'
+    try:
+        d = pcn.data(**params)
+    except ParsingException:
         # Hack. Storing the error in here will bite us later.
         item.pacer_case_id = "Error"
+    else:
+        item.pacer_case_id = d['pacer_case_id']
+        item.case_name = d['title']
     item.save()
 
 
