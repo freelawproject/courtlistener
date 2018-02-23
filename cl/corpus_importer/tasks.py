@@ -472,12 +472,7 @@ def get_pacer_case_id_for_idb_row(self, pk, session):
     logger.info("Getting pacer_case_id for IDB item with pk %s" % pk)
     item = FjcIntegratedDatabase.objects.get(pk=pk)
     pcn = PossibleCaseNumberApi(map_cl_to_pacer_id(item.district_id), session)
-    try:
-        pcn.query(item.docket_number)
-    except AttributeError:
-        print("Session object is: %s" % session)
-        print("Session details: %s" % session.__dict__)
-        return
+    pcn.query(item.docket_number)
     d = pcn.data(case_name='%s v. %s' % (item.plaintiff, item.defendant))
     if d is not None:
         item.pacer_case_id = d['pacer_case_id']
