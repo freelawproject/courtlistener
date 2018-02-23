@@ -473,7 +473,12 @@ def get_pacer_case_id_for_idb_row(self, pk, session):
     item = FjcIntegratedDatabase.objects.get(pk=pk)
     pcn = PossibleCaseNumberApi(map_cl_to_pacer_id(item.district_id), session)
     pcn.query(item.docket_number)
-    d = pcn.data(case_name='%s v. %s' % (item.plaintiff, item.defendant))
+    params = {
+        'office_number': item.office if item.office else None,
+    }
+    if item.plaintiff or item.defendant:
+        params['case_name'] = '%s v. %s' % (item.plaintiff, item.defendant)
+    d = pcn.data(**params)
     if d is not None:
         item.pacer_case_id = d['pacer_case_id']
         item.case_name = d['title']
