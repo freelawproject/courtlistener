@@ -211,7 +211,10 @@ class Command(VerboseCommand):
         ).values_list('pk', flat=True)
         get_pacer_dockets(self.options, row_pks, tag=KOMPLY_TAG)
 
-    def get_gavelytics_dockets(self):
+    def get_gavelytics_docket_sample(self):
+        self.get_gavelytics_dockets(sample=True)
+
+    def get_gavelytics_dockets(self, sample=False):
         row_pks = FjcIntegratedDatabase.objects.exclude(
             Q(pacer_case_id='') | Q(pacer_case_id='Error'),
             nature_of_suit__in=[
@@ -235,6 +238,8 @@ class Command(VerboseCommand):
             'pacer_case_id',
             'district_id',
         ).values_list('pk', flat=True)
+        if sample is True:
+            row_pks = row_pks.order_by('?')[0:100]
         get_pacer_dockets(self.options, row_pks, tag=GAVELYTICS_TAG)
 
     def get_komply_cover_sheets(self):
@@ -270,5 +275,6 @@ class Command(VerboseCommand):
         'get-komply-initial-complaints': get_komply_initial_complaints,
         # Gavelytics
         'get-gavelytics-pacer-ids': get_gavelytics_ids,
+        'get-gavelytics-docket-sample': get_gavelytics_docket_sample,
         'get-gavelytics-dockets': get_gavelytics_dockets,
     }
