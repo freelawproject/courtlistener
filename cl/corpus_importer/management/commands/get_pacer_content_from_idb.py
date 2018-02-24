@@ -217,7 +217,6 @@ class Command(VerboseCommand):
 
     def get_gavelytics_dockets(self, sample=False):
         row_pks = FjcIntegratedDatabase.objects.exclude(
-            Q(pacer_case_id='') | Q(pacer_case_id='Error'),
             nature_of_suit__in=[
                 BANKRUPTCY_APPEALS,
                 BANKRUPTCY_WITHDRAWAL,
@@ -231,6 +230,8 @@ class Command(VerboseCommand):
                 SOCIAL_SECURITY,
                 TAX_SUITS,
             ],
+        ).exclude(
+            Q(pacer_case_id='') | Q(pacer_case_id='Error'),
         ).filter(
             district_id__in=['cand', 'casd', 'cacd', 'caed'],
             date_filed__gte='2012-01-01',
