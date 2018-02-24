@@ -1,5 +1,6 @@
 import argparse
 import os
+import random
 import re
 
 from celery.canvas import chain
@@ -239,7 +240,8 @@ class Command(VerboseCommand):
             'district_id',
         ).values_list('pk', flat=True)
         if sample is True:
-            row_pks = row_pks.order_by('?')[0:100]
+            random.shuffle(list(row_pks))
+            row_pks = row_pks[0:100]
         get_pacer_dockets(self.options, row_pks, tag=GAVELYTICS_TAG)
 
     def get_komply_cover_sheets(self):
