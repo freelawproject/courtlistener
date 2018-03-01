@@ -241,7 +241,9 @@ class Command(VerboseCommand):
             'district_id',
         ).values_list('pk', flat=True)
         if sample is True:
-            random.shuffle(list(row_pks))
+            # Do not combine the next two lines. That won't be random.
+            row_pks = list(row_pks)
+            random.shuffle(row_pks)
             row_pks = row_pks[0:100]
         get_pacer_dockets(self.options, row_pks, tag=GAVELYTICS_TAG)
 
