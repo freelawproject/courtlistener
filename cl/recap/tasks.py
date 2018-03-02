@@ -598,6 +598,8 @@ def process_recap_docket(self, pk):
 
     add_recap_source(d)
     update_docket_metadata(d, data)
+    if not d.pacer_case_id:
+        d.pacer_case_id = pq.pacer_case_id
 
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
