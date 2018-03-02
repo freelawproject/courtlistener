@@ -215,6 +215,10 @@ class ProcessingQueue(models.Model):
             ("has_recap_upload_access", 'Can upload documents to RECAP.'),
         )
 
+    def print_file_contents(self):
+        with open(self.filepath_local.path, 'r') as f:
+            print(f.read().decode('utf-8'))
+
 
 class FjcIntegratedDatabase(models.Model):
     """The Integrated Database of PACER data as described here:
