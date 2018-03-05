@@ -644,6 +644,13 @@ def process_recap_attachment(self, pk):
     att_data = att_page.data
     logger.info("Parsing completed for item %s" % pq)
 
+    if att_data == {}:
+        # Bad attachment page.
+        msg = "Not a valid attachment page upload."
+        mark_pq_status(pq, msg, pq.INVALID_CONTENT)
+        self.request.callbacks = None
+        return None
+
     if pq.pacer_case_id in ['undefined', 'null']:
         # Bad data from the client. Fix it with parsed data.
         pq.pacer_case_id = att_data.get('pacer_case_id')
