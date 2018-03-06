@@ -103,14 +103,31 @@ def targz_json_files(courts, obj_type_str, court_attr):
         tar.close()
 
 
-def write_json_to_disk(courts, obj_type_str, obj_type, court_attr,
-                       serializer):
+def write_json_to_disk(courts, obj_type_str, obj_class, court_attr,
+                       serializer, bulk_dir=join(settings.BULK_DATA_DIR, 'tmp')):
     """Write all items to disk as json files inside directories named by
     jurisdiction.
 
     The main trick is that we identify if we are creating a bulk archive
     from scratch. If so, we iterate over everything. If not, we only
     iterate over items that have been modified since the last good date.
+
+    We deal with two kinds of bulk data. The first is jurisdiction-centric, in
+    which we want to make bulk data for that particular jurisdiction, such as
+    opinions or PACER data, or whatever. The second is non-jurisdiction-
+    specific, like people or schools. For jurisdiction-specific data, we make
+    jurisdiction directories to put the data into. Otherwise, we do not.
+
+    :param courts: Court objects that you expect to make data for.
+    :param obj_type_str: A string to use for the directory name of a type of
+    data. For example, for clusters, it's 'clusters'.
+    :param obj_class: The actual class to make a bulk data for.
+    :param court_attr: A string that can be used to find the court attribute
+    on an object. For example, on clusters, this is currently docket.court_id.
+    :param serializer: A DRF serializer to use to generate the data.
+    :param bulk_dir: A directory to place the serialized JSON data into.
+
+    :returns int: The number of items generated
     """
     # Are there already bulk files?
     history = BulkJsonHistory(obj_type_str)
@@ -122,18 +139,17 @@ def write_json_to_disk(courts, obj_type_str, obj_type, court_attr,
         # exist. This does not clobber.
         for court in courts:
             mkdir_p(join(
-                settings.BULK_DATA_DIR,
-                'tmp',
+                bulk_dir,
                 obj_type_str,
                 court.pk,
             ))
 
     if last_good_date is not None:
         print("   - Incremental data found. Assuming it's good and using it...")
-        qs = obj_type.objects.filter(date_modified__gte=last_good_date)
+        qs = obj_class.objects.filter(date_modified__gte=last_good_date)
     else:
         print("   - Incremental data not found. Working from scratch...")
-        qs = obj_type.objects.all()
+        qs = obj_class.objects.all()
 
     if qs.count() == 0:
         print("   - No %s-type items in the DB or none that have changed. All "
@@ -161,12 +177,11 @@ def write_json_to_disk(courts, obj_type_str, obj_type, court_attr,
             )
 
             if court_attr is not None:
-                loc = join(settings.BULK_DATA_DIR, 'tmp', obj_type_str,
-                           deepgetattr(item, court_attr), '%s.json' % item.pk)
+                loc = join(bulk_dir, obj_type_str, deepgetattr(item, court_attr),
+                           '%s.json' % item.pk)
             else:
                 # A non-jurisdiction-centric object.
-                loc = join(settings.BULK_DATA_DIR, 'tmp', obj_type_str,
-                           '%s.json' % item.pk)
+                loc = join(bulk_dir, obj_type_str, '%s.json' % item.pk)
 
             with open(loc, 'wb') as f:
                 f.write(json_str)
