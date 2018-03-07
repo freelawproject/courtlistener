@@ -171,6 +171,8 @@ def write_json_to_disk(courts, obj_type_str, obj_class, court_attr,
         r.versioning_scheme = URLPathVersioning()
         context = dict(request=r)
         for item in item_list:
+            if i % 1000 == 0:
+                print("Completed %s items so far." % i)
             json_str = renderer.render(
                 serializer(item, context=context).data,
                 accepted_media_type='application/json; indent=2',
