@@ -21,7 +21,12 @@
             <div class="row v-offset-above-2">
                 {% with party=party_type.party %}
                 <div class="col-xs-5">
-                    <h4>{{ party.name }}</h4>
+                    <h4>{{ party.name|safe }}
+                        {% if perms.people_db.change_party %}
+                            <a href="{% url 'admin:people_db_party_change' party.id %}"><i class="fa fa-pencil gray"></i>
+                            </a>
+                        {% endif %}
+                    </h4>
                 </div>
                 {% regroup party_type.party.roles.all by attorney as attorney_list %}
                 {% if attorney_list %}
@@ -31,7 +36,12 @@
                 <div class="col-xs-4">
                     {% for a in attorney_list %}
                         <div class="v-offset-below-1">
-                        <h4 class="bottom">{{ a.grouper.name }}</h4>
+                        <h4 class="bottom">{{ a.grouper.name|safe }}
+                            {% if perms.people_db.change_attorney %}
+                                <a href="{% url 'admin:people_db_attorney_change' a.grouper.id %}"><i class="fa fa-pencil gray"></i>
+                                </a>
+                            {% endif %}
+                        </h4>
                         {% if a.grouper.phone or a.grouper.fax %}
                             <p class="bottom">
                                 {% if a.grouper.phone %}
@@ -46,6 +56,10 @@
                         {% endif %}
                         {% for f in a.grouper.firms_in_docket %}
                             <p class="bottom">
+                                {% if perms.people_db.change_attorneyorganization %}
+                                    <a href="{% url 'admin:people_db_attorneyorganization_change' f.id %}"><i class="fa fa-pencil gray"></i>
+                                    </a>
+                                {% endif %}
                                 {% if f.name %}
                                     {{ f.name }}<br>
                                 {% endif %}
