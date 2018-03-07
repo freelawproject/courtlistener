@@ -5,7 +5,7 @@ from django.conf import settings
 from six.moves import input
 
 from cl.audio.models import Audio
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.lib.argparse_types import valid_date_time, valid_obj_type
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.db_tools import queryset_generator

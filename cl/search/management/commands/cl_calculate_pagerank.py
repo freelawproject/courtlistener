@@ -1,4 +1,3 @@
-import logging
 import os
 import pwd
 import shutil
@@ -6,7 +5,7 @@ import shutil
 import igraph
 from django.conf import settings
 
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.lib.solr_core_admin import get_data_dir, \
     reload_pagerank_external_file_cache
 from cl.lib.utils import mkdir_p
