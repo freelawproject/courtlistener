@@ -114,19 +114,22 @@ def view_parties(request, docket_id, slug):
     # which reduces the number of queries needed for this down to four instead
     # of potentially thousands (good times!)
     party_types = docket.party_types.select_related('party').prefetch_related(
-        Prefetch('party__roles',
-                 queryset=Role.objects.filter(
-                     docket=docket
-                 ).order_by(
-                     'attorney_id', 'role', 'date_action'
-                 ).select_related(
-                     'attorney'
-                 ).prefetch_related(
-                     Prefetch('attorney__organizations',
-                              queryset=AttorneyOrganization.objects.filter(
-                                  attorney_organization_associations__docket=docket),
-                              to_attr='firms_in_docket')
-                 ))
+        Prefetch(
+            'party__roles',
+            queryset=Role.objects.filter(docket=docket).order_by(
+                'attorney_id', 'role', 'date_action'
+            ).select_related(
+                'attorney'
+            ).prefetch_related(
+                Prefetch(
+                    'attorney__organizations',
+                    queryset=AttorneyOrganization.objects.filter(
+                        attorney_organization_associations__docket=docket
+                    ).distinct(),
+                    to_attr='firms_in_docket',
+                )
+            )
+        )
     ).order_by('name', 'party__name')
 
     parties = []
