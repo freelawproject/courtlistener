@@ -1255,6 +1255,12 @@ class FinancialDisclosure(models.Model):
 
 
 class PartyType(models.Model):
+    """Links together the parties and the docket. Probably a poorly named
+    model.
+
+    (It made sense at the time.)
+    """
+
     docket = models.ForeignKey(
         'search.Docket',
         related_name="party_types",
@@ -1267,6 +1273,12 @@ class PartyType(models.Model):
         help_text="The name of the type (Defendant, Plaintiff, etc.)",
         max_length="100",  # 2× the max in first 100,000 sampled.
         db_index=True,
+    )
+    date_terminated = models.DateField(
+        help_text="The date that the party was terminated from the case, if "
+                  "applicable.",
+        null=True,
+        blank=True,
     )
 
     class Meta:
