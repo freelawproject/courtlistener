@@ -1255,6 +1255,12 @@ class FinancialDisclosure(models.Model):
 
 
 class PartyType(models.Model):
+    """Links together the parties and the docket. Probably a poorly named
+    model.
+
+    (It made sense at the time.)
+    """
+
     docket = models.ForeignKey(
         'search.Docket',
         related_name="party_types",
@@ -1420,7 +1426,6 @@ class Attorney(models.Model):
     )
 
     class Meta:
-        unique_together = ('name', 'contact_raw')
         permissions = (
             ("has_recap_api_access", "Can work with RECAP API"),
         )
