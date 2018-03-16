@@ -394,27 +394,23 @@ class PacerXMLParser(object):
             try:
                 party = Party.objects.get(name=party_name)
             except Party.DoesNotExist:
-                party = Party(
-                    name=party_name,
-                    extra_info=party_extra_info,
-                )
+                party = Party(name=party_name)
                 if not debug:
                     try:
                         party.save()
                     except IntegrityError:
                         party = Party.objects.get(name=party_name)
 
-            if party_extra_info and not debug:
-                party.extra_info = party_extra_info
-                party.save()
-
             # If the party type doesn't exist, make a new one.
-            if not party.party_types.filter(docket=docket,
-                                            name=party_type).exists():
+            pts = party.party_types.filter(docket=docket, name=party_type)
+            if pts.exists():
+                pts.update(extra_info=party_extra_info)
+            else:
                 pt = PartyType(
                     docket=docket,
                     party=party,
                     name=party_type,
+                    extra_info=party_extra_info,
                 )
                 if not debug:
                     pt.save()
@@ -422,13 +418,6 @@ class PacerXMLParser(object):
             self.add_attorneys(docket, party_node, party, atty_obj_cache, debug)
 
     def add_attorneys(self, docket, party_node, party, atty_obj_cache, debug):
-        # Get the most recent date on the docket. We'll use this to have the
-        # most updated attorney info.
-        newest_docket_date = max(
-            [d for d in [docket.date_filed,
-                         docket.date_terminated,
-                         docket.date_last_filing] if d],
-        )
         atty_nodes = party_node.xpath('.//attorney_list/attorney')
         logger.info("Adding %s attorneys to the party." % len(atty_nodes))
         for atty_node in atty_nodes:
@@ -448,7 +437,6 @@ class PacerXMLParser(object):
                                                     contact_raw=atty_contact_raw)
                     except Attorney.DoesNotExist:
                         atty = Attorney(name=atty_name,
-                                        date_sourced=newest_docket_date,
                                         contact_raw=atty_contact_raw)
                         if not debug:
                             atty.save()
@@ -481,7 +469,6 @@ class PacerXMLParser(object):
                     logger.info("Unable to find matching attorney. Creating a "
                                 "new one: %s" % atty_name)
                     atty = Attorney(name=atty_name,
-                                    date_sourced=newest_docket_date,
                                     contact_raw=atty_contact_raw)
                     if not debug:
                         atty.save()
@@ -514,12 +501,7 @@ class PacerXMLParser(object):
                             docket=docket,
                         )
 
-                atty_info_is_newer = (atty.date_sourced <= newest_docket_date)
-                if atty_info and atty_info_is_newer:
-                    logger.info("Updating atty info because %s is more recent "
-                                "than %s." % (newest_docket_date,
-                                              atty.date_sourced))
-                    atty.date_sourced = newest_docket_date
+                if atty_info:
                     atty.contact_raw = atty_contact_raw
                     atty.email = atty_info['email']
                     atty.phone = atty_info['phone']
