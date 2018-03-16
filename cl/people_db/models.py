@@ -1382,11 +1382,12 @@ class Role(models.Model):
         unique_together = ('party', 'attorney', 'role', 'docket', 'date_action')
 
     def __unicode__(self):
-        return u'%s: Attorney %s is %s for Party %s' % (
+        return u'%s: Attorney %s is %s for Party %s in docket %s' % (
             self.pk,
             self.attorney_id,
             self.get_role_display(),
             self.party_id,
+            self.docket_id,
         )
 
 
@@ -1432,7 +1433,6 @@ class Attorney(models.Model):
     )
 
     class Meta:
-        unique_together = ('name', 'contact_raw')
         permissions = (
             ("has_recap_api_access", "Can work with RECAP API"),
         )
