@@ -143,6 +143,9 @@ def write_json_to_disk(courts, obj_type_str, obj_class, court_attr,
                 obj_type_str,
                 court.pk,
             ))
+    else:
+        # Make a directory for the object type.
+        mkdir_p(join(bulk_dir, obj_type_str))
 
     if last_good_date is not None:
         print("   - Incremental data found. Assuming it's good and using it...")
