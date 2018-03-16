@@ -1280,6 +1280,10 @@ class PartyType(models.Model):
         null=True,
         blank=True,
     )
+    extra_info = models.TextField(
+        help_text="Additional info from PACER",
+        db_index=True,
+    )
 
     class Meta:
         unique_together = ('docket', 'party', 'name')
@@ -1400,12 +1404,6 @@ class Attorney(models.Model):
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
-        db_index=True,
-    )
-    date_sourced = models.DateField(
-        help_text="The latest date on the source docket that populated this "
-                  "information. When information is in conflict use the "
-                  "latest data.",
         db_index=True,
     )
     organizations = models.ManyToManyField(
