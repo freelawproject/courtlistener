@@ -1,0 +1,356 @@
+[This proposed change](./readme.md) will include Django code that will examine each docket party's type to determine if the party is what we will consider to be a petitioner.
+
+In the list below, the party types that the Django code will consider to identify a petitioner are `highlighted like this` <<<<<.
+
+The list's 316 party type names are from a FreeLawProject Slack message that contained a list of all party types that had been seen before November 6, 2017.
+
+At a high level, the Django code will use the same kinds of comparisons to identify petitioners that are used within the following SQL statement's WHERE clause.  (This SQL is only to illustrate what the Django script will do.  This SQL will not be used in the proposed solution.)
+
+``` sql
+SELECT name
+FROM people_db_party
+WHERE
+-- Appellants
+   (people_db_party.name ILIKE '%Appellant%'
+    AND people_db_party.name NOT ILIKE '%Cross%'
+    AND people_db_party.name NOT ILIKE '%Defendant%')
+-- Applicants
+OR (people_db_party.name ILIKE '%Applicant%')
+-- Complainants
+OR (people_db_party.name ILIKE '%Complainant%')
+-- Claimants
+OR (people_db_party.name ILIKE '%Claimant%' 
+    AND people_db_party.name NOT ILIKE '%Cross%' 
+    AND people_db_party.name NOT ILIKE '%Counter%')
+- Creditors
+OR (people_db_party.name ILIKE '%Creditor%')
+-- Petitioners
+OR (people_db_party.name ILIKE '%Petition%'
+    AND people_db_party.name NOT ILIKE '%venor%' -- catch spellings Intevenor and Intervenor
+    AND people_db_party.name NOT ILIKE '%Non-Party%')
+-- Plaintiffs
+OR (people_db_party.name ILIKE '%Plaintiff%' 
+    AND people_db_party.name NOT ILIKE '%venor%' 
+    AND people_db_party.name NOT ILIKE '%Counter%'
+    AND people_db_party.name NOT ILIKE '%Party%'
+    AND people_db_party.name NOT ILIKE '%Cross%'
+    AND people_db_party.name NOT ILIKE '%Appellee%')
+-- Relators
+OR (people_db_party.name ILIKE '%Relator%')
+```
+- 2255
+- Additional Address
+- Adminstrator
+- Adr Limited Scope Counsel
+- Adr Provider
+- AKA
+- All Defendants
+- Alleged Debtor
+- All Parties
+- `All Plaintiffs` <<<<<
+- Alternate Claims Agent
+- Amicus
+- Amicus Curiae
+- `Appellant` <<<<<
+- Appellee
+- `Applicant` <<<<<
+- Apportionment Defendant
+- Arbitrator
+- As Agent
+- Assistant U.S. Trustee
+- Assist. U.S. Trustee
+- Associated Debtor
+- Asst. U.S. Trustee
+- Attorney for Trustee
+- attorney/guardian Ad Litem
+- Attorney Settlement Officer
+- Bankruptcy Admin.
+- Bankruptcy Administrator
+- Bankruptcy Judge
+- Bankruptcy Movant
+- Bk Notice Party
+- Carrier
+- Case Evaluator
+- Case Evaluator Chair
+- Chapter 11 Trustee
+- `Claimant` <<<<<
+- Claims Agent
+- Claims and Noticing Agent
+- Clerk Of
+- Commissioner
+- `Complainant` <<<<<
+- Conservator
+- `Consol Appellant` <<<<<
+- Consol Appellee
+- `Consol Claimant` <<<<<
+- Consol Countercla
+- Consol Counter Claimant
+- Consol Counter Defendant
+- Consol Counterdft
+- Consol Counter Plaintiff
+- Consol Cross Claimant
+- Consol Crossclm
+- Consol Cross Defendant
+- Consol Crossdft
+- Consol Defendant
+- `Consolidated Appellant` <<<<<
+- Consolidated Appellee
+- `Consolidated Claimant` <<<<<
+- Consolidated Counter Claimant
+- Consolidated Counter Defendant
+- Consolidated Cross Claimant
+- Consolidated Cross Defendant
+- Consolidated Debtor
+- Consolidated Defendant
+- Consolidated Filer Defendant
+- `Consolidated Filer Plaintiff` <<<<<
+- Consolidated Intervenor Defendant
+- Consolidated Intervenor Plaintiff
+- `Consolidated Petitioner` <<<<<
+- `Consolidated Plaintiff` <<<<<
+- Consolidated Respondent
+- Consolidated Third Party Defendant
+- Consolidated Third Party Plaintiff
+- Consol Intervenor
+- Consol Intervenor Defendant
+- Consol Intervenor Plaintiff
+- Consol Movant
+- `Consol Petitioner` <<<<<
+- `Consol Plaintiff` <<<<<
+- Consol Third Party Defendant
+- Consol Third Party Dft
+- Consol Third Party Pla
+- Consol Third Party Plaintiff
+- Consumer Privacy Ombudsman
+- Counter Claimant
+- Counter-Claimant
+- Counter Claimant Consolidated
+- Counterclaim Defendant
+- Counterclaim Plaintiff
+- Counter Consolidated Defendant
+- Counter Defendant
+- Counter-Defendant
+- Counter Plaintiff
+- Counter-Plaintiff
+- Court Monitor
+- Court Reporter
+- Cred. Comm. Chair
+- Cred Committee Aty
+- `Creditor` <<<<<
+- `Creditor Comm Atty` <<<<<
+- `Creditor Committee` <<<<<
+- `Creditor Committee Chair` <<<<<
+- `Creditor Cttee Atty` <<<<<
+- `Creditor's Attorney` <<<<<
+- `Creditors Committee` <<<<<
+- Cross Appellant
+- Cross Appellee
+- Cross Claimant
+- Cross-Claimant
+- Cross Defendant
+- Cross-Defendant
+- Cross Plaintiff
+- Cross-Plaintiff
+- Custodian
+- Dba
+- Debtor
+- Debtor (Ap Case Only)
+- debtor/attorney
+- Debtor Designee
+- Debtor-In-Possess
+- Debtor-In-Possess.
+- Debtor in Possession
+- Debtor-In-Possession
+- Debtor's Attorney
+- Defaulted Defendant
+- Defaulted Party
+- Defendant
+- defendant/appellant
+- defendant/appellee
+- Defendant - Consolidated
+- Defendant - Consolidated Case 2
+- Defendant - Consolidated Case 3
+- Defendant, Counter Plaintiff
+- Defendant - Defaulted
+- Defendant-In-Rem
+- defendant/intervenor
+- Defendants
+- Defendant - Stayed
+- Defendant, Third Party Plaintiff
+- Deponent
+- Discovery Master
+- Ene Evaluator
+- Estate Defendant
+- Estate Of
+- `Estate Plaintiff` <<<<<
+- `Estate-Plaintiff` <<<<<
+- Evaluator
+- Examiner
+- Executor Defendant
+- `Executor Plaintiff` <<<<<
+- `Executor-Plaintiff` <<<<<
+- Expert
+- Ex Rel.
+- Facilitator
+- Fifthparty Defendant
+- Fifth Party Defendant
+- Fifthparty Plaintiff
+- Fifth Party Plaintiff
+- Fka
+- Foreign Proceeding
+- Foreign Representative
+- Former Trustee
+- Fourth Party Defendant
+- Fourth-Party Defendant
+- Fourth Party Plaintiff
+- Fourth-Party Plaintiff
+- Garnishee
+- Guardian Ad Litem
+- Guardian Ad Litem Party
+- `Guardian Ad Litem Plaintiff` <<<<<
+- Health Care Ombudsman
+- Important! Select Party Role
+- Independent Fiduciary
+- In Re
+- In Re:
+- In Re [Civil]
+- In Re Debtor
+- In Re Estate Of
+- Interested Party
+- Interested Party Mp
+- Interested Party Related Case
+- Interim Trustee
+- Internal Revenue Service
+- Interpleader
+- Interpleader Defendant
+- `Interpleader Plaintiff` <<<<<
+- Intervenor
+- Intervenor Defendant
+- Intervenor-Defendant
+- Intervenor - Pending
+- Intervenor Petitioner
+- Intervenor Plaintiff
+- Intervenor Respondent
+- Intevenor Petitioner
+- `Involuntary Plaintiff` <<<<<
+- Jnt Admin Debtor
+- Joinder Defendant
+- Joint Admin Debtor
+- Joint Debtor
+- Jointly Administered Debtor
+- Judge
+- `Lead Plaintiff` <<<<<
+- `Lead Plaintiffs` <<<<<
+- Liquidating Trust
+- Liquidating Trustee
+- Liquidator
+- Litigant
+- Material Witness
+- Mdl Notice
+- `Mdl Plaintiff` <<<<<
+- Mediation Assistance Program Counsel
+- Mediator
+- Mediator (Adr Panel)
+- Mediator (Mandatory Program)
+- Member Debtor
+- Miscellaneous
+- Miscellaneous --Court Use Only
+- Miscellaneous Participant
+- Miscellaneous Party
+- Miscellaneous Proceeding Party
+- `Miscellaneous Proc. movant/plaintiff` <<<<<
+- Monitor
+- Movant
+- Neutral
+- Nominal Defendant
+- Nominal Defendent
+- Non-Filing Spouse
+- Non-Party
+- Non-Party Petitioner
+- Non-Party Respondent
+- Notice
+- Notice Only
+- Notice Only Party
+- Notice Party
+- Noticing / Claims Agent
+- Objector
+- Office of U.S. Trustee
+- Official Defendant
+- `Official Plaintiff` <<<<<
+- Ombudsman
+- Original Trustee
+- Other
+- Other Party
+- `Other Plaintiffs and Defendants` <<<<<
+- Party
+- Party of Interest
+- Party to Miscellaneous Proceeding
+- Patient Care Ombudsman
+- Personal Representative
+- `Petition. Cred.` <<<<<
+- `Petitioner` <<<<<
+- `Petitioning Creditor` <<<<<
+- `Petition Preparer` <<<<<
+- `Plaintiff` <<<<<
+- `plaintiff/appellant` <<<<<
+- plaintiff/appellee
+- `Plaintiff - Consolidated` <<<<<
+- `Plaintiff - Consolidated Case 2` <<<<<
+- `Plaintiff - Consolidated Case 3` <<<<<
+- Plaintiff, Counter Defendant
+- `plaintiff/intervenor` <<<<<
+- `Plaintiffs` <<<<<
+- `Plaintiffs Liaison Counsel` <<<<<
+- `Plaintiff - the Estate Of` <<<<<
+- Plan Trustee
+- Prisoner Litigation Settlement Program
+- Probation Officer
+- Proposed
+- Proposed Intervenor Defendant
+- Provider
+- Reach and Apply Defendant
+- Real Party in Interest Defendant
+- Real Party in Interest Plaintiff
+- Receiver
+- Referee
+- `Relator` <<<<<
+- `Relator Plaintiff` <<<<<
+- Relief Defendant
+- Respondent
+- Responsible Ind
+- Responsible Third Party
+- Retiree Committee
+- Selection Required
+- Sixthparty Plaintiff
+- Special Counsel
+- Special Master
+- Special Mediation Counsel
+- State Court Appointed Trustee
+- Stockholder
+- Substitute Custodian
+- Successor Trustee
+- Technical Advisor
+- Third Party Counter Claimant
+- Third Party Counter Defendant
+- Third Party Custodian
+- Third Party Defendant
+- Third-Party Defendant
+- Third Party Plaintiff
+- Third-Party Plaintiff
+- Third Party Respondent
+- Third Party Witness
+- Trustee
+- Trustee Attorney
+- Trustee, Chapter 11
+- Trustee in Bankruptcy
+- Trustee's Attorney
+- Underinsured Motorist Carrier
+- Unknown
+- Unknown Party Type
+- Unnamed Defendant
+- U.S. District Court
+- Ustr-Do Not Use
+- U.S. Trustee
+- U.S. Trustee Trial Attorney
+- Witness
+- Xdo Not Use!
