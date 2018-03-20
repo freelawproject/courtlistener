@@ -167,6 +167,7 @@ def write_json_to_disk(courts, obj_type_str, obj_class, court_attr,
         renderer = JSONRenderer()
         r = RequestFactory().request()
         r.META['SERVER_NAME'] = 'www.courtlistener.com'  # Else, it's testserver
+        r.META['wsgi.url_scheme'] = 'https'  # Else, it's http.
         r.version = 'v3'
         r.versioning_scheme = URLPathVersioning()
         context = dict(request=r)
