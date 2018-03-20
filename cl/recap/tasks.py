@@ -7,8 +7,8 @@ from datetime import timedelta
 from celery.canvas import chain
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import IntegrityError
-from django.db.models import Q
+from django.db import IntegrityError, transaction
+from django.db.models import Prefetch
 from django.utils import timezone
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -246,38 +246,31 @@ def add_attorney(atty, p, d):
     :param atty: A dict representing an attorney, as provided by Juriscraper.
     :param p: A Party object
     :param d: A Docket object
-    :return: None if there's an error, or an Attorney object if not.
+    :return: None if there's an error, or an Attorney ID if not.
     """
-    newest_docket_date = max([dt for dt in [d.date_filed, d.date_terminated,
-                                            d.date_last_filing] if dt])
     atty_org_info, atty_info = normalize_attorney_contact(
         atty['contact'],
         fallback_name=atty['name'],
     )
-    try:
-        q = Q()
-        fields = {
-            ('phone', atty_info['phone']),
-            ('fax', atty_info['fax']),
-            ('email', atty_info['email']),
-            ('contact_raw', atty['contact']),
-            ('organizations__lookup_key', atty_org_info.get('lookup_key')),
-        }
-        for field, lookup in fields:
-            if lookup:
-                q |= Q(**{field: lookup})
-        a, created = Attorney.objects.filter(
-            Q(name=atty['name']) & q,
-        ).distinct().get_or_create(
-            defaults={
-                'name': atty['name'],
-                'date_sourced': newest_docket_date,
-                'contact_raw': atty['contact'],
-            },
+
+    # Try lookup by atty name in the docket.
+    attys = Attorney.objects.filter(name=atty['name'],
+                                    roles__docket=d).distinct()
+    count = attys.count()
+    if count == 0:
+        # Couldn't find the attorney. Make one.
+        a = Attorney.objects.create(
+            name=atty['name'],
+            contact_raw=atty['contact'],
         )
-    except Attorney.MultipleObjectsReturned:
-        logger.info("Got too many results for attorney: '%s'. Punting." % atty)
-        return None
+    elif count == 1:
+        # Nailed it.
+        a = attys[0]
+    elif count >= 2:
+        # Too many found, choose the most recent attorney.
+        logger.info("Got too many results for atty: '%s'. Picking earliest." %
+                    atty)
+        a = attys.earliest('date_created')
 
     # Associate the attorney with an org and update their contact info.
     if atty['contact']:
@@ -304,11 +297,7 @@ def add_attorney(atty, p, d):
                 docket=d,
             )
 
-        docket_info_is_newer = (a.date_sourced <= newest_docket_date)
-        if atty_info and docket_info_is_newer:
-            logger.info("Updating atty info because %s is more recent than %s."
-                        % (newest_docket_date, a.date_sourced))
-            a.date_sourced = newest_docket_date
+        if atty_info:
             a.contact_raw = atty['contact']
             a.email = atty_info['email']
             a.phone = atty_info['phone']
@@ -316,23 +305,21 @@ def add_attorney(atty, p, d):
             a.save()
 
     # Do roles
-    atty_roles = [normalize_attorney_role(r) for r in atty['roles']]
-    atty_roles = filter(lambda r: r['role'] is not None, atty_roles)
-    atty_roles = remove_duplicate_dicts(atty_roles)
-    if len(atty_roles) > 0:
+    roles = atty['roles']
+    if len(roles) > 0:
         logger.info("Linking attorney '%s' to party '%s' via %s roles: %s" %
-                    (atty['name'], p.name, len(atty_roles), atty_roles))
+                    (atty['name'], p.name, len(roles), roles))
     else:
         logger.info("No role data parsed. Linking via 'UNKNOWN' role.")
-        atty_roles = [{'role': Role.UNKNOWN, 'date_action': None}]
+        roles = [{'role': Role.UNKNOWN, 'date_action': None}]
 
     # Delete the old roles, replace with new.
     Role.objects.filter(attorney=a, party=p, docket=d).delete()
     Role.objects.bulk_create([
         Role(attorney=a, party=p, docket=d, **atty_role) for
-        atty_role in atty_roles
+        atty_role in roles
     ])
-    return a
+    return a.pk
 
 
 def find_docket_object(court_id, pacer_case_id, docket_number):
@@ -471,6 +458,167 @@ def add_docket_entries(d, docket_entries, tag=None):
     return rds_created, needs_solr_update
 
 
+def check_json_for_terminated_entities(parties):
+    """Check the parties and attorneys to find if any terminated entities
+
+    If so, we can assume that the user checked the box for "Terminated Parties"
+    before running their docket report. If not, we can assume they didn't.
+
+    :param parties: List of party dicts, as returned by Juriscraper.
+    :returns boolean indicating whether any parties had termination dates.
+    """
+    for party in parties:
+        if party.get('date_terminated'):
+            return True
+        for atty in party.get('attorneys', []):
+            terminated_role = {a['role'] for a in atty['roles']} & \
+                                  {Role.TERMINATED, Role.SELF_TERMINATED}
+            if terminated_role:
+                return True
+    return False
+
+
+def get_terminated_entities(d):
+    """Check the docket to identify if there were any terminated parties or
+    attorneys. If so, return their IDs.
+
+    :param d: A docket object to investigate.
+    :returns (parties, attorneys): A tuple of two sets. One for party IDs, one
+    for attorney IDs.
+    """
+    # This will do five queries at most rather than doing potentially hundreds
+    # on cases with many parties.
+    parties = d.parties.prefetch_related(
+        Prefetch('party_types',
+                 queryset=PartyType.objects.filter(
+                     docket=d,
+                 ).exclude(
+                     date_terminated=None,
+                 ).distinct().only('pk'),
+                 to_attr='party_types_for_d'),
+        Prefetch('attorneys',
+                 queryset=Attorney.objects.filter(
+                     roles__docket=d,
+                 ).distinct().only('pk'),
+                 to_attr='attys_in_d'),
+        Prefetch('attys_in_d__roles',
+                 queryset=Role.objects.filter(
+                     docket=d,
+                     role__in=[Role.SELF_TERMINATED,
+                               Role.TERMINATED],
+                 ).distinct().only('pk'),
+                 to_attr='roles_for_atty'),
+    ).distinct().only('pk')
+    terminated_party_ids = set()
+    terminated_attorney_ids = set()
+    for party in parties:
+        for _ in party.party_types_for_d:
+            # PartyTypes are filtered to terminated objects. Thus, if any exist,
+            # we know it's a terminated party.
+            terminated_party_ids.add(party.pk)
+            break
+        for atty in party.attys_in_d:
+            for _ in atty.roles_for_atty:
+                # Roles are filtered to terminated roles. Thus, if any hits, we
+                # know we have terminated attys.
+                terminated_attorney_ids.add(atty.pk)
+                break
+    return terminated_party_ids, terminated_attorney_ids
+
+
+def normalize_attorney_roles(parties):
+    """Clean up the attorney roles for all parties.
+
+    We do this fairly early in the process because we need to know if there are
+    any terminated attorneys before we can start adding/removing content to/from
+    the database. By normalizing early, we ensure we have good data for that
+    sniffing.
+
+    A party might be input with an attorney such as:
+
+        {
+            'name': 'William H. Narwold',
+            'contact': ("1 Corporate Center\n",
+                        "20 Church Street\n",
+                        "17th Floor\n",
+                        "Hartford, CT 06103\n",
+                        "860-882-1676\n",
+                        "Fax: 860-882-1682\n",
+                        "Email: bnarwold@motleyrice.com"),
+            'roles': ['LEAD ATTORNEY',
+                      'TERMINATED: 03/12/2013'],
+        }
+
+    The role attribute will be cleaned up to be:
+
+        'roles': [{
+            'role': Role.ATTORNEY_LEAD,
+            'date_action': None,
+        }, {
+            'role': Role.TERMINATED,
+            'date_action': date(2013, 3, 12),
+        }
+
+    :param parties: The parties dict from Juriscraper.
+    :returns None; editing happens in place.
+    """
+    for party in parties:
+        for atty in party.get('attorneys', []):
+            roles = [normalize_attorney_role(r) for r in atty['roles']]
+            roles = filter(lambda r: r['role'] is not None, roles)
+            roles = remove_duplicate_dicts(roles)
+            atty['roles'] = roles
+
+
+def disassociate_extraneous_entities(d, parties, parties_to_preserve,
+                                     attorneys_to_preserve):
+    """Disassociate any parties or attorneys no longer in the latest info.
+
+     - Do not delete parties or attorneys, just allow them to be orphaned.
+       Later, we can decide what to do with these, but keeping them around at
+       least lets us have them later if we need them.
+
+     - Sort out if terminated parties were included in the new data. If so,
+       they'll be automatically preserved (because they would have been
+       updated). If not, find the old terminated parties on the docket, and
+       prevent them from getting disassociated.
+
+    :param d: The docket to interrogate and act upon.
+    :param parties: The parties dict that was scraped, and which we inspect to
+    check if terminated parties were included.
+    :param parties_to_preserve: A set of party IDs that were updated or created
+    while updating the docket.
+    :param attorneys_to_preserve: A set of attorney IDs that were updated or
+    created while updating the docket.
+    """
+    new_has_terminated_entities = check_json_for_terminated_entities(parties)
+    if not new_has_terminated_entities:
+        # No terminated data in the JSON. Check if we have any in the DB.
+        terminated_parties, terminated_attorneys = get_terminated_entities(d)
+        if any([terminated_parties, terminated_attorneys]):
+            # The docket currently has terminated entities, but new info
+            # doesn't, indicating that the user didn't request it. Thus, delete
+            # any entities that weren't just created/updated and that aren't in
+            # the list of terminated entities.
+            parties_to_preserve = parties_to_preserve | terminated_parties
+            attorneys_to_preserve = attorneys_to_preserve | terminated_attorneys
+
+    # Disassociate extraneous parties from the docket.
+    PartyType.objects.filter(
+        docket=d,
+    ).exclude(
+        party_id__in=parties_to_preserve,
+    ).delete()
+
+    # Disassociate extraneous attorneys from the docket and parties.
+    Role.objects.filter(
+        docket=d,
+    ).exclude(
+        attorney_id__in=attorneys_to_preserve,
+    ).delete()
+
+
+@transaction.atomic
 def add_parties_and_attorneys(d, parties):
     """Add parties and attorneys from the docket data to the docket.
 
@@ -479,36 +627,43 @@ def add_parties_and_attorneys(d, parties):
     attorney objects. This is typically the docket_data['parties'] field.
     :return: None
     """
+    normalize_attorney_roles(parties)
+
+    updated_parties = set()
+    updated_attorneys = set()
     for party in parties:
-        try:
-            p = Party.objects.get(name=party['name'])
-        except Party.DoesNotExist:
+        ps = Party.objects.filter(name=party['name'],
+                                  party_types__docket=d).distinct()
+        count = ps.count()
+        if count == 0:
             try:
-                p = Party.objects.create(
-                    name=party['name'],
-                    extra_info=party['extra_info'],
-                )
+                p = Party.objects.create(name=party['name'])
             except IntegrityError:
                 # Race condition. Object was created after our get and before
                 # our create. Try to get it again.
-                p = Party.objects.get(
-                    name=party['name'],
-                    extra_info=party['extra_info'],
-                )
-        except Party.MultipleObjectsReturned:
-            continue
-        else:
-            if party['extra_info']:
-                p.extra_info = party['extra_info']
-                p.save()
+                ps = Party.objects.filter(name=party['name'],
+                                          party_types__docket=3).distinct()
+                count = ps.count()
+        if count == 1:
+            p = ps[0]
+        elif count >= 2:
+            p = ps.earliest('date_created')
+        updated_parties.add(p.pk)
 
         # If the party type doesn't exist, make a new one.
-        if not p.party_types.filter(docket=d, name=party['type']).exists():
-            PartyType.objects.create(docket=d, party=p, name=party['type'])
+        pts = p.party_types.filter(docket=d, name=party['type'])
+        if pts.exists():
+            pts.update(extra_info=party['extra_info'])
+        else:
+            PartyType.objects.create(docket=d, party=p, name=party['type'],
+                                     extra_info=party['extra_info'])
 
         # Attorneys
         for atty in party.get('attorneys', []):
-            add_attorney(atty, p, d)
+            updated_attorneys.add(add_attorney(atty, p, d))
+
+    disassociate_extraneous_entities(d, parties, updated_parties,
+                                     updated_attorneys)
 
 
 def process_orphan_documents(rds_created, court_id, docket_date):
