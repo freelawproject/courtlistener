@@ -76,11 +76,11 @@ AND EXISTS (
     AND   people_db_attorney_sq.name != ''
     -- There are instances where a party's name is like "Mr. John Smith" and the related 
     -- attorney's name is "John Smith" (or vice versa).  So, to determine that a party had
-    -- representation, we need to determine that both:
+    -- representation, we need to determine (case-insenstive) that both:
     -- The attorney's name is NOT within the party's name
-    AND people_db_party_sq.name    NOT LIKE ('%' || people_db_attorney_sq.name || '%')
+    AND people_db_party_sq.name    NOT ILIKE ('%' || people_db_attorney_sq.name || '%')
     -- AND the party's name is NOT within the attorney's name
-    AND people_db_attorney_sq.name NOT LIKE ('%' || people_db_party_sq.name    || '%')
+    AND people_db_attorney_sq.name NOT ILIKE ('%' || people_db_party_sq.name    || '%')
 )
 ```
 
