@@ -605,6 +605,10 @@ def disassociate_extraneous_entities(d, parties, parties_to_preserve,
             # the list of terminated entities.
             parties_to_preserve = parties_to_preserve | terminated_parties
             attorneys_to_preserve = attorneys_to_preserve | terminated_attorneys
+    else:
+        # The terminated parties are already included in the entities to
+        # preserve, so just create an empty variable for this.
+        terminated_parties = set()
 
     # Disassociate extraneous parties from the docket.
     PartyType.objects.filter(
@@ -620,8 +624,9 @@ def disassociate_extraneous_entities(d, parties, parties_to_preserve,
         # Don't delete attorney roles for attorneys we're preserving.
         attorney_id__in=attorneys_to_preserve,
     ).exclude(
-        # Don't delete attorney roles for parties we're preserving.
-        party_id__in=parties_to_preserve,
+        # Don't delete attorney roles for parties we're preserving b/c
+        # they were terminated.
+        party_id__in=terminated_parties,
     ).delete()
 
 
