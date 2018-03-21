@@ -1324,7 +1324,6 @@ class Party(models.Model):
     )
 
     class Meta:
-        unique_together = ('name', 'extra_info')
         verbose_name_plural = "Parties"
         permissions = (
             ("has_recap_api_access", "Can work with RECAP API"),
