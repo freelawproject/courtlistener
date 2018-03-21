@@ -653,10 +653,12 @@ def add_parties_and_attorneys(d, parties):
         # If the party type doesn't exist, make a new one.
         pts = p.party_types.filter(docket=d, name=party['type'])
         if pts.exists():
-            pts.update(extra_info=party['extra_info'])
+            pts.update(extra_info=party['extra_info'],
+                       date_terminated=party['date_terminated'])
         else:
             PartyType.objects.create(docket=d, party=p, name=party['type'],
-                                     extra_info=party['extra_info'])
+                                     extra_info=party['extra_info'],
+                                     date_terminated=party['date_terminated'])
 
         # Attorneys
         for atty in party.get('attorneys', []):
