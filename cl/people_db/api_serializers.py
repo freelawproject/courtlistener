@@ -138,7 +138,7 @@ class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = PartyType
-        fields = ('docket', 'name')
+        fields = ('docket', 'name', 'date_terminated', 'extra_info')
 
 
 class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):

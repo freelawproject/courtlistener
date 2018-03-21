@@ -553,6 +553,7 @@ class TerminatedEntitiesTest(TestCase):
                     "LEAD ATTORNEY",
                 ]
             }],
+            'date_terminated': None,
         }
         self.new_mccarthy_data = {
             "extra_info": '',
@@ -580,7 +581,7 @@ class TerminatedEntitiesTest(TestCase):
         """Do we update all existing data when there aren't terminated entities
         at play?
         """
-        del self.new_mccarthy_data['date_terminated']
+        self.new_mccarthy_data['date_terminated'] = None
         add_parties_and_attorneys(self.d, self.new_party_data)
 
         # Docket should have two parties, Powell and McCarthy. This implies that
@@ -609,7 +610,7 @@ class TerminatedEntitiesTest(TestCase):
                                  date_terminated=date(2018, 11, 4))
 
         # Remove termination data from the new.
-        del self.new_mccarthy_data['date_terminated']
+        self.new_mccarthy_data['date_terminated'] = None
 
         add_parties_and_attorneys(self.d, self.new_party_data)
 
