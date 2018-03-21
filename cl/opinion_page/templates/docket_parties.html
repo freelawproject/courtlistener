@@ -28,7 +28,7 @@
                         {% endif %}
                     </h4>
                 </div>
-                {% regroup party_type.party.roles.all by attorney as attorney_list %}
+                {% regroup party_type.party.roles.all|dictsort:"attorney.name" by attorney as attorney_list %}
                 {% if attorney_list %}
                 <div class="col-xs-3">
                     <p class="alt text-uppercase right representation">Represented&nbsp;by</p>
