@@ -21,12 +21,15 @@
             <div class="row v-offset-above-2">
                 {% with party=party_type.party %}
                 <div class="col-xs-5">
-                    <h4>{{ party.name|safe }}
+                    <h4 class="bottom">{{ party.name|safe }}
                         {% if perms.people_db.change_party %}
                             <a href="{% url 'admin:people_db_party_change' party.id %}"><i class="fa fa-pencil gray"></i>
                             </a>
                         {% endif %}
                     </h4>
+                    {% if party_type.date_terminated %}
+                      <p><em>Terminated ({{ party_type.date_terminated }})</em></p>
+                    {% endif %}
                 </div>
                 {% regroup party_type.party.roles.all|dictsort:"attorney.name" by attorney as attorney_list %}
                 {% if attorney_list %}
