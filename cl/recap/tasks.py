@@ -583,6 +583,9 @@ def disassociate_extraneous_entities(d, parties, parties_to_preserve,
        updated). If not, find the old terminated parties on the docket, and
        prevent them from getting disassociated.
 
+     - If a party is terminated, do not delete their attorneys even if their
+       attorneys are not listed as terminated.
+
     :param d: The docket to interrogate and act upon.
     :param parties: The parties dict that was scraped, and which we inspect to
     check if terminated parties were included.
@@ -614,7 +617,11 @@ def disassociate_extraneous_entities(d, parties, parties_to_preserve,
     Role.objects.filter(
         docket=d,
     ).exclude(
+        # Don't delete attorney roles for attorneys we're preserving.
         attorney_id__in=attorneys_to_preserve,
+    ).exclude(
+        # Don't delete attorney roles for parties we're preserving.
+        party_id__in=parties_to_preserve,
     ).delete()
 
 
