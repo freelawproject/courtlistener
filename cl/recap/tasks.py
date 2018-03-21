@@ -642,7 +642,7 @@ def add_parties_and_attorneys(d, parties):
                 # Race condition. Object was created after our get and before
                 # our create. Try to get it again.
                 ps = Party.objects.filter(name=party['name'],
-                                          party_types__docket=3).distinct()
+                                          party_types__docket=d).distinct()
                 count = ps.count()
         if count == 1:
             p = ps[0]
