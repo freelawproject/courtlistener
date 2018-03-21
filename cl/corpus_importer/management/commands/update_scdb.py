@@ -167,7 +167,7 @@ class Command(VerboseCommand):
                 led_ok = self.set_if_falsy(cluster, field, scdb_info['ledCite'])
                 led_done = True
             else:
-                logger.warn("WARNING: Fell through search for citation.")
+                logger.warn("WARNING: Fell through search for citation: %s" % value)
                 save = False
         if not all([us_ok, sct_ok, led_ok]):
             save = False
@@ -251,7 +251,7 @@ class Command(VerboseCommand):
         good_cluster_ids = []
         for cluster in clusters:
             dn = cluster.docket.docket_number
-            if dn is not None:
+            if dn:
                 dn = dn.replace(', Original', ' ORIG')
                 dn = dn.replace('___, ORIGINAL', 'ORIG')
                 dn = dn.replace(', Orig', ' ORIG')
@@ -260,6 +260,10 @@ class Command(VerboseCommand):
                 dn = dn.replace('NO. ', '')
                 if dn == d['docket']:
                     good_cluster_ids.append(cluster.pk)
+            else:
+                # No docket number. Assume it's good for now; it'll get
+                # winnowed in the next round.
+                good_cluster_ids.append(cluster.pk)
 
         # Convert our list of IDs back into a QuerySet for consistency.
         return OpinionCluster.objects.filter(pk__in=good_cluster_ids)

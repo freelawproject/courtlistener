@@ -904,9 +904,16 @@ def process_recap_docket_history_report(self, pk):
     data = report.data
     logger.info("Parsing completed for item %s" % pq)
 
+    if data == {}:
+        # Bad docket history page.
+        msg = "Not a valid docket history page upload."
+        mark_pq_status(pq, msg, pq.INVALID_CONTENT)
+        self.request.callbacks = None
+        return None
+
     # Merge the contents of the docket into CL.
     d, count = find_docket_object(pq.court_id, pq.pacer_case_id,
-                           data['docket_number'])
+                                  data['docket_number'])
     if count > 1:
         logger.info("Found %s dockets during lookup. Choosing oldest." % count)
         d = d.earliest('date_created')
