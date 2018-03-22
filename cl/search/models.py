@@ -466,6 +466,25 @@ class Docket(models.Model):
 
         return search_list
 
+    def reprocess_recap_content(self, do_original_xml=False):
+        """Go over any associated RECAP files and reprocess them.
+
+        Do them in the order they were received since that should correspond to
+        the history of the docket itself.
+
+        :param do_original_xml: Whether to do the original XML file as received
+        from Internet Archive.
+        """
+        from cl.lib.pacer import reprocess_docket_data
+        for html in self.html_documents.order_by('date_created'):
+            filepath = html.filepath.path
+            reprocess_docket_data(self, filepath, html.upload_type)
+
+        # Finally, do the XML file if we've got it.
+        if do_original_xml:
+            # Grab the XML file from disk and parse it.
+            pass
+
 
 class DocketEntry(models.Model):
 
