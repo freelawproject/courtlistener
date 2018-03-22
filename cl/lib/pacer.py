@@ -14,6 +14,7 @@ from django.db import transaction
 from django.db.models import Q
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from juriscraper.lib.exceptions import ParsingException
+from juriscraper.pacer import DocketReport, DocketHistoryReport
 from juriscraper.pacer.docket_utils import normalize_party_types
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
@@ -29,6 +30,8 @@ from cl.scrapers.tasks import get_page_count
 from cl.search.models import Court, Docket, RECAPDocument, DocketEntry
 from cl.people_db.models import Role, Party, AttorneyOrganization, PartyType, \
     Attorney, AttorneyOrganizationAssociation
+from cl.recap.models import DOCKET_HISTORY_REPORT, DOCKET
+
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +186,34 @@ def get_blocked_status(docket, count_override=None):
     if all([small_case, docket.court in Court.BANKRUPTCY_JURISDICTIONS]):
         return True, date.today()
     return False, None
+
+
+def reprocess_docket_data(d, filepath, report_type):
+    """Reprocess docket data that we already have.
+
+    :param d: A docket object to work on.
+    :param filepath: The path to a saved HTML file containing docket or docket
+    history report data.
+    :param report_type: Whether it's a docket or a docket history report.
+    """
+    from cl.recap.tasks import update_docket_metadata, add_docket_entries, \
+        add_parties_and_attorneys
+    if report_type == DOCKET:
+        report = DocketReport(map_cl_to_pacer_id(d.court_id))
+    elif report_type == DOCKET_HISTORY_REPORT:
+        report = DocketHistoryReport(map_cl_to_pacer_id(d.court_id))
+    with open(filepath, 'r') as f:
+        text = f.read().decode('utf-8')
+    report._parse_text(text)
+    data = report.data
+    if data == {}:
+        return None
+    update_docket_metadata(d, data)
+    d.save()
+    add_docket_entries(d, data['docket_entries'])
+    if report_type == DOCKET:
+        add_parties_and_attorneys(d, data['parties'])
+    return d.pk
 
 
 class PacerXMLParser(object):
