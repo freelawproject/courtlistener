@@ -92,7 +92,7 @@
              id="entry-{{ de.entry_number }}">
             <div class="col-xs-1 text-center"><p>{{ de.entry_number }}</p></div>
             <div class="col-xs-3 col-sm-2 col-md-1"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
-            <div class="col-xs-7 col-sm-6 col-md-8"><p>{{ de.description|safe|default:'<em class="gray">Unknown docket entry description</em>' }}</p></div>
+            <div class="col-xs-7 col-sm-6 col-md-8"><p>{{ de.description|safe|default:'' }}</p></div>
             <div class="hidden-xs col-sm-3 col-md-2">
                 <p class="right"><a href="#entry-{{ de.entry_number }}"
                    data-toggle="tooltip"
