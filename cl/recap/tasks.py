@@ -306,11 +306,7 @@ def add_attorney(atty, p, d):
 
     # Do roles
     roles = atty['roles']
-    if len(roles) > 0:
-        logger.info("Linking attorney '%s' to party '%s' via %s roles: %s" %
-                    (atty['name'], p.name, len(roles), roles))
-    else:
-        logger.info("No role data parsed. Linking via 'UNKNOWN' role.")
+    if len(roles) == 0:
         roles = [{'role': Role.UNKNOWN, 'date_action': None}]
 
     # Delete the old roles, replace with new.
