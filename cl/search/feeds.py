@@ -41,18 +41,23 @@ class SearchFeed(Feed):
         search_form = SearchForm(obj.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
+            order_by = 'dateFiled'
             if cd['type'] == 'o':
                 solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
             elif cd['type'] == 'r':
                 solr = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
+            else:
+                return []
             main_params = search_utils.build_main_query(cd, highlight=False,
                                                         facet=False)
             main_params.update({
-                'sort': 'dateFiled desc',
+                'sort': '%s desc' % order_by,
                 'rows': '20',
                 'start': '0',
                 'caller': 'SearchFeed',
             })
+            # Eliminate items that lack the ordering field.
+            main_params['fq'].append('%s:[* TO *]' % order_by)
             return solr.query().add_extra(**main_params).execute()
         else:
             return []
