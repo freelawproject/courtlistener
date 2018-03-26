@@ -14,10 +14,12 @@
 {% block head %}
     {% if not error %}
         {% if get_string %}
+          {% if search_form.type.value != "p" %}
             <link rel="alternate"
                   type="application/rss+xml"
                   title="Atom Feed for These Search Results"
                   href="/feed/search/?{{ get_string }}" />
+          {% endif %}
         {% endif %}
     {% endif %}
     <link rel="alternate"
