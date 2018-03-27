@@ -59,12 +59,10 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                                       "attachment number must be blank for "
                                       "docket uploads.")
         elif attrs['upload_type'] == PDF:
-            # PDFs require pacer_doc_id and document_number values.
-            if not all([attrs.get('pacer_doc_id'),
-                        attrs.get('document_number')]):
+            # PDFs require a pacer_doc_id value.
+            if not attrs.get('pacer_doc_id'):
                 raise ValidationError("Uploaded PDFs must have the "
-                                      "pacer_doc_id and document_number fields "
-                                      "completed.")
+                                      "pacer_doc_id field completed.")
 
         if attrs['upload_type'] != PDF:
             # Everything but PDFs require the case ID.
