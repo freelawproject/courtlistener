@@ -185,14 +185,14 @@ def view_settings(request):
 def delete_account(request):
     if request.method == 'POST':
         try:
+            email = emails['account_deleted']
+            send_mail(email['subject'], email['body'] % request.user,
+                      email['from'], email['to'])
             request.user.alerts.all().delete()
             request.user.favorites.all().delete()
             request.user.scotus_maps.all().update(deleted=True)
             convert_to_stub_account(request.user)
             logout(request)
-            email = emails['account_deleted']
-            send_mail(email['subject'], email['body'] % request.user,
-                      email['from'], email['to'])
 
         except Exception as e:
             logger.critical("User was unable to delete account. %s" % e)
