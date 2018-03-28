@@ -4,11 +4,18 @@
 {% block message %}{% endblock %}
 
 {% block title %}
-    {% if request.GET.q %}
-        Search Results for {{ request.GET.q }}
+    {% if search_summary_str %}
+        Search Results for {{ search_summary_str }}
     {% else %}
         Free Legal Search Engine and Alert System
-    {% endif %} – CourtListener.com
+    {% endif %} &mdash; CourtListener.com
+{% endblock %}
+{% block og_title %}
+  {% if search_summary_str %}
+    Search Results for {{ search_summary_str }}
+  {% else %}
+    Free Legal Search Engine and Alert System
+  {% endif %} &mdash; CourtListener.com
 {% endblock %}
 
 {% block head %}
