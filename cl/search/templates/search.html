@@ -5,17 +5,17 @@
 
 {% block title %}
     {% if search_summary_str %}
-        Search Results for {{ search_summary_str }}
+        Search Results for {{ search_summary_str }} &mdash; CourtListener.com
     {% else %}
-        Free Legal Search Engine and Alert System
-    {% endif %} &mdash; CourtListener.com
+        Free Legal Search Engine and Alert System &mdash; CourtListener.com
+    {% endif %}
 {% endblock %}
 {% block og_title %}
   {% if search_summary_str %}
-    Search Results for {{ search_summary_str }}
+    Search Results for {{ search_summary_str }} &mdash; CourtListener.com
   {% else %}
-    Free Legal Search Engine and Alert System
-  {% endif %} &mdash; CourtListener.com
+    Free Legal Search Engine and Alert System &mdash; CourtListener.com
+  {% endif %}
 {% endblock %}
 
 {% block head %}
