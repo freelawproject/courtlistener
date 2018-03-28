@@ -1,14 +1,15 @@
+# coding=utf-8
 import re
 
 from django import forms
-from django.forms import DateField
+from django.forms import DateField, ChoiceField
 from localflavor.us.us_states import STATE_CHOICES
 
+from cl.lib.model_helpers import flatten_choices
 from cl.people_db.models import Position, PoliticalAffiliation
 from cl.search.fields import CeilingDateField, FloorDateField, RandomChoiceField
 from cl.search.models import Court
 from cl.search.models import DOCUMENT_STATUSES
-
 
 OPINION_ORDER_BY_CHOICES = (
     ('score desc',       'Relevance'),
@@ -60,7 +61,10 @@ def _clean_form(request, cd, courts):
     for status in DOCUMENT_STATUSES:
         mutable_GET['stat_%s' % status[1]] = cd['stat_%s' % status[1]]
 
-    return SearchForm(mutable_GET)
+    # Ensure that we have the cleaned_data and other related attributes set.
+    form = SearchForm(mutable_GET)
+    form.is_valid()
+    return form
 
 
 class SearchForm(forms.Form):
@@ -75,13 +79,17 @@ class SearchForm(forms.Form):
             attrs={'class': 'external-input form-control'}
         )
     )
+    type.as_str_types = []
     q = forms.CharField(
-        required=False
+        required=False,
+        label="Query",
     )
+    q.as_str_types = ['o', 'oa', 'r', 'p']
     court = forms.CharField(
         required=False,
         widget=forms.HiddenInput()
     )
+    court.as_str_types = []
     order_by = RandomChoiceField(
         choices=OPINION_ORDER_BY_CHOICES,
         required=False,
@@ -91,10 +99,23 @@ class SearchForm(forms.Form):
             attrs={'class': 'external-input form-control'}
         )
     )
+    order_by.as_str_types = []
 
     #
     # Oral argument and Opinion shared fields
     #
+    judge = forms.CharField(
+        required=False,
+        initial='',
+        label="Judge",
+        widget=forms.TextInput(
+            attrs={'class': 'external-input form-control',
+                   'autocomplete': 'off'}
+        )
+    )
+    judge.as_str_types = ['oa', 'o']
+
+    # Oral arg, opinion, and RECAP
     case_name = forms.CharField(
         required=False,
         label='Case Name',
@@ -104,14 +125,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
-    judge = forms.CharField(
-        required=False,
-        initial='',
-        widget=forms.TextInput(
-            attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off'}
-        )
-    )
+    case_name.as_str_types = ['oa', 'o', 'r']
     docket_number = forms.CharField(
         required=False,
         label='Docket Number',
@@ -120,6 +134,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    docket_number.as_str_types = ['oa', 'o', 'r']
 
     #
     # RECAP fields
@@ -132,6 +147,7 @@ class SearchForm(forms.Form):
             'class': 'external-input form-control left',
         }),
     )
+    available_only.as_str_types = ['r']
     description = forms.CharField(
         required=False,
         label="Document Description",
@@ -140,6 +156,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    description.as_str_types = ['r']
     nature_of_suit = forms.CharField(
         required=False,
         label="Nature of Suit",
@@ -148,6 +165,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    nature_of_suit.as_str_types = ['r']
     cause = forms.CharField(
         required=False,
         label="Cause",
@@ -156,6 +174,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    cause.as_str_types = ['r']
     assigned_to = forms.CharField(
         required=False,
         label="Assigned To Judge",
@@ -164,6 +183,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    assigned_to.as_str_types = ['r']
     referred_to = forms.CharField(
         required=False,
         label="Referred To Judge",
@@ -172,6 +192,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    referred_to.as_str_types = ['r']
     document_number = forms.CharField(
         required=False,
         label="Document #",
@@ -180,6 +201,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    document_number.as_str_types = ['r']
     attachment_number = forms.CharField(
         required=False,
         label="Attachment #",
@@ -188,6 +210,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    attachment_number.as_str_types = ['r']
     party_name = forms.CharField(
         required=False,
         label="Party Name",
@@ -196,6 +219,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'},
         )
     )
+    party_name.as_str_types = ['r']
     atty_name = forms.CharField(
         required=False,
         label="Attorney Name",
@@ -204,6 +228,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'},
         )
     )
+    atty_name.as_str_types = ['r']
 
     #
     # Oral argument fields
@@ -217,6 +242,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    argued_after.as_str_types = ['oa']
     argued_before = CeilingDateField(
         required=False,
         label="Argued Before",
@@ -226,6 +252,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    argued_before.as_str_types = ['oa']
 
     #
     # Opinion fields
@@ -239,6 +266,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    filed_after.as_str_types = ['o', 'r']
     filed_before = CeilingDateField(
         required=False,
         label='Filed Before',
@@ -248,13 +276,16 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    filed_before.as_str_types = ['o', 'r']
     citation = forms.CharField(
         required=False,
+        label="Citation",
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
                    'autocomplete': 'off'}
         )
     )
+    citation.as_str_types = ['o']
     neutral_cite = forms.CharField(
         required=False,
         label='Neutral Citation',
@@ -263,6 +294,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    neutral_cite.as_str_types = ['o']
     cited_gt = forms.CharField(
         required=False,
         label='Min Cites',
@@ -272,6 +304,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    cited_gt.as_str_types = ['o']
     cited_lt = forms.CharField(
         required=False,
         label='Max Cites',
@@ -281,6 +314,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    cited_lt.as_str_types = ['o']
 
     #
     # Judge fields
@@ -293,6 +327,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    name.as_str_types = ['p']
     born_after = FloorDateField(
         required=False,
         label="Born After",
@@ -302,6 +337,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    born_after.as_str_types = ['p']
     born_before = CeilingDateField(
         required=False,
         label="Born Before",
@@ -311,6 +347,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    born_before.as_str_types = ['p']
     dob_city = forms.CharField(
         required=False,
         label='Birth City',
@@ -319,6 +356,7 @@ class SearchForm(forms.Form):
                        'autocomplete': 'off'}
         )
     )
+    dob_city.as_str_types = ['p']
     dob_state = forms.ChoiceField(
         choices=[('', '---------')] + list(STATE_CHOICES),
         required=False,
@@ -327,6 +365,7 @@ class SearchForm(forms.Form):
             attrs={'class': 'external-input form-control'}
         )
     )
+    dob_state.as_str_types = ['p']
     school = forms.CharField(
         required=False,
         label='School Attended',
@@ -335,6 +374,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    school.as_str_types = ['p']
     appointer = forms.CharField(
         required=False,
         label='Appointed By',
@@ -343,6 +383,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    appointer.as_str_types = ['p']
     selection_method = forms.ChoiceField(
         choices=[('', '---------')] + list(Position.SELECTION_METHODS),
         required=False,
@@ -352,6 +393,7 @@ class SearchForm(forms.Form):
             attrs={'class': 'external-input form-control'}
         )
     )
+    selection_method.as_str_types = ['p']
     political_affiliation = forms.ChoiceField(
         choices=[('', '---------')] + list(PoliticalAffiliation.POLITICAL_PARTIES),
         required=False,
@@ -361,6 +403,7 @@ class SearchForm(forms.Form):
             attrs={'class': 'external-input form-control'}
         )
     )
+    political_affiliation.as_str_types = ['p']
 
     def get_date_field_names(self):
         return {f_name.split('_')[0] for f_name, f in self.fields.items()
@@ -536,3 +579,22 @@ class SearchForm(forms.Form):
                 cleaned_data[k] = v.strip()
 
         return cleaned_data
+
+    def as_text(self, court_count, court_count_human):
+        crumbs = []
+        search_type = self.data['type']
+        for field_name, field in self.base_fields.items():
+            if not hasattr(field, 'as_str_types'):
+                continue
+            if search_type in field.as_str_types:
+                value = self.cleaned_data[field_name]
+                if value:
+                    if isinstance(field, ChoiceField):
+                        choices = flatten_choices(self.fields[field_name])
+                        value = dict(choices)[value]
+                    crumbs.append('%s: %s' % (field.label, value))
+
+        if court_count_human != "All":
+            pluralize = "s" if court_count > 1 else ""
+            crumbs.append("%s Court%s" % (court_count, pluralize))
+        return u" › ".join(crumbs)

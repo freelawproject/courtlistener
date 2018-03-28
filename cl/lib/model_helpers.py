@@ -235,6 +235,21 @@ def make_choices_group_lookup(c):
     return d
 
 
+def flatten_choices(self):
+    """Flattened version of choices tuple on a model or form field
+
+    Important helper when you have named groups in your choices that you need
+    to have flattened.
+    """
+    flat = []
+    for choice, value in self.choices:
+        if isinstance(value, (list, tuple)):
+            flat.extend(value)
+        else:
+            flat.append((choice, value))
+    return flat
+
+
 def disable_auto_now_fields(*models):
     """Turns off the auto_now and auto_now_add attributes on a Model's fields,
     so that an instance of the Model can be saved with a custom value.
