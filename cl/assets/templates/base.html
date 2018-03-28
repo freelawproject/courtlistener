@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
 
     {% block meta %}
-    <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court opinions. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
+    <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
     <link rel="author" href="/humans.txt" type="text/plain"/>
 
     {# Open Search Plugin #}
@@ -31,7 +31,7 @@
     <meta property="og:type" content="website"/>
     <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
     <meta property="og:description"
-          content="{% block og_description %}Create alerts, search for and browse the latest court opinions.{% endblock %}">
+          content="{% block og_description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
     <meta property="og:url" content="{% get_full_host %}{{ request.path }}"/>
     <meta property="og:site_name" content="CourtListener"/>
     <meta property="og:image"
