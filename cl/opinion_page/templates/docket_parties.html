@@ -1,13 +1,15 @@
 {% extends "docket_tabs.html" %}
-{% load text_filters %}
 
-
-{% block title %}Parties for {{ docket|best_case_name }} –
+{% block title %}Parties for {{ title }} –
     CourtListener.com{% endblock %}
-{% block og_title %}Parties for {{ docket|best_case_name }} -
+{% block og_title %}Parties for {{ title }} -
     CourtListener.com{% endblock %}
-{% block description %}Parties for {{ docket|best_case_name }}{% endblock %}
-{% block og_description %}Parties for {{ docket|best_case_name }}{% endblock %}
+{% block description %}Parties for {{ title }} — Brought to you by the RECAP
+  Initiative and Free Law Project, a non-profit dedicated to creating high
+  quality open legal information.{% endblock %}
+{% block og_description %}Parties for {{ title }} — Brought to you by the RECAP
+  Initiative and Free Law Project, a non-profit dedicated to creating high
+  quality open legal information.{% endblock %}
 
 {% block nav-parties %}active{% endblock %}
 
