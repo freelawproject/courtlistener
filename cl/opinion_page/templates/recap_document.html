@@ -206,8 +206,10 @@
                         {% if document.pacer_url %}
                             <a class="btn btn-primary btn-sm" href="{{ document.pacer_url }}"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
                         {% endif %}
-                        <a href="https://free.law/recap/"
-                           class="btn btn-success btn-sm">Install RECAP</a>
+                        {% if not request.COOKIES.recap_install_plea %}
+                          <a href="https://free.law/recap/"
+                             class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
+                        {% endif %}
                     </span>
                 </p>
             </div>

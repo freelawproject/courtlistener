@@ -54,6 +54,9 @@
                 <p class="text-center gray large">Search our database of
                     millions of PACER documents and dockets.
                 </p>
+               {% if not request.COOKIES.recap_install_plea %}
+                 <p class="text-center gray large recap_install_plea">Install the free <a href="https://free.law/recap/">RECAP extensions for Firefox and Chrome</a> to contribute to this archive.</p>
+               {% endif %}
             {% elif search_form.type.value == 'oa' %}
                 <h1 class="text-center">Advanced Oral Argument Search</h1>
                 <p class="text-center gray large">Search the biggest collection of oral argument audio on the Internet. Updated constantly.
@@ -627,7 +630,7 @@
                 </p>
                 <p>
                     <a href="https://free.law/recap/"
-                       class="btn btn-primary">Install the Extensions</a>
+                       class="btn btn-success">Install the Extensions</a>
                 </p>
 
 
