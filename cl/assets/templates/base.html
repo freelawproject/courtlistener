@@ -100,7 +100,7 @@
     <header class="row">
         <!-- Donate Banner -->
         {% if FUNDRAISING_MODE and not request.COOKIES.no_banner %}
-        <div class="navbar navbar-default subnav alert-danger" role="navigation">
+        <div class="navbar navbar-default subnav alert-danger alert-dismissible" role="navigation">
             <div class="container-fluid">
                 <div class="row">
                     <div class="col-xs-7 col-sm-8 col-md-9 col-lg-10">
@@ -111,9 +111,9 @@
                         <div class="row">
                             <div class="col-xs-12">
                                 <button type="button" class="close"
-                                        data-dismiss="alert"
-                                        aria-label="Close"
-                                        id="dismiss-banner">
+                                        data-cookie-name="no_banner"
+                                        data-duration="2"
+                                        aria-label="Close">
                                     <span aria-hidden="true"
                                           class="x-large">&times;</span></button>
                             </div>

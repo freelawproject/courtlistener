@@ -186,15 +186,18 @@ $(document).ready(function () {
     this.closest("form").submit();
   });
 
-  ///////////////////
-  // Banner Cookie //
-  ///////////////////
-  $('#dismiss-banner').click(function () {
-    var date = new Date();
-    date.setTime(date.getTime() + (2 * 24 * 60 * 60 * 1000)); // Two days.
-    var expires = "; expires=" + date.toGMTString();
-    document.cookie = 'no_banner' + "=" + 'true' + expires + "; path=/";
-    $(this).closest('.navbar').addClass('hidden');
+  //////////////////////////
+  // Popup Cookie Handling//
+  //////////////////////////
+  $('.alert-dismissible button').click(function () {
+    let that = $(this);
+    let duration = parseInt(that.data('duration'), 10);
+    let cookie_name = that.data('cookie-name');
+    let date = new Date();
+    date.setTime(date.getTime() + (duration * 24 * 60 * 60 * 1000));
+    let expires = "; expires=" + date.toGMTString();
+    document.cookie = cookie_name + "=" + 'true' + expires + "; path=/";
+    that.closest('.alert-dismissible').addClass('hidden');
   });
 
   //////////
@@ -404,7 +407,24 @@ $(document).ready(function () {
   });
 
   $('[data-toggle="tooltip"]').tooltip();
+
+  // Hide RECAP install pleas for people that already have it, and set a cookie
+  // so they won't see the page flash each time.
+  window.addEventListener("message", function (event) {
+    if (event.source == window &&
+      event.data.sender &&
+      event.data.sender === "recap-extension" &&
+      event.data.message_name &&
+      event.data.message_name === "version") {
+      $(".recap_install_plea").addClass('hidden');
+      let date = new Date();
+      date.setTime(date.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days
+      let expires = "; expires=" + date.toGMTString();
+      document.cookie = "recap_install_plea" + "=" + 'true' + expires + "; path=/";
+    }
+  });
 });
+
 
 
 // Debounce - rate limit a function

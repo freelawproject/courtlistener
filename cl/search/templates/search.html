@@ -152,6 +152,21 @@
         {% if results.paginator.count > 0 %}
             <div class="row">
                 <div class="col-sm-12">
+                    {% if not request.COOKIES.recap_install_plea %}
+                      {% if type == 'r' or type_override == 'r' %}
+                        {# Show the RECAP install plea. #}
+                        <div class="alert alert-info alert-dismissible recap_install_plea"
+                             role="alert">
+                          <button type="button" class="close"
+                                  data-duration="7"
+                                  data-cookie-name="recap_install_plea"
+                                  aria-label="Close"><span aria-hidden="true">&times;</span>
+                          </button>
+                          The results below were contributed to the RECAP Archive by users of the RECAP Extension. If you use PACER, please install RECAP. <a href="https://free.law/recap" class="alert-link">Learn More</a>.
+                        </div>
+                      {% endif %}
+                    {% endif %}
+
                     <h2 id="result-count" class="bottom">
                         {% if type == 'o' %}
                             {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
