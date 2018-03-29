@@ -7,7 +7,7 @@ from datetime import timedelta
 from celery.canvas import chain
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, transaction, OperationalError
 from django.db.models import Prefetch
 from django.utils import timezone
 from django.utils.timezone import now
@@ -15,6 +15,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import DocketReport, AttachmentPage, DocketHistoryReport
 
 from cl.celery import app
+from cl.lib.decorators import retry
 from cl.lib.import_lib import get_candidate_judges
 from cl.lib.pacer import map_cl_to_pacer_id, normalize_attorney_contact, \
     normalize_attorney_role, get_blocked_status
@@ -627,6 +628,8 @@ def disassociate_extraneous_entities(d, parties, parties_to_preserve,
 
 
 @transaction.atomic
+# Retry on transaction deadlocks; see #814.
+@retry(OperationalError, tries=2, delay=1, backoff=1, logger=logger)
 def add_parties_and_attorneys(d, parties):
     """Add parties and attorneys from the docket data to the docket.
 
