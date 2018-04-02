@@ -362,17 +362,55 @@ def add_recap_source(d):
         d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
 
 
+def update_case_names(d, new_case_name):
+    """Update the case name fields if applicable.
+
+    This is a more complex than you'd think at first, and has resulted in at
+    least two live bugs. The existing dockets and the new data can each have
+    one of three values:
+
+     - A valid case name
+     - Unknown Case Title (UCT)
+     - ""
+
+    So here's a matrix for what to do:
+
+                                       new_case_name
+                       +------------+-----------------+-----------------+
+                       |   x v. y   |      UCT        |      blank      |
+             +---------+------------+-----------------+-----------------+
+             | x v. y  |   Update   |    No update    |    No update    |
+             +---------+------------+-----------------+-----------------+
+      docket |  UCT    |   Update   |  Same/Whatever  |    No update    |
+             +---------+------------+-----------------+-----------------+
+             |  blank  |   Update   |     Update      |  Same/Whatever  |
+             +---------+------------+-----------------+-----------------+
+
+    :param d: The docket object to update or ignore
+    :param new_case_name: The incoming case name
+    :returns d
+    """
+    uct = "Unknown Case Title"
+    if not new_case_name:
+        return d
+    if new_case_name == uct and d.case_name != "":
+        return d
+
+    d.case_name = new_case_name
+    d.case_name_short = cnt.make_case_name_short(d.case_name)
+    return d
+
+
 def update_docket_metadata(d, docket_data):
     """Update the Docket object with the data from Juriscraper.
 
     Works on either docket history report or docket report results.
     """
+    d = update_case_names(d, docket_data['case_name'])
     d.docket_number = docket_data['docket_number'] or d.docket_number
     d.date_filed = docket_data['date_filed'] or d.date_filed
     d.date_last_filing = docket_data.get('date_last_filing') or d.date_last_filing
     d.date_terminated = docket_data['date_terminated'] or d.date_terminated
-    d.case_name = docket_data['case_name'] or d.case_name
-    d.case_name_short = cnt.make_case_name_short(d.case_name) or d.case_name_short
     d.cause = docket_data.get('cause') or d.cause
     d.nature_of_suit = docket_data.get('nature_of_suit') or d.nature_of_suit
     d.jury_demand = docket_data.get('jury_demand') or d.jury_demand
