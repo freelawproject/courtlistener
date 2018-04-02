@@ -23,7 +23,8 @@ from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
     Attorney, Role, PartyType
 from cl.recap.models import ProcessingQueue, DOCKET, ATTACHMENT_PAGE, PDF
 from cl.recap.tasks import process_recap_pdf, add_attorney, \
-    process_recap_docket, process_recap_attachment, add_parties_and_attorneys
+    process_recap_docket, process_recap_attachment, add_parties_and_attorneys, \
+    update_case_names
 from cl.search.models import Docket, RECAPDocument, DocketEntry
 from cl.recap.management.commands.import_idb import Command
 
@@ -493,6 +494,65 @@ class RecapAddAttorneyTest(TestCase):
         roles = a.roles.all()
         self.assertEqual(roles.count(), 2)
         self.assertNotIn(r, roles)
+
+
+class DocketCaseNameUpdateTest(TestCase):
+    """Do we properly handle the nine cases of incoming case name
+    information?
+    """
+
+    def setUp(self):
+        self.d = Docket()
+        self.v_case_name = 'x v. y'
+        self.new_case_name = 'x v. z'
+        self.uct = 'Unknown Case Title'
+
+    def test_new_v_old_v_updates(self):
+        """Do we update if new is different and old has a value?"""
+        self.d.case_name = self.v_case_name
+        d = update_case_names(self.d, self.new_case_name)
+        self.assertEqual(d.case_name, self.new_case_name)
+
+    def test_new_v_old_uct_updates(self):
+        """Do we update if new has a value and old is UCT"""
+        self.d.case_name = self.uct
+        d = update_case_names(self.d, self.new_case_name)
+        self.assertEqual(d.case_name, self.new_case_name)
+
+    def test_new_v_old_blank_updates(self):
+        self.d.case_name = ''
+        d = update_case_names(self.d, self.new_case_name)
+        self.assertEqual(d.case_name, self.new_case_name)
+
+    def test_new_uct_old_v_no_update(self):
+        self.d.case_name = self.v_case_name
+        d = update_case_names(self.d, self.uct)
+        self.assertEqual(d.case_name, self.v_case_name)
+
+    def test_new_uct_old_uct_no_update(self):
+        self.d.case_name = self.uct
+        d = update_case_names(self.d, self.uct)
+        self.assertEqual(d.case_name, self.uct)
+
+    def test_new_uct_old_blank_updates(self):
+        self.d.case_name = ''
+        d = update_case_names(self.d, self.uct)
+        self.assertEqual(d.case_name, self.uct)
+
+    def test_new_blank_old_v_no_update(self):
+        self.d.case_name = self.v_case_name
+        d = update_case_names(self.d, '')
+        self.assertEqual(d.case_name, self.v_case_name)
+
+    def test_new_blank_old_uct_no_update(self):
+        self.d.case_name = self.uct
+        d = update_case_names(self.d, '')
+        self.assertEqual(d.case_name, self.uct)
+
+    def test_new_blank_old_blank_no_update(self):
+        self.d.case_name = ''
+        d = update_case_names(self.d, '')
+        self.assertEqual(d.case_name, '')
 
 
 class TerminatedEntitiesTest(TestCase):
