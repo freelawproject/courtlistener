@@ -89,7 +89,24 @@
         <p>A list of all current jurisdictions is on the right and we regularly add new jurisdictions as our content expands (at this point these tend to be terminated or otherwise obscure jurisdictions). To monitor for new jurisdictions, you may want to look at the <a href="{% url "rest_docs" %}#jurisdiction-endpoint">Jurisdiction endpoint</a> of the REST API.
         </p>
 
+        <h2 id="dockets-clusters-opinions">Docket, Cluster and Opinion files</h2>
+        <p>There is a hierarchical relationship between dockets, clusters and opinions. One docket contains one or more clusters and one cluster contains one or more opinions. For a more detailed explaination see <a href="{% url "rest_docs" %}#judge-endpoint">the documentation for the REST API</a>.
+        </p>
+        <p>In general, the bulk data that is generated for the judicial database is as follows:</p>
+        <ul>
+            <li><strong>Docket</strong>: A docket is TODO. For example, it contains the docket number (under <code>docket_number</code>). See <a href="https://www.courtlistener.com/api/rest/v3/dockets/488071/">an example docket file</a>.
+            </li>
+            <li><strong>Cluster</strong>: A cluster is TODO. For example, it contains the SCDB id and the date filed (under <code>scdb_id</code> and <code>date_filed</code>). See <a href="https://www.courtlistener.com/api/rest/v3/clusters/108713/">an example cluster file</a>.
+            </li>
+            <li><strong>Opinions</strong>: A opinion is TODO. For example, it contains the text of the opinion (under <code>html_with_citations</code>). See <a href="https://www.courtlistener.com/api/rest/v3/opinions/108713/">an example opinion file</a>.
+            </li>
+        </ul>
 
+        Imagine Jason Bourne sues the NSA. A district court issues an opinion (this would be a cluster with one opinion object). It's appealed to CA9 and they issue an opinion (another cluster with one opinion object). He requests a panel at CA9 and they issue several opinions (a dissent, and a lead opinion; a cluster with two opinions).
+
+        <h5 id="docket-cluster-opinion-crosslisting"> Crosslisting</h5>
+
+        Each docket, cluster and opinion has a unique key. The docket file lists the corresponding cluster keys (under field <code>clusters</code>). The cluster file lists the corresponding opinion keys (under field <code>sub_opinions</code>) and the corresponding docket keys (under field <code>docket</code>. The opinion file list the corresponding cluster keys (under field <code>cluster</code>). Note that for many (but not all) files there is a one-to-one-to correspondence and the ideas are the same for all three files, but this is not the rule. For example, Roe vs. Wade has docket id <code>488071</code>, cluster id <code>108713</code> and opinion id <code>108713</code>.
 
         <h2 id="judge-data">Bulk Judicial Database Files</h2>
         <p>The bulk data for the judicial database is generated in the same manner as the other content above, using the latest version of the REST API. You can find detailed explanations in <a href="{% url "rest_docs" %}#judge-endpoint">the documentation for the REST API</a>.
