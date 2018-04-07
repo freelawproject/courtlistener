@@ -146,7 +146,7 @@ class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Role
-        fields = ('role', 'docket', 'attorney')
+        fields = ('role', 'docket', 'attorney', 'date_action')
 
 
 class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
@@ -154,7 +154,7 @@ class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Role
-        fields = ('role', 'docket', 'party')
+        fields = ('role', 'docket', 'party', 'date_action')
 
 
 class PartySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
