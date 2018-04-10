@@ -98,7 +98,8 @@ class Command(VerboseCommand):
         logger.info('Starting bulk file creation with %s celery tasks...' %
                     len(kwargs_list))
         for kwargs in kwargs_list:
-            make_bulk_data_and_swap_it_in(courts, kwargs)
+            make_bulk_data_and_swap_it_in(courts, settings.BULK_DATA_DIR,
+                                          kwargs)
 
         # Make the citation bulk data
         obj_type_str = 'citations'
