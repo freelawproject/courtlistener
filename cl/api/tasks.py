@@ -18,39 +18,35 @@ from cl.lib.utils import deepgetattr, mkdir_p
 
 @app.task
 @print_timing
-def make_bulk_data_and_swap_it_in(courts, kwargs):
+def make_bulk_data_and_swap_it_in(courts, bulk_dir, kwargs):
     """We can't wrap the handle() function, but we can wrap this one."""
 
     print(' - Creating bulk %s files...' % kwargs['obj_type_str'])
-    num_written = write_json_to_disk(courts, **kwargs)
+    num_written = write_json_to_disk(courts, bulk_dir=bulk_dir, **kwargs)
 
     if num_written > 0:
         print('   - Tarring and compressing all %s files...' %
               kwargs['obj_type_str'])
-        targz_json_files(courts, kwargs['obj_type_str'], kwargs['court_attr'])
+        targz_json_files(courts, bulk_dir, kwargs['obj_type_str'],
+                         kwargs['court_attr'])
 
         print('   - Swapping in the new %s archives...' %
               kwargs['obj_type_str'])
-        swap_archives(kwargs['obj_type_str'])
+        swap_archives(kwargs['obj_type_str'], bulk_dir)
 
 
-def swap_archives(obj_type_str):
+def swap_archives(obj_type_str, bulk_dir):
     """Swap out new archives, clobbering the old, if present"""
-    mkdir_p(join(settings.BULK_DATA_DIR, obj_type_str))
-    path_to_gz_files = join(settings.BULK_DATA_DIR, 'tmp', obj_type_str,
-                            '*.tar*')
-    for f in glob.glob(path_to_gz_files):
-        shutil.move(
-            f,
-            join(settings.BULK_DATA_DIR, obj_type_str, os.path.basename(f))
-        )
+    tmp_gz_dir = join(bulk_dir, 'tmp', obj_type_str)
+    final_gz_dir = join(bulk_dir, obj_type_str)
+    mkdir_p(final_gz_dir)
+    for f in glob.glob(join(tmp_gz_dir, '*.tar*')):
+        shutil.move(f, join(final_gz_dir, os.path.basename(f)))
 
     # Move the info files too.
     try:
-        shutil.copy2(
-            join(settings.BULK_DATA_DIR, 'tmp', obj_type_str, 'info.json'),
-            join(settings.BULK_DATA_DIR, obj_type_str, 'info.json')
-        )
+        shutil.copy2(join(tmp_gz_dir, 'info.json'),
+                     join(final_gz_dir, 'info.json'))
     except IOError as e:
         if e.errno == 2:
             # No such file/directory
@@ -59,46 +55,31 @@ def swap_archives(obj_type_str):
             raise
 
 
-def targz_json_files(courts, obj_type_str, court_attr):
+def targz_json_files(courts, bulk_dir, obj_type_str, court_attr):
     """Create gz-compressed archives using the JSON on disk."""
 
+    root_path = join(bulk_dir, 'tmp', obj_type_str)
     if court_attr is not None:
         for court in courts:
-            tar = tarfile.open(
-                join(settings.BULK_DATA_DIR, 'tmp', obj_type_str,
-                     '%s.tar.gz' % court.pk),
-                "w:gz",
-                compresslevel=3,
-            )
-            for name in glob.glob(join(settings.BULK_DATA_DIR, 'tmp',
-                                       obj_type_str, court.pk, "*.json")):
+            tar_path = join(root_path, '%s.tar.gz' % court.pk)
+            tar = tarfile.open(tar_path, "w:gz", compresslevel=3)
+            for name in glob.glob(join(root_path, court.pk, "*.json")):
                 tar.add(name, arcname=os.path.basename(name))
             tar.close()
     else:
         # Non-jurisdictional-centric object type (like an ABA Rating)
-        tar = tarfile.open(
-            join(settings.BULK_DATA_DIR, 'tmp', obj_type_str, 'all.tar.gz'),
-            'w:gz',
-            compresslevel=3
-        )
-        for name in glob.glob(join(settings.BULK_DATA_DIR, 'tmp', obj_type_str,
-                                   '*.json')):
+        tar_path = join(root_path, 'all.tar.gz')
+        tar = tarfile.open(tar_path, 'w:gz', compresslevel=3)
+        for name in glob.glob(join(root_path, '*.json')):
             tar.add(name, arcname=os.path.basename(name))
         tar.close()
 
     if court_attr is not None:
         # Make the all.tar file by tarring up the other files. Non-court-centric
         # objects already did this.
-        tar = tarfile.open(
-            join(settings.BULK_DATA_DIR, 'tmp', obj_type_str, 'all.tar'),
-            "w"
-        )
+        tar = tarfile.open(join(root_path, 'all.tar'), "w")
         for court in courts:
-            targz = join(
-                settings.BULK_DATA_DIR,
-                'tmp',
-                obj_type_str,
-                "%s.tar.gz" % court.pk)
+            targz = join(root_path, "%s.tar.gz" % court.pk)
             tar.add(targz, arcname=os.path.basename(targz))
         tar.close()
 
@@ -130,7 +111,7 @@ def write_json_to_disk(courts, obj_type_str, obj_class, court_attr,
     :returns int: The number of items generated
     """
     # Are there already bulk files?
-    history = BulkJsonHistory(obj_type_str)
+    history = BulkJsonHistory(obj_type_str, bulk_dir)
     last_good_date = history.get_last_good_date()
     history.add_current_attempt_and_save()
 

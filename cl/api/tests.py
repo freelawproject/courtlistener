@@ -4,6 +4,7 @@ import json
 import shutil
 from datetime import timedelta, date
 
+from django.conf import settings
 from django.contrib.auth.models import User, Permission
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest, JsonResponse
@@ -742,7 +743,7 @@ class DRFRecapPermissionTest(TestCase):
 class BulkJsonHistoryTest(TestCase):
 
     def setUp(self):
-        self.history = BulkJsonHistory('test')
+        self.history = BulkJsonHistory('test', settings.BULK_DATA_DIR)
 
     def tearDown(self):
         self.history.delete_from_disk()
