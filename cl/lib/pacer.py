@@ -188,8 +188,8 @@ def get_blocked_status(docket, count_override=None):
     return False, None
 
 
-def reprocess_docket_data(d, filepath, report_type):
-    """Reprocess docket data that we already have.
+def process_docket_data(d, filepath, report_type):
+    """Process docket data file.
 
     :param d: A docket object to work on.
     :param filepath: The path to a saved HTML file containing docket or docket
