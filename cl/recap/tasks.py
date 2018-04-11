@@ -487,12 +487,12 @@ def add_docket_entries(d, docket_entries, tag=None):
                 "while processing '%s'" % (docket_entry['document_number'], d)
             )
             continue
-        else:
-            rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
-            rd.description = docket_entry.get('short_description') or rd.description
-            rd.save()
-            if tag is not None:
-                rd.tags.add(tag)
+
+        rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
+        rd.description = docket_entry.get('short_description') or rd.description
+        rd.save()
+        if tag is not None:
+            rd.tags.add(tag)
 
     return rds_created, needs_solr_update
 
