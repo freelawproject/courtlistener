@@ -202,6 +202,8 @@ def reprocess_docket_data(d, filepath, report_type):
         report = DocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == DOCKET_HISTORY_REPORT:
         report = DocketHistoryReport(map_cl_to_pacer_id(d.court_id))
+    elif report_type == IA_XML_FILE:
+        report = InternetArchive()
     with open(filepath, 'r') as f:
         text = f.read().decode('utf-8')
     report._parse_text(text)
@@ -211,7 +213,7 @@ def reprocess_docket_data(d, filepath, report_type):
     update_docket_metadata(d, data)
     d.save()
     add_docket_entries(d, data['docket_entries'])
-    if report_type == DOCKET:
+    if report_type in (DOCKET, IA_XML_FILE):
         add_parties_and_attorneys(d, data['parties'])
     return d.pk
 
