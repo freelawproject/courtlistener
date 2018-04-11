@@ -475,10 +475,10 @@ class Docket(models.Model):
         :param do_original_xml: Whether to do the original XML file as received
         from Internet Archive.
         """
-        from cl.lib.pacer import reprocess_docket_data
+        from cl.lib.pacer import process_docket_data
         for html in self.html_documents.order_by('date_created'):
             filepath = html.filepath.path
-            reprocess_docket_data(self, filepath, html.upload_type)
+            process_docket_data(self, filepath, html.upload_type)
 
         # Finally, do the XML file if we've got it.
         if do_original_xml:
