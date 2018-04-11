@@ -469,21 +469,24 @@ class Docket(models.Model):
     def reprocess_recap_content(self, do_original_xml=False):
         """Go over any associated RECAP files and reprocess them.
 
-        Do them in the order they were received since that should correspond to
-        the history of the docket itself.
+        Start with the XML, then do them in the order they were received since
+        that should correspond to the history of the docket itself.
 
         :param do_original_xml: Whether to do the original XML file as received
         from Internet Archive.
         """
-        from cl.lib.pacer import process_docket_data
-        for html in self.html_documents.order_by('date_created'):
-            filepath = html.filepath.path
-            process_docket_data(self, filepath, html.upload_type)
+        if self.source not in self.RECAP_SOURCES:
+            return
 
-        # Finally, do the XML file if we've got it.
+        from cl.lib.pacer import process_docket_data
+        # Start with the XML if we've got it.
         if do_original_xml:
-            # Grab the XML file from disk and parse it.
-            pass
+            from cl.recap.models import IA_XML_FILE
+            process_docket_data(self, self.filepath_local.path, IA_XML_FILE)
+
+        # Then layer the uploads on top of that.
+        for html in self.html_documents.order_by('date_created'):
+            process_docket_data(self, html.filepath.path, html.upload_type)
 
 
 class DocketEntry(models.Model):
