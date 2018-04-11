@@ -460,10 +460,14 @@ def add_docket_entries(d, docket_entries, tag=None):
         # or throw an error.
         params = {
             'docket_entry': de,
-            # No attachments when uploading dockets.
-            'document_type': RECAPDocument.PACER_DOCUMENT,
             'document_number': docket_entry['document_number'],
         }
+        if docket_entry.get('attachment_number'):
+            params['document_type'] = RECAPDocument.ATTACHMENT
+            params['attachment_number'] = docket_entry['attachment_number']
+        else:
+            params['document_type'] = RECAPDocument.PACER_DOCUMENT
+
         try:
             rd = RECAPDocument.objects.get(**params)
         except RECAPDocument.DoesNotExist:
