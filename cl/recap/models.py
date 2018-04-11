@@ -15,6 +15,7 @@ PDF = 3
 DOCKET_HISTORY_REPORT = 4
 APPELLATE_DOCKET = 5
 APPELLATE_ATTACHMENT_PAGE = 6
+IA_XML_FILE = 7
 UPLOAD_TYPES = (
     (DOCKET, 'HTML Docket'),
     (ATTACHMENT_PAGE, 'HTML attachment page'),
@@ -22,6 +23,7 @@ UPLOAD_TYPES = (
     (DOCKET_HISTORY_REPORT, 'Docket history report'),
     (APPELLATE_DOCKET, 'Appellate HTML docket'),
     (APPELLATE_ATTACHMENT_PAGE, 'Appellate HTML attachment page'),
+    (IA_XML_FILE, 'Internet Archive XML docket'),
 )
 
 
