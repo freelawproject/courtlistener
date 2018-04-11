@@ -30,7 +30,7 @@ from rest_framework.status import (
 
 from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.pacer import PacerXMLParser, lookup_and_save, get_blocked_status, \
+from cl.lib.pacer import lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_number
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
 from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles, DOCKET
@@ -80,33 +80,6 @@ def download_recap_item(self, url, filename, clobber=False):
                 # Successful download. Copy from tmp to the right spot. Note
                 # that this will clobber.
                 shutil.copyfile(tmp.name, location)
-
-
-@app.task(bind=True, max_retries=3)
-def parse_recap_docket(self, filename, debug=False):
-    """Parse a docket path, creating items or updating existing ones."""
-    docket_path = os.path.join(settings.MEDIA_ROOT, 'recap', filename)
-    recap_pks = []
-    try:
-        pacer_doc = PacerXMLParser(docket_path)
-    except IOError:
-        logger.warning("Unable to find the docket at: %s" % docket_path)
-    else:
-        required_fields = ['case_name', 'date_filed']
-        for field in required_fields:
-            if not getattr(pacer_doc, field):
-                logger.error("Missing required field: %s" % field)
-                return recap_pks
-        docket = lookup_and_save(pacer_doc, debug=debug)
-        if docket is not None:
-            try:
-                recap_pks = pacer_doc.make_documents(docket, debug=debug)
-            except (IntegrityError, DocketEntry.MultipleObjectsReturned) as exc:
-                raise self.retry(exc=exc, countdown=20 * 60)
-            else:
-                pacer_doc.make_parties(docket, debug=debug)
-
-    return recap_pks
 
 
 @app.task(bind=True, max_retries=5)
