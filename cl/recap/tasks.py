@@ -276,8 +276,6 @@ def add_attorney(atty, p, d):
     # Associate the attorney with an org and update their contact info.
     if atty['contact']:
         if atty_org_info:
-            logger.info("Adding organization information to '%s': '%s'" %
-                        (atty['name'], atty_org_info))
             try:
                 org = AttorneyOrganization.objects.get(
                     lookup_key=atty_org_info['lookup_key'],
