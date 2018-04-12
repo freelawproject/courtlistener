@@ -9,6 +9,15 @@ from cl.search.models import Docket
 class Command(VerboseCommand):
     help = 'Reprocess all dockets in the RECAP Archive.'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--start-pk',
+            type=int,
+            default=0,
+            help="Skip any primary keys lower than this value. (Useful for "
+                 "restarts.)",
+        )
+
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
 
@@ -23,4 +32,7 @@ class Command(VerboseCommand):
             sys.stdout.write('\rDoing docket: %s of %s, with pk: %s' %
                              (i, count, d.pk))
             sys.stdout.flush()
+            if d.pk < options['start_pk'] > 0:
+                continue
+
             d.reprocess_recap_content(do_original_xml=True)
