@@ -1,6 +1,8 @@
 
 import sys
 
+from django.db import IntegrityError
+
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.db_tools import queryset_generator
 from cl.search.models import Docket
@@ -35,4 +37,8 @@ class Command(VerboseCommand):
             if d.pk < options['start_pk'] > 0:
                 continue
 
-            d.reprocess_recap_content(do_original_xml=True)
+            try:
+                d.reprocess_recap_content(do_original_xml=True)
+            except IntegrityError:
+                # Happens when there's wonkiness in the source data. Move on.
+                continue
