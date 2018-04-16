@@ -6,6 +6,7 @@ from django.template.loader import render_to_string
 from cl.lib.argparse_types import readable_dir
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.db_tools import queryset_generator
+from cl.lib.utils import mkdir_p
 from cl.search.models import Opinion
 
 
@@ -33,7 +34,13 @@ class Command(VerboseCommand):
             content = render_to_string('simple_opinion.html', {
                 'o': op,
             })
-            output_dir = os.path.join(options['output_directory'],
-                                      '%s.html' % op.pk)
-            with open(output_dir, 'w') as f:
+            output_dir = os.path.join(
+                options['output_directory'],
+                op.cluster.date_filed.year,
+                op.cluster.date_filed.month,
+                op.cluster.date_filed.day,
+            )
+            mkdir_p(output_dir)
+            output_path = os.path.join(output_dir, '%s.html' % op.pk)
+            with open(output_path, 'w') as f:
                 f.write(content.encode('utf-8'))
