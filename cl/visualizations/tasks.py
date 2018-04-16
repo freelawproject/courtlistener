@@ -3,7 +3,7 @@ from django.core.mail import send_mail
 from django.core.urlresolvers import reverse
 from juriscraper.lib.string_utils import trunc
 from lxml import html
-from requests.exceptions import HTTPError, MissingSchema
+from requests.exceptions import HTTPError, MissingSchema, TooManyRedirects
 
 from cl.celery import app
 from cl.visualizations.models import Referer
@@ -54,6 +54,8 @@ def get_title(self, referer_id):
             verify=False,  # Integrity of a referer's referent is not important.
         )
     except MissingSchema:
+        return
+    except TooManyRedirects:
         return
 
     try:
