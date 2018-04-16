@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="Content-Language" content="en"/>
+  <meta name="language" content="en_us"/>
+  <title>{{ o.cluster.case_name }} - CourtListener.com</title>
+</head>
+
+
+<body>
+  {% with cluster=o.cluster %}
+    <div class="titles">
+      <h1>{{ cluster.caption|safe }}</h1>
+      <h2>{{ cluster.docket.court }}</h2>
+      <h3><a href="https://www.courtlistener.com{{ o.get_absolute_url }}">https://www.courtlistener.com{{ o.get_absolute_url }}</a></h3>
+    </div>
+
+
+    <div class="metadata">
+      <p>Date filed: {{ cluster.date_filed }}</p>
+      <p>Citations: {{ cluster.citation_string }}</p>
+      <p>Docket Number: {{ cluster.docket_number }}</p>
+      <p>Nature of suit: {{ cluster.nature_of_suit }}</p>
+      {% if o.author %}
+        <p>Author: {{ o.author.name_full }}</p>
+      {% elif o.author_str %}
+        <p>Author: {{ o.author_str }}</p>
+      {% elif cluster.judges %}
+        <p>Judges: {{ cluster.judges }}</p>
+      {% endif %}
+    </div>
+
+
+    <div class="text">
+      <article>
+        {% if o.html_columbia %}
+          {{ o.html_columbia|safe }}
+        {% elif o.html_lawbox %}
+          {{ o.html_lawbox|safe }}
+        {% elif o.html %}
+          {{ o.html|safe }}
+        {% else %}
+          <pre>{{ o.plain_text }}</pre>
+        {% endif %}
+      </article>
+    </div>
+  {% endwith %}
+</body>
