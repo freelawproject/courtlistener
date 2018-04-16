@@ -36,4 +36,4 @@ class Command(VerboseCommand):
             output_dir = os.path.join(options['output_directory'],
                                       '%s.html' % op.pk)
             with open(output_dir, 'w') as f:
-                f.write(content)
+                f.write(content.encode('utf-8'))
