@@ -36,9 +36,9 @@ class Command(VerboseCommand):
             })
             output_dir = os.path.join(
                 options['output_directory'],
-                op.cluster.date_filed.year,
-                op.cluster.date_filed.month,
-                op.cluster.date_filed.day,
+                str(op.cluster.date_filed.year),
+                str(op.cluster.date_filed.month),
+                str(op.cluster.date_filed.day),
             )
             mkdir_p(output_dir)
             output_path = os.path.join(output_dir, '%s.html' % op.pk)
