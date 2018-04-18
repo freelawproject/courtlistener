@@ -105,6 +105,7 @@ INSTALLED_APPS = [
     'cl.stats',
     'cl.users',
     'cl.visualizations',
+    'cl.recommendations'
 ]
 
 if DEVELOPMENT:
@@ -466,6 +467,7 @@ LOGGING = {
         },
     },
 }
+
 
 if DEVELOPMENT:
     LOGGING['loggers']['django.db.backends'] = {

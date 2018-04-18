@@ -27,7 +27,8 @@ from cl.lib.string_utils import trunc
 from cl.people_db.models import AttorneyOrganization, Role
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import Docket, OpinionCluster, RECAPDocument
+from cl.recommendations.models import OpinionRecommendation
+from cl.search.models import Docket, OpinionCluster, RECAPDocument, Opinion
 
 
 def redirect_docket_recap(request, court, pacer_case_id):
@@ -233,6 +234,9 @@ def view_opinion(request, pk, _):
     }
     citing_clusters = conn.raw_query(**q).execute()
 
+    # Get pre-computed recommendations from db
+    recommendations = OpinionRecommendation.get_recommendations(seed_id=pk, n=5)
+
     return render(request, 'view_opinion.html', {
         'title': title,
         'cluster': cluster,
@@ -242,6 +246,7 @@ def view_opinion(request, pk, _):
         'private': cluster.blocked,
         'citing_clusters': citing_clusters,
         'top_authorities': cluster.authorities[:5],
+        'recommendations': recommendations,
     })
 
 

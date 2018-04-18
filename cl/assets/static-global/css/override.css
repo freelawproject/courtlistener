@@ -443,7 +443,8 @@ div.shown ul {
 /* cited by and authorities styling */
 #authorities hr,
 #cited-by hr ,
-#visualizations hr {
+#visualizations hr,
+#recommendations hr {
     margin-bottom: 2px;
 }
 
@@ -451,7 +452,8 @@ div.shown ul {
 #cited-by ul,
 #visualizations ul,
 #citation-redirect ul,
-#referers ul {
+#referers ul,
+#recommendations ul{
     padding: 0;
     margin: 0 0 1.5em 0;
 }
@@ -460,7 +462,8 @@ div.shown ul {
 #cited-by ul li,
 #visualizations ul li,
 #citation-redirect ul li,
-#referers ul li {
+#referers ul li,
+#recommendations ul li {
     list-style-type: none;
     padding: 3px 0 2px 0;
     border-bottom: 1pt solid #DDD;
