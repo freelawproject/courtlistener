@@ -510,6 +510,22 @@ class TestPACERPartyParsing(TestCase):
                 'fax': u'',
             })
         }, {
+            # Ambiguous address with unicode that triggers
+            # https://github.com/datamade/probableparsing/issues/2
+            'q': u"""Darden, Koretzky, Tessier, Finn, Blossman & Areaux
+                    Energy Centre
+                    1100 Poydras Street
+                    Suite 3100
+                    New Orléans, LA 70163
+                    504-585-3800
+                    Email: darden@carverdarden.com
+                """,
+            'a': ({}, {
+                'phone': u'(504) 585-3800',
+                'email': u'darden@carverdarden.com',
+                'fax': u'',
+            })
+        }, {
             # Missing zip code, phone number ambiguously used instead.
             'q': """NSB - Department of Law
                     POB 69
