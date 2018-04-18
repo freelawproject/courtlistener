@@ -434,10 +434,12 @@ def normalize_attorney_contact(c, fallback_name=''):
     }
     try:
         address_info, address_type = usaddress.tag(
-            ', '.join(address_lines),
+            u', '.join(address_lines),
             tag_mapping=mapping,
         )
-    except usaddress.RepeatedLabelError:
+    except (usaddress.RepeatedLabelError, UnicodeEncodeError):
+        # See https://github.com/datamade/probableparsing/issues/2 for why we
+        # catch the UnicodeEncodeError. Oy.
         logger.warn("Unable to parse address (RepeatedLabelError): %s" %
                     ', '.join(c.split('\n')))
         return {}, atty_info
