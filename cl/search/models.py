@@ -981,6 +981,11 @@ class Court(models.Model):
         null=True,
         blank=True,
     )
+    pacer_has_rss_feed = models.NullBooleanField(
+        help_text="Whether the court has a PACER RSS feed. If null, this "
+                  "doesn't apply to the given court.",
+        blank=True,
+    )
     fjc_court_id = models.CharField(
         help_text="The ID used by FJC in the Integrated Database",
         max_length=3,
