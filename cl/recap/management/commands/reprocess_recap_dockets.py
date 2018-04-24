@@ -1,7 +1,8 @@
-
+from __future__ import print_function
 import sys
 
 from django.db import IntegrityError
+from lxml.etree import XMLSyntaxError
 
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.db_tools import queryset_generator
@@ -30,6 +31,7 @@ class Command(VerboseCommand):
             'case_name',
         )
         count = ds.count()
+        xml_error_ids = []
         for i, d in enumerate(queryset_generator(ds, chunksize=50000)):
             sys.stdout.write('\rDoing docket: %s of %s, with pk: %s' %
                              (i, count, d.pk))
@@ -42,3 +44,10 @@ class Command(VerboseCommand):
             except IntegrityError:
                 # Happens when there's wonkiness in the source data. Move on.
                 continue
+            except XMLSyntaxError:
+                # Happens when the local IA XML file is empty. Not sure why
+                # these happen.
+                xml_error_ids.append(d.pk)
+                continue
+
+        print("Encountered XMLSyntaxErrors for: %s" % xml_error_ids)
