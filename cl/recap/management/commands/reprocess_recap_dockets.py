@@ -44,10 +44,10 @@ class Command(VerboseCommand):
             except IntegrityError:
                 # Happens when there's wonkiness in the source data. Move on.
                 continue
-            except XMLSyntaxError:
+            except (XMLSyntaxError, IOError):
                 # Happens when the local IA XML file is empty. Not sure why
                 # these happen.
                 xml_error_ids.append(d.pk)
                 continue
 
-        print("Encountered XMLSyntaxErrors for: %s" % xml_error_ids)
+        print("Encountered XMLSyntaxErrors/IOErrors for: %s" % xml_error_ids)
