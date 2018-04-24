@@ -21,7 +21,8 @@ from rest_framework.test import APIClient
 
 from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
     Attorney, Role, PartyType
-from cl.recap.models import ProcessingQueue, DOCKET, ATTACHMENT_PAGE, PDF
+from cl.recap.models import ProcessingQueue, DOCKET, ATTACHMENT_PAGE, PDF, \
+    APPELLATE_DOCKET
 from cl.recap.tasks import process_recap_pdf, add_attorney, \
     process_recap_docket, process_recap_attachment, add_parties_and_attorneys, \
     update_case_names
@@ -41,7 +42,7 @@ class RecapUploadsTest(TestCase):
         self.path = reverse('processingqueue-list', kwargs={'version': 'v3'})
         f = SimpleUploadedFile("file.txt", b"file content more content")
         self.data = {
-            'court': 'scotus',
+            'court': 'akd',
             'pacer_case_id': 'asdf',
             'pacer_doc_id': 24,
             'document_number': 1,
@@ -55,7 +56,7 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
         j = json.loads(r.content)
-        self.assertEqual(j['court'], 'scotus')
+        self.assertEqual(j['court'], 'akd')
         self.assertEqual(j['document_number'], 1)
         self.assertEqual(j['pacer_case_id'], 'asdf')
         mock.assert_called()
@@ -102,6 +103,31 @@ class RecapUploadsTest(TestCase):
         document number.
         """
         self.data['upload_type'] = DOCKET
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+
+    def test_district_court_in_appellate_upload_fails(self, mock):
+        """If you send a district court to an appellate endpoint, does it
+        fail?
+        """
+        self.data.update({
+            'upload_type': APPELLATE_DOCKET,
+        })
+        del self.data['pacer_doc_id']
+        del self.data['document_number']
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+
+    def test_appellate_court_in_district_upload_fails(self, mock):
+        """If you send appellate court info to a distric court, does it
+        fail?
+        """
+        self.data.update({
+            'upload_type': DOCKET,
+            'court': 'scotus',
+        })
+        del self.data['pacer_doc_id']
+        del self.data['document_number']
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
