@@ -48,3 +48,8 @@ class RssFeedStatus(models.Model):
         choices=PROCESSING_STATUSES,
         db_index=True,
     )
+    is_sweep = models.BooleanField(
+        help_text="Whether this object is tracking the progress of a sweep or "
+                  "a partial crawl.",
+        default=False,
+    )

@@ -1,3 +1,5 @@
+import fcntl
+import sys
 import time
 from datetime import timedelta, datetime
 
@@ -15,23 +17,65 @@ from cl.search.tasks import add_or_update_recap_document
 class Command(VerboseCommand):
     help = 'Scrape PACER RSS feeds'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--courts',
+            type=str,
+            default='all',
+            nargs="*",
+            help="The courts that you wish to parse.",
+        )
+        parser.add_argument(
+            '--iterations',
+            type=int,
+            default=0,
+            help="The number of iterations to take. Default is 0, which means "
+                 "to loop forever",
+        )
+        parser.add_argument(
+            '--sweep',
+            type=bool,
+            default=False,
+            help="Ignore anything that says to stop and download everything "
+                 "you see. Don't create duplicates. Recommend running this "
+                 "with --iterations 1",
+        )
+
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
 
-        # xxx do flock here to ensure only one instance.
+        if 'all' in options['courts']:
+            # Only allow one script at a time that's crawling everything.
+            fp = open('program.pid', 'w')
+            try:
+                fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except IOError:
+                print("Another instance of this program is running with "
+                      "'--courts all'. Only one instance can crawl all courts "
+                      "at a time.")
+                sys.exit(1)
 
         # Loop over the PACER sites that have RSS feeds and see if they're
         # ready to do.
-        courts = Court.objects.filter(jurisdiction__in=[
-            Court.FEDERAL_BANKRUPTCY,
-            Court.FEDERAL_DISTRICT,
-        ], end_date__isnull=True)
-        while True:
+        courts = Court.objects.filter(
+            jurisdiction__in=[
+                Court.FEDERAL_BANKRUPTCY,
+                Court.FEDERAL_DISTRICT,
+            ],
+            pacer_has_rss_feed=True,
+        )
+        if 'all' != options['courts']:
+            courts = courts.filter(pk__in=options['courts'])
+
+        iterations_completed = 0
+        while options['iterations'] == 0 or \
+                iterations_completed < options['iterations']:
             for court in courts:
                 # Check the last time we successfully got the feed
                 try:
                     feed_status = RssFeedStatus.objects.filter(
                         court=court,
+                        is_sweep=options['sweep'],
                         status__in=[
                             RssFeedStatus.PROCESSING_SUCCESSFUL,
                             RssFeedStatus.UNCHANGED,
@@ -46,35 +90,48 @@ class Command(VerboseCommand):
                     feed_status = RssFeedStatus(
                         date_created=lincolns_birthday,
                         date_last_build=lincolns_birthday,
+                        is_sweep=options['sweep'],
                     )
+                if 'all' in options['courts'] and options['sweep'] is False:
+                    # If it's all courts and it's not a sweep, check if we did
+                    # it recently.
+                    five_minutes_ago = now() - timedelta(minutes=5)
+                    if feed_status.date_created > five_minutes_ago:
+                        # Processed within last five minutes. Try next court.
+                        continue
 
-                five_minutes_ago = now() - timedelta(minutes=5)
-                if feed_status.date_created > five_minutes_ago:
-                    # Processed within last five minutes. Press on.
+                # Give a court two hours to complete during non-sweep crawls
+                two_hours_ago = now() - timedelta(hours=2)
+                if all([
+                    options['sweep'] is False,
+                    feed_status.status == RssFeedStatus.PROCESSING_IN_PROGRESS,
+                    feed_status.date_created < two_hours_ago
+                ]):
                     continue
-                elif feed_status.status == RssFeedStatus.PROCESSING_IN_PROGRESS:
-                    # Still working on it. Press on.
-                    continue
-                else:
-                    # Check if the item needs crawling, and crawl it if so.
-                    new_status = RssFeedStatus.objects.create(
-                        court_id=court.pk,
-                        status=RssFeedStatus.PROCESSING_IN_PROGRESS
-                    )
-                    chain(
-                        check_if_feed_changed.s(court.pk, new_status.pk,
-                                                feed_status.date_last_build),
-                        merge_rss_feed_contents.s(court.pk),
-                        # Here, we update recap *documents*, not *dockets*. The
-                        # reason for this is that updating dockets requires
-                        # much more work, and we don't expect to get much
-                        # docket information from the RSS feeds. RSS feeds also
-                        # have information about hundreds or thousands of
-                        # dockets. Updating them all would be very bad.
-                        add_or_update_recap_document.s(),
-                        mark_status_successful.si(new_status.pk),
-                    ).apply_async()
 
-            # Wait one minute, then do all courts again.
+                # The court is ripe! Crawl it if it has changed.
+                # Make a new object to track the attempted crawl.
+                new_status = RssFeedStatus.objects.create(
+                    court_id=court.pk,
+                    status=RssFeedStatus.PROCESSING_IN_PROGRESS,
+                    is_sweep=options['sweep'],
+                )
+
+                # Check if the item needs crawling, and crawl it if so.
+                chain(
+                    check_if_feed_changed.s(court.pk, new_status.pk,
+                                            feed_status.date_last_build),
+                    merge_rss_feed_contents.s(court.pk, new_status.pk),
+                    # Update recap *documents*, not *dockets*. Updating dockets
+                    # requires much more work, and we don't expect to get much
+                    # docket information from the RSS feeds. RSS feeds also
+                    # have information about hundreds or thousands of
+                    # dockets. Updating them all would be very bad.
+                    add_or_update_recap_document.s(),
+                    mark_status_successful.si(new_status.pk),
+                ).apply_async()
+
+            # Wait one minute, then attempt all courts again if iterations not
+            # exceeded.
+            iterations_completed += 1
             time.sleep(60)
-

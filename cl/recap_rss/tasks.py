@@ -55,13 +55,18 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     One other oddity here is that we use regex parsing to grab the
     lastBuildDate value. This is because parsing the feed properly can take
     several seconds for a big feed.
+
+    :param court_pk: The CL ID for the court object.
+    :param feed_status_pk: The CL ID for the status object.
+    :param date_last_built: The last time the court was scraped.
     """
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     rss_feed = PacerRssFeed(map_cl_to_pacer_id(court_pk))
     try:
         rss_feed.query()
     except requests.RequestException as exc:
-        logger.warning("Network error trying to get RSS feed at %s" % rss_feed.url)
+        logger.warning("Network error trying to get RSS feed at %s" %
+                       rss_feed.url)
         if self.request.retries == self.max_retries:
             # Abort. Unable to get the thing.
             mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
@@ -70,35 +75,42 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
         raise self.retry(exc=exc, countdown=5)
 
-    # Get the last time this feed was pulled successfully
     current_build_date = get_last_build_date(rss_feed.response.content)
-    if date_last_built == current_build_date:
-        # Abort. Nothing has changed here.
-        self.request.callbacks = None
-        mark_status(feed_status, RssFeedStatus.UNCHANGED)
-        return
-    else:
-        feed_status.date_last_build = current_build_date
-        feed_status.save()
+
+    # Only check for early abortion during partial crawls.
+    if not feed_status.is_sweep:
+        # Get the last time this feed was pulled successfully
+        if date_last_built == current_build_date:
+            # Abort. Nothing has changed here.
+            self.request.callbacks = None
+            mark_status(feed_status, RssFeedStatus.UNCHANGED)
+            return
+
+    feed_status.date_last_build = current_build_date
+    feed_status.save()
 
     # Looks like we've got a change, folks. Let's do it.
     return rss_feed
 
 
 @app.task
-def merge_rss_feed_contents(rss_feed, court_pk):
+def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
     """Merge the rss feed contents into CourtListener
+
+    If it's not a sweep, abort after ten preexisting items are encountered.
 
     :param rss_feed: A PacerRssFeed object that has already queried the feed.
     :param court_pk: The CourtListener court ID.
-    :return:
+    :param feed_status_pk: The CL ID for the RSS status object.
+    :returns all_rds_created: A list of all the RDs created during the
+    processing.
     """
+    feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     rss_feed.parse()
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
+    preexisting_rd_count = 0
     for docket in rss_feed.data:
-        # XXX do some performance work here to early abort at some point.
-
         d, count = find_docket_object(court_pk, docket['pacer_case_id'],
                                       docket['docket_number'])
         if count > 1:
@@ -112,7 +124,15 @@ def merge_rss_feed_contents(rss_feed, court_pk):
             d.pacer_case_id = docket['pacer_case_id']
         d.save()
         rds_created, _ = add_docket_entries(d, docket['docket_entries'])
-        all_rds_created.extend([rd.pk for rd in rds_created])
+        rd_pks = [rd.pk for rd in rds_created]
+        if len(rd_pks) == 0:
+            # We've gotten this RSS item already.
+            preexisting_rd_count += 1
+            if preexisting_rd_count == 10 and not feed_status.is_sweep:
+                # Ten RDs in a row that we've already got. Abort.
+                break
+
+        all_rds_created.extend(rd_pks)
 
     return all_rds_created
 
