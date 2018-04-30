@@ -34,8 +34,8 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             '--sweep',
-            type=bool,
             default=False,
+            action='store_true',
             help="Ignore anything that says to stop and download everything "
                  "you see. Don't create duplicates. Recommend running this "
                  "with --iterations 1",
