@@ -81,15 +81,18 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     if not feed_status.is_sweep:
         # Get the last time this feed was pulled successfully
         if date_last_built == current_build_date:
+            logger.info("%s: Feed has not changed since %s. Aborting." % (
+                feed_status.court_id, date_last_built))
             # Abort. Nothing has changed here.
             self.request.callbacks = None
             mark_status(feed_status, RssFeedStatus.UNCHANGED)
             return
 
+    logger.info("%s: Feed changed or doing a sweep. Moving on to the merge." %
+                feed_status.court_id)
     feed_status.date_last_build = current_build_date
     feed_status.save()
 
-    # Looks like we've got a change, folks. Let's do it.
     return rss_feed
 
 
@@ -107,6 +110,8 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
     """
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     rss_feed.parse()
+    logger.info("%s: Got %s results to merge." % (feed_status.court_id,
+                                                  len(rss_feed.data)))
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
     preexisting_rd_count = 0
@@ -129,7 +134,8 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
             # We've gotten this RSS item already.
             preexisting_rd_count += 1
             if preexisting_rd_count == 10 and not feed_status.is_sweep:
-                # Ten RDs in a row that we've already got. Abort.
+                logger.info("%s: Got 10 results we've already seen, and not "
+                            "doing a sweep. Aborting." % feed_status.court_id)
                 break
 
         all_rds_created.extend(rd_pks)
@@ -140,4 +146,6 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
 @app.task
 def mark_status_successful(feed_status_pk):
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
+    logger.info("Marking %s as a success." % feed_status.court_id)
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)
+
