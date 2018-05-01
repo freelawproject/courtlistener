@@ -53,3 +53,9 @@ class RssFeedStatus(models.Model):
                   "a partial crawl.",
         default=False,
     )
+
+    class Meta:
+        verbose_name_plural = 'RSS Feed Statuses'
+
+    def __unicode__(self):
+        return u'RssFeedStatus: %s, %s' % (self.pk, self.court_id)
