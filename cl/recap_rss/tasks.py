@@ -1,16 +1,16 @@
 # coding=utf-8
 import logging
-import lxml
 
+import lxml
 import requests
 from dateutil import parser
 from juriscraper.pacer import PacerRssFeed
 
 from cl.celery import app
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.recap_rss.models import RssFeedStatus
 from cl.recap.tasks import find_docket_object, add_recap_source, \
     update_docket_metadata, add_docket_entries
+from cl.recap_rss.models import RssFeedStatus
 
 logger = logging.getLogger(__name__)
 
@@ -134,8 +134,10 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
             # We've gotten this RSS item already.
             preexisting_rd_count += 1
             if preexisting_rd_count == 10 and not feed_status.is_sweep:
-                logger.info("%s: Got 10 results we've already seen, and not "
-                            "doing a sweep. Aborting." % feed_status.court_id)
+                logger.info("%s: After merging %s items, got 10 results we've "
+                            "already seen. Not doing a sweep, therefore "
+                            "aborting." % (len(all_rds_created),
+                                           feed_status.court_id))
                 break
 
         all_rds_created.extend(rd_pks)
