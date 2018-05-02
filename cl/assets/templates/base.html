@@ -78,12 +78,10 @@
     {% block head %}{% endblock %}
     {% if DEBUG %}
         <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.css"
-              type="text/css"
-              media="screen, projection">
+              type="text/css">
     {% else %}
         <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.min.css"
-              type="text/css"
-              media="screen, projection">
+              type="text/css">
     {% endif %}
     <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/hopscotch.css" type="text/css"
           media="screen, projection">
@@ -297,7 +295,7 @@
     </div>
 
     {% block footer %}
-    <footer class="row">
+    <footer class="row hidden-print">
         <div class="col-sm-8">
             <div class="row">
                 <div class="col-xs-6">
@@ -383,7 +381,7 @@
 </div>
 
 {% block social %}
-    <div class="text-center" id="social-container">
+    <div class="text-center hidden-print" id="social-container">
         <a href="https://free.law/" class="fa-stack fa-lg">
             <i class="fa fa-circle fa-stack-2x gray"></i>
             <i class="fa fa-link fa-stack-1x fa-inverse"></i>
