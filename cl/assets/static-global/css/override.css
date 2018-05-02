@@ -562,6 +562,10 @@ input.court-checkbox, input.status-checkbox {
     padding-top: 8px;
     border-bottom: 1px solid #dddddd;
 }
+#docket-entry-table .recap-documents.row {
+    padding-top: 0px;
+    border-bottom: none;
+}
 .representation {
     margin-top: 8.5px;
 }
