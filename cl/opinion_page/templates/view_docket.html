@@ -93,7 +93,7 @@
              id="entry-{{ de.entry_number }}">
             <div class="col-xs-1 text-center"><p>{{ de.entry_number }}</p></div>
             <div class="col-xs-3 col-sm-2"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
-            <div class="col-xs-8 col-md-8">
+            <div class="col-xs-8 col-lg-7">
               {% if de.description %}
                 <p>{{ de.description|safe }}</p>
               {% endif %}
@@ -188,7 +188,7 @@
                 {% endfor %}
               {% endif %}
             </div>
-            <div class="hidden-xs col-sm-1 right">
+            <div class="hidden-xs col-sm-1 col-lg-2 right">
               <a href="#entry-{{ de.entry_number }}"
                  data-toggle="tooltip"
                  data-placement="top"
