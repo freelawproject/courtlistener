@@ -17,7 +17,6 @@
       "date_modified": "2017-04-25T23:52:43.497Z",
       "contact_raw": "Juneau\r\nAlaska",
       "phone": "555-555-5555",
-      "date_sourced": "2017-04-25",
       "date_created": "2017-04-25T23:52:43.497Z",
       "email": "j@me.com"
     },
@@ -27,7 +26,7 @@
   {
     "fields": {
       "date_created": "2017-04-25T23:53:11.745Z",
-      "extra_info": "Klaxon",
+      "extra_info": "",
       "name": "Honker",
       "date_modified": "2017-04-25T23:53:11.745Z"
     },
@@ -38,7 +37,8 @@
     "fields": {
       "party": 1,
       "docket": 1,
-      "name": "Defendant"
+      "name": "Defendant",
+      "extra_info": "Klaxon"
     },
     "model": "people_db.partytype",
     "pk": 1

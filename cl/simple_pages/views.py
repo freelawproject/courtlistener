@@ -174,7 +174,7 @@ def contact(
                          browser=request.META.get(u'HTTP_USER_AGENT', u"Unknown"),
                          **cd
                      ),
-                to=[m[1] for m in settings.MANAGERS],
+                to=['info@free.law'],
                 reply_to=[cd.get(u'email', default_from) or default_from],
             ).send()
             return HttpResponseRedirect(reverse(u'contact_thanks'))

@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
 
     {% block meta %}
-    <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court opinions. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
+    <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
     <link rel="author" href="/humans.txt" type="text/plain"/>
 
     {# Open Search Plugin #}
@@ -31,7 +31,7 @@
     <meta property="og:type" content="website"/>
     <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
     <meta property="og:description"
-          content="{% block og_description %}Create alerts, search for and browse the latest court opinions.{% endblock %}">
+          content="{% block og_description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
     <meta property="og:url" content="{% get_full_host %}{{ request.path }}"/>
     <meta property="og:site_name" content="CourtListener"/>
     <meta property="og:image"
@@ -78,12 +78,10 @@
     {% block head %}{% endblock %}
     {% if DEBUG %}
         <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.css"
-              type="text/css"
-              media="screen, projection">
+              type="text/css">
     {% else %}
         <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.min.css"
-              type="text/css"
-              media="screen, projection">
+              type="text/css">
     {% endif %}
     <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/hopscotch.css" type="text/css"
           media="screen, projection">
@@ -100,7 +98,7 @@
     <header class="row">
         <!-- Donate Banner -->
         {% if FUNDRAISING_MODE and not request.COOKIES.no_banner %}
-        <div class="navbar navbar-default subnav alert-danger" role="navigation">
+        <div class="navbar navbar-default subnav alert-danger alert-dismissible" role="navigation">
             <div class="container-fluid">
                 <div class="row">
                     <div class="col-xs-7 col-sm-8 col-md-9 col-lg-10">
@@ -111,9 +109,9 @@
                         <div class="row">
                             <div class="col-xs-12">
                                 <button type="button" class="close"
-                                        data-dismiss="alert"
-                                        aria-label="Close"
-                                        id="dismiss-banner">
+                                        data-cookie-name="no_banner"
+                                        data-duration="2"
+                                        aria-label="Close">
                                     <span aria-hidden="true"
                                           class="x-large">&times;</span></button>
                             </div>
@@ -297,7 +295,7 @@
     </div>
 
     {% block footer %}
-    <footer class="row">
+    <footer class="row hidden-print">
         <div class="col-sm-8">
             <div class="row">
                 <div class="col-xs-6">
@@ -383,7 +381,7 @@
 </div>
 
 {% block social %}
-    <div class="text-center" id="social-container">
+    <div class="text-center hidden-print" id="social-container">
         <a href="https://free.law/" class="fa-stack fa-lg">
             <i class="fa fa-circle fa-stack-2x gray"></i>
             <i class="fa fa-link fa-stack-1x fa-inverse"></i>

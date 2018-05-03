@@ -1,7 +1,7 @@
 {% if user.is_authenticated %}
     {# Modal box for saving the favorite #}
     <div id="modal-save-favorite"
-         class="modal"
+         class="modal hidden-print"
          role="dialog"
          aria-hidden="true"
          data-id="{{ favorite_form.instance.id }}">
@@ -68,7 +68,7 @@
 {% else %}
     {# user is not authenticated #}
     <div id="modal-logged-out"
-         class="modal"
+         class="modal hidden-print"
          role="dialog"
          aria-hidden="true">
         <div class="modal-dialog">

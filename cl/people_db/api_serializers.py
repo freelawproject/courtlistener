@@ -138,7 +138,7 @@ class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = PartyType
-        fields = ('docket', 'name')
+        fields = ('docket', 'name', 'date_terminated', 'extra_info')
 
 
 class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
@@ -146,7 +146,7 @@ class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Role
-        fields = ('role', 'docket', 'attorney')
+        fields = ('role', 'docket', 'attorney', 'date_action')
 
 
 class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
@@ -154,7 +154,7 @@ class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Role
-        fields = ('role', 'docket', 'party')
+        fields = ('role', 'docket', 'party', 'date_action')
 
 
 class PartySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):

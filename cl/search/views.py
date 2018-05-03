@@ -93,9 +93,11 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
 
     courts, court_count_human, court_count = merge_form_with_courts(courts,
                                                                     search_form)
+    search_summary_str = search_form.as_text(court_count, court_count_human)
     return {
         'results': paged_results,
         'search_form': search_form,
+        'search_summary_str': search_summary_str,
         'courts': courts,
         'court_count_human': court_count_human,
         'court_count': court_count,

@@ -1,5 +1,6 @@
 # coding=utf-8
 import os
+from datetime import date
 
 from django.conf import settings
 from django.test import TestCase
@@ -10,10 +11,12 @@ from cl.corpus_importer.import_columbia.parse_opinions import \
     get_state_court_object
 from cl.corpus_importer.lawbox.judge_extractor import get_judge_from_str, \
     REASONS
-from cl.lib.pacer import PacerXMLParser, lookup_and_save
+from cl.lib.pacer import process_docket_data
 from cl.people_db.import_judges.populate_fjc_judges import get_fed_court_object
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
-from cl.search.models import Docket
+from cl.recap.tasks import find_docket_object
+from cl.recap.models import IA_XML_FILE
+from cl.search.models import Docket, RECAPDocument
 
 
 class JudgeExtractionTest(TestCase):
@@ -465,12 +468,17 @@ class PacerDocketParserTest(TestCase):
     NUM_PARTIES = 3
     NUM_PETRO_ATTYS = 6
     NUM_FLOYD_ROLES = 3
+    NUM_DOCKET_ENTRIES = 123
     DOCKET_PATH = os.path.join(settings.MEDIA_ROOT, 'test', 'xml',
                                'gov.uscourts.akd.41664.docket.xml')
 
     def setUp(self):
-        self.pacer_doc = PacerXMLParser(self.DOCKET_PATH)
-        self.docket = lookup_and_save(self.pacer_doc, debug=False)
+
+        self.docket, count = find_docket_object('akd', '41664', '3:11-cv-00064')
+        if count > 1:
+            raise Exception("Should not get more than one docket during "
+                            "this test!")
+        process_docket_data(self.docket, self.DOCKET_PATH, IA_XML_FILE)
 
     def tearDown(self):
         Docket.objects.all().delete()
@@ -478,10 +486,38 @@ class PacerDocketParserTest(TestCase):
         Attorney.objects.all().delete()
         AttorneyOrganization.objects.all().delete()
 
+    def test_docket_entry_parsing(self):
+        """Do we get the docket entries we expected?"""
+        # Total count is good?
+        all_rds = RECAPDocument.objects.all()
+        self.assertEqual(self.NUM_DOCKET_ENTRIES, all_rds.count())
+
+        # Main docs exist and look about right?
+        rd = RECAPDocument.objects.get(pacer_doc_id='0230856334')
+        desc = rd.docket_entry.description
+        good_de_desc = all([
+            desc.startswith("COMPLAINT"),
+            'Filing fee' in desc,
+            desc.endswith("2011)"),
+        ])
+        self.assertTrue(good_de_desc)
+
+        # Attachments have good data?
+        att_rd = RECAPDocument.objects.get(pacer_doc_id='02301132632')
+        self.assertTrue(all([
+            att_rd.description.startswith('Judgment'),
+            "redistributed" in att_rd.description,
+            att_rd.description.endswith("added"),
+        ]), "Description didn't match. Got: %s" % att_rd.description)
+        self.assertEqual(att_rd.attachment_number, 1)
+        self.assertEqual(att_rd.document_number, '116')
+        self.assertEqual(att_rd.docket_entry.date_filed, date(2012, 12, 10))
+
+        # Two documents under the docket entry?
+        self.assertEqual(att_rd.docket_entry.recap_documents.all().count(), 2)
+
     def test_party_parsing(self):
         """Can we parse an XML docket and get good results in the DB"""
-        self.pacer_doc.make_parties(self.docket, debug=False)
-
         self.assertEqual(self.docket.parties.all().count(), self.NUM_PARTIES)
 
         petro = self.docket.parties.get(name__contains="Petro")

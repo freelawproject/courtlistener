@@ -466,6 +466,28 @@ class Docket(models.Model):
 
         return search_list
 
+    def reprocess_recap_content(self, do_original_xml=False):
+        """Go over any associated RECAP files and reprocess them.
+
+        Start with the XML, then do them in the order they were received since
+        that should correspond to the history of the docket itself.
+
+        :param do_original_xml: Whether to do the original XML file as received
+        from Internet Archive.
+        """
+        if self.source not in self.RECAP_SOURCES:
+            return
+
+        from cl.lib.pacer import process_docket_data
+        # Start with the XML if we've got it.
+        if do_original_xml and self.filepath_local:
+            from cl.recap.models import IA_XML_FILE
+            process_docket_data(self, self.filepath_local.path, IA_XML_FILE)
+
+        # Then layer the uploads on top of that.
+        for html in self.html_documents.order_by('date_created'):
+            process_docket_data(self, html.filepath.path, html.upload_type)
+
 
 class DocketEntry(models.Model):
 
@@ -957,6 +979,11 @@ class Court(models.Model):
         help_text="The numeric ID for the court in PACER. This can be found by "
                   "looking at the first three digits of any doc1 URL in PACER.",
         null=True,
+        blank=True,
+    )
+    pacer_has_rss_feed = models.NullBooleanField(
+        help_text="Whether the court has a PACER RSS feed. If null, this "
+                  "doesn't apply to the given court.",
         blank=True,
     )
     fjc_court_id = models.CharField(

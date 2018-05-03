@@ -41,6 +41,10 @@ def redirect_docket_recap(request, court, pacer_case_id):
 @ratelimit_if_not_whitelisted
 def view_docket(request, pk, slug):
     docket = get_object_or_404(Docket, pk=pk)
+    title = ', '.join([s for s in [
+        trunc(best_case_name(docket), 100, ellipsis="..."),
+        docket.docket_number,
+    ] if s.strip()])
     if not is_bot(request):
         with suppress_autotime(docket, ['date_modified']):
             cached_count = docket.view_count
@@ -85,6 +89,7 @@ def view_docket(request, pk, slug):
 
     return render(request, 'view_docket.html', {
         'docket': docket,
+        'title': title,
         'parties': docket.parties.exists(),  # Needed to show/hide parties tab.
         'docket_entries': docket_entries,
         'form': form,
@@ -98,7 +103,11 @@ def view_docket(request, pk, slug):
 @ratelimit_if_not_whitelisted
 def view_parties(request, docket_id, slug):
     """Show the parties and attorneys tab on the docket."""
-    docket = get_object_or_404(Docket, pk=docket_id, slug=slug)
+    docket = get_object_or_404(Docket, pk=docket_id)
+    title = ', '.join([s for s in [
+        trunc(best_case_name(docket), 100, ellipsis="..."),
+        docket.docket_number,
+    ] if s.strip()])
     try:
         fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
@@ -115,19 +124,22 @@ def view_parties(request, docket_id, slug):
     # which reduces the number of queries needed for this down to four instead
     # of potentially thousands (good times!)
     party_types = docket.party_types.select_related('party').prefetch_related(
-        Prefetch('party__roles',
-                 queryset=Role.objects.filter(
-                     docket=docket
-                 ).order_by(
-                     'attorney_id', 'role', 'date_action'
-                 ).select_related(
-                     'attorney'
-                 ).prefetch_related(
-                     Prefetch('attorney__organizations',
-                              queryset=AttorneyOrganization.objects.filter(
-                                  attorney_organization_associations__docket=docket),
-                              to_attr='firms_in_docket')
-                 ))
+        Prefetch(
+            'party__roles',
+            queryset=Role.objects.filter(docket=docket).order_by(
+                'attorney_id', 'role', 'date_action'
+            ).select_related(
+                'attorney'
+            ).prefetch_related(
+                Prefetch(
+                    'attorney__organizations',
+                    queryset=AttorneyOrganization.objects.filter(
+                        attorney_organization_associations__docket=docket
+                    ).distinct(),
+                    to_attr='firms_in_docket',
+                )
+            )
+        )
     ).order_by('name', 'party__name')
 
     parties = []
@@ -140,6 +152,7 @@ def view_parties(request, docket_id, slug):
 
     return render(request, 'docket_parties.html', {
         'docket': docket,
+        'title': title,
         'parties': parties,
         'favorite_form': favorite_form,
         'timezone': COURT_TIMEZONES.get(docket.court_id, 'US/Eastern'),
@@ -198,7 +211,7 @@ def view_opinion(request, pk, _):
     # Look up the court, cluster, title and favorite information
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     title = ', '.join([s for s in [
-        trunc(best_case_name(cluster), 100),
+        trunc(best_case_name(cluster), 100, ellipsis="..."),
         cluster.citation_string,
     ] if s.strip()])
     has_downloads = False

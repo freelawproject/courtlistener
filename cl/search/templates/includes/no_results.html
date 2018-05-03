@@ -1,7 +1,7 @@
 {% if not error %}
     <h2 class="alt">Your search
-        {% if request.GET.q %}
-            &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
+        {% if search_summary_str %}
+            &mdash; <strong>{{ search_summary_str }}</strong> &mdash;
         {% endif %}
         had no results.</h2>
     <p>Search tips:</p>

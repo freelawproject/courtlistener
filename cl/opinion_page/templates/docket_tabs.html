@@ -49,7 +49,7 @@
             </p>
         {% endif %}
         <i id="favorites-star"
-           class="{% if favorite_form.instance.docket_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
+           class="{% if favorite_form.instance.docket_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline hidden-print"
            data-toggle="modal"
            data-target="#modal-save-favorite, #modal-logged-out"
            title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
@@ -62,19 +62,19 @@
         </h2>
         {% include "includes/favorites_modal.html" %}
 
+        <h3>{{ docket.court }}</h3>
+
         {% if docket.source in docket.RECAP_SOURCES %}
-            <p>
+            <p class="v-offset-above-1">
                 {% if docket.pacer_url %}
                     <a href="{{ docket.pacer_url }}"
-                       class="btn btn-primary btn-xs"
+                       class="btn btn-primary"
                        target="_blank">View on PACER</a>
                 {% endif %}
                 <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
-                   class="btn btn-primary btn-xs">Search this Docket</a>
+                   class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
             </p>
         {% endif %}
-
-        <h3>{{ docket.court }}</h3>
 
         {% if docket.source in docket.RECAP_SOURCES %}
             <p class="bottom">

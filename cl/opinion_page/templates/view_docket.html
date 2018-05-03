@@ -1,14 +1,15 @@
 {% extends "docket_tabs.html" %}
-{% load text_filters %}
 {% load extras %}
 {% load admin_urls %}
 
-{% block title %}Docket for {{ docket|best_case_name }} –
-    CourtListener.com{% endblock %}
-{% block og_title %}Docket for {{ docket|best_case_name }} -
-    CourtListener.com{% endblock %}
-{% block description %}Docket for {{ docket|best_case_name }}{% endblock %}
-{% block og_description %}Docket for {{ docket|best_case_name }}{% endblock %}
+{% block title %}Docket for {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}Docket for {{ title }} - CourtListener.com{% endblock %}
+{% block description %}Docket for {{ title }} — Brought to you by the RECAP
+  Initiative and Free Law Project, a non-profit dedicated to creating high
+  quality open legal information.{% endblock %}
+{% block og_description %}Docket for {{ title }} — Brought to you by the RECAP
+  Initiative and Free Law Project, a non-profit dedicated to creating high
+  quality open legal information.{% endblock %}
 
 {% block nav-de %}active{% endblock %}
 
@@ -91,92 +92,109 @@
         <div class="row {% cycle "odd" "even" %}"
              id="entry-{{ de.entry_number }}">
             <div class="col-xs-1 text-center"><p>{{ de.entry_number }}</p></div>
-            <div class="col-xs-3 col-sm-2 col-md-1"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
-            <div class="col-xs-7 col-sm-6 col-md-8"><p>{{ de.description|safe|default:'<em class="gray">Unknown docket entry description</em>' }}</p></div>
-            <div class="hidden-xs col-sm-3 col-md-2">
-                <p class="right"><a href="#entry-{{ de.entry_number }}"
-                   data-toggle="tooltip"
-                   data-placement="left"
-                   title="Get direct link to this row">
-                    <i class="fa fa-share-alt gray"></i>
-                </a>
-                </p>
-            </div>
-            <div class="clearfix"></div>
-            {% if de.recap_documents.count %}
-                <div id="recap-documents">
+            <div class="col-xs-3 col-sm-2"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
+            <div class="col-xs-8 col-lg-7">
+              {% if de.description %}
+                <p>{{ de.description|safe }}</p>
+              {% endif %}
+              {% if de.recap_documents.count %}
                 {% for rd in de.recap_documents.all %}
-                <div class="col-xs-1 col-md-2"></div>
-                <div class="col-xs-3 col-sm-2">
-                    <p>
-                    {% if rd.document_type == rd.ATTACHMENT %}
-                        {% if rd.filepath_local.name %}
-                            <a href="{{ rd.get_absolute_url }}">Attach&shy;ment&nbsp;{{ rd.attachment_number }}</a>
+                  <div class="row recap-documents">
+                    <div class="col-xs-3">
+                      <p>
+                        {% if rd.document_type == rd.ATTACHMENT %}
+                          {% if rd.filepath_local.name %}
+                            <a href="{{ rd.get_absolute_url }}">Att<span
+                              class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}</a>
+                          {% else %}
+                            Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
+                          {% endif %}
                         {% else %}
-                            Attach&shy;ment&nbsp;{{ rd.attachment_number }}
+                          {% if rd.filepath_local.name %}
+                            <a href="{{ rd.get_absolute_url }}">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
+                          {% else %}
+                            Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
+                          {% endif %}
                         {% endif %}
-                    {% else %}
-                        {% if rd.filepath_local.name %}
-                            <a href="{{ rd.get_absolute_url }}">Main Doc&shy;ument</a>
-                        {% else %}
-                            Main Doc&shy;ument
-                        {% endif %}
-                    {% endif %}
-                    </p>
-                </div>
-                <div class="hidden-xs col-sm-6 col-md-4 col-lg-3">
-                    <p>{{ rd.description|safe|default:'<em class="gray">Unknown document description</em>' }}</p>
-                </div>
+                      </p>
+                    </div>
+                    <div class="col-xs-6 col-sm-5 col-md-6">
+                      <p>{{ rd.description|safe|default:'' }}</p>
+                    </div>
 
-                <div class="btn-group col-xs-7 col-sm-3">
-                    {% if rd.filepath_local %}
+                    <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print">
+                      {% if rd.filepath_local %}
                         <a href="/{{ rd.filepath_local }}"
                            role="button"
                            class="btn btn-primary btn-xs"
-                           {% if rd.date_upload %}
-                              title="Uploaded {{ rd.date_upload }}"
-                           {% endif %}>
-                            Download PDF
+                          {% if rd.date_upload %}
+                           title="Uploaded {{ rd.date_upload }}"
+                          {% endif %}>
+                          Download PDF
                         </a>
                         <button type="button"
                                 class="btn btn-primary btn-xs dropdown-toggle"
                                 data-toggle="dropdown"
                                 aria-haspopup="true"
                                 aria-expanded="false">
-                            <span class="caret"></span>
-                            <span class="sr-only">Toggle Dropdown</span>
+                          <span class="caret"></span>
+                          <span class="sr-only">Toggle Dropdown</span>
                         </button>
                         <ul class="dropdown-menu">
+                          <li>
+                            <a href="/{{ rd.filepath_local }}">From
+                              CourtListener</a>
+                          </li>
+                          {% if rd.filepath_ia %}
                             <li>
-                                <a href="/{{ rd.filepath_local }}">From CourtListener</a>
-                            </li>
-                            {% if rd.filepath_ia %}
-                            <li>
-                                <a href="{{ rd.filepath_ia }}"
-                                   rel="nofollow">From
+                              <a href="{{ rd.filepath_ia }}"
+                                 rel="nofollow">From
                                 Internet Archive</a>
                             </li>
                             <li role="separator" class="divider"></li>
-                            {% endif %}
-                            <li>
-                                <a href="{{ rd.pacer_url }}"
-                                   target="_blank"
-                                   rel="nofollow">Buy on
-                                PACER</a>
-                            </li>
+                          {% endif %}
+                          <li>
+                            <a href="{{ rd.pacer_url }}"
+                               target="_blank"
+                               rel="nofollow">Buy on
+                              PACER</a>
+                          </li>
                         </ul>
-                    {% else %}
+                      {% else %}
                         {# We don't have it #}
                         <a href="{{ rd.pacer_url }}"
                            class="btn btn-default btn-xs"
                            target="_blank"
-                           rel="nofollow">Buy on PACER</a>
-                    {% endif %}
-                </div>
-                <div class="clearfix"></div>
+                           rel="nofollow">Buy<span class="hidden-xs"> on PACER</span></a>
+                      {% endif %}
+                    </div>
+                    <div class="col-xs-3 hidden-sm hidden-md hidden-lg hidden-print">
+                      {% if rd.filepath_local %}
+                        <a href="/{{ rd.filepath_local }}"
+                           role="button"
+                           class="btn btn-primary btn-xs"
+                           title="Download PDF"><i class="fa fa-download"></i>
+                        </a>
+                      {% else %}
+                        {# We don't have it #}
+                        <a href="{{ rd.pacer_url }}"
+                           class="btn btn-primary btn-xs"
+                           target="_blank"
+                           rel="nofollow"
+                           title="Buy on PACER"><i class="fa fa-download"></i></a>
+                      {% endif %}
+                    </div>
+                  </div>
                 {% endfor %}
-                </div>
-            {% endif %}
+              {% endif %}
+            </div>
+            <div class="hidden-xs col-sm-1 col-lg-2 right">
+              <a href="#entry-{{ de.entry_number }}"
+                 data-toggle="tooltip"
+                 data-placement="top"
+                 title="Get direct link to this row">
+                <i class="fa fa-share-alt gray"></i></a>
+            </div>
         </div>
     {% endfor %}
 </div>
