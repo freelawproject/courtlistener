@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from cl.recap.models import ProcessingQueue, PDF, DOCKET
+from cl.recap.models import ProcessingQueue, PDF, DOCKET, APPELLATE_DOCKET, \
+    DOCKET_HISTORY_REPORT
 from cl.search.models import Court, RECAPDocument
 
 
@@ -58,6 +59,30 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                 raise ValidationError("PACER document ID, document number and "
                                       "attachment number must be blank for "
                                       "docket uploads.")
+
+        if attrs['upload_type'] in [DOCKET, DOCKET_HISTORY_REPORT]:
+            # These are district court dockets. Is the court valid?
+            district_court_ids = Court.objects.filter(jurisdiction__in=[
+                Court.FEDERAL_DISTRICT,
+                Court.FEDERAL_BANKRUPTCY,
+                Court.FEDERAL_BANKRUPTCY_PANEL
+            ]).values_list('pk', flat=True)
+            if attrs['court'].pk not in district_court_ids:
+                raise ValidationError("%s is not a district or bankruptcy "
+                                      "court ID. Did you mean to use the "
+                                      "upload_type for appellate dockets?" %
+                                      attrs['court'])
+
+        if attrs['upload_type'] == APPELLATE_DOCKET:
+            # Appellate court dockets. Is the court valid?
+            appellate_court_ids = Court.objects.filter(jurisdiction__in=[
+                Court.FEDERAL_APPELLATE,
+            ])
+            if attrs['court'].pk not in appellate_court_ids:
+                raise ValidationError("%s is not an appellate court ID. Did "
+                                      "you mean to use the upload_type for "
+                                      "district dockets?" % attrs['court'])
+
         elif attrs['upload_type'] == PDF:
             # PDFs require pacer_doc_id and document_number values.
             if not all([attrs.get('pacer_doc_id'),

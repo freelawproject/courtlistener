@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     'cl.lib',
     'cl.opinion_page',
     'cl.recap',
+    'cl.recap_rss',
     'cl.scrapers',
     'cl.search',
     'cl.simple_pages',

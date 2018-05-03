@@ -1,7 +1,7 @@
 {% load humanize %}
 
 {% if results.has_previous or results.has_next %}
-    <div class="well v-offset-above-3">
+    <div class="well v-offset-above-3 hidden-print">
         <div class="row">
             <div class="col-xs-2 col-sm-3">
                 {% if results.has_previous %}

@@ -1255,6 +1255,12 @@ class FinancialDisclosure(models.Model):
 
 
 class PartyType(models.Model):
+    """Links together the parties and the docket. Probably a poorly named
+    model.
+
+    (It made sense at the time.)
+    """
+
     docket = models.ForeignKey(
         'search.Docket',
         related_name="party_types",
@@ -1266,6 +1272,16 @@ class PartyType(models.Model):
     name = models.CharField(
         help_text="The name of the type (Defendant, Plaintiff, etc.)",
         max_length="100",  # 2× the max in first 100,000 sampled.
+        db_index=True,
+    )
+    date_terminated = models.DateField(
+        help_text="The date that the party was terminated from the case, if "
+                  "applicable.",
+        null=True,
+        blank=True,
+    )
+    extra_info = models.TextField(
+        help_text="Additional info from PACER",
         db_index=True,
     )
 
@@ -1308,7 +1324,6 @@ class Party(models.Model):
     )
 
     class Meta:
-        unique_together = ('name', 'extra_info')
         verbose_name_plural = "Parties"
         permissions = (
             ("has_recap_api_access", "Can work with RECAP API"),
@@ -1370,11 +1385,12 @@ class Role(models.Model):
         unique_together = ('party', 'attorney', 'role', 'docket', 'date_action')
 
     def __unicode__(self):
-        return u'%s: Attorney %s is %s for Party %s' % (
+        return u'%s: Attorney %s is %s for Party %s in docket %s' % (
             self.pk,
             self.attorney_id,
             self.get_role_display(),
             self.party_id,
+            self.docket_id,
         )
 
 
@@ -1387,12 +1403,6 @@ class Attorney(models.Model):
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
-        db_index=True,
-    )
-    date_sourced = models.DateField(
-        help_text="The latest date on the source docket that populated this "
-                  "information. When information is in conflict use the "
-                  "latest data.",
         db_index=True,
     )
     organizations = models.ManyToManyField(
@@ -1420,7 +1430,6 @@ class Attorney(models.Model):
     )
 
     class Meta:
-        unique_together = ('name', 'contact_raw')
         permissions = (
             ("has_recap_api_access", "Can work with RECAP API"),
         )

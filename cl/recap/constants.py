@@ -218,6 +218,11 @@ IDB_FIELD_DATA = {
         'field': 'transfer_docket_number',
         'type': str,
     },
+    'MAGDOCK': {
+        'sources': [CR_2017],
+        'field': 'multidistrict_litigation_docket_number',
+        'type': str,
+    },
 }
 
 

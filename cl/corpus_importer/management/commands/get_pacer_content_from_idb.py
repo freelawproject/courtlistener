@@ -1,7 +1,9 @@
 import argparse
 import os
+import random
 import re
 
+from celery.canvas import chain
 from django.conf import settings
 from django.db.models import Q
 from juriscraper.pacer.http import PacerSession
@@ -11,14 +13,20 @@ from cl.corpus_importer.tasks import get_pacer_case_id_for_idb_row, \
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Docket, RECAPDocument
-from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT_CR,\
-    FAIR_LABOR_STANDARDS_ACT_CV
+from cl.search.tasks import add_or_update_recap_docket
+from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT_CR, \
+    FAIR_LABOR_STANDARDS_ACT_CV, BANKRUPTCY_APPEALS, BANKRUPTCY_WITHDRAWAL, \
+    PRISONER_PETITIONS_VACATE_SENTENCE, PRISONER_PETITIONS_HABEAS_CORPUS, \
+    PRISONER_PETITIONS_MANDAMUS_AND_OTHER, PRISONER_CIVIL_RIGHTS, \
+    PRISONER_PRISON_CONDITION, IMMIGRATION_ACTIONS_OTHER, \
+    FORFEITURE_AND_PENALTY_SUITS_OTHER, SOCIAL_SECURITY, TAX_SUITS
 from cl.recap.models import FjcIntegratedDatabase
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 KOMPLY_TAG = 'QAV5K6HU93A67WS6'
+GAVELYTICS_TAG = 'FFQBCCFSBJSULNBS'
 
 
 def get_pacer_case_ids(options, row_pks):
@@ -34,8 +42,10 @@ def get_pacer_case_ids(options, row_pks):
                                          password=PACER_PASSWORD)
             pacer_session.login()
             logger.info("Sent %s tasks to celery so far." % i)
-        get_pacer_case_id_for_idb_row.apply_async(args=(row_pk, pacer_session),
-                                                  queue=q)
+        get_pacer_case_id_for_idb_row.apply_async(
+            args=(row_pk, pacer_session),
+            queue=q,
+        )
 
 
 def get_pacer_dockets(options, row_pks, tag=None):
@@ -52,20 +62,17 @@ def get_pacer_dockets(options, row_pks, tag=None):
             pacer_session.login()
             logger.info("Sent %s tasks to celery so far." % i)
         row = FjcIntegratedDatabase.objects.get(pk=row_pk)
-        get_docket_by_pacer_case_id.apply_async(
-            args=(
+        chain(
+            get_docket_by_pacer_case_id.s(
                 row.pacer_case_id,
                 row.district_id,
                 pacer_session,
-            ),
-            kwargs={
-                'tag': tag,
-                'show_parties_and_counsel': True,
-                'show_terminated_parties': True,
-                'show_list_of_member_cases': True,
-            },
-            queue=q,
-        )
+                **{'tag': tag, 'show_parties_and_counsel': True,
+                   'show_terminated_parties': True,
+                   'show_list_of_member_cases': True}
+            ).set(queue=q),
+            add_or_update_recap_docket.s().set(queue=q),
+        ).apply_async()
 
 
 def get_doc_by_re_and_de_nums_for_dockets(options, docket_pks, regex, de_nums,
@@ -164,6 +171,30 @@ class Command(VerboseCommand):
         row_pks = FjcIntegratedDatabase.objects.filter(
             Q(nature_of_suit=FAIR_LABOR_STANDARDS_ACT_CV) |
             Q(nature_of_offense=FAIR_LABOR_STANDARDS_ACT_CR),
+            pacer_case_id='',
+        ).values_list('pk', flat=True)
+        get_pacer_case_ids(self.options, row_pks)
+
+    def get_gavelytics_ids(self):
+        """Get the pacer_case_id values for every item relevant to Gavelytics"""
+        row_pks = FjcIntegratedDatabase.objects.exclude(
+            nature_of_suit__in=[
+                BANKRUPTCY_APPEALS,
+                BANKRUPTCY_WITHDRAWAL,
+                PRISONER_PETITIONS_VACATE_SENTENCE,
+                PRISONER_PETITIONS_HABEAS_CORPUS,
+                PRISONER_PETITIONS_MANDAMUS_AND_OTHER,
+                PRISONER_CIVIL_RIGHTS,
+                PRISONER_PRISON_CONDITION,
+                IMMIGRATION_ACTIONS_OTHER,
+                FORFEITURE_AND_PENALTY_SUITS_OTHER,
+                SOCIAL_SECURITY,
+                TAX_SUITS,
+            ],
+        ).filter(
+            district_id__in=['cand', 'casd', 'cacd', 'caed'],
+            date_filed__gte='2012-01-01',
+            pacer_case_id='',
         ).values_list('pk', flat=True)
         get_pacer_case_ids(self.options, row_pks)
 
@@ -180,6 +211,41 @@ class Command(VerboseCommand):
             'district_id',
         ).values_list('pk', flat=True)
         get_pacer_dockets(self.options, row_pks, tag=KOMPLY_TAG)
+
+    def get_gavelytics_docket_sample(self):
+        self.get_gavelytics_dockets(sample=True)
+
+    def get_gavelytics_dockets(self, sample=False):
+        row_pks = FjcIntegratedDatabase.objects.exclude(
+            nature_of_suit__in=[
+                BANKRUPTCY_APPEALS,
+                BANKRUPTCY_WITHDRAWAL,
+                PRISONER_PETITIONS_VACATE_SENTENCE,
+                PRISONER_PETITIONS_HABEAS_CORPUS,
+                PRISONER_PETITIONS_MANDAMUS_AND_OTHER,
+                PRISONER_CIVIL_RIGHTS,
+                PRISONER_PRISON_CONDITION,
+                IMMIGRATION_ACTIONS_OTHER,
+                FORFEITURE_AND_PENALTY_SUITS_OTHER,
+                SOCIAL_SECURITY,
+                TAX_SUITS,
+            ],
+        ).exclude(
+            Q(pacer_case_id='') | Q(pacer_case_id='Error'),
+        ).filter(
+            district_id__in=['cand', 'casd', 'cacd', 'caed'],
+            date_filed__gte='2012-01-01',
+        ).distinct(
+            # Avoid duplicates.
+            'pacer_case_id',
+            'district_id',
+        ).values_list('pk', flat=True)
+        if sample is True:
+            # Do not combine the next two lines. That won't be random.
+            row_pks = list(row_pks)
+            random.shuffle(row_pks)
+            row_pks = row_pks[0:100]
+        get_pacer_dockets(self.options, row_pks, tag=GAVELYTICS_TAG)
 
     def get_komply_cover_sheets(self):
         """Once we have all the dockets, our next step is to get the cover
@@ -207,8 +273,13 @@ class Command(VerboseCommand):
         )
 
     VALID_ACTIONS = {
+        # Komply
         'get-komply-pacer-ids': get_komply_ids,
         'get-komply-dockets': get_komply_dockets,
         'get-komply-cover-sheets': get_komply_cover_sheets,
         'get-komply-initial-complaints': get_komply_initial_complaints,
+        # Gavelytics
+        'get-gavelytics-pacer-ids': get_gavelytics_ids,
+        'get-gavelytics-docket-sample': get_gavelytics_docket_sample,
+        'get-gavelytics-dockets': get_gavelytics_dockets,
     }

@@ -29,67 +29,67 @@ class Command(VerboseCommand):
         kwargs_list = [
             {
                 'obj_type_str': 'clusters',
-                'obj_type': OpinionCluster,
+                'obj_class': OpinionCluster,
                 'court_attr': 'docket.court_id',
                 'serializer': OpinionClusterSerializer,
             },
             {
                 'obj_type_str': 'opinions',
-                'obj_type': Opinion,
+                'obj_class': Opinion,
                 'court_attr': 'cluster.docket.court_id',
                 'serializer': OpinionSerializer,
             },
             {
                 'obj_type_str': 'dockets',
-                'obj_type': Docket,
+                'obj_class': Docket,
                 'court_attr': 'court_id',
                 'serializer': DocketSerializer,
             },
             {
                 'obj_type_str': 'courts',
-                'obj_type': Court,
+                'obj_class': Court,
                 'court_attr': None,
                 'serializer': CourtSerializer,
             },
             {
                 'obj_type_str': 'audio',
-                'obj_type': Audio,
+                'obj_class': Audio,
                 'court_attr': 'docket.court_id',
                 'serializer': AudioSerializer,
             },
             {
                 'obj_type_str': 'people',
-                'obj_type': Person,
+                'obj_class': Person,
                 'court_attr': None,
                 'serializer': PersonSerializer,
             },
             {
                 'obj_type_str': 'schools',
-                'obj_type': School,
+                'obj_class': School,
                 'court_attr': None,
                 'serializer': SchoolSerializer,
             },
             {
                 'obj_type_str': 'positions',
-                'obj_type': Position,
+                'obj_class': Position,
                 'court_attr': None,
                 'serializer': PositionSerializer,
             },
             {
                 'obj_type_str': 'retention-events',
-                'obj_type': RetentionEvent,
+                'obj_class': RetentionEvent,
                 'court_attr': None,
                 'serializer': RetentionEventSerializer,
             },
             {
                 'obj_type_str': 'educations',
-                'obj_type': Education,
+                'obj_class': Education,
                 'court_attr': None,
                 'serializer': EducationSerializer,
             },
             {
                 'obj_type_str': 'politicial-affiliations',
-                'obj_type': PoliticalAffiliation,
+                'obj_class': PoliticalAffiliation,
                 'court_attr': None,
                 'serializer': PoliticalAffiliationSerializer,
             },
@@ -98,7 +98,8 @@ class Command(VerboseCommand):
         logger.info('Starting bulk file creation with %s celery tasks...' %
                     len(kwargs_list))
         for kwargs in kwargs_list:
-            make_bulk_data_and_swap_it_in(courts, kwargs)
+            make_bulk_data_and_swap_it_in(courts, settings.BULK_DATA_DIR,
+                                          kwargs)
 
         # Make the citation bulk data
         obj_type_str = 'citations'
