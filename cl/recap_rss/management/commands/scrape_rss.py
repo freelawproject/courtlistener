@@ -40,9 +40,13 @@ class Command(VerboseCommand):
             '--sweep',
             default=False,
             action='store_true',
-            help="Ignore anything that says to stop and download everything "
-                 "you see. Don't create duplicates. Recommend running this "
-                 "with --iterations 1",
+            help="During normal usage, there are a variety of checks in place "
+                 "that ensure that you don't scrape an RSS feed too soon, "
+                 "scrape one that hasn't changed, or scrape individual items "
+                 "that have already been added to the DB. Use this flag to "
+                 "ignore all of that and just download everything in the "
+                 "requested feeds. Don't create duplicates. Recommend running "
+                 "this with --iterations 1",
         )
 
     def handle(self, *args, **options):
