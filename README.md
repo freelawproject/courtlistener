@@ -62,6 +62,12 @@ If you're using Vagrant, you also need to be sure to run any new playbooks that 
     ansible-playbook ansible/1.6.0/0002_create_recap_core.yml -i ansible/hosts --ask-become-pass
     # etc.
 
+You may want to override the default variables (in defaults.yml) if you have CourtListener installed in a "special" location. To do that you can add something like:
+
+    --extra-vars "install_root=/home/mlissner/Programming/intellij/courtlistener virtualenv_root=/home/mlissner/.virtualenvs/courtlistener"
+
+Just to pick some random examples. 
+
 Any time you see a new playbook come in when you pull code, you should run it in the same way.
 
 If you installed from the Wiki, you should watch for upgrades coming into these folders as well, and should apply them as you see them arrive.
