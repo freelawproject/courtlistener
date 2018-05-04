@@ -1,7 +1,7 @@
 # coding=utf-8
 import logging
+import re
 
-import lxml
 import requests
 from dateutil import parser
 from juriscraper.pacer import PacerRssFeed
@@ -15,10 +15,15 @@ from cl.recap_rss.models import RssFeedStatus
 logger = logging.getLogger(__name__)
 
 
-def get_last_build_date(xml_string):
-    """Get the last build date for an RSS feed"""
-    doc = lxml.etree.fromstring(xml_string)
-    last_build_date_str = doc.xpath('//lastBuildDate/text()')[0]
+def get_last_build_date(s):
+    """Get the last build date for an RSS feed
+
+    In this case we considered using lxml & xpath, which was 1000× faster than
+    feedparser, but it turns out that using regex is *another* 1000× faster, so
+    we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
+    """
+    m = re.search(r'<lastBuildDate>(.*)</lastBuildDate>', s)
+    last_build_date_str = m.group(1)
     return parser.parse(last_build_date_str, fuzzy=False)
 
 
