@@ -17,6 +17,10 @@ from cl.search.tasks import add_or_update_recap_document
 class Command(VerboseCommand):
     help = 'Scrape PACER RSS feeds'
 
+    RSS_MAX_VISIT_FREQUENCY = 5 * 60
+    RSS_MAX_PROCESSING_DURATION = 10 * 60
+    DELAY_BETWEEN_ITERATIONS = 1 * 60
+
     def add_arguments(self, parser):
         parser.add_argument(
             '--courts',
@@ -98,17 +102,19 @@ class Command(VerboseCommand):
                 if options['courts'] == ['all'] and options['sweep'] is False:
                     # If it's all courts and it's not a sweep, check if we did
                     # it recently.
-                    five_minutes_ago = now() - timedelta(minutes=5)
+                    five_minutes_ago = now() - timedelta(
+                        seconds=self.RSS_MAX_VISIT_FREQUENCY)
                     if feed_status.date_created > five_minutes_ago:
                         # Processed within last five minutes. Try next court.
                         continue
 
-                # Give a court two hours to complete during non-sweep crawls
-                two_hours_ago = now() - timedelta(hours=2)
+                # Give a court ten minutes to complete during non-sweep crawls
+                ten_minutes_ago = now() - timedelta(
+                    seconds=self.RSS_MAX_PROCESSING_DURATION)
                 if all([
                     options['sweep'] is False,
                     feed_status.status == RssFeedStatus.PROCESSING_IN_PROGRESS,
-                    feed_status.date_created < two_hours_ago
+                    feed_status.date_created < ten_minutes_ago
                 ]):
                     continue
 
@@ -137,4 +143,4 @@ class Command(VerboseCommand):
             # Wait one minute, then attempt all courts again if iterations not
             # exceeded.
             iterations_completed += 1
-            time.sleep(60)
+            time.sleep(self.DELAY_BETWEEN_ITERATIONS)
