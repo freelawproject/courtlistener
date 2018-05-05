@@ -122,8 +122,6 @@ def check_or_cache(item):
 def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
     """Merge the rss feed contents into CourtListener
 
-    If it's not a sweep, abort after ten preexisting items are encountered.
-
     :param rss_feed: A PacerRssFeed object that has already queried the feed.
     :param court_pk: The CourtListener court ID.
     :param feed_status_pk: The CL ID for the RSS status object.
