@@ -169,3 +169,19 @@ def mark_status_successful(feed_status_pk):
     logger.info("Marking %s as a success." % feed_status.court_id)
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)
 
+
+@app.task
+def trim_rss_cache(days=7):
+    """Remove any entries in the RSS cache older than `days` days.
+
+    :returns The number removed.
+    """
+    result = RssItemCache.objects.filter(
+        date_created__lt=now() - timedelta(days=days)
+    ).delete()
+    if result is None:
+        return 0
+
+    # Deletions return a tuple of the total count and the individual item count
+    # if there is a cascade. We just want the total.
+    return result[0]

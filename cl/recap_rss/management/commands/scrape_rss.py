@@ -9,7 +9,7 @@ from django.utils.timezone import now, make_aware
 from cl.lib.command_utils import VerboseCommand
 from cl.recap_rss.models import RssFeedStatus
 from cl.recap_rss.tasks import check_if_feed_changed, merge_rss_feed_contents, \
-    mark_status_successful
+    mark_status_successful, trim_rss_cache
 from cl.search.models import Court
 from cl.search.tasks import add_or_update_recap_document
 
@@ -142,6 +142,7 @@ class Command(VerboseCommand):
                     # dockets. Updating them all would be very bad.
                     add_or_update_recap_document.s(),
                     mark_status_successful.si(new_status.pk),
+                    trim_rss_cache.si(),
                 ).apply_async()
 
             # Wait one minute, then attempt all courts again if iterations not
