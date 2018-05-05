@@ -59,3 +59,19 @@ class RssFeedStatus(models.Model):
 
     def __unicode__(self):
         return u'RssFeedStatus: %s, %s' % (self.pk, self.court_id)
+
+
+class RssItemCache(models.Model):
+    """A cache for hashes of the RSS models to make it faster to look them up
+    and merge them in.
+    """
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    hash = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+    )
