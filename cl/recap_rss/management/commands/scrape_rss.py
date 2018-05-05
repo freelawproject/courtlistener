@@ -20,6 +20,7 @@ class Command(VerboseCommand):
     RSS_MAX_VISIT_FREQUENCY = 5 * 60
     RSS_MAX_PROCESSING_DURATION = 10 * 60
     DELAY_BETWEEN_ITERATIONS = 1 * 60
+    DELAY_BETWEEN_CACHE_TRIMS = 60 * 60
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -79,6 +80,7 @@ class Command(VerboseCommand):
             courts = courts.filter(pk__in=options['courts'])
 
         iterations_completed = 0
+        last_trim_date = None
         while options['iterations'] == 0 or \
                 iterations_completed < options['iterations']:
             for court in courts:
@@ -142,10 +144,14 @@ class Command(VerboseCommand):
                     # dockets. Updating them all would be very bad.
                     add_or_update_recap_document.s(),
                     mark_status_successful.si(new_status.pk),
-                    trim_rss_cache.si(),
                 ).apply_async()
 
-            # Wait one minute, then attempt all courts again if iterations not
-            # exceeded.
+            # Trim if not too recently trimmed.
+            trim_cutoff_date = now() - timedelta(self.DELAY_BETWEEN_CACHE_TRIMS)
+            if last_trim_date is None or trim_cutoff_date > last_trim_date:
+                trim_rss_cache.delay()
+                last_trim_date = now()
+
+            # Wait, then attempt the courts again if iterations not exceeded.
             iterations_completed += 1
             time.sleep(self.DELAY_BETWEEN_ITERATIONS)

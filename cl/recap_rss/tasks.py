@@ -176,6 +176,7 @@ def trim_rss_cache(days=7):
 
     :returns The number removed.
     """
+    logger.info("Trimming RSS item cache.")
     result = RssItemCache.objects.filter(
         date_created__lt=now() - timedelta(days=days)
     ).delete()
