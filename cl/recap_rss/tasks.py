@@ -106,16 +106,22 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     return rss_feed
 
 
-def check_or_cache(item):
-    """Check if an item is in our item cache and cache it if not.
-
-    :returns boolean of whether the item was found in the cache.
-    """
+def hash_item(item):
+    """Hash an RSS item. Item should be a dict at this stage"""
     # Stringify, normalizing dates to strings.
     item_j = json.dumps(item, sort_keys=True, default=str)
     item_hash = sha1(item_j)
-    _, created = RssItemCache.objects.get_or_create(hash=item_hash)
-    return created
+    return item_hash
+
+
+def is_cached(item_hash):
+    """Check if a hash is in the RSS Item Cache"""
+    return RssItemCache.objects.filter(hash=item_hash).exists()
+
+
+def cache_hash(item_hash):
+    """Add a new hash to the RSS Item Cache"""
+    RssItemCache.objects.create(hash=item_hash)
 
 
 @app.task
@@ -135,12 +141,12 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
     for docket in rss_feed.data:
-        with transaction.atomic():
-            is_cached = check_or_cache(docket)
-            if is_cached:
-                # We've seen this one recently.
-                continue
+        item_hash = hash_item(docket)
+        if is_cached(item_hash):
+            continue
 
+        with transaction.atomic():
+            cache_hash(item_hash)
             d, count = find_docket_object(court_pk, docket['pacer_case_id'],
                                           docket['docket_number'])
             if count > 1:
