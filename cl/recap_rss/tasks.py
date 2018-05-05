@@ -171,7 +171,7 @@ def mark_status_successful(feed_status_pk):
 
 
 @app.task
-def trim_rss_cache(days=7):
+def trim_rss_cache(days=2):
     """Remove any entries in the RSS cache older than `days` days.
 
     :returns The number removed.
