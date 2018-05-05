@@ -115,12 +115,12 @@ class Command(VerboseCommand):
                         continue
 
                 # Give a court some time to complete during non-sweep crawls
-                ten_minutes_ago = now() - timedelta(
+                processing_cutoff = now() - timedelta(
                     seconds=self.RSS_MAX_PROCESSING_DURATION)
                 if all([
                     options['sweep'] is False,
                     feed_status.status == RssFeedStatus.PROCESSING_IN_PROGRESS,
-                    feed_status.date_created < ten_minutes_ago
+                    feed_status.date_created < processing_cutoff
                 ]):
                     continue
 
