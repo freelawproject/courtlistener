@@ -108,13 +108,13 @@ class Command(VerboseCommand):
                 if options['courts'] == ['all'] and options['sweep'] is False:
                     # If it's all courts and it's not a sweep, check if we did
                     # it recently.
-                    five_minutes_ago = now() - timedelta(
+                    max_visit_ago = now() - timedelta(
                         seconds=self.RSS_MAX_VISIT_FREQUENCY)
-                    if feed_status.date_created > five_minutes_ago:
-                        # Processed within last five minutes. Try next court.
+                    if feed_status.date_created > max_visit_ago:
+                        # Processed too recently. Try next court.
                         continue
 
-                # Give a court ten minutes to complete during non-sweep crawls
+                # Give a court some time to complete during non-sweep crawls
                 ten_minutes_ago = now() - timedelta(
                     seconds=self.RSS_MAX_PROCESSING_DURATION)
                 if all([
