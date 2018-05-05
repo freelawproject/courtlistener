@@ -1,16 +1,21 @@
 # coding=utf-8
+import json
 import logging
 import re
+from datetime import timedelta
 
 import requests
 from dateutil import parser
+from django.db import transaction
+from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 
 from cl.celery import app
+from cl.lib.crypto import sha1
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.recap.tasks import find_docket_object, add_recap_source, \
     update_docket_metadata, add_docket_entries
-from cl.recap_rss.models import RssFeedStatus
+from cl.recap_rss.models import RssFeedStatus, RssItemCache
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +106,18 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     return rss_feed
 
 
+def check_or_cache(item):
+    """Check if an item is in our item cache and cache it if not.
+
+    :returns boolean of whether the item was found in the cache.
+    """
+    # Stringify, normalizing dates to strings.
+    item_j = json.dumps(item, sort_keys=True, default=str)
+    item_hash = sha1(item_j)
+    _, created = RssItemCache.objects.get_or_create(hash=item_hash)
+    return created
+
+
 @app.task
 def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
     """Merge the rss feed contents into CourtListener
@@ -119,34 +136,30 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
                                                   len(rss_feed.data)))
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
-    preexisting_rd_count = 0
     for docket in rss_feed.data:
-        d, count = find_docket_object(court_pk, docket['pacer_case_id'],
-                                      docket['docket_number'])
-        if count > 1:
-            logger.info("Found %s dockets during lookup. Choosing oldest." %
-                        count)
-            d = d.earliest('date_created')
+        with transaction.atomic():
+            is_cached = check_or_cache(docket)
+            if is_cached:
+                # We've seen this one recently.
+                continue
 
-        add_recap_source(d)
-        update_docket_metadata(d, docket)
-        if not d.pacer_case_id:
-            d.pacer_case_id = docket['pacer_case_id']
-        d.save()
-        rds_created, _ = add_docket_entries(d, docket['docket_entries'])
-        rd_pks = [rd.pk for rd in rds_created]
-        if len(rd_pks) == 0:
-            # We've gotten this RSS item already.
-            preexisting_rd_count += 1
-            if preexisting_rd_count == 10 and not feed_status.is_sweep:
-                logger.info("%s: After merging %s items, got 10 results we've "
-                            "already seen. Not doing a sweep, therefore "
-                            "aborting." % (len(all_rds_created),
-                                           feed_status.court_id))
-                break
+            d, count = find_docket_object(court_pk, docket['pacer_case_id'],
+                                          docket['docket_number'])
+            if count > 1:
+                logger.info("Found %s dockets during lookup. Choosing oldest." %
+                            count)
+                d = d.earliest('date_created')
 
-        all_rds_created.extend(rd_pks)
+            add_recap_source(d)
+            update_docket_metadata(d, docket)
+            if not d.pacer_case_id:
+                d.pacer_case_id = docket['pacer_case_id']
+            d.save()
+            rds_created, _ = add_docket_entries(d, docket['docket_entries'])
 
+        all_rds_created.extend([rd.pk for rd in rds_created])
+
+    # Send the list of created rds onwards for Solr indexing.
     return all_rds_created
 
 
