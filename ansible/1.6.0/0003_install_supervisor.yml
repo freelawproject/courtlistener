@@ -66,5 +66,5 @@
     become: yes
     become_user: root
     template:
-      src="{{ install_root }}/scripts/supervisor/pacer_rss_scraper.ini"
+      src="../../scripts/supervisor/pacer_rss_scraper.ini"
       dest="{{ program_dir}}/pacer_rss_scraper.ini"
