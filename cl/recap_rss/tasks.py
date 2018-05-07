@@ -30,11 +30,10 @@ def get_last_build_date(s):
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
     date_re = r'<(?:lastBuildDate|pubDate)>(.*)</(?:lastBuildDate|pubDate)>'
     m = re.search(date_re, s)
-    try:
-        last_build_date_str = m.group(1)
-    except AttributeError:
+    if m is None:
         logger.info("Couldn't get date attribute for: %s" % s)
-        raise
+        raise AttributeError("Failed to get date")
+    last_build_date_str = m.group(1)
     return parser.parse(last_build_date_str, fuzzy=False)
 
 
