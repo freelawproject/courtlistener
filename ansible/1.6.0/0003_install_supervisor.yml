@@ -29,6 +29,7 @@
     template:
       src="templates/supervisor/supervisor.init"
       dest="/etc/init.d/supervisor"
+      mode=0755
   - name: start supervisor's init service
     when: ansible_service_mgr == "upstart"
     become: yes
