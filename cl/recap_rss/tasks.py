@@ -27,7 +27,9 @@ def get_last_build_date(s):
     feedparser, but it turns out that using regex is *another* 1000× faster, so
     we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
     """
-    m = re.search(r'<lastBuildDate>(.*)</lastBuildDate>', s)
+    # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
+    date_re = r'<(?:lastBuildDate|pubDate)>(.*)</(?:lastBuildDate|pubDate)>'
+    m = re.search(date_re, s)
     last_build_date_str = m.group(1)
     return parser.parse(last_build_date_str, fuzzy=False)
 
