@@ -20,6 +20,10 @@
       src="templates/supervisor/supervisord.conf"
       dest={{ supervisor_conf }}
       mode=0600
+  - name: Ensure {{program_dir}} exists
+    become: yes
+    become_user: root
+    file: path={{program_dir}} state=directory
 
   # Install supervisor for init-based systems if applicable
   - name: install supervisor's init file
@@ -51,10 +55,13 @@
     service: name=supervisor.service state=started enabled=yes
 
   # Add program configs to the include file
-  - name: Ensures {{program_dir}} exists
-    become: yes
-    become_user: root
-    file: path={{program_dir}} state=directory
+- hosts: rss-scraper
+  vars:
+    supervisor_conf: "/etc/supervisord.conf"
+    program_dir: "/etc/supervisor"
+  tasks:
+  - include_vars: ../defaults.yml
+
   - name: Add supervisor configuration for the PACER RSS scraper
     become: yes
     become_user: root
