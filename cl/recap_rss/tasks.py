@@ -30,9 +30,6 @@ def get_last_build_date(s):
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
     date_re = r'<(?:lastBuildDate|pubDate)>(.*)</(?:lastBuildDate|pubDate)>'
     m = re.search(date_re, s)
-    if m is None:
-        logger.info("Couldn't get date attribute for: %s" % s)
-        raise AttributeError("Failed to get date")
     last_build_date_str = m.group(1)
     return parser.parse(last_build_date_str, fuzzy=False)
 
@@ -89,6 +86,13 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             return
         mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
         raise self.retry(exc=exc, countdown=5)
+    else:
+        if not rss_feed.response.content:
+            try:
+                raise Exception("Empty RSS document returned by PACER")
+            except Exception as exc:
+                mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
+                raise self.retry(exc=exc, countdown=5)
 
     current_build_date = get_last_build_date(rss_feed.response.content)
 
