@@ -40,6 +40,18 @@ def mark_status(status_obj, status_value):
     status_obj.save()
 
 
+def abort_or_retry(task, feed_status, exc):
+    """Abort a task chain if there are no more retries. Else, retry it."""
+    if task.request.retries == task.max_retries:
+        # Abort and cut off the chain. No more retries.
+        mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
+        task.request.callbacks = None
+        return
+
+    mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
+    raise task.retry(exc=exc, countdown=5)
+
+
 @app.task(bind=True, max_retries=5)
 def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     """Check if the feed changed
@@ -79,20 +91,15 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     except requests.RequestException as exc:
         logger.warning("Network error trying to get RSS feed at %s" %
                        rss_feed.url)
-        if self.request.retries == self.max_retries:
-            # Abort. Unable to get the thing.
-            mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
-            self.request.callbacks = None
-            return
-        mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
-        raise self.retry(exc=exc, countdown=5)
+        abort_or_retry(self, feed_status, exc)
     else:
         if not rss_feed.response.content:
             try:
-                raise Exception("Empty RSS document returned by PACER")
+                raise Exception("Empty RSS document returned by PACER: %s" %
+                                feed_status.court_id)
             except Exception as exc:
-                mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
-                raise self.retry(exc=exc, countdown=5)
+                logger.warning(str(exc))
+                abort_or_retry(self, feed_status, exc)
 
     current_build_date = get_last_build_date(rss_feed.response.content)
 
