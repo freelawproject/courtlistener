@@ -92,6 +92,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         logger.warning("Network error trying to get RSS feed at %s" %
                        rss_feed.url)
         abort_or_retry(self, feed_status, exc)
+        return
     else:
         if not rss_feed.response.content:
             try:
@@ -100,6 +101,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             except Exception as exc:
                 logger.warning(str(exc))
                 abort_or_retry(self, feed_status, exc)
+                return
 
     current_build_date = get_last_build_date(rss_feed.response.content)
 
