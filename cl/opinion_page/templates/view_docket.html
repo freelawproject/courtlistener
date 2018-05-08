@@ -122,7 +122,7 @@
                       <p>{{ rd.description|safe|default:'' }}</p>
                     </div>
 
-                    <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print">
+                    <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print flex">
                       {% if rd.filepath_local %}
                         <a href="/{{ rd.filepath_local }}"
                            role="button"
