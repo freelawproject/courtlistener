@@ -28,9 +28,9 @@ def get_last_build_date(s):
     we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
     """
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
-    date_re = r'<(?:lastBuildDate|pubDate)>(.*)</(?:lastBuildDate|pubDate)>'
+    date_re = r'<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>'
     m = re.search(date_re, s)
-    last_build_date_str = m.group(1)
+    last_build_date_str = m.group(2)
     return parser.parse(last_build_date_str, fuzzy=False)
 
 
