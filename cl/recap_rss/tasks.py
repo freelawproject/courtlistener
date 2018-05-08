@@ -181,7 +181,8 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
 
         all_rds_created.extend([rd.pk for rd in rds_created])
 
-    # Send the list of created rds onwards for Solr indexing.
+    logger.info("%s: Sending %s new RECAP documents to Solr for indexing." %
+                (feed_status.court_id, len(all_rds_created)))
     return all_rds_created
 
 
