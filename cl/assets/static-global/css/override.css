@@ -102,6 +102,10 @@ header {
     text-decoration: dotted underline gray;
 }
 
+.flex {
+    display: flex;
+}
+
 a.button:active{
   background-color:#6299c5;
 /* border:1px solid #6299c5; */
