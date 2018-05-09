@@ -1,8 +1,10 @@
+from django.db import DatabaseError
+
 from cl import settings
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.sunburnt.search import MltSolrSearch
 from cl.lib.sunburnt.sunburnt import SolrInterface
-from cl.recommendations.models import OpinionRecommendation
+from cl.recommendations.models import BaseRecommendation
 from cl.search.models import Opinion
 
 
@@ -15,15 +17,22 @@ class Command(VerboseCommand):
     help = 'Generates recommendations based on different algorithms (for now only MoreLikeThis is supported).'
     solr_conn = None  # type: SolrInterface
     solr_url = settings.SOLR_OPINION_URL
-    recommendation_model = OpinionRecommendation
+    recommendation_model = None  # type: BaseRecommendation
     seed_model = Opinion
 
     def add_arguments(self, parser):
         parser.add_argument(
+            'type',
+            type=str,
+            choices=BaseRecommendation.available_models,
+            help='Type of content for that recommendation will be generated (%(choices)s).'
+        )
+        parser.add_argument(
             '--algorithm',
             type=str,
             default='mlt',
-            help='Specify recommendation algorithm (available: mlt).'
+            choices=['mlt'],
+            help='Specify recommendation algorithm (available: %(choices)s; default: %(default)s).'
         )
         parser.add_argument(
             '--limit',
@@ -78,6 +87,9 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         logger.debug('Solr Interface: %s' % self.solr_url)
 
+        # Get model class from type
+        self.recommendation_model = BaseRecommendation.get_model_class(options['type'])
+
         if options['algorithm'] not in ALGORITHMS:
             raise ValueError('Selected recommendation algorithm is not supported: %s' % options['algorithm'])
 
@@ -103,16 +115,19 @@ class Command(VerboseCommand):
 
             for rec in recommendations:
                 if rec['id'] != seed.pk:  # Seed cannot be recommendation
+                    try:
 
-                    # Initialize recommendation instance
-                    rec = self.recommendation_model(seed_id=seed.pk,
-                                                    recommendation_id=rec['id'],
-                                                    score=rec['score'])
+                        # Initialize recommendation instance
+                        rec = self.recommendation_model(seed_id=seed.pk,
+                                                        recommendation_id=rec['id'],
+                                                        score=rec['score'])
 
-                    if options['simulate']:
-                        logger.debug('Generated (but not saved): %s' % rec)
-                    else:
-                        rec.save()
-                        logger.debug('Saved: %s' % rec)
+                        if options['simulate']:
+                            logger.debug('Generated (but not saved): {}'.format(rec))
+                        else:
+                            rec.save()
+                            logger.debug('Saved: {}'.format(rec))
+                    except DatabaseError as e:
+                        logger.error('Cannot save to db: {}'.format(e))
 
         logger.info('Recommendations generated.')

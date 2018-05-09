@@ -6,6 +6,7 @@ from django.conf import settings
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
+from cl.recommendations.search import handle_related_query
 from cl.search.models import Court
 
 boosts = {
@@ -651,6 +652,7 @@ def build_main_query(cd, highlight='all', order_by='', facet=True, group=True):
     add_highlighting(main_params, cd, highlight)
     add_filter_queries(main_params, cd)
     add_grouping(main_params, cd, group)
+    handle_related_query(main_params)
 
     print_params(main_params)
     return main_params
