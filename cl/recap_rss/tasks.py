@@ -208,4 +208,6 @@ def trim_rss_cache(days=2):
 
     # Deletions return a tuple of the total count and the individual item count
     # if there is a cascade. We just want the total.
-    return result[0]
+    num_deleted = result[0]
+    logger.info("Trimmed %s items from the RSS cache." % num_deleted)
+    return num_deleted
