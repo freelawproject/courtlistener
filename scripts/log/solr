@@ -1,9 +1,14 @@
 /var/log/solr/*.log {
-  weekly
   rotate 12
+  maxage 84
+  weekly
   compress
   delaycompress
   create 640 root root
+  missingok
+  notifempty
+  noolddir
+  sharedscripts
   postrotate
 	/etc/init.d/solr restart
   endscript
