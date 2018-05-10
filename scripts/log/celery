@@ -1,7 +1,9 @@
 /var/log/celery/*.log {
     rotate 84
+    maxage 84
     daily
     dateext
+    missingok
     notifempty
     noolddir
     sharedscripts
