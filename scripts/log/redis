@@ -1,5 +1,5 @@
 /var/log/redis/*.log {
-    rotate 36500
+    rotate 84
     daily
     dateext
     notifempty
