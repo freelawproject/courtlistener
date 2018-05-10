@@ -147,7 +147,8 @@ class Command(VerboseCommand):
                 ).apply_async()
 
             # Trim if not too recently trimmed.
-            trim_cutoff_date = now() - timedelta(self.DELAY_BETWEEN_CACHE_TRIMS)
+            trim_cutoff_date = now() - timedelta(
+                seconds=self.DELAY_BETWEEN_CACHE_TRIMS)
             if last_trim_date is None or trim_cutoff_date > last_trim_date:
                 trim_rss_cache.delay()
                 last_trim_date = now()
