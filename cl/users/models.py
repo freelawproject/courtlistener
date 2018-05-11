@@ -1,9 +1,10 @@
 from datetime import timedelta
 from decimal import Decimal
+
+from django.contrib.auth.models import User
+from django.db import models
 from django.db.models import Sum
 from django.utils.timezone import now
-from django.db import models
-from django.contrib.auth.models import User
 from localflavor.us import models as local_models
 
 donation_exclusion_codes = [
@@ -43,7 +44,7 @@ class UserProfile(models.Model):
         default=False,
     )
     employer = models.CharField(
-        "the user's employer",
+        help_text="the user's employer",
         max_length=100,
         blank=True,
         null=True,
@@ -74,29 +75,33 @@ class UserProfile(models.Model):
         null=True,
     )
     avatar = models.ImageField(
-        'the user\'s avatar',
+        help_text="the user's avatar",
         upload_to='avatars/%Y/%m/%d',
         blank=True,
     )
     wants_newsletter = models.BooleanField(
-        'This user wants newsletters',
+        help_text='This user wants newsletters',
         default=False,
     )
     plaintext_preferred = models.BooleanField(
-        'should the alert should be sent in plaintext',
+        help_text='should the alert should be sent in plaintext',
         default=False,
     )
     activation_key = models.CharField(
         max_length=40,
     )
     key_expires = models.DateTimeField(
-        'The time and date when the user\'s activation_key expires',
+        help_text='The time and date when the user\'s activation_key expires',
         blank=True,
         null=True,
     )
     email_confirmed = models.BooleanField(
-        'The user has confirmed their email address',
+        help_text='The user has confirmed their email address',
         default=False,
+    )
+    notes = models.TextField(
+        help_text="Any notes about the user.",
+        blank=True,
     )
 
     @property
