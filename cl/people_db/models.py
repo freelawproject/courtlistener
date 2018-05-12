@@ -20,7 +20,8 @@ from cl.lib.model_helpers import (
     validate_at_most_n,
     validate_supervisor,
 )
-from cl.lib.search_index_utils import solr_list, null_map, normalize_search_dicts
+from cl.lib.search_index_utils import solr_list, null_map, \
+    normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
@@ -1284,6 +1285,16 @@ class PartyType(models.Model):
         help_text="Additional info from PACER",
         db_index=True,
     )
+    highest_offense_level_opening = models.TextField(
+        help_text="In a criminal case, the highest offense level at the "
+                  "opening of the case.",
+        blank=True,
+    )
+    highest_offense_level_terminated = models.TextField(
+        help_text="In a criminal case, the highest offense level at the end "
+                  "of the case.",
+        blank=True,
+    )
 
     class Meta:
         unique_together = ('docket', 'party', 'name')
@@ -1295,6 +1306,64 @@ class PartyType(models.Model):
             self.name,
             self.docket_id,
         )
+
+
+class CriminalCount(models.Model):
+    """The criminal counts associated with a PartyType object (i.e., associated
+    with a party in a docket.
+    """
+    PENDING = 1
+    TERMINATED = 2
+    COUNT_STATUSES = (
+        (PENDING, "Pending"),
+        (TERMINATED, "Terminated"),
+    )
+    party_type = models.ForeignKey(
+        PartyType,
+        help_text="The docket and party the counts are associated with.",
+        related_name="criminal_counts",
+    )
+    name = models.TextField(
+        help_text="The name of the count, such as '21:952 and 960 - "
+                  "Importation of Marijuana(1)'.",
+    )
+    disposition = models.TextField(
+        help_text="The disposition of the count, such as 'Custody of BOP for "
+                  "60 months, followed by 4 years supervised release. No "
+                  "fine. $100 penalty assessment.",
+        # Can be blank if no disposition yet.
+        blank=True,
+    )
+    status = models.SmallIntegerField(
+        help_text="Whether the count is pending or terminated.",
+        choices=COUNT_STATUSES,
+    )
+
+    @staticmethod
+    def normalize_status(status_str):
+        """Convert a status string into one of COUNT_STATUSES"""
+        if status_str == 'pending':
+            return CriminalCount.PENDING
+        elif status_str == 'terminated':
+            return CriminalCount.TERMINATED
+
+
+class CriminalComplaint(models.Model):
+    """The criminal complaints associated with a PartyType object (i.e.,
+    associated with a party in a docket.
+    """
+    party_type = models.ForeignKey(
+        PartyType,
+        help_text="The docket and party the complaints are associated with.",
+        related_name="criminal_complaints",
+    )
+    name = models.TextField(
+        help_text="The name of the criminal complaint, for example, '8:1326 "
+                  "Reentry of Deported Alien'",
+    )
+    disposition = models.TextField(
+        help_text="The disposition of the criminal complaint.",
+    )
 
 
 class Party(models.Model):
