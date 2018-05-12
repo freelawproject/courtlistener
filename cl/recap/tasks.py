@@ -22,7 +22,8 @@ from cl.lib.pacer import map_cl_to_pacer_id, normalize_attorney_contact, \
 from cl.lib.recap_utils import get_document_filename
 from cl.lib.utils import remove_duplicate_dicts
 from cl.people_db.models import Party, PartyType, Attorney, \
-    AttorneyOrganization, AttorneyOrganizationAssociation, Role
+    AttorneyOrganization, AttorneyOrganizationAssociation, Role, \
+    CriminalComplaint, CriminalCount
 from cl.recap.models import ProcessingQueue, PacerHtmlFiles, APPELLATE_DOCKET, \
     APPELLATE_ATTACHMENT_PAGE, DOCKET_HISTORY_REPORT, PDF, ATTACHMENT_PAGE, \
     DOCKET
@@ -703,13 +704,42 @@ def add_parties_and_attorneys(d, parties):
 
         # If the party type doesn't exist, make a new one.
         pts = p.party_types.filter(docket=d, name=party['type'])
+        criminal_data = party.get('criminal_data')
+        update_dict = {
+            'extra_info': party['extra_info'],
+            'date_terminated': party['date_terminated'],
+        }
+        if criminal_data:
+            update_dict['highest_offense_level_opening'] = criminal_data[
+                'highest_offense_level_opening']
+            update_dict['highest_offense_level_terminated'] = criminal_data[
+                'highest_offense_level_terminated']
         if pts.exists():
-            pts.update(extra_info=party['extra_info'],
-                       date_terminated=party['date_terminated'])
+            pts.update(**update_dict)
+            pt = pts[0]
         else:
-            PartyType.objects.create(docket=d, party=p, name=party['type'],
-                                     extra_info=party['extra_info'],
-                                     date_terminated=party['date_terminated'])
+            pt = PartyType.objects.create(docket=d, party=p, name=party['type'],
+                                          **update_dict)
+
+        # Criminal counts and complaints
+        if criminal_data and criminal_data['counts']:
+            CriminalCount.objects.filter(party_type=pt).delete()
+            CriminalCount.objects.bulk_create([
+                CriminalCount(
+                    party_type=pt, name=count['name'],
+                    disposition=count['disposition'],
+                    status=CriminalCount.normalize_status(count['status'])
+                ) for count in criminal_data['counts']
+            ])
+
+        if criminal_data and criminal_data['complaints']:
+            CriminalComplaint.objects.filter(party_type=pt).delete()
+            CriminalComplaint.objects.bulk_create([
+                CriminalComplaint(
+                    party_type=pt, name=complaint['name'],
+                    disposition=complaint['disposition'],
+                ) for complaint in criminal_data['complaints']
+            ])
 
         # Attorneys
         for atty in party.get('attorneys', []):
