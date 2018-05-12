@@ -1,10 +1,9 @@
 # coding=utf-8
 import json
 import os
-
-import mock
 from datetime import date
 
+import mock
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
@@ -20,14 +19,14 @@ from rest_framework.status import (
 from rest_framework.test import APIClient
 
 from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
-    Attorney, Role, PartyType
+    Attorney, Role, PartyType, CriminalCount, CriminalComplaint
+from cl.recap.management.commands.import_idb import Command
 from cl.recap.models import ProcessingQueue, DOCKET, ATTACHMENT_PAGE, PDF, \
     APPELLATE_DOCKET
 from cl.recap.tasks import process_recap_pdf, add_attorney, \
     process_recap_docket, process_recap_attachment, add_parties_and_attorneys, \
     update_case_names
 from cl.search.models import Docket, RECAPDocument, DocketEntry
-from cl.recap.management.commands.import_idb import Command
 
 
 @mock.patch('cl.recap.views.process_recap_upload')
@@ -802,6 +801,43 @@ class RecapDocketTaskTest(TestCase):
         process_recap_docket(self.pq.pk)
         pq.refresh_from_db()
         self.assertEqual(pq.status, pq.PROCESSING_SUCCESSFUL)
+
+
+class RecapCriminalDataUploadTaskTest(TestCase):
+    """Can we handle it properly when criminal data is uploaded as part of
+    a docket?
+    """
+    def setUp(self):
+        self.user = User.objects.get(username='recap')
+        self.filename = 'cand_criminal.html'
+        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets',
+                            self.filename)
+        with open(path, 'r') as f:
+            f = SimpleUploadedFile(self.filename, f.read())
+        self.pq = ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=self.user,
+            pacer_case_id='asdf',
+            filepath_local=f,
+            upload_type=DOCKET,
+        )
+
+    def tearDown(self):
+        self.pq.filepath_local.delete()
+        self.pq.delete()
+        Docket.objects.all().delete()
+
+    def test_criminal_data_gets_created(self):
+        """Does the criminal data appear in the DB properly when we process
+        the docket?
+        """
+        process_recap_docket(self.pq.pk)
+        expected_criminal_count_count = 1
+        self.assertEqual(expected_criminal_count_count,
+                         CriminalCount.objects.count())
+        expected_criminal_complaint_count = 1
+        self.assertEqual(expected_criminal_complaint_count,
+                         CriminalComplaint.objects.count())
 
 
 @mock.patch('cl.recap.tasks.add_or_update_recap_document')
