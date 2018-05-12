@@ -2,12 +2,16 @@ from django.conf import settings
 from django.contrib import admin
 
 from cl.lib.admin import CSSAdminMixin
+# Judge DB imports
 from cl.people_db.models import (
-    Education, School, Person, Position, RetentionEvent, Race,
-    PoliticalAffiliation, Source, ABARating, PartyType,
-    Party, Role, Attorney, AttorneyOrganization,
-    AttorneyOrganizationAssociation,
-    FinancialDisclosure)
+    ABARating, Education, Person, PoliticalAffiliation, Position,
+    Race, RetentionEvent, School, Source, FinancialDisclosure,
+)
+# RECAP imports
+from cl.people_db.models import (
+    Attorney, AttorneyOrganization, AttorneyOrganizationAssociation,
+    CriminalComplaint, CriminalCount, PartyType, Party, Role,
+)
 
 
 class RetentionEventInline(admin.TabularInline):
@@ -170,6 +174,20 @@ class PartyTypeAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(CriminalComplaint)
+class CriminalComplaintAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'party_type',
+    )
+
+
+@admin.register(CriminalCount)
+class CriminalCountAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'party_type',
+    )
+
+
 @admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
     raw_id_fields = (
@@ -222,6 +240,7 @@ class AttorneyOrganizationAdmin(admin.ModelAdmin):
         'city',
         'zip_code',
     )
+
 
 admin.site.register(PoliticalAffiliation)
 admin.site.register(RetentionEvent)
