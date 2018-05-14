@@ -210,6 +210,28 @@ def delete_profile_done(request):
     return render(request, 'profile/deleted.html', {'private': True})
 
 
+@login_required
+def take_out(request):
+    if request.method == 'POST':
+        email = emails['take_out_requested']
+        send_mail(
+            email['subject'],
+            email['body'] % (request.user, request.user.email),
+            email['from'],
+            email['to'],
+        )
+
+        return HttpResponseRedirect(reverse('take_out_done'))
+
+    return render(request, 'profile/take_out.html', {
+        'private': True
+    })
+
+
+def take_out_done(request):
+    return render(request, 'profile/take_out_done.html', {'private': True})
+
+
 @sensitive_post_parameters('password1', 'password2')
 @sensitive_variables('salt', 'activation_key', 'email_body')
 @check_honeypot(field_name='skip_me_if_alive')
