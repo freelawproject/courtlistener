@@ -90,6 +90,18 @@
                   </p>
                 {% endif %}
               </div>
+              <div class="checkbox">
+                {% if consent_form.consent.errors %}
+                  <p class="help-block">
+                    {% for error in consent_form.consent.errors %}
+                      {{ error|escape }}
+                    {% endfor %}
+                  </p>
+                {% endif %}
+                <label>
+                  {{ consent_form.consent }} I consent to CourtListener and Free Law Project using information I provide for services on this website such as sending me emails and creating alerts. Checking this box does <strong>not</strong> sign me up for any newsletters. I further consent to the data usages described in the CourtListener <a href="{% url "terms" %}">Terms of Service</a>.
+                </label>
+              </div>
               <div class="v-offset-above-2">
                 <button type="submit"
                         class="btn btn-primary btn-lg float-right"

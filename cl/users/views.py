@@ -26,7 +26,7 @@ from cl.lib import search_utils
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
     ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm,
-    CustomPasswordChangeForm
+    CustomPasswordChangeForm, OptInConsentForm,
 )
 from cl.users.models import UserProfile
 from cl.users.utils import convert_to_stub_account, emails, message_dict
@@ -274,7 +274,8 @@ def register(request):
             else:
                 form = UserCreationFormExtended(request.POST)
 
-            if form.is_valid():
+            consent_form = OptInConsentForm(request.POST)
+            if form.is_valid() and consent_form.is_valid():
                 cd = form.cleaned_data
                 if not stub_account:
                     # make a new user that is active, but has not confirmed
@@ -328,8 +329,10 @@ def register(request):
                                             '?next=%s' % redirect_to)
         else:
             form = UserCreationFormExtended()
+            consent_form = OptInConsentForm()
         return render(request, "register/register.html", {
             'form': form,
+            'consent_form': consent_form,
             'private': False
         })
     else:
