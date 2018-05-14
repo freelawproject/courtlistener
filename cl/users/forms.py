@@ -185,6 +185,15 @@ class EmailConfirmationForm(forms.Form):
     )
 
 
+class OptInConsentForm(forms.Form):
+    consent = forms.BooleanField(
+        error_messages={
+            'required': "To create a new account, you must agree below.",
+        },
+        required=True,
+    )
+
+
 class CustomPasswordChangeForm(PasswordChangeForm):
     """
     A form that lets a user change his/her password by entering
