@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% load humanize %}
-{% load cache %}
 
 {% block title %}Non-Profit Free Legal Search Engine and Alert System – CourtListener.com{% endblock %}
 
@@ -152,7 +151,6 @@
             </div>
         </div>
 
-        {% cache 21600 homepage-stats %}
         <div class="col-sm-6">
           <h3>The Numbers&nbsp;<i class="gray fa fa-pie-chart"></i></h3>
 
@@ -251,7 +249,6 @@
             </div>
           {% endif %}
         </div>
-        {% endcache %}
     </div>
     </div>
 {% endblock %}
