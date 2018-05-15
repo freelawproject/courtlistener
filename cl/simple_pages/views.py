@@ -86,7 +86,7 @@ def build_court_dicts(courts):
 def coverage_graph(request):
     coverage_cache_key = 'coverage-data'
     coverage_data = cache.get(coverage_cache_key)
-    if coverage_cache_key is None:
+    if coverage_data is None:
         courts = Court.objects.filter(in_use=True)
         courts_json = json.dumps(build_court_dicts(courts))
 
