@@ -1,4 +1,6 @@
 # coding=utf-8
+from __future__ import print_function
+
 import datetime
 import os
 
@@ -118,6 +120,7 @@ class SimplePagesTest(TestCase):
             {'viewname': 'contribute'},
             {'viewname': 'contact'},
             {'viewname': 'contact_thanks'},
+            {'viewname': 'alert_help'},
             {'viewname': 'markdown_help'},
             {'viewname': 'advanced_search'},
             {'viewname': 'old_terms', 'args': ['1']},

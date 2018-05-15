@@ -57,6 +57,10 @@ def faq(request):
     )
 
 
+def alert_help(request):
+    return render(request, 'help/alert_help.html', {'private': False})
+
+
 def markdown_help(request):
     return render(request, 'markdown_help.html', {'private': False})
 

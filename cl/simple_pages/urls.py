@@ -5,11 +5,10 @@ from cl.simple_pages.sitemap import sitemap_maker
 from cl.simple_pages.views import (
     about, advanced_search, browser_warning, contact, contact_thanks,
     contribute, coverage_graph, faq, feeds, humans, latest_terms,
-    markdown_help, old_terms, podcasts, robots, tools_page,
+    alert_help, markdown_help, old_terms, podcasts, robots, tools_page,
     validate_for_bing, validate_for_google, validate_for_google2,
     validate_for_wot,
 )
-
 
 urlpatterns = [
     # Footer stuff
@@ -22,6 +21,7 @@ urlpatterns = [
     url(r'^contact/$', contact, name="contact"),
     url(r'^contact/thanks/$', contact_thanks, name='contact_thanks'),
     url(r'^help/markdown/$', markdown_help, name="markdown_help"),
+    url(r'^help/alerts/$', alert_help, name="alert_help"),
 
     # Advanced search page
     url(
