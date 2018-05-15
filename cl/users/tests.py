@@ -9,8 +9,8 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from timeout_decorator import timeout_decorator
 
-from cl.users.models import UserProfile
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
+from cl.users.models import UserProfile
 
 
 class UserTest(LiveServerTestCase):
@@ -26,6 +26,7 @@ class UserTest(LiveServerTestCase):
             'first_name': 'dora',
             'last_name': '☠☠☠☠☠☠☠☠☠☠☠',
             'skip_me_if_alive': '',
+            'consent': True,
         }
         response = self.client.post(
             '{host}{path}'.format(
