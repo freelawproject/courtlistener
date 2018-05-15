@@ -29,7 +29,6 @@
             <a href="#how-different">What makes this site different from other sites that put legal documents
                 online?</a><br>
             <a href="#explain-alerts">What are alerts and how do they work?</a><br>
-            <a href="#real-time-alerts">What are Real Time Alerts?</a><br>
             <a href="#explain-citations">How do you identify citations?</a><br>
             <a href="#oral-args">How do you get the oral arguments you have?</a><br>
         </p>
@@ -180,18 +179,7 @@
         have donated at least $10 in the last year, you can also set up real
         time alerts to get notified even more quickly.</p>
 
-    <p>Get started by running a search and the "Create an Alert" option will be
-        in the sidebar next to your results.
-    </p>
-    <p>Note that alerts are only currently supported in <a href="{% url "coverage" %}#scraped-jurisdictions">
-        {{ scraped_court_count }} jurisdictions</a>.</p>
-
-    <h4 id="real-time-alerts">What Are Real Time Alerts?</h4>
-    <p>Real Time alerts are alerts that are triggered as soon as we find an
-        item on a court website. Unlike regular alerts, these are sent out
-        throughout the day, which takes considerable processing power (and thus
-        expense). These alerts are only usually triggered within about half an
-        hour from when an item appears on a court website.
+    <p>To see more about alerts, <a href="{% url "alert_help" %}">see their documentation</a>.
     </p>
 
     <h4 id="explain-citations">How Do You Identify Citations?</h4>
