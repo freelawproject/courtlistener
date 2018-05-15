@@ -7,6 +7,7 @@ import redis
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.urlresolvers import reverse
 from django.db.models import Sum, Count
@@ -21,7 +22,7 @@ from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query, get_query_citation, \
-    make_stats_variable, merge_form_with_courts,  make_get_string, \
+    make_stats_variable, merge_form_with_courts, make_get_string, \
     regroup_snippets
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
@@ -111,76 +112,73 @@ def get_homepage_stats():
     """Get any stats that are displayed on the homepage and return them as a
     dict
     """
-    ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
-    alerts_in_last_ten = Stat.objects.filter(
-        name__contains='alerts.sent',
-        date_logged__gte=ten_days_ago
-    ).aggregate(Sum('count'))['count__sum']
-    queries_in_last_ten = Stat.objects.filter(
-        name='search.results',
-        date_logged__gte=ten_days_ago
-    ).aggregate(Sum('count'))['count__sum']
-    bulk_in_last_ten = Stat.objects.filter(
-        name__contains='bulk_data',
-        date_logged__gte=ten_days_ago
-    ).aggregate(Sum('count'))['count__sum']
+    homepage_stats_key = 'homepage-stats'
+    homepage_data = cache.get(homepage_stats_key)
+    if homepage_data is not None:
+        return homepage_data
+
     r = redis.StrictRedis(
         host=settings.REDIS_HOST,
         port=settings.REDIS_PORT,
         db=settings.REDIS_DATABASES['STATS'],
     )
+    ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
     last_ten_days = ['api:v3.d:%s.count' %
                      (date.today() - timedelta(days=x)).isoformat()
                      for x in range(0, 10)]
-    api_in_last_ten = sum(
-        [int(result) for result in
-         r.mget(*last_ten_days) if result is not None]
-    )
-    users_in_last_ten = User.objects.filter(
-        date_joined__gte=ten_days_ago
-    ).count()
-    opinions_in_last_ten = Opinion.objects.filter(
-        date_created__gte=ten_days_ago
-    ).count()
-    oral_arguments_in_last_ten = Audio.objects.filter(
-        date_created__gte=ten_days_ago
-    ).count()
-    days_of_oa = naturalduration(
-        Audio.objects.aggregate(
-            Sum('duration')
-        )['duration__sum'],
-        as_dict=True,
-    )['d']
-    viz_in_last_ten = SCOTUSMap.objects.filter(
-        date_published__gte=ten_days_ago,
-        published=True,
-    ).count()
-    visualizations = SCOTUSMap.objects.filter(
-        published=True,
-        deleted=False,
-    ).annotate(
-        Count('clusters'),
-    ).filter(
-        # Ensures that we only show good stuff on homepage
-        clusters__count__gt=10,
-    ).order_by(
-        '-date_published',
-        '-date_modified',
-        '-date_created',
-    )[:1]
-    return {
-        'alerts_in_last_ten': alerts_in_last_ten,
-        'queries_in_last_ten': queries_in_last_ten,
-        'opinions_in_last_ten': opinions_in_last_ten,
-        'oral_arguments_in_last_ten': oral_arguments_in_last_ten,
-        'bulk_in_last_ten': bulk_in_last_ten,
-        'api_in_last_ten': api_in_last_ten,
-        'users_in_last_ten': users_in_last_ten,
-        'days_of_oa': days_of_oa,
-        'viz_in_last_ten': viz_in_last_ten,
-        'visualizations': visualizations,
+    homepage_data = {
+        'alerts_in_last_ten': Stat.objects.filter(
+            name__contains='alerts.sent',
+            date_logged__gte=ten_days_ago
+        ).aggregate(Sum('count'))['count__sum'],
+        'queries_in_last_ten': Stat.objects.filter(
+            name='search.results',
+            date_logged__gte=ten_days_ago
+        ).aggregate(Sum('count'))['count__sum'],
+        'bulk_in_last_ten': Stat.objects.filter(
+            name__contains='bulk_data',
+            date_logged__gte=ten_days_ago
+        ).aggregate(Sum('count'))['count__sum'],
+        'opinions_in_last_ten': Opinion.objects.filter(
+            date_created__gte=ten_days_ago
+        ).count(),
+        'oral_arguments_in_last_ten': Audio.objects.filter(
+            date_created__gte=ten_days_ago
+        ).count(),
+        'api_in_last_ten': sum(
+            [int(result) for result in
+             r.mget(*last_ten_days) if result is not None]
+        ),
+        'users_in_last_ten': User.objects.filter(
+            date_joined__gte=ten_days_ago
+        ).count(),
+        'days_of_oa': naturalduration(
+            Audio.objects.aggregate(
+                Sum('duration')
+            )['duration__sum'],
+            as_dict=True,
+        )['d'],
+        'viz_in_last_ten': SCOTUSMap.objects.filter(
+            date_published__gte=ten_days_ago,
+            published=True,
+        ).count(),
+        'visualizations': SCOTUSMap.objects.filter(
+            published=True,
+            deleted=False,
+        ).annotate(
+            Count('clusters'),
+        ).filter(
+            # Ensures that we only show good stuff on homepage
+            clusters__count__gt=10,
+        ).order_by(
+            '-date_published',
+            '-date_modified',
+            '-date_created',
+        )[:1],
         'private': False,  # VERY IMPORTANT!
     }
+    cache.set(homepage_stats_key, homepage_data, 21600)
+    return homepage_data
 
 
 @never_cache
