@@ -177,7 +177,8 @@ def get_homepage_stats():
         )[:1],
         'private': False,  # VERY IMPORTANT!
     }
-    cache.set(homepage_stats_key, homepage_data, 21600)
+    six_hours = 60 * 60 * 6
+    cache.set(homepage_stats_key, homepage_data, six_hours)
     return homepage_data
 
 
