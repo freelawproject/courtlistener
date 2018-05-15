@@ -24,8 +24,8 @@ from cl.lib.model_helpers import suppress_autotime
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
-from cl.people_db.models import AttorneyOrganization, Role
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
+from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
@@ -122,24 +122,33 @@ def view_parties(request, docket_id, slug):
     # the parties by this field. From there, we do a whole mess of prefetching,
     # which reduces the number of queries needed for this down to four instead
     # of potentially thousands (good times!)
-    party_types = docket.party_types.select_related('party').prefetch_related(
-        Prefetch(
-            'party__roles',
-            queryset=Role.objects.filter(docket=docket).order_by(
-                'attorney_id', 'role', 'date_action'
-            ).select_related(
-                'attorney'
-            ).prefetch_related(
+    party_types = (
+        docket.party_types
+            .select_related('party')
+            .prefetch_related(
                 Prefetch(
-                    'attorney__organizations',
-                    queryset=AttorneyOrganization.objects.filter(
-                        attorney_organization_associations__docket=docket
-                    ).distinct(),
-                    to_attr='firms_in_docket',
-                )
-            )
-        )
-    ).order_by('name', 'party__name')
+                    'party__roles',
+                    queryset=Role.objects.filter(docket=docket).order_by(
+                        'attorney_id', 'role', 'date_action'
+                    ).select_related(
+                        'attorney'
+                    ).prefetch_related(
+                        Prefetch(
+                            'attorney__organizations',
+                            queryset=AttorneyOrganization.objects.filter(
+                                attorney_organization_associations__docket=docket
+                            ).distinct(),
+                            to_attr='firms_in_docket',
+                        )
+                    )
+                ),
+                Prefetch(
+                    'criminal_counts',
+                    queryset=CriminalCount.objects.all().order_by('status')
+                ),
+                'criminal_complaints',
+            ).order_by('name', 'party__name')
+    )
 
     parties = []
     for party_type_name, party_types in groupby(party_types, lambda x: x.name):
