@@ -112,11 +112,6 @@ def get_homepage_stats():
     """Get any stats that are displayed on the homepage and return them as a
     dict
     """
-    homepage_stats_key = 'homepage-stats'
-    homepage_data = cache.get(homepage_stats_key)
-    if homepage_data is not None:
-        return homepage_data
-
     r = redis.StrictRedis(
         host=settings.REDIS_HOST,
         port=settings.REDIS_PORT,
@@ -177,8 +172,6 @@ def get_homepage_stats():
         )[:1],
         'private': False,  # VERY IMPORTANT!
     }
-    six_hours = 60 * 60 * 6
-    cache.set(homepage_stats_key, homepage_data, six_hours)
     return homepage_data
 
 
@@ -257,6 +250,11 @@ def show_results(request):
             request.GET = request.GET.copy()  # Makes it mutable
             request.GET['filed_before'] = date.today()
 
+            homepage_cache_key = 'homepage-data'
+            homepage_dict = cache.get(homepage_cache_key)
+            if homepage_dict is not None:
+                return render(request, 'homepage.html', homepage_dict)
+
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
             render_dict.update(do_search(request, rows=5,
@@ -272,6 +270,8 @@ def show_results(request):
             # Get a bunch of stats.
             render_dict.update(get_homepage_stats())
 
+            six_hours = 60 * 60 * 6
+            cache.set(homepage_cache_key, render_dict, six_hours)
             return render(request, 'homepage.html', render_dict)
         else:
             # User placed a search or is trying to edit an alert
