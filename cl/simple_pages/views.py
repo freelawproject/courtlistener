@@ -84,42 +84,50 @@ def build_court_dicts(courts):
 
 
 def coverage_graph(request):
-    courts = Court.objects.filter(in_use=True)
-    courts_json = json.dumps(build_court_dicts(courts))
+    coverage_cache_key = 'coverage-data'
+    coverage_data = cache.get(coverage_cache_key)
+    if coverage_cache_key is None:
+        courts = Court.objects.filter(in_use=True)
+        courts_json = json.dumps(build_court_dicts(courts))
 
-    search_form = SearchForm(request.GET)
-    precedential_statuses = [field for field in
-        search_form.fields.keys() if field.startswith('stat_')]
+        search_form = SearchForm(request.GET)
+        precedential_statuses = [field for field in
+            search_form.fields.keys() if field.startswith('stat_')]
 
-    # Build up the sourcing stats.
-    counts = OpinionCluster.objects.values('source').annotate(Count('source'))
-    count_pro = 0
-    count_lawbox = 0
-    count_scraper = 0
-    for d in counts:
-        if 'R' in d['source']:
-            count_pro += d['source__count']
-        if 'C' in d['source']:
-            count_scraper += d['source__count']
-        if 'L' in d['source']:
-            count_lawbox += d['source__count']
+        # Build up the sourcing stats.
+        counts = OpinionCluster.objects.values('source').annotate(Count('source'))
+        count_pro = 0
+        count_lawbox = 0
+        count_scraper = 0
+        for d in counts:
+            if 'R' in d['source']:
+                count_pro += d['source__count']
+            if 'C' in d['source']:
+                count_scraper += d['source__count']
+            if 'L' in d['source']:
+                count_lawbox += d['source__count']
 
-    opinion_courts = Court.objects.filter(
-        in_use=True,
-        has_opinion_scraper=True)
-    oral_argument_courts = Court.objects.filter(
-        in_use=True,
-        has_oral_argument_scraper=True)
-    return render(request, 'coverage_graph.html', {
-        'sorted_courts': courts_json,
-        'precedential_statuses': precedential_statuses,
-        'count_pro': count_pro,
-        'count_lawbox': count_lawbox,
-        'count_scraper': count_scraper,
-        'courts_with_opinion_scrapers': opinion_courts,
-        'courts_with_oral_argument_scrapers': oral_argument_courts,
-        'private': False
-    })
+        opinion_courts = Court.objects.filter(
+            in_use=True,
+            has_opinion_scraper=True)
+        oral_argument_courts = Court.objects.filter(
+            in_use=True,
+            has_oral_argument_scraper=True)
+
+        coverage_data = {
+            'sorted_courts': courts_json,
+            'precedential_statuses': precedential_statuses,
+            'count_pro': count_pro,
+            'count_lawbox': count_lawbox,
+            'count_scraper': count_scraper,
+            'courts_with_opinion_scrapers': opinion_courts,
+            'courts_with_oral_argument_scrapers': oral_argument_courts,
+            'private': False
+        }
+        one_day = 60 * 60 * 24
+        cache.set(coverage_cache_key, coverage_data, one_day)
+
+    return render(request, 'coverage_graph.html', coverage_data)
 
 
 def feeds(request):
