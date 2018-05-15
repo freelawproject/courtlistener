@@ -1284,6 +1284,7 @@ class PartyType(models.Model):
     extra_info = models.TextField(
         help_text="Additional info from PACER",
         db_index=True,
+        blank=True,
     )
     highest_offense_level_opening = models.TextField(
         help_text="In a criminal case, the highest offense level at the "
@@ -1363,6 +1364,7 @@ class CriminalComplaint(models.Model):
     )
     disposition = models.TextField(
         help_text="The disposition of the criminal complaint.",
+        blank=True,
     )
 
 
