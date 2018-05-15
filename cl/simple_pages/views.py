@@ -5,6 +5,7 @@ import os
 import re
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.mail import EmailMessage
 from django.core.urlresolvers import reverse
 from django.db.models import Count, Sum
@@ -35,19 +36,24 @@ def about(request):
 
 def faq(request):
     """Loads the FAQ page"""
-    template_data = {
-        'scraped_court_count': Court.objects.filter(
-            in_use=True,
-            has_opinion_scraper=True
-        ).count(),
-        'total_opinion_count': OpinionCluster.objects.all().count(),
-        'total_recap_count': RECAPDocument.objects.filter(
-            is_available=True).count(),
-        'total_oa_minutes': (Audio.objects.aggregate(
-            Sum('duration')
-        )['duration__sum'] or 0) / 60,
-        'total_judge_count': Person.objects.all().count(),
-    }
+    faq_cache_key = 'faq-stats'
+    template_data = cache.get(faq_cache_key)
+    if template_data is None:
+        template_data = {
+            'scraped_court_count': Court.objects.filter(
+                in_use=True,
+                has_opinion_scraper=True
+            ).count(),
+            'total_opinion_count': OpinionCluster.objects.all().count(),
+            'total_recap_count': RECAPDocument.objects.filter(
+                is_available=True).count(),
+            'total_oa_minutes': (Audio.objects.aggregate(
+                Sum('duration')
+            )['duration__sum'] or 0) / 60,
+            'total_judge_count': Person.objects.all().count(),
+        }
+        five_days = 60 * 60 * 24 * 5
+        cache.set(faq_cache_key, template_data, five_days)
 
     return contact(
         request,
