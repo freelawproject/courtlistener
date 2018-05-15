@@ -62,7 +62,7 @@ def alert_help(request):
 
 
 def markdown_help(request):
-    return render(request, 'markdown_help.html', {'private': False})
+    return render(request, 'help/markdown_help.html', {'private': False})
 
 
 def build_court_dicts(courts):
