@@ -10,8 +10,10 @@
     {% if user.is_authenticated %}
         {% if get_string %}
             {% if not request.GET.edit_alert %}
-                <p>Get regular notifications about this query by creating an
-                    alert.</p>
+              <p>Get regular notifications about this query by creating an
+                  alert.
+              </p>
+              <p><a href="{% url "alert_help" %}">Learn more&nbsp;<i class="fa fa-question-circle gray"></i></a></p>
             {% endif %}
             <form action="" method="post">{% csrf_token %}
                 {{ alert_form.query }}

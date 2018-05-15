@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Creating Alerts – CourtListener.com{% endblock %}
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+{% block sidebar %}{% endblock %}
+
+
+{% block content %}
+  <div class="col-sm-3"></div>
+  <div class="col-sm-6">
+    <h2>Creating Alerts on CourtListener</h2>
+    <p>CourtListener was originally created in 2009 as an alert and awareness tool for people that were interested in keeping up with new cases in the federal circuit courts.
+    </p>
+    <p>Since then, we have added numerous alerting features and we have expanded our alert tool to support hundreds of jurisdictions across the country.
+    </p>
+    <p>For details on how to create, edit, and delete alerts, read on.</p>
+
+    <h3>Creating Alerts</h3>
+    <p>Creating an alert is usually straightforward. Simply do a search in CourtListener's Opinion or Oral Argument sections and then complete the "Create Alert" form on the left of your search results.
+    </p>
+    <p>You can use the current set of results as an example of what the alert will look like. For example, if you have many results for your query, you may get a lot of results in your alert. If there are too few, your alert may rarely trigger.
+    </p>
+    <p>Once the alert is created, whenever there are new results for your query, we will send you an email with those results.
+    </p>
+    <p>
+      <img src="{{ STATIC_PREFIX }}png/create-alert-form.png"
+           class="img-responsive img-rounded shadow center-block"
+           height="316"
+           width="284">
+    </p>
+    <p>Complete the form as follows:</p>
+    <ul>
+      <li><strong>Alert name:</strong> Use this to set the name of the alert so that you can recall its purpose at a later time.
+      </li>
+      <li><strong>How often:</strong> Here you can set how often you wish to receive an alert for this search.
+      </li>
+    </ul>
+
+    <p>The available rates are "Real Time", "Daily", "Weekly", "Monthly", or "Off". Real Time alerts are usually delivered within about an hour of when something is published by the court. Daily, weekly, and monthly alerts come at the end of the day, week, and month.
+    </p>
+    <p>Alerts that are Off will not be run. This can be useful for temporarily disabling an alert.
+    </p>
+
+    <h3>Enabling Real Time Alerts</h3>
+    <p>Real Time alerts are only available for supporters of Free Law Project that have donated at least ten dollars over the past year. If you see a message like the one below, you will <a href="{% url "donate" %}?referrer=alerts-help">need to donate</a> to enable Real Time alerts:
+    </p>
+    <p>
+      <img src="{{ STATIC_PREFIX }}/png/real-time-donation-required.png"
+           class="img-responsive img-rounded shadow center-block"
+           height="274"
+           width="278">
+    </p>
+
+    <h3>Editing or Deleting an Alert</h3>
+    <p>Existing alerts can be edited or deleted from <a href="{% url "profile_alerts" %}">your user profile</a>. By clicking the <a class="btn btn-xs btn-primary"><i class="fa fa-pencil"></i>Edit</a> button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
+    </p>
+    <p>From your profile page, you can also easily delete an alert.</p>
+
+    <h3>Disabling an Alert</h3>
+    <p>If you wish to temporarily disable an alert, you can edit it and set the rate to "Off".
+    </p>
+
+    <h3>Supported Jurisdictions</h3>
+    <p>Alerts are available for many jurisdictions across the country, and we are frequently expanding them to support even more courts. To see which courts are currently supported, check <a href="{% url "coverage" %}#scraped-jurisdictions">our coverage page</a> where we list the jurisdictions that we regularly scrape for oral arguments or opinions.
+    </p>
+    <p>If there is a jurisdiction that is not currently listed, please <a href="{% url "contact" %}">let us know you are interested in it</a>, and we will do our best to add it to our list.
+    </p>
+
+    <h3>Citation Alerts</h3>
+    <p>Citation alerts are a way to keep up with citations to a case of interest so that whenever that case is cited, you get an email. To create a citation alert, start at webpage for the case that interests you, for example, <a href="/opinion/108713/roe-v-wade/"><em>Roe v. Wade</em></a>.
+    </p>
+    <p>On that page, in the sidebar on the left, the cases that cite it are listed, and there is a button to "View All Citing Opinions":
+    </p>
+    <p>
+      <img src="{{ STATIC_PREFIX }}/png/citing-opinions.png"
+           class="img-responsive img-rounded shadow center-block"
+           width="241"
+           height="253">
+    </p>
+
+    <p>Clicking that button will perform a search in CourtListener that <a href="/?q=cites%3A(108713)">shows the opinions that cite <em>Roe v. Wade</em></a>. To create a citation alert, simply save these search results as an alert, as you normally would.
+    </p>
+    <p>For more on citation alerts, <a href="https://free.law/2016/01/30/citation-searching-on-courtlistener/">see our blog post announcing this feature</a>.
+    </p>
+
+    <h3>Coming Soon</h3>
+    <p>We do not currently support alerts for the RECAP Archive, but we plan to do so soon. When they are ready, you will be able to create case-specific alerts to stay up to date with a case that interests you.
+    </p>
+    <p>We are also currently working on adding automated transcripts to CourtListener. When this feature is ready, you will be able to get Oral Argument alerts for words that were said in court.
+    </p>
+    <p>Please stay tuned!</p>
+  </div>
+{% endblock %}
