@@ -66,13 +66,14 @@ def get_pacer_dockets(options, docket_pks, tag):
     """Get the pacer dockets identified by the FJC IDB rows"""
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
+    pacer_session = None
     for i, docket_pk in enumerate(docket_pks):
         if i < options['offset']:
             continue
         if i >= options['limit'] > 0:
             break
         throttle.maybe_wait()
-        if i % 1000 == 0:
+        if i % 1000 == 0 or pacer_session is None:
             pacer_session = PacerSession(username=PACER_USERNAME,
                                          password=PACER_PASSWORD)
             pacer_session.login()
