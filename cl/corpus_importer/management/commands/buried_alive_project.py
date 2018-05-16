@@ -107,6 +107,7 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
+        logger.info("Using PACER username: %s" % PACER_USERNAME)
         main_query = make_main_query()
         docket_ids = get_docket_ids(main_query)
         get_pacer_dockets(options, docket_ids, BAL_TAG)
