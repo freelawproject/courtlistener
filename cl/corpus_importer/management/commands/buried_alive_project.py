@@ -67,7 +67,9 @@ def get_pacer_dockets(options, docket_pks, tag):
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
     for i, docket_pk in enumerate(docket_pks):
-        if i >= options['count'] > 0:
+        if i < options['offset']:
+            continue
+        if i >= options['limit'] > 0:
             break
         throttle.maybe_wait()
         if i % 1000 == 0:
@@ -99,10 +101,18 @@ class Command(VerboseCommand):
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(
-            '--count',
+            '--offset',
             type=int,
             default=0,
-            help="The number of items to do. Default is to do all of them.",
+            help="The number of items to skip before beginning. Default is to "
+                 "skip none.",
+        )
+        parser.add_argument(
+            '--limit',
+            type=int,
+            default=0,
+            help="After doing this number, stop. This number is not additive "
+                 "with the offset parameter. Default is to do all of them.",
         )
 
     def handle(self, *args, **options):
