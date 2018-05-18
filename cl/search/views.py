@@ -318,8 +318,14 @@ def advanced(request):
     if request.path == reverse('advanced_o'):
         obj_type = 'o'
         # Needed b/c of facet values.
-        render_dict.update(do_search(request, rows=1, type=obj_type,
-                                     facet=True))
+        o_cache_key = 'opinion-homepage-results'
+        o_results = cache.get(o_cache_key)
+        if o_results is None:
+            o_results = do_search(request, rows=1, type=obj_type, facet=True)
+            six_hours = 60 * 60 * 6
+            cache.set(o_cache_key, o_results, six_hours)
+
+        render_dict.update(o_results)
         render_dict['search_form'] = SearchForm({'type': obj_type})
         return render(request, 'advanced.html', render_dict)
     else:
