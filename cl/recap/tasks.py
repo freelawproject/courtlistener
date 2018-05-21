@@ -223,7 +223,7 @@ def process_recap_pdf(self, pk):
     if not pq.debug:
         try:
             rd.save()
-        except IntegrityError:
+        except (IntegrityError, ValidationError):
             msg = "Duplicate key on unique_together constraint"
             mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
             rd.filepath_local.delete(save=False)
