@@ -1,4 +1,4 @@
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.scrapers.utils import extract_recap_documents
 from cl.search.models import RECAPDocument
 
