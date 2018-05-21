@@ -30,6 +30,8 @@ def get_last_build_date(s):
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
     date_re = r'<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>'
     m = re.search(date_re, s)
+    if m is None:
+        return None
     last_build_date_str = m.group(2)
     return parser.parse(last_build_date_str, fuzzy=False)
 
@@ -104,6 +106,14 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
                 return
 
     current_build_date = get_last_build_date(rss_feed.response.content)
+    if not current_build_date:
+        try:
+            raise Exception("No last build date in RSS document returned by "
+                            "PACER: %s" % feed_status.court_id)
+        except Exception as exc:
+            logger.warning(str(exc))
+            abort_or_retry(self, feed_status, exc)
+            return
 
     # Only check for early abortion during partial crawls.
     if not feed_status.is_sweep:
