@@ -6,7 +6,7 @@ from datetime import timedelta
 
 import requests
 from dateutil import parser
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 
@@ -148,8 +148,20 @@ def is_cached(item_hash):
 
 
 def cache_hash(item_hash):
-    """Add a new hash to the RSS Item Cache"""
-    RssItemCache.objects.create(hash=item_hash)
+    """Add a new hash to the RSS Item Cache
+
+    :param item_hash: A SHA1 hash you wish to cache.
+    :returns True if successful, False if not.
+    """
+    try:
+        RssItemCache.objects.create(hash=item_hash)
+    except IntegrityError:
+        # Happens during race conditions or when you try to cache something
+        # that's already in there.
+        return False
+    else:
+        return True
+
 
 
 @app.task
@@ -174,7 +186,11 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
             continue
 
         with transaction.atomic():
-            cache_hash(item_hash)
+            cached_ok = cache_hash(item_hash)
+            if not cached_ok:
+                # The item is already in the cache, ergo it's getting processed
+                # in another thread/process and we had a race condition.
+                continue
             d, count = find_docket_object(court_pk, docket['pacer_case_id'],
                                           docket['docket_number'])
             if count > 1:
