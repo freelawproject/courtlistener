@@ -3,6 +3,7 @@ import logging
 import random
 import re
 from datetime import timedelta
+from email.utils import parseaddr
 
 from django.conf import settings
 from django.contrib import messages
@@ -346,8 +347,10 @@ def register_success(request):
     """Tell the user they have been registered and allow them to continue where
     they left off."""
     redirect_to = request.GET.get('next', '')
+    default_from = parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
     return render(request, 'register/registration_complete.html', {
         'redirect_to': redirect_to,
+        'default_from': default_from,
         'private': True,
     })
 
