@@ -101,6 +101,14 @@
                 </a>
             </span>
         </p>
+        {% if document.docket_entry.date_filed %}
+        <p class="bottom">
+          <span class="meta-data-header">Date Filed:</span>
+          <span class="meta-data-value">
+            {{ document.docket_entry.date_filed|date:"F jS, Y" }}
+          </span>
+        </p>
+        {% endif %}
         {% if document.date_upload %}
         <p class="bottom">
             <span class="meta-data-header">Uploaded:</span>
