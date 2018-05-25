@@ -9,7 +9,6 @@ from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer.http import PacerSession
 
-from cl.search.models import Court, RECAPDocument
 from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     get_and_save_free_document_report,
@@ -22,6 +21,7 @@ from cl.lib.db_tools import queryset_generator
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf
+from cl.search.models import Court, RECAPDocument
 from cl.search.tasks import add_or_update_recap_document
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
@@ -107,6 +107,7 @@ def get_and_save_free_document_reports(options):
     # Iterate over every court, X days at a time. As courts are completed,
     # remove them from the list of courts to process until none are left
     today = now()
+    max_delay_count = 20
     while len(pacer_court_ids) > 0:
         court_ids_copy = pacer_court_ids.copy()  # Make a copy of the list.
         for pacer_court_id, delay in court_ids_copy.items():
@@ -133,6 +134,12 @@ def get_and_save_free_document_reports(options):
                         pacer_court_ids.pop(pacer_court_id, None)
                         continue
                 else:
+                    if delay['count'] > max_delay_count:
+                        logger.error("Something went wrong and we weren't "
+                                     "able to finish %s. We ran out of time." %
+                                     pacer_court_id)
+                        pacer_court_ids.pop(pacer_court_id, None)
+                        continue
                     next_delay = min(delay['count'] * 5, 30)  # backoff w/cap
                     logger.info("Court %s still in progress. Delaying at least "
                                 "%ss." % (pacer_court_id, next_delay))
