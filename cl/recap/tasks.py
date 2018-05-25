@@ -489,7 +489,11 @@ def add_docket_entries(d, docket_entries, tag=None):
 
         rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
         rd.description = docket_entry.get('short_description') or rd.description
-        rd.save()
+        try:
+            rd.save()
+        except ValidationError:
+            # Happens from race conditions.
+            continue
         if tag is not None:
             rd.tags.add(tag)
 
