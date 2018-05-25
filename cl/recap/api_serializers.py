@@ -65,7 +65,6 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             district_court_ids = Court.objects.filter(jurisdiction__in=[
                 Court.FEDERAL_DISTRICT,
                 Court.FEDERAL_BANKRUPTCY,
-                Court.FEDERAL_BANKRUPTCY_PANEL
             ]).values_list('pk', flat=True)
             if attrs['court'].pk not in district_court_ids:
                 raise ValidationError("%s is not a district or bankruptcy "
