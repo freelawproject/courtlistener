@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -62,10 +63,12 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
 
         if attrs['upload_type'] in [DOCKET, DOCKET_HISTORY_REPORT]:
             # These are district court dockets. Is the court valid?
-            district_court_ids = Court.objects.filter(jurisdiction__in=[
-                Court.FEDERAL_DISTRICT,
-                Court.FEDERAL_BANKRUPTCY,
-            ]).values_list('pk', flat=True)
+            district_court_ids = Court.objects.filter(
+                Q(jurisdiction__in=[
+                    Court.FEDERAL_DISTRICT,
+                    Court.FEDERAL_BANKRUPTCY,
+                ]) | Q(pk__in=['uscfc', 'cit']),
+            ).values_list('pk', flat=True)
             if attrs['court'].pk not in district_court_ids:
                 raise ValidationError("%s is not a district or bankruptcy "
                                       "court ID. Did you mean to use the "
