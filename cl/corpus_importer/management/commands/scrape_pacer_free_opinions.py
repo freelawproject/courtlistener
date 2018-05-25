@@ -54,8 +54,8 @@ def get_next_date_range(court_id, span=7):
     if last_completion_log.status == PACERFreeDocumentLog.SCRAPE_IN_PROGRESS:
         return None, None
 
-    # Ensure that we go back five days from the last time we had success if that
-    # success was in the last few days.
+    # Ensure that we go back five days from the last time we had success if
+    # that success was in the last few days.
     last_complete_date = min(now().date() - timedelta(days=5),
                              last_completion_log.date_queried)
     next_end_date = min(now().date(),
@@ -116,12 +116,12 @@ def get_and_save_free_document_reports(options):
                 # anything since at the end there will only be one court left.
                 continue
 
-            next_start_date, next_end_date = get_next_date_range(pacer_court_id)
+            next_start_d, next_end_d = get_next_date_range(pacer_court_id)
             if delay['result'] is not None:
                 if delay['result'].ready():
                     result = delay['result'].get()
                     if result == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
-                        if next_end_date >= today.date():
+                        if next_end_d >= today.date():
                             logger.info("Finished '%s'. Marking it complete." %
                                         pacer_court_id)
                             pacer_court_ids.pop(pacer_court_id, None)
@@ -141,23 +141,23 @@ def get_and_save_free_document_reports(options):
                         pacer_court_ids.pop(pacer_court_id, None)
                         continue
                     next_delay = min(delay['count'] * 5, 30)  # backoff w/cap
-                    logger.info("Court %s still in progress. Delaying at least "
-                                "%ss." % (pacer_court_id, next_delay))
-                    pacer_court_ids[pacer_court_id]['until'] = now() + timedelta(
-                        seconds=next_delay)
+                    logger.info("Court %s still in progress. Delaying at "
+                                "least %ss." % (pacer_court_id, next_delay))
+                    delay_until = now() + timedelta(seconds=next_delay)
+                    pacer_court_ids[pacer_court_id]['until'] = delay_until
                     pacer_court_ids[pacer_court_id]['count'] += 1
                     continue
 
-            mark_court_in_progress(pacer_court_id, next_end_date)
+            mark_court_in_progress(pacer_court_id, next_end_d)
             pacer_court_ids[pacer_court_id]['count'] = 1  # Reset
             delay['result'] = chain(
                 get_and_save_free_document_report.si(
                     pacer_court_id,
-                    next_start_date,
-                    next_end_date,
+                    next_start_d,
+                    next_end_d,
                     pacer_session
                 ),
-                mark_court_done_on_date.s(pacer_court_id, next_end_date),
+                mark_court_done_on_date.s(pacer_court_id, next_end_d),
             ).apply_async()
 
 
@@ -216,7 +216,8 @@ def do_ocr(options):
         else:
             chain(
                 extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q),
-                add_or_update_recap_document.s(coalesce_docket=True).set(queue=q),
+                add_or_update_recap_document.s(
+                    coalesce_docket=True).set(queue=q),
             ).apply_async()
         if i % 1000 == 0:
             logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
@@ -313,4 +314,3 @@ class Command(VerboseCommand):
         'upload-to-ia': upload_to_internet_archive,
         'upload-non-free-pdfs-to-ia': upload_non_free_pdfs_to_internet_archive,
     }
-
