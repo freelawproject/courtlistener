@@ -566,10 +566,12 @@ class FjcIntegratedDatabase(models.Model):
     )
     plaintiff = models.TextField(
         help_text="First listed plaintiff",
+        db_index=True,
         blank=True,
     )
     defendant = models.TextField(
         help_text="First listed defendant",
+        db_index=True,
         blank=True,
     )
     date_transfer = models.DateField(
