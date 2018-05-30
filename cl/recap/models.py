@@ -51,9 +51,9 @@ class PacerHtmlFiles(models.Model):
     """This is a simple object for holding original HTML content from PACER
 
     We use this object to make sure that for every item we receive from users,
-    we can go back and re-parse it one day if we have to. This becomes essential
-    as we do more and more data work where we're purchasing content. If we don't
-    keep an original copy, a bug could be devastating.
+    we can go back and re-parse it one day if we have to. This becomes
+    essential as we do more and more data work where we're purchasing content.
+    If we don't keep an original copy, a bug could be devastating.
     """
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -145,9 +145,9 @@ class ProcessingQueue(models.Model):
         max_length=1000,
     )
     status = models.SmallIntegerField(
-        help_text="The current status of this upload. Possible values are: %s" %
-                  ', '.join(['(%s): %s' % (t[0], t[1]) for t in
-                             PROCESSING_STATUSES]),
+        help_text="The current status of this upload. Possible values "
+                  "are: %s" % ', '.join(['(%s): %s' % (t[0], t[1]) for t in
+                                         PROCESSING_STATUSES]),
         default=AWAITING_PROCESSING,
         choices=PROCESSING_STATUSES,
         db_index=True,
@@ -161,8 +161,8 @@ class ProcessingQueue(models.Model):
         blank=True,
     )
     debug = models.BooleanField(
-        help_text="Are you debugging? Debugging uploads will be validated, but "
-                  "not saved to the database.",
+        help_text="Are you debugging? Debugging uploads will be validated, "
+                  "but not saved to the database.",
         default=False,
     )
 
@@ -246,8 +246,8 @@ class FjcIntegratedDatabase(models.Model):
     MULTI_DIST_ORIG = 13
     ORIGINS = (
         (ORIG, "Original Proceeding"),
-        (REMOVED, "Removed  (began in the state court, removed to the district "
-                  "court)"),
+        (REMOVED, "Removed  (began in the state court, removed to the "
+                  "district court)"),
         (REMANDED, "Remanded for further action (removal from court of "
                    "appeals)"),
         (REINSTATED, "Reinstated/reopened (previously opened and closed, "
@@ -473,8 +473,8 @@ class FjcIntegratedDatabase(models.Model):
         max_length=7,
     )
     origin = models.SmallIntegerField(
-        help_text="A single digit code describing the manner in which the case "
-                  "was filed in the district.",
+        help_text="A single digit code describing the manner in which the "
+                  "case was filed in the district.",
         choices=ORIGINS,
         blank=True,
         null=True,
@@ -547,9 +547,9 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
     )
     arbitration_at_filing = models.CharField(
-        help_text="This field is used only by the courts  participating in the "
-                  "Formal Arbitration Program.  It is not used for any other "
-                  "purpose.",
+        help_text="This field is used only by the courts  participating in "
+                  "the Formal Arbitration Program.  It is not used for any "
+                  "other purpose.",
         max_length=1,
         choices=ARBITRATION_CHOICES,
         blank=True,
@@ -600,8 +600,8 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
     )
     termination_class_action_status = models.SmallIntegerField(
-        help_text="A code that indicates a case involving allegations of class "
-                  "action.",
+        help_text="A code that indicates a case involving allegations of "
+                  "class action.",
         choices=CLASS_ACTION_STATUSES,
         null=True,
         blank=True,
@@ -646,8 +646,8 @@ class FjcIntegratedDatabase(models.Model):
     )
     year_of_tape = models.IntegerField(
         help_text="Statistical year label on data files obtained from the "
-                  "Administrative Office of the United States Courts.  2099 on "
-                  "pending case records.",
+                  "Administrative Office of the United States Courts.  2099 "
+                  "on pending case records.",
         blank=True,
         null=True,
     )
