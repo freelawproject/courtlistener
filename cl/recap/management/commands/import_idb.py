@@ -1,13 +1,12 @@
 import io
-import os
 import re
 import sys
-
 from datetime import date
+
 from dateutil import parser
 from django.core.management import CommandError
 
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
 from cl.recap.constants import (
     DATASET_SOURCES, CV_OLD, CV_2017, CR_OLD, CR_2017, APP_2017, APP_OLD,
     BANKR_2017, IDB_FIELD_DATA
@@ -16,7 +15,7 @@ from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Court
 
 
-class Command(VerboseCommand):
+class Command(VerboseCommand, CommandUtils):
     help = 'Import a tab-separated file as produced by FJC for their IDB'
     BAD_CHARS = re.compile(u'[\u0000\u001E]')
 
@@ -49,13 +48,6 @@ class Command(VerboseCommand):
         self.date_fields = []
         self.court_fields = []
         self.nullable_fields = None
-
-    @staticmethod
-    def ensure_file_ok(file_path):
-        if not os.path.exists(file_path):
-            raise CommandError("Unable to find file at %s" % file_path)
-        if not os.access(file_path, os.R_OK):
-            raise CommandError("Unable to read file at %s" % file_path)
 
     @staticmethod
     def ensure_filetype_ok(filetype):
