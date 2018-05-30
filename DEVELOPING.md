@@ -24,7 +24,7 @@ Then, just choose one of the following boxes, grab the provided Vagrantfile, sav
 
 
 ## Headless FreeLawBox
-[Vagrantfile](vagrantfile)
+[Vagrantfile](https://github.com/freelawproject/freelawmachine/blob/master/Vagrantfile)
 
 Preconfigured for:
 * 2 CPU cores
@@ -36,7 +36,7 @@ This version works great for command-line access via `vagrant ssh`, using your o
 _Note: if using a tool like PyCharm that supports a remote Python interpreter, set it to: `/home/vagrant/.virtualenvs/courtlistener/bin/python` and make sure you set the working directory to `/var/www/courtlistener`. You may also need to prevent the tool from adding the project to the PYTHONPATH, which is not needed due to the virtual environment._
 
 ## Desktop/GUI-based FreeLawBox
-[Vagrantfile](vagrantfile-desktop)
+[Vagrantfile](https://github.com/freelawproject/freelawmachine/blob/master/Vagrantfile.desktop)
 
 Preconfigured for:
 * 2 CPU cores
