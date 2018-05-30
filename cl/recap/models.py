@@ -1,4 +1,5 @@
 import os
+
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -664,3 +665,9 @@ class FjcIntegratedDatabase(models.Model):
         null=True,
         blank=True,
     )
+
+    def __unicode__(self):
+        return u'%s: %s v. %s' % (self.pk, self.plaintiff, self.defendant)
+
+    class Meta:
+        verbose_name_plural = 'FJC Integrated Database Entries'
