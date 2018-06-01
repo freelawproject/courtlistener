@@ -925,14 +925,21 @@ class IdbImportTest(TestCase):
     cmd = Command()
 
     def test_csv_parsing(self):
+        # https://www.ietf.org/rfc/rfc4180.txt
         qa = (
-            ('asdf\tasdf', {'1': 'asdf', '2': 'asdf'}),
-            ('asdf\t"toyrus"\tasdf', {'1': 'asdf', '2': '"toyrus"',
-                                      '3': 'asdf'}),
-            ('asdf\t"\ttoyrus"\tasdf', {'1': 'asdf', '2': 'toyrus',
-                                        '3': 'asdf'}),
+            # Satisfies RFC 4180 rules 1 & 2 (simple values)
+            ('asdf\tasdf',
+             {'1': 'asdf', '2': 'asdf'}),
+            # RFC 4180 rule 5 (quotes around value)
+            ('asdf\t"toyrus"\tasdf',
+             {'1': 'asdf', '2': '"toyrus"', '3': 'asdf'}),
+            # RFC 4180 rule 6 (tab in the value)
+            ('asdf\t"\ttoyrus"\tasdf',
+             {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
+            # More tabs in the value.
             ('asdf\t"\tto\tyrus"\tasdf',
              {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
+            # MOAR tabs in the value.
             ('asdf\t"\tto\tyrus\t"\tasdf',
              {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
             # RFC 4180 rule 7 (double quotes in the value)
