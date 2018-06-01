@@ -932,7 +932,7 @@ class IdbImportTest(TestCase):
              {'1': 'asdf', '2': 'asdf'}),
             # RFC 4180 rule 5 (quotes around value)
             ('asdf\t"toyrus"\tasdf',
-             {'1': 'asdf', '2': '"toyrus"', '3': 'asdf'}),
+             {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
             # RFC 4180 rule 6 (tab in the value)
             ('asdf\t"\ttoyrus"\tasdf',
              {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
