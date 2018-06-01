@@ -1,8 +1,8 @@
 import datetime
+import os
 import re
 import sys
 
-import os
 from django.contrib.messages import constants as message_constants
 from judge_pics import judge_root
 
@@ -367,6 +367,13 @@ MARKDOWN_DEUX_STYLES = {
         ],
     },
 }
+
+
+#########
+# PIWIK #
+#########
+PIWIK_URL = 'https://piwik.courtlistener.com/piwik.php'
+PIWIK_SITE_ID = '1'
 
 
 ########
