@@ -935,6 +935,9 @@ class IdbImportTest(TestCase):
              {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
             ('asdf\t"\tto\tyrus\t"\tasdf',
              {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
+            # RFC 4180 rule 7 (double quotes in the value)
+            ('asdf\t"M/V ""Pheonix"""\tasdf',
+             {'1': 'asdf', '2': 'M/V "Pheonix"', '3': 'asdf'})
         )
         for qa in qa:
             print("Testing CSV parser on: %s" % qa[0])
