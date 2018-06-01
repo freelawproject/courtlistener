@@ -64,9 +64,11 @@ class Command(VerboseCommand, CommandUtils):
         Some examples include:
             "VESSEL ""HORIZONTE"""
             "M/V ""THEODORA MARIA"" HER ENGIN"
-        There's a weird thing happening with double-double quotes, so the
-        solution is to strip one double quote off either end, and then replace
-        double-double quotes with singles.
+
+        According to RFC 4180, double quotes in a CSV field get escaped by
+        being doubled up as double-double-quotes. The solution is to strip one
+        double quote off either end, and then replace double-double quotes with
+        singles.
 
         That makes the above:
             VESSEL "HORIZONTE"
