@@ -19,12 +19,11 @@ from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
 from cl.lib import magic
-from cl.lib.bot_detector import is_bot
+from cl.lib.decorators import track_in_piwik
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
 from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument
 from cl.simple_pages.forms import ContactForm
-from cl.stats.utils import tally_stat
 
 logger = logging.getLogger(__name__)
 
@@ -282,6 +281,7 @@ def ratelimited(request, exception):
                   status=HTTP_429_TOO_MANY_REQUESTS)
 
 
+@track_in_piwik
 def serve_static_file(request, file_path=''):
     """Sends a static file to a user.
 
@@ -323,6 +323,4 @@ def serve_static_file(request, file_path=''):
     response['Content-Disposition'] = 'inline; filename="%s"' % \
                                       file_name.encode('utf-8')
     response['Content-Type'] = mimetype
-    if not is_bot(request):
-        tally_stat('case_page.static_file.served')
     return response
