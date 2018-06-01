@@ -7,7 +7,8 @@ from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.model_helpers import flatten_choices
 from cl.people_db.models import Position, PoliticalAffiliation
-from cl.search.fields import CeilingDateField, FloorDateField, RandomChoiceField
+from cl.search.fields import CeilingDateField, FloorDateField, \
+    RandomChoiceField
 from cl.search.models import Court
 from cl.search.models import DOCUMENT_STATUSES
 
@@ -140,7 +141,7 @@ class SearchForm(forms.Form):
     # RECAP fields
     #
     available_only = forms.BooleanField(
-        label="Exclude items not in RECAP",
+        label="Only show results with PDFs",
         label_suffix='',
         required=False,
         widget=forms.CheckboxInput(attrs={
