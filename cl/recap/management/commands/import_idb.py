@@ -56,6 +56,27 @@ class Command(VerboseCommand, CommandUtils):
             raise CommandError("%s not a valid filetype. Valid types are: %s" %
                                (filetype, allowed_types))
 
+    # noinspection PySingleQuotedDocstring
+    @staticmethod
+    def _normalize_row_value(value):
+        '''Normalize a TSV value.
+
+        Some examples include:
+            "VESSEL ""HORIZONTE"""
+            "M/V ""THEODORA MARIA"" HER ENGIN"
+        There's a weird thing happening with double-double quotes, so the
+        solution is to strip one double quote off either end, and then replace
+        double-double quotes with singles.
+
+        That makes the above:
+            VESSEL "HORIZONTE"
+            M/V "THEODORA MARIA" HER ENGIN
+        '''
+        value = re.sub(r'"$', '', value)
+        value = re.sub(r'^"', '', value)
+        value = re.sub(r'""', '"', value)
+        return value
+
     def make_csv_row_dict(self, line, col_headers):
         """Because the PACER data is so nasty, we need our own CSV parser. I
         guess this is how we learn, by doing things at lower and lower levels.
@@ -79,15 +100,17 @@ class Command(VerboseCommand, CommandUtils):
         for value in row_values:
             if merging_cells:
                 if value.endswith('"'):
-                    merging_cells = False
                     merged_contents += value
-                    row.append(merged_contents.strip('"'))
+                    row.append(self._normalize_row_value(merged_contents))
+                    merging_cells = False
+                    merged_contents = ''
                 else:
                     merged_contents += value
             elif value.startswith('"'):
                 if value.endswith('"') and len(value) > 1:
                     # Just a value in quotes, like "TOYS 'R US". And not just
                     # the " character.
+                    value = self._normalize_row_value(value)
                     row.append(value)
                 else:
                     merging_cells = True
