@@ -565,12 +565,14 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
     )
     plaintiff = models.TextField(
-        help_text="First listed plaintiff",
+        help_text="First listed plaintiff. This field appears to be cut off "
+                  "at 30 characters",
         db_index=True,
         blank=True,
     )
     defendant = models.TextField(
-        help_text="First listed defendant",
+        help_text="First listed defendant. This field appears to be cut off "
+                  "at 30 characters.",
         db_index=True,
         blank=True,
     )
