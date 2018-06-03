@@ -113,9 +113,13 @@ def coverage_graph(request):
             in_use=True,
             has_oral_argument_scraper=True)
 
+        oa_duration = Audio.objects.aggregate(
+            Sum('duration'))['duration__sum'] / 60
+
         coverage_data = {
             'sorted_courts': courts_json,
             'precedential_statuses': precedential_statuses,
+            'oa_duration': oa_duration,
             'count_pro': count_pro,
             'count_lawbox': count_lawbox,
             'count_scraper': count_scraper,
