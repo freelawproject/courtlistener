@@ -33,11 +33,11 @@
                 <label for="password">Password</label><br>
                 <input autocomplete="current-password" type="password" name="password" value="" id="password" class="form-control">
             </div>
-            <input type="hidden" name="next" value="{{ next|escape }}">
+            <input type="hidden" name="next" value="{{ next }}">
             <button type="submit" class="btn btn-primary btn-lg float-right">Sign In</button>
         </form>
         <p class="v-offset-above-2"><a href="{% url "password_reset" %}">Forgot username/password?</a></p>
-        <p><a href="/register/">Need to register?</a></p>
+        <p><a href="{% url "register" %}?next={{ next|urlencode }}">Need to register?</a></p>
     </div>
     <div class="col-xs-1 col-sm-2 col-med-3"></div>
 {% endblock %}
