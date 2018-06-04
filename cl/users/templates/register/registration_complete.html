@@ -5,22 +5,30 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-  <div class="col-xs-3"></div>
-  <div class="col-xs-6">
-    <h2><i class="fa fa-check-circle-o green"></i>&nbsp;Registration Complete</h2>
-    <h3>Welcome to CourtListener!</h3>
-    <p>We have sent you an email to confirm your email address. To log in, please click the link in that email within five days. That will confirm your account.
-    </p>
-    <p>If you do not receive the confirmation email:
-    </p>
+  <div class="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
+  <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
+    <h1><i class="fa fa-check-circle-o green"></i>&nbsp;Registration Complete &mdash;
+      Welcome to&nbsp;CourtListener!</h1>
+    <p class="v-offset-above-2">We have sent you an email to confirm the following address:</p>
+
+    <h3 class="well">{{ email }}</h3>
+
+    <p class="alt v-offset-above-2">If this address is not correct, please register again using your correct email address.</p>
+
+    <p>To log in, please click the link in that email within five days. That will confirm your account.</p>
+
+    <p>If you do not receive the confirmation email:</p>
     <ul>
-      <li><p>Check your spam folder. Because we send a lot of alert emails, we sometimes get wrongly categorized as a spammer. If the email is in your spam folder, please add <code>{{ default_from }}</code> to your contacts.</p>
+      <li><p>Is the email address above correct? If not, please register again.</p></li>
+      <li><p>Check your spam folder. Because we send a lot of alert emails, we sometimes get wrongly categorized as a spammer. If the email is in your spam folder, please mark the message as <strong>NOT SPAM</strong> and add <code>{{ default_from }}</code> to your contacts.</p>
       </li>
       <li><p>If it's not in your spam folder, you may <a href="{% url "email_confirmation_request" %}">request another confirmation email</a> from us. This can sometimes help if the email gets lost in transit.</p>
       </li>
     </ul>
     <p>If you are still unable to confirm your email address, please <a href="{% url "contact" %}">contact us for assistance</a>. We are always happy to help.
     </p>
+
+    <p><a href="{{ redirect_to|escape }}" class="btn btn-lg btn-primary">Return to Where you Left Off</a></p>
   </div>
-  <div class="col-xs-3"></div>
+  <div class="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
 {% endblock %}

@@ -16,6 +16,7 @@ from django.core.urlresolvers import reverse
 from django.db.models import Count
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
+from django.template.defaultfilters import urlencode
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import (sensitive_post_parameters,
@@ -326,8 +327,10 @@ def register(request):
                     email['to'],
                 )
                 tally_stat('user.created')
+                get_str = '?next=%s&email=%s' % (urlencode(redirect_to),
+                                                 urlencode(user.email))
                 return HttpResponseRedirect(reverse('register_success') +
-                                            '?next=%s' % redirect_to)
+                                            get_str)
         else:
             form = UserCreationFormExtended()
             consent_form = OptInConsentForm()
@@ -347,9 +350,11 @@ def register_success(request):
     """Tell the user they have been registered and allow them to continue where
     they left off."""
     redirect_to = request.GET.get('next', '')
+    email = request.GET.get('email', '')
     default_from = parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
     return render(request, 'register/registration_complete.html', {
         'redirect_to': redirect_to,
+        'email': email,
         'default_from': default_from,
         'private': True,
     })
