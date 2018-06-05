@@ -130,7 +130,7 @@ def coverage_graph(request):
         one_day = 60 * 60 * 24
         cache.set(coverage_cache_key, coverage_data, one_day)
 
-    return render(request, 'coverage_graph.html', coverage_data)
+    return render(request, 'coverage.html', coverage_data)
 
 
 def feeds(request):
