@@ -7,7 +7,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.template import loader
 from django.utils.timezone import now
 
-from cl.alerts.models import FREQUENCY, RealTimeQueue, ITEM_TYPES
+from cl.alerts.models import Alert, RealTimeQueue
 from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -25,15 +25,15 @@ def get_cut_off_date(rate, d=datetime.date.today()):
     new results should be considered a hit for an cl.
     """
     cut_off_date = None
-    if rate == 'rt':
+    if rate == Alert.REAL_TIME:
         # use a couple days ago to limit results without risk of leaving out
         # important items (this will be filtered further later).
         cut_off_date = d - datetime.timedelta(days=10)
-    elif rate == 'dly':
+    elif rate == Alert.DAILY:
         cut_off_date = d
-    elif rate == 'wly':
+    elif rate == Alert.WEEKLY:
         cut_off_date = d - datetime.timedelta(days=7)
-    elif rate == 'mly':
+    elif rate == Alert.MONTHLY:
         if datetime.date.today().day > 28:
             raise InvalidDateError('Monthly alerts cannot be run on the 29th, '
                                    '30th or 31st.')
@@ -79,9 +79,9 @@ class Command(VerboseCommand):
         parser.add_argument(
             '--rate',
             required=True,
-            choices=dict(FREQUENCY).keys(),
+            choices=Alert.ALL_FREQUENCIES,
             help="The rate to send emails (%s)" %
-                 ', '.join(dict(FREQUENCY).keys()),
+                 ', '.join(Alert.ALL_FREQUENCIES),
         )
         parser.add_argument(
             '--simulate',
@@ -110,7 +110,8 @@ class Command(VerboseCommand):
             if search_form.is_valid():
                 cd = search_form.cleaned_data
 
-                if rate == 'rt' and len(self.valid_ids[cd['type']]) == 0:
+                if rate == Alert.REAL_TIME and \
+                        len(self.valid_ids[cd['type']]) == 0:
                     # Bail out. No results will be found if no valid_ids.
                     return error, cd['type'], results
 
@@ -128,7 +129,7 @@ class Command(VerboseCommand):
                     'caller': 'cl_send_alerts',
                 })
 
-                if rate == 'rt':
+                if rate == Alert.REAL_TIME:
                     main_params['fq'].append('id:(%s)' % ' OR '.join(
                         [str(i) for i in self.valid_ids[cd['type']]]
                     ))
@@ -170,7 +171,7 @@ class Command(VerboseCommand):
 
             not_donated_enough = user.profile.total_donated_last_year < \
                 settings.MIN_DONATION['rt_alerts']
-            if not_donated_enough and rate == 'rt':
+            if not_donated_enough and rate == Alert.REAL_TIME:
                 logger.info('\n\nUser: %s has not donated enough for their %s '
                             'RT alerts to be sent.\n' % (user, len(alerts)))
                 continue
@@ -237,7 +238,7 @@ class Command(VerboseCommand):
             }
         """
         valid_ids = {}
-        for item_type in [t[0] for t in ITEM_TYPES]:
+        for item_type in RealTimeQueue.ALL_ITEM_TYPES:
             ids = RealTimeQueue.objects.filter(item_type=item_type)
             if ids:
                 main_params = {
@@ -260,7 +261,7 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         self.options = options
-        if options['rate'] == 'rt':
+        if options['rate'] == Alert.REAL_TIME:
             self.remove_stale_rt_items()
             self.valid_ids = self.get_new_ids()
 
@@ -270,5 +271,5 @@ class Command(VerboseCommand):
                         "******************************************\n")
 
         self.send_emails(options['rate'])
-        if options['rate'] == 'rt':
+        if options['rate'] == Alert.REAL_TIME:
             self.clean_rt_queue()
