@@ -1,21 +1,21 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-FREQUENCY = (
-    ('rt',  'Real Time'),
-    ('dly', 'Daily'),
-    ('wly', 'Weekly'),
-    ('mly', 'Monthly'),
-    ('off', 'Off'),
-)
-
-ITEM_TYPES = (
-    ('o', 'Opinion'),
-    ('oa', 'Oral Argument'),
-)
-
 
 class Alert(models.Model):
+    REAL_TIME = 'rt'
+    DAILY = 'dly'
+    WEEKLY = 'wly'
+    MONTHLY = 'mly'
+    OFF = 'off'
+    FREQUENCY = (
+        (REAL_TIME, 'Real Time'),
+        (DAILY, 'Daily'),
+        (WEEKLY, 'Weekly'),
+        (MONTHLY, 'Monthly'),
+        (OFF, 'Off'),
+    )
+    ALL_FREQUENCIES = [REAL_TIME, DAILY, WEEKLY, MONTHLY, OFF]
     user = models.ForeignKey(
         User,
         help_text="The user that created the item",
@@ -59,6 +59,13 @@ class Alert(models.Model):
 
 
 class RealTimeQueue(models.Model):
+    OPINION = 'o'
+    ORAL_ARGUMENT = 'oa'
+    ITEM_TYPES = (
+        (OPINION, 'Opinion'),
+        (ORAL_ARGUMENT, 'Oral Argument'),
+    )
+    ALL_ITEM_TYPES = [OPINION, ORAL_ARGUMENT]
     date_modified = models.DateTimeField(
         help_text='the last moment when the item was modified',
         auto_now=True,
