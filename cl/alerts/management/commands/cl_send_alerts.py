@@ -233,14 +233,17 @@ class Command(VerboseCommand):
                     item_pk__in=ids,
                 ).delete()
 
-    def remove_stale_rt_items(self):
+    def remove_stale_rt_items(self, age=2):
         """Remove anything old from the RTQ.
 
         This helps avoid issues with solr hitting the maxboolean clause errors.
+
+        :param age: How many days old should items be before we start deleting
+        them?
         """
         if not self.options['simulate']:
             RealTimeQueue.objects.filter(
-                date_modified__lt=now() - datetime.timedelta(days=2),
+                date_modified__lt=now() - datetime.timedelta(days=age),
             ).delete()
 
     def get_new_ids(self):
