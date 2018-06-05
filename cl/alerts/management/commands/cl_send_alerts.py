@@ -126,7 +126,7 @@ class Command(VerboseCommand):
             except KeyError:
                 pass
             data['order_by'] = 'score desc'
-            logger.info("  Data sent to SearchForm is: %s\n" % data)
+            logger.info("Data sent to SearchForm is: %s\n" % data)
             search_form = SearchForm(data)
             if search_form.is_valid():
                 cd = search_form.cleaned_data
@@ -162,17 +162,17 @@ class Command(VerboseCommand):
                 regroup_snippets(results)
 
             else:
-                logger.info("  Query for alert %s was invalid\n"
-                            "  Errors from the SearchForm: %s\n" %
-                            (alert.query, search_form.errors))
+                logger.info("Query for alert %s was invalid. Errors "
+                            "from the  SearchForm: %s" % (alert.query,
+                                                          search_form.errors))
                 error = True
         except:
             traceback.print_exc()
-            logger.info("  Search for this alert failed: %s\n" %
+            logger.info("Search for this alert failed: %s\n" %
                         alert.query)
             error = True
 
-        logger.info("  There were %s results\n" % len(results))
+        logger.info("There were %s results\n" % len(results))
 
         return error, cd.get('type'), results
 
@@ -180,21 +180,18 @@ class Command(VerboseCommand):
         """Send out an email to every user whose alert has a new hit for a
         rate.
         """
-        users = User.objects.filter(
-            alerts__rate=rate,
-        ).distinct()
+        users = User.objects.filter(alerts__rate=rate).distinct()
 
         alerts_sent_count = 0
         for user in users:
             alerts = user.alerts.filter(rate=rate)
-            logger.info("\n\nAlerts for user '%s': %s\n"
-                        "%s\n" % (user, alerts, '*' * 40))
+            logger.info("Running alerts for user '%s': %s" % (user, alerts))
 
             not_donated_enough = user.profile.total_donated_last_year < \
                 settings.MIN_DONATION['rt_alerts']
             if not_donated_enough and rate == Alert.REAL_TIME:
-                logger.info('\n\nUser: %s has not donated enough for their %s '
-                            'RT alerts to be sent.\n' % (user, len(alerts)))
+                logger.info('User: %s has not donated enough for their %s '
+                            'RT alerts to be sent.\n' % (user, alerts.count()))
                 continue
 
             hits = []
@@ -213,19 +210,16 @@ class Command(VerboseCommand):
                         alert.save()
                 except Exception as e:
                     traceback.print_exc()
-                    logger.info("  Search failed on this alert: %s\n%s\n" %
-                                (alert.query, e))
+                    logger.info("Search failed on alert: %s with "
+                                "error: %s" % (alert.query, e))
 
             if len(hits) > 0:
                 alerts_sent_count += 1
                 send_alert(user.profile, hits, self.options['simulate'])
-            elif self.options['verbosity'] >= 1:
-                logger.info("  No hits. Not sending mail for this cl.\n")
 
         if not self.options['simulate']:
             tally_stat('alerts.sent.%s' % rate, inc=alerts_sent_count)
-            logger.info("Sent %s %s email alerts." %
-                        (alerts_sent_count, rate))
+            logger.info("Sent %s %s email alerts." % (alerts_sent_count, rate))
 
     def clean_rt_queue(self):
         """Clean out any items in the RealTime queue once they've been run or
