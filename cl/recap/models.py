@@ -190,7 +190,8 @@ class ProcessingQueue(models.Model):
 
     def __unicode__(self):
         if self.upload_type in [
-                UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.DOCKET_HISTORY_REPORT]:
+                UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
+                UPLOAD_TYPE.APPELLATE_DOCKET]:
             return u'ProcessingQueue %s: %s case #%s (%s)' % (
                 self.pk,
                 self.court_id,
