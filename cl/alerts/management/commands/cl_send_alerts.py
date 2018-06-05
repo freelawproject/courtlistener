@@ -4,6 +4,7 @@ import traceback
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
+from django.db.models import Q
 from django.template import loader
 from django.utils.timezone import now
 
@@ -231,11 +232,10 @@ class Command(VerboseCommand):
         if they are stale.
         """
         if not self.options['simulate']:
+            q = Q()
             for item_type, ids in self.valid_ids.items():
-                RealTimeQueue.objects.filter(
-                    item_type=item_type,
-                    item_pk__in=ids,
-                ).delete()
+                q |= Q(item_type=item_type, item_pk__in=ids)
+            RealTimeQueue.objects.filter(q).delete()
 
     def remove_stale_rt_items(self, age=2):
         """Remove anything old from the RTQ.
