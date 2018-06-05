@@ -21,8 +21,7 @@ from rest_framework.test import APIClient
 from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
     Attorney, Role, PartyType, CriminalCount, CriminalComplaint
 from cl.recap.management.commands.import_idb import Command
-from cl.recap.models import ProcessingQueue, DOCKET, ATTACHMENT_PAGE, PDF, \
-    APPELLATE_DOCKET
+from cl.recap.models import ProcessingQueue, UPLOAD_TYPE
 from cl.recap.tasks import process_recap_pdf, add_attorney, \
     process_recap_docket, process_recap_attachment, \
     add_parties_and_attorneys, update_case_names
@@ -46,7 +45,7 @@ class RecapUploadsTest(TestCase):
             'pacer_doc_id': 24,
             'document_number': 1,
             'filepath_local': f,
-            'upload_type': PDF,
+            'upload_type': UPLOAD_TYPE.PDF,
         }
 
     def test_uploading_a_pdf(self, mock):
@@ -67,7 +66,7 @@ class RecapUploadsTest(TestCase):
         docket due to the mock.
         """
         self.data.update({
-            'upload_type': DOCKET,
+            'upload_type': UPLOAD_TYPE.DOCKET,
             'document_number': '',
         })
         del self.data['pacer_doc_id']
@@ -83,7 +82,7 @@ class RecapUploadsTest(TestCase):
     def test_uploading_an_attachment_page(self, mock):
         """Can we upload an attachment page and have it be saved correctly?"""
         self.data.update({
-            'upload_type': ATTACHMENT_PAGE,
+            'upload_type': UPLOAD_TYPE.ATTACHMENT_PAGE,
             'document_number': '',
         })
         r = self.client.post(self.path, self.data)
@@ -101,7 +100,7 @@ class RecapUploadsTest(TestCase):
         For example, if you're uploading a Docket, you shouldn't be providing a
         document number.
         """
-        self.data['upload_type'] = DOCKET
+        self.data['upload_type'] = UPLOAD_TYPE.DOCKET
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
@@ -110,7 +109,7 @@ class RecapUploadsTest(TestCase):
         fail?
         """
         self.data.update({
-            'upload_type': APPELLATE_DOCKET,
+            'upload_type': UPLOAD_TYPE.APPELLATE_DOCKET,
         })
         del self.data['pacer_doc_id']
         del self.data['document_number']
@@ -122,7 +121,7 @@ class RecapUploadsTest(TestCase):
         fail?
         """
         self.data.update({
-            'upload_type': DOCKET,
+            'upload_type': UPLOAD_TYPE.DOCKET,
             'court': 'scotus',
         })
         del self.data['pacer_doc_id']
@@ -136,7 +135,7 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
     def test_no_numbers_in_docket_uploads_work(self, mock):
-        self.data['upload_type'] = DOCKET
+        self.data['upload_type'] = UPLOAD_TYPE.DOCKET
         del self.data['pacer_doc_id']
         del self.data['document_number']
         r = self.client.post(self.path, self.data)
@@ -206,7 +205,7 @@ class ProcessingQueueApiFilterTest(TestCase):
             'document_number': '1',
             'filepath_local': f,
             'status': ProcessingQueue.AWAITING_PROCESSING,
-            'upload_type': PDF,
+            'upload_type': UPLOAD_TYPE.PDF,
         }
 
     def test_filters(self):
@@ -214,7 +213,7 @@ class ProcessingQueueApiFilterTest(TestCase):
         # Create two PQ objects with different values.
         ProcessingQueue.objects.create(**self.params)
         self.params['status'] = ProcessingQueue.PROCESSING_FAILED
-        self.params['upload_type'] = ATTACHMENT_PAGE
+        self.params['upload_type'] = UPLOAD_TYPE.ATTACHMENT_PAGE
         ProcessingQueue.objects.create(**self.params)
 
         # Then try filtering.
@@ -232,7 +231,7 @@ class ProcessingQueueApiFilterTest(TestCase):
 
         total_pdfs = 1
         r = self.client.get(self.path, {
-            'upload_type': PDF,
+            'upload_type': UPLOAD_TYPE.PDF,
         })
         j = json.loads(r.content)
         self.assertEqual(j['count'], total_pdfs)
@@ -279,7 +278,7 @@ class DebugRecapUploadtest(TestCase):
             pacer_doc_id='asdf',
             document_number='1',
             filepath_local=self.pdf,
-            upload_type=PDF,
+            upload_type=UPLOAD_TYPE.PDF,
             debug=True,
         )
         process_recap_pdf(pq.pk)
@@ -294,7 +293,7 @@ class DebugRecapUploadtest(TestCase):
             uploader=self.user,
             pacer_case_id='asdf',
             filepath_local=self.docket,
-            upload_type=DOCKET,
+            upload_type=UPLOAD_TYPE.DOCKET,
             debug=True,
         )
         process_recap_docket(pq.pk)
@@ -317,7 +316,7 @@ class DebugRecapUploadtest(TestCase):
         pq = ProcessingQueue.objects.create(
             court_id='scotus',
             uploader=self.user,
-            upload_type=ATTACHMENT_PAGE,
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
             filepath_local=self.att,
             debug=True,
         )
@@ -343,7 +342,7 @@ class RecapPdfTaskTest(TestCase):
             pacer_doc_id='asdf',
             document_number='1',
             filepath_local=f,
-            upload_type=PDF,
+            upload_type=UPLOAD_TYPE.PDF,
         )
         self.docket = Docket.objects.create(source=0, court_id='scotus',
                                             pacer_case_id='asdf')
@@ -729,7 +728,7 @@ class RecapDocketTaskTest(TestCase):
             uploader=self.user,
             pacer_case_id='asdf',
             filepath_local=f,
-            upload_type=DOCKET,
+            upload_type=UPLOAD_TYPE.DOCKET,
         )
 
     def tearDown(self):
@@ -801,7 +800,7 @@ class RecapDocketTaskTest(TestCase):
                 'file.pdf',
                 b"file content more content",
             ),
-            upload_type=PDF,
+            upload_type=UPLOAD_TYPE.PDF,
             status=ProcessingQueue.PROCESSING_FAILED,
         )
         process_recap_docket(self.pq.pk)
@@ -825,7 +824,7 @@ class RecapCriminalDataUploadTaskTest(TestCase):
             uploader=self.user,
             pacer_case_id='asdf',
             filepath_local=f,
-            upload_type=DOCKET,
+            upload_type=UPLOAD_TYPE.DOCKET,
         )
 
     def tearDown(self):
@@ -869,7 +868,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         self.pq = ProcessingQueue.objects.create(
             court_id='scotus',
             uploader=user,
-            upload_type=ATTACHMENT_PAGE,
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
             filepath_local=self.att,
         )
 

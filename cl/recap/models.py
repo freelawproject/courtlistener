@@ -10,22 +10,25 @@ from cl.lib.storage import UUIDFileSystemStorage
 from cl.recap.constants import NOS_CODES, DATASET_SOURCES, NOO_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 
-DOCKET = 1
-ATTACHMENT_PAGE = 2
-PDF = 3
-DOCKET_HISTORY_REPORT = 4
-APPELLATE_DOCKET = 5
-APPELLATE_ATTACHMENT_PAGE = 6
-IA_XML_FILE = 7
-UPLOAD_TYPES = (
-    (DOCKET, 'HTML Docket'),
-    (ATTACHMENT_PAGE, 'HTML attachment page'),
-    (PDF, 'PDF'),
-    (DOCKET_HISTORY_REPORT, 'Docket history report'),
-    (APPELLATE_DOCKET, 'Appellate HTML docket'),
-    (APPELLATE_ATTACHMENT_PAGE, 'Appellate HTML attachment page'),
-    (IA_XML_FILE, 'Internet Archive XML docket'),
-)
+
+class UPLOAD_TYPE:
+    DOCKET = 1
+    ATTACHMENT_PAGE = 2
+    PDF = 3
+    DOCKET_HISTORY_REPORT = 4
+    APPELLATE_DOCKET = 5
+    APPELLATE_ATTACHMENT_PAGE = 6
+    IA_XML_FILE = 7
+
+    NAMES = (
+        (DOCKET, 'HTML Docket'),
+        (ATTACHMENT_PAGE, 'HTML attachment page'),
+        (PDF, 'PDF'),
+        (DOCKET_HISTORY_REPORT, 'Docket history report'),
+        (APPELLATE_DOCKET, 'Appellate HTML docket'),
+        (APPELLATE_ATTACHMENT_PAGE, 'Appellate HTML attachment page'),
+        (IA_XML_FILE, 'Internet Archive XML docket'),
+    )
 
 
 def make_path(root, filename):
@@ -73,7 +76,7 @@ class PacerHtmlFiles(models.Model):
     )
     upload_type = models.SmallIntegerField(
         help_text="The type of object that is uploaded",
-        choices=UPLOAD_TYPES,
+        choices=UPLOAD_TYPE.NAMES,
     )
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
@@ -154,7 +157,7 @@ class ProcessingQueue(models.Model):
     )
     upload_type = models.SmallIntegerField(
         help_text="The type of object that is uploaded",
-        choices=UPLOAD_TYPES,
+        choices=UPLOAD_TYPE.NAMES,
     )
     error_message = models.TextField(
         help_text="Any errors that occurred while processing an item",
@@ -186,14 +189,15 @@ class ProcessingQueue(models.Model):
     )
 
     def __unicode__(self):
-        if self.upload_type in [DOCKET, DOCKET_HISTORY_REPORT]:
+        if self.upload_type in [
+                UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.DOCKET_HISTORY_REPORT]:
             return u'ProcessingQueue %s: %s case #%s (%s)' % (
                 self.pk,
                 self.court_id,
                 self.pacer_case_id,
                 self.get_upload_type_display(),
             )
-        elif self.upload_type == PDF:
+        elif self.upload_type == UPLOAD_TYPE.PDF:
             return u'ProcessingQueue: %s: %s.%s.%s.%s (%s)' % (
                 self.pk,
                 self.court_id,
@@ -202,7 +206,7 @@ class ProcessingQueue(models.Model):
                 self.attachment_number or 0,
                 self.get_upload_type_display(),
             )
-        elif self.upload_type == ATTACHMENT_PAGE:
+        elif self.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
             return u'ProcessingQueue: %s (%s)' % (
                 self.pk,
                 self.get_upload_type_display(),
