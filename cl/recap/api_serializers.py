@@ -90,8 +90,8 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             if not all([attrs.get('pacer_doc_id'),
                         attrs.get('document_number')]):
                 raise ValidationError("Uploaded PDFs must have the "
-                                      "pacer_doc_id and document_number fields "
-                                      "completed.")
+                                      "pacer_doc_id and document_number "
+                                      "fields completed.")
 
         if attrs['upload_type'] != PDF:
             # Everything but PDFs require the case ID.
