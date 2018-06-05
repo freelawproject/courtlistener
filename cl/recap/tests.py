@@ -24,8 +24,8 @@ from cl.recap.management.commands.import_idb import Command
 from cl.recap.models import ProcessingQueue, DOCKET, ATTACHMENT_PAGE, PDF, \
     APPELLATE_DOCKET
 from cl.recap.tasks import process_recap_pdf, add_attorney, \
-    process_recap_docket, process_recap_attachment, add_parties_and_attorneys, \
-    update_case_names
+    process_recap_docket, process_recap_attachment, \
+    add_parties_and_attorneys, update_case_names
 from cl.search.models import Docket, RECAPDocument, DocketEntry
 
 
@@ -282,7 +282,7 @@ class DebugRecapUploadtest(TestCase):
             upload_type=PDF,
             debug=True,
         )
-        _ = process_recap_pdf(pq.pk)
+        process_recap_pdf(pq.pk)
         self.assertEqual(RECAPDocument.objects.count(), 0)
         mock.assert_not_called()
 
@@ -308,7 +308,7 @@ class DebugRecapUploadtest(TestCase):
         d = Docket.objects.create(source=0, court_id='scotus',
                                   pacer_case_id='asdf')
         de = DocketEntry.objects.create(docket=d, entry_number=1)
-        rd = RECAPDocument.objects.create(
+        RECAPDocument.objects.create(
             docket_entry=de,
             document_number='1',
             pacer_doc_id='04505578698',
@@ -347,7 +347,8 @@ class RecapPdfTaskTest(TestCase):
         )
         self.docket = Docket.objects.create(source=0, court_id='scotus',
                                             pacer_case_id='asdf')
-        self.de = DocketEntry.objects.create(docket=self.docket, entry_number=1)
+        self.de = DocketEntry.objects.create(docket=self.docket,
+                                             entry_number=1)
         self.rd = RECAPDocument.objects.create(
             docket_entry=self.de,
             document_type=1,
@@ -385,7 +386,8 @@ class RecapPdfTaskTest(TestCase):
         # Did we update pq appropriately?
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, self.pq.PROCESSING_SUCCESSFUL)
-        self.assertEqual(self.pq.error_message, 'Successful upload! Nice work.')
+        self.assertEqual(self.pq.error_message,
+                         'Successful upload! Nice work.')
         self.assertFalse(self.pq.filepath_local)
         self.assertEqual(self.pq.docket_id, self.docket.pk)
         self.assertEqual(self.pq.docket_entry_id, self.de.pk)
@@ -424,7 +426,8 @@ class RecapPdfTaskTest(TestCase):
 
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, self.pq.PROCESSING_SUCCESSFUL)
-        self.assertEqual(self.pq.error_message, "Successful upload! Nice work.")
+        self.assertEqual(self.pq.error_message,
+                         "Successful upload! Nice work.")
         self.assertFalse(self.pq.filepath_local)
 
     def test_nothing_already_exists(self):
@@ -462,8 +465,7 @@ class RecapAddAttorneyTest(TestCase):
             "name": self.atty_name,
             "roles": [
                 {'role': Role.ATTORNEY_LEAD, 'date_action': None},
-                {'role': Role.ATTORNEY_TO_BE_NOTICED, 'date_action': None},
-            ]
+                {'role': Role.ATTORNEY_TO_BE_NOTICED, 'date_action': None}]
         }
         self.d = Docket.objects.create(source=0, court_id='scotus',
                                        pacer_case_id='asdf',
@@ -586,13 +588,14 @@ class TerminatedEntitiesTest(TestCase):
 
     There are four possibilities we need to handle properly:
 
-     1. The scraped data has terminated entities (easy: update all existing and
-        delete anything that's not touched).
-     2. The scraped data lacks terminated entities and the current data lacks
-        them too (easy: update as above).
-     3. The scraped data lacks terminated entities and the current data has them
-        (hard: update whatever is in common, keep terminated entities,
-        disassociate the rest).
+     1. The scraped data has terminated entities (easy: update all
+        existing and delete anything that's not touched).
+     2. The scraped data lacks terminated entities and the current
+        data lacks them too (easy: update as above).
+     3. The scraped data lacks terminated entities and the current
+        data has them (hard: update whatever is in common, keep
+        terminated entities, disassociate the rest).
+
     """
     def setUp(self):
         # Docket: self.d has...
@@ -619,10 +622,12 @@ class TerminatedEntitiesTest(TestCase):
                                  name="special intervenor")
         self.extraneous_a = Attorney.objects.create(name="Matthew Lesko")
         Role.objects.create(docket=self.d, party=self.extraneous_p,
-                            attorney=self.extraneous_a, role=Role.ATTORNEY_LEAD)
+                            attorney=self.extraneous_a,
+                            role=Role.ATTORNEY_LEAD)
 
         # Extraneous attorney on a valid party. Should always be disassociated.
-        self.extraneous_a2 = Attorney.objects.create(name="Mathew Lesko")  # Typo
+        # Typo:
+        self.extraneous_a2 = Attorney.objects.create(name="Mathew Lesko")
         Role.objects.create(docket=self.d, party=self.p,
                             attorney=self.extraneous_a2,
                             role=Role.ATTORNEY_TO_BE_NOTICED)
@@ -654,8 +659,8 @@ class TerminatedEntitiesTest(TestCase):
         entities?
         """
         add_parties_and_attorneys(self.d, self.new_party_data)
-        # Docket should have two parties, Powell and McCarthy. This implies that
-        # extraneous_p has been removed.
+        # Docket should have two parties, Powell and McCarthy. This
+        # implies that extraneous_p has been removed.
         self.assertEqual(self.d.parties.count(), 2)
 
         # Powell has an attorney. The rest are extraneous or don't have attys.
@@ -669,8 +674,8 @@ class TerminatedEntitiesTest(TestCase):
         self.new_mccarthy_data['date_terminated'] = None
         add_parties_and_attorneys(self.d, self.new_party_data)
 
-        # Docket should have two parties, Powell and McCarthy. This implies that
-        # extraneous_p has been removed.
+        # Docket should have two parties, Powell and McCarthy. This
+        # implies that extraneous_p has been removed.
         self.assertEqual(self.d.parties.count(), 2)
 
         # Powell has an attorney. The rest are extraneous or don't have attys.
@@ -687,7 +692,8 @@ class TerminatedEntitiesTest(TestCase):
         # Add terminated attorney that's not in the new data.
         term_a = Attorney.objects.create(name="Robert Mueller")
         Role.objects.create(docket=self.d, attorney=term_a, party=self.p,
-                            role=Role.TERMINATED, date_action=date(2018, 3, 16))
+                            role=Role.TERMINATED,
+                            date_action=date(2018, 3, 16))
 
         # Add a terminated party that's not in the new data.
         term_p = Party.objects.create(name='Zainab Ahmad')
@@ -714,8 +720,8 @@ class RecapDocketTaskTest(TestCase):
     def setUp(self):
         self.user = User.objects.get(username='recap')
         self.filename = 'cand.html'
-        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets',
-                            self.filename)
+        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                            'test_assets', self.filename)
         with open(path, 'r') as f:
             f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
@@ -810,8 +816,8 @@ class RecapCriminalDataUploadTaskTest(TestCase):
     def setUp(self):
         self.user = User.objects.get(username='recap')
         self.filename = 'cand_criminal.html'
-        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets',
-                            self.filename)
+        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                            'test_assets', self.filename)
         with open(path, 'r') as f:
             f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
@@ -845,7 +851,8 @@ class RecapAttachmentPageTaskTest(TestCase):
     def setUp(self):
         user = User.objects.get(username='recap')
         self.filename = 'cand.html'
-        test_dir = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets')
+        test_dir = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                                'test_assets')
         self.att_filename = 'dcd_04505578698.html'
         att_path = os.path.join(test_dir, self.att_filename)
         with open(att_path, 'r') as f:
@@ -853,7 +860,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         d = Docket.objects.create(source=0, court_id='scotus',
                                   pacer_case_id='asdf')
         de = DocketEntry.objects.create(docket=d, entry_number=1)
-        rd = RECAPDocument.objects.create(
+        RECAPDocument.objects.create(
             docket_entry=de,
             document_number='1',
             pacer_doc_id='04505578698',
@@ -872,7 +879,8 @@ class RecapAttachmentPageTaskTest(TestCase):
         ).delete()
 
     def test_attachments_get_created(self, mock):
-        """Do attachments get created if we have a RECAPDocument to match on?"""
+        """Do attachments get created if we have a RECAPDocument to match
+        on?"""
         process_recap_attachment(self.pq.pk)
         num_attachments_to_create = 3
         self.assertEqual(
@@ -952,4 +960,3 @@ class IdbImportTest(TestCase):
                 self.cmd.make_csv_row_dict(qa[0], ['1', '2', '3']),
                 qa[1],
             )
-
