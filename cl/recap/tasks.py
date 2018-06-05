@@ -404,7 +404,8 @@ def update_case_names(d, new_case_name):
 def update_docket_metadata(d, docket_data):
     """Update the Docket object with the data from Juriscraper.
 
-    Works on either docket history report or docket report results.
+    Works on either docket history report or docket report (appellate
+    or district) results.
     """
     d = update_case_names(d, docket_data['case_name'])
     d.docket_number = docket_data['docket_number'] or d.docket_number
@@ -428,6 +429,13 @@ def update_docket_metadata(d, docket_data):
         d.referred_to = judges[0]
     d.referred_to_str = docket_data.get('referred_to_str') or ''
     d.blocked, d.date_blocked = get_blocked_status(d)
+    # xxx appellate:
+    #   docket_data[u'panel']
+    #   docket_data[u'appeal_from']
+    #   docket_data[u'fee_status']
+    #   docket_data[u'case_type_information']
+    #   docket_data[u'originating_court_information']
+    #   # Note oci needs to restrict RESTRICTED_ALIEN_NUMBER.
     return d
 
 
