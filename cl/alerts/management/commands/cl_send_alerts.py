@@ -91,6 +91,22 @@ class Command(VerboseCommand):
                  'backend.',
         )
 
+    def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
+        self.options = options
+        if options['rate'] == Alert.REAL_TIME:
+            self.remove_stale_rt_items()
+            self.valid_ids = self.get_new_ids()
+
+        if options['simulate']:
+            logger.info("******************************************\n"
+                        "* SIMULATE MODE - NO EMAILS WILL BE SENT *\n"
+                        "******************************************\n")
+
+        self.send_emails(options['rate'])
+        if options['rate'] == Alert.REAL_TIME:
+            self.clean_rt_queue()
+
     def run_query(self, alert, rate):
         results = []
         error = False
@@ -257,19 +273,3 @@ class Command(VerboseCommand):
             else:
                 valid_ids[item_type] = []
         return valid_ids
-
-    def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
-        self.options = options
-        if options['rate'] == Alert.REAL_TIME:
-            self.remove_stale_rt_items()
-            self.valid_ids = self.get_new_ids()
-
-        if options['simulate']:
-            logger.info("******************************************\n"
-                        "* SIMULATE MODE - NO EMAILS WILL BE SENT *\n"
-                        "******************************************\n")
-
-        self.send_emails(options['rate'])
-        if options['rate'] == Alert.REAL_TIME:
-            self.clean_rt_queue()
