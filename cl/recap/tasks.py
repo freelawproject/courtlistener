@@ -12,7 +12,8 @@ from django.db.models import Prefetch
 from django.utils import timezone
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer import AttachmentPage, DocketHistoryReport, DocketReport
+from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
+    DocketHistoryReport, DocketReport
 
 from cl.celery import app
 from cl.lib.decorators import retry
@@ -1058,8 +1059,7 @@ def process_recap_docket_history_report(self, pk):
     }
 
 
-@app.task(bind=True, max_retries=3, interval_start=5 * 60,
-          interval_step=5 * 60)
+@app.task(bind=True, max_retries=3, ignore_result=True)
 def process_recap_appellate_docket(self, pk):
     """Process an uploaded appellate docket from the RECAP API endpoint.
 
@@ -1081,20 +1081,11 @@ def process_recap_appellate_docket(self, pk):
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
-    logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
+    logger.info("Processing Appellate RECAP item"
+                " (debug is: %s): %s" % (pq.debug, pq))
 
-    report = DocketReport(map_cl_to_pacer_id(pq.court_id))
+    report = AppellateDocketReport(map_cl_to_pacer_id(pq.court_id))
     text = pq.filepath_local.read().decode('utf-8')
-
-    if 'History/Documents' in text:
-        # Prior to 1.1.8, we did not separate docket history reports into their
-        # own upload_type. Alas, we still have some old clients around, so we
-        # need to handle those clients here.
-        pq.upload_type = UPLOAD_TYPE.DOCKET_HISTORY_REPORT
-        pq.save()
-        process_recap_docket_history_report(pk)
-        self.request.callbacks = None
-        return None
 
     report._parse_text(text)
     data = report.data
@@ -1128,7 +1119,7 @@ def process_recap_appellate_docket(self, pk):
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(content_object=d,
-                                upload_type=UPLOAD_TYPE.DOCKET)
+                                upload_type=UPLOAD_TYPE.APPELLATE_DOCKET)
     pacer_file.filepath.save(
         'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(text),
