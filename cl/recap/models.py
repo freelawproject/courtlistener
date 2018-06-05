@@ -459,7 +459,7 @@ class FjcIntegratedDatabase(models.Model):
     office = models.CharField(
         help_text="The code that designates the office within the district "
                   "where the case is filed. Must conform with format "
-                  "established in Volume XI, Guide to Judiciary Policies and " 
+                  "established in Volume XI, Guide to Judiciary Policies and "
                   "Procedures, Appendix A.",
         max_length=3,
         blank=True,
