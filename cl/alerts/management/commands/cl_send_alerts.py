@@ -247,8 +247,11 @@ class Command(VerboseCommand):
             ).delete()
 
     def get_new_ids(self):
-        """For every item that's in the RealTimeQueue, query Solr and
-        see which have made it to the index. We'll use these to run the alerts.
+        """Get an intersection of the items that are new in the DB and those
+        that have made it into Solr.
+
+        For every item that's in the RealTimeQueue, query Solr and see which
+        have made it to the index. We'll use these to run the alerts.
 
         Returns a dict like so:
             {

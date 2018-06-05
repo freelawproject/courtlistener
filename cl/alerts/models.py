@@ -72,6 +72,16 @@ class Alert(models.Model):
 
 
 class RealTimeQueue(models.Model):
+    """These are created any time a new item is added to our database.
+
+    The idea here was, back in 2015, to keep a table of new items. Well, why is
+    that necessary? Why can't we just keep track of the last time we ran alerts
+    and then check the date_created field for the table? That'd be much easier.
+
+    Also, this kind of thing should really use Django's contenttypes framework.
+
+    Hindsight is 20/20, but we're here now.
+    """
     OPINION = 'o'
     ORAL_ARGUMENT = 'oa'
     ITEM_TYPES = (
