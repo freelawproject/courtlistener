@@ -8,7 +8,8 @@ from dateutil import parser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from juriscraper.lib.string_utils import titlecase
-from juriscraper.pacer import DocketReport, DocketHistoryReport, InternetArchive
+from juriscraper.pacer import DocketReport, DocketHistoryReport, \
+    InternetArchive
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
@@ -274,8 +275,8 @@ def make_address_lookup_key(address_info):
 
      - Sort the fields alphabetically
      - Strip anything that's not a character or number
-     - Remove/normalize a variety of words that add little meaning and are often
-       omitted.
+     - Remove/normalize a variety of words that add little meaning and
+       are often omitted.
     """
     sorted_info = OrderedDict(sorted(address_info.items()))
     fixes = {
