@@ -34,7 +34,8 @@ class JudgeExtractionTest(TestCase):
              (None, REASONS[10])),
             ('MR. JUSTICE CLARK delivered the opinion of the Court.',
              (u'Clark', REASONS[5])),
-            ('Justice THEIS delivered the judgment of the court, with opinion.',
+            ('Justice THEIS delivered the judgment of the court, '
+             'with opinion.',
              (u'Theis', REASONS[5])),
             ('Kennedy, J., announced the judgment of the Court and delivered '
              'the opinion of the Court, except...',
@@ -153,7 +154,8 @@ class JudgeExtractionTest(TestCase):
             ('("DGCL") SEEKING judge Advancement of Reasonable Attorney\'s '
              'Fees',
              (None, REASONS[3])),
-            ('"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees',
+            ('"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s '
+             'Fees',
              (None, REASONS[3])),
             (':"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s '
              'Fees',
@@ -166,7 +168,7 @@ class JudgeExtractionTest(TestCase):
              (None, REASONS[3])),
             ('{"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s '
              'Fees',
-            (None, REASONS[3])),
+             (None, REASONS[3])),
             ('}"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s '
              'Fees',
              (None, REASONS[3])),
@@ -233,78 +235,81 @@ class CourtMatchingTest(TestCase):
         pairs = (
             {
                 'args': (
-                    "California Superior Court  Appellate Division, Kern County.",
-                    'california/supreme_court_opinions/documents/0dc538c63bd07a28.xml',
+                    "California Superior Court  "
+                    "Appellate Division, Kern County.",
+                    'california/supreme_court_opinions/documents/0dc538c63bd07a28.xml',  # noqa
                 ),
                 'answer': 'calappdeptsuperct'
             },
             {
                 'args': (
-                    "California Superior Court  Appellate Department, Sacramento.",
-                    'california/supreme_court_opinions/documents/0dc538c63bd07a28.xml',
+                    "California Superior Court  "
+                    "Appellate Department, Sacramento.",
+                    'california/supreme_court_opinions/documents/0dc538c63bd07a28.xml',  # noqa
                 ),
                 'answer': 'calappdeptsuperct'
             },
             {
                 'args': (
                     "Appellate Session of the Superior Court",
-                    'connecticut/appellate_court_opinions/documents/0412a06c60a7c2a2.xml',
+                    'connecticut/appellate_court_opinions/documents/0412a06c60a7c2a2.xml',  # noqa
                 ),
                 'answer': 'connsuperct'
             },
             {
                 'args': (
                     "Court of Errors and Appeals.",
-                    'new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml',
+                    'new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml',  # noqa
                 ),
                 'answer': 'nj'
             },
             {
                 'args': (
                     "Court of Chancery",
-                    'new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml',
+                    'new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml',  # noqa
                 ),
                 'answer': 'njch'
             },
             {
                 'args': (
                     "Workers' Compensation Commission",
-                    'connecticut/workers_compensation_commission/documents/0902142af68ef9df.xml',
+                    'connecticut/workers_compensation_commission/documents/0902142af68ef9df.xml',  # noqa
                 ),
                 'answer': 'connworkcompcom',
             },
             {
                 'args': (
                     'Appellate Session of the Superior Court',
-                    'connecticut/appellate_court_opinions/documents/00ea30ce0e26a5fd.xml'
+                    'connecticut/appellate_court_opinions/documents/00ea30ce0e26a5fd.xml'  # noqa
                 ),
                 'answer': 'connsuperct',
             },
             {
                 'args': (
                     'Superior Court  New Haven County',
-                    'connecticut/superior_court_opinions/documents/0218655b78d2135b.xml'
+                    'connecticut/superior_court_opinions/documents/0218655b78d2135b.xml'  # noqa
                 ),
                 'answer': 'connsuperct',
             },
             {
                 'args': (
                     'Superior Court, Hartford County',
-                    'connecticut/superior_court_opinions/documents/0218655b78d2135b.xml'
+                    'connecticut/superior_court_opinions/documents/0218655b78d2135b.xml'  # noqa
                 ),
                 'answer': 'connsuperct',
             },
             {
                 'args': (
-                    "Compensation Review Board  WORKERS' COMPENSATION COMMISSION",
-                    'connecticut/workers_compensation_commission/documents/00397336451f6659.xml',
+                    "Compensation Review Board  "
+                    "WORKERS' COMPENSATION COMMISSION",
+                    'connecticut/workers_compensation_commission/documents/00397336451f6659.xml',  # noqa
                 ),
                 'answer': 'connworkcompcom',
             },
             {
                 'args': (
                     'Appellate Division Of The Circuit Court',
-                    'connecticut/superior_court_opinions/documents/03dd9ec415bf5bf4.xml',
+                    'connecticut/superior_court_opinions/documents/03dd9ec415bf5bf4.xml',  # noqa
                 ),
                 'answer': 'connsuperct',
             },
@@ -317,7 +322,8 @@ class CourtMatchingTest(TestCase):
             },
             {
                 'args': (
-                    'Courts of General Sessions and Oyer and Terminer of Delaware',
+                    'Courts of General Sessions and Oyer and Terminer '
+                    'of Delaware',
                     'delaware/court_opinions/documents/108da18f9278da90.xml',
                 ),
                 'answer': 'delsuperct',
@@ -338,7 +344,8 @@ class CourtMatchingTest(TestCase):
             },
             {
                 'args': (
-                    'Court of Quarter Sessions Court of Delaware,  Kent County.',
+                    'Court of Quarter Sessions '
+                    'Court of Delaware,  Kent County.',
                     'delaware/court_opinions/documents/f01f1724cc350bb9.xml',
                 ),
                 'answer': 'delsuperct',
@@ -381,14 +388,14 @@ class CourtMatchingTest(TestCase):
             {
                 'args': (
                     'District Court of Appeal of Florida, Second District.',
-                    '/data/dumps/florida/court_opinions/documents/25ce1e2a128df7ff.xml',
+                    '/data/dumps/florida/court_opinions/documents/25ce1e2a128df7ff.xml',  # noqa
                 ),
                 'answer': 'fladistctapp',
             },
             {
                 'args': (
                     'U.S. Circuit Court',
-                    'north_carolina/court_opinions/documents/fa5b96d590ae8d48.xml',
+                    'north_carolina/court_opinions/documents/fa5b96d590ae8d48.xml',  # noqa
                 ),
                 'answer': 'circtnc',
             },
@@ -474,7 +481,8 @@ class PacerDocketParserTest(TestCase):
 
     def setUp(self):
 
-        self.docket, count = find_docket_object('akd', '41664', '3:11-cv-00064')
+        self.docket, count = find_docket_object('akd', '41664',
+                                                '3:11-cv-00064')
         if count > 1:
             raise Exception("Should not get more than one docket during "
                             "this test!")
