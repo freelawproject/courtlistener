@@ -7,28 +7,28 @@ from datetime import timedelta
 from celery.canvas import chain
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, transaction, OperationalError
+from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Prefetch
 from django.utils import timezone
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer import DocketReport, AttachmentPage, DocketHistoryReport
+from juriscraper.pacer import AttachmentPage, DocketHistoryReport, DocketReport
 
 from cl.celery import app
 from cl.lib.decorators import retry
 from cl.lib.import_lib import get_candidate_judges
-from cl.lib.pacer import map_cl_to_pacer_id, normalize_attorney_contact, \
-    normalize_attorney_role, get_blocked_status
+from cl.lib.pacer import get_blocked_status, map_cl_to_pacer_id, \
+    normalize_attorney_contact, normalize_attorney_role
 from cl.lib.recap_utils import get_document_filename
 from cl.lib.utils import remove_duplicate_dicts
-from cl.people_db.models import Party, PartyType, Attorney, \
-    AttorneyOrganization, AttorneyOrganizationAssociation, Role, \
-    CriminalComplaint, CriminalCount
-from cl.recap.models import ProcessingQueue, PacerHtmlFiles, UPLOAD_TYPE
-from cl.scrapers.tasks import get_page_count, extract_recap_pdf
-from cl.search.models import Docket, RECAPDocument, DocketEntry
-from cl.search.tasks import add_or_update_recap_document, \
-    add_or_update_recap_docket
+from cl.people_db.models import Attorney, AttorneyOrganization, \
+    AttorneyOrganizationAssociation, CriminalComplaint, CriminalCount, \
+    Party, PartyType, Role    
+from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE
+from cl.scrapers.tasks import extract_recap_pdf, get_page_count
+from cl.search.models import Docket, DocketEntry, RECAPDocument
+from cl.search.tasks import add_or_update_recap_docket, \
+    add_or_update_recap_document
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
