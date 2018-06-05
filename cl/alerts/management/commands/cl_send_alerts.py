@@ -269,7 +269,7 @@ class Command(VerboseCommand):
             if ids:
                 main_params = {
                     'q': '*',  # Vital!
-                    'caller': 'cl_send_alerts',
+                    'caller': 'cl_send_alerts:%s' % item_type,
                     'rows': MAX_RT_ITEM_QUERY,
                     'fl': 'id',
                     'fq': ['id:(%s)' % ' OR '.join(
