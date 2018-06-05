@@ -15,7 +15,7 @@ from cl.lib.pacer import process_docket_data
 from cl.people_db.import_judges.populate_fjc_judges import get_fed_court_object
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.tasks import find_docket_object
-from cl.recap.models import IA_XML_FILE
+from cl.recap.models import UPLOAD_TYPE
 from cl.search.models import Docket, RECAPDocument
 
 
@@ -486,7 +486,8 @@ class PacerDocketParserTest(TestCase):
         if count > 1:
             raise Exception("Should not get more than one docket during "
                             "this test!")
-        process_docket_data(self.docket, self.DOCKET_PATH, IA_XML_FILE)
+        process_docket_data(self.docket, self.DOCKET_PATH,
+                            UPLOAD_TYPE.IA_XML_FILE)
 
     def tearDown(self):
         Docket.objects.all().delete()

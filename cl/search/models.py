@@ -484,8 +484,9 @@ class Docket(models.Model):
         from cl.lib.pacer import process_docket_data
         # Start with the XML if we've got it.
         if do_original_xml and self.filepath_local:
-            from cl.recap.models import IA_XML_FILE
-            process_docket_data(self, self.filepath_local.path, IA_XML_FILE)
+            from cl.recap.models import UPLOAD_TYPE
+            process_docket_data(self, self.filepath_local.path,
+                                UPLOAD_TYPE.IA_XML_FILE)
 
         # Then layer the uploads on top of that.
         for html in self.html_documents.order_by('date_created'):
