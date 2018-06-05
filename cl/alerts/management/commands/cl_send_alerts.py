@@ -15,6 +15,10 @@ from cl.lib.search_utils import regroup_snippets
 from cl.search.forms import SearchForm
 from cl.stats.utils import tally_stat
 
+# Only do this number of RT items at a time. If there are more, they will be
+# handled in the next run of this script.
+MAX_RT_ITEM_QUERY = 1000
+
 
 class InvalidDateError(Exception):
     pass
@@ -266,7 +270,7 @@ class Command(VerboseCommand):
                 main_params = {
                     'q': '*',  # Vital!
                     'caller': 'cl_send_alerts',
-                    'rows': 1000,
+                    'rows': MAX_RT_ITEM_QUERY,
                     'fl': 'id',
                     'fq': ['id:(%s)' % ' OR '.join(
                         [str(i.item_pk) for i in ids]
