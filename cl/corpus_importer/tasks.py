@@ -33,7 +33,8 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_number
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
-from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles, DOCKET
+from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles, \
+    UPLOAD_TYPE
 from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
     find_docket_object, add_recap_source, add_docket_entries, \
     process_orphan_documents
@@ -222,7 +223,8 @@ def process_free_opinion_result(self, row_pk, cnt):
         self.request.callbacks = None
         return
 
-    return {'result': result, 'rd_pk': rd.pk, 'pacer_court_id': result.court_id}
+    return {'result': result, 'rd_pk': rd.pk,
+            'pacer_court_id': result.court_id}
 
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5,
@@ -249,7 +251,8 @@ def get_and_process_pdf(self, data, session, row_pk, index=False):
             msg = "Ran into unknown HTTPError. %s. Aborting." % \
                   exc.response.status_code
             logger.error(msg)
-            PACERFreeDocumentRow.objects.filter(pk=row_pk).update(error_msg=msg)
+            PACERFreeDocumentRow.objects.filter(pk=row_pk).update(
+                error_msg=msg)
             self.request.callbacks = None
             return
 
@@ -313,7 +316,8 @@ def upload_pdf_to_ia(self, rd_pk):
             metadata={
                 'title': best_case_name(d),
                 'collection': settings.IA_COLLECTIONS,
-                'contributor': '<a href="https://free.law">Free Law Project</a>',
+                'contributor':
+                    '<a href="https://free.law">Free Law Project</a>',
                 'court': d.court_id,
                 'language': 'eng',
                 'mediatype': 'texts',
@@ -342,9 +346,10 @@ def upload_pdf_to_ia(self, rd_pk):
             increment_failure_count(rd)
             return [exc.response]
         if self.request.retries == self.max_retries:
-            # This exception is also raised when the endpoint is overloaded, but
-            # doesn't get caught in the OverloadedException below due to
-            # multiple processes running at the same time. Just give up for now.
+            # This exception is also raised when the endpoint is
+            # overloaded, but doesn't get caught in the
+            # OverloadedException below due to multiple processes
+            # running at the same time. Just give up for now.
             increment_failure_count(rd)
             return
         raise self.retry(exc=exc)
@@ -379,10 +384,11 @@ def upload_to_ia(identifier, files, metadata=None):
 
         https://internetarchive.readthedocs.io/en/latest/items.html
 
-    This function mirrors the IA library's similar upload function, but builds
-    in retries and various assumptions that make sense. Note that according to
-    emails with IA staff, it is best to maximize the number of files uploaded to
-    an Item at a time, rather than uploading each file in a separate go.
+    This function mirrors the IA library's similar upload function,
+    but builds in retries and various assumptions that make
+    sense. Note that according to emails with IA staff, it is best to
+    maximize the number of files uploaded to an Item at a time, rather
+    than uploading each file in a separate go.
 
     :param identifier: The global identifier within IA for the item you wish to
     work with.
@@ -524,7 +530,8 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
         d.tags.add(tag)
 
     # Add the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(content_object=d, upload_type=DOCKET)
+    pacer_file = PacerHtmlFiles(content_object=d,
+                                upload_type=UPLOAD_TYPE.DOCKET)
     pacer_file.filepath.save(
         'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(report.response.text),
@@ -623,7 +630,8 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
             'date_upload': now(),
         },
     )
-    # Replace the description if we have description data. Else fallback on old.
+    # Replace the description if we have description data.
+    # Else fallback on old.
     rd.description = att_found.get('description', '') or rd.description
     if tag is not None:
         tag, _ = Tag.objects.get_or_create(name=tag)
@@ -730,4 +738,3 @@ def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, session):
         rd.pacer_doc_id = pacer_doc_id
         rd.save()
         logger.info("Successfully saved pacer_doc_id to rd %s" % rd_pk)
-

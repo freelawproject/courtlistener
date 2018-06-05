@@ -2,8 +2,7 @@ from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from cl.recap.models import ProcessingQueue, PDF, DOCKET, APPELLATE_DOCKET, \
-    DOCKET_HISTORY_REPORT
+from cl.recap.models import ProcessingQueue, UPLOAD_TYPE
 from cl.search.models import Court, RECAPDocument
 
 
@@ -51,7 +50,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         extra_kwargs = {'filepath_local': {'write_only': True}}
 
     def validate(self, attrs):
-        if attrs['upload_type'] == DOCKET:
+        if attrs['upload_type'] == UPLOAD_TYPE.DOCKET:
             # Dockets shouldn't have these fields completed.
             numbers_not_blank = any([attrs.get('pacer_doc_id'),
                                      attrs.get('document_number'),
@@ -61,7 +60,8 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                                       "attachment number must be blank for "
                                       "docket uploads.")
 
-        if attrs['upload_type'] in [DOCKET, DOCKET_HISTORY_REPORT]:
+        if attrs['upload_type'] in [UPLOAD_TYPE.DOCKET,
+                                    UPLOAD_TYPE.DOCKET_HISTORY_REPORT]:
             # These are district court dockets. Is the court valid?
             district_court_ids = Court.objects.filter(
                 Q(jurisdiction__in=[
@@ -75,7 +75,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                                       "upload_type for appellate dockets?" %
                                       attrs['court'])
 
-        if attrs['upload_type'] == APPELLATE_DOCKET:
+        if attrs['upload_type'] == UPLOAD_TYPE.APPELLATE_DOCKET:
             # Appellate court dockets. Is the court valid?
             appellate_court_ids = Court.objects.filter(jurisdiction__in=[
                 Court.FEDERAL_APPELLATE,
@@ -85,15 +85,15 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                                       "you mean to use the upload_type for "
                                       "district dockets?" % attrs['court'])
 
-        elif attrs['upload_type'] == PDF:
+        elif attrs['upload_type'] == UPLOAD_TYPE.PDF:
             # PDFs require pacer_doc_id and document_number values.
             if not all([attrs.get('pacer_doc_id'),
                         attrs.get('document_number')]):
                 raise ValidationError("Uploaded PDFs must have the "
-                                      "pacer_doc_id and document_number fields "
-                                      "completed.")
+                                      "pacer_doc_id and document_number "
+                                      "fields completed.")
 
-        if attrs['upload_type'] != PDF:
+        if attrs['upload_type'] != UPLOAD_TYPE.PDF:
             # Everything but PDFs require the case ID.
             if not attrs.get('pacer_case_id'):
                 raise ValidationError("PACER case ID is required for for all "

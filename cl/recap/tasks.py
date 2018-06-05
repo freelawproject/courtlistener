@@ -24,9 +24,7 @@ from cl.lib.utils import remove_duplicate_dicts
 from cl.people_db.models import Party, PartyType, Attorney, \
     AttorneyOrganization, AttorneyOrganizationAssociation, Role, \
     CriminalComplaint, CriminalCount
-from cl.recap.models import ProcessingQueue, PacerHtmlFiles, APPELLATE_DOCKET, \
-    APPELLATE_ATTACHMENT_PAGE, DOCKET_HISTORY_REPORT, PDF, ATTACHMENT_PAGE, \
-    DOCKET
+from cl.recap.models import ProcessingQueue, PacerHtmlFiles, UPLOAD_TYPE
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import Docket, RECAPDocument, DocketEntry
 from cl.search.tasks import add_or_update_recap_document, \
@@ -39,22 +37,22 @@ cnt = CaseNameTweaker()
 def process_recap_upload(pq):
     """Process an item uploaded from an extension or API user.
 
-    Uploaded objects can take a variety of forms, and we'll need to process them
-    accordingly.
+    Uploaded objects can take a variety of forms, and we'll need to
+    process them accordingly.
     """
-    if pq.upload_type == DOCKET:
+    if pq.upload_type == UPLOAD_TYPE.DOCKET:
         chain(process_recap_docket.s(pq.pk),
               add_or_update_recap_docket.s()).apply_async()
-    elif pq.upload_type == ATTACHMENT_PAGE:
+    elif pq.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
         process_recap_attachment.delay(pq.pk)
-    elif pq.upload_type == PDF:
+    elif pq.upload_type == UPLOAD_TYPE.PDF:
         process_recap_pdf.delay(pq.pk)
-    elif pq.upload_type == DOCKET_HISTORY_REPORT:
+    elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         chain(process_recap_docket_history_report.s(pq.pk),
               add_or_update_recap_docket.s()).apply_async()
-    elif pq.upload_type == APPELLATE_DOCKET:
+    elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
         process_recap_appellate_docket.delay(pq.pk)
-    elif pq.upload_type == APPELLATE_ATTACHMENT_PAGE:
+    elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         process_recap_appellate_attachment.delay(pq.pk)
 
 
@@ -131,9 +129,9 @@ def process_recap_pdf(self, pk):
             d = Docket.objects.get(pacer_case_id=pq.pacer_case_id,
                                    court_id=pq.court_id)
         except Docket.DoesNotExist as exc:
-            # No Docket and no RECAPDocument. Do a retry. Hopefully the docket
-            # will be in place soon (it could be in a different upload task that
-            # hasn't yet been processed).
+            # No Docket and no RECAPDocument. Do a retry. Hopefully
+            # the docket will be in place soon (it could be in a
+            # different upload task that hasn't yet been processed).
             logger.warning("Unable to find docket for processing queue '%s'. "
                            "Retrying if max_retries is not exceeded." % pq)
             error_message = "Unable to find docket for item."
@@ -167,10 +165,11 @@ def process_recap_pdf(self, pk):
                     pq.save()
                     raise self.retry(exc=exc)
             else:
-                # If we're here, we've got the docket and docket entry, but
-                # were unable to find the document by pacer_doc_id. This happens
-                # when pacer_doc_id is missing, for example. ∴, try to get the
-                # document from the docket entry.
+                # If we're here, we've got the docket and docket
+                # entry, but were unable to find the document by
+                # pacer_doc_id. This happens when pacer_doc_id is
+                # missing, for example. ∴, try to get the document
+                # from the docket entry.
                 try:
                     rd = RECAPDocument.objects.get(
                         docket_entry=de,
@@ -322,8 +321,8 @@ def find_docket_object(court_id, pacer_case_id, docket_number):
     """Attempt to find the docket based on the uploaded data. If cannot be
     found, create a new docket. If multiple are found, return all of them.
     """
-    # Attempt several lookups of decreasing specificity. Note that pacer_case_id
-    # is required for Docket and Docket History uploads.
+    # Attempt several lookups of decreasing specificity. Note that
+    # pacer_case_id is required for Docket and Docket History uploads.
     d = None
     for kwargs in [{'pacer_case_id': pacer_case_id,
                     'docket_number': docket_number},
@@ -408,19 +407,21 @@ def update_docket_metadata(d, docket_data):
     d = update_case_names(d, docket_data['case_name'])
     d.docket_number = docket_data['docket_number'] or d.docket_number
     d.date_filed = docket_data['date_filed'] or d.date_filed
-    d.date_last_filing = docket_data.get('date_last_filing') or d.date_last_filing
+    d.date_last_filing = docket_data.get(
+        'date_last_filing') or d.date_last_filing
     d.date_terminated = docket_data['date_terminated'] or d.date_terminated
     d.cause = docket_data.get('cause') or d.cause
     d.nature_of_suit = docket_data.get('nature_of_suit') or d.nature_of_suit
     d.jury_demand = docket_data.get('jury_demand') or d.jury_demand
-    d.jurisdiction_type = docket_data.get('jurisdiction') or d.jurisdiction_type
-    judges = get_candidate_judges(docket_data.get('assigned_to_str'), d.court_id,
-                                  docket_data['date_filed'])
+    d.jurisdiction_type = docket_data.get(
+        'jurisdiction') or d.jurisdiction_type
+    judges = get_candidate_judges(docket_data.get('assigned_to_str'),
+                                  d.court_id, docket_data['date_filed'])
     if judges is not None and len(judges) == 1:
         d.assigned_to = judges[0]
     d.assigned_to_str = docket_data.get('assigned_to_str') or ''
-    judges = get_candidate_judges(docket_data.get('referred_to_str'), d.court_id,
-                                  docket_data['date_filed'])
+    judges = get_candidate_judges(docket_data.get('referred_to_str'),
+                                  d.court_id, docket_data['date_filed'])
     if judges is not None and len(judges) == 1:
         d.referred_to = judges[0]
     d.referred_to_str = docket_data.get('referred_to_str') or ''
@@ -488,7 +489,8 @@ def add_docket_entries(d, docket_entries, tag=None):
             continue
 
         rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
-        rd.description = docket_entry.get('short_description') or rd.description
+        rd.description = docket_entry.get(
+            'short_description') or rd.description
         try:
             rd.save()
         except ValidationError:
@@ -555,8 +557,8 @@ def get_terminated_entities(d):
     terminated_attorney_ids = set()
     for party in parties:
         for _ in party.party_types_for_d:
-            # PartyTypes are filtered to terminated objects. Thus, if any exist,
-            # we know it's a terminated party.
+            # PartyTypes are filtered to terminated objects. Thus, if
+            # any exist, we know it's a terminated party.
             terminated_party_ids.add(party.pk)
             break
         for atty in party.attys_in_d:
@@ -571,10 +573,10 @@ def get_terminated_entities(d):
 def normalize_attorney_roles(parties):
     """Clean up the attorney roles for all parties.
 
-    We do this fairly early in the process because we need to know if there are
-    any terminated attorneys before we can start adding/removing content to/from
-    the database. By normalizing early, we ensure we have good data for that
-    sniffing.
+    We do this fairly early in the process because we need to know if
+    there are any terminated attorneys before we can start
+    adding/removing content to/from the database. By normalizing
+    early, we ensure we have good data for that sniffing.
 
     A party might be input with an attorney such as:
 
@@ -603,6 +605,7 @@ def normalize_attorney_roles(parties):
 
     :param parties: The parties dict from Juriscraper.
     :returns None; editing happens in place.
+
     """
     for party in parties:
         for atty in party.get('attorneys', []):
@@ -646,7 +649,8 @@ def disassociate_extraneous_entities(d, parties, parties_to_preserve,
             # any entities that weren't just created/updated and that aren't in
             # the list of terminated entities.
             parties_to_preserve = parties_to_preserve | terminated_parties
-            attorneys_to_preserve = attorneys_to_preserve | terminated_attorneys
+            attorneys_to_preserve = \
+                attorneys_to_preserve | terminated_attorneys
     else:
         # The terminated parties are already included in the entities to
         # preserve, so just create an empty variable for this.
@@ -679,9 +683,11 @@ def add_parties_and_attorneys(d, parties):
     """Add parties and attorneys from the docket data to the docket.
 
     :param d: The docket to update
-    :param parties: The parties to update the docket with, with their associated
-    attorney objects. This is typically the docket_data['parties'] field.
+    :param parties: The parties to update the docket with, with their
+    associated attorney objects. This is typically the
+    docket_data['parties'] field.
     :return: None
+
     """
     normalize_attorney_roles(parties)
 
@@ -722,18 +728,18 @@ def add_parties_and_attorneys(d, parties):
             pts.update(**update_dict)
             pt = pts[0]
         else:
-            pt = PartyType.objects.create(docket=d, party=p, name=party['type'],
-                                          **update_dict)
+            pt = PartyType.objects.create(docket=d, party=p,
+                                          name=party['type'], **update_dict)
 
         # Criminal counts and complaints
         if criminal_data and criminal_data['counts']:
             CriminalCount.objects.filter(party_type=pt).delete()
             CriminalCount.objects.bulk_create([
                 CriminalCount(
-                    party_type=pt, name=count['name'],
+                    party_type=pt, name=criminal_count['name'],
                     disposition=count['disposition'],
                     status=CriminalCount.normalize_status(count['status'])
-                ) for count in criminal_data['counts']
+                ) for criminal_count in criminal_data['counts']
             ])
 
         if criminal_data and criminal_data['complaints']:
@@ -772,7 +778,7 @@ def process_orphan_documents(rds_created, court_id, docket_date):
         pacer_doc_id__in=pacer_doc_ids,
         court_id=court_id,
         status=ProcessingQueue.PROCESSING_FAILED,
-        upload_type=PDF,
+        upload_type=UPLOAD_TYPE.PDF,
         debug=False,
         date_modified__gt=cutoff_date,
     ).values_list('pk', flat=True)
@@ -780,9 +786,9 @@ def process_orphan_documents(rds_created, court_id, docket_date):
         try:
             process_recap_pdf(pq)
         except:
-            # We can ignore this. If we don't, we get all of the exceptions that
-            # were previously raised for the processing queue items a second
-            # time.
+            # We can ignore this. If we don't, we get all of the
+            # exceptions that were previously raised for the
+            # processing queue items a second time.
             pass
 
 
@@ -790,18 +796,21 @@ def process_orphan_documents(rds_created, court_id, docket_date):
 def process_recap_docket(self, pk):
     """Process an uploaded docket from the RECAP API endpoint.
 
-    :param pk: The primary key of the processing queue item you want to work on.
+    :param pk: The primary key of the processing queue item you want to work
+    on.
     :returns: A dict of the form:
 
         {
             // The PK of the docket that's created or updated
             'docket_pk': 22,
-            // A boolean indicating whether a new docket entry or recap document
-            // was created (implying a Solr needs updating).
+            // A boolean indicating whether a new docket entry or
+            // recap document was created (implying a Solr needs
+            // updating).
             'needs_solr_update': True,
         }
 
     This value is a dict so that it can be ingested in a Celery chain.
+
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
@@ -814,7 +823,7 @@ def process_recap_docket(self, pk):
         # Prior to 1.1.8, we did not separate docket history reports into their
         # own upload_type. Alas, we still have some old clients around, so we
         # need to handle those clients here.
-        pq.upload_type = DOCKET_HISTORY_REPORT
+        pq.upload_type = UPLOAD_TYPE.DOCKET_HISTORY_REPORT
         pq.save()
         process_recap_docket_history_report(pk)
         self.request.callbacks = None
@@ -851,13 +860,15 @@ def process_recap_docket(self, pk):
     d.save()
 
     # Add the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(content_object=d, upload_type=DOCKET)
+    pacer_file = PacerHtmlFiles(content_object=d,
+                                upload_type=UPLOAD_TYPE.DOCKET)
     pacer_file.filepath.save(
         'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(text),
     )
 
-    rds_created, needs_solr_update = add_docket_entries(d, data['docket_entries'])
+    rds_created, needs_solr_update = add_docket_entries(d,
+                                                        data['docket_entries'])
     add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
@@ -934,7 +945,7 @@ def process_recap_attachment(self, pk):
     if not pq.debug:
         # Save the old HTML to the docket entry.
         pacer_file = PacerHtmlFiles(content_object=de,
-                                    upload_type=ATTACHMENT_PAGE)
+                                    upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE)
         pacer_file.filepath.save(
             'attachment_page.html',  # Irrelevant b/c UUIDFileSystemStorage
             ContentFile(text),
@@ -1029,13 +1040,15 @@ def process_recap_docket_history_report(self, pk):
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(content_object=d,
-                                upload_type=DOCKET_HISTORY_REPORT)
+                                upload_type=UPLOAD_TYPE.DOCKET_HISTORY_REPORT)
     pacer_file.filepath.save(
-        'docket_history.html',  # We only care about the ext w/UUIDFileSystemStorage
+        # We only care about the ext w/UUIDFileSystemStorage
+        'docket_history.html',
         ContentFile(text),
     )
 
-    rds_created, needs_solr_update = add_docket_entries(d, data['docket_entries'])
+    rds_created, needs_solr_update = add_docket_entries(d,
+                                                        data['docket_entries'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
     return {

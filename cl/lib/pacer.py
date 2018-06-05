@@ -8,13 +8,14 @@ from dateutil import parser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from juriscraper.lib.string_utils import titlecase
-from juriscraper.pacer import DocketReport, DocketHistoryReport, InternetArchive
+from juriscraper.pacer import DocketReport, DocketHistoryReport, \
+    InternetArchive
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
 from cl.search.models import Court, Docket
 from cl.people_db.models import Role, AttorneyOrganization
-from cl.recap.models import DOCKET_HISTORY_REPORT, DOCKET, IA_XML_FILE
+from cl.recap.models import UPLOAD_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -181,11 +182,11 @@ def process_docket_data(d, filepath, report_type):
     """
     from cl.recap.tasks import update_docket_metadata, add_docket_entries, \
         add_parties_and_attorneys
-    if report_type == DOCKET:
+    if report_type == UPLOAD_TYPE.DOCKET:
         report = DocketReport(map_cl_to_pacer_id(d.court_id))
-    elif report_type == DOCKET_HISTORY_REPORT:
+    elif report_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         report = DocketHistoryReport(map_cl_to_pacer_id(d.court_id))
-    elif report_type == IA_XML_FILE:
+    elif report_type == UPLOAD_TYPE.IA_XML_FILE:
         report = InternetArchive()
     with open(filepath, 'r') as f:
         text = f.read().decode('utf-8')
@@ -196,7 +197,7 @@ def process_docket_data(d, filepath, report_type):
     update_docket_metadata(d, data)
     d.save()
     add_docket_entries(d, data['docket_entries'])
-    if report_type in (DOCKET, IA_XML_FILE):
+    if report_type in (UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.IA_XML_FILE):
         add_parties_and_attorneys(d, data['parties'])
     return d.pk
 
@@ -274,8 +275,8 @@ def make_address_lookup_key(address_info):
 
      - Sort the fields alphabetically
      - Strip anything that's not a character or number
-     - Remove/normalize a variety of words that add little meaning and are often
-       omitted.
+     - Remove/normalize a variety of words that add little meaning and
+       are often omitted.
     """
     sorted_info = OrderedDict(sorted(address_info.items()))
     fixes = {
