@@ -51,7 +51,8 @@ def process_recap_upload(pq):
         chain(process_recap_docket_history_report.s(pq.pk),
               add_or_update_recap_docket.s()).apply_async()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
-        process_recap_appellate_docket.delay(pq.pk)
+        chain(process_recap_appellate_docket.s(pq.pk),
+              add_or_update_recap_docket.s()).apply_async()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         process_recap_appellate_attachment.delay(pq.pk)
 
