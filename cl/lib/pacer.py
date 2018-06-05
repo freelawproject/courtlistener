@@ -8,8 +8,8 @@ from dateutil import parser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from juriscraper.lib.string_utils import titlecase
-from juriscraper.pacer import DocketReport, DocketHistoryReport, \
-    InternetArchive
+from juriscraper.pacer import AppellateDocketReport, DocketReport, \
+    DocketHistoryReport, InternetArchive
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
@@ -186,6 +186,8 @@ def process_docket_data(d, filepath, report_type):
         report = DocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         report = DocketHistoryReport(map_cl_to_pacer_id(d.court_id))
+    elif report_type == UPLOAD_TYPE.APPELLATE_DOCKET_REPORT:
+        report = AppellateDocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == UPLOAD_TYPE.IA_XML_FILE:
         report = InternetArchive()
     with open(filepath, 'r') as f:
@@ -197,7 +199,8 @@ def process_docket_data(d, filepath, report_type):
     update_docket_metadata(d, data)
     d.save()
     add_docket_entries(d, data['docket_entries'])
-    if report_type in (UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.IA_XML_FILE):
+    if report_type in (UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.APPELLATE_DOCKET,
+                       UPLOAD_TYPE.IA_XML_FILE):
         add_parties_and_attorneys(d, data['parties'])
     return d.pk
 
