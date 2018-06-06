@@ -181,15 +181,10 @@ class Command(VerboseCommand):
                 # hits is a multi-dimensional array. It consists of alerts,
                 # paired with a list of document dicts, of the form:
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
-                try:
-                    if len(results) > 0:
-                        hits.append([alert, alert_type, results])
-                        alert.date_last_hit = now()
-                        alert.save()
-                except Exception as e:
-                    traceback.print_exc()
-                    logger.info("Search failed on alert: %s with "
-                                "error: %s" % (alert.query, e))
+                if len(results) > 0:
+                    hits.append([alert, alert_type, results])
+                    alert.date_last_hit = now()
+                    alert.save()
 
             if len(hits) > 0:
                 alerts_sent_count += 1
