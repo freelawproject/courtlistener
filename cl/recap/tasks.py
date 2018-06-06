@@ -737,8 +737,9 @@ def add_parties_and_attorneys(d, parties):
             CriminalCount.objects.bulk_create([
                 CriminalCount(
                     party_type=pt, name=criminal_count['name'],
-                    disposition=count['disposition'],
-                    status=CriminalCount.normalize_status(count['status'])
+                    disposition=criminal_count['disposition'],
+                    status=CriminalCount.normalize_status(
+                        criminal_count['status'])
                 ) for criminal_count in criminal_data['counts']
             ])
 
