@@ -13,9 +13,9 @@ from juriscraper.pacer import AppellateDocketReport, DocketReport, \
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
-from cl.search.models import Court, Docket
 from cl.people_db.models import Role, AttorneyOrganization
 from cl.recap.models import UPLOAD_TYPE
+from cl.search.models import Court, Docket
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +186,7 @@ def process_docket_data(d, filepath, report_type):
         report = DocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         report = DocketHistoryReport(map_cl_to_pacer_id(d.court_id))
-    elif report_type == UPLOAD_TYPE.APPELLATE_DOCKET_REPORT:
+    elif report_type == UPLOAD_TYPE.APPELLATE_DOCKET:
         report = AppellateDocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == UPLOAD_TYPE.IA_XML_FILE:
         report = InternetArchive()
