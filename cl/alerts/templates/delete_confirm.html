@@ -7,13 +7,13 @@
 {% block content %}
     <div class="col-sm-3">&nbsp;</div>
     <div class="col-sm-6">
-        <h2>You are about to delete this alert</h2>
-        <h3 class="v-offset-below-3">Are you sure you want to do this?</h3>
+        <h1 class="text-center">You are about to delete this alert</h1>
+        <h2 class="v-offset-below-3 text-center">Are you sure you want to do this?</h2>
 
-        <a href="{% url "profile_alerts" %}" class="btn btn-primary">Cancel and Go
+        <a href="{% url "profile_alerts" %}" class="btn btn-primary btn-lg">Cancel and Go
             Back</a>&nbsp;&nbsp;
         <form action="/alert/delete/{{alert_id}}/" method="post" class="float-right">{% csrf_token %}
-            <button type="submit" class="btn btn-danger">Delete this Alert</button>
+            <button type="submit" class="btn btn-danger btn-lg">Delete this Alert</button>
         </form>
 
     </div>
