@@ -571,7 +571,7 @@
                     Most Recent Oral Arguments Heard by {{ person.name_last }} ({{ oral_arguments_heard.result.numFound|intcomma }})
                     {% if not person.date_dod and not person.dod_state and not person.dod_city %}
                         <a href="/feed/search/?type=oa&q=panel_ids%3A{{ person.pk }}">
-                            <i class="gray fa fa-rss"
+                            <i class="gray fa fa-podcast"
                                title="Subscribe to a podcast of {{ person.name_last }}'s latest cases"></i>
                         </a>
                     {% endif %}
