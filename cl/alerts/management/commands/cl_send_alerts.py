@@ -51,7 +51,7 @@ def get_cut_off_date(rate, d=datetime.date.today()):
     return cut_off_date
 
 
-def send_alert(user_profile, hits, simulate):
+def send_alert(user_profile, hits):
     email_subject = 'New hits for your CourtListener alerts'
     email_sender = 'CourtListener Alerts <alerts@courtlistener.com>'
 
@@ -63,8 +63,7 @@ def send_alert(user_profile, hits, simulate):
     msg = EmailMultiAlternatives(email_subject, txt, email_sender,
                                  [user_profile.user.email])
     msg.attach_alternative(html, "text/html")
-    if not simulate:
-        msg.send(fail_silently=False)
+    msg.send(fail_silently=False)
 
 
 class Command(VerboseCommand):
@@ -88,13 +87,6 @@ class Command(VerboseCommand):
             help="The rate to send emails (%s)" %
                  ', '.join(Alert.ALL_FREQUENCIES),
         )
-        parser.add_argument(
-            '--simulate',
-            action='store_true',
-            default=False,
-            help='Simulate the emails that would be sent using the console '
-                 'backend.',
-        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
@@ -102,11 +94,6 @@ class Command(VerboseCommand):
         if options['rate'] == Alert.REAL_TIME:
             self.remove_stale_rt_items()
             self.valid_ids = self.get_new_ids()
-
-        if options['simulate']:
-            logger.info("******************************************\n"
-                        "* SIMULATE MODE - NO EMAILS WILL BE SENT *\n"
-                        "******************************************\n")
 
         self.send_emails(options['rate'])
         if options['rate'] == Alert.REAL_TIME:
@@ -215,21 +202,19 @@ class Command(VerboseCommand):
 
             if len(hits) > 0:
                 alerts_sent_count += 1
-                send_alert(user.profile, hits, self.options['simulate'])
+                send_alert(user.profile, hits)
 
-        if not self.options['simulate']:
-            tally_stat('alerts.sent.%s' % rate, inc=alerts_sent_count)
-            logger.info("Sent %s %s email alerts." % (alerts_sent_count, rate))
+        tally_stat('alerts.sent.%s' % rate, inc=alerts_sent_count)
+        logger.info("Sent %s %s email alerts." % (alerts_sent_count, rate))
 
     def clean_rt_queue(self):
         """Clean out any items in the RealTime queue once they've been run or
         if they are stale.
         """
-        if not self.options['simulate']:
-            q = Q()
-            for item_type, ids in self.valid_ids.items():
-                q |= Q(item_type=item_type, item_pk__in=ids)
-            RealTimeQueue.objects.filter(q).delete()
+        q = Q()
+        for item_type, ids in self.valid_ids.items():
+            q |= Q(item_type=item_type, item_pk__in=ids)
+        RealTimeQueue.objects.filter(q).delete()
 
     def remove_stale_rt_items(self, age=2):
         """Remove anything old from the RTQ.
@@ -239,10 +224,9 @@ class Command(VerboseCommand):
         :param age: How many days old should items be before we start deleting
         them?
         """
-        if not self.options['simulate']:
-            RealTimeQueue.objects.filter(
-                date_modified__lt=now() - datetime.timedelta(days=age),
-            ).delete()
+        RealTimeQueue.objects.filter(
+            date_modified__lt=now() - datetime.timedelta(days=age),
+        ).delete()
 
     def get_new_ids(self):
         """Get an intersection of the items that are new in the DB and those
