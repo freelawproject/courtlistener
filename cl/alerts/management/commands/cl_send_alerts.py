@@ -103,65 +103,52 @@ class Command(VerboseCommand):
         results = []
         error = False
         cd = {}
+        logger.info("Now running the query: %s\n" % alert.query)
+
+        # Set up the data
+        data = search_utils.get_string_to_dict(alert.query)
         try:
-            logger.info("Now running the query: %s\n" % alert.query)
+            del data['filed_before']
+        except KeyError:
+            pass
+        data['order_by'] = 'score desc'
+        logger.info("Data sent to SearchForm is: %s\n" % data)
+        search_form = SearchForm(data)
+        if search_form.is_valid():
+            cd = search_form.cleaned_data
 
-            # Set up the data
-            data = search_utils.get_string_to_dict(alert.query)
-            try:
-                del data['filed_before']
-            except KeyError:
-                pass
-            data['order_by'] = 'score desc'
-            logger.info("Data sent to SearchForm is: %s\n" % data)
-            search_form = SearchForm(data)
-            if search_form.is_valid():
-                cd = search_form.cleaned_data
+            if rate == Alert.REAL_TIME and \
+                    len(self.valid_ids[cd['type']]) == 0:
+                # Bail out. No results will be found if no valid_ids.
+                return error, cd['type'], results
 
-                if rate == Alert.REAL_TIME and \
-                        len(self.valid_ids[cd['type']]) == 0:
-                    # Bail out. No results will be found if no valid_ids.
-                    return error, cd['type'], results
+            cut_off_date = get_cut_off_date(rate)
+            if cd['type'] == 'o':
+                cd['filed_after'] = cut_off_date
+            elif cd['type'] == 'oa':
+                cd['argued_after'] = cut_off_date
+            main_params = search_utils.build_main_query(cd, facet=False)
+            main_params.update({
+                'rows': '20',
+                'start': '0',
+                'hl.tag.pre': '<em><strong>',
+                'hl.tag.post': '</strong></em>',
+                'caller': 'cl_send_alerts',
+            })
 
-                cut_off_date = get_cut_off_date(rate)
-                if cd['type'] == 'o':
-                    cd['filed_after'] = cut_off_date
-                elif cd['type'] == 'oa':
-                    cd['argued_after'] = cut_off_date
-                main_params = search_utils.build_main_query(cd, facet=False)
-                main_params.update({
-                    'rows': '20',
-                    'start': '0',
-                    'hl.tag.pre': '<em><strong>',
-                    'hl.tag.post': '</strong></em>',
-                    'caller': 'cl_send_alerts',
-                })
-
-                if rate == Alert.REAL_TIME:
-                    main_params['fq'].append('id:(%s)' % ' OR '.join(
-                        [str(i) for i in self.valid_ids[cd['type']]]
-                    ))
-                results = self.connections[
-                    cd['type']
-                ].query().add_extra(
-                    **main_params
-                ).execute()
-                regroup_snippets(results)
-
-            else:
-                logger.info("Query for alert %s was invalid. Errors "
-                            "from the  SearchForm: %s" % (alert.query,
-                                                          search_form.errors))
-                error = True
-        except:
-            traceback.print_exc()
-            logger.info("Search for this alert failed: %s\n" %
-                        alert.query)
-            error = True
+            if rate == Alert.REAL_TIME:
+                main_params['fq'].append('id:(%s)' % ' OR '.join(
+                    [str(i) for i in self.valid_ids[cd['type']]]
+                ))
+            results = self.connections[
+                cd['type']
+            ].query().add_extra(
+                **main_params
+            ).execute()
+            regroup_snippets(results)
 
         logger.info("There were %s results\n" % len(results))
-
-        return error, cd.get('type'), results
+        return cd.get('type'), results
 
     def send_emails(self, rate):
         """Send out an email to every user whose alert has a new hit for a
@@ -183,8 +170,12 @@ class Command(VerboseCommand):
 
             hits = []
             for alert in alerts:
-                error, alert_type, results = self.run_query(alert, rate)
-                if error:
+                try:
+                    alert_type, results = self.run_query(alert, rate)
+                except:
+                    traceback.print_exc()
+                    logger.info("Search for this alert failed: %s\n" %
+                                alert.query)
                     continue
 
                 # hits is a multi-dimensional array. It consists of alerts,
