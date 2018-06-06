@@ -69,9 +69,16 @@
         </button>
       </form>
 
-      <p class="gray">Some jurisdictions do not yet support alerts. Check
-        <a href="{% url "coverage" %}#scraped-jurisdictions">our list</a> to be sure your query is supported.
-      </p>
+      {% if search_form.type.value == 'o' %}
+        <p class="gray">Some jurisdictions do not yet support alerts. Check
+          <a href="{% url "coverage" %}#scraped-jurisdictions">our list</a> to be sure your query is supported.
+        </p>
+      {% elif search_form.type.value == 'oa' %}
+        {# No need for statement here. All OA jurisdictions are scraped. #}
+      {% elif search_form.type.value == 'r' %}
+        <p class="gray">RECAP alerts will only be triggered when the RECAP Archive gets a responsive document. Check out <a href="{% url "coverage" %}#recap-archive">how RECAP content is acquired</a> to learn more.
+        </p>
+      {% endif %}
     {% else %}
       {# User is not authenticated #}
       <p>To get daily alerts for this search, <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">sign in</a> or <a href="{% url "register" %}?next={{ request.path }}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">register</a> as a new user.
