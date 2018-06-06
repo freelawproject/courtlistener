@@ -43,10 +43,15 @@ def view_alerts(request):
     alerts = request.user.alerts.all()
     for a in alerts:
         alert_dict = search_utils.get_string_to_dict(a.query)
-        if alert_dict.get('type') == 'oa':
+        alert_type = alert_dict.get('type')
+        if alert_type == 'oa':
             a.type = 'oa'
-        else:
+        elif alert_type == 'o':
             a.type = 'o'
+        elif alert_type == 'r':
+            a.type = 'r'
+        else:
+            raise NotImplementedError("Unexpected alert type, %s" % alert_type)
     return render(request, 'profile/alerts.html', {
         'alerts': alerts,
         'private': True
