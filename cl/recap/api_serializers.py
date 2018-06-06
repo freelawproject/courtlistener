@@ -50,7 +50,8 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         extra_kwargs = {'filepath_local': {'write_only': True}}
 
     def validate(self, attrs):
-        if attrs['upload_type'] == UPLOAD_TYPE.DOCKET:
+        if attrs['upload_type'] in [UPLOAD_TYPE.DOCKET,
+                                    UPLOAD_TYPE.APPELLATE_DOCKET]:
             # Dockets shouldn't have these fields completed.
             numbers_not_blank = any([attrs.get('pacer_doc_id'),
                                      attrs.get('document_number'),
