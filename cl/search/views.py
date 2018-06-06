@@ -306,7 +306,11 @@ def show_results(request):
                              'rate': "dly"},
                     user=request.user
                 )
+
             render_dict.update(do_search(request))
+            # Set the value to the query as a convenience
+            alert_form.fields['name'].widget.attrs['value'] = \
+                render_dict['search_summary_str']
             render_dict.update({'alert_form': alert_form})
             return render(request, 'search.html', render_dict)
 
