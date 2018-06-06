@@ -114,7 +114,9 @@ def coverage_graph(request):
             has_oral_argument_scraper=True)
 
         oa_duration = Audio.objects.aggregate(
-            Sum('duration'))['duration__sum'] / 60
+            Sum('duration'))['duration__sum']
+        if oa_duration:
+            oa_duration /= 60  # Avoids a "unsupported operand type" error
 
         coverage_data = {
             'sorted_courts': courts_json,
