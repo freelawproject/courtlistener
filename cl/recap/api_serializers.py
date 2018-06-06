@@ -79,7 +79,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             # Appellate court dockets. Is the court valid?
             appellate_court_ids = Court.objects.filter(jurisdiction__in=[
                 Court.FEDERAL_APPELLATE,
-            ])
+            ]).values_list('pk', flat=True)
             if attrs['court'].pk not in appellate_court_ids:
                 raise ValidationError("%s is not an appellate court ID. Did "
                                       "you mean to use the upload_type for "
