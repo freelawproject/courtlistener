@@ -24,7 +24,7 @@ from cl.lib.recap_utils import get_document_filename
 from cl.lib.utils import remove_duplicate_dicts
 from cl.people_db.models import Attorney, AttorneyOrganization, \
     AttorneyOrganizationAssociation, CriminalComplaint, CriminalCount, \
-    Party, PartyType, Role    
+    Party, PartyType, Role
 from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import Docket, DocketEntry, RECAPDocument
