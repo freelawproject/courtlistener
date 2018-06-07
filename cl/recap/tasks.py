@@ -24,7 +24,7 @@ from cl.lib.recap_utils import get_document_filename
 from cl.lib.utils import remove_duplicate_dicts
 from cl.people_db.models import Attorney, AttorneyOrganization, \
     AttorneyOrganizationAssociation, CriminalComplaint, CriminalCount, \
-    Party, PartyType, Role    
+    Party, PartyType, Role
 from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import Docket, DocketEntry, RECAPDocument
@@ -608,9 +608,11 @@ def normalize_attorney_roles(parties):
         'roles': [{
             'role': Role.ATTORNEY_LEAD,
             'date_action': None,
+            'role_raw': 'LEAD ATTORNEY',
         }, {
             'role': Role.TERMINATED,
             'date_action': date(2013, 3, 12),
+            'role_raw': 'TERMINATED: 03/12/2013',
         }
 
     :param parties: The parties dict from Juriscraper.
@@ -620,7 +622,6 @@ def normalize_attorney_roles(parties):
     for party in parties:
         for atty in party.get('attorneys', []):
             roles = [normalize_attorney_role(r) for r in atty['roles']]
-            roles = filter(lambda r: r['role'] is not None, roles)
             roles = remove_duplicate_dicts(roles)
             atty['roles'] = roles
 
