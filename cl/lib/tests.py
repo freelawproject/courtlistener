@@ -2,9 +2,8 @@
 from __future__ import print_function
 
 import datetime
-import re
-
 import os
+import re
 import tempfile
 
 from django.core.files.base import ContentFile
@@ -16,7 +15,7 @@ from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 from cl.lib.db_tools import queryset_generator
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_upload_path
-from cl.lib.pacer import normalize_attorney_role, normalize_attorney_contact,\
+from cl.lib.pacer import normalize_attorney_role, normalize_attorney_contact, \
     normalize_us_state, make_address_lookup_key
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import UUIDFileSystemStorage
@@ -250,41 +249,65 @@ class TestPACERPartyParsing(TestCase):
         """Can we normalize the attorney roles into a small number of roles?"""
         pairs = [{
             'q': '(Inactive)',
-            'a': {'role': Role.INACTIVE, 'date_action': None},
+            'a': {'role': Role.INACTIVE,
+                  'date_action': None,
+                  'role_raw': '(Inactive)'},
         }, {
             'q': 'ATTORNEY IN SEALED GROUP',
-            'a': {'role': Role.ATTORNEY_IN_SEALED_GROUP, 'date_action': None},
+            'a': {'role': Role.ATTORNEY_IN_SEALED_GROUP,
+                  'date_action': None,
+                  'role_raw': 'ATTORNEY IN SEALED GROUP'},
         }, {
             'q': 'ATTORNEY TO BE NOTICED',
-            'a': {'role': Role.ATTORNEY_TO_BE_NOTICED, 'date_action': None},
+            'a': {'role': Role.ATTORNEY_TO_BE_NOTICED,
+                  'date_action': None,
+                  'role_raw': 'ATTORNEY TO BE NOTICED'},
         }, {
             'q': 'Bar Status: ACTIVE',
-            'a': {'role': None, 'date_action': None},
+            'a': {'role': None,
+                  'date_action': None,
+                  'role_raw': 'Bar Status: ACTIVE'},
         }, {
             'q': 'DISBARRED 02/19/2010',
             'a': {'role': Role.DISBARRED,
-                  'date_action': datetime.date(2010, 2, 19)},
+                  'date_action': datetime.date(2010, 2, 19),
+                  'role_raw': 'DISBARRED 02/19/2010'},
         }, {
             'q': 'Designation: ADR Pro Bono Limited Scope Counsel',
-            'a': {'role': None, 'date_action': None},
+            'a': {'role': None,
+                  'date_action': None,
+                  'role_raw': 'Designation: ADR Pro Bono Limited Scope '
+                              'Counsel'},
         }, {
             'q': 'LEAD ATTORNEY',
-            'a': {'role': Role.ATTORNEY_LEAD, 'date_action': None},
+            'a': {'role': Role.ATTORNEY_LEAD,
+                  'date_action': None,
+                  'role_raw': 'LEAD ATTORNEY'},
         }, {
             'q': 'PRO HAC VICE',
-            'a': {'role': Role.PRO_HAC_VICE, 'date_action': None},
+            'a': {'role': Role.PRO_HAC_VICE,
+                  'date_action': None,
+                  'role_raw': 'PRO HAC VICE'},
         }, {
             'q': 'SELF- TERMINATED: 01/14/2013',
             'a': {'role': Role.SELF_TERMINATED,
-                  'date_action': datetime.date(2013, 1, 14)},
+                  'date_action': datetime.date(2013, 1, 14),
+                  'role_raw': 'SELF- TERMINATED: 01/14/2013'},
         }, {
             'q': 'SUSPENDED 01/22/2016',
             'a': {'role': Role.SUSPENDED,
-                  'date_action': datetime.date(2016, 1, 22)},
+                  'date_action': datetime.date(2016, 1, 22),
+                  'role_raw': 'SUSPENDED 01/22/2016'},
         }, {
             'q': 'TERMINATED: 01/01/2007',
             'a': {'role': Role.TERMINATED,
-                  'date_action': datetime.date(2007, 1, 1)},
+                  'date_action': datetime.date(2007, 1, 1),
+                  'role_raw': 'TERMINATED: 01/01/2007'},
+        }, {
+            'q': 'Blagger jabber',
+            'a': {'role': None,
+                  'date_action': None,
+                  'role_raw': 'Blagger jabber'},
         }]
         for pair in pairs:
             print("Normalizing PACER role of '%s' to '%s'..." %
@@ -292,8 +315,6 @@ class TestPACERPartyParsing(TestCase):
             result = normalize_attorney_role(pair['q'])
             self.assertEqual(result, pair['a'])
             print('✓')
-        with self.assertRaises(ValueError):
-            normalize_attorney_role('this is an unknown role')
 
     def test_state_normalization(self):
         pairs = [{
