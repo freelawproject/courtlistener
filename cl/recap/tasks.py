@@ -727,8 +727,8 @@ def add_parties_and_attorneys(d, parties):
         pts = p.party_types.filter(docket=d, name=party['type'])
         criminal_data = party.get('criminal_data')
         update_dict = {
-            'extra_info': party['extra_info'],
-            'date_terminated': party['date_terminated'],
+            'extra_info': party.get('extra_info', ''),
+            'date_terminated': party.get('date_terminated'),
         }
         if criminal_data:
             update_dict['highest_offense_level_opening'] = criminal_data[
