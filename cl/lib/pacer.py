@@ -207,7 +207,7 @@ def process_docket_data(d, filepath, report_type):
 
 def normalize_attorney_role(r):
     """Normalize attorney roles into the valid set"""
-    role = {'role': None, 'date_action': None}
+    role = {'role': None, 'date_action': None, 'role_raw': r}
 
     r = r.lower()
     # Bad values we can expect. Nuke these early so they don't cause problems.
@@ -239,10 +239,7 @@ def normalize_attorney_role(r):
     except ValueError:
         role['date_action'] = None
 
-    if role['role'] is None:
-        raise ValueError(u"Unable to match role: %s" % r)
-    else:
-        return role
+    return role
 
 
 def normalize_us_phone_number(phone):
