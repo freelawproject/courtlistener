@@ -457,6 +457,7 @@ def add_docket_entries(d, docket_entries, tag=None):
             continue
 
         de.description = docket_entry['description'] or de.description
+        de.date_entered = docket_entry['date_entered'] or de.date_entered
         de.date_filed = docket_entry['date_filed'] or de.date_filed
         de.save()
         if tag is not None:
@@ -990,8 +991,12 @@ def process_recap_attachment(self, pk):
                 add_or_update_recap_document([rd.pk], force_commit=False)
 
     mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
-    process_orphan_documents(rds_created, pq.court_id,
-                             main_rd.docket_entry.docket.date_filed)
+
+    # We only have one of these two dates, but the parameter
+    # is only used for a rough cutoff anyhow.
+    docket_date = main_rd.docket_entry.docket.date_filed or \
+        main_rd.docket_entry.docket.date_entered
+    process_orphan_documents(rds_created, pq.court_id, docket_date)
 
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60,
