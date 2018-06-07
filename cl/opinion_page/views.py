@@ -129,7 +129,7 @@ def view_parties(request, docket_id, slug):
                 Prefetch(
                     'party__roles',
                     queryset=Role.objects.filter(docket=docket).order_by(
-                        'attorney_id', 'role', 'date_action'
+                        'attorney_id', 'role', 'role_raw', 'date_action'
                     ).select_related(
                         'attorney'
                     ).prefetch_related(
