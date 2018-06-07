@@ -83,7 +83,11 @@
                         {% for role in a.list %}
                             {% if role.role != role.UNKNOWN %}
                             <p class="bottom"><em>
-                                {{  role.get_role_display }}&nbsp;{% if role.date_action %}({{ role.date_action }}){% endif %}<br>
+                              {% if role.role_raw %}
+                                {{ role.role_raw }}&nbsp;{% if role.date_action %}({{ role.date_action }}){% endif %}
+                              {% else %}
+                                {{  role.get_role_display }}&nbsp;{% if role.date_action %}({{ role.date_action }}){% endif %}
+                              {% endif %}<br>
                             </em></p>
                             {% endif %}
                         {% endfor %}
