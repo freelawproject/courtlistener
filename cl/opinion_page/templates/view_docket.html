@@ -153,19 +153,23 @@
                             </li>
                             <li role="separator" class="divider"></li>
                           {% endif %}
-                          <li>
-                            <a href="{{ rd.pacer_url }}"
-                               target="_blank"
-                               rel="nofollow">Buy on
-                              PACER</a>
-                          </li>
+                          {% if rd.pacer_url %}
+                            <li>
+                              <a href="{{ rd.pacer_url }}"
+                                 target="_blank"
+                                 rel="nofollow">Buy on
+                                PACER</a>
+                            </li>
+                          {% endif %}
                         </ul>
                       {% else %}
                         {# We don't have it #}
-                        <a href="{{ rd.pacer_url }}"
-                           class="btn btn-default btn-xs"
-                           target="_blank"
-                           rel="nofollow">Buy<span class="hidden-xs"> on PACER</span></a>
+                        {% if rd.pacer_url %}
+                          <a href="{{ rd.pacer_url }}"
+                             class="btn btn-default btn-xs"
+                             target="_blank"
+                             rel="nofollow">Buy<span class="hidden-xs"> on PACER</span></a>
+                        {% endif %}
                       {% endif %}
                     </div>
                     <div class="col-xs-3 hidden-sm hidden-md hidden-lg hidden-print">
@@ -177,11 +181,13 @@
                         </a>
                       {% else %}
                         {# We don't have it #}
-                        <a href="{{ rd.pacer_url }}"
-                           class="btn btn-primary btn-xs"
-                           target="_blank"
-                           rel="nofollow"
-                           title="Buy on PACER"><i class="fa fa-download"></i></a>
+                        {% if rd.pacer_url %}
+                          <a href="{{ rd.pacer_url }}"
+                             class="btn btn-primary btn-xs"
+                             target="_blank"
+                             rel="nofollow"
+                             title="Buy on PACER"><i class="fa fa-download"></i></a>
+                        {% endif %}
                       {% endif %}
                     </div>
                   </div>

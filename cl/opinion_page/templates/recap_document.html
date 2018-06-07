@@ -144,15 +144,19 @@
                         </li>
                         <li role="separator" class="divider"></li>
                     {% endif %}
-                    <li>
+                    {% if document.pacer_url %}
+                      <li>
                         <a href="{{ document.pacer_url }}">Buy on
                             PACER</a>
-                    </li>
+                      </li>
+                    {% endif %}
                 </ul>
             {% else %}
                 {# We don't have it #}
-                <a href="{{ document.pacer_url }}"
-                   class="btn btn-primary btn-xs">Buy on PACER</a>
+                {% if document.pacer_url %}
+                  <a href="{{ document.pacer_url }}"
+                     class="btn btn-primary btn-xs">Buy on PACER</a>
+                {% endif %}
             {% endif %}
         </div>
 
