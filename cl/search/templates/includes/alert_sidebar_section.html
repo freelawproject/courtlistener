@@ -76,7 +76,7 @@
       {% elif search_form.type.value == 'oa' %}
         {# No need for statement here. All OA jurisdictions are scraped. #}
       {% elif search_form.type.value == 'r' %}
-        <p class="gray">RECAP alerts will only be triggered when the RECAP Archive gets a responsive document. Check out <a href="{% url "coverage" %}#recap-archive">how RECAP content is acquired</a> to learn more.
+        <p class="gray">RECAP alerts will only be triggered when there is a new responsive document added to the RECAP Archive. Check out <a href="{% url "coverage" %}#recap-archive">how RECAP content is acquired</a> to learn more.
         </p>
       {% endif %}
     {% else %}
