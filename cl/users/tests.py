@@ -38,7 +38,7 @@ class UserTest(LiveServerTestCase):
         )
         self.assertRedirects(
             response,
-            '{host}{path}?next=/'.format(
+            '{host}{path}?next=/&email=pan%40courtlistener.com'.format(
                 host='http://testserver',
                 path=reverse('register_success')
             ),

@@ -1442,9 +1442,16 @@ class Role(models.Model):
                   "role.",
     )
     role = models.SmallIntegerField(
-        help_text="The name of the attorney's role.",
+        help_text="The name of the attorney's role. Used primarily in "
+                  "district court cases.",
         choices=ATTORNEY_ROLES,
         db_index=True,
+        null=True,
+    )
+    role_raw = models.TextField(
+        help_text="The raw value of the role, as a string. Items prior to "
+                  "2018-06-06 may not have this value.",
+        blank=True,
     )
     date_action = models.DateField(
         help_text="The date the attorney was disbarred, suspended, "

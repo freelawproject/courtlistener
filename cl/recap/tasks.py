@@ -7,28 +7,29 @@ from datetime import timedelta
 from celery.canvas import chain
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, transaction, OperationalError
+from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Prefetch
 from django.utils import timezone
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer import DocketReport, AttachmentPage, DocketHistoryReport
+from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
+    DocketHistoryReport, DocketReport
 
 from cl.celery import app
 from cl.lib.decorators import retry
 from cl.lib.import_lib import get_candidate_judges
-from cl.lib.pacer import map_cl_to_pacer_id, normalize_attorney_contact, \
-    normalize_attorney_role, get_blocked_status
+from cl.lib.pacer import get_blocked_status, map_cl_to_pacer_id, \
+    normalize_attorney_contact, normalize_attorney_role
 from cl.lib.recap_utils import get_document_filename
 from cl.lib.utils import remove_duplicate_dicts
-from cl.people_db.models import Party, PartyType, Attorney, \
-    AttorneyOrganization, AttorneyOrganizationAssociation, Role, \
-    CriminalComplaint, CriminalCount
-from cl.recap.models import ProcessingQueue, PacerHtmlFiles, UPLOAD_TYPE
-from cl.scrapers.tasks import get_page_count, extract_recap_pdf
-from cl.search.models import Docket, RECAPDocument, DocketEntry
-from cl.search.tasks import add_or_update_recap_document, \
-    add_or_update_recap_docket
+from cl.people_db.models import Attorney, AttorneyOrganization, \
+    AttorneyOrganizationAssociation, CriminalComplaint, CriminalCount, \
+    Party, PartyType, Role
+from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE
+from cl.scrapers.tasks import extract_recap_pdf, get_page_count
+from cl.search.models import Docket, DocketEntry, RECAPDocument
+from cl.search.tasks import add_or_update_recap_docket, \
+    add_or_update_recap_document
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -51,7 +52,8 @@ def process_recap_upload(pq):
         chain(process_recap_docket_history_report.s(pq.pk),
               add_or_update_recap_docket.s()).apply_async()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
-        process_recap_appellate_docket.delay(pq.pk)
+        chain(process_recap_appellate_docket.s(pq.pk),
+              add_or_update_recap_docket.s()).apply_async()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         process_recap_appellate_attachment.delay(pq.pk)
 
@@ -402,7 +404,8 @@ def update_case_names(d, new_case_name):
 def update_docket_metadata(d, docket_data):
     """Update the Docket object with the data from Juriscraper.
 
-    Works on either docket history report or docket report results.
+    Works on either docket history report or docket report (appellate
+    or district) results.
     """
     d = update_case_names(d, docket_data['case_name'])
     d.docket_number = docket_data['docket_number'] or d.docket_number
@@ -426,6 +429,13 @@ def update_docket_metadata(d, docket_data):
         d.referred_to = judges[0]
     d.referred_to_str = docket_data.get('referred_to_str') or ''
     d.blocked, d.date_blocked = get_blocked_status(d)
+    # xxx appellate:
+    #   docket_data[u'panel']
+    #   docket_data[u'appeal_from']
+    #   docket_data[u'fee_status']
+    #   docket_data[u'case_type_information']
+    #   docket_data[u'originating_court_information']
+    #   # Note oci needs to restrict RESTRICTED_ALIEN_NUMBER.
     return d
 
 
@@ -598,9 +608,11 @@ def normalize_attorney_roles(parties):
         'roles': [{
             'role': Role.ATTORNEY_LEAD,
             'date_action': None,
+            'role_raw': 'LEAD ATTORNEY',
         }, {
             'role': Role.TERMINATED,
             'date_action': date(2013, 3, 12),
+            'role_raw': 'TERMINATED: 03/12/2013',
         }
 
     :param parties: The parties dict from Juriscraper.
@@ -610,7 +622,6 @@ def normalize_attorney_roles(parties):
     for party in parties:
         for atty in party.get('attorneys', []):
             roles = [normalize_attorney_role(r) for r in atty['roles']]
-            roles = filter(lambda r: r['role'] is not None, roles)
             roles = remove_duplicate_dicts(roles)
             atty['roles'] = roles
 
@@ -716,8 +727,8 @@ def add_parties_and_attorneys(d, parties):
         pts = p.party_types.filter(docket=d, name=party['type'])
         criminal_data = party.get('criminal_data')
         update_dict = {
-            'extra_info': party['extra_info'],
-            'date_terminated': party['date_terminated'],
+            'extra_info': party.get('extra_info', ''),
+            'date_terminated': party.get('date_terminated'),
         }
         if criminal_data:
             update_dict['highest_offense_level_opening'] = criminal_data[
@@ -737,8 +748,9 @@ def add_parties_and_attorneys(d, parties):
             CriminalCount.objects.bulk_create([
                 CriminalCount(
                     party_type=pt, name=criminal_count['name'],
-                    disposition=count['disposition'],
-                    status=CriminalCount.normalize_status(count['status'])
+                    disposition=criminal_count['disposition'],
+                    status=CriminalCount.normalize_status(
+                        criminal_count['status'])
                 ) for criminal_count in criminal_data['counts']
             ])
 
@@ -1057,18 +1069,81 @@ def process_recap_docket_history_report(self, pk):
     }
 
 
-@app.task(bind=True, max_retries=3, interval_start=5 * 60,
-          interval_step=5 * 60)
+@app.task(bind=True, max_retries=3, ignore_result=True)
 def process_recap_appellate_docket(self, pk):
-    """Process the appellate docket.
+    """Process an uploaded appellate docket from the RECAP API endpoint.
 
-    For now, this is a stub until we can get the parser working properly in
-    Juriscraper.
+    :param pk: The primary key of the processing queue item you want to work
+    on.
+    :returns: A dict of the form:
+
+        {
+            // The PK of the docket that's created or updated
+            'docket_pk': 22,
+            // A boolean indicating whether a new docket entry or
+            // recap document was created (implying a Solr needs
+            // updating).
+            'needs_solr_update': True,
+        }
+
+    This value is a dict so that it can be ingested in a Celery chain.
+
     """
     pq = ProcessingQueue.objects.get(pk=pk)
-    msg = "Appellate dockets not yet supported. Coming soon."
-    mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
-    return None
+    mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
+    logger.info("Processing Appellate RECAP item"
+                " (debug is: %s): %s" % (pq.debug, pq))
+
+    report = AppellateDocketReport(map_cl_to_pacer_id(pq.court_id))
+    text = pq.filepath_local.read().decode('utf-8')
+
+    report._parse_text(text)
+    data = report.data
+    logger.info("Parsing completed of item %s" % pq)
+
+    if data == {}:
+        # Not really a docket. Some sort of invalid document (see Juriscraper).
+        msg = "Not a valid docket upload."
+        mark_pq_status(pq, msg, pq.INVALID_CONTENT)
+        self.request.callbacks = None
+        return None
+
+    # Merge the contents of the docket into CL.
+    d, count = find_docket_object(pq.court_id, pq.pacer_case_id,
+                                  data['docket_number'])
+    if count > 1:
+        logger.info("Found %s dockets during lookup. Choosing oldest." % count)
+        d = d.earliest('date_created')
+
+    add_recap_source(d)
+    update_docket_metadata(d, data)
+    if not d.pacer_case_id:
+        d.pacer_case_id = pq.pacer_case_id
+
+    if pq.debug:
+        mark_pq_successful(pq, d_id=d.pk)
+        self.request.callbacks = None
+        return {'docket_pk': d.pk, 'needs_solr_update': False}
+
+    d.save()
+
+    # Add the HTML to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles(content_object=d,
+                                upload_type=UPLOAD_TYPE.APPELLATE_DOCKET)
+    pacer_file.filepath.save(
+        'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(text),
+    )
+
+    rds_created, needs_solr_update = add_docket_entries(d,
+                                                        data['docket_entries'])
+    add_parties_and_attorneys(d, data['parties'])
+    process_orphan_documents(rds_created, pq.court_id, d.date_filed)
+    mark_pq_successful(pq, d_id=d.pk)
+    return {
+        'docket_pk': d.pk,
+        'needs_solr_update': bool(rds_created or needs_solr_update),
+    }
 
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60,

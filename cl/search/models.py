@@ -23,7 +23,6 @@ from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
 
-
 DOCUMENT_STATUSES = (
     ('Published', 'Precedential'),
     ('Unpublished', 'Non-Precedential'),
@@ -713,27 +712,36 @@ class RECAPDocument(models.Model):
     def pacer_url(self):
         """Construct a doc1 URL for any item, if we can. Else, return None."""
         from cl.lib.pacer import map_cl_to_pacer_id
-        court_id = map_cl_to_pacer_id(self.docket_entry.docket.court_id)
+        court = self.docket_entry.docket.court
+        court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
-            return "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s" % (
+            if court.jurisdiction == Court.FEDERAL_APPELLATE:
+                path = 'docs1'
+            else:
+                path = 'doc1'
+            return "https://ecf.%s.uscourts.gov/%s/%s?caseid=%s" % (
                 court_id,
+                path,
                 self.pacer_doc_id,
                 self.docket_entry.docket.pacer_case_id,
             )
         else:
-            attachment_number = self.attachment_number or ''
-            return ('https://ecf.{court_id}.uscourts.gov/cgi-bin/'
-                    'show_case_doc?'
-                    '{document_number},'
-                    '{pacer_case_id},'
-                    '{attachment_number},'
-                    '{magic_number},'.format(
-                        court_id=court_id,
-                        document_number=self.document_number,
-                        pacer_case_id=self.docket_entry.docket.pacer_case_id,
-                        attachment_number=attachment_number,
-                        magic_number='',  # For future use.
-                    ))
+            if court.jurisdiction == Court.FEDERAL_APPELLATE:
+                return ''
+            else:
+                attachment_number = self.attachment_number or ''
+                return ('https://ecf.{court_id}.uscourts.gov/cgi-bin/'
+                        'show_case_doc?'
+                        '{document_number},'
+                        '{pacer_case_id},'
+                        '{attachment_number},'
+                        '{magic_number},'.format(
+                            court_id=court_id,
+                            document_number=self.document_number,
+                            pacer_case_id=self.docket_entry.docket.pacer_case_id,
+                            attachment_number=attachment_number,
+                            magic_number='',  # For future use.
+                        ))
 
     @property
     def needs_extraction(self):
