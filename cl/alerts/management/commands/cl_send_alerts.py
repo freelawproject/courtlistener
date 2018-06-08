@@ -124,7 +124,7 @@ class Command(VerboseCommand):
                 return cd['type'], results
 
             cut_off_date = get_cut_off_date(rate)
-            if cd['type'] == 'o':
+            if cd['type'] in ['o', 'r']:
                 cd['filed_after'] = cut_off_date
             elif cd['type'] == 'oa':
                 cd['argued_after'] = cut_off_date
