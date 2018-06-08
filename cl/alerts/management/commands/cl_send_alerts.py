@@ -107,14 +107,14 @@ class Command(VerboseCommand):
         logger.info("Now running the query: %s\n" % alert.query)
 
         # Make a dict from the query string. Make a copy to make it mutable.
-        data = QueryDict(alert.query).copy()
+        qd = QueryDict(alert.query).copy()
         try:
-            del data['filed_before']
+            del qd['filed_before']
         except KeyError:
             pass
-        data['order_by'] = 'score desc'
-        logger.info("Data sent to SearchForm is: %s\n" % data)
-        search_form = SearchForm(data)
+        qd['order_by'] = 'score desc'
+        logger.info("Data sent to SearchForm is: %s\n" % qd)
+        search_form = SearchForm(qd)
         if search_form.is_valid():
             cd = search_form.cleaned_data
 
