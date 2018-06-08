@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
+from django.http import QueryDict
 from django.template import loader
 from django.utils.timezone import now
 
@@ -106,8 +107,8 @@ class Command(VerboseCommand):
         cd = {}
         logger.info("Now running the query: %s\n" % alert.query)
 
-        # Set up the data
-        data = search_utils.get_string_to_dict(alert.query)
+        # Make a dict from the query string. Make a copy to make it mutable.
+        data = QueryDict(alert.query).copy()
         try:
             del data['filed_before']
         except KeyError:

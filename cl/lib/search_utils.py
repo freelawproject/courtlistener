@@ -75,18 +75,6 @@ def make_get_string(request, nuke_fields=None):
     return get_string
 
 
-def get_string_to_dict(get_string):
-    """Reverses the work that the make_get_string function performs, building a
-    dict from the get_string.
-
-    Used by alerts.
-    """
-    get_dict = {}
-    for k, v in parse_qs(get_string).items():
-        get_dict[k] = v[0]
-    return get_dict
-
-
 def get_query_citation(cd):
     """Extract citations from the query string and return them, or return
     None
