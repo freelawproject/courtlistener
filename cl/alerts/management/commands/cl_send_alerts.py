@@ -134,7 +134,7 @@ class Command(VerboseCommand):
                 'start': '0',
                 'hl.tag.pre': '<em><strong>',
                 'hl.tag.post': '</strong></em>',
-                'caller': 'cl_send_alerts',
+                'caller': 'cl_send_alerts:%s' % cd['type'],
             })
 
             if rate == Alert.REAL_TIME:
