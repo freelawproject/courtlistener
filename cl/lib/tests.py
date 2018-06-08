@@ -16,13 +16,33 @@ from cl.lib.db_tools import queryset_generator
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.pacer import normalize_attorney_role, normalize_attorney_contact, \
-    normalize_us_state, make_address_lookup_key
+    normalize_us_state, make_address_lookup_key, get_blocked_status
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import UUIDFileSystemStorage
 from cl.lib.string_utils import trunc
 from cl.people_db.models import Role
 from cl.scrapers.models import UrlHash
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
+
+
+class TestPacerUtils(TestCase):
+    fixtures = ['court_data.json']
+
+    def test_auto_blocking_small_bankr_docket(self):
+        """Do we properly set small bankruptcy dockets to private?"""
+        d = Docket()
+        d.court = Court.objects.get(pk='akb')
+        blocked, date_blocked = get_blocked_status(d)
+        self.assertTrue(blocked, msg="Bankruptcy dockets with few entries "
+                                     "should be blocked.")
+        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        self.assertFalse(blocked, msg="Bankruptcy dockets with many entries "
+                                      "should not be blocked")
+        # This should stay blocked even though it's a big bankruptcy docket.
+        d.blocked = True
+        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        self.assertTrue(blocked, msg="Bankruptcy dockets that start blocked "
+                                     "should stay blocked.")
 
 
 class TestDBTools(TestCase):

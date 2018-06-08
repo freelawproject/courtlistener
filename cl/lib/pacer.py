@@ -167,7 +167,9 @@ def get_blocked_status(docket, count_override=None):
     else:
         count = docket.docket_entries.all().count()
     small_case = count <= bankruptcy_privacy_threshold
-    if all([small_case, docket.court in Court.BANKRUPTCY_JURISDICTIONS]):
+    bankruptcy_court = docket.court.jurisdiction in \
+                                    Court.BANKRUPTCY_JURISDICTIONS
+    if all([small_case, bankruptcy_court]):
         return True, date.today()
     return False, None
 
