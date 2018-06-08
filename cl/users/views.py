@@ -14,7 +14,7 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
 from django.db.models import Count
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, QueryDict
 from django.shortcuts import render
 from django.template.defaultfilters import urlencode
 from django.utils.timezone import now
@@ -24,7 +24,6 @@ from django.views.decorators.debug import (sensitive_post_parameters,
 
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
-from cl.lib import search_utils
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
     ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm,
@@ -42,7 +41,7 @@ logger = logging.getLogger(__name__)
 def view_alerts(request):
     alerts = request.user.alerts.all()
     for a in alerts:
-        alert_dict = search_utils.get_string_to_dict(a.query)
+        alert_dict = QueryDict(a.query)
         alert_type = alert_dict.get('type')
         if alert_type == 'oa':
             a.type = 'oa'
