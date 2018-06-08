@@ -103,7 +103,6 @@ class Command(VerboseCommand):
 
     def run_query(self, alert, rate):
         results = []
-        error = False
         cd = {}
         logger.info("Now running the query: %s\n" % alert.query)
 
@@ -122,7 +121,7 @@ class Command(VerboseCommand):
             if rate == Alert.REAL_TIME and \
                     len(self.valid_ids[cd['type']]) == 0:
                 # Bail out. No results will be found if no valid_ids.
-                return error, cd['type'], results
+                return cd['type'], results
 
             cut_off_date = get_cut_off_date(rate)
             if cd['type'] == 'o':
