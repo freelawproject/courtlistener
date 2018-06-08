@@ -8,14 +8,14 @@ from dateutil import parser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from juriscraper.lib.string_utils import titlecase
-from juriscraper.pacer import DocketReport, DocketHistoryReport, \
-    InternetArchive
+from juriscraper.pacer import AppellateDocketReport, DocketReport, \
+    DocketHistoryReport, InternetArchive
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
-from cl.search.models import Court, Docket
 from cl.people_db.models import Role, AttorneyOrganization
 from cl.recap.models import UPLOAD_TYPE
+from cl.search.models import Court, Docket
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +186,8 @@ def process_docket_data(d, filepath, report_type):
         report = DocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         report = DocketHistoryReport(map_cl_to_pacer_id(d.court_id))
+    elif report_type == UPLOAD_TYPE.APPELLATE_DOCKET:
+        report = AppellateDocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == UPLOAD_TYPE.IA_XML_FILE:
         report = InternetArchive()
     with open(filepath, 'r') as f:
@@ -197,14 +199,15 @@ def process_docket_data(d, filepath, report_type):
     update_docket_metadata(d, data)
     d.save()
     add_docket_entries(d, data['docket_entries'])
-    if report_type in (UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.IA_XML_FILE):
+    if report_type in (UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.APPELLATE_DOCKET,
+                       UPLOAD_TYPE.IA_XML_FILE):
         add_parties_and_attorneys(d, data['parties'])
     return d.pk
 
 
 def normalize_attorney_role(r):
     """Normalize attorney roles into the valid set"""
-    role = {'role': None, 'date_action': None}
+    role = {'role': None, 'date_action': None, 'role_raw': r}
 
     r = r.lower()
     # Bad values we can expect. Nuke these early so they don't cause problems.
@@ -236,10 +239,7 @@ def normalize_attorney_role(r):
     except ValueError:
         role['date_action'] = None
 
-    if role['role'] is None:
-        raise ValueError(u"Unable to match role: %s" % r)
-    else:
-        return role
+    return role
 
 
 def normalize_us_phone_number(phone):
