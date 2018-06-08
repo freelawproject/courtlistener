@@ -141,14 +141,11 @@ class Command(VerboseCommand):
                 main_params['fq'].append('id:(%s)' % ' OR '.join(
                     [str(i) for i in self.valid_ids[cd['type']]]
                 ))
-            results = self.connections[
-                cd['type']
-            ].query().add_extra(
-                **main_params
-            ).execute()
+            results = self.connections[cd['type']].query().add_extra(
+                **main_params).execute()
             regroup_snippets(results)
 
-        logger.info("There were %s results\n" % len(results))
+        logger.info("There were %s results." % len(results))
         return cd.get('type'), results
 
     def send_emails(self, rate):
