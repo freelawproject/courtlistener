@@ -52,7 +52,7 @@ def get_cut_off_date(rate, d=datetime.date.today()):
 
 
 def send_alert(user_profile, hits):
-    email_subject = 'New hits for your CourtListener alerts'
+    email_subject = '[CourtListener] New hits for your alerts'
     email_sender = 'CourtListener Alerts <alerts@courtlistener.com>'
 
     txt_template = loader.get_template('email.txt')
@@ -75,6 +75,7 @@ class Command(VerboseCommand):
         self.connections = {
             'o': ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r'),
             'oa': ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r'),
+            'r': ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r'),
         }
         self.options = {}
         self.valid_ids = {}
