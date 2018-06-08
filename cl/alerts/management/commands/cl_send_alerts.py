@@ -56,8 +56,8 @@ def send_alert(user_profile, hits):
     email_subject = '[CourtListener] New hits for your alerts'
     email_sender = 'CourtListener Alerts <alerts@courtlistener.com>'
 
-    txt_template = loader.get_template('email.txt')
-    html_template = loader.get_template('email.html')
+    txt_template = loader.get_template('alert_email.txt')
+    html_template = loader.get_template('alert_email.html')
     context = {'hits': hits}
     txt = txt_template.render(context)
     html = html_template.render(context)
