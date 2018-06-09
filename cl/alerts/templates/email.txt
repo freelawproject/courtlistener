@@ -12,7 +12,8 @@ We have news regarding your alerts at CourtListener.com
 
 {% for alert, type, results in hits %}{% for result in results %}{% if forloop.first %}Your {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% endif %} alert -- {{alert.name}} -- had {{results.result.numFound|intcomma}} hit{{results|pluralize}}:
 -------------------------------------------------------
-Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/{% endif %}
+Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/
+Disable this Alert (one click): https://www.courtlistener.com{% url "disable_alert" alert.secret_key %}{% endif %}
 
 {{forloop.counter}}. {{ result.solr_highlights.caseName.0|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|striptags }} {% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
 {% if type == 'o' or type == 'oa' %}{% for frag in result.solr_highlights.text %}...{{ frag|safe|striptags|underscore_to_space|compress_whitespace }}...
