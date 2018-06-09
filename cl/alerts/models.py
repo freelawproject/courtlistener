@@ -50,6 +50,12 @@ class Alert(models.Model):
         choices=FREQUENCY,
         max_length=10
     )
+    secret_key = models.CharField(
+        verbose_name="A key to be used in links to access the alert without "
+                     "having to log in. Can be used for a variety of "
+                     "purposes.",
+        max_length=40,
+    )
 
     def __unicode__(self):
         return u'Alert %s: %s' % (self.pk, self.name)
