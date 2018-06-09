@@ -56,6 +56,10 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
         si.add(search_item_list)
     except socket.error as exc:
         add_or_update_items.retry(exc=exc, countdown=120)
+    else:
+        if type(item) == Docket:
+            item.date_last_index = now()
+            item.save()
 
 
 @app.task
