@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils.crypto import get_random_string
 
 FREQUENCY = (
     ('rt',  'Real Time'),
@@ -62,6 +63,12 @@ class Alert(models.Model):
 
     class Meta:
         ordering = ['rate', 'query']
+
+    def save(self, *args, **kwargs):
+        """Ensure we get a token when we save the first time."""
+        if self.pk is None:
+            self.secret_key = get_random_string(length=40)
+        super(Alert, self).save(*args, **kwargs)
 
 
 class RealTimeQueue(models.Model):
