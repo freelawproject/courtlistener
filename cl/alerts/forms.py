@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
-from django.forms.widgets import HiddenInput, TextInput, Select, CheckboxInput
+from django.forms.widgets import HiddenInput, TextInput, Select
 
 from cl.alerts.models import Alert
 
@@ -27,7 +27,7 @@ class CreateAlertForm(ModelForm):
 
     class Meta:
         model = Alert
-        exclude = ('user',)
+        exclude = ('user', 'secret_key')
         fields = (
             'name',
             'query',
