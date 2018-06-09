@@ -1,4 +1,4 @@
-{% load text_filters %}*****************
+{% load text_filters %}{% load humanize %}*****************
 CourtListener.com
 *****************
 {% comment %}
@@ -10,7 +10,7 @@ CourtListener.com
 We have news regarding your alerts at CourtListener.com
 -------------------------------------------------------
 
-{% for alert, type, results in hits %}{% for result in results %}{% if forloop.first %}Your {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% endif %} alert -- {{alert.name}} -- had {{results|length}} hit{{results|pluralize}}:
+{% for alert, type, results in hits %}{% for result in results %}{% if forloop.first %}Your {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% endif %} alert -- {{alert.name}} -- had {{results.result.numFound|intcomma}} hit{{results|pluralize}}:
 -------------------------------------------------------
 Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/{% endif %}
 
