@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Your Alert is Now Disabled – CourtListener.com{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="hidden-xs col-sm-2 col-md-3">&nbsp;</div>
+  <div class="col-xs-12 col-sm-8 col-md-6 well text-center">
+    <h1>Alert Disabled</h1>
+    <h3>Your alert, <span class="gray">"{{ alert.name }}"</span> has been set to <span class="gray">"{{ alert.get_rate_display }}"</span></h3>
+    <p>If you wish to edit it or re-enable this alert, click below.</p>
+    <div class="v-offset-above-3 text-left">
+      <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
+         class="btn btn-primary btn-lg">
+        <i class="fa fa-pencil"></i>&nbsp;Edit Alert</a>
+      <a href="{% url "enable_alert" alert.secret_key %}?rate={{ prev_rate }}"
+         class="float-right btn btn-lg btn-primary"><i class="fa fa-undo"></i>&nbsp;Re-enable Alert</a>
+    </div>
+  </div>
+  <div class="hidden-xs col-sm-2 col-md-3">&nbsp;</div>
+{% endblock %}
