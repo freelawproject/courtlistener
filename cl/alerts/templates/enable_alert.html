@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Your Alert is now Enabled – CourtListener.com{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="hidden-xs col-sm-2 col-md-3">&nbsp;</div>
+  <div class="col-xs-12 col-sm-8 col-md-6 well text-center">
+    {% if failed %}
+      <h1>An Error Occurred</h1>
+      <p>An error occurred while enabling your alert. It appears {{ failed }}.</p>
+      <p>Please try editing your alert manually instead.</p>
+    {% else %}
+      <h1>You Have Enabled This Alert</h1>
+      <h3>Your alert, <span class="gray">"{{ alert.name }}"</span> has been set to <span class="gray">"{{ alert.get_rate_display }}"</span></h3>
+      <p class="v-offset-above-2">If you wish to edit it further, click below.
+      </p>
+    {% endif %}
+    <div class="v-offset-above-3">
+      <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
+         class="btn btn-primary btn-lg btn-block">
+        <i class="fa fa-pencil"></i>&nbsp;Edit Alert</a>
+    </div>
+  </div>
+  <div class="hidden-xs col-sm-1 col-md-2">&nbsp;</div>
+{% endblock %}
