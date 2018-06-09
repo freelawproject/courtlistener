@@ -223,9 +223,13 @@ class ProcessingQueue(models.Model):
             ("has_recap_upload_access", 'Can upload documents to RECAP.'),
         )
 
-    def print_file_contents(self):
+    @property
+    def file_contents(self):
         with open(self.filepath_local.path, 'r') as f:
-            print(f.read().decode('utf-8'))
+            return f.read().decode('utf-8')
+
+    def print_file_contents(self):
+        print(self.file_contents)
 
 
 class FjcIntegratedDatabase(models.Model):
