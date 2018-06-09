@@ -107,12 +107,17 @@ class Command(VerboseCommand):
         logger.info("Now running the query: %s\n" % alert.query)
 
         # Make a dict from the query string. Make a copy to make it mutable.
-        qd = QueryDict(alert.query).copy()
+        qd = QueryDict(alert.query, mutable=True)
         try:
             del qd['filed_before']
         except KeyError:
             pass
         qd['order_by'] = 'score desc'
+        cut_off_date = get_cut_off_date(rate)
+        if qd['type'] in ['o', 'r']:
+            qd['filed_after'] = cut_off_date
+        elif qd['type'] == 'oa':
+            qd['argued_after'] = cut_off_date
         logger.info("Data sent to SearchForm is: %s\n" % qd)
         search_form = SearchForm(qd)
         if search_form.is_valid():
@@ -123,11 +128,6 @@ class Command(VerboseCommand):
                 # Bail out. No results will be found if no valid_ids.
                 return cd['type'], results
 
-            cut_off_date = get_cut_off_date(rate)
-            if cd['type'] in ['o', 'r']:
-                cd['filed_after'] = cut_off_date
-            elif cd['type'] == 'oa':
-                cd['argued_after'] = cut_off_date
             main_params = search_utils.build_main_query(cd, facet=False)
             main_params.update({
                 'rows': '20',
@@ -146,7 +146,7 @@ class Command(VerboseCommand):
             regroup_snippets(results)
 
         logger.info("There were %s results." % len(results))
-        return cd.get('type'), results
+        return qd, results
 
     def send_emails(self, rate):
         """Send out an email to every user whose alert has a new hit for a
@@ -169,7 +169,7 @@ class Command(VerboseCommand):
             hits = []
             for alert in alerts:
                 try:
-                    alert_type, results = self.run_query(alert, rate)
+                    qd, results = self.run_query(alert, rate)
                 except:
                     traceback.print_exc()
                     logger.info("Search for this alert failed: %s\n" %
@@ -180,7 +180,8 @@ class Command(VerboseCommand):
                 # paired with a list of document dicts, of the form:
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
                 if len(results) > 0:
-                    hits.append([alert, alert_type, results])
+                    hits.append([alert, qd['type'], results])
+                    alert.query_run = qd.urlencode()
                     alert.date_last_hit = now()
                     alert.save()
 
