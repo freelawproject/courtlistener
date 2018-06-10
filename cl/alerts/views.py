@@ -41,7 +41,7 @@ def delete_alert(request, pk):
     messages.add_message(
         request,
         messages.SUCCESS,
-        'Your alert was deleted successfully.'
+        "Your alert <strong>%s</strong> was deleted successfully." % alert.name
     )
     return HttpResponseRedirect(reverse("profile_alerts"))
 
