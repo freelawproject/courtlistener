@@ -41,16 +41,9 @@ logger = logging.getLogger(__name__)
 def view_alerts(request):
     alerts = request.user.alerts.all()
     for a in alerts:
-        alert_dict = QueryDict(a.query)
-        alert_type = alert_dict.get('type')
-        if alert_type == 'oa':
-            a.type = 'oa'
-        elif alert_type == 'o':
-            a.type = 'o'
-        elif alert_type == 'r':
-            a.type = 'r'
-        else:
-            raise NotImplementedError("Unexpected alert type, %s" % alert_type)
+        # default to 'o' because if there's no 'type' param in the search UI,
+        # that's an opinion search.
+        a.type = QueryDict(a.query).get('type', 'o')
     return render(request, 'profile/alerts.html', {
         'alerts': alerts,
         'private': True
