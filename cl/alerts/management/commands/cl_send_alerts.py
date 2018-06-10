@@ -107,7 +107,7 @@ class Command(VerboseCommand):
         logger.info("Now running the query: %s\n" % alert.query)
 
         # Make a dict from the query string.
-        qd = QueryDict(alert.query, mutable=True)
+        qd = QueryDict(alert.query.encode('utf-8'), mutable=True)
         try:
             del qd['filed_before']
         except KeyError:
