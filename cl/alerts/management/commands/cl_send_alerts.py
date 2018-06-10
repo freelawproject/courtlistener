@@ -106,7 +106,7 @@ class Command(VerboseCommand):
         cd = {}
         logger.info("Now running the query: %s\n" % alert.query)
 
-        # Make a dict from the query string. Make a copy to make it mutable.
+        # Make a dict from the query string.
         qd = QueryDict(alert.query, mutable=True)
         try:
             del qd['filed_before']
@@ -114,9 +114,11 @@ class Command(VerboseCommand):
             pass
         qd['order_by'] = 'score desc'
         cut_off_date = get_cut_off_date(rate)
-        if qd['type'] in ['o', 'r']:
+        # Default to 'o', if not available, according to the front end.
+        query_type = qd.get('type', 'o')
+        if query_type in ['o', 'r']:
             qd['filed_after'] = cut_off_date
-        elif qd['type'] == 'oa':
+        elif query_type == 'oa':
             qd['argued_after'] = cut_off_date
         logger.info("Data sent to SearchForm is: %s\n" % qd)
         search_form = SearchForm(qd)
@@ -124,9 +126,9 @@ class Command(VerboseCommand):
             cd = search_form.cleaned_data
 
             if rate == Alert.REAL_TIME and \
-                    len(self.valid_ids[cd['type']]) == 0:
+                    len(self.valid_ids[query_type]) == 0:
                 # Bail out. No results will be found if no valid_ids.
-                return cd['type'], results
+                return query_type, results
 
             main_params = search_utils.build_main_query(cd, facet=False)
             main_params.update({
@@ -134,14 +136,14 @@ class Command(VerboseCommand):
                 'start': '0',
                 'hl.tag.pre': '<em><strong>',
                 'hl.tag.post': '</strong></em>',
-                'caller': 'cl_send_alerts:%s' % cd['type'],
+                'caller': 'cl_send_alerts:%s' % query_type,
             })
 
             if rate == Alert.REAL_TIME:
                 main_params['fq'].append('id:(%s)' % ' OR '.join(
-                    [str(i) for i in self.valid_ids[cd['type']]]
+                    [str(i) for i in self.valid_ids[query_type]]
                 ))
-            results = self.connections[cd['type']].query().add_extra(
+            results = self.connections[query_type].query().add_extra(
                 **main_params).execute()
             regroup_snippets(results)
 
@@ -180,7 +182,7 @@ class Command(VerboseCommand):
                 # paired with a list of document dicts, of the form:
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
                 if len(results) > 0:
-                    hits.append([alert, qd['type'], results])
+                    hits.append([alert, qd.get('type', 'o'), results])
                     alert.query_run = qd.urlencode()
                     alert.date_last_hit = now()
                     alert.save()
