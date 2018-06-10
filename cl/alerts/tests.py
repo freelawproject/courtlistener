@@ -18,6 +18,10 @@ class AlertTest(TestCase):
             'name': 'dummy alert',
             'rate': 'dly',
         }
+        self.alert = Alert.objects.create(user_id=1001, **self.alert_params)
+
+    def tearDown(self):
+        Alert.objects.all().delete()
 
     def test_create_alert(self):
         """Can we create an alert by sending a post?"""
@@ -38,6 +42,25 @@ class AlertTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn('error creating your alert', r.content)
         self.client.logout()
+
+    def test_new_alert_gets_secret_key(self):
+        """When you create a new alert, does it get a secret key?"""
+        self.assertTrue(self.alert.secret_key)
+
+    def test_are_alerts_disabled_when_the_link_is_visited(self):
+        self.assertEqual(self.alert.rate, self.alert_params['rate'])
+        self.client.get(reverse('disable_alert', args=[self.alert.secret_key]))
+        self.alert.refresh_from_db()
+        self.assertEqual(self.alert.rate, 'off')
+
+    def test_are_alerts_enabled_when_the_link_is_visited(self):
+        self.assertEqual(self.alert.rate, self.alert_params['rate'])
+        self.alert.rate = 'off'
+        new_rate = 'wly'
+        path = reverse('enable_alert', args=[self.alert.secret_key])
+        self.client.get('%s?rate=%s' % (path, new_rate))
+        self.alert.refresh_from_db()
+        self.assertEqual(self.alert.rate, new_rate)
 
 
 class AlertSeleniumTest(BaseSeleniumTest):
