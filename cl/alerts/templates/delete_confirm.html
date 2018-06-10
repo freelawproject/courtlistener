@@ -10,10 +10,10 @@
         <h1 class="text-center">You are about to delete this alert</h1>
         <h2 class="v-offset-below-3 text-center">Are you sure you want to do this?</h2>
 
-        <a href="{% url "profile_alerts" %}" class="btn btn-primary btn-lg">Cancel and Go
+        <a href="{% url "profile_alerts" %}" class="btn btn-primary btn-lg"><i class="fa fa-arrow-circle-left"></i>&nbsp;Cancel and Go
             Back</a>&nbsp;&nbsp;
         <form action="/alert/delete/{{alert_id}}/" method="post" class="float-right">{% csrf_token %}
-            <button type="submit" class="btn btn-danger btn-lg">Delete this Alert</button>
+            <button type="submit" class="btn btn-danger btn-lg"><i class="fa fa-trash-o"></i>&nbsp;Delete this Alert</button>
         </form>
 
     </div>
