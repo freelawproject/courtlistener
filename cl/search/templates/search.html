@@ -63,7 +63,7 @@
     </div>
     {% include "includes/result_type_chooser.html" %}
     {% include "includes/sidebar_filters.html" %}
-    {% if search_form.type.value != 'p' %}
+    {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
         {% include "includes/alert_sidebar_section.html" %}
     {% endif %}
     {% include "includes/donate_sidebar.html" with referrer="search-donate-now" %}
