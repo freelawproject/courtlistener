@@ -166,6 +166,7 @@ REDIS_DATABASES = {
     'CELERY': 0,
     'CACHE': 1,
     'STATS': 2,
+    'ALERTS': 3,
 }
 REDIS_HOST = 'localhost'
 REDIS_PORT = 6379
