@@ -65,15 +65,15 @@
         <h3>{{ docket.court }}</h3>
 
         {% if docket.source in docket.RECAP_SOURCES %}
-            <p class="v-offset-above-1">
-                {% if docket.pacer_url %}
-                    <a href="{{ docket.pacer_url }}"
-                       class="btn btn-primary"
-                       target="_blank">View on PACER</a>
-                {% endif %}
-                <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
-                   class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
-            </p>
+          <p class="v-offset-above-1">
+            {% if docket.pacer_url %}
+                <a href="{{ docket.pacer_url }}"
+                   class="btn btn-primary"
+                   target="_blank">View on PACER</a>
+            {% endif %}
+            <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+               class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
+          </p>
         {% endif %}
 
         {% if docket.source in docket.RECAP_SOURCES %}
