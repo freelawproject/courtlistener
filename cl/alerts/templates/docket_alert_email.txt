@@ -1,0 +1,29 @@
+{% load text_filters %}{% load humanize %}***************************
+CourtListener Docket Alerts
+***************************
+-------------------------------------------------------
+There are {{ new_des.count|apnumber|title }} New Entr{{ new_des.count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
+-------------------------------------------------------
+{{ docket.court }}
+~~~
+View Full Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc
+Buy on PACER: {{ docket.pacer_url }}
+To disable this alert, view the full docket and click the "disable" button.
+
+{% for de in new_des %}
+Document Number: {{ de.entry_number }}
+Date Filed: {{ de.date_filed|date:"M j, Y"|default:'<em>Unknown</em>' }}
+{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}
+{% endfor %}
+
+To disable this alert, view the full docket and click the "disable" button.
+
+
+************************
+This alert brought to you by the 501(c)(3) non-profit Free Law Project
+
+ - Blog: https://free.law
+ - Twitter: http://twitter.com/freelawproject
+ - Donate: https://www.courtlistener.com{% url "donate" %}?referrer=pt-email
+
+Please donate to support our work.
