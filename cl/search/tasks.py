@@ -80,8 +80,8 @@ def add_or_update_recap_docket(data, force_commit=False,
     update unless we know the docket has something new.
 
     :param data: A dictionary containing the a key for 'docket_pk' and
-    'needs_solr_update'. 'docket_pk' will be used to find the docket to modify.
-    'needs_solr_update' is a boolean indicating whether the docket must be
+    'content_updated'. 'docket_pk' will be used to find the docket to modify.
+    'content_updated' is a boolean indicating whether the docket must be
     updated.
     :param force_commit: Whether to send a commit to Solr (this is usually not
     needed).
@@ -93,7 +93,7 @@ def add_or_update_recap_docket(data, force_commit=False,
     d = Docket.objects.get(pk=data['docket_pk'])
     too_fresh = d.date_last_index is not None and \
                       (d.date_last_index > some_time_ago)
-    update_not_required = not data.get('needs_solr_update', False)
+    update_not_required = not data.get('content_updated', False)
     if all([too_fresh, update_not_required]):
         return
     else:

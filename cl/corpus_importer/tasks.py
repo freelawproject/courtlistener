@@ -3,6 +3,7 @@ import hashlib
 import logging
 import os
 import shutil
+from pyexpat import ExpatError
 from tempfile import NamedTemporaryFile
 
 import internetarchive as ia
@@ -17,7 +18,6 @@ from juriscraper.lib.exceptions import ParsingException
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import FreeOpinionReport, PossibleCaseNumberApi, \
     DocketReport, AttachmentPage, ShowCaseDocApi
-from pyexpat import ExpatError
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -33,6 +33,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_number
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
+from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles, \
     UPLOAD_TYPE
 from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
@@ -40,9 +41,8 @@ from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
     process_orphan_documents
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
-from cl.search.tasks import add_or_update_recap_document
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
-from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
+from cl.search.tasks import add_or_update_recap_document
 
 logger = logging.getLogger(__name__)
 
@@ -537,14 +537,14 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
         ContentFile(report.response.text),
     )
 
-    rds_created, needs_solr_update = add_docket_entries(
+    rds_created, content_updated = add_docket_entries(
         d, docket_data['docket_entries'], tag=tag)
     add_parties_and_attorneys(d, docket_data['parties'])
     process_orphan_documents(rds_created, d.court_id, d.date_filed)
     logger.info("Created/updated docket: %s" % d)
     return {
         'docket_pk': d.pk,
-        'needs_solr_update': bool(rds_created or needs_solr_update),
+        'content_updated': bool(rds_created or content_updated),
     }
 
 

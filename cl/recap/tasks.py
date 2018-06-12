@@ -15,6 +15,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
     DocketHistoryReport, DocketReport
 
+from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery import app
 from cl.lib.decorators import retry
 from cl.lib.import_lib import get_candidate_judges
@@ -442,7 +443,7 @@ def update_docket_metadata(d, docket_data):
 def add_docket_entries(d, docket_entries, tag=None):
     """Update or create the docket entries and documents."""
     rds_created = []
-    needs_solr_update = False
+    content_updated = False
     for docket_entry in docket_entries:
         try:
             de, de_created = DocketEntry.objects.get_or_create(
@@ -463,7 +464,7 @@ def add_docket_entries(d, docket_entries, tag=None):
             de.tags.add(tag)
 
         if de_created:
-            needs_solr_update = True
+            content_updated = True
 
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
@@ -509,7 +510,7 @@ def add_docket_entries(d, docket_entries, tag=None):
         if tag is not None:
             rd.tags.add(tag)
 
-    return rds_created, needs_solr_update
+    return rds_created, content_updated
 
 
 def check_json_for_terminated_entities(parties):
@@ -818,12 +819,13 @@ def process_recap_docket(self, pk):
             // A boolean indicating whether a new docket entry or
             // recap document was created (implying a Solr needs
             // updating).
-            'needs_solr_update': True,
+            'content_updated': True,
         }
 
     This value is a dict so that it can be ingested in a Celery chain.
 
     """
+    start_time = now()
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
@@ -867,7 +869,7 @@ def process_recap_docket(self, pk):
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
         self.request.callbacks = None
-        return {'docket_pk': d.pk, 'needs_solr_update': False}
+        return {'docket_pk': d.pk, 'content_updated': False}
 
     d.save()
 
@@ -879,14 +881,16 @@ def process_recap_docket(self, pk):
         ContentFile(text),
     )
 
-    rds_created, needs_solr_update = add_docket_entries(d,
-                                                        data['docket_entries'])
+    rds_created, content_updated = add_docket_entries(
+        d, data['docket_entries'])
+    if content_updated:
+        enqueue_docket_alert(d.pk, start_time)
     add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         'docket_pk': d.pk,
-        'needs_solr_update': bool(rds_created or needs_solr_update),
+        'content_updated': bool(rds_created or content_updated),
     }
 
 
@@ -1003,6 +1007,7 @@ def process_recap_docket_history_report(self, pk):
     :param pk: The primary key of the processing queue item you want to work on
     :returns: A dict indicating whether the docket needs Solr re-indexing.
     """
+    start_time = now()
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
@@ -1034,7 +1039,7 @@ def process_recap_docket_history_report(self, pk):
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
         self.request.callbacks = None
-        return {'docket_pk': d.pk, 'needs_solr_update': False}
+        return {'docket_pk': d.pk, 'content_updated': False}
 
     try:
         d.save()
@@ -1059,13 +1064,15 @@ def process_recap_docket_history_report(self, pk):
         ContentFile(text),
     )
 
-    rds_created, needs_solr_update = add_docket_entries(d,
-                                                        data['docket_entries'])
+    rds_created, content_updated = add_docket_entries(
+        d, data['docket_entries'])
+    if content_updated:
+        enqueue_docket_alert(d.pk, start_time)
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         'docket_pk': d.pk,
-        'needs_solr_update': bool(rds_created or needs_solr_update),
+        'content_updated': bool(rds_created or content_updated),
     }
 
 
@@ -1083,12 +1090,13 @@ def process_recap_appellate_docket(self, pk):
             // A boolean indicating whether a new docket entry or
             // recap document was created (implying a Solr needs
             // updating).
-            'needs_solr_update': True,
+            'content_updated': True,
         }
 
     This value is a dict so that it can be ingested in a Celery chain.
 
     """
+    start_time = now()
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, '', pq.PROCESSING_IN_PROGRESS)
     logger.info("Processing Appellate RECAP item"
@@ -1123,7 +1131,7 @@ def process_recap_appellate_docket(self, pk):
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
         self.request.callbacks = None
-        return {'docket_pk': d.pk, 'needs_solr_update': False}
+        return {'docket_pk': d.pk, 'content_updated': False}
 
     d.save()
 
@@ -1135,14 +1143,16 @@ def process_recap_appellate_docket(self, pk):
         ContentFile(text),
     )
 
-    rds_created, needs_solr_update = add_docket_entries(d,
-                                                        data['docket_entries'])
+    rds_created, content_updated = add_docket_entries(
+        d, data['docket_entries'])
+    if content_updated:
+        enqueue_docket_alert(d.pk, start_time)
     add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         'docket_pk': d.pk,
-        'needs_solr_update': bool(rds_created or needs_solr_update),
+        'content_updated': bool(rds_created or content_updated),
     }
 
 
