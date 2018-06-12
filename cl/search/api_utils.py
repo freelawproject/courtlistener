@@ -2,6 +2,7 @@ from django.conf import settings
 
 from cl.lib import search_utils
 from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.search_utils import map_to_docket_entry_sorting
 
 
 def get_object_list(request, cd, paginator):
@@ -14,6 +15,8 @@ def get_object_list(request, cd, paginator):
     main_query = search_utils.build_main_query(cd, highlight='text',
                                                facet=False, group=False)
     main_query['caller'] = 'api_search'
+    if cd['type'] == 'r':
+        main_query['sort'] = map_to_docket_entry_sorting(main_query['sort'])
     sl = SolrList(
         main_query=main_query,
         offset=offset,
