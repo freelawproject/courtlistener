@@ -2,6 +2,8 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils.crypto import get_random_string
 
+from cl.search.models import Docket
+
 
 class Alert(models.Model):
     REAL_TIME = 'rt'
@@ -69,6 +71,42 @@ class Alert(models.Model):
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
         super(Alert, self).save(*args, **kwargs)
+
+
+class DocketAlert(models.Model):
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket that we are subscribed to.",
+        related_name='alerts',
+    )
+    user = models.ForeignKey(
+        User,
+        help_text="The user that is subscribed to the docket.",
+        related_name="docket_alerts",
+    )
+    secret_key = models.CharField(
+        verbose_name="A key to be used in links to access the alert without "
+                     "having to log in. Can be used for a variety of "
+                     "purposes.",
+        max_length=40,
+    )
+
+    class Meta:
+        unique_together = ('docket', 'user')
+
+    def __unicode__(self):
+        return u'DocketAlert %s: %s' % (self.pk, self.docket_id)
+
+    def save(self, *args, **kwargs):
+        """Ensure we get a token when we save the first time."""
+        if self.pk is None:
+            self.secret_key = get_random_string(length=40)
+        super(DocketAlert, self).save(*args, **kwargs)
 
 
 class RealTimeQueue(models.Model):
