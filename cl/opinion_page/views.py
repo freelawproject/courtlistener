@@ -13,6 +13,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.status import HTTP_404_NOT_FOUND
 
+from cl.alerts.models import DocketAlert
 from cl.citations.find_citations import get_citations
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
@@ -61,6 +62,8 @@ def view_docket(request, pk, slug):
         })
     else:
         favorite_form = FavoriteForm(instance=fave)
+    has_alert = DocketAlert.objects.filter(docket=docket,
+                                           user=request.user).exists()
 
     de_list = docket.docket_entries.all().prefetch_related('recap_documents')
     form = DocketEntryFilterForm(request.GET)
@@ -93,6 +96,7 @@ def view_docket(request, pk, slug):
         'docket_entries': docket_entries,
         'form': form,
         'favorite_form': favorite_form,
+        'has_alert': has_alert,
         'get_string': make_get_string(request),
         'timezone': COURT_TIMEZONES.get(docket.court_id, 'US/Eastern'),
         'private': docket.blocked,
@@ -117,6 +121,8 @@ def view_parties(request, docket_id, slug):
         })
     else:
         favorite_form = FavoriteForm(instance=fave)
+    has_alert = DocketAlert.objects.filter(docket=docket,
+                                           user=request.user).exists()
 
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
@@ -163,6 +169,7 @@ def view_parties(request, docket_id, slug):
         'title': title,
         'parties': parties,
         'favorite_form': favorite_form,
+        'has_alert': has_alert,
         'timezone': COURT_TIMEZONES.get(docket.court_id, 'US/Eastern'),
         'private': docket.blocked,
     })
