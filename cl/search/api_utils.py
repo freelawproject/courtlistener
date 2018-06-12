@@ -10,9 +10,9 @@ def get_object_list(request=None, **kwargs):
     # Set the offset value
     paginator = kwargs['paginator']
     page_number = int(request.GET.get(paginator.page_query_param, 1))
-    # Assume page_size = 20, then: 1 --> 0, 2 --> 19, 3 --> 39
-    offset = max(0, (page_number - 1) * paginator.page_size - 1)
-    limit = 20
+    page_size = paginator.get_page_size(request)
+    # Assume page_size = 20, then: 1 --> 0, 2 --> 20, 3 --> 40
+    offset = max(0, (page_number - 1) * page_size)
     try:
         main_query = search_utils.build_main_query(
             kwargs['cd'],
