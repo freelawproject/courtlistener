@@ -11,33 +11,14 @@ def get_object_list(request, cd, paginator):
     page_size = paginator.get_page_size(request)
     # Assume page_size = 20, then: 1 --> 0, 2 --> 20, 3 --> 40
     offset = max(0, (page_number - 1) * page_size)
-    try:
-        main_query = search_utils.build_main_query(
-            cd,
-            highlight='text',
-            facet=False,
-            group=False,
-        )
-        main_query['caller'] = 'api_search'
-        sl = SolrList(
-            main_query=main_query,
-            offset=offset,
-            type=cd['type'],
-        )
-    except KeyError:
-        sf = forms.SearchForm({'q': '*'})
-        if sf.is_valid():
-            main_query = search_utils.build_main_query(
-                sf.cleaned_data,
-                highlight='text',
-                facet=False,
-                group=False,
-            )
-            main_query['caller'] = 'api_search'
-        sl = SolrList(
-            main_query=main_query,
-            offset=offset,
-        )
+    main_query = search_utils.build_main_query(cd, highlight='text',
+                                               facet=False, group=False)
+    main_query['caller'] = 'api_search'
+    sl = SolrList(
+        main_query=main_query,
+        offset=offset,
+        type=cd['type'],
+    )
     return sl
 
 
@@ -46,7 +27,7 @@ class SolrList(object):
     queried.
     """
 
-    def __init__(self, main_query, offset, type=None, length=None):
+    def __init__(self, main_query, offset, type, length=None):
         super(SolrList, self).__init__()
         self.main_query = main_query
         self.offset = offset
