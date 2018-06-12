@@ -10,6 +10,7 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, RealTimeQueue
+from cl.alerts.utils import emails
 from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -53,15 +54,14 @@ def get_cut_off_date(rate, d=datetime.date.today()):
 
 
 def send_alert(user_profile, hits):
-    email_subject = '[CourtListener] New hits for your alerts'
-    email_sender = 'CourtListener Alerts <alerts@courtlistener.com>'
+    subject = emails['search_alert']['subject']
 
     txt_template = loader.get_template('alert_email.txt')
     html_template = loader.get_template('alert_email.html')
     context = {'hits': hits}
     txt = txt_template.render(context)
     html = html_template.render(context)
-    msg = EmailMultiAlternatives(email_subject, txt, email_sender,
+    msg = EmailMultiAlternatives(subject, txt, settings.DEFAULT_ALERTS_EMAIL,
                                  [user_profile.user.email])
     msg.attach_alternative(html, "text/html")
     msg.send(fail_silently=False)
