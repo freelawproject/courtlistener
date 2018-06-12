@@ -10,6 +10,7 @@ from django.db import transaction, IntegrityError
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 
+from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery import app
 from cl.lib.crypto import sha1
 from cl.lib.pacer import map_cl_to_pacer_id
@@ -174,6 +175,7 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
     :returns all_rds_created: A list of all the RDs created during the
     processing.
     """
+    start_time = now()
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     rss_feed.parse()
     logger.info("%s: Got %s results to merge." % (feed_status.court_id,
@@ -203,7 +205,10 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
             if not d.pacer_case_id:
                 d.pacer_case_id = docket['pacer_case_id']
             d.save()
-            rds_created, _ = add_docket_entries(d, docket['docket_entries'])
+            rds_created, content_updated = add_docket_entries(
+                d, docket['docket_entries'])
+            if content_updated:
+                enqueue_docket_alert(d.pk, start_time)
 
         all_rds_created.extend([rd.pk for rd in rds_created])
 
