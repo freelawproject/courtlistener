@@ -17,11 +17,7 @@ def get_object_list(request, cd, paginator):
     main_query['caller'] = 'api_search'
     if cd['type'] == 'r':
         main_query['sort'] = map_to_docket_entry_sorting(main_query['sort'])
-    sl = SolrList(
-        main_query=main_query,
-        offset=offset,
-        type=cd['type'],
-    )
+    sl = SolrList(main_query=main_query, offset=offset, type=cd['type'])
     return sl
 
 
