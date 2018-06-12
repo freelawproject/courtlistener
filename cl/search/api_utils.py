@@ -24,7 +24,6 @@ def get_object_list(request=None, **kwargs):
         sl = SolrList(
             main_query=main_query,
             offset=offset,
-            limit=limit,
             type=kwargs['cd']['type'],
         )
     except KeyError:
@@ -40,7 +39,6 @@ def get_object_list(request=None, **kwargs):
         sl = SolrList(
             main_query=main_query,
             offset=offset,
-            limit=limit,
         )
     return sl
 
@@ -50,11 +48,10 @@ class SolrList(object):
     queried.
     """
 
-    def __init__(self, main_query, offset, limit, type=None, length=None):
+    def __init__(self, main_query, offset, type=None, length=None):
         super(SolrList, self).__init__()
         self.main_query = main_query
         self.offset = offset
-        self.limit = limit
         self.type = type
         self._item_cache = []
         if self.type == 'o':
