@@ -1,9 +1,13 @@
 from django.contrib.auth.models import User
+from django.core import mail
 from django.core.urlresolvers import reverse
 from django.test import Client, TestCase
+from django.utils.timezone import now
 from timeout_decorator import timeout_decorator
 
-from cl.alerts.models import Alert
+from cl.alerts.models import Alert, DocketAlert
+from cl.alerts.tasks import enqueue_docket_alert
+from cl.search.models import Docket, DocketEntry
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
 
@@ -61,6 +65,47 @@ class AlertTest(TestCase):
         self.client.get('%s?rate=%s' % (path, new_rate))
         self.alert.refresh_from_db()
         self.assertEqual(self.alert.rate, new_rate)
+
+
+class DocketAlertTest(TestCase):
+    """Do docket alerts work properly?"""
+    fixtures = ['test_court.json', 'authtest_data.json']
+
+    def setUp(self):
+        self.before = now()
+        # Create a new docket
+        self.docket = Docket.objects.create(source=Docket.RECAP,
+                                       court_id='scotus',
+                                       pacer_case_id='asdf',
+                                       docket_number='asdf')
+
+        # Add an alert for it
+        DocketAlert.objects.create(docket=self.docket, user_id=1001)
+
+        # Add a new docket entry to it
+        DocketEntry.objects.create(docket=self.docket, entry_number=1)
+        self.after = now()
+
+    def tearDown(self):
+        Docket.objects.all().delete()
+        DocketAlert.objects.all().delete()
+        DocketEntry.objects.all().delete()
+        # Clear the outbox
+        mail.outbox = []
+
+    def test_triggering_docket_alert(self):
+        """Does the alert trigger when it should?"""
+        enqueue_docket_alert(self.docket.pk, self.before)
+
+        # Does the alert go out? It should.
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_nothing_happens_for_timers_after_de_creation(self):
+        """Do we avoid sending alerts for timers after the de was created?"""
+        enqueue_docket_alert(self.docket.pk, self.after)
+
+        # Do zero emails go out? None should.
+        self.assertEqual(len(mail.outbox), 0)
 
 
 class AlertSeleniumTest(BaseSeleniumTest):
