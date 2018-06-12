@@ -1,9 +1,10 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.urlresolvers import reverse
+from django.http import HttpResponseNotAllowed, HttpResponse
 from django.shortcuts import get_object_or_404, HttpResponseRedirect, render
 
-from cl.alerts.models import Alert
+from cl.alerts.models import Alert, DocketAlert
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 
 
@@ -90,3 +91,21 @@ def enable_alert(request, secret_key):
         'failed': failed,
         'private': True,
     })
+
+
+def toggle_docket_alert(request):
+    """Use Ajax to create or delete an alert for a user."""
+    if request.is_ajax():
+        docket_pk = request.POST.get('docket_id')
+        existing_alert = DocketAlert.objects.filter(user=request.user,
+                                                    docket_id=docket_pk)
+        if existing_alert.exists():
+            existing_alert.delete()
+            msg = "Alert disabled successfully"
+        else:
+            DocketAlert.objects.create(docket_id=docket_pk, user=request.user)
+            msg = "Alerts are now enabled for this docket"
+        return HttpResponse(msg)
+    else:
+        return HttpResponseNotAllowed(permitted_methods={'POST'},
+                                      content="Not an ajax POST request.")
