@@ -93,7 +93,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # Oops! She's not signed in and she sees a prompt telling her as such
         link = self.browser.find_element_by_css_selector('#modal-logged-out a')
-        self.assertIn('Sign in or register to save a favorite', link.text)
+        self.assertIn('Sign in or register to complete', link.text)
         link.click()
 
         # Clicking it brings her to the sign in page
