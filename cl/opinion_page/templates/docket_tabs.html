@@ -13,6 +13,7 @@
 {% block footer-scripts %}
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/save-favorites.js"></script>
     {% if request.user.is_authenticated %}
@@ -22,11 +23,6 @@
     {% if request.user.is_staff %}
         <script defer type="text/javascript"
                 src="{{ STATIC_URL }}js/admin_tools.js"></script>
-        {% if DEBUG %}
-            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
-        {% else %}
-            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
-        {% endif %}
     {% endif %}
 {% endblock %}
 
@@ -86,6 +82,8 @@
                  class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %} toggle-docket-alert"
                  {% if user.is_authenticated %}
                    data-docket-id="{{ docket.pk }}"
+                   data-enable-message="Get Alerts"
+                   data-disable-message="Disable Alerts"
                  {% else %}
                    data-toggle="modal"
                    data-target="#modal-logged-out"
