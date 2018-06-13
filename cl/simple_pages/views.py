@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.cache import cache
@@ -13,6 +14,7 @@ from django.http import HttpResponse
 from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render, get_object_or_404
 from django.template import loader
+from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
@@ -22,7 +24,8 @@ from cl.lib import magic
 from cl.lib.decorators import track_in_piwik
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
-from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument
+from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument, \
+    Docket
 from cl.simple_pages.forms import ContactForm
 
 logger = logging.getLogger(__name__)
@@ -63,7 +66,30 @@ def faq(request):
 
 
 def alert_help(request):
-    return render(request, 'help/alert_help.html', {'private': False})
+    no_feeds = Court.objects.filter(
+        jurisdiction__in=[
+            Court.FEDERAL_BANKRUPTCY,
+            Court.FEDERAL_DISTRICT,
+        ],
+        pacer_has_rss_feed=False,
+    )
+    cache_key = 'alert-help-stats'
+    data = cache.get(cache_key)
+    if data is None:
+        data = {
+            'd_update_count': Docket.objects.filter(
+                date_modified__gte=now() - timedelta(days=1)).count(),
+            'de_update_count': RECAPDocument.objects.filter(
+                date_modified__gte=now() - timedelta(days=1)).count(),
+        }
+        one_day = 60 * 60 * 24
+        cache.set(cache_key, data, one_day)
+    context = {
+        'no_feeds': no_feeds,
+        'private': False,
+    }
+    context.update(data)
+    return render(request, 'help/alert_help.html', context)
 
 
 def markdown_help(request):

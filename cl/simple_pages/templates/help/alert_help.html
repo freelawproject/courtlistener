@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% load humanize %}
 
-{% block title %}Creating Alerts – CourtListener.com{% endblock %}
+{% block title %}Help with Alerts – CourtListener.com{% endblock %}
 {% block footer-scripts %}
   {% include "includes/anchors.html" %}
 {% endblock %}
@@ -8,17 +9,102 @@
 
 
 {% block content %}
-  <div class="col-sm-3"></div>
-  <div class="col-sm-6">
-    <h2>Creating Alerts on CourtListener</h2>
-    <p>CourtListener was originally created in 2009 as an alert and awareness tool for people that were interested in keeping up with new cases in the federal circuit courts.
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+  <div class="col-xs-12 col-sm-8 col-md-6">
+    <h1>Help with Alerts on CourtListener</h1>
+    <p>CourtListener was created in 2009 as an alert and awareness tool for people that were interested in keeping up with new cases or topics in the federal circuit courts.
     </p>
     <p>Since then, we have added numerous alerting features and we have expanded our alert tool to support hundreds of jurisdictions across the country.
     </p>
-    <p>For details on how to create, edit, and delete alerts, read on.</p>
+    <p>We currently have two kinds of alerts: search alerts and RECAP Alerts for PACER. Read on to learn more or skip ahead to the section that interests you:
+    </p>
+    <ul>
+      <li>
+        <a href="#recap-alerts">RECAP Alerts for PACER</a>
+        <ul>
+          <li><a href="#creating-a-recap-alert">Creating a RECAP Alert</a></li>
+          <li><a href="#disabling-a-recap-alert">Disabling a RECAP Alert</a></li>
+          <li><a href="#coverage-gaps">Coverage Gaps</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#search-alerts">Search Alerts</a>
+        <ul>
+          <li><a href="#creating-alerts">Creating Alerts</a></li>
+          <li><a href="#enabling-real-time-alerts">Enabling Real Time Alerts</a></li>
+          <li><a href="#editing-or-deleting-an-alert">Editing or Deleting an Alert</a></li>
+          <li><a href="#disabling-an-alert">Disabling an Alert</a></li>
+          <li><a href="#citation-alerts">Citation Alerts</a></li>
+        </ul>
+      </li>
+      <li><a href="#coming-soon">Coming Soon</a></li>
+    </ul>
+    <p>We hope that if you find our alerts useful, you will donate to <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP, to support their ongoing maintenance.
+    </p>
+    <p><a href="{% url "donate" %}?referrer=alerts-help"
+          class="btn btn-danger btn-lg"><i class="fa fa-heart-o"></i> Donate Now</a></p>
+    <hr>
 
+    <h2 id="recap-alerts">RECAP Alerts for PACER</h2>
+    <p>RECAP Alerts are a way of keeping up with cases in the PACER federal court filing system. These alerts monitor tens of thousands of cases across the country for new docket entries and send an email whenever new entries are acquired. In the last 24 hours, {{ d_update_count|intcomma }} dockets and {{ de_update_count|intcomma }} docket entries were updated.
+    </p>
+    <p>The sources for these alerts are as described in detail on our <a href="{% url "coverage" %}">coverage page</a> and include:
+    </p>
+    <ul>
+      <li>The RECAP extensions</li>
+      <li>PACER judicial opinion scraper</li>
+      <li>Client work that we do at Free Law Project</li>
+      <li>PACER RSS feeds</li>
+    </ul>
+    <p>For active cases, this means that alerts will come any time from about a minute after the content is posted to PACER (for a case of national importance), to an hour or two, for a case of lesser importance in a jurisdiction that does not regularly provide public updates via their RSS feed.
+    </p>
+    <p>For closed cases, we get new content and can send alerts when we do client work on those cases or when a <a href="https://free.law/recap/">RECAP extension</a> user shares a docket with us.
+    </p>
+
+    <h3>Creating a RECAP Alert</h3>
+    <p>To create a RECAP Alert, simply find the docket you are interested in following, and look for the button on the top that says, "<i class="fa fa-bell gray"></i> Get Alerts":
+    </p>
+    <p>
+      <img src="{{ STATIC_PREFIX }}png/docket-alert-button.png"
+           alt="screenshot of the enable button"
+           class="img-responsive img-rounded shadow center-block"
+           height="31"
+           width="94">
+    </p>
+    <p>That's all there is to it. You'll begin getting alerts as soon as the docket has a new docket entry.
+    </p>
+
+    <h3>Disabling a RECAP Alert</h3>
+    <p>To disable an a RECAP Alert, simply pull up the docket you no longer are interested in, and press the button that says, "<i class="fa fa-bell-slash-o"></i> Disable Alerts":
+    </p>
+    <p>
+      <img src="{{ STATIC_PREFIX }}png/docket-alert-disable-button.png"
+           alt="screenshot of the disable button"
+           class="img-responsive img-rounded shadow center-block"
+           height="31"
+           width="119">
+    </p>
+
+    <h3>Coverage Gaps</h3>
+    <p>Unfortunately, the sources for RECAP alerts do <strong>not</strong> provide complete coverage of everything being filed in PACER. There are two important gaps to note. First, although we collect more than 100,000 new docket entry descriptions every day from the RSS feeds, some courts do not provide such feeds and others only provide partial feeds.
+    </p>
+    <p>In addition to the federal Circuit Courts, the following courts do not provide RSS feeds of their latest filings:
+    </p>
+    <ul>
+      {% for court in no_feeds %}
+        <li>{{ court }}</li>
+      {% endfor %}
+    </ul>
+    <p>If you rely on one of these courts, we encourage you to contact the court to request a full and complete PACER RSS feed.
+    </p>
+    <hr>
+
+
+    <h2 id="search-alerts">Search Alerts</h2>
+    <p>Search alerts are triggered by our search engine and are thus a powerful way to get fine-tuned alerts on cases or topics that you are following.
+    </p>
     <h3>Creating Alerts</h3>
-    <p>Creating an alert is usually straightforward. Simply do a search in CourtListener's Opinion or Oral Argument sections and then complete the "Create Alert" form on the left of your search results.
+    <p>Creating a search alert is usually straightforward. Simply do a search in CourtListener's Opinion or Oral Argument sections and then complete the "Create Alert" form on the left of your search results.
     </p>
     <p>You can use the current set of results as an example of what the alert will look like. For example, if you have many results for your query, you may get a lot of results in your alert. If there are too few, your alert may rarely trigger.
     </p>
@@ -26,6 +112,7 @@
     </p>
     <p>
       <img src="{{ STATIC_PREFIX }}png/create-alert-form.png"
+           alt="screenshot of the create alert form"
            class="img-responsive img-rounded shadow center-block"
            height="316"
            width="284">
@@ -48,6 +135,7 @@
     </p>
     <p>
       <img src="{{ STATIC_PREFIX }}/png/real-time-donation-required.png"
+           alt="screenshot of the please donate for real time notification"
            class="img-responsive img-rounded shadow center-block"
            height="274"
            width="278">
@@ -59,7 +147,7 @@
     <p>From your profile page, you can also easily delete an alert.</p>
 
     <h3>Disabling an Alert</h3>
-    <p>If you wish to temporarily disable an alert, you can edit it and set the rate to "Off".
+    <p>If you wish to temporarily disable an alert, you can edit it and set the rate to "Off". Every alert email also has a one-click link for disabling the alert that triggered it.
     </p>
 
     <h3>Supported Jurisdictions</h3>
@@ -75,6 +163,7 @@
     </p>
     <p>
       <img src="{{ STATIC_PREFIX }}/png/citing-opinions.png"
+           alt="screenshot of the citing opinions sidebar"
            class="img-responsive img-rounded shadow center-block"
            width="241"
            height="253">
@@ -84,9 +173,10 @@
     </p>
     <p>For more on citation alerts, <a href="https://free.law/2016/01/30/citation-searching-on-courtlistener/">see our blog post announcing this feature</a>.
     </p>
+    <hr>
 
-    <h3>Coming Soon</h3>
-    <p>We do not currently support alerts for the RECAP Archive, but we plan to do so soon. When they are ready, you will be able to create case-specific alerts to stay up to date with a case that interests you.
+    <h2>Coming Soon</h2>
+    <p>We do not currently support search alerts for the RECAP Archive, but we plan to do so soon.
     </p>
     <p>We are also currently working on adding automated transcripts to CourtListener. When this feature is ready, you will be able to get Oral Argument alerts for words that were said in court.
     </p>
