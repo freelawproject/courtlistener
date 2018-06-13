@@ -560,6 +560,16 @@ def add_filter_queries(main_params, cd):
             main_params['fq'] = main_fq
 
 
+def map_to_docket_entry_sorting(sort_string):
+    """Convert a RECAP sorting param to a docket entry sorting parameter."""
+    if sort_string == 'dateFiled asc':
+        return 'entry_date_filed asc'
+    elif sort_string == 'dateFiled desc':
+        return 'entry_date_filed desc'
+    else:
+        return sort_string
+
+
 def add_grouping(main_params, cd, group):
     """Add any grouping parameters."""
     if cd['type'] == 'o':
@@ -574,12 +584,16 @@ def add_grouping(main_params, cd, group):
 
     elif cd['type'] == 'r' and group is True:
         docket_query = re.match('docket_id:\d+', cd['q'])
+        if docket_query:
+            group_sort = map_to_docket_entry_sorting(main_params['sort'])
+        else:
+            group_sort = 'score desc'
         group_params = {
             'group': 'true',
             'group.ngroups': 'true',
             'group.limit': 5 if not docket_query else 500,
             'group.field': 'docket_id',
-            'group.sort': 'score desc',
+            'group.sort': group_sort,
         }
         main_params.update(group_params)
 

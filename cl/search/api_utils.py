@@ -2,44 +2,22 @@ from django.conf import settings
 
 from cl.lib import search_utils
 from cl.lib.scorched_utils import ExtraSolrInterface
-from cl.search import forms
+from cl.lib.search_utils import map_to_docket_entry_sorting
 
 
-def get_object_list(request=None, **kwargs):
+def get_object_list(request, cd, paginator):
     """Perform the Solr work"""
     # Set the offset value
-    paginator = kwargs['paginator']
     page_number = int(request.GET.get(paginator.page_query_param, 1))
     page_size = paginator.get_page_size(request)
     # Assume page_size = 20, then: 1 --> 0, 2 --> 20, 3 --> 40
     offset = max(0, (page_number - 1) * page_size)
-    try:
-        main_query = search_utils.build_main_query(
-            kwargs['cd'],
-            highlight='text',
-            facet=False,
-            group=False,
-        )
-        main_query['caller'] = 'api_search'
-        sl = SolrList(
-            main_query=main_query,
-            offset=offset,
-            type=kwargs['cd']['type'],
-        )
-    except KeyError:
-        sf = forms.SearchForm({'q': '*'})
-        if sf.is_valid():
-            main_query = search_utils.build_main_query(
-                sf.cleaned_data,
-                highlight='text',
-                facet=False,
-                group=False,
-            )
-            main_query['caller'] = 'api_search'
-        sl = SolrList(
-            main_query=main_query,
-            offset=offset,
-        )
+    main_query = search_utils.build_main_query(cd, highlight='text',
+                                               facet=False, group=False)
+    main_query['caller'] = 'api_search'
+    if cd['type'] == 'r':
+        main_query['sort'] = map_to_docket_entry_sorting(main_query['sort'])
+    sl = SolrList(main_query=main_query, offset=offset, type=cd['type'])
     return sl
 
 
@@ -48,7 +26,7 @@ class SolrList(object):
     queried.
     """
 
-    def __init__(self, main_query, offset, type=None, length=None):
+    def __init__(self, main_query, offset, type, length=None):
         super(SolrList, self).__init__()
         self.main_query = main_query
         self.offset = offset
