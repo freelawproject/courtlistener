@@ -3,6 +3,8 @@ $(document).ready(function () {
     e.preventDefault();
     let button = $(this),
         docket_id = button.data('docketId'),
+        enable_message = button.data('enableMessage'),
+        disable_message = button.data('disableMessage'),
         button_icon = button.find('i'),
         alert_text = button.find('.alert_btn_txt'),
         url = button.attr('href');
@@ -35,7 +37,7 @@ $(document).ready(function () {
           button
             .removeClass("btn-danger")
             .addClass("btn-success");
-          alert_text.text('Get Alerts');
+          alert_text.text(enable_message);
         } else {
           button_icon
             .removeClass("fa-spinner fa-pulse")
@@ -43,7 +45,7 @@ $(document).ready(function () {
           button
             .removeClass("btn-success")
             .addClass("btn-danger");
-          alert_text.text('Disable Alerts');
+          alert_text.text(disable_message);
         }
       },
       error: function (data) {
