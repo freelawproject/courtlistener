@@ -69,29 +69,37 @@
         <h3>{{ docket.court }}</h3>
 
         {% if docket.source in docket.RECAP_SOURCES %}
-          <p class="v-offset-above-1">
-            {% if docket.pacer_url %}
-                <a href="{{ docket.pacer_url }}"
-                   class="btn btn-primary"
-                   target="_blank">View on PACER</a>
-            {% endif %}
-            <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
-               class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
-            <a href="{% url "toggle_docket_alert" %}"
-               class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %} toggle-docket-alert"
-               {% if user.is_authenticated %}
-                 data-docket-id="{{ docket.pk }}"
-               {% else %}
-                 data-toggle="modal"
-                 data-target="#modal-logged-out"
-               {% endif %}>
-                 {% if has_alert %}
-                   <i class="fa fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Disable Alerts</span>
+          <div class="v-offset-above-2">
+            <div class="left">
+              {% if docket.pacer_url %}
+                  <p><a href="{{ docket.pacer_url }}"
+                     class="btn btn-primary"
+                     target="_blank"><i class="fa fa-external-link"></i> View on PACER</a>&nbsp;</p>
+              {% endif %}
+            </div>
+            <div class="left">
+              <p><a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+                 class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>&nbsp;</p>
+            </div>
+            <div class="left">
+              <p><a href="{% url "toggle_docket_alert" %}"
+                 class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %} toggle-docket-alert"
+                 {% if user.is_authenticated %}
+                   data-docket-id="{{ docket.pk }}"
                  {% else %}
-                   <i class="fa fa-bell"></i>&nbsp;<span class="alert_btn_txt">Get Alerts</span>
-                 {% endif %}
-            </a>
-          </p>
+                   data-toggle="modal"
+                   data-target="#modal-logged-out"
+                 {% endif %}>
+                   {% if has_alert %}
+                     <i class="fa fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Disable Alerts</span>
+                   {% else %}
+                     <i class="fa fa-bell"></i>&nbsp;<span class="alert_btn_txt">Get Alerts</span>
+                   {% endif %}
+              </a><br>
+              <a href="{% url "alert_help" %}">Learn More</a></p>
+            </div>
+          </div>
+          <div class="clearfix"></div>
         {% endif %}
 
         {% if docket.source in docket.RECAP_SOURCES %}
