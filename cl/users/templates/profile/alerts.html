@@ -5,89 +5,88 @@
 {% block nav-alerts %}active{% endblock %}
 
 {% block content %}
-    {% if alerts %}
-        <div class="col-xs-12">
-            <div class="table-responsive">
-                <table class="table settings-table">
-                    <thead>
-                        <tr>
-                          <th>Alert&nbsp;Type</th>
-                          <th>Alert&nbsp;Name<br>and Query</th>
-                          <th>Frequency</th>
-                          <th colspan="2">Last&nbsp;Hit</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for alert in alerts %}
-                        <tr>
-                          <td>
-                            <p class="bottom">
-                              {% if alert.type == 'o' %}
-                                Opinion
-                              {% elif alert.type == 'oa' %}
-                                Oral Argument
-                              {% elif alert.type == 'r' %}
-                                RECAP
-                              {% endif %}
-                            </p>
-                          </td>
-                            <td>
-                                <p class="bottom">
-                                  <a href="/?{{ alert.query }}">{{ alert.name }}</a>
-                                </p>
-                            </td>
-                            <td>{{ alert.get_rate_display }}</td>
-                            <td>{{ alert.date_last_hit|date:"D, n/j/Y"|default:"Never" }}</td>
-                            <td class="right">
-                                {% if alert.type == 'o' or alert.type == 'r' %}
-                                    <a href="{% url "search_feed" "search" %}?{{ alert.query }}"
-                                       title="Atom feed for this alert"
-                                       class="btn btn-primary btn-xs">
-                                        <i class="fa fa-rss"></i>&nbsp;Subscribe
-                                    </a>
-                                {% elif alert.type == 'oa' %}
-                                    <a href="{% url "search_podcast" "search" %}?{{ alert.query }}"
-                                       title="Podcast for this alert"
-                                       class="btn btn-primary btn-xs">
-                                        <i class="fa fa-podcast"></i>&nbsp;Podcast
-                                    </a>
-                                {% endif %}
-                                {% if user.profile.total_donated_last_year < MIN_DONATION.rt_alerts and alert.rate == 'rt' %}
-                                    <p class="bottom inline"
-                                       title="Donate at least $10 each year for Real Time alerts">
-                                        <a class="btn btn-primary btn-xs disabled">
-                                            <i class="fa fa-pencil"></i>&nbsp;Edit</a>
-                                    </p>
-                                {% else %}
-                                    <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
-                                       class="btn btn-primary btn-xs">
-                                        <i class="fa fa-pencil"></i>&nbsp;Edit</a>
-                                {% endif %}
-                                <a href="/alert/delete/confirm/{{ alert.pk }}"
-                                   class="btn btn-danger btn-xs">
-                                    <i class="fa fa-trash-o"></i>&nbsp;Delete</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    {% else %}
-        <div class="hidden-xs col-sm-1 col-md-3"></div>
-        <div class="col-xs-12 col-sm-10 col-md-6">
-            <h3>You have not made any alerts.</h3>
-            <p>CourtListener Alerts let you create search queries that will send you emails every time there's new opinions, oral arguments, or RECAP data that matches a query.
-            </p>
-            <p>Start by doing a search for a topic you're interested in, and then sign up for an alert by using the sidebar of the search results. <a href="{% url "alert_help" %}">Learn more</a>.
-            </p>
-            <p class="v-offset-above-1">
-              <a href="{% url "advanced_o" %}" class="btn btn-primary btn-lg v-offset-above-1">Make Opinion Alert</a>
-              <a href="{% url "advanced_r" %}" class="btn btn-primary btn-lg v-offset-above-1">Make RECAP Alert</a>
-              <a href="{% url "advanced_oa" %}" class="btn btn-primary btn-lg v-offset-above-1">Make Oral Argument Alert</a>
-            </p>
-        </div>
-        <div class="hidden-xs col-sm-1 col-md-3"></div>
-    {% endif %}
-
+  {% if alerts %}
+    <div class="col-xs-12">
+      <div class="table-responsive">
+        <table class="table settings-table">
+          <thead>
+              <tr>
+                <th>Alert&nbsp;Type</th>
+                <th>Alert&nbsp;Name<br>and Query</th>
+                <th>Frequency</th>
+                <th colspan="2">Last&nbsp;Hit</th>
+              </tr>
+          </thead>
+          <tbody>
+            {% for alert in alerts %}
+            <tr>
+              <td>
+                <p class="bottom">
+                  {% if alert.type == 'o' %}
+                    Opinion
+                  {% elif alert.type == 'oa' %}
+                    Oral Argument
+                  {% elif alert.type == 'r' %}
+                    RECAP
+                  {% endif %}
+                </p>
+              </td>
+                <td>
+                  <p class="bottom">
+                    <a href="/?{{ alert.query }}">{{ alert.name }}</a>
+                  </p>
+                </td>
+                <td>{{ alert.get_rate_display }}</td>
+                <td>{{ alert.date_last_hit|date:"D, n/j/Y"|default:"Never" }}</td>
+                <td class="right">
+                  {% if alert.type == 'o' or alert.type == 'r' %}
+                    <a href="{% url "search_feed" "search" %}?{{ alert.query }}"
+                       title="Atom feed for this alert"
+                       class="btn btn-primary btn-xs">
+                        <i class="fa fa-rss"></i>&nbsp;Subscribe
+                    </a>
+                  {% elif alert.type == 'oa' %}
+                    <a href="{% url "search_podcast" "search" %}?{{ alert.query }}"
+                       title="Podcast for this alert"
+                       class="btn btn-primary btn-xs">
+                        <i class="fa fa-podcast"></i>&nbsp;Podcast
+                    </a>
+                  {% endif %}
+                  {% if user.profile.total_donated_last_year < MIN_DONATION.rt_alerts and alert.rate == 'rt' %}
+                    <p class="bottom inline"
+                       title="Donate at least $10 each year for Real Time alerts">
+                      <a class="btn btn-primary btn-xs disabled">
+                          <i class="fa fa-pencil"></i>&nbsp;Edit</a>
+                    </p>
+                  {% else %}
+                    <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
+                       class="btn btn-primary btn-xs">
+                        <i class="fa fa-pencil"></i>&nbsp;Edit</a>
+                  {% endif %}
+                  <a href="/alert/delete/confirm/{{ alert.pk }}"
+                     class="btn btn-danger btn-xs">
+                      <i class="fa fa-trash-o"></i>&nbsp;Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% else %}
+    <div class="hidden-xs col-sm-1 col-md-3"></div>
+    <div class="col-xs-12 col-sm-10 col-md-6">
+      <h3>You have not made any alerts.</h3>
+      <p>CourtListener Alerts let you create search queries that will send you emails every time there's new opinions, oral arguments, or RECAP data that matches a query.
+      </p>
+      <p>Start by doing a search for a topic you're interested in, and then sign up for an alert by using the sidebar of the search results. <a href="{% url "alert_help" %}">Learn more</a>.
+      </p>
+      <p class="v-offset-above-1">
+        <a href="{% url "advanced_o" %}" class="btn btn-primary btn-lg v-offset-above-1">Make Opinion Alert</a>
+        <a href="{% url "advanced_r" %}" class="btn btn-primary btn-lg v-offset-above-1">Make RECAP Alert</a>
+        <a href="{% url "advanced_oa" %}" class="btn btn-primary btn-lg v-offset-above-1">Make Oral Argument Alert</a>
+      </p>
+    </div>
+    <div class="hidden-xs col-sm-1 col-md-3"></div>
+  {% endif %}
 {% endblock %}
