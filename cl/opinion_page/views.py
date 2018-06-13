@@ -62,8 +62,11 @@ def view_docket(request, pk, slug):
         })
     else:
         favorite_form = FavoriteForm(instance=fave)
-    has_alert = DocketAlert.objects.filter(docket=docket,
-                                           user=request.user).exists()
+
+    has_alert = False
+    if request.user.is_authenticated():
+        has_alert = DocketAlert.objects.filter(docket=docket,
+                                               user=request.user).exists()
 
     de_list = docket.docket_entries.all().prefetch_related('recap_documents')
     form = DocketEntryFilterForm(request.GET)
@@ -121,8 +124,10 @@ def view_parties(request, docket_id, slug):
         })
     else:
         favorite_form = FavoriteForm(instance=fave)
-    has_alert = DocketAlert.objects.filter(docket=docket,
-                                           user=request.user).exists()
+    has_alert = False
+    if request.user.is_authenticated():
+        has_alert = DocketAlert.objects.filter(docket=docket,
+                                               user=request.user).exists()
 
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
