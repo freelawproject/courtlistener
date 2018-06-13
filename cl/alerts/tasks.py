@@ -3,7 +3,9 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.template import loader
+from django.utils.timezone import now
 
+from cl.alerts.models import DocketAlert
 from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import trunc
@@ -78,6 +80,8 @@ def send_docket_alert(d_pk, since):
         html = html_template.render(email_context)
         msg.attach_alternative(html, "text/html")
         msg.send(fail_silently=False)
+
+    DocketAlert.objects.filter(docket=docket).update(date_last_hit=now())
 
     # Work completed, clear the semaphor
     r = redis.StrictRedis(host=settings.REDIS_HOST,

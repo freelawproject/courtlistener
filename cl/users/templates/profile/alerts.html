@@ -108,6 +108,13 @@
       </div>
     {% endif %}
   {% endif %}
+
+  {% if search_alerts and docket_alerts %}
+    <div class="col-xs-12">
+      <hr class="v-offset-above-3 v-offset-below-3">
+    </div>
+  {% endif %}
+
   {% if docket_alerts %}
     <div class="col-xs-12">
       <h1>RECAP Docket Alerts for PACER Cases</h1>
@@ -140,7 +147,7 @@
                   {{ alert.docket.court.short_name }}
                 </p>
               </td>
-              <td>{{ alert.date_last_hit|date:"D, n/j/Y"|default:"Never" }}</td>
+              <td>{{ alert.date_last_hit|default:"Never" }}</td>
               <td class="right">
                 <a href="{% url "toggle_docket_alert" %}"
                    class="btn btn-danger btn-xs toggle-docket-alert"
