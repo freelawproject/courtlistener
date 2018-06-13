@@ -10,7 +10,6 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, RealTimeQueue
-from cl.alerts.utils import emails
 from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -54,7 +53,7 @@ def get_cut_off_date(rate, d=datetime.date.today()):
 
 
 def send_alert(user_profile, hits):
-    subject = emails['search_alert']['subject']
+    subject = 'New hits for your alerts'
 
     txt_template = loader.get_template('alert_email.txt')
     html_template = loader.get_template('alert_email.html')

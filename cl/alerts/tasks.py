@@ -4,7 +4,6 @@ from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.template import loader
 
-from cl.alerts.utils import emails
 from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import trunc
@@ -60,20 +59,24 @@ def send_docket_alert(d_pk, since):
 
     if new_des.count() > 0 and email_addresses:
         # Notify every user that's subscribed to this alert.
-        email = emails['docket_alert']
         case_name = trunc(best_case_name(docket), 100, ellipsis='...')
-        subject = email['subject'] % (new_des.count(), case_name)
-
-        context = {'new_des': new_des, 'docket': docket}
+        subject_template = loader.get_template('docket_alert_subject.txt')
+        subject = subject_template.render({
+            'docket': docket,
+            'count': new_des.count(),
+            'case_name': case_name,
+        }).strip()  # Remove newlines that editors can insist on adding.
+        email_context = {'new_des': new_des, 'docket': docket}
         txt_template = loader.get_template('docket_alert_email.txt')
         html_template = loader.get_template('docket_alert_email.html')
         msg = EmailMultiAlternatives(
             subject=subject,
-            body=txt_template.render(context),
+            body=txt_template.render(email_context),
             from_email=settings.DEFAULT_ALERTS_EMAIL,
             bcc=email_addresses,
         )
-        msg.attach_alternative(html_template.render(context), "text/html")
+        html = html_template.render(email_context)
+        msg.attach_alternative(html, "text/html")
         msg.send(fail_silently=False)
 
     # Work completed, clear the semaphor
