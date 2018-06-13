@@ -7,7 +7,7 @@ from timeout_decorator import timeout_decorator
 
 from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import enqueue_docket_alert
-from cl.search.models import Docket, DocketEntry
+from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
 
@@ -74,16 +74,20 @@ class DocketAlertTest(TestCase):
     def setUp(self):
         self.before = now()
         # Create a new docket
-        self.docket = Docket.objects.create(source=Docket.RECAP,
-                                       court_id='scotus',
-                                       pacer_case_id='asdf',
-                                       docket_number='asdf')
+        self.docket = Docket.objects.create(
+            source=Docket.RECAP, court_id='scotus', pacer_case_id='asdf',
+            docket_number='12-cv-02354', case_name="Vargas v. Wilkins",
+        )
 
         # Add an alert for it
         DocketAlert.objects.create(docket=self.docket, user_id=1001)
 
         # Add a new docket entry to it
-        DocketEntry.objects.create(docket=self.docket, entry_number=1)
+        de = DocketEntry.objects.create(docket=self.docket, entry_number=1)
+        RECAPDocument.objects.create(
+            docket_entry=de, document_type=RECAPDocument.PACER_DOCUMENT,
+            document_number=1, pacer_doc_id='232322332', is_available=False,
+        )
         self.after = now()
 
     def tearDown(self):
