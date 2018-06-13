@@ -39,13 +39,15 @@ logger = logging.getLogger(__name__)
 @login_required
 @never_cache
 def view_alerts(request):
-    alerts = request.user.alerts.all()
-    for a in alerts:
+    search_alerts = request.user.alerts.all()
+    for a in search_alerts:
         # default to 'o' because if there's no 'type' param in the search UI,
         # that's an opinion search.
         a.type = QueryDict(a.query).get('type', 'o')
+    docket_alerts = request.user.docket_alerts.all().order_by('date_created')
     return render(request, 'profile/alerts.html', {
-        'alerts': alerts,
+        'search_alerts': search_alerts,
+        'docket_alerts': docket_alerts,
         'private': True
     })
 
