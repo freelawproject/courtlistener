@@ -41,6 +41,10 @@ class DocketAlertInline(admin.TabularInline):
     model = DocketAlert
     extra = 1
 
+    raw_id_fields = (
+        'user',
+        'docket',
+    )
 
 @admin.register(RealTimeQueue)
 class RealTimeQueueAdmin(admin.ModelAdmin):
