@@ -10,6 +10,7 @@ from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import trunc
 from cl.search.models import Docket, DocketEntry
+from cl.stats.utils import tally_stat
 
 
 def make_alert_key(d_pk):
@@ -80,6 +81,7 @@ def send_docket_alert(d_pk, since):
         html = html_template.render(email_context)
         msg.attach_alternative(html, "text/html")
         msg.send(fail_silently=False)
+        tally_stat('alerts.docket.alerts.sent', inc=len(email_addresses))
 
     DocketAlert.objects.filter(docket=docket).update(date_last_hit=now())
 
