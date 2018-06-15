@@ -207,8 +207,9 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
             d.save()
             rds_created, content_updated = add_docket_entries(
                 d, docket['docket_entries'])
-            if content_updated:
-                enqueue_docket_alert(d.pk, start_time)
+
+        if content_updated:
+            enqueue_docket_alert(d.pk, start_time)
 
         all_rds_created.extend([rd.pk for rd in rds_created])
 
