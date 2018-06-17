@@ -16,7 +16,7 @@ With your support, we've made a lot of progress over the past year:
  - We've sent {{ alerts_sent_count|intcomma }} email alerts.
  - We've added a bunch of new features too numerous to mention.
 
-We still have a lot to do, but every bit that you give helps to sustain our efforts to create a free and open legal ecosystem in America. If you're interested in what we have planned, you can always take a look at our planning board and even get involved, suggesting ideas or prioritization. For ideas about how to get involved, see our page at:
+We still have a lot to do, but every bit that you give helps to sustain our efforts to create an open and competitive legal ecosystem in America. If you're interested in what we have planned, you can always take a look at our planning board and even get involved, suggesting ideas or prioritization. For ideas about how to get involved, see our page at:
 
  - https://www.courtlistener.com/contribute/
 
