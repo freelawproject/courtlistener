@@ -95,7 +95,7 @@ def enable_alert(request, secret_key):
 
 def toggle_docket_alert(request):
     """Use Ajax to create or delete an alert for a user."""
-    if request.is_ajax():
+    if request.is_ajax() and request.method == 'POST':
         docket_pk = request.POST.get('docket_id')
         existing_alert = DocketAlert.objects.filter(user=request.user,
                                                     docket_id=docket_pk)
