@@ -79,7 +79,8 @@
             </div>
             <div class="left">
               <p><a href="{% url "toggle_docket_alert" %}"
-                 class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %} toggle-docket-alert"
+                    class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %} toggle-docket-alert"
+                    rel="nofollow"
                  {% if user.is_authenticated %}
                    data-docket-id="{{ docket.pk }}"
                    data-enable-message="Get Alerts"
