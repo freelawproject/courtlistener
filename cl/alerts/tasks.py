@@ -81,13 +81,14 @@ def send_docket_alert(d_pk, since):
                     body=txt_template.render(email_context),
                     from_email=settings.DEFAULT_ALERTS_EMAIL,
                     to=[email_address],
-                    bcc=['docket-alert-testing@free.law'],
                     headers={'X-Entity-Ref-ID': 'docket.alert:%s' % d_pk}
                 )
                 html = html_template.render(email_context)
                 msg.attach_alternative(html, "text/html")
                 messages.append(msg)
 
+            # Add a bcc to the first message in the list so that we get a copy.
+            messages[0].bcc = ['docket-alert-testing@free.law']
             connection = get_connection()
             connection.send_messages(messages)
             tally_stat('alerts.docket.alerts.sent', inc=len(email_addresses))
