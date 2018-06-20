@@ -893,10 +893,10 @@ def process_recap_docket(self, pk):
 
     rds_created, content_updated = add_docket_entries(
         d, data['docket_entries'])
-    if content_updated and docket_count > 0:
-        enqueue_docket_alert(d.pk, start_time)
     add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
+    if content_updated and docket_count > 0:
+        enqueue_docket_alert(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         'docket_pk': d.pk,
@@ -1077,9 +1077,9 @@ def process_recap_docket_history_report(self, pk):
 
     rds_created, content_updated = add_docket_entries(
         d, data['docket_entries'])
+    process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated and docket_count > 0:
         enqueue_docket_alert(d.pk, start_time)
-    process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         'docket_pk': d.pk,
@@ -1157,10 +1157,10 @@ def process_recap_appellate_docket(self, pk):
 
     rds_created, content_updated = add_docket_entries(
         d, data['docket_entries'])
-    if content_updated and docket_count > 0:
-        enqueue_docket_alert(d.pk, start_time)
     add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
+    if content_updated and docket_count > 0:
+        enqueue_docket_alert(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         'docket_pk': d.pk,
