@@ -193,11 +193,11 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
                 # The item is already in the cache, ergo it's getting processed
                 # in another thread/process and we had a race condition.
                 continue
-            d, count = find_docket_object(court_pk, docket['pacer_case_id'],
-                                          docket['docket_number'])
-            if count > 1:
-                logger.info("Found %s dockets during lookup. Choosing oldest." %
-                            count)
+            d, docket_count = find_docket_object(
+                court_pk, docket['pacer_case_id'], docket['docket_number'])
+            if docket_count > 1:
+                logger.info("Found %s dockets during lookup. Choosing "
+                            "oldest." % docket_count)
                 d = d.earliest('date_created')
 
             add_recap_source(d)
@@ -208,7 +208,7 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
             rds_created, content_updated = add_docket_entries(
                 d, docket['docket_entries'])
 
-        if content_updated:
+        if content_updated and docket_count > 0:
             enqueue_docket_alert(d.pk, start_time)
 
         all_rds_created.extend([rd.pk for rd in rds_created])

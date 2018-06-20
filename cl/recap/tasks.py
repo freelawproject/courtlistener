@@ -323,6 +323,14 @@ def add_attorney(atty, p, d):
 def find_docket_object(court_id, pacer_case_id, docket_number):
     """Attempt to find the docket based on the uploaded data. If cannot be
     found, create a new docket. If multiple are found, return all of them.
+
+    :param court_id: The CourtListener court_id to lookup
+    :param pacer_case_id: The PACER case ID for the docket
+    :param docket_number: The docket number to lookup.
+    :returns a tuple. The first item is either a QuerySet of all the items
+    found if more than one is identified or just the docket found if only one
+    is identified. The second item in the tuple is the count of items found
+    (this number is zero if we had to create a new docket item).
     """
     # Attempt several lookups of decreasing specificity. Note that
     # pacer_case_id is required for Docket and Docket History uploads.
@@ -349,6 +357,7 @@ def find_docket_object(court_id, pacer_case_id, docket_number):
             pacer_case_id=pacer_case_id,
             court_id=court_id,
         )
+        return d, 0
 
     return d, 1
 
@@ -855,10 +864,11 @@ def process_recap_docket(self, pk):
         return None
 
     # Merge the contents of the docket into CL.
-    d, count = find_docket_object(pq.court_id, pq.pacer_case_id,
-                                  data['docket_number'])
-    if count > 1:
-        logger.info("Found %s dockets during lookup. Choosing oldest." % count)
+    d, docket_count = find_docket_object(pq.court_id, pq.pacer_case_id,
+                                         data['docket_number'])
+    if docket_count > 1:
+        logger.info("Found %s dockets during lookup. Choosing oldest." %
+                    docket_count)
         d = d.earliest('date_created')
 
     add_recap_source(d)
@@ -883,7 +893,7 @@ def process_recap_docket(self, pk):
 
     rds_created, content_updated = add_docket_entries(
         d, data['docket_entries'])
-    if content_updated:
+    if content_updated and docket_count > 0:
         enqueue_docket_alert(d.pk, start_time)
     add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
@@ -1027,10 +1037,11 @@ def process_recap_docket_history_report(self, pk):
         return None
 
     # Merge the contents of the docket into CL.
-    d, count = find_docket_object(pq.court_id, pq.pacer_case_id,
-                                  data['docket_number'])
-    if count > 1:
-        logger.info("Found %s dockets during lookup. Choosing oldest." % count)
+    d, docket_count = find_docket_object(pq.court_id, pq.pacer_case_id,
+                                         data['docket_number'])
+    if docket_count > 1:
+        logger.info("Found %s dockets during lookup. Choosing oldest." %
+                    docket_count)
         d = d.earliest('date_created')
 
     add_recap_source(d)
@@ -1066,7 +1077,7 @@ def process_recap_docket_history_report(self, pk):
 
     rds_created, content_updated = add_docket_entries(
         d, data['docket_entries'])
-    if content_updated:
+    if content_updated and docket_count > 0:
         enqueue_docket_alert(d.pk, start_time)
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     mark_pq_successful(pq, d_id=d.pk)
@@ -1117,10 +1128,11 @@ def process_recap_appellate_docket(self, pk):
         return None
 
     # Merge the contents of the docket into CL.
-    d, count = find_docket_object(pq.court_id, pq.pacer_case_id,
-                                  data['docket_number'])
-    if count > 1:
-        logger.info("Found %s dockets during lookup. Choosing oldest." % count)
+    d, docket_count = find_docket_object(pq.court_id, pq.pacer_case_id,
+                                         data['docket_number'])
+    if docket_count > 1:
+        logger.info("Found %s dockets during lookup. Choosing oldest." %
+                    docket_count)
         d = d.earliest('date_created')
 
     add_recap_source(d)
@@ -1145,7 +1157,7 @@ def process_recap_appellate_docket(self, pk):
 
     rds_created, content_updated = add_docket_entries(
         d, data['docket_entries'])
-    if content_updated:
+    if content_updated and docket_count > 0:
         enqueue_docket_alert(d.pk, start_time)
     add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
