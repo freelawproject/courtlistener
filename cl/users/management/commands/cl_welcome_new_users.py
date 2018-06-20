@@ -2,7 +2,7 @@ import sys
 from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
-from django.core.mail import send_mass_mail
+from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template import loader
 from django.utils.timezone import utc, make_aware
 
@@ -42,23 +42,22 @@ class Command(VerboseCommand):
 
     def send_emails(self, recipients):
         """Send the emails using the templates and contexts requested."""
-        messages = []
-        email_subject = 'Hi from CourtListener and Free Law Project'
-        email_sender = 'Michael Lissner <mlissner@courtListener.com>'
         txt_template = loader.get_template('emails/welcome_email.txt')
+        messages = []
         for recipient in recipients:
-            context = {'name': recipient.first_name}
-            email_txt = txt_template.render(context)
-            messages.append((
-                email_subject,
-                email_txt,
-                email_sender,
-                [recipient.email],
+            email_txt = txt_template.render({'name': recipient.first_name})
+            messages.append(EmailMultiAlternatives(
+                subject='Welcome to CourtListener and Free Law Project',
+                body=email_txt,
+                from_email='Mike Lissner <mike@free.law>',
+                to=[recipient.email],
+                headers={'X-Entity-Ref-ID': 'welcome.email:%s' % recipient.pk}
             ))
 
         if not self.options['simulate']:
-            send_mass_mail(messages, fail_silently=False)
-            logger.info("Sent daily welcome emails.")
+            connection = get_connection()
+            connection.send_messages(messages)
+            logger.info("Sent %s daily welcome emails." % len(messages))
         else:
-            sys.stdout.write('Simulation mode. Imagine that we just sent the '
-                             'welcome emails!\n')
+            sys.stdout.write('Simulation mode. Imagine that we just sent %s '
+                             'welcome emails!\n' % len(messages))
