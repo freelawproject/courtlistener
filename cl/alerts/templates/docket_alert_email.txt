@@ -1,8 +1,8 @@
-{% load text_filters %}{% load humanize %}***************************
-CourtListener Docket Alerts
-***************************
+{% load text_filters %}{% load humanize %}**************************
+CourtListener Docket Alert
+**************************
 
-{{ new_des.count|apnumber|title }} New Entr{{ new_des.count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
+{{ new_des.count }} New Entr{{ new_des.count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
 {{ docket.court }}
 ~~~
 View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc
@@ -10,7 +10,7 @@ Buy Docket on PACER: {{ docket.pacer_url }}
 
 {% for de in new_des %}{% for rd in de.recap_documents.all %}Document Number: {{ de.entry_number }}
 Date Filed: {{ de.date_filed|date:"M j, Y"|default:'Unknown' }}
-{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% if rd.filepath_local %}
+{% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% if rd.filepath_local %}
 Download PDF from RECAP: https://www.courtlistener.com/{{ rd.filepath_local }}{% endif %}{% if rd.pacer_url %}
 Buy PDF from PACER: {{ rd.pacer_url }}{% endif %}
 {% endfor %}{% endfor %}
