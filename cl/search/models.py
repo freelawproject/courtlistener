@@ -55,6 +55,91 @@ SOURCES = (
 )
 
 
+class OriginatingCourtInformation(models.Model):
+    """Lower court metadata to associate with appellate cases.
+
+    For example, if you appeal from a district court to a circuit court, the
+    district court information would be in here. You may wonder, "Why do we
+    duplicate this information?" Well:
+
+        1. We don't want to update the lower court case based on information
+           we learn in the upper court. Say they have a conflict? Which do we
+           trust?
+
+        2. We may have the docket from the upper court without ever getting
+           docket information for the lower court. If that happens, would we
+           create a docket for the lower court using only the info in the
+           upper court. That seems bad.
+
+    The other thought you might have is, "Why not just associate this directly
+    with the docket object —-- why do we have a 1to1 join between them?" This
+    was a difficult data modelling decision. There are a few answers:
+
+        1. Most cases in the RECAP Archive are not appellate cases. For those
+           cases, the extra fields for this information would just pollute the
+           Docket namespace.
+
+        2. In general, we prefer to have Docket.originating_court_data.field
+           than, Docket.ogc_field.
+    """
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    assigned_to = models.ForeignKey(
+        'people_db.Person',
+        related_name='original_court_info',
+        help_text="The judge the case was assigned to.",
+        null=True,
+        blank=True,
+    )
+    assigned_to_str = models.TextField(
+        help_text="The judge that the case was assigned to, as a string.",
+        blank=True,
+    )
+    court_reporter = models.TextField(
+        help_text="The court reporter responsible for the case.",
+        blank=True,
+    )
+    date_disposed = models.DateField(
+        help_text="The date the case was disposed at the lower court.",
+        blank=True,
+        null=True,
+    )
+    date_filed = models.DateField(
+        help_text="The date the case was filed in the lower court.",
+        blank=True,
+        null=True,
+    )
+    date_judgement = models.DateField(
+        help_text="The date of the order or judgement in the lower court.",
+        blank=True,
+        null=True,
+    )
+    date_judgement_oed = models.DateField(
+        help_text="The date the judgement was entered on the docket at the "
+                  "lower court.",
+        blank=True,
+        null=True,
+    )
+    date_filed_noa = models.DateField(
+        help_text="The date the notice of appeal was filed for the case.",
+        blank=True,
+        null=True,
+    )
+    date_received_coa = models.DateField(
+        help_text="The date the case was received at the court of appeals.",
+        blank=True,
+        null=True,
+    )
+
+
 class Docket(models.Model):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
     and link them together.
@@ -94,6 +179,33 @@ class Docket(models.Model):
         db_index=True,
         related_name='dockets',
     )
+    appeal_from = models.ForeignKey(
+        'Court',
+        help_text="In appellate cases, this is the lower court or "
+                  "administrative body where this case was originally heard. "
+                  "This field is frequently blank due to it not being "
+                  "populated historically or due to our inability to "
+                  "normalize the value in appeal_from_str.",
+        related_name='+',
+        blank=True,
+        null=True,
+    )
+    appeal_from_str = models.TextField(
+        help_text="In appeallate cases, this is the lower court or "
+                  "administrative body where this case was originally heard. "
+                  "This field is frequently blank due to it not being "
+                  "populated historically. This field may have values when "
+                  "the appeal_from field does not. That can happen if we are "
+                  "unable to normalize the value in this field.",
+        blank=True,
+    )
+    originating_court = models.OneToOneField(
+        OriginatingCourtInformation,
+        help_text="Lower court information for appellate dockets",
+        related_name="docket",
+        blank=True,
+        null=True,
+    )
     tags = models.ManyToManyField(
         'search.Tag',
         help_text="The tags associated with the docket.",
@@ -127,6 +239,22 @@ class Docket(models.Model):
     )
     referred_to_str = models.TextField(
         help_text="The judge that the case was referred to, as a string.",
+        blank=True,
+    )
+    panel = models.ManyToManyField(
+        'people_db.Person',
+        help_text="The empaneled judges for the case. Currently an unused "
+                  "field but planned to be used in conjunction with the "
+                  "panel_str field.",
+        related_name="empanelled_dockets",
+        blank=True,
+    )
+    panel_str = models.TextField(
+        help_text="The initials of the judges on the panel that heard this "
+                  "case. This field is similar to the 'judges' field on "
+                  "the cluster, but contains initials instead of full judge "
+                  "names, and applies to the case on the whole instead of "
+                  "only to a specific decision.",
         blank=True,
     )
     parties = models.ManyToManyField(
@@ -251,6 +379,17 @@ class Docket(models.Model):
         help_text="Stands for jurisdiction in RECAP XML docket. For example, "
                   "'Diversity', 'U.S. Government Defendant'.",
         max_length=100,
+        blank=True,
+    )
+    appellate_fee_status = models.TextField(
+        help_text="The status of the fee in the appellate court. Can be used "
+                  "as a hint as to whether the government is the appellant "
+                  "(in which case the fee is waived).",
+        blank=True,
+    )
+    appellate_case_type_information = models.TextField(
+        help_text="Information about a case from the appellate docket in "
+                  "PACER. For example, 'civil, private, bankruptcy'.",
         blank=True,
     )
     filepath_local = models.FileField(
@@ -1102,7 +1241,7 @@ class OpinionCluster(models.Model):
     )
     panel = models.ManyToManyField(
         'people_db.Person',
-        help_text="The judges that heard the oral arguments",
+        help_text="The judges that participated in the opinion",
         related_name="opinion_clusters_participating_judges",
         blank=True,
     )
@@ -1114,9 +1253,9 @@ class OpinionCluster(models.Model):
         blank=True,
     )
     judges = models.TextField(
-        help_text="The judges that heard the oral arguments as a simple text "
-                  "string. This field is used when normalized judges cannot "
-                  "be placed into the panel field.",
+        help_text="The judges that participated in the opinion as a simple "
+                  "text string. This field is used when normalized judges "
+                  "cannot be placed into the panel field.",
         blank=True,
     )
     date_created = models.DateTimeField(
