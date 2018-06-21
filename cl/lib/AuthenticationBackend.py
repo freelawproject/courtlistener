@@ -1,6 +1,6 @@
+from django import forms
 from django.contrib.auth import authenticate
 from django.contrib.auth.forms import AuthenticationForm
-from django import forms
 from django.core.urlresolvers import reverse
 
 
@@ -23,11 +23,18 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
         if username and password:
             self.user_cache = authenticate(username=username, password=password)
             if self.user_cache is None:
-                raise forms.ValidationError(
-                    self.error_messages['invalid_login'],
-                    code='invalid_login',
-                    params={'username': self.username_field.verbose_name},
-                )
+                if '@' in username:
+                    raise forms.ValidationError(
+                        'Please enter a correct username and password. Note '
+                        'that both fields may be case-sensitive. Did you use '
+                        'your email address instead of your username?'
+                    )
+                else:
+                    raise forms.ValidationError(
+                        self.error_messages['invalid_login'],
+                        code='invalid_login',
+                        params={'username': self.username_field.verbose_name},
+                    )
             elif not self.user_cache.is_active:
                 raise forms.ValidationError(
                     self.error_messages['inactive'],
