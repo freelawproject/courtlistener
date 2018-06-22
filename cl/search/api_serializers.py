@@ -7,7 +7,7 @@ from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
 from cl.people_db.models import Person, PartyType
 from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
-    OpinionsCited, DocketEntry, RECAPDocument, Tag
+    OpinionsCited, DocketEntry, RECAPDocument, Tag, OriginatingCourtInformation
 
 
 class PartyTypeSerializer(HyperlinkedModelSerializerWithId):
@@ -18,12 +18,22 @@ class PartyTypeSerializer(HyperlinkedModelSerializerWithId):
         fields = ('party', 'party_type',)
 
 
+class OriginalCourtInformationSerializer(HyperlinkedModelSerializerWithId):
+
+    class Meta:
+        model = OriginatingCourtInformation
+        fields = '__all__'
+
+
 class DocketSerializer(DynamicFieldsMixin,
                        HyperlinkedModelSerializerWithId):
     court = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='court-detail',
         queryset=Court.objects.exclude(jurisdiction=Court.TESTING_COURT),
+    )
+    original_court_info = OriginalCourtInformationSerializer(
+        source='originating_court',
     )
     clusters = serializers.HyperlinkedRelatedField(
         many=True,
