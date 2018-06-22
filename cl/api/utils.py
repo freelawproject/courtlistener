@@ -1,8 +1,8 @@
 import json
+import os
 from collections import OrderedDict, defaultdict
 from datetime import date
 
-import os
 import redis
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
@@ -131,7 +131,8 @@ class SimpleMetadataWithFilters(SimpleMetadata):
 class LoggingMixin(object):
     """Log requests to Redis
 
-    This draws inspiration from the code that can be found at: https://github.com/aschn/drf-tracking/blob/master/rest_framework_tracking/mixins.py
+    This draws inspiration from the code that can be found at:
+      https://github.com/aschn/drf-tracking/blob/master/rest_framework_tracking/mixins.py
 
     The big distinctions, however, are that this code uses Redis for greater
     speed, and that it logs significantly less information.
