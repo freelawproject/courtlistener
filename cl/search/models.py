@@ -139,6 +139,12 @@ class OriginatingCourtInformation(models.Model):
         null=True,
     )
 
+    def __unicode__(self):
+        return "<OriginatingCourtInformation: %s>" % self.pk
+
+    class Meta:
+        verbose_name_plural = 'Originating Court Information'
+
 
 class Docket(models.Model):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
