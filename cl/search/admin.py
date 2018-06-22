@@ -186,6 +186,7 @@ class DocketEntryInline(admin.TabularInline):
 class OriginatingCourtInformationAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'assigned_to',
+        'ordering_judge',
     )
 
 
