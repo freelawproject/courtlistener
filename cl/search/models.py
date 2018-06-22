@@ -107,6 +107,18 @@ class OriginatingCourtInformation(models.Model):
         help_text="The judge that the case was assigned to, as a string.",
         blank=True,
     )
+    ordering_judge = models.ForeignKey(
+        'people_db.Person',
+        related_name='+',
+        help_text="The judge that issued the final order in the case.",
+        null=True,
+        blank=True,
+    )
+    ordering_judge_str = models.TextField(
+        help_text="The judge that issued the final order in the case, as a "
+                  "string.",
+        blank=True,
+    )
     court_reporter = models.TextField(
         help_text="The court reporter responsible for the case.",
         blank=True,
@@ -121,13 +133,13 @@ class OriginatingCourtInformation(models.Model):
         blank=True,
         null=True,
     )
-    date_judgement = models.DateField(
-        help_text="The date of the order or judgement in the lower court.",
+    date_judgment = models.DateField(
+        help_text="The date of the order or judgment in the lower court.",
         blank=True,
         null=True,
     )
-    date_judgement_oed = models.DateField(
-        help_text="The date the judgement was entered on the docket at the "
+    date_judgment_eod = models.DateField(
+        help_text="The date the judgment was Entered On the Docket at the "
                   "lower court.",
         blank=True,
         null=True,
