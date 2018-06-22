@@ -1,5 +1,6 @@
 # coding=utf-8
 from __future__ import print_function
+
 import json
 import shutil
 from datetime import timedelta, date
@@ -8,7 +9,8 @@ from django.conf import settings
 from django.contrib.auth.models import User, Permission
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest, JsonResponse
-from django.test import Client, TestCase, override_settings, TransactionTestCase
+from django.test import Client, TestCase, override_settings, \
+    TransactionTestCase
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 
@@ -136,7 +138,7 @@ class ApiQueryCountTests(TransactionTestCase):
             self.client.get(path)
 
     def test_search_api_query_counts(self):
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(7):
             path = reverse('docket-list', kwargs={'version': 'v3'})
             self.client.get(path)
 
