@@ -6,14 +6,22 @@ from cl.search.api_serializers import (
     DocketSerializer, CourtSerializer, OpinionClusterSerializer,
     OpinionSerializer, SearchResultSerializer,
     OpinionsCitedSerializer, DocketEntrySerializer, RECAPDocumentSerializer,
-    TagSerializer,
+    TagSerializer, OriginalCourtInformationSerializer,
 )
 from cl.search.filters import (
     DocketFilter, CourtFilter, OpinionClusterFilter, OpinionFilter,
-    OpinionsCitedFilter, DocketEntryFilter, RECAPDocumentFilter)
+    OpinionsCitedFilter, DocketEntryFilter, RECAPDocumentFilter,
+)
 from cl.search.forms import SearchForm
-from cl.search.models import Docket, Court, OpinionCluster, Opinion, \
-    OpinionsCited, DocketEntry, RECAPDocument, Tag
+from cl.search.models import (
+    Court, Docket, DocketEntry, Opinion, OpinionCluster, OpinionsCited,
+    OriginatingCourtInformation, RECAPDocument, Tag,
+)
+
+
+class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
+    queryset = OriginatingCourtInformation.objects.all()
+    serializer_class = OriginalCourtInformationSerializer
 
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -21,6 +29,7 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
         'court',
         'assigned_to',
         'referred_to',
+        'originating_court',
     ).prefetch_related(
         'clusters',
         'audio_files',
