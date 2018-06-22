@@ -52,15 +52,15 @@
        data-target="#modal-save-favorite, #modal-logged-out"
        title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
 
-    <h2 class="bottom inline">
+    <h1 class="bottom inline">
       {{ docket|best_case_name|safe|v_wrapper }}
       {% if docket.docket_number %}
         ({{ docket.docket_number }})
       {% endif %}
-    </h2>
+    </h1>
     {% include "includes/favorites_modal.html" %}
 
-    <h3>{{ docket.court }}</h3>
+    <h2>{{ docket.court }}</h2>
 
     {% if docket.source in docket.RECAP_SOURCES %}
       <div class="v-offset-above-2">
@@ -101,12 +101,20 @@
 
     {% if docket.source in docket.RECAP_SOURCES %}
       <p class="bottom">
-        <span class="meta-data-header">Last updated:</span>
+        <span class="meta-data-header">Last Updated:</span>
         <span class="meta-data-value cursor-help dotted"
               data-toggle="tooltip"
               data-placement="right"
               data-html="true"
               title="This docket was collected as part of the RECAP Project. Therefore, it is updated when users of the RECAP Extension download the docket from PACER. To see the most up to date version of this docket, click the button above to &quot;View on PACER.&quot;">{{ docket.date_modified|timezone:timezone }}</span>
+      </p>
+    {% endif %}
+
+    {% with og_info=docket.originating_court_information %}
+    {% if docket.panel_str %}
+      <p class="bottom">
+        <span class="meta-data-header">Panel:</span>
+        <span class="meta-data-value">{{ docket.panel_str }}</span>
       </p>
     {% endif %}
 
@@ -134,6 +142,23 @@
           {% endif %}
         </span>
       </p>
+    {% endif %}
+
+    {% if docket.appeal_from or docket.appeal_from_str %}
+      <span class="meta-data-header">Appealed From:</span>
+      <span class="meta-data-value">
+        {% if docket.appeal_from %}
+          {{ docket.appeal_from.short_name }}
+        {% elif docket.appeal_from_str %}
+          {{ docket.appeal_from_str }}
+        {% endif %}
+        {% if og_info.docket_number %}
+          (<a href="/?type=r&amp;docket_number={{ og_info.docket_number }}{% if docket.appeal_from %}&amp;court={{ docket.appeal_from.pk }}{% endif %}"
+              data-toggle="tooltip"
+              data-placement="right"
+              title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }})</a>
+        {% endif %}
+      </span>
     {% endif %}
 
     {% if docket.date_cert_granted %}
@@ -218,13 +243,116 @@
         </span>
       </p>
     {% endif %}
+
+    {% if docket.appellate_fee_status %}
+      <p class="bottom">
+        <span class="meta-data-header">Fee Status:</span>
+        <span class="meta-data-value">{{ docket.appellate_fee_status }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.appellate_case_type_information %}
+      <p class="bottom">
+        <span class="meta-data-header">Case Type Information:</span>
+        <span class="meta-data-value">{{ docket.appellate_case_type_information }}</span>
+      </p>
+    {% endif %}
+
+    {% if og_info %}
+      {% spaceless %}{# Wrap things in spans to make this work. #}
+      <h3 class="v-offset-above-3">
+        Originating Court
+        {% if docket.appeal_from %}
+          (<span>{{ docket.appeal_from.short_name }}</span>
+        {% elif docket.appeal_from_str %}
+          (<span>{{ docket.appeal_from_str }}</span>
+        {% endif %}
+        {% if og_info.docket_number %}
+          &mdash; <a href="/?type=r&amp;docket_number=
+          {{ og_info.docket_number }}{% if docket.appeal_from %}&amp;court={{ docket.appeal_from.pk }}{% endif %}"
+              data-toggle="tooltip"
+              data-placement="right"
+              title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }}</a>
+        {% endif %}
+        <span>)</span>
+      </h3>
+      {% endspaceless %}
+      <hr class="top">
+      {% if og_info.court_reporter %}
+        <p class="bottom">
+          <span class="meta-data-header">Court Reporter:</span>
+          <span class="meta-data-value">{{ og_info.court_reporter }}</span>
+        </p>
+      {% endif %}
+      {% if og_info.assigned_to or og_info.assigned_to_str %}
+        <p class="bottom">
+          <span class="meta-data-header">Trial Judge:</span>
+          <span class="meta-data-value">
+            {% if og_info.assigned_to %}
+              <a href="{{ og_info.assigned_to.get_absolute_url }}">{{ og_info.assigned_to.name_full }}</a>
+            {% elif og_info.assigned_to_str %}
+              <a
+                href="/?type=r&amp;assigned_to=&quot;{{ og_info.assigned_to_str }}&quot;">{{ og_info.assigned_to_str }}</a>
+            {% endif %}
+          </span>
+        </p>
+      {% endif %}
+
+      {% if og_info.ordering_judge or og_info.ordering_judge_str %}
+        <p class="bottom">
+          <span class="meta-data-header">Ordering Judge:</span>
+          <span class="meta-data-value">
+            {% if og_info.ordering_judge %}
+              <a
+                href="{{ og_info.ordering_judge.get_absolute_url }}">{{ og_info.ordering_judge.name_full }}</a>
+            {% elif og_info.assigned_to_str %}
+              <a
+                href="/?type=r&amp;assigned_to=&quot;{{ og_info.ordering_judge_str }}&quot;">{{ og_info.ordering_judge_str }}</a>
+            {% endif %}
+          </span>
+        </p>
+      {% endif %}
+    {% endif %}
+
+    {% if og_info.date_filed %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Filed:</span>
+        <span class="meta-data-value">{{ og_info.date_filed }}</span>
+      </p>
+    {% endif %}
+
+    {% if og_info.date_judgment %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Order/Judgment:</span>
+        <span class="meta-data-value">{{ og_info.date_judgment }}</span>
+      </p>
+    {% endif %}
+    {% if og_info.date_judgment_eod %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Order/Judgment EOD:</span>
+        <span class="meta-data-value">{{ og_info.date_judgment_eod }}</span>
+      </p>
+    {% endif %}
+    {% if og_info.date_filed_noa %}
+      <p class="bottom">
+        <span class="meta-data-header">Date NOA Filed:</span>
+        <span class="meta-data-value">{{ og_info.date_filed_noa }}</span>
+      </p>
+    {% endif %}
+    {% if og_info.date_received_coa %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Rec'd COA:</span>
+        <span class="meta-data-value">{{ og_info.date_received_coa }}</span>
+      </p>
+    {% endif %}
+    {% endwith %}{# No more og_info variable #}
   </div>
 
 
   {% if docket.clusters.count %}
     <div class="col-xs-6">
       <h3>Opinions Outside of RECAP Collection</h3>
-      <hr>
+      <hr class="top">
       <ul>
         {% for cluster in docket.clusters.all %}
           <li>
@@ -246,7 +374,7 @@
   {% if docket.audio_files.count %}
     <div class="col-xs-6">
       <h3>Oral Argument Recordings</h3>
-      <hr>
+      <hr class="top">
       <ul>
         {% for af in docket.audio_files.all %}
           <li>
