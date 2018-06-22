@@ -92,6 +92,10 @@ class OriginatingCourtInformation(models.Model):
         auto_now=True,
         db_index=True,
     )
+    docket_number = models.TextField(
+        help_text="The docket number in the lower court.",
+        blank=True,
+    )
     assigned_to = models.ForeignKey(
         'people_db.Person',
         related_name='original_court_info',
@@ -205,7 +209,7 @@ class Docket(models.Model):
                   "unable to normalize the value in this field.",
         blank=True,
     )
-    originating_court = models.OneToOneField(
+    originating_court_information = models.OneToOneField(
         OriginatingCourtInformation,
         help_text="Lower court information for appellate dockets",
         related_name="docket",
