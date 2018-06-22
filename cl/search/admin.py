@@ -2,8 +2,8 @@ from django.conf import settings
 from django.contrib import admin
 
 from cl.search.models import (
-    Docket, OpinionsCited, Court, Opinion, OpinionCluster,
-    DocketEntry, RECAPDocument
+    Court, Docket, DocketEntry, Opinion, OpinionCluster, OpinionsCited,
+    OriginatingCourtInformation, RECAPDocument,
 )
 
 
@@ -180,6 +180,13 @@ class DocketEntryAdmin(admin.ModelAdmin):
 class DocketEntryInline(admin.TabularInline):
     model = DocketEntry
     extra = 1
+
+
+@admin.register(OriginatingCourtInformation)
+class OriginatingCourtInformationAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'assigned_to',
+    )
 
 
 @admin.register(Docket)
