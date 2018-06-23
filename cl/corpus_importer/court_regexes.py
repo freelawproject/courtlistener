@@ -184,6 +184,8 @@ fd_pairs = (
         (re.compile('D\. Wisconsin, E\. D', re.I), 'wied'),
     (re.compile('(^|\s)W(\.|(estern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Wisconsin', re.I), 'wiwd'),
     (re.compile('Wyoming', re.I), 'wyd'),
+
+    # Territories and commonwealths
     # Abolished. 1937-07-26 to 1982-03-31
     (re.compile('Canal Zone', re.I), 'canalzoned'),
     (re.compile('Guam', re.I), 'gud'),
@@ -191,25 +193,10 @@ fd_pairs = (
     (re.compile('Puerto Rico', re.I), 'prd'),
     (re.compile('Virgin Islands', re.I), 'vid'),
 
+    # Federal speciality courts
     (re.compile('U\. S\. Court of Customs Appeals', re.I), 'ccpa'),
     (re.compile(u'Commerce Court', re.I), 'com'),
     (re.compile(u'Court of Claims', re.I), 'cc'),
-    (re.compile(u'Supreme Court of the United States', re.I), 'scotus'),
-
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Second Circuit', re.I), 'ca2'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Third Circuit', re.I), 'ca3'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Fourth Circuit', re.I), 'ca4'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Fifth Circuit', re.I), 'ca5'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Sixth Circuit', re.I), 'ca6'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Seventh Circuit', re.I), 'ca7'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Eighth Circuit', re.I), 'ca8'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Ninth Circuit', re.I), 'ca9'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Tenth Circuit', re.I), 'ca10'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Eleventh Circuit', re.I), 'ca11'),
-
-    (re.compile(u'(^|\s)U\. S\. Court of Appeals for the District of Columbia Circuit', re.I), 'cadc'),
-    (re.compile(u'(^|\s)U\. S\. Court of Appeals for the Federal Circuit', re.I), 'cafc'),
     (re.compile(u'(^|\s)U\. S\. Court of Customs and Patent Appeals', re.I), 'ccpa'),
     (re.compile(u'(^|\s)U\. S\. Court of International Trade', re.I), 'cit'),
     (re.compile(u'(^|\s)U\. S\. Customs Court', re.I), 'cusc'),
@@ -239,6 +226,24 @@ fd_pairs = (
     (re.compile(u'District of Washington', re.I), 'washd'),
     (re.compile(u'District of West Virginia', re.I), 'wvad'),
     (re.compile(u'District of Wisconsin', re.I), 'wisd'),
+)
+
+ca_pairs = (
+    (re.compile(u'Supreme Court of the United States', re.I), 'scotus'),
+
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Second Circuit', re.I), 'ca2'),
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Third Circuit', re.I), 'ca3'),
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Fourth Circuit', re.I), 'ca4'),
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Fifth Circuit', re.I), 'ca5'),
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Sixth Circuit', re.I), 'ca6'),
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Seventh Circuit', re.I), 'ca7'),
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Eighth Circuit', re.I), 'ca8'),
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Ninth Circuit', re.I), 'ca9'),
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Tenth Circuit', re.I), 'ca10'),
+    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Eleventh Circuit', re.I), 'ca11'),
+    (re.compile(u'(^|\s)U\. S\. Court of Appeals for the District of Columbia Circuit', re.I), 'cadc'),
+    (re.compile(u'(^|\s)U\. S\. Court of Appeals for the Federal Circuit', re.I), 'cafc'),
 )
 
 # noinspection PyPep8
@@ -357,7 +362,7 @@ fb_pairs = (
     (re.compile('(^|\s)W(\.|(estern))? ?D(\.|(istrict))? (of )?Wis(consin)?', re.I), 'wiwb'),
     (re.compile('(^|\s)D\. Wyoming', re.I), 'wyb'),
 
-    # Bankruptcy special
+    # Bankruptcy territories and commonwealths
     (re.compile('Guam', re.I), 'gub'),
     (re.compile('Northern Mariana', re.I), 'nmib'),
     (re.compile('Puerto Rico', re.I), 'prb'),
@@ -410,8 +415,8 @@ state_pairs = (
         (re.compile('Delaware Supreme Court', re.I), 'del'),
         (re.compile('(High )?Court of Errors and Appeals (Court )?of Delaware', re.I), 'del'),
         # This is a guess, but there's only one case in this jurisdiction and
-        # it has to do with a governor that passed in office. Seems like Supreme
-        # court level stuff.
+        # it has to do with a governor that passed in office. Seems like
+        # Supreme court level stuff.
         (re.compile('In vacation of Delaware', re.I), 'del'),
     (re.compile('Court of Chancery of (the State of )?Delaware', re.I), 'delch'),
         (re.compile('Chancery Court of Delaware', re.I), 'delch'),
@@ -621,7 +626,15 @@ state_pairs = (
 
     (re.compile('Supreme Court (of )?Wyoming', re.I), 'wyo'),
 
-    # attorneys general
+    # worker's compensation commissions
+    (re.compile('Industrial Claim Appeals Office', re.I), 'coloworkcompcom'),
+    (re.compile('Connecticut Compensation Review Board', re.I), 'connworkcompcom'),
+    (re.compile('Commonwealth of Massachusetts Department of Industrial Accidents', re.I), 'maworkcompcom'),
+    (re.compile('North Carolina Industrial Commission', re.I), 'ncworkcompcom'),
+    (re.compile('Arkansas Workers\' Compensation Commission', re.I), 'arkworkcompcom'),
+)
+
+state_ag_pairs = (
     (re.compile('Attorney General of Arkansas', re.I), 'arkag'),
     (re.compile('Attorney General of California', re.I), 'calag'),
     (re.compile('Attorney General of Colorado', re.I), 'coloag'),
@@ -636,27 +649,78 @@ state_pairs = (
     (re.compile('Attorney General of Texas', re.I), 'texag'),
     (re.compile('Attorney General of Washington', re.I), 'washag'),
     (re.compile('Attorney General of Wisconsin', re.I), 'wisag'),
+)
 
-    # worker's compensation commissions
-    (re.compile('Industrial Claim Appeals Office', re.I), 'coloworkcompcom'),
-    (re.compile('Connecticut Compensation Review Board', re.I), 'connworkcompcom'),
-    (re.compile('Commonwealth of Massachusetts Department of Industrial Accidents', re.I), 'maworkcompcom'),
-    (re.compile('North Carolina Industrial Commission', re.I), 'ncworkcompcom'),
-    (re.compile('Arkansas Workers\' Compensation Commission', re.I), 'arkworkcompcom'),
-
-    # non-US courts
+international_pairs = (
     (re.compile("Court of King's Bench", re.I), 'kingsbench'),
 )
 
 
+def match_court_string(court_str, federal_appeals=False,
+                       federal_district=False, bankruptcy=False, state=False,
+                       state_ag=False, international=False):
+    """Look up a court string and return a CourtListener ID.
+
+    Note you cannot use bankruptcy and federal_district together due to
+    collisions between their regular expressions.
+
+    :param court_str: The court string to look up.
+    :param federal_appeals: Whether the string might be a federal appeals
+    court.
+    :param federal_district: Whether the string might be a federal district
+    court. This may return abolished or specialty federal courts courts.
+    :param bankruptcy: Whether the string might be a bankruptcy court. This may
+    return abolished courts.
+    :param state: Whether the string might be a state court.
+    :param state_ag: Whether it might be a state AG "court".
+    :param international: Whether it might be an international court.
+    :returns The abbreviation for the court, if possible. Else, returns None
+    """
+    assert not (federal_district and bankruptcy), \
+        "federal_district and bankruptcy cannot be used in conjunction"
+
+    # Generally, we test these from most specific regex to least specific. The
+    # order of the tests below should not be changed.
+    matches = []
+    if international:
+        for regex, value in international_pairs:
+            if re.search(regex, court_str):
+                matches.append(value)
+    if state:
+        for regex, value in state_pairs:
+            if re.search(regex, court_str):
+                matches.append(value)
+    if state_ag:
+        for regex, value in state_ag_pairs:
+            if re.search(regex, court_str):
+                matches.append(value)
+    if federal_appeals:
+        for regex, value in ca_pairs:
+            if re.search(regex, court_str):
+                matches.append(value)
+    if bankruptcy:
+        for regex, value in fb_pairs:
+            if re.search(regex, court_str):
+                matches.append(value)
+    # District go last because they've got some broad ones.
+    if federal_district:
+        for regex, value in fd_pairs:
+            if re.search(regex, court_str):
+                matches.append(value)
+
+    # Safety check. If we have more than one match, that's a problem.
+    assert len(matches) >= 1, "Too many matches for %s" % court_str
+    return matches[0] if matches else None
+
+
 ##########################################
-# This variable is used to do statistical work on Opinions whose jurisdiction is
-# unclear. The problem is that many Opinions, probably thousands of them, have a
-# court like, "D. Wisconsin." Well, Wisconsin has an east and west district, but
-# no generic district, so this has to be resolved. When we hit such a case, we
-# set it aside for later processing, once we've processed all the easy cases. At
-# that point, we will have the variable below, judge stats, which will have all
-# of the judges along with a count of their jurisdictions:
+# This variable is used to do statistical work on Opinions whose jurisdiction
+# is unclear. The problem is that many Opinions, probably thousands of them,
+# have a court like, "D. Wisconsin." Well, Wisconsin has an east and west
+# district, but no generic district, so this has to be resolved. When we hit
+# such a case, we set it aside for later processing, once we've processed all
+# the easy cases. At that point, we will have the variable below, judge stats,
+# which will have all of the judges along with a count of their jurisdictions:
 # judge_stats = {
 #     'McKensey': {
 #         'wied': 998,
