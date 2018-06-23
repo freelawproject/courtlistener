@@ -5,6 +5,7 @@ from datetime import date
 from django.conf import settings
 from django.test import TestCase
 
+from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.dup_helpers import case_name_in_candidate
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.corpus_importer.import_columbia.parse_opinions import \
@@ -12,10 +13,9 @@ from cl.corpus_importer.import_columbia.parse_opinions import \
 from cl.corpus_importer.lawbox.judge_extractor import get_judge_from_str, \
     REASONS
 from cl.lib.pacer import process_docket_data
-from cl.people_db.import_judges.populate_fjc_judges import get_fed_court_object
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
-from cl.recap.tasks import find_docket_object
 from cl.recap.models import UPLOAD_TYPE
+from cl.recap.tasks import find_docket_object
 from cl.search.models import Docket, RECAPDocument
 
 
@@ -462,8 +462,8 @@ class CourtMatchingTest(TestCase):
             }
         )
         for test in pairs:
-            print "Testing: %s, expecting: %s" % (test['q'], test['a'])
-            got = get_fed_court_object(test['q'])
+            print("Testing: %s, expecting: %s" % (test['q'], test['a']))
+            got = match_court_string(test['q'], federal_district=True)
             self.assertEqual(
                 test['a'],
                 got,
