@@ -3,14 +3,14 @@ import argparse
 import numpy as np
 import pandas as pd
 
+from cl.corpus_importer.court_regexes import match_court_string
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.import_judges.assign_authors import (
-    assign_authors_to_opinions,  assign_authors_to_oral_arguments,
+    assign_authors_to_opinions, assign_authors_to_oral_arguments,
 )
 from cl.people_db.import_judges.judge_utils import process_date_string
 from cl.people_db.import_judges.populate_fjc_judges import make_federal_judge, \
-    get_fed_court_object, add_positions_from_row, \
-    update_bankruptcy_and_magistrate
+    add_positions_from_row, update_bankruptcy_and_magistrate
 from cl.people_db.import_judges.populate_presidents import make_president
 from cl.people_db.import_judges.populate_state_judges import make_state_judge
 from cl.people_db.models import Person, Position
@@ -184,9 +184,10 @@ class Command(VerboseCommand):
 
                 if pd.isnull(item['Court Name' + pos_str]):
                     continue
-                courtid = get_fed_court_object(item['Court Name' + pos_str])
+                courtid = match_court_string(item['Court Name' + pos_str],
+                                             federal_district=True)
                 if courtid is None:
-                    raise
+                    raise Exception
                 date_termination = process_date_string(
                     item['Date of Termination' + pos_str])
                 date_start = process_date_string(

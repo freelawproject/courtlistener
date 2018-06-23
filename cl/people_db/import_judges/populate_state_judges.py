@@ -6,7 +6,7 @@ import pandas as pd
 from cl.corpus_importer.import_columbia.parse_opinions import \
     get_state_court_object
 from cl.people_db.import_judges.judge_utils import get_school, process_date, \
-     get_suffix
+    get_suffix
 from cl.people_db.models import Person, Position, Education, \
     PoliticalAffiliation, Source
 
@@ -85,7 +85,7 @@ def make_state_judge(item, testing=False):
 
     if courtid is None:
         print(item)
-        raise
+        raise Exception
 
     # assign start date
     date_start, date_granularity_start = process_date(item['startyear'],
