@@ -19,7 +19,7 @@ from cl.lib.pacer import normalize_attorney_role, normalize_attorney_contact, \
     normalize_us_state, make_address_lookup_key, get_blocked_status
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import UUIDFileSystemStorage
-from cl.lib.string_utils import trunc
+from cl.lib.string_utils import trunc, anonymize
 from cl.people_db.models import Role
 from cl.scrapers.models import UrlHash
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
@@ -140,6 +140,38 @@ class TestStringUtils(TestCase):
                     "%s is longer than %s" %
                     (test_dict, result, test_dict['length'])
             )
+
+    def test_anonymize(self):
+        """Can we properly anonymize SSNs, EINs, and A-Numbers?"""
+        # Simple cases. Anonymize them.
+        self.assertEqual(anonymize('111-11-1111'), ('XXX-XX-XXXX', True))
+        self.assertEqual(anonymize('11-1111111'), ('XX-XXXXXXX', True))
+        self.assertEqual(anonymize('A11111111'), ('AXXXXXXXX', True))
+        self.assertEqual(anonymize('A111111111'), ('AXXXXXXXX', True))
+
+        # Starting or ending with letters isn't an SSN
+        self.assertEqual(anonymize('A111-11-1111'), ('A111-11-1111', False))
+        self.assertEqual(anonymize('111-11-1111A'), ('111-11-1111A', False))
+
+        # Matches in a sentence
+        self.assertEqual(
+            anonymize('Term 111-11-1111 Term'),
+            ('Term XXX-XX-XXXX Term', True),
+        )
+        self.assertEqual(
+            anonymize('Term 11-1111111 Term'),
+            ('Term XX-XXXXXXX Term', True),
+        )
+        self.assertEqual(
+            anonymize('Term A11111111 Term'),
+            ('Term AXXXXXXXX Term', True),
+        )
+
+        # Multiple matches
+        self.assertEqual(
+            anonymize("Term 111-11-1111 Term 111-11-1111 Term"),
+            ('Term XXX-XX-XXXX Term XXX-XX-XXXX Term', True),
+        )
 
 
 class TestMakeFQ(TestCase):
