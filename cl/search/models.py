@@ -213,7 +213,7 @@ class Docket(models.Model):
         null=True,
     )
     appeal_from_str = models.TextField(
-        help_text="In appeallate cases, this is the lower court or "
+        help_text="In appellate cases, this is the lower court or "
                   "administrative body where this case was originally heard. "
                   "This field is frequently blank due to it not being "
                   "populated historically. This field may have values when "
