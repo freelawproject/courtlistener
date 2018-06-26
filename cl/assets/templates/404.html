@@ -26,6 +26,10 @@
         <p><a href="{% url "contact" %}">Let us know</a> it's missing. Sometimes we can help.
         </p>
       </li>
+      <li>
+        <p><a href="{% url "faq" %}#explain-neutral-citations">Learn about neutral citations</a> so we can avoid citations like <strong>"404 U.S. ___"</strong> in the future.
+        </p>
+      </li>
     </ul>
     <p>Sorry about this. If you continue having problems, please do let us know.</p>
     <p class="v-offset-above-2">
@@ -45,6 +49,11 @@
       {% elif p_url in request_path %}
         <a href="{{ p_url }}"
            class="btn btn-lg btn-primary">Do a New Judge Search</a>
+      {% else %}
+        <div class="well v-offset-above-3">
+          <strong><i class="fa fa-lightbulb-o grey"></i> Quick Tip!
+          </strong>{{ TIP|safe }}
+        </div>
       {% endif %}
     </p>
   </div>
