@@ -31,6 +31,7 @@ from cl.users.forms import (
     CustomPasswordChangeForm, OptInConsentForm,
 )
 from cl.users.models import UserProfile
+from cl.users.tasks import subscribe_to_mailchimp, unsubscribe_from_mailchimp
 from cl.users.utils import convert_to_stub_account, emails, message_dict
 from cl.visualizations.models import SCOTUSMap
 
@@ -137,15 +138,17 @@ def view_api(request):
 @never_cache
 def view_settings(request):
     old_email = request.user.email  # this line has to be at the top to work.
+    old_wants_newsletter = request.user.profile.wants_newsletter
     user = request.user
     up = user.profile
     user_form = UserForm(request.POST or None, instance=user)
     profile_form = ProfileForm(request.POST or None, instance=up)
     if profile_form.is_valid() and user_form.is_valid():
-        cd = user_form.cleaned_data
-        new_email = cd['email']
-
-        if old_email != new_email:
+        user_cd = user_form.cleaned_data
+        profile_cd = profile_form.cleaned_data
+        new_email = user_cd['email']
+        changed_email = old_email != new_email
+        if changed_email:
             # Email was changed.
 
             # Build the activation key for the new account
@@ -153,6 +156,10 @@ def view_settings(request):
             up.activation_key = hashlib.sha1(salt + user.username).hexdigest()
             up.key_expires = now() + timedelta(5)
             up.email_confirmed = False
+
+            # Unsubscribe the old address in mailchimp (we'll
+            # resubscribe it when they confirm it later).
+            unsubscribe_from_mailchimp.delay(old_email)
 
             # Send the email.
             email = emails['email_changed_successfully']
@@ -170,6 +177,16 @@ def view_settings(request):
             # if the email wasn't changed, simply inform of success.
             msg = message_dict['settings_changed_successfully']
             messages.add_message(request, msg['level'], msg['message'])
+
+        new_wants_newsletter = profile_cd['wants_newsletter']
+        if old_wants_newsletter != new_wants_newsletter:
+            if new_wants_newsletter is True and not changed_email:
+                # They just subscribed. If they didn't *also* update their
+                # email address, subscribe them.
+                subscribe_to_mailchimp.delay(new_email)
+            elif new_wants_newsletter is False:
+                # They just unsubscribed
+                unsubscribe_from_mailchimp.delay(new_email)
 
         # New email address and changes above are saved here.
         profile_form.save()
@@ -195,6 +212,7 @@ def delete_account(request):
             request.user.scotus_maps.all().update(deleted=True)
             convert_to_stub_account(request.user)
             logout(request)
+            unsubscribe_from_mailchimp.delay(request.user.email)
 
         except Exception as e:
             logger.critical("User was unable to delete account. %s" % e)
@@ -364,8 +382,9 @@ def register_success(request):
 def confirm_email(request, activation_key):
     """Confirms email addresses for a user and sends an email to the admins.
 
-    Checks if a hash in a confirmation link is valid, and if so validates the
-    user's email address as valid.
+    Checks if a hash in a confirmation link is valid, and if so sets the user's
+    email address as valid. If they are subscribed to the newsletter, ensures
+    that mailchimp is updated.
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
@@ -397,6 +416,8 @@ def confirm_email(request, activation_key):
 
     # Tests pass; Save the profile
     for up in ups:
+        if up.wants_newsletter:
+            subscribe_to_mailchimp.delay(up.user.email)
         up.email_confirmed = True
         up.save()
 
