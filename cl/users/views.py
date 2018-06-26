@@ -14,7 +14,7 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
 from django.db.models import Count
-from django.http import HttpResponseRedirect, QueryDict
+from django.http import HttpResponseRedirect, QueryDict, HttpResponse
 from django.shortcuts import render
 from django.template.defaultfilters import urlencode
 from django.utils.timezone import now
@@ -473,3 +473,24 @@ def password_change(request):
         'form': form,
         'private': False
     })
+
+
+def mailchimp_webhook(request):
+    """Respond to changes to our mailing list"""
+    if request.method == 'POST':
+        # Process the subscribe or unsubscribe
+        webhook_type = request.POST.get('type')
+        wants_newsletter = None
+        if webhook_type == 'subscribe':
+            wants_newsletter = True
+        elif webhook_type == 'unsubscribe':
+            wants_newsletter = False
+        if wants_newsletter is not None:
+            # Only update this value if we get a valid webhook_type
+            email = request.POST.get('data[email]')
+            profiles = UserProfile.objects.filter(user__email=email)
+            profiles.update(wants_newsletter=wants_newsletter)
+
+    # Mailchimp does a GET when you create the webhook,
+    # so we need to return a 200 even for GETs.
+    return HttpResponse('<h1>200: OK</h1>')
