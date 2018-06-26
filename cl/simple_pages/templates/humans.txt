@@ -33,7 +33,7 @@
   Standards: HTML5, CSS3
   Components:
         Text Extraction: Antiword, libwpd-tools, pdf2text
-        Audio: avconv, eyeD3
+        Audio: avconv, eyeD3, ffmpeg
         Code: Celery, Django, jQuery, D3, plottable.js, lxml, Git, requests,
               sunburnt, Tesseract
         Display: Bootstrap, Font Awesome
