@@ -14,6 +14,7 @@ from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 
 from cl.audio.models import Audio
+from cl.audio.utils import get_audio_binary
 from cl.celery import app
 
 TRANSCRIPTS_BUCKET_NAME = 'freelawproject-transcripts'
@@ -73,8 +74,9 @@ def encode_as_linear16(path, tmp):
     # http://stackoverflow.com/a/4854627/64911 and
     # https://trac.ffmpeg.org/wiki/audio%20types
     assert isinstance(path, basestring), "path argument is not a str."
-    avconv_command = [
-        'avconv',
+    av_path = get_audio_binary()
+    av_command = [
+        av_path,
         '-y',           # Assume yes (clobber existing files)
         '-i', path,     # Input file
         '-f', 's16le',  # Force output format
@@ -83,15 +85,12 @@ def encode_as_linear16(path, tmp):
         tmp.name,       # Output file
     ]
     try:
-        _ = subprocess.check_output(
-            avconv_command,
-            stderr=subprocess.STDOUT,
-        )
+        _ = subprocess.check_output(av_command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        print('avconv failed command: %s\n'
+        print('%s failed command: %s\n'
               'error code: %s\n'
-              'output: %s\n' % (avconv_command, e.returncode, e.output))
-        print traceback.format_exc()
+              'output: %s\n' % (av_path, av_command, e.returncode, e.output))
+        print(traceback.format_exc())
         raise e
 
 
