@@ -31,7 +31,7 @@ from cl.users.forms import (
     CustomPasswordChangeForm, OptInConsentForm,
 )
 from cl.users.models import UserProfile
-from cl.users.tasks import subscribe_to_mailchimp, unsubscribe_from_mailchimp
+from cl.users.tasks import subscribe_to_mailchimp, update_mailchimp
 from cl.users.utils import convert_to_stub_account, emails, message_dict
 from cl.visualizations.models import SCOTUSMap
 
@@ -159,7 +159,7 @@ def view_settings(request):
 
             # Unsubscribe the old address in mailchimp (we'll
             # resubscribe it when they confirm it later).
-            unsubscribe_from_mailchimp.delay(old_email)
+            update_mailchimp.delay(old_email, 'unsubscribe')
 
             # Send the email.
             email = emails['email_changed_successfully']
@@ -186,7 +186,7 @@ def view_settings(request):
                 subscribe_to_mailchimp.delay(new_email)
             elif new_wants_newsletter is False:
                 # They just unsubscribed
-                unsubscribe_from_mailchimp.delay(new_email)
+                update_mailchimp.delay(new_email, 'unsubscribe')
 
         # New email address and changes above are saved here.
         profile_form.save()
@@ -212,7 +212,7 @@ def delete_account(request):
             request.user.scotus_maps.all().update(deleted=True)
             convert_to_stub_account(request.user)
             logout(request)
-            unsubscribe_from_mailchimp.delay(request.user.email)
+            update_mailchimp.delay(request.user.email, 'unsubscribe')
 
         except Exception as e:
             logger.critical("User was unable to delete account. %s" % e)
