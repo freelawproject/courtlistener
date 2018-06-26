@@ -130,10 +130,10 @@ MESSAGE_TAGS = {
 ########
 # Solr #
 ########
-SOLR_OPINION_URL = 'http://127.0.0.1:8983/solr/collection1'
-SOLR_AUDIO_URL = 'http://127.0.0.1:8983/solr/audio'
-SOLR_PEOPLE_URL = 'http://127.0.0.1:8983/solr/person'
-SOLR_RECAP_URL = 'http://127.0.0.1:8983/solr/recap'
+SOLR_OPINION_URL = '%s/solr/collection1' % SOLR_URL
+SOLR_AUDIO_URL = '%s/solr/audio' % SOLR_URL
+SOLR_PEOPLE_URL = '%s/solr/person' % SOLR_URL
+SOLR_RECAP_URL = '%s/solr/recap' % SOLR_URL
 SOLR_URLS = {
     'opinions': SOLR_OPINION_URL,
     'audio': SOLR_AUDIO_URL,
@@ -146,10 +146,10 @@ SOLR_AUDIO_TEST_CORE_NAME = 'audio_test'
 SOLR_PEOPLE_TEST_CORE_NAME = 'person_test'
 SOLR_RECAP_TEST_CORE_NAME = 'recap_test'
 
-SOLR_OPINION_TEST_URL = 'http://127.0.0.1:8983/solr/opinion_test'
-SOLR_AUDIO_TEST_URL = 'http://127.0.0.1:8983/solr/audio_test'
-SOLR_PEOPLE_TEST_URL = 'http://127.0.0.1:8983/solr/person_test'
-SOLR_RECAP_TEST_URL = 'http://127.0.0.1:8983/solr/recap_test'
+SOLR_OPINION_TEST_URL = '%s/solr/opinion_test' % SOLR_URL
+SOLR_AUDIO_TEST_URL = '%s/solr/audio_test' % SOLR_URL
+SOLR_PEOPLE_TEST_URL = '%s/solr/person_test' % SOLR_URL
+SOLR_RECAP_TEST_URL = '%s/solr/recap_test' % SOLR_URL
 SOLR_TEST_URLS = {
     'opinion': SOLR_OPINION_TEST_URL,
     'audio': SOLR_AUDIO_TEST_URL,
@@ -168,9 +168,6 @@ REDIS_DATABASES = {
     'STATS': 2,
     'ALERTS': 3,
 }
-REDIS_HOST = 'localhost'
-REDIS_PORT = 6379
-
 
 ##########
 # CELERY #
@@ -209,7 +206,7 @@ CELERY_SEND_TASK_ERROR_EMAILS = True
 CACHES = {
     'default': {
         'BACKEND': 'redis_cache.RedisCache',
-        'LOCATION': 'localhost:6379',
+        'LOCATION': '%s:%s' % (REDIS_HOST, REDIS_PORT),
         'OPTIONS': {
             'DB': REDIS_DATABASES['CACHE'],
         },
