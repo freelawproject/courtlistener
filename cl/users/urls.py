@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.conf.urls import url
 from django.contrib.auth import views as auth_views
 
@@ -147,4 +148,8 @@ urlpatterns = [
         views.email_confirm_success,
         name='email_confirm_success'
     ),
+
+    # Webhooks
+    url(r'^webhook/mailchimp/%s/$' % settings.MAILCHIMP_SECRET,
+        views.mailchimp_webhook),
 ]
