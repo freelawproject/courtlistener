@@ -47,7 +47,7 @@ def subscribe_to_mailchimp(self, email):
         if j['title'] == 'Member Exists':
             logger.info("User with email '%s' already exists in mailchimp. "
                         "Attempting via PATCH request.", email)
-            update_mailchimp(email, 'subscribe')
+            update_mailchimp(email, 'subscribed')
     else:
         j = r.json()
         logger.warn("Did not subscribe '%s' to mailchimp: '%s: %s'",
