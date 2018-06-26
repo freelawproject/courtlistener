@@ -19,6 +19,7 @@ from django.shortcuts import render
 from django.template.defaultfilters import urlencode
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import (sensitive_post_parameters,
                                            sensitive_variables)
 
@@ -475,6 +476,7 @@ def password_change(request):
     })
 
 
+@csrf_exempt
 def mailchimp_webhook(request):
     """Respond to changes to our mailing list"""
     logger.info("Got mailchimp webhook with %s method.", request.method)
