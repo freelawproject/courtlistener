@@ -28,6 +28,11 @@ DATABASES = {
     },
 }
 
+SOLR_URL = 'http://127.0.0.1:8983'
+
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379
+
 # Make these unique, and don't share it with anybody.
 SECRET_KEY = 'your-secret-key'
 
