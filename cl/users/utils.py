@@ -101,12 +101,18 @@ emails = {
     },
     'confirm_your_new_account': {
         'subject': 'Confirm your account on CourtListener.com',
-        'body': "Hello, %s, and thanks for signing up for an account!\n\n"
+        'body': "Hello, %s, and thanks for signing up for an account on "
+                "CourtListener.com.\n\n"
                 "To send you emails, we need you to activate your account with "
                 "CourtListener. To activate your account, click this link "
                 "within five days:\n\n"
-                "https://www.courtlistener.com/email/confirm/%s\n\n"
-                "Thanks for using our site,\n\n"
+                "    https://www.courtlistener.com/email/confirm/%s\n\n"
+                "We're always adding features and listening to your requests. "
+                "To join the conversation:\n\n"
+                " - Sign up for the Free Law Project newsletter: https://free.law/newsletter/\n"
+                " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject or https://twitter.com/courtlistener\n"
+                " - Check our blog for the latest news and updates: https://free.law/\n\n"
+                "Thanks for using CourtListener and joining our community,\n\n"
                 "The CourtListener Team\n\n"
                 "-------------------\n"
                 "For questions or comments, please see our contact page, "
