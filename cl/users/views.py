@@ -477,9 +477,10 @@ def password_change(request):
 
 def mailchimp_webhook(request):
     """Respond to changes to our mailing list"""
+    logger.info("Got mailchimp webhook with %s method.", request.method)
     if request.method == 'POST':
-        # Process the subscribe or unsubscribe
         webhook_type = request.POST.get('type')
+        logger.info("Handling mailchimp '%s' request.", webhook_type)
         wants_newsletter = None
         if webhook_type == 'subscribe':
             wants_newsletter = True
@@ -489,6 +490,8 @@ def mailchimp_webhook(request):
             # Only update this value if we get a valid webhook_type
             email = request.POST.get('data[email]')
             profiles = UserProfile.objects.filter(user__email=email)
+            logger.info("Updating %s profiles for email %s", (profiles.count(),
+                                                              email))
             profiles.update(wants_newsletter=wants_newsletter)
 
     # Mailchimp does a GET when you create the webhook,
