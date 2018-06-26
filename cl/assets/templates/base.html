@@ -85,7 +85,7 @@
   {% endif %}
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/hopscotch.css" type="text/css"
         media="screen, projection">
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css?v=20180508" type="text/css"
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css?v=20180626" type="text/css"
         media="screen, projection">
   {% if DEBUG %}
     <!--<script src="{{ STATIC_PREFIX}}js/bootlint.min.js"></script>-->
@@ -280,6 +280,31 @@
       <p>Your content seems to be missing! This is never good.</p>
     {% endblock %}
   </div>
+
+  {% if user.is_anonymous or user.is_authenticated and not user.profile.wants_newsletter %}
+  <div class="row base-newsletter">
+    <div class="col-sm-6">
+      <p class="bold bottom">Newsletter</p>
+      <p>Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
+    </div>
+    <div class="col-sm-6 right">
+      <form action="https://law.us14.list-manage.com/subscribe/post?u=4ea266fe7d0d074abd3f6a2ae&amp;id=ba547fa86b&amp;ANNOU=TRUE"
+        method="post" target="_blank" class="form-inline">
+        <div class="form-group">
+          <input name="EMAIL" class="form-control" id="mce-EMAIL"
+                 type="email" placeholder="Email Address"
+                 value="{{ user.email|default:"" }}">
+        </div>
+        <!-- Honey pot -->
+        <div style="position: absolute; left: -5000px;" aria-hidden="true">
+          <input name="b_4ea266fe7d0d074abd3f6a2ae_ba547fa86b" tabindex="-1"
+                 value="" type="text">
+        </div>
+        <button type="submit" class="btn btn-default"><i class="fa fa-newspaper-o"></i>&nbsp;Subscribe</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
 
   {% block footer %}
   <footer class="row hidden-print">
