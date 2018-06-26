@@ -159,7 +159,7 @@ def view_settings(request):
 
             # Unsubscribe the old address in mailchimp (we'll
             # resubscribe it when they confirm it later).
-            update_mailchimp.delay(old_email, 'unsubscribe')
+            update_mailchimp.delay(old_email, 'unsubscribed')
 
             # Send the email.
             email = emails['email_changed_successfully']
@@ -186,7 +186,7 @@ def view_settings(request):
                 subscribe_to_mailchimp.delay(new_email)
             elif new_wants_newsletter is False:
                 # They just unsubscribed
-                update_mailchimp.delay(new_email, 'unsubscribe')
+                update_mailchimp.delay(new_email, 'unsubscribed')
 
         # New email address and changes above are saved here.
         profile_form.save()
@@ -212,7 +212,7 @@ def delete_account(request):
             request.user.scotus_maps.all().update(deleted=True)
             convert_to_stub_account(request.user)
             logout(request)
-            update_mailchimp.delay(request.user.email, 'unsubscribe')
+            update_mailchimp.delay(request.user.email, 'unsubscribed')
 
         except Exception as e:
             logger.critical("User was unable to delete account. %s" % e)
