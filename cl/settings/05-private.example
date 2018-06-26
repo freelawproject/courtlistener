@@ -68,7 +68,8 @@ IA_SECRET_KEY = ''
 IA_COLLECTIONS = []
 
 # Mailchimp secret (used for webhook URLs)
-MAILCHIMP_SECRET = 'RppWzvKRZVSkCfQXKgTGqujTBpZdJOrQmjmjXKit'
+MAILCHIMP_SECRET = ''
+MAILCHIMP_API_KEY = ''
 
 # PACER
 PACER_USERNAME = ''
