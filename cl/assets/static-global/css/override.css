@@ -1,82 +1,82 @@
 /* --------------------------------------------------------------------------
 Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
-::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
-::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
+::-moz-selection {background: #AE0B0B; color: #fff; text-shadow: none;}
+::selection {background: #AE0B0B; color: #fff; text-shadow: none;}
 
 .navbar-brand {
-    padding: 16px 15px 16px 30px;
-    height: 65px;
+  padding: 16px 15px 16px 30px;
+  height: 65px;
 }
 
 header {
-    margin-bottom: 30px;
+  margin-bottom: 30px;
 }
 
 .navbar {
-    margin-bottom: 0;
-    border-bottom: 1px solid #e7e7e7;
+  margin-bottom: 0;
+  border-bottom: 1px solid #e7e7e7;
 }
 .navbar-toggle {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 .navbar-nav > li > a {
-    padding-top: 13px;
-    padding-bottom: 13px;
+  padding-top: 13px;
+  padding-bottom: 13px;
 }
 
 .navbar-default .navbar-nav > li.active a {
-    background-color: transparent;
-    border-bottom: 3px solid #AE0B0B;
+  background-color: transparent;
+  border-bottom: 3px solid #AE0B0B;
 }
 
 .navbar-default .navbar-nav > li a {
-    /* Layout fix. */
-    border-bottom: 3px solid transparent;
+  /* Layout fix. */
+  border-bottom: 3px solid transparent;
 }
 .subnav {
-    min-height: 0;
-    border-top: 0;
+  min-height: 0;
+  border-top: 0;
 }
 .subnav .navbar-nav {
-    margin: 0;
+  margin: 0;
 }
 .subnav .navbar-nav > li {
-    float: left;
+  float: left;
 }
 #navbar-r:after {
-    content: "PACER";
-    display: block;
-    position: absolute;
-    top: 25px;
-    left: 14px;
-    color: gray;
-    opacity: 0;
-    transform: skewX(0deg) rotate(180deg) translateX(0px);
-    transition: opacity .4s, transform .4s;
+  content: "PACER";
+  display: block;
+  position: absolute;
+  top: 25px;
+  left: 14px;
+  color: gray;
+  opacity: 0;
+  transform: skewX(0deg) rotate(180deg) translateX(0px);
+  transition: opacity .4s, transform .4s;
 }
 
 #navbar-r:hover:after {
-    opacity: 1;
-    transform: skewX(20deg) rotate(180deg) translateX(-3px);
-    backface-visibility: hidden; /* Fixes jumpy transition */
+  opacity: 1;
+  transform: skewX(20deg) rotate(180deg) translateX(-3px);
+  backface-visibility: hidden; /* Fixes jumpy transition */
 }
 
 #search-results {
-    margin-top: 23px;
+  margin-top: 23px;
 }
 #search-results article {
-    padding-top: 10px;
+  padding-top: 10px;
 }
 
 /* Make anchor targets in tables have a special color. */
 .table-hover > tbody > tr:target {
-    background-color: #f5f5f5;
+  background-color: #f5f5f5;
 }
 /* Standard target color. */
 *:target {
-    background-color: lightyellow;
+  background-color: lightyellow;
 }
 
 .alt {
@@ -90,296 +90,305 @@ header {
   font-variant: small-caps;
   letter-spacing: 1px;
   text-transform: lowercase;
-  font-weight:bold;
-  padding:0 2px;
+  font-weight: bold;
+  padding: 0 2px;
 }
 
 .tooltip {
-    text-transform: none;
+  text-transform: none;
 }
 
 .dotted {
-    text-decoration: dotted underline gray;
+  text-decoration: dotted underline gray;
 }
 
 .flex {
-    display: flex;
+  display: flex;
 }
 
-a.button:active{
-  background-color:#6299c5;
-/* border:1px solid #6299c5; */
-  color:#fff;
+a.button:active {
+  background-color: #6299c5;
+  /* border:1px solid #6299c5; */
+  color: #fff;
 }
 .shadow {
-    box-shadow: 2px 2px 5px #000000;
+  box-shadow: 2px 2px 5px #000000;
 }
 
 #main-query-box {
-    /* margin: 0 auto; */
-    -webkit-transition : all 0.5s ease;
-    -moz-transition: all 0.5s ease;
-    -o-transition: all 0.5s ease;
-    transition: all 0.5s ease;
-    margin-bottom: 4em;
-    margin-top: 4em;
+  /* margin: 0 auto; */
+  -webkit-transition: all 0.5s ease;
+  -moz-transition: all 0.5s ease;
+  -o-transition: all 0.5s ease;
+  transition: all 0.5s ease;
+  margin-bottom: 4em;
+  margin-top: 4em;
 }
 
 
-@media(max-width:767px){
-    #homepage #main-query-box {
-        margin-bottom: 2em;
-    }
-    #main-query-box #id_q {
-        width: 250px;
-    }
-    #main-query-box .input-group {
-        display: inline-table;
-        vertical-align: middle;
-    }
-    #main-query-box .input-group-btn {
-        width: auto;
-    }
-    #main-query-box .form-group {
-        display: inline-block;
-        margin-bottom: 0;
-        vertical-align: middle;
-    }
-    .headshot { /* shrink photos on about page for phone size*/
-        height: 135px;
-        width: 135px;
-    }
-    #court-picker-tabs {
-        padding-top: 15px;
-    }
-    #donate-image {
-        text-align: start;
-    }
+@media (max-width: 767px) {
+  #homepage #main-query-box {
+    margin-bottom: 2em;
+  }
+  #main-query-box #id_q {
+    width: 250px;
+  }
+  #main-query-box .input-group {
+    display: inline-table;
+    vertical-align: middle;
+  }
+  #main-query-box .input-group-btn {
+    width: auto;
+  }
+  #main-query-box .form-group {
+    display: inline-block;
+    margin-bottom: 0;
+    vertical-align: middle;
+  }
+  .headshot { /* shrink photos on about page for phone size*/
+    height: 135px;
+    width: 135px;
+  }
+  #court-picker-tabs {
+    padding-top: 15px;
+  }
+  #donate-image {
+    text-align: start;
+  }
 }
-@media(min-width:768px){
-    #main-query-box #id_q {
-        width: 400px;
-    }
-    #above-main-query {
-        margin-top: 6em;
-    }
-    #advanced-search {
-        margin-bottom: 6em;
-    }
-    #advanced-search p:not(:first-child) {
-        margin-top: 1.5em;
-    }
-    #court-picker-tabs {
-        text-align: right;
-    }
+@media (min-width: 768px) {
+  #main-query-box #id_q {
+    width: 400px;
+  }
+  #above-main-query {
+    margin-top: 6em;
+  }
+  #advanced-search {
+    margin-bottom: 6em;
+  }
+  #advanced-search p:not(:first-child) {
+    margin-top: 1.5em;
+  }
+  #court-picker-tabs {
+    text-align: right;
+  }
 
 }
-@media(min-width:992px){
-    #main-query-box #id_q {
-        width: 600px;
-    }
-    .lg-v-offset-below-3 {
-        padding-bottom: 40px;
-    }
-    .col-md-offset-half {
-        margin-left: 4.166666666%;
-    }
+@media (min-width: 992px) {
+  #main-query-box #id_q {
+    width: 600px;
+  }
+  .lg-v-offset-below-3 {
+    padding-bottom: 40px;
+  }
+  .col-md-offset-half {
+    margin-left: 4.166666666%;
+  }
 }
-@media(min-width:1200px){
-    #main-query-box #id_q {
-        width: 800px;
-    }
+@media (min-width: 1200px) {
+  #main-query-box #id_q {
+    width: 800px;
+  }
 }
 
 .bottom {
-    margin-bottom:0;
-    padding-bottom:0;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 .top {
-    margin-top:0;
-    padding-top:0;
+  margin-top: 0;
+  padding-top: 0;
 }
 
 .x-large {
-    font-size: 25px;
+  font-size: 25px;
 }
 .large {
-    font-size: 21px;
+  font-size: 21px;
 }
 
 .btn-xl {
-    padding: 15px 22px;
-    font-size: 20px;
-    border-radius: 9px;
+  padding: 15px 22px;
+  font-size: 20px;
+  border-radius: 9px;
 }
 
 #jurisdiction-count {
-    -webkit-transition: all 0.5s ease;
-    -moz-transition: all 0.5s ease;
-    -o-transition: all 0.5s ease;
-    transition: all 0.5s ease;
+  -webkit-transition: all 0.5s ease;
+  -moz-transition: all 0.5s ease;
+  -o-transition: all 0.5s ease;
+  transition: all 0.5s ease;
+}
+
+.container > .content {
+  margin-bottom: 4em;
+}
+
+.container > .base-newsletter {
+  background-color: #e5ecf9;
+  border-top: 1px solid #c8d7f2;
+  padding: 10px;
 }
 
 .container > footer {
-    padding-top: 2em;
-    margin-top: 4em;
-    border-top: 1px solid #dddddd;
+  padding-top: 2em;
+  border-top: 1px solid #dddddd;
 }
 
 .footer-item {
-    margin-bottom: 0.4em;
-    font-size: 120%;
-    line-height: 1.2em;
+  margin-bottom: 0.4em;
+  font-size: 120%;
+  line-height: 1.2em;
 }
 
 #by-line {
-    margin: 1em 0;
+  margin: 1em 0;
 }
 
 #by-line a {
-    color: gray;
-    text-decoration: underline;
+  color: gray;
+  text-decoration: underline;
 }
 
 #social-container {
-    display: block;
-    background: none;
-    /*width: 200px; */
-    margin: 2em auto;
+  display: block;
+  background: none;
+  /*width: 200px; */
+  margin: 2em auto;
 }
 
 #social-container a {
-    margin-right: 0.75em;
+  margin-right: 0.75em;
 }
 
-#social-container .fa-lg:hover i.fa-circle{
-    color: #6683b7;
+#social-container .fa-lg:hover i.fa-circle {
+  color: #6683b7;
 }
 
 div.hopscotch-bubble .hopscotch-bubble-content {
-    margin: 0;
+  margin: 0;
 }
 
 /* General class shortcuts */
 .inline {
-    display: inline;
+  display: inline;
 }
 .inline-block {
-    display: inline-block;
+  display: inline-block;
 }
 
 .bold {
-    font-weight: bold;
+  font-weight: bold;
 }
 
 .striken {
-    text-decoration: line-through;
-    color: gray;
+  text-decoration: line-through;
+  color: gray;
 }
 
 .no-underline,
 .no-underline:hover,
 .no-underline:active,
 .no-underline:focus {
-    text-decoration: none;
+  text-decoration: none;
 }
 
 a.black-link,
 a.black-link:hover,
 a.black-link:active,
 a.black-link:focus {
-    color: #333333;
+  color: #333333;
 }
 
 .gray, .grey {
-    color: gray;
+  color: gray;
 }
 .gold {
-    color: gold;
+  color: gold;
 }
 
 .red {
-    color: #8a1f11;
+  color: #8a1f11;
 }
 .green {
-    color: green;
+  color: green;
 }
 .white-background {
-    background-color: white;
+  background-color: white;
 }
 
 .align-top {
-    vertical-align: top;
+  vertical-align: top;
 }
 
 .left {
-    float: left;
+  float: left;
 }
 .center {
-    text-align: center;
+  text-align: center;
 }
 
 .right {
-    text-align: right;
+  text-align: right;
 }
 
 .float-right { /* replace with text-right? */
-    float: right;
+  float: right;
 }
 
 .nowrap {
-    white-space: nowrap;
+  white-space: nowrap;
 }
 
 .round-bottom {
-    -webkit-border-bottom-right-radius: 6px;
-    -webkit-border-bottom-left-radius: 6px;
-    border-bottom-right-radius: 6px;
-    border-bottom-left-radius: 6px;
+  -webkit-border-bottom-right-radius: 6px;
+  -webkit-border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
+  border-bottom-left-radius: 6px;
 }
 
 .pointer, .cursor, label {
-    cursor: pointer;
-    cursor: hand;
+  cursor: pointer;
+  cursor: hand;
 }
 
 .cursor-help {
-    cursor: help;
+  cursor: help;
 }
 
 mark {
-    /* Needs extra declarations for old browsers */
-    background-color: #ffffbf;
-    padding: 0;
+  /* Needs extra declarations for old browsers */
+  background-color: #ffffbf;
+  padding: 0;
 }
 
 .no-gutter {
-    margin-left: -15px;
-    margin-right: -15px;
+  margin-left: -15px;
+  margin-right: -15px;
 }
 
 /* For adding vertical whitespace */
-.v-offset-above-1 { margin-top: 10px; }
-.v-offset-above-2 { margin-top: 20px; }
-.v-offset-above-3 { margin-top: 40px; }
-.v-offset-above-4 { margin-top: 60px; }
-.v-offset-above-5 { margin-top: 80px; }
-.v-offset-above-6 { margin-top: 100px; }
-.v-offset-above-7 { margin-top: 150px; }
-.v-offset-below-1 { margin-bottom: 10px; }
-.v-offset-below-2 { margin-bottom: 20px; }
-.v-offset-below-3 { margin-bottom: 40px; }
-.v-offset-below-4 { margin-bottom: 60px; }
-.v-offset-below-5 { margin-bottom: 80px; }
-.v-offset-below-6 { margin-bottom: 100px; }
-.v-offset-below-7 { margin-bottom: 150px; }
+.v-offset-above-1 {margin-top: 10px;}
+.v-offset-above-2 {margin-top: 20px;}
+.v-offset-above-3 {margin-top: 40px;}
+.v-offset-above-4 {margin-top: 60px;}
+.v-offset-above-5 {margin-top: 80px;}
+.v-offset-above-6 {margin-top: 100px;}
+.v-offset-above-7 {margin-top: 150px;}
+.v-offset-below-1 {margin-bottom: 10px;}
+.v-offset-below-2 {margin-bottom: 20px;}
+.v-offset-below-3 {margin-bottom: 40px;}
+.v-offset-below-4 {margin-bottom: 60px;}
+.v-offset-below-5 {margin-bottom: 80px;}
+.v-offset-below-6 {margin-bottom: 100px;}
+.v-offset-below-7 {margin-bottom: 150px;}
 
 .radio-list ul {
-    /* Django creates radio items as a list, but they need to be wrapped in a
-       div with class "radio-list" then this style will make them look normal */
-    list-style-type: none;
-    padding-left: 0;
+  /* Django creates radio items as a list, but they need to be wrapped in a
+     div with class "radio-list" then this style will make them look normal */
+  list-style-type: none;
+  padding-left: 0;
 }
 
 .serif{ font-family: "Warnock Pro","Palatino","Book Antiqua",Georgia,serif; }
@@ -389,66 +398,66 @@ mark {
 
 /* layout */
 body {
-    background-color: #E9E8E8;
+  background-color: #E9E8E8;
 }
 
 .container {
-    background-color: white;
-    border-left: 1px solid #c2c2c2;
-    border-bottom: 1px solid #c2c2c2;
-    border-right: 1px solid #c2c2c2;
+  background-color: white;
+  border-left: 1px solid #c2c2c2;
+  border-bottom: 1px solid #c2c2c2;
+  border-right: 1px solid #c2c2c2;
 }
 
 #id_q {
-    border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
-    border-style: solid none solid solid;
-    border-width: 1px 0px 1px 1px;
-    margin: 0;
-    font-size: 16px;
-    -webkit-transition: all 0.5s ease;
-    -moz-transition: all 0.5s ease;
-    -o-transition: all 0.5s ease;
-    transition: all 0.5s ease;
+  border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
+  border-style: solid none solid solid;
+  border-width: 1px 0px 1px 1px;
+  margin: 0;
+  font-size: 16px;
+  -webkit-transition: all 0.5s ease;
+  -moz-transition: all 0.5s ease;
+  -o-transition: all 0.5s ease;
+  transition: all 0.5s ease;
 }
 
 #advanced {
-    color: black;
+  color: black;
 }
 
 #scrollable-jurisdictions {
-    overflow-y: scroll;
-    height: 500px;
+  overflow-y: scroll;
+  height: 500px;
 }
 
 /* New case view styling, including citations */
 #default-text pre, .citation {
-    background-color: transparent;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    font-weight: inherit;
-    font-style: inherit;
-    font-size: 100%;
-    font-family: "andale mono","lucida console",monospace;
-    vertical-align: baseline;
-    white-space: pre;
+  background-color: transparent;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-weight: inherit;
+  font-style: inherit;
+  font-size: 100%;
+  font-family: "andale mono", "lucida console", monospace;
+  vertical-align: baseline;
+  white-space: pre;
 }
 
 /* cited by sidebar list styling */
 div.shown {
-    padding-top: 5px;
+  padding-top: 5px;
 }
 
 div.shown ul {
-    margin: 0;
-    padding: 0 0 0 17px;
+  margin: 0;
+  padding: 0 0 0 17px;
 }
 
 /* cited by and authorities styling */
 #authorities hr,
-#cited-by hr ,
+#cited-by hr,
 #visualizations hr {
-    margin-bottom: 2px;
+  margin-bottom: 2px;
 }
 
 #authorities ul,
@@ -456,8 +465,8 @@ div.shown ul {
 #visualizations ul,
 #citation-redirect ul,
 #referers ul {
-    padding: 0;
-    margin: 0 0 1.5em 0;
+  padding: 0;
+  margin: 0 0 1.5em 0;
 }
 
 #authorities ul li,
@@ -465,132 +474,132 @@ div.shown ul {
 #visualizations ul li,
 #citation-redirect ul li,
 #referers ul li {
-    list-style-type: none;
-    padding: 3px 0 2px 0;
-    border-bottom: 1pt solid #DDD;
+  list-style-type: none;
+  padding: 3px 0 2px 0;
+  border-bottom: 1pt solid #DDD;
 }
 
 .citation-name {
-    font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 input.bottom {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 #sidebar {
-    margin-top: 6px;
+  margin-top: 6px;
 }
 
 .sidebar-section {
-    margin-bottom: 3em;
+  margin-bottom: 3em;
 }
 
 .sidebar-section h3 {
-    margin-bottom: 0.6em;
-    margin-top: 0;
+  margin-bottom: 0.6em;
+  margin-top: 0;
 }
 
 .sidebar-section h3 > span {
-    padding: 0.5em 0 0.1em;
-    border-bottom: 1px solid #ddd;
-    line-height: 1.4em;
+  padding: 0.5em 0 0.1em;
+  border-bottom: 1px solid #ddd;
+  line-height: 1.4em;
 }
 
 div.sidebar-checkbox {
-    padding-top: 2px;
-    padding-bottom: 2px;
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
 div.sidebar-checkbox label {
-    display: block;
-    padding-left: 22px;
+  display: block;
+  padding-left: 22px;
 }
 
 div.sidebar-checkbox input {
-    width: 13px;
-    height: 13px;
-    padding: 0;
-    margin: 0 0 0 5px;
-    vertical-align: bottom;
-    position: relative;
-    top: 1px;
-    overflow: hidden;
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  margin: 0 0 0 5px;
+  vertical-align: bottom;
+  position: relative;
+  top: 1px;
+  overflow: hidden;
 }
 
 input.court-checkbox, input.status-checkbox {
-    top: 0;
+  top: 0;
 }
 
 #citation-count {
-    float: right;
+  float: right;
 }
 
 #slider-range {
-    margin: 0.5em;
+  margin: 0.5em;
 }
 
 /* Results page */
-#id_q:focus{
-    outline-style: none;
+#id_q:focus {
+  outline-style: none;
 }
 #new-search-chooser {
-    float: right;
+  float: right;
 }
 
 .nojs #sidebar-search-form {
-    display: none;
+  display: none;
 }
 #pagination-left {
-    float: left;
-    width: 200px;
+  float: left;
+  width: 200px;
 }
 #pagination-center {
-    margin: auto;
-    text-align: center;
+  margin: auto;
+  text-align: center;
 }
 #pagination-right {
-    float: right;
-    width: 200px;
-    text-align: right;
+  float: right;
+  width: 200px;
+  text-align: right;
 }
 
 /* Docket page */
 #id_entry_gte, #id_entry_lte {
-    width: 60px;
+  width: 60px;
 }
 #id_filed_after, #id_filed_before {
-    width: 120px;
+  width: 120px;
 }
 #docket-entry-table .row {
-    padding-top: 8px;
-    border-bottom: 1px solid #dddddd;
+  padding-top: 8px;
+  border-bottom: 1px solid #dddddd;
 }
 #docket-entry-table .recap-documents.row {
-    padding-top: 0px;
-    border-bottom: none;
+  padding-top: 0px;
+  border-bottom: none;
 }
 .representation {
-    margin-top: 8.5px;
+  margin-top: 8.5px;
 }
 
 .odd {
-    background-color: #f5f5f5;
+  background-color: #f5f5f5;
 }
 
 /* Donations page */
 #id_amount_other {
-    float: none;
-    margin-top: 0;
+  float: none;
+  margin-top: 0;
 }
 
 #how-much-donate-choices {
-    padding-left: 2em;
+  padding-left: 2em;
 }
 
-#unconfirmed-email-warning{
-    margin-top: 9px;
-    margin-left: 5px;
+#unconfirmed-email-warning {
+  margin-top: 9px;
+  margin-left: 5px;
 }
 
 /* Special case for Oregon, which has a name attr with a value of TOP on
@@ -600,350 +609,350 @@ input.court-checkbox, input.status-checkbox {
    Idea here is to simply ignore the anchor element.
 */
 a[name="TOP"]:focus, a[name="TOP"]:hover, a[name="TOP"] {
-    text-decoration: none;
-    color: #333;
+  text-decoration: none;
+  color: #333;
 }
 
 a:focus, a:hover {
-    color: #009;
+  color: #009;
 }
 
 a {
-    color: #009;
+  color: #009;
 }
 a:visited.visitable {
-    color: #9d11b3;
+  color: #9d11b3;
 }
 a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
-    color: gray;
+  color: gray;
 }
 #share-links a:hover {
-    text-decoration: none;
+  text-decoration: none;
 }
 
 
 /* Display cases from Resource.org neatly */
 #resource-org-text span.num {
-    position: absolute;
-    color: #999999;
+  position: absolute;
+  color: #999999;
 }
 #resource-org-text p.indent {
-    position: relative;
-    margin-left: 2em;
-    margin-top: 1.5em;
+  position: relative;
+  margin-left: 2em;
+  margin-top: 1.5em;
 }
 #resource-org-text div.footnotes {
-    border-top: 1px dotted black;
-    padding-top: 1em;
+  border-top: 1px dotted black;
+  padding-top: 1em;
 }
 #resource-org-text div.footnote > p {
-    margin-left: 2em;
+  margin-left: 2em;
 }
 #resource-org-text div.prelims {
-    background: none repeat scroll 0 0 #eeeeee;
-    border: 1px solid #dddddd;
-    padding-top: 1.5em;
+  background: none repeat scroll 0 0 #eeeeee;
+  border: 1px solid #dddddd;
+  padding-top: 1.5em;
 }
 #resource-org-text div.prelims p {
-    position: relative;
-    margin-left: 2em;
-    margin-right: 2em;
-    margin-top: 0;
+  position: relative;
+  margin-left: 2em;
+  margin-right: 2em;
+  margin-top: 0;
 }
 #resource-org-text p.parties {
-    text-align: center;
-    font-size: 1.25em;
-    font-weight: bold;
+  text-align: center;
+  font-size: 1.25em;
+  font-weight: bold;
 }
 
 #resource-org-text div.footnote a.footnote {
-    /* Needs proper color use */
-    color: #000099;
-    position: absolute;
+  /* Needs proper color use */
+  color: #000099;
+  position: absolute;
 }
 #resource-org-text p a.footnote {
-    /* make footnotes superscript */
-    vertical-align: text-top;
-    font-size: 70%;
-    color: #000099;
+  /* make footnotes superscript */
+  vertical-align: text-top;
+  font-size: 70%;
+  color: #000099;
 }
 /* End Resource.org display CSS */
 
 
 /* Start lawbox display CSS */
 #lawbox-text h1 {
-    font-size: 1.25em;
-    padding-top: 0.75em;
-    padding-bottom: 0.75em;
-    font-weight: bold;
+  font-size: 1.25em;
+  padding-top: 0.75em;
+  padding-bottom: 0.75em;
+  font-weight: bold;
 }
 #lawbox-text h2 {
-    font-size: 1.25em;
-    font-weight: bold;
+  font-size: 1.25em;
+  font-weight: bold;
 }
 span.star-pagination {
-    color: #999999;
+  color: #999999;
 }
 span.star-pagination::after {
-    display: inline;
-    position: relative;
-    content: "•";
-    float: left;
-    left: -1em;
-    font-size: 1em;
-    color: #8a1f11;
-    width: 0;
+  display: inline;
+  position: relative;
+  content: "•";
+  float: left;
+  left: -1em;
+  font-size: 1em;
+  color: #8a1f11;
+  width: 0;
 }
 
 blockquote span.star-pagination::after {
-    left: -2.5em;
+  left: -2.5em;
 }
 /* End lawbox display CSS */
 
 
 /* Disabled button formatting */
 button[disabled]:active, button[disabled]:hover, button[disabled] {
-    color: #bdbdbd;
-    background-color: #F5F5F5;
-    -moz-border-bottom-colors: none;
-    -moz-border-image: none;
-    -moz-border-left-colors: none;
-    -moz-border-right-colors: none;
-    -moz-border-top-colors: none;
-    border-color: #EEEEEE #DEDEDE #DEDEDE #EEEEEE;
-    border-right: 1px solid #DEDEDE;
-    border-style: solid;
-    border-width: 1px;
-    cursor: default;
+  color: #bdbdbd;
+  background-color: #F5F5F5;
+  -moz-border-bottom-colors: none;
+  -moz-border-image: none;
+  -moz-border-left-colors: none;
+  -moz-border-right-colors: none;
+  -moz-border-top-colors: none;
+  border-color: #EEEEEE #DEDEDE #DEDEDE #EEEEEE;
+  border-right: 1px solid #DEDEDE;
+  border-style: solid;
+  border-width: 1px;
+  cursor: default;
 }
 
 /* Save favorites and modal box configs */
 .modal {
-    box-shadow: 2px 2px 5px #000000;
-    border: 1px solid #dddddd;
+  box-shadow: 2px 2px 5px #000000;
+  border: 1px solid #dddddd;
 }
 
 .modal-content {
-    padding: 1em;
+  padding: 1em;
 }
 
 #modal-court-picker {
-    width: 95%;
-    max-width: 950px;
+  width: 95%;
+  max-width: 950px;
 }
 #modal-court-picker p.inline {
-    margin-left: 10px;
+  margin-left: 10px;
 }
 #modal-court-picker a.close {
-    font-size: 2em;
-    position: relative;
-    top: -0.45em;
-    padding: 0.3em 0.7em 0.1em;
-    left: 0.4em;
+  font-size: 2em;
+  position: relative;
+  top: -0.45em;
+  padding: 0.3em 0.7em 0.1em;
+  left: 0.4em;
 }
 
 #modal-court-picker label {
-    font-weight: normal;
+  font-weight: normal;
 }
 
 #modal-court-picker #tab-state .appeals-court {
-    /* Indent appeals courts in the state tab. */
-    margin-left: 15px;
+  /* Indent appeals courts in the state tab. */
+  margin-left: 15px;
 }
 
 #court-filter {
-    float: left;
-    width: 218px;
+  float: left;
+  width: 218px;
 }
 
 #modal-court-picker #court-picker-tabs li {
-    /* Has very specific selector to beat specific one in Bootstrap */
-    float: none;
-    display: inline-block;
+  /* Has very specific selector to beat specific one in Bootstrap */
+  float: none;
+  display: inline-block;
 }
 .nav-tabs a {
-    text-transform: uppercase;
+  text-transform: uppercase;
 }
 #modal-save-favorite .modal-dialog {
-    width: 430px;
+  width: 430px;
 }
 #modal-logged-out .modal-dialog {
-    width: 270px;
+  width: 270px;
 }
 #modal-save-favorite textarea, #modal-save-favorite input {
-    width: 404px !important;
+  width: 404px !important;
 }
 #save-favorite-text-area {
-    height: auto;
+  height: auto;
 }
 
 #modal-save-favorite .save-favorite-button {
-    margin-right: 0;
+  margin-right: 0;
 }
 
 #favorites-bottom-section {
-    margin-top: 5.5em;
+  margin-top: 5.5em;
 }
 #save-favorite-delete {
-    margin-bottom: 0.3em;
+  margin-bottom: 0.3em;
 }
 #favorites-buttons {
-    position: absolute;
-    right: 1em;
-    bottom: 0.3em;
+  position: absolute;
+  right: 1em;
+  bottom: 0.3em;
 }
 
 /* Tables on settings pages */
 .settings-table {
-    border-collapse: collapse;
+  border-collapse: collapse;
 }
 .settings-table th {
-    border-width: 0 0 1px 0;
-    border-style: solid;
-    border-color: gray;
+  border-width: 0 0 1px 0;
+  border-style: solid;
+  border-color: gray;
 }
 .settings-table tr {
-    border-width: 0 0 1px 0;
-    border-style: dotted;
-    border-color: gray;
+  border-width: 0 0 1px 0;
+  border-style: dotted;
+  border-color: gray;
 }
 .settings-table tr:last-child {
-    border-width: 0;
+  border-width: 0;
 }
 .settings-table tbody tr:hover {
-    background-color: #f0f0f0;
+  background-color: #f0f0f0;
 }
 #copy-input {
-    width: 118px;
+  width: 118px;
 }
 #favorites-star {
-    font-size: 1.5em;
-    margin-right: 0.5em;
+  font-size: 1.5em;
+  margin-right: 0.5em;
 }
 
 .help-block {
-    color: #8a1f11;
+  color: #8a1f11;
 }
 
 /* Visualization CSS */
 body.embed {
-    background-color: white;
+  background-color: white;
 }
 body.embed div.container {
-    border: 0 none;
-    margin: 0;
+  border: 0 none;
+  margin: 0;
 }
 body.embed div#title-block {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
-body.embed .plottable .axis text{
-    font-size: 10px;
+body.embed .plottable .axis text {
+  font-size: 10px;
 }
 
 body.embed .plottable .label-area text,
 body.embed .caseHoverText {
-    font-size: 11px;
+  font-size: 11px;
 }
 
 .caseHoverText {
-    color: rgb(51, 51, 51);
-    font-size: 14px;
-    text-shadow: white 0 0 6px, white 0 0 6px, white 0 0 6px, white 0 0 6px;
+  color: rgb(51, 51, 51);
+  font-size: 14px;
+  text-shadow: white 0 0 6px, white 0 0 6px, white 0 0 6px, white 0 0 6px;
 }
 
 .label-area .text-line {
-    text-shadow: white 0 0 6px, white 0 0 6px, white 0 0 6px, white 0 0 6px;
+  text-shadow: white 0 0 6px, white 0 0 6px, white 0 0 6px, white 0 0 6px;
 }
 
 .plottable .light-label .text-line {
-    fill: #000;
+  fill: #000;
 }
 
 .plottable-colors-0 {
-    background-color: mediumpurple;
+  background-color: mediumpurple;
 }
 
 .plottable-colors-1 {
-    background-color: orangered;
+  background-color: orangered;
 }
 #table {
-    overflow-y: auto;
-    max-height: 450px;
+  overflow-y: auto;
+  max-height: 450px;
 }
 #viz-page .tooltip-inner {
-    text-align: left;
+  text-align: left;
 }
 #viz-homepage #background-chart {
-    position: absolute;
+  position: absolute;
 }
 #viz-homepage #background-chart svg {
-    filter: url(#blur);
-    filter: blur(1px);
+  filter: url(#blur);
+  filter: blur(1px);
 }
 #viz-homepage .white-out {
-    background-color: rgba(255, 255, 255, 0.65);
-    z-index: 1;
-    position: relative;
+  background-color: rgba(255, 255, 255, 0.65);
+  z-index: 1;
+  position: relative;
 }
 
 #coverageChart .bar-area {
-    cursor: pointer;
+  cursor: pointer;
 }
 
 
 /* Typeahead */
 .twitter-typeahead .tt-query,
 .twitter-typeahead .tt-hint {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 .tt-menu {
-    max-height: 150px;
-    overflow-y: auto;
-    margin-top: 2px;
-    padding: 5px 0;
-    background-color: #ffffff;
-    border: 1px solid #cccccc;
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    border-radius: 4px;
-    -webkit-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
-    background-clip: padding-box;
+  max-height: 150px;
+  overflow-y: auto;
+  margin-top: 2px;
+  padding: 5px 0;
+  background-color: #ffffff;
+  border: 1px solid #cccccc;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  -webkit-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+  background-clip: padding-box;
 }
 .tt-suggestion {
-    display: block;
-    padding: 3px 20px;
+  display: block;
+  padding: 3px 20px;
 }
 .tt-suggestion:hover {
-    color: #fff;
-    background-color: #AE0B0B;
+  color: #fff;
+  background-color: #AE0B0B;
 }
 .tt-suggestion.tt-is-under-cursor a {
-    color: #fff;
+  color: #fff;
 }
 .tt-suggestion p {
-    margin: 0;
+  margin: 0;
 }
 .twitter-typeahead, .tt-hint, .tt-input, .tt-menu {
-    width: 100%;
+  width: 100%;
 }
 
 
 /* Hide hopscotch number in tour */
 div.hopscotch-bubble .hopscotch-bubble-number {
-    display: none;
-    padding: 0;
+  display: none;
+  padding: 0;
 }
 
 div.hopscotch-bubble .hopscotch-nav-button.next,
 div.hopscotch-bubble .hopscotch-nav-button.next:hover,
 div.hopscotch-bubble .hopscotch-nav-button.prev,
 div.hopscotch-bubble .hopscotch-nav-button.prev:hover {
-    background-image: none;
+  background-image: none;
 }
 
 #notes.markdown img {
-    /* disable highlight border on images without height/width */
-    border: 0;
+  /* disable highlight border on images without height/width */
+  border: 0;
 }
 
 /* Highlights images that need height/width */
