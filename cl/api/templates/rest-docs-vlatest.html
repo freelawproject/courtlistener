@@ -425,7 +425,13 @@
 
 
     <h3 id="og-court-info-endpoint">{% url 'originatingcourtinformation-list' version="v3" %}</h3>
-    <p>TEst</p>
+    <p><code>Originating Court Information</code> represents the information gathered at an appellate court about the case when it was in a lower court or administrative body. The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, this table is only completed for appellate cases that we acquire from PACER.
+    </p>
+    <p>Some systems may normalize this data by linking the lower and upper courts on the database level rather than storing this information in a separate table, but CourtListener does not. Because we get information about the lower court case from the appellate court website, we prefer to keep it separate. This keeps the information acquired from each court compartmentalized so that when we get data from one case, it does not affect the data in the other.
+    </p>
+    <p>Cross-walking from the upper court docket to the lower is still possible using the the <code>docket_number</code> and <code>appeal_from</code> fields.
+    </p>
+
 
     <h3 id="docket-entry-endpoint">{% url "docketentry-list" version="v3" %} <span class="alt">&amp;</span> {% url "recapdocument-list" version="v3" %}</h3>
     <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain nested <code>RECAP Document</code> objects. This follows the design on PACER, in which a single row on a docket may represent a document and several additional attachments.
@@ -478,6 +484,7 @@
       <li>The <code>source</code> field is a very important one, as it designates where the content of the <code>Opinion Cluster</code> came from. This is vitally important when you are looking at the sub_opinions of the <code>Opinion Cluster</code> (the dissents, concurrences, etc.) because the <code>source</code> field indicates whether we will have the plain text or HTML of the item.
       </li>
     </ul>
+
 
     <h3 id="opinion-endpoint">{% url "opinion-list" version="v3" %}</h3>
     <p>The <code>Opinion</code> endpoint contains specific information about Opinions. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
