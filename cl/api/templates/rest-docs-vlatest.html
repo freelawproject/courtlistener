@@ -18,6 +18,7 @@
 {% block content %}
   <div class="col-sm-7">
     <h1 id="about">REST API &ndash; v3.3</h1>
+    <h2 id="api-overview">Getting Started &amp; Overview</h2>
 
     <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
     </p>
@@ -304,7 +305,7 @@
     <pre class="scrollable">curl {% get_full_host %}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected</pre>
 
 
-    <h3>Field Selection</h3>
+    <h3 id="field-selection">Field Selection</h3>
     <p>To save bandwidth and increase serialization performance, fields can be limited by using the <code>fields</code> parameter with a comma-separated list of fields you wish to receive.
     </p>
     <p>For example, if you wish to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
@@ -422,6 +423,9 @@
     </p>
     <pre class="pre-scrollable">curl {% get_full_host %}{% url "docketentry-list" version="v3" %}?docket__id=XXX</pre>
 
+
+    <h3 id="og-court-info-endpoint">{% url 'originatingcourtinformation-list' version="v3" %}</h3>
+    <p>TEst</p>
 
     <h3 id="docket-entry-endpoint">{% url "docketentry-list" version="v3" %} <span class="alt">&amp;</span> {% url "recapdocument-list" version="v3" %}</h3>
     <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain nested <code>RECAP Document</code> objects. This follows the design on PACER, in which a single row on a docket may represent a document and several additional attachments.
@@ -580,7 +584,7 @@
     <h3 id="judge-endpoint">Judge Endpoints</h3>
     <p>We are pleased to share the world's first REST API of federal and state judges. This database is very detailed, containing nearly 100 fields. As with the other endpoints, the best way to find field-level descriptions is by sending an <code>OPTIONS</code> request to an endpoint. If you don't have a clear understanding of a field after sending an options request and reading this documentation, please <a href="{% url "contact" %}">contact us</a> so we may help.
     </p>
-    <h4>Endpoint-Level Notes</h4>
+    <h4 id="judge-endpoint-notes">Endpoint-Level Notes</h4>
     <p>The judicial REST API contains the following endpoints:</p>
     <ul>
       {% include "includes/judge-endpoints.html" %}
@@ -589,7 +593,7 @@
       <li><strong>ABA Ratings</strong>: These are the American Bar Association ratings that are given to many judges, particularly those that are nominated to federal positions.
       </li>
     </ul>
-    <h4>Field-Level Notes</h4>
+    <h4 id="judge-field-notes">Field-Level Notes</h4>
     <ul>
       <li>There are a number of date "granularity" fields. These are used to indicate how granular a date is known to be. For example, for many people we know the year they died but not the month or day. For these people, the <code>date_dod</code> field might be <code>2010-01-01</code>, and the <code>date_granularity_dod</code> field would be set to <code>%Y</code>, using <a href="https://secure.php.net/manual/en/function.strftime.php">strftime formatting</a> to indicate the granularity. If a date field has a granularity field, both fields will either be completed or null.
       </li>
@@ -608,7 +612,7 @@
       <li><code>{% url "processingqueue-list" version="v3" %}</code>: This endpoint can be used to upload items and to check on the progress of an upload.</li>
       <li><code>{% url "fast-recapdocument-list" version="v3" %}</code>: This endpoint can be used to check if documents are in RECAP</li>
     </ul>
-    <h4>{% url "processingqueue-list" version="v3" %}</h4>
+    <h4 id="processing-queue-endpoint">{% url "processingqueue-list" version="v3" %}</h4>
     <p>This endpoint can be used to upload PACER content to the RECAP Archive. We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/master/cl/recap/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using POST requests and multipart form data.
     </p>
     <p>The following parameters apply to all uploads:</p>
@@ -684,7 +688,7 @@ PACER_TO_CL_IDS = {
     '{% get_full_host %}{% url "processingqueue-list" version="v3" %}'</pre>
     <p>And once you've completed your upload, you would have a <code>Processing Queue</code> object that you could monitor for completeness. Once its <code>status</code> field indicated that it was processed successfully, it would have  a link to the docket that was created or updated.
     </p>
-    <h4>{% url "fast-recapdocument-list" version="v3" %}</h4>
+    <h4 id="recap-query">{% url "fast-recapdocument-list" version="v3" %}</h4>
     <p>To check if a document is in RECAP, simply complete a query like so:
     </p>
     <pre class="scrollable">curl '{% get_full_host %}{% url "fast-recapdocument-list" version="v3" %}?docket_entry__docket__court=dcd&pacer_doc_id__in=04505578698,04505578717' \
@@ -717,6 +721,8 @@ PACER_TO_CL_IDS = {
         </p>
       {% endif %}
     </div>
+
+    {% include "includes/toc_sidebar.html" %}
 
     <div class="sidebar-section">
       <h3><span>Available Jurisdictions</span></h3>
