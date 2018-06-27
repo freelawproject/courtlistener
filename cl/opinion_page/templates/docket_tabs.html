@@ -153,10 +153,14 @@
           {{ docket.appeal_from_str }}
         {% endif %}
         {% if og_info.docket_number %}
-          (<a href="/?type=r&amp;docket_number={{ og_info.docket_number }}{% if docket.appeal_from %}&amp;court={{ docket.appeal_from.pk }}{% endif %}"
-              data-toggle="tooltip"
-              data-placement="right"
-              title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }})</a>
+          {% if docket.appeal_from %}
+            (<a href="/?type=r&amp;docket_number={{ og_info.docket_number }}&amp;court={{ docket.appeal_from.pk }}"
+                data-toggle="tooltip"
+                data-placement="right"
+                title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }})</a>
+          {% else %}
+            ({{ og_info.docket_number }})
+          {% endif %}
         {% endif %}
       </span>
     {% endif %}
