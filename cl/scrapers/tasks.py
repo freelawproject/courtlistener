@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
+
 import os
 import subprocess
 import traceback
@@ -19,6 +20,7 @@ from lxml.html.clean import Cleaner
 from seal_rookery import seals_data, seals_root
 
 from cl.audio.models import Audio
+from cl.audio.utils import get_audio_binary
 from cl.celery import app
 from cl.citations.tasks import update_document_by_id
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -462,20 +464,19 @@ def process_audio_file(pk):
     """
     af = Audio.objects.get(pk=pk)
     tmp_path = os.path.join('/tmp', 'audio_' + uuid.uuid4().hex + '.mp3')
-    avconv_command = [
-        'avconv', '-i', af.local_path_original_file.path,
+    av_path = get_audio_binary()
+    av_command = [
+        av_path, '-i', af.local_path_original_file.path,
         '-ar', '22050',  # sample rate (audio samples/s) of 22050Hz
         '-ab', '48k',    # constant bit rate (sample resolution) of 48kbps
         tmp_path
     ]
     try:
-        _ = subprocess.check_output(
-            avconv_command,
-            stderr=subprocess.STDOUT
-        )
+        _ = subprocess.check_output(av_command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        print('avconv failed command: %s\nerror code: %s\noutput: %s\n%s' %
-              (avconv_command, e.returncode, e.output, traceback.format_exc()))
+        print('%s failed command: %s\nerror code: %s\noutput: %s\n%s' %
+              (av_path, av_command, e.returncode, e.output,
+               traceback.format_exc()))
         raise
 
     set_mp3_meta_data(af, tmp_path)

@@ -28,6 +28,11 @@ DATABASES = {
     },
 }
 
+SOLR_URL = 'http://127.0.0.1:8983'
+
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379
+
 # Make these unique, and don't share it with anybody.
 SECRET_KEY = 'your-secret-key'
 
@@ -61,6 +66,10 @@ FTM_LAST_UPDATED = date.today()
 IA_ACCESS_KEY = ''
 IA_SECRET_KEY = ''
 IA_COLLECTIONS = []
+
+# Mailchimp secret (used for webhook URLs)
+MAILCHIMP_SECRET = ''
+MAILCHIMP_API_KEY = ''
 
 # PACER
 PACER_USERNAME = ''

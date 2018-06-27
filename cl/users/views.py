@@ -14,11 +14,12 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
 from django.db.models import Count
-from django.http import HttpResponseRedirect, QueryDict
+from django.http import HttpResponseRedirect, QueryDict, HttpResponse
 from django.shortcuts import render
 from django.template.defaultfilters import urlencode
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import (sensitive_post_parameters,
                                            sensitive_variables)
 
@@ -30,6 +31,7 @@ from cl.users.forms import (
     CustomPasswordChangeForm, OptInConsentForm,
 )
 from cl.users.models import UserProfile
+from cl.users.tasks import subscribe_to_mailchimp, update_mailchimp
 from cl.users.utils import convert_to_stub_account, emails, message_dict
 from cl.visualizations.models import SCOTUSMap
 
@@ -136,15 +138,17 @@ def view_api(request):
 @never_cache
 def view_settings(request):
     old_email = request.user.email  # this line has to be at the top to work.
+    old_wants_newsletter = request.user.profile.wants_newsletter
     user = request.user
     up = user.profile
     user_form = UserForm(request.POST or None, instance=user)
     profile_form = ProfileForm(request.POST or None, instance=up)
     if profile_form.is_valid() and user_form.is_valid():
-        cd = user_form.cleaned_data
-        new_email = cd['email']
-
-        if old_email != new_email:
+        user_cd = user_form.cleaned_data
+        profile_cd = profile_form.cleaned_data
+        new_email = user_cd['email']
+        changed_email = old_email != new_email
+        if changed_email:
             # Email was changed.
 
             # Build the activation key for the new account
@@ -152,6 +156,10 @@ def view_settings(request):
             up.activation_key = hashlib.sha1(salt + user.username).hexdigest()
             up.key_expires = now() + timedelta(5)
             up.email_confirmed = False
+
+            # Unsubscribe the old address in mailchimp (we'll
+            # resubscribe it when they confirm it later).
+            update_mailchimp.delay(old_email, 'unsubscribed')
 
             # Send the email.
             email = emails['email_changed_successfully']
@@ -169,6 +177,16 @@ def view_settings(request):
             # if the email wasn't changed, simply inform of success.
             msg = message_dict['settings_changed_successfully']
             messages.add_message(request, msg['level'], msg['message'])
+
+        new_wants_newsletter = profile_cd['wants_newsletter']
+        if old_wants_newsletter != new_wants_newsletter:
+            if new_wants_newsletter is True and not changed_email:
+                # They just subscribed. If they didn't *also* update their
+                # email address, subscribe them.
+                subscribe_to_mailchimp.delay(new_email)
+            elif new_wants_newsletter is False:
+                # They just unsubscribed
+                update_mailchimp.delay(new_email, 'unsubscribed')
 
         # New email address and changes above are saved here.
         profile_form.save()
@@ -194,6 +212,7 @@ def delete_account(request):
             request.user.scotus_maps.all().update(deleted=True)
             convert_to_stub_account(request.user)
             logout(request)
+            update_mailchimp.delay(request.user.email, 'unsubscribed')
 
         except Exception as e:
             logger.critical("User was unable to delete account. %s" % e)
@@ -363,8 +382,9 @@ def register_success(request):
 def confirm_email(request, activation_key):
     """Confirms email addresses for a user and sends an email to the admins.
 
-    Checks if a hash in a confirmation link is valid, and if so validates the
-    user's email address as valid.
+    Checks if a hash in a confirmation link is valid, and if so sets the user's
+    email address as valid. If they are subscribed to the newsletter, ensures
+    that mailchimp is updated.
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
@@ -396,6 +416,8 @@ def confirm_email(request, activation_key):
 
     # Tests pass; Save the profile
     for up in ups:
+        if up.wants_newsletter:
+            subscribe_to_mailchimp.delay(up.user.email)
         up.email_confirmed = True
         up.save()
 
@@ -473,3 +495,28 @@ def password_change(request):
         'form': form,
         'private': False
     })
+
+
+@csrf_exempt
+def mailchimp_webhook(request):
+    """Respond to changes to our mailing list"""
+    logger.info("Got mailchimp webhook with %s method.", request.method)
+    if request.method == 'POST':
+        webhook_type = request.POST.get('type')
+        logger.info("Handling mailchimp '%s' request.", webhook_type)
+        wants_newsletter = None
+        if webhook_type == 'subscribe':
+            wants_newsletter = True
+        elif webhook_type == 'unsubscribe':
+            wants_newsletter = False
+        if wants_newsletter is not None:
+            # Only update this value if we get a valid webhook_type
+            email = request.POST.get('data[email]')
+            profiles = UserProfile.objects.filter(user__email=email)
+            logger.info("Updating %s profiles for email %s", (profiles.count(),
+                                                              email))
+            profiles.update(wants_newsletter=wants_newsletter)
+
+    # Mailchimp does a GET when you create the webhook,
+    # so we need to return a 200 even for GETs.
+    return HttpResponse('<h1>200: OK</h1>')
