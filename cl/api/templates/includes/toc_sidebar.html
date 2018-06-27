@@ -1,0 +1,70 @@
+<div class="sidebar-section">
+  <h3><span>Table of Contents</span></h3>
+  <ul>
+    <li><a href="#api-overview">Getting Started &amp; Overview</a></li>
+    <li>
+      <a href="#overview">Overview of Endpoints</a>
+      <ul>
+        <li><a href="#permissions">Permissions</a></li>
+        <li>
+          <a href="#authentication">Authentication</a>
+          <ul>
+            <li><a href="#basic-auth">HTTP Basic Authentication</a></li>
+            <li><a href="#session-auth">Django Session Authentication</a></li>
+            <li><a href="#token-auth">Token Authentication</a></li>
+          </ul>
+        </li>
+        <li><a href="#formats">Serialization Formats</a></li>
+        <li><a href="#parsing">Parsing Uploaded Content</a></li>
+        <li><a href="#filtering">Filtering</a></li>
+        <li><a href="#ordering">Ordering</a></li>
+        <li><a href="#field-selection">Field Selection</a></li>
+        <li><a href="#limitations-throttles">Limitations &amp; Throttles</a></li>
+        <li>
+          <a href="#field-details">Field Details</a>
+          <ul>
+            <li><a href="#date-formats">Date Formats</a></li>
+            <li><a href="#case-names">Case Names</a></li>
+            <li><a href="#absolute-url">The <code>absolute_url</code> Field</a></li>
+          </ul>
+        </li>
+        <li><a href="#upgrades">Upgrades &amp; Fixes</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#endpoints">Endpoints</a>
+      <ul>
+        <li><a href="#docket-endpoint">{% url "docket-list" version="v3" %}</a></li>
+        <li><a href="#og-court-info-endpoint">{% url 'originatingcourtinformation-list' version="v3" %}</a></li>
+        <li><a href="#docket-entry-endpoint">{% url "docketentry-list" version="v3" %}
+          <span
+            class="alt">&amp;</span> {% url "recapdocument-list" version="v3" %}</a></li>
+        <li><a href="#party-and-attorney-endpoints">{% url "party-list" version="v3" %}
+          <span class="alt">&amp;</span> {% url "attorney-list" version="v3" %}</a></li>
+        <li><a href="#cluster-endpoint">{% url "opinioncluster-list" version="v3" %}</a></li>
+        <li><a href="#opinion-endpoint">{% url "opinion-list" version="v3" %}</a></li>
+        <li><a href="#audio-endpoint">{% url "audio-list" version="v3" %}</a></li>
+        <li><a href="#cites-endpoint">{% url "opinionscited-list" version="v3" %}</a></li>
+        <li><a href="#jurisdiction-endpoint">{% url "court-list" version="v3" %}</a></li>
+        <li><a href="#search-endpoint">{% url "search-list" version="v3" %}</a></li>
+        <li>
+          <a href="#judge-endpoint">Judge Endpoints</a>
+          <ul>
+            <li><a href="#judge-endpoint-notes">Endpoint-Level Notes</a></li>
+            <li><a href="#judge-field-notes">Field-Level Notes</a></li>
+          </ul>
+        </li>
+        <li>
+          <a href="#recap-endpoint">RECAP Endpoints</a>
+          <ul>
+            <li><a href="#processing-queue-endpoint">{% url "processingqueue-list" version="v3" %}</a></li>
+            <li><a href="#recap-query">{% url "fast-recapdocument-list" version="v3" %}</a></li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+    <li><a href="#footnotes">Footnotes</a></li>
+
+
+  </ul>
+</div>
