@@ -38,7 +38,7 @@ from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles, \
     UPLOAD_TYPE
 from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
     find_docket_object, add_recap_source, add_docket_entries, \
-    process_orphan_documents
+    process_orphan_documents, update_docket_appellate_metadata
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
@@ -524,6 +524,10 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
 
     add_recap_source(d)
     update_docket_metadata(d, docket_data)
+    d, og_info = update_docket_appellate_metadata(d, docket_data)
+    if og_info is not None:
+        og_info.save()
+        d.originating_court_information = og_info
     d.save()
     if tag is not None:
         tag, _ = Tag.objects.get_or_create(name=tag)
