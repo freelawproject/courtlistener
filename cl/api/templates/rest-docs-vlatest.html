@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load extras %}
 
-{% block title %}REST API, v3.2 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v3.3 &ndash; CourtListener.com{% endblock %}
 {% block description %}
     REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.
 {% endblock %}
@@ -17,7 +17,7 @@
 
 {% block content %}
     <div class="col-sm-7">
-        <h1 id="about">REST API &ndash; V3.2</h1>
+        <h1 id="about">REST API &ndash; v3.3</h1>
 
         <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
         </p>
@@ -707,14 +707,6 @@ PACER_TO_CL_IDS = {
         <p>The ID fields in that query are the CourtListener court abbreviation and the document ID numbers as found in PACER. Several document ID numbers can be provided, separated by commas. A maximum of 300 items will be returned per page.
         </p>
         <p>To query whether a case is in the RECAP Archive, use the <code>Docket</code> endpoint described above.
-        </p>
-
-
-        <h2 id="tips">Tips <span class="alt">&amp;</span> Tricks</h2>
-        <p>The SSL certificate issued by identrust.com, or <i>Let’s Encrypt</i>, which is used by CourtListener.com, has not been added to the Java JVM list of trusted Certificate Authorities as of version 8u74. There is a discussion on <i>Let's Encrypt</i> about their progress getting their certificate trusted by various organizations at &quot;<a href="https://community.letsencrypt.org/t/inclusion-of-isrg-root/9002">Inclusion of ISRG Root.</a>&quot; For now, this causes an error when using Java libraries to access the REST api. The error shown is:
-        </p>
-        <pre>PKIX path  building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target.</pre>
-        <p>A workaround has been posted on StackOverflow under <a href="http://stackoverflow.com/questions/2893819/telling-java-to-accept-self-signed-ssl-certificate/36707080#36707080">telling java to accept self-signed ssl certificate</a>.
         </p>
 
         <h2>Footnotes</h2>
