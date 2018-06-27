@@ -24,8 +24,10 @@ from cl.recap.management.commands.import_idb import Command
 from cl.recap.models import ProcessingQueue, UPLOAD_TYPE
 from cl.recap.tasks import process_recap_pdf, add_attorney, \
     process_recap_docket, process_recap_attachment, \
-    add_parties_and_attorneys, update_case_names
-from cl.search.models import Docket, RECAPDocument, DocketEntry
+    add_parties_and_attorneys, update_case_names, \
+    process_recap_appellate_docket
+from cl.search.models import Docket, RECAPDocument, DocketEntry, \
+    OriginatingCourtInformation
 
 
 @mock.patch('cl.recap.views.process_recap_upload')
@@ -806,6 +808,45 @@ class RecapDocketTaskTest(TestCase):
         process_recap_docket(self.pq.pk)
         pq.refresh_from_db()
         self.assertEqual(pq.status, pq.PROCESSING_SUCCESSFUL)
+
+
+class RecapDocketAppellateTaskTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.get(username='recap')
+        self.filename = 'ca9.html'
+        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                            'test_assets', self.filename)
+        with open(path, 'r') as f:
+            f = SimpleUploadedFile(self.filename, f.read())
+        self.pq = ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=self.user,
+            pacer_case_id='asdf',
+            filepath_local=f,
+            upload_type=UPLOAD_TYPE.APPELLATE_DOCKET,
+        )
+
+    def tearDown(self):
+        self.pq.filepath_local.delete()
+        self.pq.delete()
+        Docket.objects.all().delete()
+        OriginatingCourtInformation.objects.all().delete()
+
+    def test_parsing_appellate_docket(self):
+        """Can we parse an HTML docket we have never seen before?"""
+        returned_data = process_recap_appellate_docket(self.pq.pk)
+        d = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d.source, Docket.RECAP)
+        self.assertTrue(d.case_name)
+        self.assertEqual(d.appeal_from_id, 'hid')
+        self.assertIn('Hawaii', d.appeal_from_str)
+
+        # Test the originating court information
+        og_info = d.originating_court_information
+        self.assertTrue(og_info)
+        self.assertIn('Gloria', og_info.court_reporter)
+        self.assertEqual(og_info.date_judgment, date(2017, 3, 29))
+        self.assertEqual(og_info.docket_number, u'1:17-cv-00050')
 
 
 class RecapCriminalDataUploadTaskTest(TestCase):
