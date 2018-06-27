@@ -183,7 +183,7 @@ def process_docket_data(d, filepath, report_type):
     :param report_type: Whether it's a docket or a docket history report.
     """
     from cl.recap.tasks import update_docket_metadata, add_docket_entries, \
-        add_parties_and_attorneys
+        add_parties_and_attorneys, update_docket_appellate_metadata
     if report_type == UPLOAD_TYPE.DOCKET:
         report = DocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
@@ -199,6 +199,10 @@ def process_docket_data(d, filepath, report_type):
     if data == {}:
         return None
     update_docket_metadata(d, data)
+    d, og_info = update_docket_appellate_metadata(d, data)
+    if og_info is not None:
+        og_info.save()
+        d.originating_court_information = og_info
     d.save()
     add_docket_entries(d, data['docket_entries'])
     if report_type in (UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.APPELLATE_DOCKET,
