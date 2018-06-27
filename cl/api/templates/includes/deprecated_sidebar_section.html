@@ -1,20 +1,32 @@
 <div class="sidebar-section">
   <h3><span>API Change Log</span></h3>
   <ul>
-    <li><strong>v3.2</strong> &ndash; This version added the <code>id</code> field to many of the endpoints.
+    <li>
+      <p><strong>v3.3</strong> &ndash; This version added a variety of appellate fields to the docket object including a new related item called the <code>OriginalCourtInformation</code>. See <a href="#og-court-info-endpoint">documentation of that new endpoint</a> for details.
+      </p>
+      <p>The new fields added to the docket include <code>appeal_from</code>, <code>appeal_from_str</code>, <code>originating_court_information</code>, <code>panel</code>, <code>panel_str</code>, <code>appellate_fee_status</code>, and <code>appellate_case_type_information</code>.
+      </p>
     </li>
     <li>
-      <strong>v3.1</strong> &ndash; This version added experimental Swagger and Core API implementations.
+      <p><strong>v3.2</strong> &ndash; This version added the <code>id</code> field to many of the endpoints.
+      </p>
     </li>
     <li>
-      <strong>v3.0</strong> &ndash; Upgraded and overhauled the API to use the Django REST Framework.
+      <p><strong>v3.1</strong> &ndash; This version added experimental Swagger and Core API implementations.
+      </p>
     </li>
-    <li><strong>v2</strong> &ndash; <a
+    <li>
+      <p><strong>v3.0</strong> &ndash; Upgraded and overhauled the API to use the Django REST Framework.
+      </p>
+    </li>
+    <li>
+      <p><strong>v2</strong> &ndash; <a
       href="{% url "rest_docs" version="v2" %}">For original documentation, see: {% url "rest_docs" version="v2" %}</a>
+      </p>
     </li>
-    <li><strong>v1</strong> &ndash; <a
-      href="{% url "rest_docs" version="v1" %}">For original
-      documentation, see: {% url "rest_docs" version="v1" %}</a>
+    <li>
+      <p><strong>v1</strong> &ndash; <a href="{% url "rest_docs" version="v1" %}">For original documentation, see: {% url "rest_docs" version="v1" %}</a>
+      </p>
     </li>
   </ul>
 </div>
