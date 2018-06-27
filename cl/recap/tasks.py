@@ -20,15 +20,17 @@ from cl.celery import app
 from cl.lib.decorators import retry
 from cl.lib.import_lib import get_candidate_judges
 from cl.lib.pacer import get_blocked_status, map_cl_to_pacer_id, \
-    normalize_attorney_contact, normalize_attorney_role
+    normalize_attorney_contact, normalize_attorney_role, map_pacer_to_cl_id
 from cl.lib.recap_utils import get_document_filename
+from cl.lib.string_utils import anonymize
 from cl.lib.utils import remove_duplicate_dicts
 from cl.people_db.models import Attorney, AttorneyOrganization, \
     AttorneyOrganizationAssociation, CriminalComplaint, CriminalCount, \
     Party, PartyType, Role
 from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
-from cl.search.models import Docket, DocketEntry, RECAPDocument
+from cl.search.models import Docket, DocketEntry, RECAPDocument, \
+    OriginatingCourtInformation
 from cl.search.tasks import add_or_update_recap_docket, \
     add_or_update_recap_document
 
@@ -439,14 +441,81 @@ def update_docket_metadata(d, docket_data):
         d.referred_to = judges[0]
     d.referred_to_str = docket_data.get('referred_to_str') or ''
     d.blocked, d.date_blocked = get_blocked_status(d)
-    # xxx appellate:
-    #   docket_data[u'panel']
-    #   docket_data[u'appeal_from']
-    #   docket_data[u'fee_status']
-    #   docket_data[u'case_type_information']
-    #   docket_data[u'originating_court_information']
-    #   # Note oci needs to restrict RESTRICTED_ALIEN_NUMBER.
+
     return d
+
+
+def update_docket_appellate_metadata(d, docket_data):
+    """Update the metadata specific to appellate cases."""
+    if not any([docket_data.get('originating_court_information'),
+                docket_data.get('appeal_from'),
+                docket_data.get('panel')]):
+        # Probably not appellate.
+        return d, None
+
+    d.panel_str = ', '.join(docket_data.get(
+        'panel', [])) or d.panel_str
+    d.appellate_fee_status = docket_data.get(
+        'fee_status', '') or d.appellate_fee_status
+    d.appellate_case_type_information = docket_data.get(
+        'case_type_information', '') or d.appellate_case_type_information
+    d.appeal_from_str = docket_data.get(
+        'appeal_from', '') or d.appeal_from_str
+
+    # Do originating court information dict
+    og_info = docket_data.get('originating_court_information')
+    if not og_info:
+        return d, None
+
+    if og_info.get('court_id'):
+        d.appeal_from_id = map_pacer_to_cl_id(og_info['court_id'])
+
+    if d.originating_court_information:
+        d_og_info = d.originating_court_information
+    else:
+        d_og_info = OriginatingCourtInformation()
+
+    # Ensure we don't share A-Numbers, which can sometimes be in the docket
+    # number field.
+    docket_number = og_info.get('docket_number', '') or d_og_info.docket_number
+    docket_number, _ = anonymize(docket_number)
+    d_og_info.docket_number = docket_number
+    d_og_info.court_reporter = og_info.get(
+        'court_reporter', '') or d_og_info.court_reporter
+    d_og_info.date_disposed = og_info.get(
+        'date_disposed') or d_og_info.date_disposed
+    d_og_info.date_filed = og_info.get(
+        'date_filed') or d_og_info.date_filed
+    d_og_info.date_judgment = og_info.get(
+        'date_judgment') or d_og_info.date_judgment
+    d_og_info.date_judgment_eod = og_info.get(
+        'date_judgment_eod') or d_og_info.date_judgment_eod
+    d_og_info.date_filed_noa = og_info.get(
+        'date_filed_noa') or d_og_info.date_filed_noa
+    d_og_info.date_received_coa = og_info.get(
+        'date_received_coa') or d_og_info.date_received_coa
+    d_og_info.assigned_to_str = og_info.get(
+        'assigned_to') or d_og_info.assigned_to_str
+    d_og_info.ordering_judge_str = og_info.get(
+        'ordering_judge') or d_og_info.ordering_judge_str
+
+    if not all([d.appeal_from_id, d_og_info.date_filed]):
+        # Can't do judge lookups. Call it quits.
+        return d, d_og_info
+
+    if og_info.get('assigned_to'):
+        judges = get_candidate_judges(og_info['assigned_to'], d.appeal_from_id,
+                                      d_og_info.date_filed)
+        if judges is not None and len(judges) == 1:
+            d_og_info.assigned_to = judges[0]
+
+    if og_info.get('ordering_judge'):
+        judges = get_candidate_judges(og_info['ordering_judge'], d.appeal_from_id,
+                                      d_og_info.date_filed)
+        if judges is not None and len(judges) == 1:
+            d_og_info.ordering_judge = judges[0]
+
+    return d, d_og_info
 
 
 def add_docket_entries(d, docket_entries, tag=None):
@@ -1137,6 +1206,7 @@ def process_recap_appellate_docket(self, pk):
 
     add_recap_source(d)
     update_docket_metadata(d, data)
+    d, og_info = update_docket_appellate_metadata(d, data)
     if not d.pacer_case_id:
         d.pacer_case_id = pq.pacer_case_id
 
@@ -1145,6 +1215,9 @@ def process_recap_appellate_docket(self, pk):
         self.request.callbacks = None
         return {'docket_pk': d.pk, 'content_updated': False}
 
+    if og_info is not None:
+        og_info.save()
+        d.originating_court_information = og_info
     d.save()
 
     # Add the HTML to the docket in case we need it someday.
