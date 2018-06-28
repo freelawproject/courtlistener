@@ -44,7 +44,8 @@ def enqueue_docket_alert(d_pk, since):
     return True
 
 
-@app.task
+# Ignore the result or else we'll use a lot of memory.
+@app.task(ignore_result=True)
 def send_docket_alert(d_pk, since):
     """Send an alert for a given docket
 
