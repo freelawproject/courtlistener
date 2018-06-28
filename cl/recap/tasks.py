@@ -30,7 +30,7 @@ from cl.people_db.models import Attorney, AttorneyOrganization, \
 from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import Docket, DocketEntry, RECAPDocument, \
-    OriginatingCourtInformation
+    OriginatingCourtInformation, Court
 from cl.search.tasks import add_or_update_recap_docket, \
     add_or_update_recap_document
 
@@ -468,7 +468,13 @@ def update_docket_appellate_metadata(d, docket_data):
         return d, None
 
     if og_info.get('court_id'):
-        d.appeal_from_id = map_pacer_to_cl_id(og_info['court_id'])
+        cl_id = map_pacer_to_cl_id(og_info['court_id'])
+        if Court.objects.filter(pk=cl_id).exists():
+            # Ensure the court exists. Sometimes PACER does weird things,
+            # like in 14-1743 in CA3, where it says the court_id is 'uspci'.
+            # If we don't do this check, the court ID could be invalid, and
+            # our whole save of the docket fails.
+            d.appeal_from_id = cl_id
 
     if d.originating_court_information:
         d_og_info = d.originating_court_information
