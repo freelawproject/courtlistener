@@ -5,11 +5,13 @@ import shutil
 
 import lxml
 import requests
+from django.conf import settings
 
 from cl.lib.sunburnt import SolrError
 
 
-def create_temp_solr_core(core_name, schema_path, delete_if_present=True):
+def create_temp_solr_core(core_name, schema_path, delete_if_present=True,
+                          url=settings.SOLR_URL):
     """ Create a new core by copying collection1 and updating it """
     core_path = os.path.join(os.sep, 'tmp', 'solr', core_name)
     if delete_if_present and os.path.exists(core_path):
@@ -44,14 +46,14 @@ def create_temp_solr_core(core_name, schema_path, delete_if_present=True):
         # This is supposedly optional, but didn't work without it:
         'dataDir': 'data',
     }
-    r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
+    r = requests.get('%s/solr/admin/cores' % url, params=params)
     if r.status_code != 200:
         raise Exception("Problem creating core. Got status_code of %s. Check "
                         "the Solr logs for details." % r.status_code)
 
 
 def delete_solr_core(core_name, delete_index=True, delete_data=True,
-                     delete_instance=True):
+                     delete_instance=True, url=settings.SOLR_URL):
     """ Delete a solr core by name."""
     params = {
         'wt': 'json',
@@ -61,13 +63,13 @@ def delete_solr_core(core_name, delete_index=True, delete_data=True,
         'deleteDataDir': str(delete_data).lower(),
         'deleteInstanceDir': str(delete_instance).lower(),
     }
-    r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
+    r = requests.get('%s/solr/admin/cores' % url, params=params)
     if r.status_code != 200:
         raise Exception("Problem deleting core. Got status_code of %s. Check "
                         "the Solr logs for details." % r.status_code)
 
 
-def swap_solr_core(current_core, desired_core):
+def swap_solr_core(current_core, desired_core, url=settings.SOLR_URL):
     """Swap cores, keeping on on deck for easy reversion.
 
     @current_core is the core you are currently using which will be swapped OUT.
@@ -79,23 +81,22 @@ def swap_solr_core(current_core, desired_core):
         'core': current_core,
         'other': desired_core,
     }
-    r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
+    r = requests.get('%s/solr/admin/cores' % url, params=params)
     if r.status_code != 200:
-        print "Problem swapping cores. Got status_code of %s. Check the Solr " \
-              "logs for details." % r.status_code
+        print("Problem swapping cores. Got status_code of %s. "
+              "Check the Solr logs for details." % r.status_code)
 
 
-def get_solr_core_status(core='all'):
+def get_solr_core_status(core='all', url=settings.SOLR_URL):
     """Get the status for the solr core as an XML document."""
     if core == 'all':
         core_query = ''
     else:
         core_query = '&core=%s' % core
-    r = requests.get(
-        'http://localhost:8983/solr/admin/cores?action=STATUS%s' % core_query)
+    r = requests.get('%s/solr/admin/cores?action=STATUS%s' % (url, core_query))
     if r.status_code != 200:
-        print "Problem getting the core status. Got status_code of %s. Check " \
-              "the Solr logs for details." % r.status_code
+        print("Problem getting the core status. Got status_code of %s. "
+              "Check the Solr logs for details." % r.status_code)
 
     try:
         solr_config = lxml.etree.parse(StringIO.StringIO(r.content))
@@ -105,7 +106,8 @@ def get_solr_core_status(core='all'):
     return solr_config
 
 
-def get_term_frequency(count=500, result_type='dict', field='text'):
+def get_term_frequency(count=500, result_type='dict', field='text',
+                       url=settings.SOLR_URL):
     """Get the term frequency in the index.
 
     result_type can be json, list or dict.
@@ -115,7 +117,7 @@ def get_term_frequency(count=500, result_type='dict', field='text'):
         'numTerms': str(count),
         'wt': 'json',
     }
-    r = requests.get('http://localhost:8983/solr/admin/luke', params=params)
+    r = requests.get('%s/solr/admin/luke' % url, params=params)
     content_as_json = json.loads(r.content)
     if result_type == 'list':
         if len(content_as_json['fields']) == 0:
@@ -145,22 +147,22 @@ def get_term_frequency(count=500, result_type='dict', field='text'):
         raise ValueError("Unknown output type!")
 
 
-def get_data_dir(core):
+def get_data_dir(core, url=settings.SOLR_URL):
     """
     Interrogate Solr to get the location of its data directory.
 
     Useful when writing the external_pagerank file or when reading it.
     """
-    status_doc = get_solr_core_status()
+    status_doc = get_solr_core_status(url=url)
     return str(status_doc.xpath(
             '//*[@name="%s"]//*[@name="dataDir"]/text()' % core)[0])
 
 
-def reload_pagerank_external_file_cache():
+def reload_pagerank_external_file_cache(url=settings.SOLR_URL):
     """Hit the URL of reloadCache to reload ExternalFileField (necessary for
     Solr version prior to 4.1)
     """
-    r = requests.get('http://localhost:8983/solr/reloadCache')
+    r = requests.get('%s/solr/reloadCache' % url)
     if r.status_code != 200:
         raise Exception("Problem reloading pagerank cache. Got status_code of "
                         "%s. Check the Solr logs for details." % r.status_code)
