@@ -1,5 +1,4 @@
 import argparse
-import csv
 import os
 
 from dateutil import parser
@@ -27,12 +26,6 @@ def valid_date_time(s):
     except ValueError:
         raise argparse.ArgumentTypeError(
             "Unable to parse date/time, %s" % s)
-
-
-def csv_list(s):
-    for row in csv.reader([s]):
-        # Just return the first row, parsed into a list.
-        return row
 
 
 def readable_dir(prospective_dir):
