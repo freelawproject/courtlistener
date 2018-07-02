@@ -17,7 +17,7 @@ from django.utils.timezone import now
 from juriscraper.lib.exceptions import ParsingException
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import FreeOpinionReport, PossibleCaseNumberApi, \
-    DocketReport, AttachmentPage, ShowCaseDocApi
+    DocketReport, AttachmentPage, ShowCaseDocApi, AppellateDocketReport
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -536,6 +536,92 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(content_object=d,
                                 upload_type=UPLOAD_TYPE.DOCKET)
+    pacer_file.filepath.save(
+        'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(report.response.text),
+    )
+
+    rds_created, content_updated = add_docket_entries(
+        d, docket_data['docket_entries'], tag=tag)
+    add_parties_and_attorneys(d, docket_data['parties'])
+    process_orphan_documents(rds_created, d.court_id, d.date_filed)
+    logger.info("Created/updated docket: %s" % d)
+    return {
+        'docket_pk': d.pk,
+        'content_updated': bool(rds_created or content_updated),
+    }
+
+
+@app.task(bind=True, max_retries=2, interval_start=5 * 60,
+          interval_step=10 * 60, ignore_result=True)
+def get_appellate_docket_by_docket_number(self, docket_number, court_id,
+                                          session, tag=None, **kwargs):
+    """Get a docket by docket number, CL court ID, and a collection of kwargs
+    that can be passed to the DocketReport query.
+
+    For details of acceptable parameters, see DocketReport.query()
+
+    :param docket_number: The docket number of the case.
+    :param court_id: A courtlistener/PACER appellate court ID.
+    :param session: A valid and logged-in PacerSession object.
+    :param tag: The tag name that should be stored with the item in the DB, if
+    desired.
+    :param kwargs: A variety of keyword args to pass to DocketReport.query().
+    """
+    report = AppellateDocketReport(court_id, session)
+    logging_id = "%s - %s" % (court_id, docket_number)
+    logger.info("Querying docket report %s",  logging_id)
+
+    try:
+        report.query(docket_number, **kwargs)
+    except requests.RequestException as e:
+        logger.warning("Problem getting docket %s", logging_id)
+        if self.request.retries == self.max_retries:
+            self.request.callbacks = None
+            return None
+        raise self.retry(exc=e)
+
+    docket_data = report.data
+    logger.info('Querying and parsing complete for %s', logging_id)
+
+    if docket_data == {}:
+        logger.info("Unable to find docket: %s", logging_id)
+        self.request.callbacks = None
+        return None
+
+    try:
+        d = Docket.objects.get(
+            docket_number=docket_number,
+            court_id=court_id,
+        )
+    except Docket.DoesNotExist:
+        d = None
+    except Docket.MultipleObjectsReturned:
+        d = None
+
+    if d is None:
+        d, count = find_docket_object(court_id, docket_number,
+                                      docket_number)
+        if count > 1:
+            d = d.earliest('date_created')
+
+    add_recap_source(d)
+    update_docket_metadata(d, docket_data)
+    d, og_info = update_docket_appellate_metadata(d, docket_data)
+    if not d.pacer_case_id:
+        d.pacer_case_id = docket_number
+
+    if og_info is not None:
+        og_info.save()
+        d.originating_court_information = og_info
+    d.save()
+    if tag is not None:
+        tag, _ = Tag.objects.get_or_create(name=tag)
+        d.tags.add(tag)
+
+    # Save the HTML to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles(content_object=d,
+                                upload_type=UPLOAD_TYPE.APPELLATE_DOCKET)
     pacer_file.filepath.save(
         'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(report.response.text),
