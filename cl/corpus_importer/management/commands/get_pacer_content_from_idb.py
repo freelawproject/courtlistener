@@ -12,8 +12,6 @@ from cl.corpus_importer.tasks import get_pacer_case_id_for_idb_row, \
     get_docket_by_pacer_case_id, get_pacer_doc_by_rd_and_description
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import Docket, RECAPDocument
-from cl.search.tasks import add_or_update_recap_docket
 from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT_CR, \
     FAIR_LABOR_STANDARDS_ACT_CV, BANKRUPTCY_APPEALS, BANKRUPTCY_WITHDRAWAL, \
     PRISONER_PETITIONS_VACATE_SENTENCE, PRISONER_PETITIONS_HABEAS_CORPUS, \
@@ -21,6 +19,8 @@ from cl.recap.constants import FAIR_LABOR_STANDARDS_ACT_CR, \
     PRISONER_PRISON_CONDITION, IMMIGRATION_ACTIONS_OTHER, \
     FORFEITURE_AND_PENALTY_SUITS_OTHER, SOCIAL_SECURITY, TAX_SUITS
 from cl.recap.models import FjcIntegratedDatabase
+from cl.search.models import Docket, RECAPDocument
+from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
@@ -30,7 +30,8 @@ GAVELYTICS_TAG = 'FFQBCCFSBJSULNBS'
 
 
 def get_pacer_case_ids(options, row_pks):
-    """Get the PACER case IDs for the given items."""
+    """Get the PACER case IDs for an item in the IDB by looking it up on
+    PACER"""
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
     for i, row_pk in enumerate(row_pks):
