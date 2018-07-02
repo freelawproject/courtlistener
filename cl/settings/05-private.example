@@ -29,6 +29,7 @@ DATABASES = {
 }
 
 SOLR_URL = 'http://127.0.0.1:8983'
+SOLR_RECAP_URL = SOLR_URL
 
 REDIS_HOST = 'localhost'
 REDIS_PORT = 6379
