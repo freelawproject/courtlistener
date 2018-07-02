@@ -9,6 +9,8 @@ from cl.people_db.models import Person
 from cl.search.models import Opinion, RECAPDocument, Docket
 
 
+# Note: for files see argparse.FileType!
+
 def valid_date(s):
     try:
         return parser.parse(s).date()
