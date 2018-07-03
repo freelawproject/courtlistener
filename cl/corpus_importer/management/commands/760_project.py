@@ -20,9 +20,7 @@ TAG = 'QAV5K6HU93A67WS6-760'
 def get_appellate_dockets(options):
     """Download the appellate dockets described in the CSV."""
     f = options['file']
-    dialect = csv.Sniffer().sniff(f.read(1024))
-    f.seek(0)
-    reader = csv.DictReader(f, dialect=dialect)
+    reader = csv.DictReader(f)
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
     session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
