@@ -155,7 +155,7 @@ def get_and_save_free_document_reports(options):
                     pacer_court_id,
                     next_start_d,
                     next_end_d,
-                    pacer_session
+                    pacer_session.cookies,
                 ),
                 mark_court_done_on_date.s(pacer_court_id, next_end_d),
             ).apply_async()
@@ -192,7 +192,11 @@ def get_pdfs(options):
             pacer_session.login()
         chain(
             process_free_opinion_result.si(row.pk, cnt).set(queue=q),
-            get_and_process_pdf.s(pacer_session, row.pk, index=index).set(queue=q),
+            get_and_process_pdf.s(
+                pacer_session.cookies,
+                row.pk,
+                index=index,
+            ).set(queue=q),
             delete_pacer_row.si(row.pk).set(queue=q),
         ).apply_async()
         completed += 1
