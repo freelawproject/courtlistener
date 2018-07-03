@@ -83,7 +83,7 @@ def get_pacer_dockets(options, docket_pks, tag):
             get_docket_by_pacer_case_id.s(
                 d.pacer_case_id,
                 d.court_id,
-                pacer_session,
+                cookies=pacer_session.cookies,
                 **{'tag': tag, 'show_parties_and_counsel': True,
                    'show_terminated_parties': True,
                    'show_list_of_member_cases': True}

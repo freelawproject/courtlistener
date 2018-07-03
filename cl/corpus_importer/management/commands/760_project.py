@@ -41,7 +41,7 @@ def get_appellate_dockets(options):
             get_appellate_docket_by_docket_number.s(
                 docket_number=row['Cleaned case_No'],
                 court_id=row['fjc_court_id'],
-                session=session,
+                cookies=session.cookies,
                 tag=TAG,
                 **{
                     'show_docket_entries': True,

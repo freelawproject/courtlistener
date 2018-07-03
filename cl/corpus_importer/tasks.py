@@ -17,7 +17,8 @@ from django.utils.timezone import now
 from juriscraper.lib.exceptions import ParsingException
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import FreeOpinionReport, PossibleCaseNumberApi, \
-    DocketReport, AttachmentPage, ShowCaseDocApi, AppellateDocketReport
+    DocketReport, AttachmentPage, ShowCaseDocApi, AppellateDocketReport, \
+    PacerSession
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -103,17 +104,19 @@ def get_free_document_report(self, court_id, start, end, session):
 
 
 @app.task(bind=True, max_retries=2, soft_time_limit=60)
-def get_and_save_free_document_report(self, court_id, start, end, session):
+def get_and_save_free_document_report(self, court_id, start, end, cookies):
     """Download the Free document report and save it to the DB.
 
     :param self: The Celery task.
     :param court_id: A pacer court id.
     :param start: a date object representing the first day to get results.
     :param end: a date object representing the last day to get results.
-    :param session: A PACER Session object
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
     :return: None
     """
-    report = FreeOpinionReport(court_id, session)
+    s = PacerSession(cookies=cookies)
+    report = FreeOpinionReport(court_id, s)
     try:
         report.query(start, end, sort='case_number')
     except (ConnectionError, ChunkedEncodingError, ReadTimeoutError,
@@ -229,12 +232,26 @@ def process_free_opinion_result(self, row_pk, cnt):
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5,
           ignore_result=True)
-def get_and_process_pdf(self, data, session, row_pk, index=False):
+def get_and_process_pdf(self, data, cookies, row_pk, index=False):
+    """Get a PDF from a PACERFreeDocumentRow object
+
+    :param data: The returned results from the previous task, takes the form
+    of:
+        {'result': <PACERFreeDocumentRow> object,
+         'rd_pk': rd.pk,
+         'pacer_court_id': result.court_id}
+
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
+    :param row_pk: The PACERFreeDocumentRow operate on
+    :param index: Whether to add the item to Solr once downloaded.
+    """
     if data is None:
         return
     result = data['result']
     rd = RECAPDocument.objects.get(pk=data['rd_pk'])
-    report = FreeOpinionReport(data['pacer_court_id'], session)
+    s = PacerSession(cookies=cookies)
+    report = FreeOpinionReport(data['pacer_court_id'], s)
     try:
         r = report.download_pdf(result.pacer_case_id, result.pacer_doc_id)
     except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
@@ -445,13 +462,18 @@ def delete_pacer_row(pk):
 
 @app.task(bind=True, max_retries=2, interval_start=5 * 60,
           interval_step=10 * 60, ignore_result=True)
-def get_pacer_case_id_for_idb_row(self, pk, session):
+def get_pacer_case_id_for_idb_row(self, pk, cookies):
     """Populate the pacer_case_id field in the FJC IDB table for an item in the
     IDB table
+
+    :param pk: The primary key of the IDB row to get.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
     """
     logger.info("Getting pacer_case_id for IDB item with pk %s" % pk)
+    s = PacerSession(cookies=cookies)
     item = FjcIntegratedDatabase.objects.get(pk=pk)
-    pcn = PossibleCaseNumberApi(map_cl_to_pacer_id(item.district_id), session)
+    pcn = PossibleCaseNumberApi(map_cl_to_pacer_id(item.district_id), s)
     pcn.query(item.docket_number)
     params = {
         'office_number': item.office if item.office else None,
@@ -479,7 +501,7 @@ def get_pacer_case_id_for_idb_row(self, pk, session):
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60, ignore_result=True)
-def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
+def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, cookies,
                                 tag=None, **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
@@ -488,11 +510,13 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
 
     :param pacer_case_id: The internal case ID of the item in PACER.
     :param court_id: A courtlistener court ID.
-    :param session: A valid PacerSession object.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
     :param tag: The tag name that should be stored with the item in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     """
-    report = DocketReport(map_cl_to_pacer_id(court_id), session)
+    s = PacerSession(cookies=cookies)
+    report = DocketReport(map_cl_to_pacer_id(court_id), s)
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
     try:
         d = Docket.objects.get(
@@ -555,7 +579,7 @@ def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, session,
 @app.task(bind=True, max_retries=2, interval_start=5 * 60,
           interval_step=10 * 60, ignore_result=True)
 def get_appellate_docket_by_docket_number(self, docket_number, court_id,
-                                          session, tag=None, **kwargs):
+                                          cookies, tag=None, **kwargs):
     """Get a docket by docket number, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -563,12 +587,14 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
 
     :param docket_number: The docket number of the case.
     :param court_id: A courtlistener/PACER appellate court ID.
-    :param session: A valid and logged-in PacerSession object.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
     :param tag: The tag name that should be stored with the item in the DB, if
     desired.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     """
-    report = AppellateDocketReport(court_id, session)
+    s = PacerSession(cookies=cookies)
+    report = AppellateDocketReport(court_id, s)
     logging_id = "%s - %s" % (court_id, docket_number)
     logger.info("Querying docket report %s",  logging_id)
 
@@ -640,7 +666,7 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
 
 @app.task(bind=True, max_retries=15, interval_start=5,
           interval_step=5, ignore_result=True)
-def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
+def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
                                         fallback_to_main_doc=False, tag=None):
     """Using a RECAPDocument object ID and a description of a document, get the
     document from PACER.
@@ -651,7 +677,8 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
     :param rd_pk: The PK of a RECAPDocument object to use as a source.
     :param description_re: A compiled regular expression to search against the
     description provided by the attachment page.
-    :param session: The PACER session object to use.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
     :param fallback_to_main_doc: Should we grab the main doc if none of the
     attachments match the regex?
     :param tag: A tag name to apply to any downloaded content.
@@ -664,8 +691,9 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
         return
 
     d = rd.docket_entry.docket
+    s = PacerSession(cookies=cookies)
     pacer_court_id = map_cl_to_pacer_id(d.court_id)
-    att_report = AttachmentPage(pacer_court_id, session)
+    att_report = AttachmentPage(pacer_court_id, s)
     try:
         att_report.query(rd.pacer_doc_id)
     except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
@@ -783,12 +811,18 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, session,
 
 @app.task(bind=True, max_retries=15, interval_start=5,
           interval_step=5, ignore_result=True)
-def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, session):
-    """use the show_case_doc URL to get pacer_doc_id values."""
+def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, cookies):
+    """use the show_case_doc URL to get pacer_doc_id values.
+
+    :param rd_pk: The pk of the RECAPDocument you want to get.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
+    """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
+    s = PacerSession(cookies=cookies)
     pacer_court_id = map_cl_to_pacer_id(d.court_id)
-    report = ShowCaseDocApi(pacer_court_id, session)
+    report = ShowCaseDocApi(pacer_court_id, s)
     last_try = (self.request.retries == self.max_retries)
     try:
         if rd.document_type == rd.ATTACHMENT:

@@ -44,7 +44,7 @@ def get_pacer_case_ids(options, row_pks):
             pacer_session.login()
             logger.info("Sent %s tasks to celery so far." % i)
         get_pacer_case_id_for_idb_row.apply_async(
-            args=(row_pk, pacer_session),
+            args=(row_pk, pacer_session.cookies),
             queue=q,
         )
 
@@ -67,7 +67,7 @@ def get_pacer_dockets(options, row_pks, tag=None):
             get_docket_by_pacer_case_id.s(
                 row.pacer_case_id,
                 row.district_id,
-                pacer_session,
+                pacer_session.cookies,
                 **{'tag': tag, 'show_parties_and_counsel': True,
                    'show_terminated_parties': True,
                    'show_list_of_member_cases': True}
@@ -118,7 +118,7 @@ def get_doc_by_re_and_de_nums_for_dockets(options, docket_pks, regex, de_nums,
                     args=(
                         rd.pk,
                         regex,
-                        pacer_session,
+                        pacer_session.cookies,
                     ),
                     kwargs={
                         'fallback_to_main_doc': fallback,
