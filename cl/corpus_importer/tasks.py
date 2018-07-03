@@ -452,10 +452,7 @@ def get_pacer_case_id_for_idb_row(self, pk, cookies):
     logged-in PACER user.
     """
     logger.info("Getting pacer_case_id for IDB item with pk %s" % pk)
-    s = PacerSession(cookies=cookies)
     item = FjcIntegratedDatabase.objects.get(pk=pk)
-    pcn = PossibleCaseNumberApi(map_cl_to_pacer_id(item.district_id), s)
-    pcn.query(item.docket_number)
     params = {
         'office_number': item.office if item.office else None,
     }
@@ -468,16 +465,67 @@ def get_pacer_case_id_for_idb_row(self, pk, cookies):
             params['docket_number_letters'] = 'cr'
     elif item.dataset_source in [CV_2017, CV_OLD]:
         params['docket_number_letters'] = 'cv'
-    try:
-        d = pcn.data(**params)
-    except ParsingException:
-        # Hack. Storing the error in here will bite us later.
+
+    lookup_result = get_pacer_case_id_and_title(
+        docket_number=item.docket_number,
+        court_id=item.district_id,
+        cookies=cookies,
+        **params
+    )
+    if lookup_result is None:
         item.pacer_case_id = "Error"
     else:
-        if d is not None:
-            item.pacer_case_id = d['pacer_case_id']
-            item.case_name = d['title']
+        item.pacer_case_id = lookup_result['pacer_case_id']
+        item.case_name = lookup_result['title']
     item.save()
+
+
+@app.task(bind=True, max_retries=5, interval_start=5 * 60,
+          interval_step=10 * 60, igore_result=True)
+def get_pacer_case_id_and_title(docket_number, court_id, cookies,
+                                case_name=None, office_number=None,
+                                docket_number_letters=None, ):
+    """Get the pacer_case_id and title values for a district court docket. Use
+    heuristics to disambiguate the results.
+
+    office_number and docket_number_letters are only needed when they are not
+    already part of the docket_number passed in. Multiple parameters are needed
+    here to allow flexibility when using this API. Some sources, like the IDB,
+    have this data all separated out, so it helps not to try to recreate docket
+    numbers from data that comes all pulled apart.
+
+    :param docket_number: The docket number to look up. This is a flexible
+    field that accepts a variety of docket number styles.
+    :param court_id: The CourtListener court ID for the docket number
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
+    :param case_name: The case name to use for disambiguation
+    :param office_number: The number (or letter) where the case took place.
+    Typically, this is in the beginning of the docket number before the colon.
+    This will be used for disambiguation. If you passed it as part of the
+    docket number, it is not needed here.
+    :param docket_number_letters: These are the letters, (cv, cr, md, etc.)
+    that may appear in a docket number. This is used for disambiguation. If
+    you passed these letters in the docket number, you do not need to pass
+    these letters again here.
+    :return: The dict formed by the PossibleCaseNumberApi lookup if a good
+    value is identified, else None. The dict takes the form of:
+        {
+            u'docket_number': force_unicode(node.xpath('./@number')[0]),
+            u'pacer_case_id': force_unicode(node.xpath('./@id')[0]),
+            u'title': force_unicode(node.xpath('./@title')[0]),
+        }
+    """
+    logger.info("Getting pacer_case_id for docket_number %s in court %s",
+                (docket_number, court_id))
+    s = PacerSession(cookies=cookies)
+    report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
+    report.query(docket_number)
+    try:
+        return report.data(case_name=case_name, office_number=office_number,
+                           docket_number_letters=docket_number_letters)
+    except ParsingException:
+        return None
 
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
