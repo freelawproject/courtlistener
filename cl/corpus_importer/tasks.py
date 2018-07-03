@@ -84,25 +84,6 @@ def download_recap_item(self, url, filename, clobber=False):
                 shutil.copyfile(tmp.name, location)
 
 
-@app.task(bind=True, max_retries=5)
-def get_free_document_report(self, court_id, start, end, session):
-    """Get structured results from the PACER free document report"""
-    report = FreeOpinionReport(court_id, session)
-    try:
-        report.query(start, end, sort='case_number')
-    except (ConnectionError, ChunkedEncodingError, ReadTimeoutError,
-            ConnectTimeout, HTTPError) as exc:
-        logger.warning("Unable to get free document report results from %s "
-                       "(%s to %s). Trying again." % (court_id, start, end))
-        raise self.retry(exc=exc, countdown=5)
-
-    try:
-        return report.data
-    except IndexError as exc:
-        # Happens when the page isn't downloaded properly, ugh.
-        raise self.retry(exc=exc, countdown=15)
-
-
 @app.task(bind=True, max_retries=2, soft_time_limit=60)
 def get_and_save_free_document_report(self, court_id, start, end, cookies):
     """Download the Free document report and save it to the DB.
