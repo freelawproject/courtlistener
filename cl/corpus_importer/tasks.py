@@ -387,7 +387,7 @@ def upload_pdf_to_ia(self, rd_pk):
 
 access_key = settings.IA_ACCESS_KEY
 secret_key = settings.IA_SECRET_KEY
-session = ia.get_session({'s3': {
+ia_session = ia.get_session({'s3': {
     'access': access_key,
     'secret': secret_key,
 }})
@@ -421,13 +421,13 @@ def upload_to_ia(identifier, files, metadata=None):
     logger.info("Uploading file to Internet Archive with identifier: %s and "
                 "files %s" % (identifier, files))
     try:
-        item = session.get_item(identifier)
+        item = ia_session.get_item(identifier)
     except AttributeError:
-        logger.info(session.__dict__)
+        logger.info(ia_session.__dict__)
         raise
     # Before pushing files, check if the endpoint is overloaded. This is
     # lighter-weight than attempting a document upload off the bat.
-    if session.s3_is_overloaded(identifier, access_key):
+    if ia_session.s3_is_overloaded(identifier, access_key):
         raise OverloadedException("S3 is currently overloaded.")
     responses = item.upload(files=files, metadata=metadata,
                             queue_derive=False, verify=True)
