@@ -65,7 +65,7 @@ def get_pacer_dockets(options, row_pks, tag=None):
         row = FjcIntegratedDatabase.objects.get(pk=row_pk)
         chain(
             get_docket_by_pacer_case_id.s(
-                row.pacer_case_id,
+                {'pacer_case_id': row.pacer_case_id},
                 row.district_id,
                 pacer_session.cookies,
                 **{'tag': tag, 'show_parties_and_counsel': True,

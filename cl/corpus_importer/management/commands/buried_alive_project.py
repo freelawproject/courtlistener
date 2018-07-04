@@ -81,7 +81,7 @@ def get_pacer_dockets(options, docket_pks, tag):
         d = Docket.objects.get(pk=docket_pk)
         chain(
             get_docket_by_pacer_case_id.s(
-                d.pacer_case_id,
+                {'pacer_case_id': d.pacer_case_id},
                 d.court_id,
                 cookies=pacer_session.cookies,
                 **{'tag': tag, 'show_parties_and_counsel': True,
