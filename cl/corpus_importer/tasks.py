@@ -530,21 +530,26 @@ def get_pacer_case_id_and_title(docket_number, court_id, cookies,
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60, ignore_result=True)
-def get_docket_by_pacer_case_id(self, pacer_case_id, court_id, cookies,
+def get_docket_by_pacer_case_id(self, data, court_id, cookies,
                                 tag=None, **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
     For details of acceptable parameters, see DocketReport.query()
 
-    :param pacer_case_id: The internal case ID of the item in PACER.
+    :param data: A dict containing at least the following: {
+        'pacer_case_id': The internal case ID of the item in PACER.
+    }
+    This is necessary to make this function chainable.
     :param court_id: A courtlistener court ID.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
     :param tag: The tag name that should be stored with the item in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
+    :return: A dict indicating if we need to update Solr.
     """
     s = PacerSession(cookies=cookies)
+    pacer_case_id = data['pacer_case_id']
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
     try:
