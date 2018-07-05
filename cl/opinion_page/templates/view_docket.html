@@ -14,6 +14,7 @@
 {% block nav-de %}active{% endblock %}
 
 {% block tab-content %}
+{% if docket_entries.paginator.count %}
 <div class="well well-sm">
     <form action="">
     <div class="row">
@@ -204,6 +205,22 @@
         </div>
     {% endfor %}
 </div>
+{% else %}
+<div class="row">
+  <div class="col-sm-8">
+    <p class="lead">There are no entries for this docket in the RECAP Archive. Please download the latest from PACER while using the RECAP Extension.
+    </p>
+  </div>
+  <div class="col-sm-4 right">
+    <p>
+      <a href="{{ docket.pacer_url }}"
+         class="btn btn-lg btn-primary"
+         target="_blank"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
+    </p>
+  </div>
+</div>
+{% endif %}
+
 
 {% if docket_entries.paginator.num_pages > 1 %}
     <div class="col-xs-12">
