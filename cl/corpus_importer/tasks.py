@@ -517,7 +517,7 @@ def get_pacer_case_id_and_title(self, docket_number, court_id, cookies,
         }
     """
     logger.info("Getting pacer_case_id for docket_number %s in court %s",
-                (docket_number, court_id))
+                docket_number, court_id)
     s = PacerSession(cookies=cookies)
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
     try:
