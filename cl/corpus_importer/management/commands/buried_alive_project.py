@@ -2,15 +2,13 @@ import os
 
 from celery.canvas import chain
 from django.conf import settings
-from django.http import QueryDict
 from juriscraper.pacer.http import PacerSession
 
 from cl.corpus_importer.tasks import get_docket_by_pacer_case_id
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
-from cl.lib.search_utils import build_main_query
-from cl.search.forms import SearchForm
+from cl.lib.search_utils import build_main_query_from_query_string
 from cl.search.models import Docket
 from cl.search.tasks import add_or_update_recap_docket
 
@@ -20,30 +18,6 @@ PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 BAL_TAG = 'AKHBLTIIGFYYGKKY'
-
-
-def make_main_query():
-    """Make a main query by using the GET parameters provided by BAL."""
-    qd = QueryDict(QUERY_STRING)
-    search_form = SearchForm(qd)
-
-    if not search_form.is_valid():
-        logger.critial("Search form is invalid! Cannot continue")
-        exit(1)
-
-    cd = search_form.cleaned_data
-    main_query = build_main_query(cd, facet=False)
-    main_query['rows'] = 10000
-    main_query['fl'] = ['id', 'docket_id']
-
-    # Delete the grouping stuff. It's not needed.
-    del main_query['group']
-    del main_query['group.limit']
-    del main_query['group.field']
-    del main_query['group.sort']
-    del main_query['group.ngroups']
-
-    return main_query
 
 
 def get_docket_ids(main_query):
@@ -119,6 +93,10 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         logger.info("Using PACER username: %s" % PACER_USERNAME)
-        main_query = make_main_query()
+        main_query = build_main_query_from_query_string(
+            QUERY_STRING,
+            {'rows': 10000, 'fl': ['id', 'docket_id']},
+            {'group': False, 'facet': False},
+        )
         docket_ids = get_docket_ids(main_query)
         get_pacer_dockets(options, docket_ids, BAL_TAG)
