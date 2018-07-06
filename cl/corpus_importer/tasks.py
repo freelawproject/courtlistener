@@ -559,7 +559,13 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     :return: A dict indicating if we need to update Solr.
     """
     s = PacerSession(cookies=cookies)
-    pacer_case_id = data['pacer_case_id']
+    if data is None:
+        logger.info("Empty data argument. Terminating "
+                    "chains and exiting.")
+        self.request.callbacks = None
+        return
+
+    pacer_case_id = data.get('pacer_case_id')
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
     try:
@@ -582,6 +588,11 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     docket_data = report.data
     logger.info("Querying and parsing complete for %s.%s" % (court_id,
                                                              pacer_case_id))
+
+    if not docket_data:
+        logger.info("No valid docket data for %s.%s", court_id, pacer_case_id)
+        self.request.callbacks = None
+        return
 
     # Merge the contents into CL.
     if d is None:
