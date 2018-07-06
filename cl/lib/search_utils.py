@@ -3,9 +3,11 @@ from urllib import urlencode
 from urlparse import parse_qs
 
 from django.conf import settings
+from django.http import QueryDict
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
+from cl.search.forms import SearchForm
 from cl.search.models import Court
 
 boosts = {
@@ -656,6 +658,28 @@ def build_main_query(cd, highlight='all', order_by='', facet=True, group=True):
 
     print_params(main_params)
     return main_params
+
+
+def build_main_query_from_query_string(query_string, updates, kwargs):
+    """Build a main query dict from a query string
+
+    :param query_string: A GET string to build from.
+    :param updates: A dict that can be added to the normal finished query
+    string to override any of its defaults.
+    :param kwargs: Kwargs to send to the build_main_query function
+    :return: A dict that can be sent to Solr for querying
+    """
+    qd = QueryDict(query_string)
+    search_form = SearchForm(qd)
+
+    if not search_form.is_valid():
+        return None
+
+    cd = search_form.cleaned_data
+    main_query = build_main_query(cd, **kwargs)
+    main_query.update(updates)
+
+    return main_query
 
 
 def build_coverage_query(court, q):
