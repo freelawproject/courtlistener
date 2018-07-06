@@ -482,7 +482,7 @@ def get_pacer_case_id_for_idb_row(self, pk, cookies):
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60, igore_result=True)
-def get_pacer_case_id_and_title(docket_number, court_id, cookies,
+def get_pacer_case_id_and_title(self, docket_number, court_id, cookies,
                                 case_name=None, office_number=None,
                                 docket_number_letters=None, ):
     """Get the pacer_case_id and title values for a district court docket. Use
