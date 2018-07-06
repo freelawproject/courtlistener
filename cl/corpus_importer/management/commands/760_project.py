@@ -41,6 +41,7 @@ def get_dockets(options):
             continue
 
         # All tests pass. Get the docket.
+        logger.info("Doing row %s: %s", i, row)
         throttle.maybe_wait()
         if task == 'appellate':
             chain(
