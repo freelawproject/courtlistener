@@ -88,6 +88,9 @@ def add_or_update_recap_docket(data, force_commit=False,
     :param update_threshold: Items staler than this number of seconds will be
     updated. Items fresher than this number will be a no-op.
     """
+    if data is None:
+        return
+
     si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode='w')
     some_time_ago = now() - timedelta(seconds=update_threshold)
     d = Docket.objects.get(pk=data['docket_pk'])
