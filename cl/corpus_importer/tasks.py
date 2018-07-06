@@ -520,7 +520,17 @@ def get_pacer_case_id_and_title(self, docket_number, court_id, cookies,
                 (docket_number, court_id))
     s = PacerSession(cookies=cookies)
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
-    report.query(docket_number)
+    try:
+        report.query(docket_number)
+    except requests.RequestException as exc:
+        logger.warning("RequestException while running possible case number "
+                       "query. Trying again if retries not exceeded: %s.%s",
+                       court_id, docket_number)
+        if self.request.retries == self.max_retries:
+            self.request.callbacks = None
+            return None
+        raise self.retry(exc=exc)
+
     try:
         return report.data(case_name=case_name, office_number=office_number,
                            docket_number_letters=docket_number_letters)
