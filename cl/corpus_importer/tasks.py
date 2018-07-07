@@ -760,6 +760,36 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
 
 @app.task(bind=True, max_retries=15, interval_start=5,
           interval_step=5, ignore_result=True)
+def make_attachment_pq_object(self, attachment_report, rd_pk, user_pk):
+    """Create an item in the processing queue for an attachment page.
+
+    This is a helper shim to convert attachment page results into processing
+    queue objects that can be processed by our standard pipeline.
+
+    :param attachment_report: An AttachmentPage object that's already queried
+    a page and populated its data attribute.
+    :param rd_pk: The RECAP document that the attachment page is associated
+    with
+    :param user_pk: The user to associate with the ProcessingQueue object when
+    it's created.
+    :return: The pk of the ProcessingQueue object that's created.
+    """
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    user = User.objects.get(pk=user_pk)
+    pq = ProcessingQueue(
+        court_id=rd.docket_entry.docket.court_id,
+        uploader=user,
+        upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+        pacer_case_id=rd.docket_entry.docket.pacer_case_id,
+    )
+    pq.filepath_local.save(
+        'attachment_page.html', ContentFile(attachment_report.response.text))
+
+    return pq.pk
+
+
+@app.task(bind=True, max_retries=15, interval_start=5,
+          interval_step=5, ignore_result=True)
 def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
                                         fallback_to_main_doc=False, tag=None):
     """Using a RECAPDocument object ID and a description of a document, get the
