@@ -10,6 +10,7 @@ import internetarchive as ia
 import requests
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction, DatabaseError
 from django.utils.encoding import force_bytes
@@ -36,7 +37,7 @@ from cl.lib.pacer import lookup_and_save, get_blocked_status, \
 from cl.lib.recap_utils import get_document_filename, get_bucket_name
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles, \
-    UPLOAD_TYPE
+    UPLOAD_TYPE, ProcessingQueue
 from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
     find_docket_object, add_recap_source, add_docket_entries, \
     process_orphan_documents, update_docket_appellate_metadata
@@ -719,6 +720,44 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
     }
 
 
+@app.task(bind=True, max_retries=5, interval_start=5,
+          interval_step=5, ignore_result=True)
+def get_attachment_page_by_rd(self, rd_pk, cookies):
+    """Get the attachment page for the item in PACER.
+
+    :param rd_pk: The PK of a RECAPDocument object to use as a source.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-on PACER user.
+    :return: The attachment report populated with the results
+    """
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    if not rd.pacer_doc_id:
+        # Some docket entries are just text/don't have a pacer_doc_id.
+        self.request.callbacks = None
+        return
+
+    s = PacerSession(cookies=cookies)
+    pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
+    att_report = AttachmentPage(pacer_court_id, s)
+    try:
+        att_report.query(rd.pacer_doc_id)
+    except HTTPError as exc:
+        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
+                                        HTTP_504_GATEWAY_TIMEOUT]:
+            logger.warning("Ran into HTTPError: %s. Retrying.",
+                           exc.response.status_code)
+            raise self.retry(exc)
+        else:
+            msg = "Ran into unknown HTTPError. %s. Aborting."
+            logger.error(msg, exc.response.status_code)
+            self.request.callbacks = None
+            return
+    except requests.RequestException as exc:
+        logger.warning("Unable to get attachment page for %s", rd)
+        raise self.retry(exc=exc)
+    return att_report
+
+
 @app.task(bind=True, max_retries=15, interval_start=5,
           interval_step=5, ignore_result=True)
 def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
@@ -740,33 +779,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
     :return: None
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
-    if not rd.pacer_doc_id:
-        # Some docket entries are just text/don't have a pacer_doc_id.
-        self.request.callbacks = None
-        return
-
-    d = rd.docket_entry.docket
-    s = PacerSession(cookies=cookies)
-    pacer_court_id = map_cl_to_pacer_id(d.court_id)
-    att_report = AttachmentPage(pacer_court_id, s)
-    try:
-        att_report.query(rd.pacer_doc_id)
-    except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
-            ChunkedEncodingError) as exc:
-        logger.warning("Unable to get PDF for %s" % rd)
-        raise self.retry(exc=exc)
-    except HTTPError as exc:
-        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
-                                        HTTP_504_GATEWAY_TIMEOUT]:
-            logger.warning("Ran into HTTPError: %s. Retrying." %
-                           exc.response.status_code)
-            raise self.retry(exc)
-        else:
-            msg = "Ran into unknown HTTPError. %s. Aborting." % \
-                  exc.response.status_code
-            logger.error(msg)
-            self.request.callbacks = None
-            return
+    att_report = get_attachment_page_by_rd(self, rd_pk, cookies)
 
     att_found = None
     for attachment in att_report.data.get('attachments', []):
@@ -836,15 +849,15 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
             self.request.callbacks = None
             return
 
+    court_id = rd.docket_entry.docket.court_id
     if r is None:
-        msg = "Unable to get PDF for %s at PACER court '%s' with doc id %s" % \
-              (rd, pacer_court_id, rd.pacer_doc_id)
-        logger.error(msg)
+        msg = "Unable to get PDF for %s at CL court '%s' with doc id %s"
+        logger.error(msg, rd, court_id, rd.pacer_doc_id)
         self.request.callbacks = None
         return
 
     file_name = get_document_filename(
-        d.court_id,
+        court_id,
         pacer_case_id,
         rd.document_number,
         rd.attachment_number,
