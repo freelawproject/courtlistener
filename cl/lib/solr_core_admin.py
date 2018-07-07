@@ -11,7 +11,7 @@ from cl.lib.sunburnt import SolrError
 
 
 def create_temp_solr_core(core_name, schema_path, delete_if_present=True,
-                          url=settings.SOLR_URL):
+                          url=settings.SOLR_HOST):
     """ Create a new core by copying collection1 and updating it """
     core_path = os.path.join(os.sep, 'tmp', 'solr', core_name)
     if delete_if_present and os.path.exists(core_path):
@@ -53,7 +53,7 @@ def create_temp_solr_core(core_name, schema_path, delete_if_present=True,
 
 
 def delete_solr_core(core_name, delete_index=True, delete_data=True,
-                     delete_instance=True, url=settings.SOLR_URL):
+                     delete_instance=True, url=settings.SOLR_HOST):
     """ Delete a solr core by name."""
     params = {
         'wt': 'json',
@@ -69,7 +69,7 @@ def delete_solr_core(core_name, delete_index=True, delete_data=True,
                         "the Solr logs for details." % r.status_code)
 
 
-def swap_solr_core(current_core, desired_core, url=settings.SOLR_URL):
+def swap_solr_core(current_core, desired_core, url=settings.SOLR_HOST):
     """Swap cores, keeping on on deck for easy reversion.
 
     @current_core is the core you are currently using which will be swapped OUT.
@@ -87,7 +87,7 @@ def swap_solr_core(current_core, desired_core, url=settings.SOLR_URL):
               "Check the Solr logs for details." % r.status_code)
 
 
-def get_solr_core_status(core='all', url=settings.SOLR_URL):
+def get_solr_core_status(core='all', url=settings.SOLR_HOST):
     """Get the status for the solr core as an XML document."""
     if core == 'all':
         core_query = ''
@@ -107,7 +107,7 @@ def get_solr_core_status(core='all', url=settings.SOLR_URL):
 
 
 def get_term_frequency(count=500, result_type='dict', field='text',
-                       url=settings.SOLR_URL):
+                       url=settings.SOLR_HOST):
     """Get the term frequency in the index.
 
     result_type can be json, list or dict.
@@ -147,7 +147,7 @@ def get_term_frequency(count=500, result_type='dict', field='text',
         raise ValueError("Unknown output type!")
 
 
-def get_data_dir(core, url=settings.SOLR_URL):
+def get_data_dir(core, url=settings.SOLR_HOST):
     """
     Interrogate Solr to get the location of its data directory.
 
@@ -158,7 +158,7 @@ def get_data_dir(core, url=settings.SOLR_URL):
             '//*[@name="%s"]//*[@name="dataDir"]/text()' % core)[0])
 
 
-def reload_pagerank_external_file_cache(url=settings.SOLR_URL):
+def reload_pagerank_external_file_cache(url=settings.SOLR_HOST):
     """Hit the URL of reloadCache to reload ExternalFileField (necessary for
     Solr version prior to 4.1)
     """
