@@ -811,6 +811,8 @@ class RecapDocketTaskTest(TestCase):
 
 
 class RecapDocketAppellateTaskTest(TestCase):
+    fixtures = ['hawaii_court.json']
+
     def setUp(self):
         self.user = User.objects.get(username='recap')
         self.filename = 'ca9.html'
