@@ -660,7 +660,7 @@ def build_main_query(cd, highlight='all', order_by='', facet=True, group=True):
     return main_params
 
 
-def build_main_query_from_query_string(query_string, updates, kwargs):
+def build_main_query_from_query_string(query_string, updates=None, kwargs=None):
     """Build a main query dict from a query string
 
     :param query_string: A GET string to build from.
@@ -676,8 +676,12 @@ def build_main_query_from_query_string(query_string, updates, kwargs):
         return None
 
     cd = search_form.cleaned_data
-    main_query = build_main_query(cd, **kwargs)
-    main_query.update(updates)
+    if kwargs is None:
+        main_query = build_main_query(cd)
+    else:
+        main_query = build_main_query(cd, **kwargs)
+    if updates is not None:
+        main_query.update(updates)
 
     return main_query
 
