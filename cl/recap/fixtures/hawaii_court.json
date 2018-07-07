@@ -1,0 +1,21 @@
+[
+  {
+    "fields": {
+      "end_date": "1809-12-31",
+      "short_name": "Faked Hawaii Court",
+      "citation_string": "",
+      "in_use": false,
+      "url": "",
+      "notes": "",
+      "jurisdiction": "SA",
+      "has_oral_argument_scraper": false,
+      "full_name": "Faked Hawaii Super Court",
+      "position": 22,
+      "date_modified": "2016-06-18T20:01:59.649Z",
+      "has_opinion_scraper": false,
+      "start_date": "1796-01-01"
+    },
+    "model": "search.court",
+    "pk": "hid"
+  }
+]
