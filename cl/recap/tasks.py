@@ -30,7 +30,7 @@ from cl.people_db.models import Attorney, AttorneyOrganization, \
 from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import Docket, DocketEntry, RECAPDocument, \
-    OriginatingCourtInformation, Court
+    OriginatingCourtInformation, Court, Tag
 from cl.search.tasks import add_or_update_recap_docket, \
     add_or_update_recap_document
 
@@ -981,10 +981,11 @@ def process_recap_docket(self, pk):
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60,
           interval_step=5 * 60)
-def process_recap_attachment(self, pk):
+def process_recap_attachment(self, pk, tag=None):
     """Process an uploaded attachment page from the RECAP API endpoint.
 
     :param pk: The primary key of the processing queue item you want to work on
+    :param tag: A tag to add to all items created or modified in this function.
     :return: None
     """
     pq = ProcessingQueue.objects.get(pk=pk)
@@ -1075,6 +1076,9 @@ def process_recap_attachment(self, pk):
                         needs_save = True
                 if needs_save:
                     rd.save()
+                if tag is not None:
+                    tag, _ = Tag.objects.get_or_create(name=tag)
+                    rd.tags.add(tag)
 
                 # Do *not* do this async — that can cause race conditions.
                 add_or_update_recap_document([rd.pk], force_commit=False)
