@@ -130,10 +130,10 @@ MESSAGE_TAGS = {
 ########
 # Solr #
 ########
-SOLR_OPINION_URL = '%s/solr/collection1' % SOLR_URL
-SOLR_AUDIO_URL = '%s/solr/audio' % SOLR_URL
-SOLR_PEOPLE_URL = '%s/solr/person' % SOLR_URL
-SOLR_RECAP_URL = '%s/solr/recap' % SOLR_RECAP_URL
+SOLR_OPINION_URL = '%s/solr/collection1' % SOLR_HOST
+SOLR_AUDIO_URL = '%s/solr/audio' % SOLR_HOST
+SOLR_PEOPLE_URL = '%s/solr/person' % SOLR_HOST
+SOLR_RECAP_URL = '%s/solr/recap' % SOLR_RECAP_HOST
 SOLR_URLS = {
     'opinions': SOLR_OPINION_URL,
     'audio': SOLR_AUDIO_URL,
@@ -146,10 +146,10 @@ SOLR_AUDIO_TEST_CORE_NAME = 'audio_test'
 SOLR_PEOPLE_TEST_CORE_NAME = 'person_test'
 SOLR_RECAP_TEST_CORE_NAME = 'recap_test'
 
-SOLR_OPINION_TEST_URL = '%s/solr/opinion_test' % SOLR_URL
-SOLR_AUDIO_TEST_URL = '%s/solr/audio_test' % SOLR_URL
-SOLR_PEOPLE_TEST_URL = '%s/solr/person_test' % SOLR_URL
-SOLR_RECAP_TEST_URL = '%s/solr/recap_test' % SOLR_RECAP_URL
+SOLR_OPINION_TEST_URL = '%s/solr/opinion_test' % SOLR_HOST
+SOLR_AUDIO_TEST_URL = '%s/solr/audio_test' % SOLR_HOST
+SOLR_PEOPLE_TEST_URL = '%s/solr/person_test' % SOLR_HOST
+SOLR_RECAP_TEST_URL = '%s/solr/recap_test' % SOLR_RECAP_HOST
 SOLR_TEST_URLS = {
     'opinion': SOLR_OPINION_TEST_URL,
     'audio': SOLR_AUDIO_TEST_URL,
