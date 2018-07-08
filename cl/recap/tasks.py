@@ -981,11 +981,12 @@ def process_recap_docket(self, pk):
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60,
           interval_step=5 * 60)
-def process_recap_attachment(self, pk, tag=None):
+def process_recap_attachment(self, pk, tag_name=None):
     """Process an uploaded attachment page from the RECAP API endpoint.
 
     :param pk: The primary key of the processing queue item you want to work on
-    :param tag: A tag to add to all items created or modified in this function.
+    :param tag_name: A tag to add to all items created or modified in this
+    function.
     :return: None
     """
     pq = ProcessingQueue.objects.get(pk=pk)
@@ -1054,6 +1055,8 @@ def process_recap_attachment(self, pk, tag=None):
         )
 
         # Create/update the attachment items.
+        if tag_name is not None:
+            tag, _ = Tag.objects.get_or_create(name=tag_name)
         for attachment in att_data['attachments']:
             if all([attachment['attachment_number'],
                     # Missing on sealed items.
@@ -1076,8 +1079,7 @@ def process_recap_attachment(self, pk, tag=None):
                         needs_save = True
                 if needs_save:
                     rd.save()
-                if tag is not None:
-                    tag, _ = Tag.objects.get_or_create(name=tag)
+                if tag_name is not None:
                     rd.tags.add(tag)
 
                 # Do *not* do this async — that can cause race conditions.
