@@ -17,7 +17,7 @@ from cl.recap.tasks import process_recap_attachment
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
-TAG = 'hDResWFzUBzlAOKPjzwpNNLQDWoLwDivLVfQPXzm'
+TAG = 'hDResWFzUBzlAOKP'
 
 
 def get_attachment_pages(options):
