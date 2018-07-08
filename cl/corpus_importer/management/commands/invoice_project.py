@@ -64,6 +64,11 @@ def get_attachment_pages(options):
                 process_recap_attachment.s(tag_name=TAG).set(queue=q),
             ).apply_async()
             i += 1
+        else:
+            # Inner loop exited normally (didn't "break")
+            continue
+        # Inner loop broke. Break outer loop too.
+        break
 
 
 def get_documents(options):
