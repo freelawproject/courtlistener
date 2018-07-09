@@ -802,6 +802,11 @@ class RECAPDocument(models.Model):
         blank=True,
         null=True,
     )
+    file_size = models.IntegerField(
+        help_text="The size of the file in bytes, if known",
+        blank=True,
+        null=True,
+    )
     filepath_local = models.FileField(
         help_text="The path of the file in the local storage area.",
         upload_to=make_recap_pdf_path,
