@@ -190,15 +190,14 @@ def get_pdfs(options):
             pacer_session = PacerSession(username=PACER_USERNAME,
                                          password=PACER_PASSWORD)
             pacer_session.login()
-        chain(
+        c = chain(
             process_free_opinion_result.si(row.pk, cnt).set(queue=q),
-            get_and_process_pdf.s(
-                pacer_session.cookies,
-                row.pk,
-                index=index,
-            ).set(queue=q),
-            delete_pacer_row.si(row.pk).set(queue=q),
-        ).apply_async()
+            get_and_process_pdf.s(pacer_session.cookies, row.pk).set(queue=q),
+            delete_pacer_row.s(row.pk).set(queue=q),
+        )
+        if index:
+            c |= add_or_update_recap_document.s().set(queue=q)
+        c.apply_async()
         completed += 1
         if completed % 1000 == 0:
             logger.info("Sent %s/%s tasks to celery for %s so "

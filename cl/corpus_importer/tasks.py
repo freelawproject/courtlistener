@@ -214,7 +214,7 @@ def process_free_opinion_result(self, row_pk, cnt):
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5,
           ignore_result=True)
-def get_and_process_pdf(self, data, cookies, row_pk, index=False):
+def get_and_process_pdf(self, data, cookies, row_pk):
     """Get a PDF from a PACERFreeDocumentRow object
 
     :param data: The returned results from the previous task, takes the form
@@ -226,61 +226,28 @@ def get_and_process_pdf(self, data, cookies, row_pk, index=False):
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
     :param row_pk: The PACERFreeDocumentRow operate on
-    :param index: Whether to add the item to Solr once downloaded.
     """
     if data is None:
         return
     result = data['result']
     rd = RECAPDocument.objects.get(pk=data['rd_pk'])
-    s = PacerSession(cookies=cookies)
-    report = FreeOpinionReport(data['pacer_court_id'], s)
-    try:
-        r = report.download_pdf(result.pacer_case_id, result.pacer_doc_id)
-    except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
-            ChunkedEncodingError) as exc:
-        logger.warning("Unable to get PDF for %s" % result)
-        raise self.retry(exc=exc)
-    except HTTPError as exc:
-        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
-                                        HTTP_504_GATEWAY_TIMEOUT]:
-            logger.warning("Ran into HTTPError: %s. Retrying." %
-                           exc.response.status_code)
-            raise self.retry(exc)
-        else:
-            msg = "Ran into unknown HTTPError. %s. Aborting." % \
-                  exc.response.status_code
-            logger.error(msg)
-            PACERFreeDocumentRow.objects.filter(pk=row_pk).update(
-                error_msg=msg)
-            self.request.callbacks = None
-            return
+    r = download_pacer_pdf_by_rd(rd.pk, result.pacer_case_id,
+                                 result.pacer_doc_id, cookies)
+    attachment_number = 0  # Always zero for free opinions
+    success, msg = update_rd_metadata(
+        self, rd.pk, r, result.court_id, result.pacer_case_id,
+        result.pacer_doc_id, result.document_number, attachment_number)
 
-    if r is None:
-        msg = "Unable to get PDF for %s at %s with doc id %s" % \
-              (result, result.court_id, result.pacer_doc_id)
-        logger.error(msg)
+    if success is False:
         PACERFreeDocumentRow.objects.filter(pk=row_pk).update(error_msg=msg)
-        self.request.callbacks = None
         return
 
-    file_name = get_document_filename(
-        result.court.pk,
-        result.pacer_case_id,
-        result.document_number,
-        0,  # Attachment number is zero for all free opinions.
-    )
-    cf = ContentFile(r.content)
-    rd.filepath_local.save(file_name, cf, save=False)
-    rd.is_available = True  # We've got the PDF.
-
-    # request.content is sometimes a str, sometimes unicode, so
-    # force it all to be bytes, pleasing hashlib.
-    rd.sha1 = hashlib.sha1(force_bytes(r.content)).hexdigest()
+    rd.refresh_from_db()
     rd.is_free_on_pacer = True
-    rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
+    rd.save()
 
-    # Save and extract, skipping OCR.
-    rd.save(do_extraction=False, index=index)
+    # Get the data temporarily. OCR is done for all nightly free
+    # docs in a separate batch, but may as well do the easy ones.
     extract_recap_pdf(rd.pk, skip_ocr=True, check_if_needed=False)
     return {'result': result, 'rd_pk': rd.pk}
 
@@ -438,8 +405,9 @@ def mark_court_done_on_date(status, court_id, d):
 
 
 @app.task(ignore_result=True)
-def delete_pacer_row(pk):
+def delete_pacer_row(data, pk):
     PACERFreeDocumentRow.objects.get(pk=pk).delete()
+    return [data['rd_pk']]
 
 
 @app.task(bind=True, max_retries=2, interval_start=5 * 60,
@@ -790,6 +758,90 @@ def make_attachment_pq_object(self, attachment_report, rd_pk, user_pk):
 
 @app.task(bind=True, max_retries=15, interval_start=5,
           interval_step=5, ignore_result=True)
+def download_pacer_pdf_by_rd(self, rd_pk, pacer_case_id, pacer_doc_id,
+                             cookies):
+    """Using a RECAPDocument object ID, download the PDF if it doesn't already
+    exist.
+
+    :param rd_pk: The PK of the RECAPDocument to download
+    :param pacer_case_id: The internal PACER case ID number
+    :param pacer_doc_id: The internal PACER document ID to download
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
+    :return: requests.Response object usually containing a PDF, or None if that
+    wasn't possible.
+    """
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
+    s = PacerSession(cookies=cookies)
+    report = FreeOpinionReport(pacer_court_id, s)
+    try:
+        r = report.download_pdf(pacer_case_id, pacer_doc_id)
+    except HTTPError as exc:
+        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
+                                        HTTP_504_GATEWAY_TIMEOUT]:
+            logger.warning("Ran into HTTPError while getting PDF: %s. "
+                           "Retrying.", exc.response.status_code)
+            if self.request.retries == self.max_retries:
+                self.request.callbacks = None
+                return
+            raise self.retry(exc)
+        else:
+            logger.error("Ran into unknown HTTPError while getting PDF: %s. "
+                         "Aborting.", exc.response.status_code)
+            self.request.callbacks = None
+            return
+    except requests.RequestException as exc:
+        logger.warning("Unable to get PDF for %s in %s", pacer_doc_id,
+                       pacer_case_id)
+        if self.request.retries == self.max_retries:
+            self.request.callbacks = None
+            return
+        raise self.retry(exc=exc)
+    return r
+
+
+def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
+                       pacer_doc_id, document_number, attachment_number):
+    """After querying PACER and downloading a document, save it to the DB.
+
+    :param rd_pk: The primary key of the RECAPDocument to work on
+    :param response: A requests.Response object containing the PDF data.
+    :param court_id: A CourtListener court ID to use for file names.
+    :param pacer_case_id: The pacer_case_id to use in error logs.
+    :param pacer_doc_id: The pacer_doc_id to use in error logs.
+    :param document_number: The docket entry number for use in file names.
+    :param attachment_number: The attachment number (if applicable) for use in
+    file names.
+    :return: A two-tuple of a boolean indicating success and a corresponding
+    error/success message string.
+    """
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    if response is None:
+        msg = "Unable to get PDF for RECAP Document '%s' " \
+              "at '%s' with doc id '%s'" % (rd_pk, court_id, pacer_doc_id)
+        logger.error(msg)
+        self.request.callbacks = None
+        return False, msg
+
+    file_name = get_document_filename(court_id, pacer_case_id, document_number,
+                                      attachment_number)
+    cf = ContentFile(response.content)
+    rd.filepath_local.save(file_name, cf, save=False)
+    rd.is_available = True  # We've got the PDF.
+
+    # request.content is sometimes a str, sometimes unicode, so
+    # force it all to be bytes, pleasing hashlib.
+    rd.sha1 = hashlib.sha1(force_bytes(response.content)).hexdigest()
+    rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
+
+    # Save and extract, skipping OCR.
+    rd.save()
+    return True, 'Saved item successfully'
+
+
+@app.task(bind=True, max_retries=15, interval_start=5,
+          interval_step=5, ignore_result=True)
 def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
                                         fallback_to_main_doc=False, tag=None):
     """Using a RECAPDocument object ID and a description of a document, get the
@@ -858,51 +910,18 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
         rd.save(do_extraction=False, index=False)
         return
 
-    # Not available. Go get it.
-    try:
-        pacer_case_id = rd.docket_entry.docket.pacer_case_id
-        r = att_report.download_pdf(pacer_case_id, att_found['pacer_doc_id'])
-    except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
-            ChunkedEncodingError) as exc:
-        logger.warning("Unable to get PDF for %s" % att_found['pacer_doc_id'])
-        raise self.retry(exc=exc)
-    except HTTPError as exc:
-        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
-                                        HTTP_504_GATEWAY_TIMEOUT]:
-            logger.warning("Ran into HTTPError: %s. Retrying." %
-                           exc.response.status_code)
-            raise self.retry(exc)
-        else:
-            msg = "Ran into unknown HTTPError. %s. Aborting." % \
-                  exc.response.status_code
-            logger.error(msg)
-            self.request.callbacks = None
-            return
-
+    pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    r = download_pacer_pdf_by_rd(rd.pk, pacer_case_id,
+                                 att_found['pacer_doc_id'], cookies)
     court_id = rd.docket_entry.docket.court_id
-    if r is None:
-        msg = "Unable to get PDF for %s at CL court '%s' with doc id %s"
-        logger.error(msg, rd, court_id, rd.pacer_doc_id)
-        self.request.callbacks = None
+    success, msg = update_rd_metadata(
+        self, rd_pk, r, court_id, pacer_case_id, rd.pacer_doc_id,
+        rd.document_number, rd.attachment_number)
+
+    if success is False:
         return
 
-    file_name = get_document_filename(
-        court_id,
-        pacer_case_id,
-        rd.document_number,
-        rd.attachment_number,
-    )
-    cf = ContentFile(r.content)
-    rd.filepath_local.save(file_name, cf, save=False)
-    rd.is_available = True  # We've got the PDF.
-
-    # request.content is sometimes a str, sometimes unicode, force it all to be
-    # bytes, pleasing hashlib.
-    rd.sha1 = hashlib.sha1(force_bytes(r.content)).hexdigest()
-    rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
-
-    # Save, extract, then save to Solr. Skip OCR for now. Don't do these async.
-    rd.save(do_extraction=False, index=False)
+    # Skip OCR for now. It'll happen in a second step.
     extract_recap_pdf(rd.pk, skip_ocr=True)
     add_or_update_recap_document([rd.pk])
 
