@@ -149,7 +149,7 @@
         {% for doc in result.doclist.docs %}
         <div class="col-md-offset-half">
             <h4>
-                <a href="{{ doc.absolute_url }}">{% if doc.solr_highlights.short_description.0 %}{{ doc.solr_highlights.short_description.0|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
+                <a href="{{ doc.absolute_url }}" class="visitable">{% if doc.solr_highlights.short_description.0 %}{{ doc.solr_highlights.short_description.0|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
                 </a>
                 {% if not doc.is_available %}
                     <i class="fa fa-ban gray"
