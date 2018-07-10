@@ -828,6 +828,7 @@ def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
                                       attachment_number)
     cf = ContentFile(response.content)
     rd.filepath_local.save(file_name, cf, save=False)
+    rd.file_size = rd.filepath_local.size
     rd.is_available = True  # We've got the PDF.
 
     # request.content is sometimes a str, sometimes unicode, so
