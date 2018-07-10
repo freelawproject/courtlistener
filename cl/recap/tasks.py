@@ -1084,7 +1084,7 @@ def process_recap_attachment(self, pk, tag_name=None):
                 # we got the real value by measuring.
                 if rd.page_count is None:
                     rd.page_count = attachment['page_count']
-                if rd.file_size is None:
+                if rd.file_size is None and attachment['file_size_str']:
                     try:
                         rd.file_size = convert_size_to_bytes(
                             attachment['file_size_str'])
