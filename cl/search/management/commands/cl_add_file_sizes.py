@@ -19,12 +19,13 @@ class Command(VerboseCommand):
                     # Problem other than No such file or directory.
                     raise
                 continue
+            try:
+                rd.save()
             except ValidationError:
                 # [u'Duplicate values violate save constraint. An object with
                 # this document_number and docket_entry already exists:
                 # (8, 16188376)']
                 continue
-            rd.save()
             if i % 1000 == 0:
                 logger.info("Completed %s items", i)
 
