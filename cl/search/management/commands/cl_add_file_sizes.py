@@ -1,3 +1,5 @@
+from django.core.exceptions import ValidationError
+
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.db_tools import queryset_generator
 from cl.search.models import RECAPDocument
@@ -16,6 +18,11 @@ class Command(VerboseCommand):
                 if e.errno != 2:
                     # Problem other than No such file or directory.
                     raise
+                continue
+            except ValidationError:
+                # [u'Duplicate values violate save constraint. An object with
+                # this document_number and docket_entry already exists:
+                # (8, 16188376)']
                 continue
             rd.save()
             if i % 1000 == 0:
