@@ -154,7 +154,6 @@ class Command(VerboseCommand):
         parser.add_argument(
             '--file',
             type=argparse.FileType('r'),
-            required=True,
             help="Where is the CSV that has the information about what to "
                  "download?",
         )
@@ -163,6 +162,9 @@ class Command(VerboseCommand):
         super(Command, self).handle(*args, **options)
         logger.info("Using PACER username: %s" % PACER_USERNAME)
         if options['task'] in ['district', 'appellate']:
+            if not options['file']:
+                raise argparse.ArgumentError(
+                    "The 'file' argument is required for that action.")
             get_dockets(options)
         elif options['task'] == 'district_attachments':
             get_district_attachment_pages(options)
