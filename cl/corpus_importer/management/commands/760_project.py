@@ -13,7 +13,7 @@ from cl.corpus_importer.tasks import get_appellate_docket_by_docket_number, \
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.recap.tasks import process_recap_attachment
-from cl.search.models import RECAPDocument
+from cl.search.models import RECAPDocument, Court
 from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
@@ -100,7 +100,12 @@ def get_district_attachment_pages(options):
     session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
     session.login()
     rd_pks = RECAPDocument.objects.filter(
-                    tags__name=TAG).values_list('pk', flat=True)
+        tags__name=TAG,
+        docket_entry__docket__court__jurisdiction__in=[
+            Court.FEDERAL_DISTRICT,
+            Court.FEDERAL_BANKRUPTCY,
+        ],
+    ).values_list('pk', flat=True)
     for i, rd_pk in enumerate(rd_pks):
         if i < options['offset']:
             continue
