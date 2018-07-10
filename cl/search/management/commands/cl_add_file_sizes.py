@@ -8,7 +8,7 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        qs = RECAPDocument.objects.filter(is_available=True)
+        qs = RECAPDocument.objects.filter(is_available=True, file_size=None)
         for i, rd in enumerate(queryset_generator(qs)):
             try:
                 rd.file_size = rd.filepath_local.size
