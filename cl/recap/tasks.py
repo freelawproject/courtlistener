@@ -18,6 +18,7 @@ from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
 from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery import app
 from cl.lib.decorators import retry
+from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.import_lib import get_candidate_judges
 from cl.lib.pacer import get_blocked_status, map_cl_to_pacer_id, \
     normalize_attorney_contact, normalize_attorney_role, map_pacer_to_cl_id
@@ -219,6 +220,7 @@ def process_recap_pdf(self, pk):
             # Do page count and extraction
             extension = rd.filepath_local.path.split('.')[-1]
             rd.page_count = get_page_count(rd.filepath_local.path, extension)
+            rd.file_size = rd.filepath_local.size
 
         rd.ocr_status = None
         rd.is_available = True
@@ -1077,6 +1079,18 @@ def process_recap_attachment(self, pk, tag_name=None):
                     if attachment[field]:
                         setattr(rd, field, attachment[field])
                         needs_save = True
+
+                # Only set page_count and file_size if they're blank, in case
+                # we got the real value by measuring.
+                if rd.page_count is None:
+                    rd.page_count = attachment['page_count']
+                if rd.file_size is None:
+                    try:
+                        rd.file_size = convert_size_to_bytes(
+                            attachment['file_size_str'])
+                    except ValueError:
+                        pass
+
                 if needs_save:
                     rd.save()
                 if tag_name is not None:
