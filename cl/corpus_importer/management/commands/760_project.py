@@ -106,7 +106,8 @@ def get_district_attachment_pages(options):
             continue
         if i >= options['limit'] > 0:
             break
-        logger.info("Doing item %s: %s", i, rd_pk)
+        if i % 100 == 0:
+            logger.info("Doing item %s: %s", i, rd_pk)
         throttle.maybe_wait()
         chain(
             get_attachment_page_by_rd.s(rd_pk, session.cookies).set(queue=q),
