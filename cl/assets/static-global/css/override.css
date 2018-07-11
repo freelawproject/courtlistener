@@ -45,7 +45,7 @@ header {
 .subnav .navbar-nav > li {
   float: left;
 }
-#navbar-r:after {
+#navbar-r a:after {
   content: "PACER";
   display: block;
   position: absolute;
@@ -57,7 +57,7 @@ header {
   transition: opacity .4s, transform .4s;
 }
 
-#navbar-r:hover:after {
+#navbar-r:hover a:after {
   opacity: 1;
   transform: skewX(20deg) rotate(180deg) translateX(-3px);
   backface-visibility: hidden; /* Fixes jumpy transition */
