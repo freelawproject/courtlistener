@@ -227,6 +227,20 @@
       </p>
     {% endif %}
 
+    {% if docket.jurisdiction_type %}
+      <p class="bottom">
+        <span class="meta-data-header">Jurisdiction Type:</span>
+        <span class="meta-data-value">{{ docket.jurisdiction_type }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.mdl_status %}
+      <p class="bottom">
+        <span class="meta-data-header">MLD Status:</span>
+        <span class="meta-data-value">{{ docket.mdl_status }}</span>
+      </p>
+    {% endif %}
+
     {% if docket.appellate_fee_status %}
       <p class="bottom">
         <span class="meta-data-header">Fee Status:</span>
