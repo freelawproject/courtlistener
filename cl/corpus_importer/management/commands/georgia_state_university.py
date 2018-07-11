@@ -1,17 +1,54 @@
 import csv
+import os
 from datetime import datetime, timedelta
 
+from celery.canvas import chain
+from django.conf import settings
 from django.db.models import Q
+from juriscraper.pacer import PacerSession
 from reporters_db import CASE_NAME_ABBREVIATIONS
 from requests.structures import CaseInsensitiveDict
 
-from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
+from cl.corpus_importer.tasks import get_pacer_case_id_and_title, \
+    get_docket_by_pacer_case_id
+from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.command_utils import CommandUtils
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.recap.constants import CV_2017
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Court
+from cl.search.tasks import add_or_update_recap_docket
 
 # Case insensitive dict for abbreviation lookups.
 CASE_NAME_IABBREVIATIONS = CaseInsensitiveDict(CASE_NAME_ABBREVIATIONS)
+
+PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
+PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
+
+TAG = 'yDVxdAsAKSixdsoM'
+
+"""
+This file contains some of the work product of our collaboration with GSU. The
+process we went through for this project was:
+   
+ - They provided a spreadsheet with case names, jurisdictions, and dates.
+  
+ - We took that spreadsheet and looked up anything we could in our IDB DB.
+ 
+ - That didn't always work, so we provided a spreadsheet of missing values
+   back to GSU.
+   
+ - Students then completed the missing values, which we merged back into our
+   spreadsheet.
+   
+ - From there, we used the new spreadsheet to look up the new and old values
+   and download them.
+   
+ - Once the docket is downloaded, we get the docket entries matching the dates
+   on the spreadsheet. 
+   
+All of this process is summarized in an email dated 2018-04-17. 
+"""
 
 
 def make_party_q(party, lookup_field, term_slice):
@@ -127,8 +164,86 @@ def lookup_row(row):
             return
 
 
+def update_csv_with_idb_lookups(options):
+    """Take in the CSV from the command line and update it with fields from
+    our local IDB database, if we can find the value in there.
+    """
+    with open(options['input_file'], 'r') as f, \
+            open('/tmp/final-pull-annotated.csv', 'wb') as o:
+        dialect = csv.Sniffer().sniff(f.read(1024))
+        f.seek(0)
+        reader = csv.DictReader(f, dialect=dialect)
+        out_fields = reader.fieldnames + ['fjc_id', 'docket_number',
+                                          'case_name']
+        writer = csv.DictWriter(o, fieldnames=out_fields)
+        writer.writeheader()
+        for i, row in enumerate(reader):
+            if i < options['offset']:
+                continue
+            if i >= options['limit'] > 0:
+                break
+            logger.info("Doing row with contents: '%s'" % row)
+            result = lookup_row(row)
+            logger.info(result)
+            if result is not None:
+                row.update({
+                    'fjc_id': result.pk,
+                    'docket_number': result.docket_number,
+                    'case_name': '%s v. %s' % (result.plaintiff,
+                                               result.defendant)
+                })
+            if not options['log_only']:
+                writer.writerow(row)
+
+
+def download_dockets(options):
+    """Download dockets listed in the spreadsheet."""
+    with open(options['input_file'], 'r') as f:
+        dialect = csv.Sniffer().sniff(f.read(1024))
+        f.seek(0)
+        reader = csv.DictReader(f, dialect=dialect)
+        q = options['queue']
+        throttle = CeleryThrottle(queue_name=q)
+        session = PacerSession(username=PACER_USERNAME,
+                               password=PACER_PASSWORD)
+        session.login()
+        for i, row in enumerate(reader):
+            if i < options['offset']:
+                continue
+            if i >= options['limit'] > 0:
+                break
+            throttle.maybe_wait()
+
+            logger.info("Doing row %s: %s", i, row)
+            docket_number = row['idb_docket_number'] or row['student_docket_number']
+            if not docket_number:
+                continue
+            court = Court.objects.get(fjc_court_id=row['AO ID'],
+                                      jurisdiction=Court.FEDERAL_DISTRICT)
+            chain(
+                get_pacer_case_id_and_title.s(
+                    docket_number=docket_number,
+                    court_id=court.pk,
+                    cookies=session.cookies,
+                    case_name=row['Case Name'],
+                ).set(queue=q),
+                get_docket_by_pacer_case_id.s(
+                    court_id=court.pk,
+                    cookies=session.cookies,
+                    tag=TAG,
+                ).set(queue=q),
+                add_or_update_recap_docket.s().set(queue=q),
+            ).apply_async()
+
+
 class Command(VerboseCommand, CommandUtils):
     help = "Do tasks related to GSU DoL project"
+
+    allowed_tasks = [
+        'lookup_in_idb',
+        'download_dockets',
+        'download_documents',
+    ]
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -156,34 +271,18 @@ class Command(VerboseCommand, CommandUtils):
             help="After doing this number, stop. This number is not additive "
                  "with the offset parameter. Default is to do all of them.",
         )
+        parser.add_argument(
+            '--task',
+            type=str,
+            required=True,
+            help="What task are we doing at this point?",
+        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         self.ensure_file_ok(options['input_file'])
 
-        with open(options['input_file'], 'r') as f, \
-                open('/tmp/final-pull-annotated.csv', 'wb') as o:
-            dialect = csv.Sniffer().sniff(f.read(1024))
-            f.seek(0)
-            reader = csv.DictReader(f, dialect=dialect)
-            out_fields = reader.fieldnames + ['fjc_id', 'docket_number',
-                                              'case_name']
-            writer = csv.DictWriter(o, fieldnames=out_fields)
-            writer.writeheader()
-            for i, row in enumerate(reader):
-                if i < options['offset']:
-                    continue
-                if i >= options['limit'] > 0:
-                    break
-                logger.info("Doing row with contents: '%s'" % row)
-                result = lookup_row(row)
-                logger.info(result)
-                if result is not None:
-                    row.update({
-                        'fjc_id': result.pk,
-                        'docket_number': result.docket_number,
-                        'case_name': '%s v. %s' % (result.plaintiff,
-                                                   result.defendant)
-                    })
-                if not options['log_only']:
-                    writer.writerow(row)
+        if options['task'] == 'lookup_in_idb':
+            update_csv_with_idb_lookups(options)
+        elif options['task'] == 'download_dockets':
+            download_dockets(options)
