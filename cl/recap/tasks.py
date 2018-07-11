@@ -432,6 +432,7 @@ def update_docket_metadata(d, docket_data):
     d.jury_demand = docket_data.get('jury_demand') or d.jury_demand
     d.jurisdiction_type = docket_data.get(
         'jurisdiction') or d.jurisdiction_type
+    d.mdl_status = docket_data.get('mdl_status') or d.mdl_status
     judges = get_candidate_judges(docket_data.get('assigned_to_str'),
                                   d.court_id, docket_data['date_filed'])
     if judges is not None and len(judges) == 1:
