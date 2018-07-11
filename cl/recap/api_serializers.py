@@ -68,7 +68,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                 Q(jurisdiction__in=[
                     Court.FEDERAL_DISTRICT,
                     Court.FEDERAL_BANKRUPTCY,
-                ]) | Q(pk__in=['uscfc', 'cit']),
+                ]) | Q(pk__in=['cit', 'jpml', 'uscfc']),
             ).values_list('pk', flat=True)
             if attrs['court'].pk not in district_court_ids:
                 raise ValidationError("%s is not a district or bankruptcy "
