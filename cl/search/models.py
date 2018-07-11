@@ -414,6 +414,12 @@ class Docket(models.Model):
                   "PACER. For example, 'civil, private, bankruptcy'.",
         blank=True,
     )
+    mdl_status = models.CharField(
+        help_text="The MDL status of a case before the Judicial Panel for "
+                  "Multidistrict Litigation",
+        max_length=100,
+        blank=True,
+    )
     filepath_local = models.FileField(
         help_text="Path to RECAP's Docket XML page.",
         upload_to=make_recap_path,
