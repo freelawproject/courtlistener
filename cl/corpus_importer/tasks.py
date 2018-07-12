@@ -579,7 +579,7 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     d.save()
     if tag is not None:
         tag, _ = Tag.objects.get_or_create(name=tag)
-        d.tags.add(tag)
+        tag.tag_object(d)
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(content_object=d,
@@ -667,7 +667,7 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
     d.save()
     if tag is not None:
         tag, _ = Tag.objects.get_or_create(name=tag)
-        d.tags.add(tag)
+        tag.tag_object(d)
 
     # Save the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(content_object=d,
@@ -904,7 +904,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
     rd.description = att_found.get('description', '') or rd.description
     if tag is not None:
         tag, _ = Tag.objects.get_or_create(name=tag)
-        rd.tags.add(tag)
+        tag.tag_object(rd)
 
     if rd.is_available:
         # Great. Call it a day.

@@ -548,7 +548,7 @@ def add_docket_entries(d, docket_entries, tag=None):
         de.date_filed = docket_entry['date_filed'] or de.date_filed
         de.save()
         if tag is not None:
-            de.tags.add(tag)
+            tag.tag_object(de)
 
         if de_created:
             content_updated = True
@@ -595,7 +595,7 @@ def add_docket_entries(d, docket_entries, tag=None):
             # Happens from race conditions.
             continue
         if tag is not None:
-            rd.tags.add(tag)
+            tag.tag_object(rd)
 
     return rds_created, content_updated
 
@@ -1095,7 +1095,7 @@ def process_recap_attachment(self, pk, tag_name=None):
                 if needs_save:
                     rd.save()
                 if tag_name is not None:
-                    rd.tags.add(tag)
+                    tag.tag_object(rd)
 
                 # Do *not* do this async — that can cause race conditions.
                 add_or_update_recap_document([rd.pk], force_commit=False)
