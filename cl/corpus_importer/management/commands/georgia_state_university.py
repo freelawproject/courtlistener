@@ -247,6 +247,11 @@ class Command(VerboseCommand, CommandUtils):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            '--queue',
+            default='batch1',
+            help="The celery queue where the tasks should be processed.",
+        )
+        parser.add_argument(
             '--input-file',
             help="The CSV file containing the data to analyze.",
             required=True,
