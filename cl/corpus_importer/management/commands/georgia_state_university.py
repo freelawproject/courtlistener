@@ -215,8 +215,16 @@ def download_dockets(options):
             throttle.maybe_wait()
 
             logger.info("Doing row %s: %s", i, row)
-            docket_number = row['idb_docket_number'] or row['student_docket_number']
-            if not docket_number:
+            if row['idb_docket_number']:
+                # Zero-pad the docket number up to seven digits because Excel
+                # ate the leading zeros that these would normally have.
+                docket_number = row['idb_docket_number'].rjust(7, '0')
+            elif row['student_docket_number']:
+                # Use the values collected by student
+                # researchers, then cleaned up my mlr.
+                docket_number = row['student_docket_number']
+            else:
+                # No docket number; move on.
                 continue
             court = Court.objects.get(fjc_court_id=row['AO ID'].rjust(2, '0'),
                                       jurisdiction=Court.FEDERAL_DISTRICT)
