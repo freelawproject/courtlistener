@@ -218,7 +218,7 @@ def download_dockets(options):
             docket_number = row['idb_docket_number'] or row['student_docket_number']
             if not docket_number:
                 continue
-            court = Court.objects.get(fjc_court_id=row['AO ID'],
+            court = Court.objects.get(fjc_court_id=row['AO ID'].rjust(2, '0'),
                                       jurisdiction=Court.FEDERAL_DISTRICT)
             chain(
                 get_pacer_case_id_and_title.s(
