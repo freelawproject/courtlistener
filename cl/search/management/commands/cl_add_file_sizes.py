@@ -19,6 +19,10 @@ class Command(VerboseCommand):
                     # Problem other than No such file or directory.
                     raise
                 continue
+            except ValueError:
+                #  The 'filepath_local' attribute has no file
+                # associated with it.
+                continue
             try:
                 rd.save()
             except ValidationError:
