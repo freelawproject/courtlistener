@@ -1919,6 +1919,39 @@ class Tag(models.Model):
     def __unicode__(self):
         return u'%s: %s' % (self.pk, self.name)
 
+    def tag_object(self, thing):
+        """Atomically add a tag to an item.
+
+        Django has a system for adding to a m2m relationship like the ones
+        between tags and other objects. Normally, you can just use:
+
+            some_thing.add(tag)
+
+        Alas, that's not atomic and if you have multiple processes or threads
+        running — as you would in a Celery queue — you will get
+        IntegrityErrors. So...this function does the same thing by using the
+        tag through tables, as described here:
+
+            https://stackoverflow.com/a/37968648/64911
+
+        By using get_or_create calls, we make it atomic, fixing the problem.
+
+        :param thing: Either a Docket, DocketEntry, or RECAPDocument that you
+        wish to tag.
+        :return: A tuple with the tag and whether a new item was created
+        """
+        if type(thing) == Docket:
+            return self.dockets.through.objects.get_or_create(
+                docket_id=thing.pk, tag_id=self.pk)
+        elif type(thing) == DocketEntry:
+            return self.docket_entries.through.objects.get_or_create(
+                docketentry_id=thing.pk, tag_id=self.pk)
+        elif type(thing) == RECAPDocument:
+            return self.recap_documents.through.objects.get_or_create(
+                    recapdocument_id=thing.pk, tag_id=self.pk)
+        else:
+            raise NotImplementedError("Object type not supported for tagging.")
+
 
 # class AppellateReview(models.Model):
 #     REVIEW_STANDARDS = (
