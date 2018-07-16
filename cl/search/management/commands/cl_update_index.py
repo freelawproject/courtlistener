@@ -5,9 +5,9 @@ from django.conf import settings
 from six.moves import input
 
 from cl.audio.models import Audio
-from cl.lib.command_utils import VerboseCommand
 from cl.lib.argparse_types import valid_date_time, valid_obj_type
 from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.command_utils import VerboseCommand
 from cl.lib.db_tools import queryset_generator
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timer import print_timing
@@ -15,7 +15,8 @@ from cl.people_db.models import Person
 from cl.search.models import Opinion, RECAPDocument, Docket
 from cl.search.tasks import (delete_items, add_or_update_audio_files,
                              add_or_update_opinions, add_or_update_items,
-                             add_or_update_people, add_or_update_recap_document)
+                             add_or_update_people,
+                             add_or_update_recap_document)
 
 VALID_OBJ_TYPES = ('opinions', 'audio', 'people', 'recap', 'recap-dockets')
 
@@ -228,8 +229,7 @@ class Command(VerboseCommand):
             chunk.append(item)
             if processed_count % chunksize == 0 or last_item:
                 throttle.maybe_wait()
-                add_or_update_items.apply_async(args=(chunk, self.solr_url),
-                                                queue=queue)
+                add_or_update_items.apply_async(args=(chunk,), queue=queue)
                 chunk = []
                 sys.stdout.write("\rProcessed {}/{} ({:.0%})".format(
                     processed_count,
