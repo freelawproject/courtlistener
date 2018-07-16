@@ -16,7 +16,7 @@ from cl.search.models import Opinion, OpinionCluster, RECAPDocument, Docket
 
 
 @app.task
-def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
+def add_or_update_items(items):
     """Adds an item to a solr index.
 
     This function is for use with the update_index command. It's slightly
@@ -26,7 +26,6 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
     this is only used by the update_index command, and we want to get the
     objects in the task, not in its caller.
     """
-    si = scorched.SolrInterface(solr_url, mode='w')
     if hasattr(items, "items") or not hasattr(items, "__iter__"):
         # If it's a dict or a single item make it a list
         items = [items]
@@ -34,16 +33,26 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
     for item in items:
         try:
             if type(item) == Opinion:
+                si = scorched.SolrInterface(settings.SOLR_OPINION_URL,
+                                            mode='w')
                 search_item_list.append(item.as_search_dict())
             elif type(item) == RECAPDocument:
+                si = scorched.SolrInterface(settings.SOLR_RECAP_URL,
+                                            mode='w')
                 search_item_list.append(item.as_search_dict())
             elif type(item) == Docket:
                 # Slightly different here b/c dockets return a list of search
                 # dicts.
+                si = scorched.SolrInterface(settings.SOLR_RECAP_URL,
+                                            mode='w')
                 search_item_list.extend(item.as_search_list())
             elif type(item) == Audio:
+                si = scorched.SolrInterface(settings.SOLR_AUDIO_URL,
+                                            mode='w')
                 search_item_list.append(item.as_search_dict())
             elif type(item) == Person:
+                si = scorched.SolrInterface(settings.SOLR_PEOPLE_URL,
+                                            mode='w')
                 search_item_list.append(item.as_search_dict())
         except AttributeError as e:
             print("AttributeError trying to add: %s\n  %s" % (item, e))
