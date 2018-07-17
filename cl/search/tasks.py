@@ -15,6 +15,27 @@ from cl.people_db.models import Person
 from cl.search.models import Opinion, OpinionCluster, RECAPDocument, Docket
 
 
+def get_solr_url_by_object(obj):
+    """Return the Solr URL for an object type.
+
+    This is important because depending on where the task is run, it needs to
+    have the correct URL.
+
+    :param obj: The object to look up.
+    :return a Solr URL that can be used.
+    """
+    if type(obj) == Opinion:
+        return settings.SOLR_OPINION_URL
+    elif type(obj) == RECAPDocument:
+        return settings.SOLR_RECAP_URL
+    elif type(obj) == Docket:
+        return settings.SOLR_RECAP_URL
+    elif type(obj) == Audio:
+        return settings.SOLR_AUDIO_URL
+    elif type(obj) == Person:
+        return settings.SOLR_PEOPLE_URL
+
+
 @app.task
 def add_or_update_items(items):
     """Adds an item to a solr index.
@@ -31,28 +52,19 @@ def add_or_update_items(items):
         items = [items]
     search_item_list = []
     for item in items:
+        si = scorched.SolrInterface(get_solr_url_by_object(item), mode='w')
         try:
             if type(item) == Opinion:
-                si = scorched.SolrInterface(settings.SOLR_OPINION_URL,
-                                            mode='w')
                 search_item_list.append(item.as_search_dict())
             elif type(item) == RECAPDocument:
-                si = scorched.SolrInterface(settings.SOLR_RECAP_URL,
-                                            mode='w')
                 search_item_list.append(item.as_search_dict())
             elif type(item) == Docket:
                 # Slightly different here b/c dockets return a list of search
                 # dicts.
-                si = scorched.SolrInterface(settings.SOLR_RECAP_URL,
-                                            mode='w')
                 search_item_list.extend(item.as_search_list())
             elif type(item) == Audio:
-                si = scorched.SolrInterface(settings.SOLR_AUDIO_URL,
-                                            mode='w')
                 search_item_list.append(item.as_search_dict())
             elif type(item) == Person:
-                si = scorched.SolrInterface(settings.SOLR_PEOPLE_URL,
-                                            mode='w')
                 search_item_list.append(item.as_search_dict())
         except AttributeError as e:
             print("AttributeError trying to add: %s\n  %s" % (item, e))
