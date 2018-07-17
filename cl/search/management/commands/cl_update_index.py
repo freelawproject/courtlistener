@@ -87,6 +87,15 @@ class Command(VerboseCommand):
             default='batch3',
             help="The celery queue where the tasks should be processed.",
         )
+        parser.add_argument(
+            '--queue-length',
+            default=30,
+            type=int,
+            help="The number of celery tasks to enqueue at a time. The default "
+                 "is to keep Celery totally swamped, but if you prefer to do "
+                 "things a little more slowly, set this value to a number "
+                 "less than your number of active celery workers",
+        )
 
         actions_group = parser.add_mutually_exclusive_group()
         actions_group.add_argument(
@@ -218,7 +227,8 @@ class Command(VerboseCommand):
         queue = self.options['queue']
         start_at = self.options['start_at']
         # Set low throttle. Higher values risk crashing Redis.
-        throttle = CeleryThrottle(min_items=30, queue_name=queue)
+        throttle = CeleryThrottle(min_items=self.options['queue_length'],
+                                  queue_name=queue)
         processed_count = 0
         chunk = []
         for item in items:
