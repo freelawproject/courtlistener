@@ -18,7 +18,7 @@ from cl.search.tasks import (delete_items, add_or_update_audio_files,
                              add_or_update_people,
                              add_or_update_recap_document)
 
-VALID_OBJ_TYPES = ('opinions', 'audio', 'people', 'recap', 'recap-dockets')
+VALID_OBJ_TYPES = ('opinions', 'audio', 'person', 'recap', 'recap-dockets')
 
 
 def proceed_with_deletion(out, count, noinput):
@@ -59,6 +59,7 @@ class Command(VerboseCommand):
         self.verbosity = None
         self.options = []
         self.type = None
+        self.type_str = None
         self.noinput = None
 
     def add_arguments(self, parser):
@@ -176,7 +177,7 @@ class Command(VerboseCommand):
         if not self.options['optimize_everything']:
             self.solr_url = options['solr_url']
             self.si = ExtraSolrInterface(self.solr_url, mode='rw')
-            self.type = options['type']
+            self.type, self.type_str = options['type']
 
         if options['update']:
             if self.verbosity >= 1:
@@ -239,7 +240,8 @@ class Command(VerboseCommand):
             chunk.append(item)
             if processed_count % chunksize == 0 or last_item:
                 throttle.maybe_wait()
-                add_or_update_items.apply_async(args=(chunk,), queue=queue)
+                add_or_update_items.apply_async(args=(chunk, self.type_str),
+                                                queue=queue)
                 chunk = []
                 sys.stdout.write("\rProcessed {}/{} ({:.0%})".format(
                     processed_count,
@@ -252,10 +254,10 @@ class Command(VerboseCommand):
     @print_timing
     def delete(self, items):
         """
-        Given an item, creates a Celery task to delete it.
+        Given a list of items, delete them.
         """
         self.stdout.write("Deleting items(s): %s\n" % items)
-        delete_items.delay(items, self.solr_url)
+        delete_items.delay(items, self.type_str)
 
     def delete_all(self):
         """
@@ -376,10 +378,7 @@ class Command(VerboseCommand):
 
     @print_timing
     def optimize(self):
-        """Runs the Solr optimize command.
-
-        This wraps Sunburnt, which wraps Solr, which wraps Lucene!
-        """
+        """Runs the Solr optimize command."""
         self.stdout.write('Optimizing the index...')
         self.si.optimize()
         self.stdout.write('done.\n')

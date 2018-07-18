@@ -4,7 +4,6 @@ import re
 from datetime import datetime, time
 
 from celery.canvas import chain
-from django.conf import settings
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse, NoReverseMatch
@@ -973,7 +972,7 @@ class RECAPDocument(models.Model):
         id_cache = self.pk
         super(RECAPDocument, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], settings.SOLR_RECAP_URL)
+        delete_items.delay([id_cache], 'recap')
 
     def get_docket_metadata(self):
         """The metadata for the item that comes from the Docket."""
@@ -1621,7 +1620,7 @@ class OpinionCluster(models.Model):
         id_cache = self.pk
         super(OpinionCluster, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], settings.SOLR_OPINION_URL)
+        delete_items.delay([id_cache], 'opinions')
 
 
 class Opinion(models.Model):

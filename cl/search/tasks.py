@@ -15,29 +15,8 @@ from cl.people_db.models import Person
 from cl.search.models import Opinion, OpinionCluster, RECAPDocument, Docket
 
 
-def get_solr_url_by_object(obj):
-    """Return the Solr URL for an object type.
-
-    This is important because depending on where the task is run, it needs to
-    have the correct URL.
-
-    :param obj: The object to look up.
-    :return a Solr URL that can be used.
-    """
-    if type(obj) == Opinion:
-        return settings.SOLR_OPINION_URL
-    elif type(obj) == RECAPDocument:
-        return settings.SOLR_RECAP_URL
-    elif type(obj) == Docket:
-        return settings.SOLR_RECAP_URL
-    elif type(obj) == Audio:
-        return settings.SOLR_AUDIO_URL
-    elif type(obj) == Person:
-        return settings.SOLR_PEOPLE_URL
-
-
 @app.task
-def add_or_update_items(items):
+def add_or_update_items(items, solr_object_type):
     """Adds an item to a solr index.
 
     This function is for use with the update_index command. It's slightly
@@ -46,13 +25,20 @@ def add_or_update_items(items):
     not passing objects around, but thread safety shouldn't be an issue since
     this is only used by the update_index command, and we want to get the
     objects in the task, not in its caller.
+
+    :param items: A list of items or a single item to add or update in Solr
+    :param solr_object_type: The solr object type being updated so that the URL
+    can be pulled from the settings file. This is essential since different
+    celery workers may connect to solr on different machines.
+    :return None
     """
     if hasattr(items, "items") or not hasattr(items, "__iter__"):
         # If it's a dict or a single item make it a list
         items = [items]
     search_item_list = []
     for item in items:
-        si = scorched.SolrInterface(get_solr_url_by_object(item), mode='w')
+        si = scorched.SolrInterface(settings.SOLR_URLS[solr_object_type],
+                                    mode='w')
         try:
             if type(item) == Opinion:
                 search_item_list.append(item.as_search_dict())
@@ -204,8 +190,8 @@ def add_or_update_recap_document(item_pks, coalesce_docket=False,
 
 
 @app.task
-def delete_items(items, solr_url, force_commit=False):
-    si = scorched.SolrInterface(solr_url, mode='w')
+def delete_items(items, solr_obj_type, force_commit=False):
+    si = scorched.SolrInterface(settings.SOLR_URLS[solr_obj_type], mode='w')
     try:
         si.delete_by_ids(list(items))
         if force_commit:

@@ -2,14 +2,14 @@ import json
 from datetime import datetime
 from datetime import time
 
-from django.conf import settings
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
 from django.template import loader
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.model_helpers import make_upload_path
-from cl.lib.search_index_utils import InvalidDocumentError, null_map, normalize_search_dicts
+from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
+    normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person
@@ -187,7 +187,7 @@ class Audio(models.Model):
         id_cache = self.pk
         super(Audio, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], settings.SOLR_AUDIO_URL)
+        delete_items.delay([id_cache], 'audio')
 
     def as_search_dict(self):
         """Create a dict that can be ingested by Solr"""
