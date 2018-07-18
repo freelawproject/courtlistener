@@ -151,7 +151,7 @@ SOLR_AUDIO_TEST_URL = '%s/solr/audio_test' % SOLR_HOST
 SOLR_PEOPLE_TEST_URL = '%s/solr/person_test' % SOLR_HOST
 SOLR_RECAP_TEST_URL = '%s/solr/recap_test' % SOLR_RECAP_HOST
 SOLR_TEST_URLS = {
-    'opinion': SOLR_OPINION_TEST_URL,
+    'opinions': SOLR_OPINION_TEST_URL,
     'audio': SOLR_AUDIO_TEST_URL,
     'person': SOLR_PEOPLE_TEST_URL,
     'recap': SOLR_RECAP_TEST_URL,

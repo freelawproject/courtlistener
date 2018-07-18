@@ -17,6 +17,7 @@ from cl.search.models import Court
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
     SOLR_PEOPLE_URL=settings.SOLR_PEOPLE_TEST_URL,
     SOLR_RECAP_URL=settings.SOLR_RECAP_TEST_URL,
+    SOLR_URLS=settings.SOLR_TEST_URLS,
 )
 class EmptySolrTestCase(TestCase):
     """Sets up an empty Solr index for tests that need to set up data manually.
@@ -92,7 +93,7 @@ class IndexedSolrTestCase(SolrTestCase):
         cores = {
             'audio': self.core_name_audio,
             'opinions': self.core_name_opinion,
-            'people': self.core_name_people,
+            'person': self.core_name_people,
         }
         for obj_type, core_name in cores.items():
             args = [
