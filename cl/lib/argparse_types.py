@@ -49,13 +49,14 @@ def valid_obj_type(s):
                                          "options are %s" % (s, VALID_OBJ_TYPES))
 
     if s == 'opinions':
-        return Opinion
+        return Opinion, s
     elif s == 'audio':
-        return Audio
-    elif s == 'people':
-        return Person
+        return Audio, s
+    elif s == 'person':
+        return Person, s
     elif s == 'recap':
-        return RECAPDocument
+        return RECAPDocument, s
     elif s == 'recap-dockets':
-        return Docket
+        # Normalize here to match values in settings.SOLR_URLS
+        return Docket, 'recap'
 

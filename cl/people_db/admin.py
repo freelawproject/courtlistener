@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib import admin
 
 from cl.lib.admin import CSSAdminMixin
@@ -149,7 +148,7 @@ class PersonAdmin(admin.ModelAdmin, CSSAdminMixin):
     def delete_model(self, request, obj):
         obj.delete()
         from cl.search.tasks import delete_items
-        delete_items.delay([obj.pk], settings.SOLR_PEOPLE_URL)
+        delete_items.delay([obj.pk], 'person')
 
 
 @admin.register(Race)
