@@ -66,7 +66,8 @@ def delete_solr_core(core_name, delete_index=True, delete_data=True,
     r = requests.get('%s/solr/admin/cores' % url, params=params)
     if r.status_code != 200:
         raise Exception("Problem deleting core. Got status_code of %s. Check "
-                        "the Solr logs for details." % r.status_code)
+                        "the Solr logs for details. Maybe delete /tmp/solr ?" %
+                        r.status_code)
 
 
 def swap_solr_core(current_core, desired_core, url=settings.SOLR_HOST):
