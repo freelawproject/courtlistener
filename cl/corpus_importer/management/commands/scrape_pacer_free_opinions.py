@@ -90,8 +90,7 @@ def get_and_save_free_document_reports(options):
         in_use=True,
         end_date=None,
     ).exclude(
-        pk__in=['casb', 'ganb', 'gub', 'innb', 'mieb', 'miwb', 'nmib', 'nvb',
-                'ohsb', 'prb', 'tnwb', 'vib'],
+        pk__in=['casb', 'gub', 'innb', 'miwb', 'ohsb', 'prb'],
     ).values_list(
         'pk',
         flat=True,
