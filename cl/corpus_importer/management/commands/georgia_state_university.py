@@ -203,6 +203,7 @@ def download_dockets(options):
         f.seek(0)
         reader = csv.DictReader(f, dialect=dialect)
         q = options['queue']
+        task = options['task']
         throttle = CeleryThrottle(queue_name=q,
                                   min_items=options['queue_length'])
         session = PacerSession(username=PACER_USERNAME,
@@ -216,7 +217,10 @@ def download_dockets(options):
             throttle.maybe_wait()
 
             logger.info("Doing row %s: %s", i, row)
+
             if row['idb_docket_number']:
+                if task == 'download_student_dockets':
+                    continue
                 # Zero-pad the docket number up to seven digits because Excel
                 # ate the leading zeros that these would normally have.
                 docket_number = row['idb_docket_number'].rjust(7, '0')
@@ -251,7 +255,11 @@ class Command(VerboseCommand, CommandUtils):
     allowed_tasks = [
         'lookup_in_idb',
         'download_dockets',
+        # Needed to do a second download, after discovering that uppercase
+        # docket numbers didn't work properly:
+        'download_student_dockets',
         'download_documents',
+
     ]
 
     def add_arguments(self, parser):
@@ -308,5 +316,6 @@ class Command(VerboseCommand, CommandUtils):
 
         if options['task'] == 'lookup_in_idb':
             update_csv_with_idb_lookups(options)
-        elif options['task'] == 'download_dockets':
+        elif options['task'] == 'download_dockets' or \
+                options['task'] == 'download_student_dockets':
             download_dockets(options)
