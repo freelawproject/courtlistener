@@ -690,6 +690,12 @@ class DocketEntry(models.Model):
         auto_now=True,
         db_index=True,
     )
+    date_entered = models.DateTimeField(
+        help_text="The entered datetime of the Docket Entry (UTC); "
+                  "frequently unavailable.",
+        null=True,
+        blank=True,
+        )
     date_filed = models.DateField(
         help_text="The created date of the Docket Entry.",
         null=True,
