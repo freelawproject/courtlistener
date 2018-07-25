@@ -356,19 +356,20 @@ def download_documents(options):
 
         # We've got our des, now download them.
         for de in good_des:
-            rd = de.recap_documents.get(
+            rds = de.recap_documents.filter(
                 document_type=RECAPDocument.PACER_DOCUMENT)
-            if not rd.pacer_doc_id:
-                logger.warn("Unable to get pacer_doc_id for item with rd_pk: "
-                            "%s. Restricted document?", rd.pk)
-                continue
+            for rd in rds:
+                if not rd.pacer_doc_id:
+                    logger.warn("Unable to get pacer_doc_id for item with "
+                                "rd_pk: %s. Restricted document?", rd.pk)
+                    continue
 
-            chain(
-                get_pacer_doc_by_rd.s(rd.pk, session.cookies,
-                                      tag=TAG_NAME).set(queue=q),
-                extract_recap_pdf.si(rd.pk).set(queue=q),
-                add_or_update_recap_document.si([rd.pk]).set(queue=q),
-            ).apply_async()
+                chain(
+                    get_pacer_doc_by_rd.s(rd.pk, session.cookies,
+                                          tag=TAG_NAME).set(queue=q),
+                    extract_recap_pdf.si(rd.pk).set(queue=q),
+                    add_or_update_recap_document.si([rd.pk]).set(queue=q),
+                ).apply_async()
     f.close()
 
 
