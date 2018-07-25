@@ -858,9 +858,9 @@ def add_tags(rd, tag_name):
         tag.tag_object(rd)
 
 
-@transaction.atomic
 @app.task(bind=True, max_retries=3, interval_start=5,
           interval_step=5, ignore_result=True)
+@transaction.atomic
 def get_pacer_doc_by_rd(self, rd_pk, cookies, tag=None):
     """A simple method for getting the PDF associated with a RECAPDocument.
 
