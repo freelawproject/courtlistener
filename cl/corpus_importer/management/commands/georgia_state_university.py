@@ -358,6 +358,10 @@ def download_documents(options):
         for de in good_des:
             rd = de.recap_documents.get(
                 document_type=RECAPDocument.PACER_DOCUMENT)
+            if not rd.pacer_doc_id:
+                logger.warn("Unable to get pacer_doc_id for item with rd_pk: "
+                            "%s. Restricted document?", rd.pk)
+                continue
 
             chain(
                 get_pacer_doc_by_rd.s(rd.pk, session.cookies,
