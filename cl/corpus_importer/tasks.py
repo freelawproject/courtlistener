@@ -890,7 +890,6 @@ def get_pacer_doc_by_rd(self, rd_pk, cookies, tag=None):
         return
 
     add_tags(rd, tag)
-    rd.save()
     return rd.pk
 
 
