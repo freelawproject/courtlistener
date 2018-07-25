@@ -267,7 +267,13 @@ def filter_des(des):
     pre_prefix_words = ['memorandum', 'report']
     good_des = []
     for de in des:
-        words = de.description.lower().split()
+        desc = de.description
+        if not desc:
+            # Got this one from an RSS feed, perhaps? Use the rd description.
+            rd = de.recap_documents.get(
+                document_type=RECAPDocument.PACER_DOCUMENT)
+            desc = rd.description
+        words = desc.lower().split()
         try:
             if any([
                 # A core word as the first word in the text
