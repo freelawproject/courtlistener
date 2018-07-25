@@ -843,6 +843,57 @@ def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
     return True, 'Saved item successfully'
 
 
+def add_tags(rd, tag_name):
+    """Add tags to a tree of objects starting with the RECAPDocument
+
+    Adds the tag to the RECAPDocument, Docket Entry, and Docket.
+
+    :param rd: The RECAPDocument where we begin the chain
+    :return None
+    """
+    if tag_name is not None:
+        tag, _ = Tag.objects.get_or_create(name=tag_name)
+        tag.tag_object(rd.docket_entry.docket)
+        tag.tag_object(rd.docket_entry)
+        tag.tag_object(rd)
+
+
+@transaction.atomic
+@app.task(bind=True, max_retries=3, interval_start=5,
+          interval_step=5, ignore_result=True)
+def get_pacer_doc_by_rd(self, rd_pk, cookies, tag=None):
+    """A simple method for getting the PDF associated with a RECAPDocument.
+
+    :param self: The bound celery task
+    :param rd_pk: The PK for the RECAPDocument object
+    :param cookies: The cookies of a logged in PACER session
+    :param tag: The name of a tag to apply to any modified items
+    :return: The RECAPDocument PK
+    """
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+
+    if rd.is_available:
+        add_tags(rd, tag)
+        self.request.callbacks = None
+        return
+
+    pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    r = download_pacer_pdf_by_rd(rd.pk, pacer_case_id,
+                                 rd.pacer_doc_id, cookies)
+    court_id = rd.docket_entry.docket.court_id
+    success, msg = update_rd_metadata(
+        self, rd_pk, r, court_id, pacer_case_id, rd.pacer_doc_id,
+        rd.document_number, rd.attachment_number)
+
+    if success is False:
+        self.request.callbacks = None
+        return
+
+    add_tags(rd, tag)
+    rd.save()
+    return rd.pk
+
+
 @app.task(bind=True, max_retries=15, interval_start=5,
           interval_step=5, ignore_result=True)
 def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
@@ -910,7 +961,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
 
     if rd.is_available:
         # Great. Call it a day.
-        rd.save(do_extraction=False, index=False)
+        rd.save()
         return
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
