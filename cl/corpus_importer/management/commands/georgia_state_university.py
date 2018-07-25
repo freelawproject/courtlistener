@@ -10,14 +10,16 @@ from reporters_db import CASE_NAME_ABBREVIATIONS
 from requests.structures import CaseInsensitiveDict
 
 from cl.corpus_importer.tasks import get_pacer_case_id_and_title, \
-    get_docket_by_pacer_case_id
+    get_docket_by_pacer_case_id, get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import CommandUtils
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.recap.constants import CV_2017
 from cl.recap.models import FjcIntegratedDatabase
-from cl.search.models import Court
-from cl.search.tasks import add_or_update_recap_docket
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.search.models import Court, Docket, RECAPDocument
+from cl.search.tasks import add_or_update_recap_docket, \
+    add_or_update_recap_document
 
 # Case insensitive dict for abbreviation lookups.
 CASE_NAME_IABBREVIATIONS = CaseInsensitiveDict(CASE_NAME_ABBREVIATIONS)
@@ -25,7 +27,7 @@ CASE_NAME_IABBREVIATIONS = CaseInsensitiveDict(CASE_NAME_ABBREVIATIONS)
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
-TAG = 'yDVxdAsAKSixdsoM'
+TAG_NAME = 'yDVxdAsAKSixdsoM'
 
 """
 This file contains some of the work product of our collaboration with GSU. The
@@ -243,10 +245,121 @@ def download_dockets(options):
                 get_docket_by_pacer_case_id.s(
                     court_id=court.pk,
                     cookies=session.cookies,
-                    tag=TAG,
+                    tag=TAG_NAME,
                 ).set(queue=q),
                 add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
+
+
+def filter_des(des):
+    """Apply filtering rules provided by GSU to the results if there are more
+    than one DE on a given date in a given docket. See email dated 2018-04-18
+    from Charlotte Alexander
+    """
+    core_words = [
+        'decided', 'decision', 'denial', 'denied', 'denying', 'entered',
+        'entry', 'finding', 'findings', 'grant', 'granted', 'granting',
+        'judge', 'magistrate', 'opinion', 'order', 'ordered ',
+        'recommendation',
+    ]
+    prefix_words = ['amended', 'corrected', 'final', 'further',
+                    'initial', 'modified', 'revised']
+    pre_prefix_words = ['memorandum', 'report']
+    good_des = []
+    for de in des:
+        words = de.description.lower().split()
+        try:
+            if any([
+                # A core word as the first word in the text
+                words[0] in core_words,
+                # A prefix word as the first word with a core word
+                # as the second word
+                words[0] in prefix_words and
+                    words[1] in core_words,
+                # 'memorandum' or 'report' as the 1st word followed
+                # by a core word as the second or third word
+                words[0] in pre_prefix_words and
+                    (words[1] in core_words or words[2] in core_words),
+                # A prefix word as the first word followed by 'memorandum' or
+                # 'report' as the second word followed by a core word as the
+                # 3rd or 4th word
+                words[0] in prefix_words and
+                    words[1] in pre_prefix_words and
+                    (words[2] in core_words or words[3] in core_words),
+            ]):
+                good_des.append(de)
+        except IndexError:
+            continue
+    return good_des
+
+
+def download_documents(options):
+    """We've got good values in the new columns, so just need to look those up,
+    and get the documents from PACER.
+    """
+    f = open(options['input_file'], 'r')
+    dialect = csv.Sniffer().sniff(f.read(1024))
+    f.seek(0)
+    reader = csv.DictReader(f, dialect=dialect)
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q,
+                              min_items=options['queue_length'])
+    session = PacerSession(username=PACER_USERNAME,
+                           password=PACER_PASSWORD)
+    session.login()
+    for i, row in enumerate(reader):
+        if i < options['offset']:
+            continue
+        if i >= options['limit'] > 0:
+            break
+        throttle.maybe_wait()
+
+        logger.info("Doing row %s: %s", i, row)
+
+        docket_number = row['cl_d_docket_number'] or \
+            row['cl_d_docket_number (student)'] or \
+            None
+
+        if not docket_number:
+            logger.warn("No docket number found for row: %s", i)
+            continue
+        court = Court.objects.get(fjc_court_id=row['AO ID'].rjust(2, '0'),
+                                  jurisdiction=Court.FEDERAL_DISTRICT)
+
+        try:
+            d = Docket.objects.get(docket_number=docket_number, court=court)
+        except Docket.MultipleObjectsReturned:
+            logger.warn("Multiple objects returned for row: %s", i)
+            continue
+        except Docket.DoesNotExist:
+            logger.warn("Could not find docket for row: %s", i)
+            continue
+
+        # Got the docket, now get the documents from it, tag & OCR them.
+        document_date = datetime.strptime(row['Date'], '%m/%d/%Y').date()
+        des = d.docket_entries.filter(date_filed=document_date)
+        count = des.count()
+        if count == 0:
+            logger.warn("No docket entries found for row: %s", i)
+            continue
+        elif des.count() == 1:
+            good_des = [des[0]]
+        else:
+            # More than one item. Apply filtering rules.
+            good_des = filter_des(des)
+
+        # We've got our des, now download them.
+        for de in good_des:
+            rd = de.recap_documents.get(
+                document_type=RECAPDocument.PACER_DOCUMENT)
+
+            chain(
+                get_pacer_doc_by_rd.s(rd.pk, session.cookies,
+                                      tag=TAG_NAME).set(queue=q),
+                extract_recap_pdf.si(rd.pk).set(queue=q),
+                add_or_update_recap_document.si([rd.pk]).set(queue=q),
+            ).apply_async()
+    f.close()
 
 
 class Command(VerboseCommand, CommandUtils):
@@ -259,7 +372,6 @@ class Command(VerboseCommand, CommandUtils):
         # docket numbers didn't work properly:
         'download_student_dockets',
         'download_documents',
-
     ]
 
     def add_arguments(self, parser):
@@ -319,3 +431,5 @@ class Command(VerboseCommand, CommandUtils):
         elif options['task'] == 'download_dockets' or \
                 options['task'] == 'download_student_dockets':
             download_dockets(options)
+        elif options['task'] == 'download_documents':
+            download_documents(options)
