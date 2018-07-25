@@ -10,7 +10,7 @@ from reporters_db import CASE_NAME_ABBREVIATIONS
 from requests.structures import CaseInsensitiveDict
 
 from cl.corpus_importer.tasks import get_pacer_case_id_and_title, \
-    get_docket_by_pacer_case_id, get_pacer_doc_by_rd
+    get_docket_by_pacer_case_id, get_pacer_doc_by_rd, add_tags
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import CommandUtils
 from cl.lib.command_utils import VerboseCommand, logger
@@ -28,6 +28,7 @@ PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 TAG_NAME = 'yDVxdAsAKSixdsoM'
+TAG_NAME_OPINIONS = TAG_NAME + '-opinions'
 
 """
 This file contains some of the work product of our collaboration with GSU. The
@@ -363,13 +364,18 @@ def download_documents(options):
                     logger.warn("Unable to get pacer_doc_id for item with "
                                 "rd_pk: %s. Restricted document?", rd.pk)
                     continue
-
-                chain(
-                    get_pacer_doc_by_rd.s(rd.pk, session.cookies,
-                                          tag=TAG_NAME).set(queue=q),
-                    extract_recap_pdf.si(rd.pk).set(queue=q),
-                    add_or_update_recap_document.si([rd.pk]).set(queue=q),
-                ).apply_async()
+                if options['task'] == 'add_extra_tags':
+                    # Wherein I belatedly realize we need a tag specifically
+                    # for this part of the project.
+                    add_tags(rd, TAG_NAME_OPINIONS)
+                else:
+                    # Otherwise, do the normal download thing.
+                    chain(
+                        get_pacer_doc_by_rd.s(rd.pk, session.cookies,
+                                              tag=TAG_NAME).set(queue=q),
+                        extract_recap_pdf.si(rd.pk).set(queue=q),
+                        add_or_update_recap_document.si([rd.pk]).set(queue=q),
+                    ).apply_async()
     f.close()
 
 
@@ -383,6 +389,9 @@ class Command(VerboseCommand, CommandUtils):
         # docket numbers didn't work properly:
         'download_student_dockets',
         'download_documents',
+        # After downloading all the docs, I realized there wasn't a good way
+        # to sort them out. This adds an extra tag in a second pass.
+        'add_extra_tags',
     ]
 
     def add_arguments(self, parser):
@@ -442,5 +451,6 @@ class Command(VerboseCommand, CommandUtils):
         elif options['task'] == 'download_dockets' or \
                 options['task'] == 'download_student_dockets':
             download_dockets(options)
-        elif options['task'] == 'download_documents':
+        elif options['task'] == 'download_documents' or \
+                options['task'] == 'add_extra_tags':
             download_documents(options)
