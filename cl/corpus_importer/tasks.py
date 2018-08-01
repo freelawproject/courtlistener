@@ -578,10 +578,6 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
 
     add_recap_source(d)
     update_docket_metadata(d, docket_data)
-    d, og_info = update_docket_appellate_metadata(d, docket_data)
-    if og_info is not None:
-        og_info.save()
-        d.originating_court_information = og_info
     d.save()
     tags = []
     if tag_names is not None:
