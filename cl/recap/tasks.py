@@ -527,8 +527,13 @@ def update_docket_appellate_metadata(d, docket_data):
     return d, d_og_info
 
 
-def add_docket_entries(d, docket_entries, tag=None):
-    """Update or create the docket entries and documents."""
+def add_docket_entries(d, docket_entries, tags=None):
+    """Update or create the docket entries and documents.
+
+    :param docket_entries: A list of dicts containing docket entry data.
+    :param tags: A list of tag objects to apply to the recap documents and
+    docket entries created or updated in this function.
+    """
     rds_created = []
     content_updated = False
     for docket_entry in docket_entries:
@@ -547,8 +552,9 @@ def add_docket_entries(d, docket_entries, tag=None):
         de.description = docket_entry['description'] or de.description
         de.date_filed = docket_entry['date_filed'] or de.date_filed
         de.save()
-        if tag is not None:
-            tag.tag_object(de)
+        if tags:
+            for tag in tags:
+                tag.tag_object(de)
 
         if de_created:
             content_updated = True
@@ -594,8 +600,9 @@ def add_docket_entries(d, docket_entries, tag=None):
         except ValidationError:
             # Happens from race conditions.
             continue
-        if tag is not None:
-            tag.tag_object(rd)
+        if tags:
+            for tag in tags:
+                tag.tag_object(rd)
 
     return rds_created, content_updated
 
@@ -984,12 +991,12 @@ def process_recap_docket(self, pk):
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60,
           interval_step=5 * 60)
-def process_recap_attachment(self, pk, tag_name=None):
+def process_recap_attachment(self, pk, tag_names=None):
     """Process an uploaded attachment page from the RECAP API endpoint.
 
     :param pk: The primary key of the processing queue item you want to work on
-    :param tag_name: A tag to add to all items created or modified in this
-    function.
+    :param tag_names: A list of tag names to add to all items created or
+    modified in this function.
     :return: None
     """
     pq = ProcessingQueue.objects.get(pk=pk)
@@ -1058,8 +1065,11 @@ def process_recap_attachment(self, pk, tag_name=None):
         )
 
         # Create/update the attachment items.
-        if tag_name is not None:
-            tag, _ = Tag.objects.get_or_create(name=tag_name)
+        tags = []
+        if tag_names:
+            for tag_name in tag_names:
+                tag, _ = Tag.objects.get_or_create(name=tag_name)
+                tags.append(tag)
         for attachment in att_data['attachments']:
             if all([attachment['attachment_number'],
                     # Missing on sealed items.
@@ -1094,8 +1104,9 @@ def process_recap_attachment(self, pk, tag_name=None):
 
                 if needs_save:
                     rd.save()
-                if tag_name is not None:
-                    tag.tag_object(rd)
+                if tags:
+                    for tag in tags:
+                        tag.tag_object(rd)
 
                 # Do *not* do this async — that can cause race conditions.
                 add_or_update_recap_document([rd.pk], force_commit=False)

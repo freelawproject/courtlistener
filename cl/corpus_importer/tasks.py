@@ -512,7 +512,7 @@ def get_pacer_case_id_and_title(self, docket_number, court_id, cookies,
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60, ignore_result=True)
 def get_docket_by_pacer_case_id(self, data, court_id, cookies,
-                                tag=None, **kwargs):
+                                tag_names=None, **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -525,7 +525,8 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     :param court_id: A courtlistener court ID.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
-    :param tag: The tag name that should be stored with the item in the DB.
+    :param tag_names: A list of tag names that should be stored with the item
+    in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     :return: A dict indicating if we need to update Solr.
     """
@@ -582,9 +583,12 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
         og_info.save()
         d.originating_court_information = og_info
     d.save()
-    if tag is not None:
-        tag, _ = Tag.objects.get_or_create(name=tag)
-        tag.tag_object(d)
+    tags = []
+    if tag_names is not None:
+        for tag_name in tag_names:
+            tag, _ = Tag.objects.get_or_create(name=tag_name)
+            tag.tag_object(d)
+            tags.append(tag)
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(content_object=d,
@@ -595,7 +599,7 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     )
 
     rds_created, content_updated = add_docket_entries(
-        d, docket_data['docket_entries'], tag=tag)
+        d, docket_data['docket_entries'], tags=tags)
     add_parties_and_attorneys(d, docket_data['parties'])
     process_orphan_documents(rds_created, d.court_id, d.date_filed)
     logger.info("Created/updated docket: %s" % d)
@@ -608,7 +612,7 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
 @app.task(bind=True, max_retries=2, interval_start=5 * 60,
           interval_step=10 * 60, ignore_result=True)
 def get_appellate_docket_by_docket_number(self, docket_number, court_id,
-                                          cookies, tag=None, **kwargs):
+                                          cookies, tag_names=None, **kwargs):
     """Get a docket by docket number, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -618,8 +622,8 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
     :param court_id: A courtlistener/PACER appellate court ID.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
-    :param tag: The tag name that should be stored with the item in the DB, if
-    desired.
+    :param tag_names: The tag name that should be stored with the item in the
+    DB, if desired.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     """
     s = PacerSession(cookies=cookies)
@@ -670,9 +674,12 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
         og_info.save()
         d.originating_court_information = og_info
     d.save()
-    if tag is not None:
-        tag, _ = Tag.objects.get_or_create(name=tag)
-        tag.tag_object(d)
+    tags = []
+    if tag_names is not None:
+        for tag_name in tag_names:
+            tag, _ = Tag.objects.get_or_create(name=tag_name)
+            tag.tag_object(d)
+            tags.append(tag)
 
     # Save the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(content_object=d,
@@ -683,7 +690,7 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
     )
 
     rds_created, content_updated = add_docket_entries(
-        d, docket_data['docket_entries'], tag=tag)
+        d, docket_data['docket_entries'], tags=tags)
     add_parties_and_attorneys(d, docket_data['parties'])
     process_orphan_documents(rds_created, d.court_id, d.date_filed)
     logger.info("Created/updated docket: %s" % d)
