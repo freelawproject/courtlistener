@@ -49,7 +49,7 @@ class Command(VerboseCommand):
             messages.append(EmailMultiAlternatives(
                 subject='Welcome to CourtListener and Free Law Project',
                 body=email_txt,
-                from_email='Mike Lissner <mike@free.law>',
+                from_email='Mike Lissner <mike@courtlistener.com>',
                 to=[recipient.email],
                 headers={'X-Entity-Ref-ID': 'welcome.email:%s' % recipient.pk}
             ))
