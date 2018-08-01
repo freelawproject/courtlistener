@@ -511,6 +511,85 @@ def get_pacer_case_id_and_title(self, docket_number, court_id, cookies,
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60, ignore_result=True)
+def do_case_query_by_pacer_case_id(self, data, court_id, cookies,
+                                   tag_names=None):
+    """Run a case query (iquery.pl) query on a case and save the data
+
+    :param data: A dict containing at least the following: {
+        'pacer_case_id': The internal pacer case ID for the item.
+    }
+    :param court_id: A courtlistener court ID
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
+    :param tag_names: A list of tag names to associate with the docket when
+    saving it in the DB.
+    :return: A dict with the pacer_case_id and docket_pk values.
+    """
+    s = PacerSession(cookies=cookies)
+    if data is None:
+        logger.info("Empty data argument. Terminating "
+                    "chains and exiting.")
+        self.request.callbacks = None
+        return
+
+    pacer_case_id = data.get('pacer_case_id')
+    report = CaseQuery(map_cl_to_pacer_id(court_id), s)
+    logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
+    try:
+        d = Docket.objects.get(
+            pacer_case_id=pacer_case_id,
+            court_id=court_id,
+        )
+    except Docket.DoesNotExist:
+        d = None
+    except Docket.MultipleObjectsReturned:
+        d = None
+
+    report.query(pacer_case_id)
+    docket_data = report.data
+    logger.info("Querying and parsing complete for %s.%s" % (court_id,
+                                                             pacer_case_id))
+
+    if not docket_data:
+        logger.info("No valid docket data for %s.%s", court_id, pacer_case_id)
+        self.request.callbacks = None
+        return
+
+    # Merge the contents into CL.
+    if d is None:
+        d, count = find_docket_object(court_id, pacer_case_id,
+                                      docket_data['docket_number'])
+        if count > 1:
+            d = d.earliest('date_created')
+
+    add_recap_source(d)
+    update_docket_metadata(d, docket_data)
+    d.save()
+
+    tags = []
+    if tag_names is not None:
+        for tag_name in tag_names:
+            tag, _ = Tag.objects.get_or_create(name=tag_name)
+            tag.tag_object(d)
+            tags.append(tag)
+
+    # Add the HTML to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles(content_object=d,
+                                upload_type=UPLOAD_TYPE.CASE_REPORT_PAGE)
+    pacer_file.filepath.save(
+        'case_report.html',  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(report.response.text),
+    )
+
+    logger.info("Created/updated docket: %s" % d)
+    return {
+        'pacer_case_id': pacer_case_id,
+        'docket_pk': d.pk,
+    }
+
+
+@app.task(bind=True, max_retries=5, interval_start=5 * 60,
+          interval_step=10 * 60, ignore_result=True)
 def get_docket_by_pacer_case_id(self, data, court_id, cookies,
                                 tag_names=None, **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
