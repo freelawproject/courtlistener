@@ -19,6 +19,7 @@ class UPLOAD_TYPE:
     APPELLATE_DOCKET = 5
     APPELLATE_ATTACHMENT_PAGE = 6
     IA_XML_FILE = 7
+    CASE_REPORT_PAGE = 8
 
     NAMES = (
         (DOCKET, 'HTML Docket'),
@@ -28,6 +29,7 @@ class UPLOAD_TYPE:
         (APPELLATE_DOCKET, 'Appellate HTML docket'),
         (APPELLATE_ATTACHMENT_PAGE, 'Appellate HTML attachment page'),
         (IA_XML_FILE, 'Internet Archive XML docket'),
+        (CASE_REPORT_PAGE, 'Case report (iquery.pl) page'),
     )
 
 
