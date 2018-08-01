@@ -246,7 +246,7 @@ def download_dockets(options):
                 get_docket_by_pacer_case_id.s(
                     court_id=court.pk,
                     cookies=session.cookies,
-                    tag=TAG_NAME,
+                    tag_names=[TAG_NAME],
                 ).set(queue=q),
                 add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()

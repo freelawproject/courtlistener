@@ -58,7 +58,7 @@ def get_pacer_dockets(options, docket_pks, tag):
                 {'pacer_case_id': d.pacer_case_id},
                 d.court_id,
                 cookies=pacer_session.cookies,
-                **{'tag': tag, 'show_parties_and_counsel': True,
+                **{'tag_names': [tag], 'show_parties_and_counsel': True,
                    'show_terminated_parties': True,
                    'show_list_of_member_cases': True}
             ).set(queue=q),

@@ -53,7 +53,7 @@ def get_dockets(options):
                     docket_number=row['Cleaned case_No'],
                     court_id=row['fjc_court_id'],
                     cookies=session.cookies,
-                    tag=TAG,
+                    tag_names=[TAG],
                     **{
                         'show_docket_entries': True,
                         'show_orig_docket': True,
@@ -77,7 +77,7 @@ def get_dockets(options):
                 get_docket_by_pacer_case_id.s(
                     court_id=row['fjc_court_id'],
                     cookies=session.cookies,
-                    tag=TAG,
+                    tag_names=[TAG],
                     **{
                         'show_parties_and_counsel': True,
                         'show_terminated_parties': True,
@@ -117,7 +117,7 @@ def get_district_attachment_pages(options):
         chain(
             get_attachment_page_by_rd.s(rd_pk, session.cookies).set(queue=q),
             make_attachment_pq_object.s(rd_pk, recap_user.pk).set(queue=q),
-            process_recap_attachment.s(tag_name=TAG).set(queue=q),
+            process_recap_attachment.s(tag_names=[TAG]).set(queue=q),
         ).apply_async()
 
 

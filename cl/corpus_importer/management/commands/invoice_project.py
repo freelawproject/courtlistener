@@ -63,7 +63,7 @@ def get_attachment_pages(options):
                 make_attachment_pq_object.s(
                     result['id'], recap_user.pk).set(queue=q),
                 # And then process that using the normal machinery.
-                process_recap_attachment.s(tag_name=TAG).set(queue=q),
+                process_recap_attachment.s(tag_names=[TAG]).set(queue=q),
             ).apply_async()
             i += 1
         else:
