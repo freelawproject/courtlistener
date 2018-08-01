@@ -478,8 +478,13 @@ class Docket(models.Model):
         from cl.lib.pacer import map_cl_to_pacer_id
         court_id = map_cl_to_pacer_id(self.court.pk)
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
+            if self.court.pk in ['ca5', 'ca7', 'ca11']:
+                path = "/cmecf/servlet/TransportRoom?"
+            else:
+                path = "/n/beam/servlet/TransportRoom?"
+
             return (u'https://ecf.%s.uscourts.gov'
-                    '/n/beam/servlet/TransportRoom?'
+                    + path +
                     u'servlet=CaseSummary.jsp&'
                     u'caseNum=%s&'
                     u'incOrigDkt=Y&'
