@@ -17,9 +17,9 @@ from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import ParsingException
 from juriscraper.lib.string_utils import harmonize
-from juriscraper.pacer import FreeOpinionReport, PossibleCaseNumberApi, \
-    DocketReport, AttachmentPage, ShowCaseDocApi, AppellateDocketReport, \
-    PacerSession
+from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
+    CaseQuery, DocketReport, FreeOpinionReport, PacerSession, \
+    PossibleCaseNumberApi, ShowCaseDocApi
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -518,10 +518,10 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
 
     For details of acceptable parameters, see DocketReport.query()
 
-    :param data: A dict containing at least the following: {
-        'pacer_case_id': The internal case ID of the item in PACER.
-    }
-    This is necessary to make this function chainable.
+    :param data: A dict containing:
+        Required: 'pacer_case_id': The internal case ID of the item in PACER.
+        Optional: 'docket_pk': The ID of the docket to work on to avoid lookups
+                  if it's known in advance.
     :param court_id: A courtlistener court ID.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
@@ -539,15 +539,18 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     pacer_case_id = data.get('pacer_case_id')
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
-    try:
-        d = Docket.objects.get(
-            pacer_case_id=pacer_case_id,
-            court_id=court_id,
-        )
-    except Docket.DoesNotExist:
-        d = None
-    except Docket.MultipleObjectsReturned:
-        d = None
+    if data.get('docket_pk') is not None:
+        d = Docket.objects.get(pk=data['docket_pk'])
+    else:
+        try:
+            d = Docket.objects.get(
+                pacer_case_id=pacer_case_id,
+                court_id=court_id,
+            )
+        except Docket.DoesNotExist:
+            d = None
+        except Docket.MultipleObjectsReturned:
+            d = None
 
     if d is not None:
         first_missing_id = get_first_missing_de_number(d)
