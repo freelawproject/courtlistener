@@ -426,7 +426,7 @@ def update_docket_metadata(d, docket_data):
     d.date_filed = docket_data['date_filed'] or d.date_filed
     d.date_last_filing = docket_data.get(
         'date_last_filing') or d.date_last_filing
-    d.date_terminated = docket_data['date_terminated'] or d.date_terminated
+    d.date_terminated = docket_data.get('date_terminated') or d.date_terminated
     d.cause = docket_data.get('cause') or d.cause
     d.nature_of_suit = docket_data.get('nature_of_suit') or d.nature_of_suit
     d.jury_demand = docket_data.get('jury_demand') or d.jury_demand
