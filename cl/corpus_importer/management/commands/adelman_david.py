@@ -26,7 +26,6 @@ def download_dockets(options):
     f.seek(0)
     reader = csv.DictReader(f, dialect=dialect)
     q = options['queue']
-    task = options['task']
     throttle = CeleryThrottle(queue_name=q,
                               min_items=options['queue_length'])
     session = PacerSession(username=PACER_USERNAME,
@@ -38,15 +37,11 @@ def download_dockets(options):
         if i >= options['limit'] > 0:
             break
 
-        if (task == 'download_appellate' and not row['district_ct']) or \
-                (task == 'download_district' and row['district_ct']):
-            throttle.maybe_wait()
-            logger.info("Doing row %s: %s", i, row)
-        else:
-            continue
+        throttle.maybe_wait()
+        logger.info("Doing row %s: %s", i, row)
 
         row_tag = '%s-%s' % (PROJECT_TAG_NAME, row['id'])
-        if task == 'download_appellate' and not row['district_ct']:
+        if not row['district_ct']:
             chain(
                 get_appellate_docket_by_docket_number.s(
                     docket_number=row['docket_no1'],
@@ -68,7 +63,7 @@ def download_dockets(options):
                 ).set(queue=q),
                 add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
-        elif task == 'download_district' and row['district_ct']:
+        else:
             chain(
                 get_pacer_case_id_and_title.s(
                     docket_number=row['docket_no1'],
@@ -104,8 +99,7 @@ class Command(VerboseCommand, CommandUtils):
     help = "Download dockets and metadata for the David Adelman project"
 
     allowed_tasks = [
-        'download_appellate',
-        'download_district',
+        'download_dockets',
     ]
 
     def add_arguments(self, parser):
