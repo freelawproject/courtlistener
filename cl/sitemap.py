@@ -44,9 +44,13 @@ def make_sitemap_solr_params(sort, caller):
     }
     if caller == 'r_sitemap':
         params.update({
+            # Use groups so we only get one result per docket,
+            # not one per document.
             'group': 'true',
             'group.ngroups': 'true',
             'group.field': 'docket_id',
+            # Smaller groups for performance
+            'group.limit': 1,
         })
     return params
 
