@@ -168,7 +168,9 @@ consol,consolidated
 const,constitution,constitutional
 constr,construction
 contemp,contemporary
-cont,contract
+# This synonym means that whenever you search for 'contract' you get results
+# for "continued". Removing this.
+# cont,contract
 conv,conveyancer
 coop,cooperative
 corp,corporate
