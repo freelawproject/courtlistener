@@ -24,5 +24,5 @@ urlpatterns = [
     url(r'^donate/check/complete/$', donate_complete, name='check_complete'),
 
     # Profile page
-    url(r'^profile/donations/$', view_donations),
+    url(r'^profile/donations/$', view_donations, name='profile_donations'),
 ]
