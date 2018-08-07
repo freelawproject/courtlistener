@@ -4,7 +4,8 @@ from django.views.generic import RedirectView
 from cl.simple_pages.sitemap import sitemap_maker
 from cl.simple_pages.views import (
     about, advanced_search, browser_warning, contact, contact_thanks,
-    contribute, coverage_graph, faq, feeds, humans, latest_terms,
+    contribute, coverage_graph, donation_help, faq, feeds, humans,
+    latest_terms,
     alert_help, markdown_help, old_terms, podcasts, robots, tools_page,
     validate_for_bing, validate_for_google, validate_for_google2,
     validate_for_wot,
@@ -20,8 +21,11 @@ urlpatterns = [
     url(r'^contribute/$', contribute, name='contribute'),
     url(r'^contact/$', contact, name="contact"),
     url(r'^contact/thanks/$', contact_thanks, name='contact_thanks'),
+
+    # Help pages
     url(r'^help/markdown/$', markdown_help, name="markdown_help"),
     url(r'^help/alerts/$', alert_help, name="alert_help"),
+    url(r'^help/donations/$', donation_help, name="donation_help"),
 
     # Advanced search page
     url(
