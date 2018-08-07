@@ -8,6 +8,7 @@ def inject_settings(request):
     """Use this function to inject specific settings into every page."""
     return {
         'DEBUG': settings.DEBUG,
+        'EIN_SECRET': settings.EIN_SECRET,
         'MIN_DONATION': settings.MIN_DONATION,
         'FUNDRAISING_MODE': settings.FUNDRAISING_MODE,
     }
