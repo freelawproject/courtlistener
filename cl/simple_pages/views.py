@@ -92,6 +92,10 @@ def alert_help(request):
     return render(request, 'help/alert_help.html', context)
 
 
+def donation_help(request):
+    return render(request, 'help/donation_help.html', {'private': False})
+
+
 def markdown_help(request):
     return render(request, 'help/markdown_help.html', {'private': False})
 
