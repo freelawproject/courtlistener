@@ -78,15 +78,36 @@ def process_stripe_callback(request):
         )
 
 
-def process_stripe_payment(cd_donation_form, cd_user_form, kwargs):
+def process_stripe_payment(amount, email, kwargs):
+    """
+    Process a stripe payment.
+
+    :param amount: The amount, in pennies, that you wish to charge
+    :param email: The email address of the person being charged
+    :param kwargs: Keyword arguments to pass to Stripe's `create` method. Some
+    functioning options for this dict are:
+
+        {'card': stripe_token}
+
+    And:
+
+        {'customer': customer.id}
+
+    Where stripe_token is a token returned by Stripe's client-side JS library,
+    and customer is an object returned by stripe's customer creation server-
+    side library.
+
+    :return: response object with information about whether the transaction
+    succeeded.
+    """
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
     # Create the charge on Stripe's servers
     try:
         charge = stripe.Charge.create(
-            amount=int(float(cd_donation_form['amount']) * 100),  # amount in cents, watch yourself
+            amount=amount,
             currency="usd",
-            description=cd_user_form['email'],
+            description=email,
             **kwargs
         )
         response = {
