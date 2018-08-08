@@ -27,10 +27,12 @@ def route_and_process_donation(cd_donation_form, cd_user_form, kwargs):
      - status: The status of the payment for the database
      - payment_id: The ID of the payment
     """
-    if cd_donation_form['payment_provider'] == 'paypal':
+    if cd_donation_form['payment_provider'] == PROVIDERS.PAYPAL:
         response = process_paypal_payment(cd_donation_form)
-    elif cd_donation_form['payment_provider'] == 'cc':
-        response = process_stripe_payment(cd_donation_form, cd_user_form,
+    elif cd_donation_form['payment_provider'] == PROVIDERS.CREDIT_CARD:
+        # Calculate the amount in cents
+        amount = int(float(cd_donation_form['amount']) * 100)
+        response = process_stripe_payment(amount, cd_user_form['email'],
                                           kwargs)
     else:
         response = None
