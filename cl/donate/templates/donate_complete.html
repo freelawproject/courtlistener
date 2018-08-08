@@ -7,25 +7,33 @@
 {% block navbar-donate %}active{% endblock %}
 
 {% block content %}
-    <div class="col-sm-2">&nbsp;</div>
-    <div class="col-sm-8">
+    <div class="hidden-xs col-sm-2 col-md-3">&nbsp;</div>
+    <div class="col-xs-12 col-sm-8 col-md-6">
         {% if error == 'User Cancelled' %}
-            <h2>Donation Cancelled</h2>
-            <p>It appears you have cancelled the donation you were about to make. Your support means the world to us.</p>
-            <p>Would you like to try again, or just go back to the homepage?</p>
-            <form action="{% url "donate" %}" method="get" class="inline">
-                <button type="submit" class="btn btn-default">Try Donating Again</button>
-                &nbsp;&nbsp;<a href="/">Go to the homepage</a>
-            </form>
+          <h1 class="text-center">Donation Cancelled</h1>
+          <p>You have cancelled your donation, but your support means the world to us.
+          </p>
+          <p>Would you like to try again, or just go back to the homepage?</p>
+
+          <p class="v-offset-above-2">
+            <a href="{% url "donate" %}"
+               class="btn btn-lg btn-primary">Try Donating Again</a>
+            <a href="/"
+               class="btn btn-lg btn-default float-right">Go to the Homepage</a>
+          </p>
+
         {% else %}
-            <h2>Thanks for Your Donation</h2>
-            <p>Thanks for your donation to Free Law Project and for supporting CourtListener. Your contribution
-                really helps our progress move along. You will be receiving an email from us shortly with a few more
-                details about your contribution.</p>
-            <p>In the meantime, may we suggest reading in more depth about <a href="https://free.law/about/">
-                our projects</a> or perhaps resuming your research from <a href="/">the homepage</a>?</p>
-            <p><strong>Thanks again from the Free Law Team.</strong></p>
+            <h1 class="text-center">Thank You for Your Donation&nbsp;<i
+              class="fa fa-heart red"></i></h1>
+            <p>Thank you for your donation to Free Law Project and for supporting CourtListener and RECAP. Your contribution helps fund our staff and ongoing operations.
+            </p>
+            <p>You will be receiving an email from us shortly with a few more details about your contribution.
+            </p>
+            <p>In the meantime, may we suggest <a href="https://free.law/">reading our blog</a>, <a href="https://free.law/newsletter/">subscribing to our newsletter</a> or returning to <a href="/">the homepage to resume your research</a>?
+            </p>
+            <p><strong>Thank you again from the Free Law Project Team.</strong></p>
+
+
         {% endif %}
     </div>
-    <div class="col-sm-2">&nbsp;</div>
 {% endblock %}
