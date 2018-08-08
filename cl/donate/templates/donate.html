@@ -68,7 +68,6 @@
     });
 
     // Make the buttons happen
-    var payment_price = $("#payment-price");
     var donor_info = $("#donor-info");
     var check_info = $("#check-info");
     var cc_info = $("#cc-info");
@@ -85,7 +84,6 @@
         check_info.hide();
         cc_info.hide();
         bitcoin_info.hide();
-        payment_price.text("PayPal charges us 2.2% + 30¢ on all donations.")
     });
     $("#id_payment_provider_1").parent("label").click(function(){
         // Credit Card
@@ -93,7 +91,6 @@
         check_info.hide();
         cc_info.show();
         bitcoin_info.hide();
-        payment_price.text("We are charged 2.9% + 30¢ on all credit card donations.")
     });
     $("#id_payment_provider_2").parent("label").click(function(){
         // Check
@@ -101,7 +98,6 @@
         check_info.show("fast");
         cc_info.hide();
         bitcoin_info.hide();
-        payment_price.text("Checks are free for us to process!")
     });
     $("#id_payment_provider_3").parent("label").click(function () {
       // Bitcoin
@@ -109,7 +105,6 @@
       check_info.hide();
       cc_info.hide();
       bitcoin_info.show("fast");
-      payment_price.text("")
     });
     </script>
 {% endblock %}
@@ -276,11 +271,9 @@
                  value="bitcoin"
                  name="payment_provider"/>Bitcoin</label>
       </div>
-      <p class="small gray" id="payment-price">PayPal charges us 2.2%
-          + 30¢ on all donations.</p>
     </div>
 
-    <div id="donor-info">
+    <div id="donor-info" class="v-offset-above-2">
       <div class="row">
         <div class="col-sm-6">
           <div class="form-group">
