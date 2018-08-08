@@ -1,5 +1,6 @@
 from django.contrib import admin
-from cl.donate.models import Donation
+
+from cl.donate.models import Donation, MonthlyDonation
 
 
 @admin.register(Donation)
@@ -24,3 +25,6 @@ class DonationAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'donor',
     )
+
+
+admin.site.register(MonthlyDonation)
