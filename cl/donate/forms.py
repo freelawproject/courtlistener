@@ -1,11 +1,11 @@
-from cl.donate.models import Donation
-from cl.users.models import UserProfile
 from django import forms
 from django.contrib.auth.models import User
 from django.forms import ModelForm
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
+from cl.donate.models import Donation
+from cl.users.models import UserProfile
 
 AMOUNTS = (
     ('5000', '$5,000'),
@@ -129,7 +129,7 @@ class DonationForm(ModelForm):
         """
         Handles validation fixes that need to be performed across fields.
         """
-        # 1. Set the Amount = to other field
+        # 1. Set the amount field to amount_other field's value
         if self.cleaned_data.get('amount') == 'other':
             self.cleaned_data['amount'] = self.cleaned_data.get('amount_other')
         return self.cleaned_data
