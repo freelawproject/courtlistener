@@ -144,11 +144,29 @@ def process_paypal_payment(cd_donation_form):
                 'transaction_id': token
             }
             logger.info("Created payment in paypal with response: %s" % response)
-            return response
         else:
-            return {'result': 'UNABLE_TO_MAKE_PAYMENT'}
+            response = {'result': 'UNABLE_TO_MAKE_PAYMENT'}
     else:
-        return {'result': 'NO_ACCESS_TOKEN', }
+        response = {'result': 'NO_ACCESS_TOKEN', }
+
+    # Normalize the response
+    if response['result'] == 'created':
+        response = {
+            'message': None,
+            'status': Donation.AWAITING_PAYMENT,
+            'payment_id': response['payment_id'],
+            'transaction_id': response['transaction_id'],
+            'redirect': response['redirect'],
+        }
+    else:
+        response = {
+            'message': 'We had an error working with PayPal. Please try '
+                       'another payment method.',
+            'status': Donation.UNKNOWN_ERROR,
+            'payment_id': None,
+            'redirect': None,
+        }
+    return response
 
 
 def donate_paypal_cancel(request):

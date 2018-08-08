@@ -16,7 +16,7 @@ from cl.users.utils import create_stub_account
 logger = logging.getLogger(__name__)
 
 
-def route_and_process_donation(cd_donation_form, cd_user_form, stripe_token):
+def route_and_process_donation(cd_donation_form, cd_user_form, kwargs):
     """Routes the donation to the correct payment provider, then normalizes
     its response.
 
@@ -27,28 +27,9 @@ def route_and_process_donation(cd_donation_form, cd_user_form, stripe_token):
     """
     if cd_donation_form['payment_provider'] == 'paypal':
         response = process_paypal_payment(cd_donation_form)
-        if response['result'] == 'created':
-            response = {
-                'message': None,
-                'status': Donation.AWAITING_PAYMENT,
-                'payment_id': response['payment_id'],
-                'transaction_id': response['transaction_id'],
-                'redirect': response['redirect'],
-            }
-        else:
-            response = {
-                'message': 'We had an error working with PayPal. Please try '
-                           'another payment method.',
-                'status': Donation.UNKNOWN_ERROR,
-                'payment_id': None,
-                'redirect': None,
-            }
     elif cd_donation_form['payment_provider'] == 'cc':
-        response = process_stripe_payment(
-            cd_donation_form,
-            cd_user_form,
-            stripe_token
-        )
+        response = process_stripe_payment(cd_donation_form, cd_user_form,
+                                          kwargs)
     else:
         response = None
     return response
