@@ -6,11 +6,13 @@ from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
+from django.utils.timezone import now
 
 from cl.donate.forms import DonationForm, UserForm, ProfileForm
-from cl.donate.models import Donation
+from cl.donate.models import Donation, MonthlyDonation, PROVIDERS
 from cl.donate.paypal import process_paypal_payment
-from cl.donate.stripe_helpers import process_stripe_payment
+from cl.donate.stripe_helpers import process_stripe_payment, \
+    create_stripe_customer
 from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,27 @@ def route_and_process_donation(cd_donation_form, cd_user_form, kwargs):
     else:
         response = None
     return response
+
+
+def add_monthly_donations(cd_donation_form, frequency, user, customer):
+    """Sets things up for monthly donations to run properly."""
+    if frequency != 'monthly':
+        return
+
+    monthly_donation = MonthlyDonation(
+        donor=user,
+        enabled=True,
+        monthly_donation_amount=cd_donation_form['amount'],
+        monthly_donation_day=min(now().date().day, 28),
+    )
+    provider = cd_donation_form['payment_provider']
+    if provider == 'paypal':
+        pass
+    elif provider == 'cc':
+        monthly_donation.payment_provider = PROVIDERS.CREDIT_CARD
+        monthly_donation.stripe_customer_id = customer.id
+
+    monthly_donation.save()
 
 
 def donate(request):
@@ -97,13 +120,18 @@ def donate(request):
             cd_user_form = user_form.cleaned_data
             cd_profile_form = profile_form.cleaned_data
             stripe_token = request.POST.get('stripeToken')
+            frequency = request.POST.get('frequency')
 
             # Route the payment to a payment provider
-            response = route_and_process_donation(
-                cd_donation_form,
-                cd_user_form,
-                stripe_token
-            )
+            if frequency == 'once':
+                response = route_and_process_donation(
+                    cd_donation_form, cd_user_form, {'card': stripe_token})
+            elif frequency == 'monthly':
+                customer = create_stripe_customer(stripe_token,
+                                                  cd_user_form['email'])
+                response = route_and_process_donation(
+                    cd_donation_form, cd_user_form, {'customer': customer.id})
+
             logger.info("Payment routed with response: %s" % response)
 
             if response['status'] == Donation.AWAITING_PAYMENT:
@@ -125,6 +153,9 @@ def donate(request):
                 donation.transaction_id = response.get('transaction_id')
                 donation.donor = user
                 donation.save()
+
+                add_monthly_donations(cd_donation_form, frequency, user,
+                                      customer)
 
                 return HttpResponseRedirect(response['redirect'])
 

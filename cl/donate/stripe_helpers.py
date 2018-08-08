@@ -78,7 +78,7 @@ def process_stripe_callback(request):
         )
 
 
-def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
+def process_stripe_payment(cd_donation_form, cd_user_form, kwargs):
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
     # Create the charge on Stripe's servers
@@ -86,8 +86,8 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
         charge = stripe.Charge.create(
             amount=int(float(cd_donation_form['amount']) * 100),  # amount in cents, watch yourself
             currency="usd",
-            card=stripe_token,
             description=cd_user_form['email'],
+            **kwargs
         )
         response = {
             'message': None,
@@ -115,3 +115,12 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
         }
 
     return response
+
+
+def create_stripe_customer(source, email):
+    """Create a stripe customer so that we can charge this person more than
+    once
+    """
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    return stripe.Customer.create(source=source, email=email)
