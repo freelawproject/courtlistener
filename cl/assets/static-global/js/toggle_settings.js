@@ -1,22 +1,23 @@
 $(document).ready(function () {
-  $('.toggle-docket-alert').click(function(e){
+  $('.toggle-docket-alert, .toggle-monthly-donation').click(function(e){
     e.preventDefault();
     let button = $(this),
-        docket_id = button.data('docketId'),
+        id = button.data('id'),
         enable_message = button.data('enableMessage'),
         disable_message = button.data('disableMessage'),
         button_icon = button.find('i'),
+        button_enable_class = button_icon.data('enableIconClass'),
+        button_disable_class = button_icon.data('disableIconClass'),
         alert_text = button.find('.alert_btn_txt'),
         url = button.attr('href');
 
     button_icon
-      .removeClass("fa-bell-slash-o")
-      .removeClass("fa-bell")
-      .addClass('fa-spinner fa-pulse');
+      .removeClass()
+      .addClass('fa fa-spinner fa-pulse');
     $.ajax({
       method: 'POST',
       url: url,
-      data: {'docket_id': docket_id},
+      data: {'id': id},
       success: function(data){
         $('.bootstrap-growl').alert("close");
         $.bootstrapGrowl(
@@ -32,16 +33,16 @@ $(document).ready(function () {
         );
         if (/disabled/g.exec(data)) {
           button_icon
-            .removeClass("fa-spinner fa-pulse")
-            .addClass("fa-bell");
+            .removeClass()
+            .addClass("fa " + button_enable_class);
           button
             .removeClass("btn-danger")
             .addClass("btn-success");
           alert_text.text(enable_message);
         } else {
           button_icon
-            .removeClass("fa-spinner fa-pulse")
-            .addClass("fa-bell-slash-o");
+            .removeClass()
+            .addClass("fa " + button_disable_class);
           button
             .removeClass("btn-success")
             .addClass("btn-danger");
