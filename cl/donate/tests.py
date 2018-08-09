@@ -1,9 +1,9 @@
 # coding=utf-8
 import json
-import stripe
-
 from datetime import datetime, timedelta
 from unittest import skipIf
+
+import stripe
 from django.conf import settings
 from django.core import mail
 from django.core.urlresolvers import reverse
@@ -62,6 +62,7 @@ class DonationFormSubmissionTest(TestCase):
             'email': 'pandora@courtlistener.com',
             'send_annual_reminder': True,
             'payment_provider': 'paypal',
+            'frequency': 'once',
         }
 
     def test_paypal_with_other_value_as_anonymous(self):
@@ -125,6 +126,7 @@ class StripeTest(TestCase):
             'email': 'barack@freelawproject.org',
             'referrer': 'tests.py',
             'stripeToken': token.id,
+            'frequency': 'once',
         })
         return token, r
 
