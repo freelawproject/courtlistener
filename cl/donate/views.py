@@ -4,7 +4,8 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponseNotAllowed, \
+    HttpResponse
 from django.shortcuts import render
 from django.utils.timezone import now
 
@@ -219,6 +220,25 @@ def donate_complete(request):
         'error': error,
         'private': True,
     })
+
+
+def toggle_monthly_donation(request):
+    """Use Ajax to enable/disable monthly contributions"""
+    if request.is_ajax() and request.method == 'POST':
+        monthly_pk = request.POST.get('id')
+        m_donation = MonthlyDonation.objects.get(pk=monthly_pk)
+        state = m_donation.enabled
+        if state:
+            m_donation.enabled = False
+            msg = "Monthly contribution disabled successfully"
+        else:
+            m_donation.enabled = True
+            msg = "Monthly contribution enabled successfully"
+        m_donation.save()
+        return HttpResponse(msg)
+    else:
+        return HttpResponseNotAllowed(permitted_methods={'POST'},
+                                      content="Not an Ajax POST request.")
 
 
 @staff_member_required
