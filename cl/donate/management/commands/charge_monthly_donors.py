@@ -1,7 +1,10 @@
+from django.conf import settings
+from django.core.mail import send_mail
 from django.utils.timezone import now
 
 from cl.donate.models import MonthlyDonation, PROVIDERS, Donation
 from cl.donate.stripe_helpers import process_stripe_payment
+from cl.donate.utils import emails
 from cl.lib.command_utils import VerboseCommand
 
 
@@ -14,25 +17,67 @@ class Command(VerboseCommand):
         m_donations = MonthlyDonation.objects.filter(
             enabled=True,
             monthly_donation_day=now().date().day,
-        )
+        ).order_by('-date_created')
 
+        results = {'amount': 0, 'users': []}
         for m_donation in m_donations:
-            # Charge each m_donation.
             if m_donation.payment_provider == PROVIDERS.CREDIT_CARD:
                 response = process_stripe_payment(
-                    m_donation.monthly_donation_amount * 100,
+                    # Stripe rejects the charge if there are decimals;
+                    # cast to int.
+                    int(m_donation.monthly_donation_amount * 100),
                     m_donation.donor.email,
-                    {'customer', m_donation.stripe_customer_id},
+                    {'customer': m_donation.stripe_customer_id},
                 )
-                if response['status'] == Donation.AWAITING_PAYMENT:
-                    # It worked. Create a donation in our system as well.
-                    Donation.objects.create(
-                        donor=m_donation.donor,
-                        amount=m_donation.monthly_donation_amount,
-                        payment_provider=m_donation.payment_provider,
-                        status=response['status'],
-                        payment_id=response['payment_id'],
-                        # Only applies to PayPal
-                        transaction_id=response.get('transaction_id'),
-                        referrer='monthly_donation_%s' % m_donation.pk,
-                    )
+            else:
+                raise NotImplementedError(
+                    "%s is not a supported provider for monthly donations" %
+                    m_donation.payment_provider
+                )
+
+            if response.get('status') == Donation.AWAITING_PAYMENT:
+                # It worked. Create a donation in our system as well.
+                results['amount'] += m_donation.monthly_donation_amount
+                results['users'].append(' - %s %s (%s): $%s' % (
+                    m_donation.donor.first_name,
+                    m_donation.donor.last_name,
+                    m_donation.donor.email,
+                    m_donation.monthly_donation_amount,
+                ))
+                Donation.objects.create(
+                    donor=m_donation.donor,
+                    amount=m_donation.monthly_donation_amount,
+                    payment_provider=m_donation.payment_provider,
+                    status=response['status'],
+                    payment_id=response['payment_id'],
+                    # Only applies to PayPal
+                    transaction_id=response.get('transaction_id'),
+                    referrer='monthly_donation_%s' % m_donation.pk,
+                )
+                email = emails['donation_thanks_monthly']
+                send_mail(
+                    email['subject'],
+                    email['body'] % (m_donation.donor.first_name,
+                                     m_donation.monthly_donation_amount,
+                                     settings.EIN_SECRET),
+                    email['from'],
+                    [m_donation.donor.email],
+                )
+            else:
+                email = emails['bad_subscription']
+                send_mail(
+                    email['subject'],
+                    email['body'] % (m_donation.pk, response.get('status')),
+                    email['from'],
+                    email['to'],
+                )
+
+        if results['users']:
+            email = emails['donation_report']
+            send_mail(
+                email['subject'] % results['amount'],
+                email['body'] % (results['amount'],
+                                 '\n'.join(results['users'])),
+                email['from'],
+                email['to'],
+            )

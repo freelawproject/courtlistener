@@ -4,7 +4,9 @@ from django.core.mail import send_mail
 emails = {
     'donation_thanks': {
         'subject': 'Thanks for your donation to Free Law Project!',
-        'body': ('Hello %s,\n\nThanks for your donation of $%0.2f to Free '
+        'body': ('Hello %s,\n\n'
+                 
+                 'Thanks for your donation of $%0.2f to Free '
                  'Law Project. We are currently using donations like yours '
                  'for a variety of important projects that would never exist '
                  'without your help.\n\n'
@@ -21,7 +23,47 @@ emails = {
                  'Founders of Free Law Project\n'
                  'https://free.law/contact/'),
         'from': settings.DEFAULT_FROM_EMAIL,
-    }
+    },
+    'donation_thanks_monthly': {
+        'subject': 'We have received your recurring contribution to Free Law '
+                   'Project',
+        'body': ('Dear %s,\n\n'
+                 
+                 'Your recurring donation of $%0.2f was successfully charged '
+                 'today. Your ongoing support of Free Law Project allows us '
+                 'to continue making high quality legal data and tools widely '
+                 'available. We would be unable to do our work without '
+                 'your help.\n\n'
+                 
+                 'If you have any questions about your donation or need any '
+                 'help, please contact us at info@free.law. Thank you for '
+                 'supporting our work!\n\n'
+                 
+                 'Michael Lissner and Brian Carver\n'
+                 'Founders of Free Law Project\n'
+                 'https://free.law/contact\n\n'
+                 
+                 'PS: Free Law Project is a U.S. 501(c)(3) non-profit, with '
+                 'tax ID of %s. Your gift is tax deductible as allowed by '
+                 'law.'),
+        'from': settings.DEFAULT_FROM_EMAIL,
+    },
+    'bad_subscription': {
+        'subject': 'Something went wrong with a donor\'s subscription',
+        'body': ("Something went wrong while processing the monthly donation "
+                 "with ID %s. It had a status of: %s\n\n"
+                 
+                 "An admin should look into this."),
+        'from': settings.DEFAULT_FROM_EMAIL,
+        'to': [a[1] for a in settings.ADMINS],
+    },
+    'donation_report': {
+        'subject': '$%s were donated by monthly donors today',
+        'body': "The following monthly donors contributed a total of $%s:\n\n "
+                "%s",
+        'from': settings.DEFAULT_FROM_EMAIL,
+        'to': [a[1] for a in settings.ADMINS],
+    },
 }
 
 
