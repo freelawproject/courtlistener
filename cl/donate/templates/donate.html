@@ -459,7 +459,7 @@
         </label>
       </div>
       {# Only show the newsletter question to people who aren't getting it already (this is not an opportunity to opt out). #}
-      <div class="checkbox" {% if profile_form.wants_newsletter.value %}class="hidden"{% endif %}>
+      <div class="checkbox {% if profile_form.wants_newsletter.value %}hidden{% endif %}">
         <label for="{{ profile_form.wants_newsletter.id_for_label }}">
             {{ profile_form.wants_newsletter }} {{ profile_form.wants_newsletter.label }}
         </label>
