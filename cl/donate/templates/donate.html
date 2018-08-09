@@ -52,13 +52,40 @@
       });
     });
 
+    // Make the buttons happen
+    let donor_info = $("#donor-info");
+    let check_info = $("#check-info");
+    let cc_info = $("#cc-info");
+    let bitcoin_info = $("#bitcoin-info");
+
     // Monthly/one-time handling
-    // Show/hide the "remind me in one month" prompt if monthly
     $("#id_frequency_1").parent("label").click(function () {
+      // Credit card
       $("#annual-reminder").hide();
+      $("#how-donate label[for=id_payment_provider_0], " +
+        "#how-donate label[for=id_payment_provider_2], " +
+        "#how-donate label[for=id_payment_provider_3]")
+        .addClass('disabled')
+        .removeClass('active');
+
+      $("#how-donate input[value=cc]").prop('checked', true);
+      $("#how-donate label[for=id_payment_provider_1]").addClass('active');
+      donor_info.show("fast");
+      check_info.hide();
+      cc_info.show();
+      bitcoin_info.hide();
     });
     $("#id_frequency_0").parent("label").click(function () {
       $("#annual-reminder").show("fast");
+      $("#how-donate label[for=id_payment_provider_0], " +
+        "#how-donate label[for=id_payment_provider_2], " +
+        "#how-donate label[for=id_payment_provider_3]")
+        .removeClass('disabled');
+
+      $("#how-donate input[value=paypal]").prop('checked', true);
+      $("#how-donate label[for=id_payment_provider_0]").addClass('active');
+      $("#how-donate label[for=id_payment_provider_1]").removeClass('active');
+      cc_info.hide();
     });
 
 
@@ -67,11 +94,7 @@
         $(".radio-list li:last-child input[type=radio]").prop('checked', true);
     });
 
-    // Make the buttons happen
-    var donor_info = $("#donor-info");
-    var check_info = $("#check-info");
-    var cc_info = $("#cc-info");
-    var bitcoin_info = $("#bitcoin-info");
+
 
     // Hide check and cc info by default
     check_info.hide();
