@@ -42,9 +42,6 @@ def route_and_process_donation(cd_donation_form, cd_user_form, kwargs):
 
 def add_monthly_donations(cd_donation_form, frequency, user, customer):
     """Sets things up for monthly donations to run properly."""
-    if frequency != 'monthly':
-        return
-
     monthly_donation = MonthlyDonation(
         donor=user,
         enabled=True,
@@ -157,8 +154,9 @@ def donate(request):
                 donation.donor = user
                 donation.save()
 
-                add_monthly_donations(cd_donation_form, frequency, user,
-                                      customer)
+                if frequency == 'monthly':
+                    add_monthly_donations(cd_donation_form, frequency, user,
+                                          customer)
 
                 return HttpResponseRedirect(response['redirect'])
 
