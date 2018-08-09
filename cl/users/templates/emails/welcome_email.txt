@@ -1,10 +1,44 @@
 Hello{% if name %} {{ name }}{% endif %},
 
-I'm Mike, one of the co-founders of Free Law Project, the non-profit that sponsors the development of CourtListener. I saw that you recently signed up, and I just wanted to say hello and welcome you to the site.
+I'm Mike, one of the co-founders of Free Law Project, the non-profit that
+sponsors the development of CourtListener and RECAP. This is an automated
+message, but I like to send it anyway just to say hello and to welcome you to
+the site. Welcome!
 
-Whether you'd just like to set up some daily alerts for topics that interest you, download all our data (for free!), or even contribute somehow to our efforts, I'm glad you've signed up and would be happy to try to help you with whatever you're trying to do.
+Whether you'd just like to set up some daily alerts for topics that interest
+you, download our data, or even contribute somehow to our efforts, I'm glad
+you've signed up and would be happy to try to help you with whatever you're
+trying to do.
 
-Let me know if you can't figure something out or if you have a suggestion on how things could be better. I hope you enjoy the site!
+Some of the highlights of CourtListener and RECAP are:
+
+ - A searchable archive of opinions with high quality metadata and citations:
+
+       https://www.courtlistener.com{% url "advanced_o" %}
+
+ - The RECAP Archive, one of the largest open collections of federal court
+   data:
+
+       https://www.courtlistener.com{% url "advanced_r" %}
+
+ - The RECAP Extension for Firefox and Chrome, which helps make PACER better
+   and cheaper, while contributing to the RECAP Archive:
+
+       https://free.law/recap/
+
+ - Our oral argument audio archive, containing over a million minutes of
+   recordings:
+
+       https://www.courtlistener.com{% url "advanced_oa" %}
+
+Everything we do here is open source, and we always do our best to share
+everything we can with the public. Right now for example, we're uploading
+around 2,000 PDFs to Internet Archive every night!
+
+You've got my email address now. Let me know if you can't figure something out
+or if you have a suggestion on how things could be better. I hope you enjoy
+using CourtListener and RECAP!
+
 
 Mike Lissner
 https://free.law/donate/
