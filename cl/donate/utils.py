@@ -48,7 +48,7 @@ emails = {
                  
                  'Michael Lissner and Brian Carver\n'
                  'Founders of Free Law Project\n'
-                 'https://free.law/contact\n\n'
+                 'https://free.law/contact/\n\n'
                  
                  'PS: Free Law Project is a U.S. 501(c)(3) non-profit, with '
                  'tax ID of %s. Your gift is tax deductible as allowed by '
