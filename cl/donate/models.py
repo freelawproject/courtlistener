@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator
 from django.db import models
 
 
@@ -61,10 +63,15 @@ class Donation(models.Model):
         'Send me a reminder to donate again in one year',
         default=False,
     )
+    min_docket_donation = settings.MIN_DONATION['docket_alerts']
+    min_donation_error = "Sorry, the minimum donation amount is $%0.2f." % \
+                         min_docket_donation
     amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=None,
+        validators=[MinValueValidator(min_docket_donation,
+                                      min_donation_error)],
     )
     payment_provider = models.CharField(
         max_length=50,
