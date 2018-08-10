@@ -27,4 +27,23 @@ class DonationAdmin(admin.ModelAdmin):
     )
 
 
-admin.site.register(MonthlyDonation)
+@admin.register(MonthlyDonation)
+class MonthlyDonationAdmin(admin.ModelAdmin):
+    readonly_fields = (
+        'date_created',
+        'date_modified',
+    )
+    list_display = (
+        '__str__',
+        'donor_id',
+        'enabled',
+        'monthly_donation_amount',
+        'failure_count',
+    )
+    list_filter = (
+        'enabled',
+        'failure_count',
+    )
+    raw_id_fields = (
+        'donor',
+    )
