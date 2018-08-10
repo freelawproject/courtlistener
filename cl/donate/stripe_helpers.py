@@ -10,7 +10,7 @@ from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
 
 from cl.donate.models import Donation
-from cl.donate.utils import send_thank_you_email
+from cl.donate.utils import send_thank_you_email, PaymentFailureException
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,8 @@ def process_stripe_callback(request):
         # Now use the API to call back.
         stripe.api_key = settings.STRIPE_SECRET_KEY
         event = json.loads(str(stripe.Event.retrieve(event_id)))
-        logger.info('Stripe callback triggered. See webhook documentation for '
-                    'details.')
+        logger.info('Stripe callback triggered with event id of %s. See '
+                    'webhook documentation for details.', event_id)
         if event['type'].startswith('charge') and \
                 event['livemode'] != settings.PAYMENT_TESTING_MODE:
             charge = event['data']['object']
@@ -114,29 +114,15 @@ def process_stripe_payment(amount, email, kwargs):
             **kwargs
         )
         response = {
-            'message': None,
             'status': Donation.AWAITING_PAYMENT,
             'payment_id': charge.id,
             'redirect': reverse('stripe_complete'),
         }
-    except stripe.error.CardError as e:
+    except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
         logger.warn("Stripe was unable to process the payment: %s" % e)
-        response = {
-            'message': 'Oops, we had a problem processing your card: '
-                       '<strong>%s</strong>' % e.json_body['error']['message'],
-            'status': Donation.UNKNOWN_ERROR,
-            'payment_id': None,
-            'redirect': None,
-        }
-    except stripe.error.InvalidRequestError as e:
-        logger.warn("Stripe was unable to process the payment: %s" % e)
-        response = {
-            'message': 'Oops, we had an error with your donation: '
-                       '<strong>%s</strong>' % e.json_body['error']['message'],
-            'status': Donation.UNKNOWN_ERROR,
-            'payment_id': None,
-            'redirect': None,
-        }
+        message = ('Oops, we had an error with your donation: '
+                   '<strong>%s</strong>' % e.json_body['error']['message'])
+        raise PaymentFailureException(message)
 
     return response
 
@@ -146,5 +132,10 @@ def create_stripe_customer(source, email):
     once
     """
     stripe.api_key = settings.STRIPE_SECRET_KEY
-
-    return stripe.Customer.create(source=source, email=email)
+    try:
+        return stripe.Customer.create(source=source, email=email)
+    except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
+        logger.warn("Stripe was unable to create the customer: %s" % e)
+        message = ('Oops, we had an error with your donation: '
+                   '<strong>%s</strong>' % e.json_body['error']['message'])
+        raise PaymentFailureException(message)

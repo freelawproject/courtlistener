@@ -14,6 +14,7 @@ from cl.donate.models import Donation, MonthlyDonation, PROVIDERS
 from cl.donate.paypal import process_paypal_payment
 from cl.donate.stripe_helpers import process_stripe_payment, \
     create_stripe_customer
+from cl.donate.utils import PaymentFailureException
 from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)
