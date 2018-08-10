@@ -27,7 +27,7 @@ class Command(VerboseCommand):
 
         results = {'amount': 0, 'users': []}
         for m_donation in m_donations:
-            if m_donation.payment_provider == PROVIDERS.CREDIT_CARD:
+            try:
                 response = process_stripe_payment(
                     # Stripe rejects the charge if there are decimals;
                     # cast to int.
@@ -36,11 +36,15 @@ class Command(VerboseCommand):
                     {'customer': m_donation.stripe_customer_id,
                      'metadata': {'recurring': True}},
                 )
-            else:
-                raise NotImplementedError(
-                    "%s is not a supported provider for monthly donations" %
-                    m_donation.payment_provider
+            except PaymentFailureException as e:
+                email = emails['bad_subscription']
+                send_mail(
+                    email['subject'],
+                    email['body'] % (m_donation.pk, e.message),
+                    email['from'],
+                    email['to'],
                 )
+                continue
 
             if response.get('status') == Donation.AWAITING_PAYMENT:
                 # It worked. Create a donation in our system as well.

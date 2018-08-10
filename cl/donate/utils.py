@@ -1,6 +1,12 @@
 from django.conf import settings
 from django.core.mail import send_mail
 
+
+class PaymentFailureException(Exception):
+    def __init__(self, message):
+        self.message = message
+
+
 emails = {
     'donation_thanks': {
         'subject': 'Thanks for your donation to Free Law Project!',
