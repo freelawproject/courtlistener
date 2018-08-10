@@ -75,11 +75,8 @@ class Command(VerboseCommand):
                 # is triggered.
 
         if results['users']:
-            email = emails['donation_report']
-            send_mail(
-                email['subject'] % results['amount'],
-                email['body'] % (results['amount'],
-                                 '\n'.join(results['users'])),
-                email['from'],
-                email['to'],
-            )
+            email = emails['admin_donation_report']
+            body = email['body'] % (results['amount'],
+                                    '\n'.join(results['users']))
+            send_mail(email['subject'] % results['amount'], body,
+                      email['from'], email['to'])
