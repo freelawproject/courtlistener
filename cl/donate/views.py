@@ -162,12 +162,6 @@ def donate(request):
                     add_monthly_donations(cd_donation_form, user, customer)
 
                 return HttpResponseRedirect(response['redirect'])
-
-            else:
-                logger.critical("Got back status of %s when making initial "
-                                "request of API. Message was:\n%s" %
-                                (response['status'], response['message']))
-                message = response['message']
     else:
         # Loading the page...
         try:
