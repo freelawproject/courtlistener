@@ -137,3 +137,8 @@ class MonthlyDonation(models.Model):
                   "credit card users each month.",
         max_length=200,
     )
+    failure_count = models.SmallIntegerField(
+        help_text="The number of times this customer ID has failed. If a "
+                  "threshold is exceeded, we disable the subscription.",
+        default=0,
+    )
