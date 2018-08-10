@@ -49,13 +49,8 @@ def add_monthly_donations(cd_donation_form, user, customer):
         monthly_donation_amount=cd_donation_form['amount'],
         monthly_donation_day=min(now().date().day, 28),
     )
-    provider = cd_donation_form['payment_provider']
-    if provider == 'paypal':
-        pass
-    elif provider == 'cc':
-        monthly_donation.payment_provider = PROVIDERS.CREDIT_CARD
-        monthly_donation.stripe_customer_id = customer.id
-
+    monthly_donation.payment_provider = PROVIDERS.CREDIT_CARD
+    monthly_donation.stripe_customer_id = customer.id
     monthly_donation.save()
 
 
@@ -164,8 +159,7 @@ def donate(request):
                 donation.save()
 
                 if frequency == 'monthly':
-                    add_monthly_donations(cd_donation_form, frequency, user,
-                                          customer)
+                    add_monthly_donations(cd_donation_form, user, customer)
 
                 return HttpResponseRedirect(response['redirect'])
 
