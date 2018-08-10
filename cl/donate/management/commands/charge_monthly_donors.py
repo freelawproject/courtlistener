@@ -5,8 +5,11 @@ from django.utils.timezone import now
 
 from cl.donate.models import MonthlyDonation, Donation
 from cl.donate.stripe_helpers import process_stripe_payment
-from cl.donate.utils import emails, PaymentFailureException
+from cl.donate.utils import emails, PaymentFailureException, \
+    send_failed_subscription_email
 from cl.lib.command_utils import VerboseCommand
+
+subscription_failure_threshold = 3
 
 
 class Command(VerboseCommand):
@@ -37,13 +40,16 @@ class Command(VerboseCommand):
                      'metadata': {'recurring': True}},
                 )
             except PaymentFailureException as e:
-                email = emails['bad_subscription']
-                send_mail(
-                    email['subject'],
-                    email['body'] % (m_donation.pk, e.message),
-                    email['from'],
-                    email['to'],
-                )
+                m_donation.failure_count += 1
+                if m_donation.failure_count == subscription_failure_threshold:
+                    m_donation.enabled = False
+                    send_failed_subscription_email(m_donation)
+
+                email = emails['admin_bad_subscription']
+                body = email['body'] % (m_donation.pk, e.message)
+                send_mail(email['subject'], body, email['from'],
+                          email['to'])
+                m_donation.save()
                 continue
 
             if response.get('status') == Donation.AWAITING_PAYMENT:
