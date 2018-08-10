@@ -1,10 +1,11 @@
-from django.conf import settings
+from datetime import timedelta
+
 from django.core.mail import send_mail
 from django.utils.timezone import now
 
-from cl.donate.models import MonthlyDonation, PROVIDERS, Donation
+from cl.donate.models import MonthlyDonation, Donation
 from cl.donate.stripe_helpers import process_stripe_payment
-from cl.donate.utils import emails
+from cl.donate.utils import emails, PaymentFailureException
 from cl.lib.command_utils import VerboseCommand
 
 
@@ -17,6 +18,11 @@ class Command(VerboseCommand):
         m_donations = MonthlyDonation.objects.filter(
             enabled=True,
             monthly_donation_day=now().date().day,
+            # This is a safety to account for timezones. We want to be very
+            # careful that we don't double-bill people right when they sign up,
+            # so this ensures that we don't bill anybody except when the
+            # recurring donation is more than 15 days old.
+            date_created__lt=now() - timedelta(days=15),
         ).order_by('-date_created')
 
         results = {'amount': 0, 'users': []}
