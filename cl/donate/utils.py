@@ -110,12 +110,12 @@ def send_thank_you_email(donation, recurring=False):
     if recurring:
         email = emails['donation_thanks_recurring']
         body = email['body'] % (user.first_name, donation.amount,
-                                settings.EIN_SECRET),
+                                settings.EIN_SECRET)
         send_mail(email['subject'], body, email['from'], [user.email])
     else:
         email = emails['donation_thanks']
         body = email['body'] % (user.first_name, donation.amount,
-                                settings.EIN_SECRET),
+                                settings.EIN_SECRET)
         send_mail(email['subject'], body, email['from'], [user.email])
 
 
