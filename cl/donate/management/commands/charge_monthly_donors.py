@@ -33,7 +33,8 @@ class Command(VerboseCommand):
                     # cast to int.
                     int(m_donation.monthly_donation_amount * 100),
                     m_donation.donor.email,
-                    {'customer': m_donation.stripe_customer_id},
+                    {'customer': m_donation.stripe_customer_id,
+                     'metadata': {'recurring': True}},
                 )
             else:
                 raise NotImplementedError(
@@ -60,23 +61,8 @@ class Command(VerboseCommand):
                     transaction_id=response.get('transaction_id'),
                     referrer='monthly_donation_%s' % m_donation.pk,
                 )
-                email = emails['donation_thanks_monthly']
-                send_mail(
-                    email['subject'],
-                    email['body'] % (m_donation.donor.first_name,
-                                     m_donation.monthly_donation_amount,
-                                     settings.EIN_SECRET),
-                    email['from'],
-                    [m_donation.donor.email],
-                )
-            else:
-                email = emails['bad_subscription']
-                send_mail(
-                    email['subject'],
-                    email['body'] % (m_donation.pk, response.get('status')),
-                    email['from'],
-                    email['to'],
-                )
+                # Thank you email is triggered later when the stripe callback
+                # is triggered.
 
         if results['users']:
             email = emails['donation_report']

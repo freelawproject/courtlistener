@@ -43,7 +43,10 @@ def process_stripe_callback(request):
                 d.clearing_date = datetime.utcfromtimestamp(
                     charge['created']).replace(tzinfo=utc)
                 d.status = Donation.PROCESSED
-                send_thank_you_email(d)
+                if charge['metadata'].get('recurring'):
+                    send_thank_you_email(d, recurring=True)
+                else:
+                    send_thank_you_email(d)
             elif event['type'].endswith('failed'):
                 if not d:
                     return HttpResponse('<h1>200: No matching object in the '
