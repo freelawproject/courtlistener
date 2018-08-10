@@ -40,7 +40,7 @@ def route_and_process_donation(cd_donation_form, cd_user_form, kwargs):
     return response
 
 
-def add_monthly_donations(cd_donation_form, frequency, user, customer):
+def add_monthly_donations(cd_donation_form, user, customer):
     """Sets things up for monthly donations to run properly."""
     monthly_donation = MonthlyDonation(
         donor=user,
@@ -123,16 +123,24 @@ def donate(request):
             frequency = request.POST.get('frequency')
 
             # Route the payment to a payment provider
-            if frequency == 'once':
-                response = route_and_process_donation(
-                    cd_donation_form, cd_user_form, {'card': stripe_token})
-            elif frequency == 'monthly':
-                customer = create_stripe_customer(stripe_token,
-                                                  cd_user_form['email'])
-                response = route_and_process_donation(
-                    cd_donation_form, cd_user_form, {'customer': customer.id})
-
-            logger.info("Payment routed with response: %s" % response)
+            try:
+                if frequency == 'once':
+                    response = route_and_process_donation(
+                        cd_donation_form, cd_user_form, {'card': stripe_token})
+                elif frequency == 'monthly':
+                    customer = create_stripe_customer(stripe_token,
+                                                      cd_user_form['email'])
+                    response = route_and_process_donation(
+                        cd_donation_form, cd_user_form,
+                        {'customer': customer.id,
+                         'metadata': {'recurring': True}},
+                    )
+            except PaymentFailureException as e:
+                logger.critical("Payment failed. Message was: %s", e.message)
+                message = e.message
+                response = {'status': 'Failed'}
+            else:
+                logger.info("Payment routed with response: %s", response)
 
             if response['status'] == Donation.AWAITING_PAYMENT:
                 if request.user.is_anonymous() and not stub_account:

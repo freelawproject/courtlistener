@@ -24,7 +24,7 @@ emails = {
                  'https://free.law/contact/'),
         'from': settings.DEFAULT_FROM_EMAIL,
     },
-    'donation_thanks_monthly': {
+    'donation_thanks_recurring': {
         'subject': 'We have received your recurring contribution to Free Law '
                    'Project',
         'body': ('Dear %s,\n\n'
@@ -51,7 +51,9 @@ emails = {
     'bad_subscription': {
         'subject': 'Something went wrong with a donor\'s subscription',
         'body': ("Something went wrong while processing the monthly donation "
-                 "with ID %s. It had a status of: %s\n\n"
+                 "with ID %s. It had a message of:\n\n"
+                 
+                 "     %s\n\n"
                  
                  "An admin should look into this."),
         'from': settings.DEFAULT_FROM_EMAIL,
@@ -60,19 +62,32 @@ emails = {
     'donation_report': {
         'subject': '$%s were donated by monthly donors today',
         'body': "The following monthly donors contributed a total of $%s:\n\n "
-                "%s",
+                "%s\n\n"
+                "(Note that some of these charges still can fail to go "
+                "through.)",
         'from': settings.DEFAULT_FROM_EMAIL,
         'to': [a[1] for a in settings.ADMINS],
     },
 }
 
 
-def send_thank_you_email(donation):
+def send_thank_you_email(donation, recurring=False):
     user = donation.donor
-    email = emails['donation_thanks']
-    send_mail(
-        email['subject'],
-        email['body'] % (user.first_name, donation.amount, settings.EIN_SECRET),
-        email['from'],
-        [user.email]
-    )
+    if recurring:
+        email = emails['donation_thanks_recurring']
+        send_mail(
+            email['subject'],
+            email['body'] % (user.first_name, donation.amount,
+                             settings.EIN_SECRET),
+            email['from'],
+            [user.email],
+        )
+    else:
+        email = emails['donation_thanks']
+        send_mail(
+            email['subject'],
+            email['body'] % (user.first_name, donation.amount,
+                             settings.EIN_SECRET),
+            email['from'],
+            [user.email]
+        )
