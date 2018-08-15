@@ -1,6 +1,6 @@
 from rest_framework import status, pagination, viewsets, permissions, response
 
-from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
+from cl.api.utils import LoggingMixin, RECAPUsersReadOnly, CacheListMixin
 from cl.search import api_utils
 from cl.search.api_serializers import (
     DocketSerializer, CourtSerializer, OpinionClusterSerializer,
@@ -60,7 +60,8 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = ('date_created', 'date_modified', 'date_filed')
 
 
-class RECAPDocumentViewSet(LoggingMixin, viewsets.ModelViewSet):
+class RECAPDocumentViewSet(LoggingMixin, CacheListMixin,
+                           viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     queryset = RECAPDocument.objects.select_related(
         'docket_entry',
