@@ -69,7 +69,7 @@ class DonationFormSubmissionTest(TestCase):
         """Can a paypal donation go through using the "Other" field?"""
         self.params.update({
             'amount': 'other',
-            'amount_other': '1',
+            'amount_other': '5',
         })
         r = self.client.post(
             reverse('donate'),
