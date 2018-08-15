@@ -24,6 +24,17 @@
         <script defer type="text/javascript"
                 src="{{ STATIC_URL }}js/admin_tools.js"></script>
     {% endif %}
+  <script type="text/javascript">
+    window.addEventListener("message", function (event){
+      // If RECAP is installed, check whether we should allow this person to
+      // make more alerts.
+      // xxx Do some JS work here to swap out the docket alerts modal for the
+      // xxx data attributes that make alert creation possible. *If* the user
+      // xxx is still legal.
+      // xxx Further, when you resume this, the modal and all its interactions
+      // xxx are where to look.
+    });
+  </script>
 {% endblock %}
 
 {% block nav %}
@@ -59,6 +70,7 @@
       {% endif %}
     </h1>
     {% include "includes/favorites_modal.html" %}
+    {% include "includes/docket_alerts_modal.html" %}
 
     <h2>{{ docket.court }}</h2>
 
@@ -79,14 +91,29 @@
           <p><a href="{% url "toggle_docket_alert" %}"
                 class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %} toggle-docket-alert"
                 rel="nofollow"
-             {% if user.is_authenticated %}
-               data-id="{{ docket.pk }}"
-               data-enable-message="Get Alerts"
-               data-disable-message="Disable Alerts"
-             {% else %}
-               data-toggle="modal"
-               data-target="#modal-logged-out"
-             {% endif %}>
+                {% if user.is_authenticated %}
+                  {% if has_alert or user.docket_alerts.count < MAX_FREE_DOCKET_ALERTS or user.profile.is_free_account %}
+                    {% comment %}
+                    Either it already has an alert, or the person can create
+                    one. Show the data attrs to make enable/disable possible.
+                    {% endcomment %}
+                    data-id="{{ docket.pk }}"
+                    data-enable-message="Get Alerts"
+                    data-disable-message="Disable Alerts"
+                  {% else %}
+                    {% comment %}
+                    This user has maxed out their alert allowance, show them a
+                    modal, but note that this can be overridden by JS if RECAP
+                    is installed.
+                    {% endcomment %}
+                    data-toggle="modal"
+                    data-target="#modal-no-more-alerts"
+                  {% endif %}
+                {% else %}
+                  data-toggle="modal"
+                  data-target="#modal-logged-out"
+                {% endif %}
+             >
              {% if has_alert %}
                <i class="fa fa-bell-slash-o"
                   data-enable-icon-class="fa-bell"
