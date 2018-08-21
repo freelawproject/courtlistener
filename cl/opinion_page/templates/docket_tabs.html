@@ -113,7 +113,7 @@
              class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>&nbsp;</p>
         </div>
         <div class="left">
-          <p><a href="{% url "toggle_docket_alert" %}"
+          <a href="{% url "toggle_docket_alert" %}"
                 data-id="{{ docket.pk }}"
                 data-enable-message="Get Alerts"
                 data-disable-message="Disable Alerts"
@@ -146,8 +146,15 @@
                   data-enable-icon-class="fa-bell"
                   data-disable-icon-class="fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Get Alerts</span>
              {% endif %}
-          </a><br>
-          <a href="{% url "alert_help" %}">Learn More</a></p>
+          </a>
+        </div>
+        <div class="left">
+          <a href="{% url "alert_help" %}#recap-alerts"
+             class="btn btn-link btn-close"
+             data-toggle="tooltip"
+             data-placement="right"
+             title="Learn about docket alerts"><i
+            class="fa fa-question-circle fa-lg gray"></i></a>
         </div>
       </div>
       <div class="clearfix"></div>
