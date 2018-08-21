@@ -14,14 +14,13 @@
     <h1>Help with Alerts on CourtListener</h1>
     <p>CourtListener was created in 2009 as an alert and awareness tool for people that were interested in keeping up with new cases or topics in the federal circuit courts.
     </p>
-    <p>Since then, we have added numerous alerting features and we have expanded our alert tool to support hundreds of jurisdictions across the country.
-    </p>
-    <p>We currently have two kinds of alerts: search alerts and RECAP Alerts for PACER. Read on to learn more or skip ahead to the section that interests you:
+    <p>We currently have two kinds of alerts: Search Alerts and RECAP Alerts for PACER. Read on to learn more or skip ahead to the section that interests you:
     </p>
     <ul>
       <li>
         <a href="#recap-alerts">RECAP Alerts for PACER</a>
         <ul>
+          <li><a href="#limitations-on-recap-alerts">Limitations on RECAP Alerts</a></li>
           <li><a href="#creating-a-recap-alert">Creating a RECAP Alert</a></li>
           <li><a href="#disabling-a-recap-alert">Disabling a RECAP Alert</a></li>
           <li><a href="#coverage-gaps">Coverage Gaps</a></li>
@@ -59,6 +58,19 @@
     <p>For active cases, this means that alerts will come any time from about a minute after the content is posted to PACER (for a case of national importance), to an hour or two, for a case of lesser importance in a jurisdiction that does not regularly provide public updates via their RSS feed.
     </p>
     <p>For closed cases, we get new content and can send alerts when we do client work on those cases or when a <a href="https://free.law/recap/">RECAP extension</a> user shares a docket with us.
+    </p>
+
+    <h3>Limitations on RECAP Alerts</h3>
+    <p>As a non-profit, we try to provide our services to as many people as possible. We currently allow <span class="bold">{{ MAX_FREE_DOCKET_ALERTS }}</span> docket alerts for free, and give a bonus of <span class="bold">{{ DOCKET_ALERT_RECAP_BONUS }}</span> alerts to anybody with RECAP installed.
+    </p>
+    <p>Monthly donors can create an unlimited number of docket alerts.</p>
+    <p>We also can sometimes provide need-based exceptions to these rules. If you might need an exception, <a href="{% url "contact" %}">please let us know</a>.
+    </p>
+    <p>
+      <a href="https://free.law/recap/"
+         class="btn btn-default">Install RECAP</a>
+      <a href="{% url "donate" %}?referrer=more-docket-alerts"
+         class="btn btn-default"><i class="fa fa-heart-o"></i> Become a Monthly Donor</a>
     </p>
 
     <h3>Creating a RECAP Alert</h3>
