@@ -83,6 +83,10 @@ class UserProfile(models.Model):
         help_text='This user wants newsletters',
         default=False,
     )
+    unlimited_docket_alerts = models.BooleanField(
+        help_text='Should the user get unlimited docket alerts?',
+        default=False,
+    )
     plaintext_preferred = models.BooleanField(
         help_text='should the alert should be sent in plaintext',
         default=False,
