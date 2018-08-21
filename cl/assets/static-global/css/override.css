@@ -213,6 +213,10 @@ a.button:active {
   font-size: 20px;
   border-radius: 9px;
 }
+.btn-close {
+  padding-left: 3px;
+  padding-right: 3px;
+}
 
 #jurisdiction-count {
   -webkit-transition: all 0.5s ease;
