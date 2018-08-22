@@ -780,9 +780,6 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 #modal-save-favorite .modal-dialog {
   width: 430px;
 }
-#modal-logged-out .modal-dialog {
-  width: 270px;
-}
 #modal-save-favorite textarea, #modal-save-favorite input {
   width: 404px !important;
 }
