@@ -118,6 +118,9 @@
   {% if docket_alerts %}
     <div class="col-xs-12">
       <h2>RECAP Docket Alerts for PACER Cases</h2>
+      {% if user.profile.unlimited_docket_alerts %}
+        <h3 class="gray caps">Your account has unlimited docket alerts</h3>
+      {% endif %}
     </div>
     <div class="col-xs-12">
       <div class="table-responsive">
@@ -165,6 +168,9 @@
           </tbody>
         </table>
       </div>
+      <p><a
+        href="{% url "alert_help" %}"
+        class="btn btn-default">Learn More About RECAP Alerts</a></p>
     </div>
     {% if not search_alerts %}
       <div class="col-xs-12">

@@ -24,6 +24,42 @@
         <script defer type="text/javascript"
                 src="{{ STATIC_URL }}js/admin_tools.js"></script>
     {% endif %}
+  <script type="text/javascript">
+    $(document).ready(function () {
+      window.addEventListener("message", function (event){
+        // If RECAP is installed, check whether we should allow this person to
+        // make more alerts. If so, tweak the events on the button to create
+        // the alert, not to show the "too many alerts" modal. Note that this
+        // is pretty nasty because we're introducing Django variables into our
+        // JavaScript code.
+        let max_free_docket_alerts = {{ MAX_FREE_DOCKET_ALERTS }},
+            user_alert_count = {{ user.docket_alerts.count|default:"0" }},
+            recap_bonus = {{ DOCKET_ALERT_RECAP_BONUS }},
+            bad_class = 'no-more-alerts-modal-trigger';
+        if (recapIsInstalled(event)){
+          let total_allowed_alerts = max_free_docket_alerts + recap_bonus;
+          if (user_alert_count < total_allowed_alerts){
+            // Disable the "Too many alerts" popup, and enable the function to
+            // toggle settings.
+            anchors = $('.' + bad_class);
+            anchors.off();
+            anchors.on("click", toggleSettings);
+          }
+        }
+      });
+    });
+
+    // If we have classes indicating too many alerts or logged out users,
+    // activate their modals.
+    $(".no-more-alerts-modal-trigger").click(function(e){
+      e.preventDefault();
+      $("#modal-no-more-alerts").modal('toggle');
+    });
+    $(".logged-out-modal-trigger").click(function(e) {
+      e.preventDefault();
+      $("#modal-logged-out").modal('toggle');
+    });
+  </script>
 {% endblock %}
 
 {% block nav %}
@@ -59,6 +95,7 @@
       {% endif %}
     </h1>
     {% include "includes/favorites_modal.html" %}
+    {% include "includes/docket_alerts_modal.html" %}
 
     <h2>{{ docket.court }}</h2>
 
@@ -76,17 +113,30 @@
              class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>&nbsp;</p>
         </div>
         <div class="left">
-          <p><a href="{% url "toggle_docket_alert" %}"
-                class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %} toggle-docket-alert"
+          <a href="{% url "toggle_docket_alert" %}"
+                data-id="{{ docket.pk }}"
+                data-enable-message="Get Alerts"
+                data-disable-message="Disable Alerts"
                 rel="nofollow"
-             {% if user.is_authenticated %}
-               data-id="{{ docket.pk }}"
-               data-enable-message="Get Alerts"
-               data-disable-message="Disable Alerts"
-             {% else %}
-               data-toggle="modal"
-               data-target="#modal-logged-out"
-             {% endif %}>
+                class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %}
+                {% if user.is_authenticated %}
+                  {% if has_alert or user.profile.unlimited_docket_alerts or user.docket_alerts.count < MAX_FREE_DOCKET_ALERTS %}
+                    {% comment %}
+                    Either it already has an alert, they get things for free or
+                    they don't have too many alerts. Make clicking do ajax.
+                    {% endcomment %}
+                    toggle-docket-alert
+                  {% else %}
+                    {% comment %}
+                    Too many alerts, not free, and doesn't already have one.
+                    Block for now, but perhaps we'll get a message that RECAP
+                    is installed, and we'll unblock as a result.
+                    {% endcomment %}
+                    no-more-alerts-modal-trigger
+                  {% endif %}
+                {% else %}
+                  logged-out-modal-trigger
+                {% endif %}">
              {% if has_alert %}
                <i class="fa fa-bell-slash-o"
                   data-enable-icon-class="fa-bell"
@@ -96,8 +146,15 @@
                   data-enable-icon-class="fa-bell"
                   data-disable-icon-class="fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Get Alerts</span>
              {% endif %}
-          </a><br>
-          <a href="{% url "alert_help" %}">Learn More</a></p>
+          </a>
+        </div>
+        <div class="left">
+          <a href="{% url "alert_help" %}#recap-alerts"
+             class="btn btn-link btn-close"
+             data-toggle="tooltip"
+             data-placement="right"
+             title="Learn about docket alerts"><i
+            class="fa fa-question-circle fa-lg gray"></i></a>
         </div>
       </div>
       <div class="clearfix"></div>

@@ -213,6 +213,10 @@ a.button:active {
   font-size: 20px;
   border-radius: 9px;
 }
+.btn-close {
+  padding-left: 3px;
+  padding-right: 3px;
+}
 
 #jurisdiction-count {
   -webkit-transition: all 0.5s ease;
@@ -775,9 +779,6 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 }
 #modal-save-favorite .modal-dialog {
   width: 430px;
-}
-#modal-logged-out .modal-dialog {
-  width: 270px;
 }
 #modal-save-favorite textarea, #modal-save-favorite input {
   width: 404px !important;

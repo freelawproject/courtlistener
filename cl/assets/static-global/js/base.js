@@ -1,6 +1,18 @@
 /*eslint-env browser */
 /*global $, hopscotch */
 
+function recapIsInstalled(event) {
+  // Check the event that's returned by the extension and return whether it
+  // indicates that RECAP is installed.
+  return !!(
+    event.source === window &&
+    event.data.sender &&
+    event.data.sender === "recap-extension" &&
+    event.data.message_name &&
+    event.data.message_name === "version"
+  );
+}
+
 $(document).ready(function () {
   // 'use strict'; // uncomment later on after full cleanup
   var citedGreaterThan = $('#id_cited_gt');
@@ -411,11 +423,7 @@ $(document).ready(function () {
   // Hide RECAP install pleas for people that already have it, and set a cookie
   // so they won't see the page flash each time.
   window.addEventListener("message", function (event) {
-    if (event.source == window &&
-      event.data.sender &&
-      event.data.sender === "recap-extension" &&
-      event.data.message_name &&
-      event.data.message_name === "version") {
+    if (recapIsInstalled(event)){
       $(".recap_install_plea").addClass('hidden');
       let date = new Date();
       date.setTime(date.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days
