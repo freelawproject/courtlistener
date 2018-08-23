@@ -30,6 +30,7 @@ class DocketAlertAdmin(admin.ModelAdmin):
         '__str__',
         'user',
         'docket',
+        'date_created',
     )
     raw_id_fields = (
         'docket',
