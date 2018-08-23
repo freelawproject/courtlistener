@@ -37,6 +37,7 @@
             recap_bonus = {{ DOCKET_ALERT_RECAP_BONUS }},
             bad_class = 'no-more-alerts-modal-trigger';
         if (recapIsInstalled(event)){
+          console.log("You have RECAP installed. Applying docket alert bonus.");
           let total_allowed_alerts = max_free_docket_alerts + recap_bonus;
           if (user_alert_count < total_allowed_alerts){
             // Disable the "Too many alerts" popup, and enable the function to
