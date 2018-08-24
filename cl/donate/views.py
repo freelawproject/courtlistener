@@ -275,6 +275,8 @@ def make_check_donation(request):
             d.status = Donation.PROCESSED
             d.donor = user
             d.save()
+            if user.email:
+                send_thank_you_email(d)
 
             return HttpResponseRedirect(reverse('check_complete'))
     else:
