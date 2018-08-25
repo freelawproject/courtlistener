@@ -129,6 +129,14 @@ class UserProfile(models.Model):
             total = Decimal(0.0)
         return total
 
+    @property
+    def is_monthly_donor(self):
+        """Does the profile have any monthly donations set up and running?
+
+        :return bool: True if so, False if not.
+        """
+        return bool(self.user.monthly_donations.filter(enabled=True).count())
+
     def __unicode__(self):
         return u"{name}".format(name=self.user.username)
 
