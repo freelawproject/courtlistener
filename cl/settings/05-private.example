@@ -67,6 +67,8 @@ FTM_LAST_UPDATED = date.today()
 IA_ACCESS_KEY = ''
 IA_SECRET_KEY = ''
 IA_COLLECTIONS = []
+IA_OA_COLLECTIONS = ['uscourtsoralargumentsdev']
+
 
 # Mailchimp secret (used for webhook URLs)
 MAILCHIMP_SECRET = ''
