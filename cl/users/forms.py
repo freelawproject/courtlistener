@@ -3,18 +3,19 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm, \
     PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from django.core.urlresolvers import reverse
 from django.forms import ModelForm
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.users.models import UserProfile
+from cl.users.utils import emails
 
 
 # Many forms in here use unusual autocomplete attributes. These conform with
 # https://html.spec.whatwg.org/multipage/forms.html#autofill, and enables them
 # to be autofilled in various ways.
-
-
 class ProfileForm(ModelForm):
     STATE_CHOICES = list(STATE_CHOICES)
     STATE_CHOICES.insert(0, ('', '---------'))
@@ -237,6 +238,19 @@ class CustomPasswordResetForm(PasswordResetForm):
                 'autocomplete': 'email',
             }
         )
+
+    def save(self, *args, **kwargs):
+        """Override the usual password form to send a message if we don't find
+        any accounts
+        """
+        email = self.cleaned_data["email"]
+        users = self.get_users(email)
+        if not len(list(users)):
+            msg = emails['no_account_found']
+            body = msg['body'] % ('password reset', reverse('register'))
+            send_mail(msg['subject'], body, msg['from'], [email])
+        else:
+            super(CustomPasswordResetForm, self).save(*args, **kwargs)
 
 
 class CustomSetPasswordForm(SetPasswordForm):
