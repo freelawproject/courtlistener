@@ -254,12 +254,12 @@ def get_and_process_pdf(self, data, cookies, row_pk):
     return {'result': result, 'rd_pk': rd.pk}
 
 
-def increment_failure_count(rd):
-    if rd.ia_upload_failure_count is None:
-        rd.ia_upload_failure_count = 1
+def increment_failure_count(obj):
+    if obj.ia_upload_failure_count is None:
+        obj.ia_upload_failure_count = 1
     else:
-        rd.ia_upload_failure_count += 1
-    rd.save()
+        obj.ia_upload_failure_count += 1
+    obj.save()
 
 
 class OverloadedException(Exception):
@@ -277,63 +277,30 @@ def upload_pdf_to_ia(self, rd_pk):
         rd.attachment_number or 0,
     )
     bucket_name = get_bucket_name(d.court_id, d.pacer_case_id)
-    try:
-        responses = upload_to_ia(
-            identifier=bucket_name,
-            files=rd.filepath_local.path,
-            metadata={
-                'title': best_case_name(d),
-                'collection': settings.IA_COLLECTIONS,
-                'contributor':
-                    '<a href="https://free.law">Free Law Project</a>',
-                'court': d.court_id,
-                'language': 'eng',
-                'mediatype': 'texts',
-                'description': "This item represents a case in PACER, "
-                               "the U.S. Government's website for "
-                               "federal case data. If you wish to see "
-                               "the entire case, please consult PACER "
-                               "directly.",
-                'licenseurl': 'https://www.usa.gov/government-works',
-            },
-        )
-    except (OverloadedException, ExpatError) as exc:
-        # Overloaded: IA wants us to slow down.
-        # ExpatError: The syntax of the XML file that's supposed to be returned
-        #             by IA is bad (or something).
-        if self.request.retries == self.max_retries:
-            # Give up for now. It'll get done next time cron is run.
-            increment_failure_count(rd)
-            return
-        raise self.retry(exc=exc)
-    except HTTPError as exc:
-        if exc.response.status_code in [
-            HTTP_403_FORBIDDEN,    # Can't access bucket, typically.
-            HTTP_400_BAD_REQUEST,  # Corrupt PDF, typically.
-        ]:
-            increment_failure_count(rd)
-            return [exc.response]
-        if self.request.retries == self.max_retries:
-            # This exception is also raised when the endpoint is
-            # overloaded, but doesn't get caught in the
-            # OverloadedException below due to multiple processes
-            # running at the same time. Just give up for now.
-            increment_failure_count(rd)
-            return
-        raise self.retry(exc=exc)
-    except (requests.Timeout, requests.RequestException) as exc:
-        logger.warning("Timeout or unknown RequestException. Unable to upload "
-                       "to IA. Trying again if retries not exceeded: %s" % rd)
-        if self.request.retries == self.max_retries:
-            # Give up for now. It'll get done next time cron is run.
-            increment_failure_count(rd)
-            return
-        raise self.retry(exc=exc)
+    responses = upload_to_ia(
+        self,
+        identifier=bucket_name,
+        files=rd.filepath_local.path,
+        title=best_case_name(d),
+        collection=settings.IA_COLLECTIONS,
+        court_id=d.court_id,
+        source_url='https://www.courtlistener.com%s' % rd.get_absolute_url(),
+        media_type='texts',
+        description="This item represents a case in PACER, the U.S. "
+                    "Government's website for federal case data. If you wish "
+                    "to see the entire case, please consult PACER directly.",
+    )
+    if responses is None:
+        increment_failure_count(rd)
+        return
+
     if all(r.ok for r in responses):
         rd.ia_upload_failure_count = None
         rd.filepath_ia = "https://archive.org/download/%s/%s" % (
             bucket_name, file_name)
         rd.save()
+    else:
+        increment_failure_count(rd)
 
 
 access_key = settings.IA_ACCESS_KEY
@@ -344,7 +311,8 @@ ia_session = ia.get_session({'s3': {
 }})
 
 
-def upload_to_ia(identifier, files, metadata=None):
+def upload_to_ia(self, identifier, files, title, collection, court_id,
+                 source_url, media_type, description):
     """Upload an item and its files to the Internet Archive
 
     On the Internet Archive there are Items and files. Items have a global
@@ -360,28 +328,82 @@ def upload_to_ia(identifier, files, metadata=None):
 
     :param identifier: The global identifier within IA for the item you wish to
     work with.
-    :param files: The filepaths or file-like objects to upload. This value can
-    be an iterable or a single file-like object or string.
-    :param metadata: Metadata used to create a new item. If the item already
-    exists, the metadata will not be updated
+    :param files: This is a weird parameter from the IA library. It can accept:
+     - str: A path to the file to upload
+     - list: A list of paths to files or of file objects
+     - dict: A filename to file object/path mapping. It's unclear if a list of
+       these can be provided as an argument!
+    :param title: The title of the item in IA
+    :param collection: The collection to add the item to in IA
+    :param court_id: The court ID info for the item
+    :param source_url: A URL link where the item can found
+    :param media_type: The IA mediatype value for the item
+    :param description: A description of the item
 
-    :rtype: list
-    :returns: List of response objects, one per file.
+    :rtype: list or None
+    :returns: List of response objects, one per file, or None if an error
+    occurred.
     """
-    metadata = {} if metadata is None else metadata
+    try:
+        # Before pushing files, check if the endpoint is overloaded. This is
+        # lighter-weight than attempting a document upload off the bat.
+        if ia_session.s3_is_overloaded(identifier, access_key):
+            raise OverloadedException("S3 is currently overloaded.")
+    except OverloadedException as exc:
+        # Overloaded: IA wants us to slow down.
+        if self.request.retries == self.max_retries:
+            # Give up for now. It'll get done next time cron is run.
+            return
+        raise self.retry(exc=exc)
     logger.info("Uploading file to Internet Archive with identifier: %s and "
-                "files %s" % (identifier, files))
+                "files %s", identifier, files)
     try:
         item = ia_session.get_item(identifier)
-    except AttributeError:
-        logger.info(ia_session.__dict__)
-        raise
-    # Before pushing files, check if the endpoint is overloaded. This is
-    # lighter-weight than attempting a document upload off the bat.
-    if ia_session.s3_is_overloaded(identifier, access_key):
-        raise OverloadedException("S3 is currently overloaded.")
-    responses = item.upload(files=files, metadata=metadata,
-                            queue_derive=False, verify=True)
+        responses = item.upload(
+            files=files,
+            metadata={
+                'title': title,
+                'collection': collection,
+                'contributor':
+                    '<a href="https://free.law">Free Law Project</a>',
+                'court': court_id,
+                'source_url': source_url,
+                'language': 'eng',
+                'mediatype': media_type,
+                'description': description,
+                'licenseurl': 'https://www.usa.gov/government-works',
+            },
+            queue_derive=False,
+            verify=True,
+        )
+    except ExpatError as exc:
+        # ExpatError: The syntax of the XML file that's supposed to be returned
+        #             by IA is bad (or something).
+        if self.request.retries == self.max_retries:
+            # Give up for now. It'll get done next time cron is run.
+            return
+        raise self.retry(exc=exc)
+    except HTTPError as exc:
+        if exc.response.status_code in [
+            HTTP_403_FORBIDDEN,  # Can't access bucket, typically.
+            HTTP_400_BAD_REQUEST,  # Corrupt PDF, typically.
+        ]:
+            return [exc.response]
+        if self.request.retries == self.max_retries:
+            # This exception is also raised when the endpoint is
+            # overloaded, but doesn't get caught in the
+            # OverloadedException below due to multiple processes
+            # running at the same time. Just give up for now.
+            return
+        raise self.retry(exc=exc)
+    except (requests.Timeout, requests.RequestException) as exc:
+        logger.warning("Timeout or unknown RequestException. Unable to upload "
+                       "to IA. Trying again if retries not exceeded: %s",
+                       identifier)
+        if self.request.retries == self.max_retries:
+            # Give up for now. It'll get done next time cron is run.
+            return
+        raise self.retry(exc=exc)
     logger.info("Item uploaded to IA with responses %s" %
                 [r.status_code for r in responses])
     return responses
