@@ -437,9 +437,14 @@ def request_email_confirmation(request):
             cd = form.cleaned_data
             users = User.objects.filter(email__iexact=cd['email'])
             if not len(users):
-                # Normally, we'd throw an error here, but we don't want to
-                # reveal what accounts we have on file, so instead, we just
-                # pretend like it worked.
+                # Normally, we'd throw an error here, but instead we pretend it
+                # was a success. Meanwhile, we send an email saying that a
+                # request was made, but we don't have an account with that
+                # email address.
+                email = emails['no_account_found']
+                message = email['body'] % reverse('register'),
+                send_mail(email['subject'], message,
+                          email['from'], [cd['email']])
                 return HttpResponseRedirect(reverse('email_confirm_success'))
 
             # make a new activation key for all associated accounts.
