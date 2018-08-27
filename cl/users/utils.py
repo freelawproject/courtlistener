@@ -1,3 +1,4 @@
+# coding=utf-8
 import hashlib
 
 from django.conf import settings
@@ -134,6 +135,35 @@ emails = {
                 "For questions or comments, please visit our contact page, "
                 "https://www.courtlistener.com/contact/\n"
                 "We're always happy to hear from you.",
+        'from': settings.DEFAULT_FROM_EMAIL,
+    },
+    'no_account_found': {
+        'subject': 'Password reset and username information on '
+                   'CourtListener.com',
+        'body': 'Hello,\n\n'
+                ''
+                'Somebody — probably you — has asked that we send password '
+                'reset instructions to this address. If this was you, we '
+                'regret to inform you that we do not have an account with '
+                'this email address. This sometimes  happens when people '
+                'have have typos in their email address when they sign up.\n\n'
+                ''
+                'If you think that may have happened to you, the solution is '
+                'to simply create a new account using your email address:\n\n'
+                ''
+                ' - https://www.courtlistener.com%s\n\n'
+                ''
+                'That usually will fix the problem.\n\n'
+                ''
+                'If this was not you, you can ignore this email.\n\n'
+                ''
+                'Thanks for using our site,\n\n'
+                ''
+                'The CourtListener Team\n\n'
+                '-------\n'
+                'For questions or comments, please visit our contact page, '
+                'https://www.courtlistener.com/contact/\n'
+                'We\'re always happy to hear from you.',
         'from': settings.DEFAULT_FROM_EMAIL,
     },
     'email_not_confirmed': {
