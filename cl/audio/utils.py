@@ -28,3 +28,9 @@ def get_audio_binary():
             raise Exception("Unable to find avconv or ffmpeg for doing "
                             "audio conversions.")
     return path_to_binary
+
+
+def make_af_filename(court_id, docket_number, date_argued, extension):
+    """Make a filename for the audio file for uploading to IA"""
+    return '.'.join(['gov', 'uscourts', court_id, docket_number,
+                     date_argued.isoformat(), extension])
