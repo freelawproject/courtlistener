@@ -442,7 +442,8 @@ def request_email_confirmation(request):
                 # request was made, but we don't have an account with that
                 # email address.
                 email = emails['no_account_found']
-                message = email['body'] % reverse('register')
+                message = email['body'] % ('email confirmation',
+                                           reverse('register'))
                 send_mail(email['subject'], message,
                           email['from'], [cd['email']])
                 return HttpResponseRedirect(reverse('email_confirm_success'))
