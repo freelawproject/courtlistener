@@ -74,9 +74,9 @@ def get_and_save_free_document_reports(options):
     documents. Do not download those items, as that step is done later.
     """
     # Kill any *old* logs that report they're in progress. (They've failed.)
-    twelve_hrs_ago = now() - timedelta(hours=12)
+    three_hrs_ago = now() - timedelta(hours=3)
     PACERFreeDocumentLog.objects.filter(
-        date_started__lt=twelve_hrs_ago,
+        date_started__lt=three_hrs_ago,
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
     ).update(
         status=PACERFreeDocumentLog.SCRAPE_FAILED,
