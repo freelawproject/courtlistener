@@ -97,7 +97,8 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
     logged-in PACER user.
     :return: None
     """
-    s = PacerSession(cookies=cookies)
+    s = PacerSession(cookies=cookies, username=settings.PACER_USERNAME,
+                     password=settings.PACER_PASSWORD)
     report = FreeOpinionReport(court_id, s)
     try:
         report.query(start, end, sort='case_number')
