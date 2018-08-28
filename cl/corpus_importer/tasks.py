@@ -85,7 +85,7 @@ def download_recap_item(self, url, filename, clobber=False):
                 shutil.copyfile(tmp.name, location)
 
 
-@app.task(bind=True, max_retries=2, soft_time_limit=120)
+@app.task(bind=True, max_retries=2, soft_time_limit=240)
 def get_and_save_free_document_report(self, court_id, start, end, cookies):
     """Download the Free document report and save it to the DB.
 
@@ -109,6 +109,8 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
     except SoftTimeLimitExceeded as exc:
+        logger.warning("Soft time limit exceeded at %s. %s retries remain.",
+                       court_id, (self.max_retries - self.request.retries))
         if self.request.retries == self.max_retries:
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
