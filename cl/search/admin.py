@@ -203,6 +203,7 @@ class DocketAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'assigned_to',
         'referred_to',
+        'originating_court_information',
     )
 
 
