@@ -16,10 +16,10 @@ PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 
 def upload_non_free_pdfs_to_internet_archive(options):
-    upload_to_internet_archive(options, do_non_free=True)
+    upload_pdfs_to_internet_archive(options, do_non_free=True)
 
 
-def upload_to_internet_archive(options, do_non_free=False):
+def upload_pdfs_to_internet_archive(options, do_non_free=False):
     """Upload items to the Internet Archive."""
     q = options['queue']
     rds = RECAPDocument.objects.filter(
@@ -68,7 +68,7 @@ def upload_oral_arguments_to_internet_archive(options):
 
 def do_everything(options):
     logger.info("Uploading free opinions to Internet Archive.")
-    upload_to_internet_archive(options)
+    upload_pdfs_to_internet_archive(options)
     logger.info("Uploading non-free PDFs to Internet Archive.")
     upload_non_free_pdfs_to_internet_archive(options)
     logger.info("Uploading oral arguments to Internet Archive.")
@@ -109,7 +109,7 @@ class Command(VerboseCommand):
 
     VALID_ACTIONS = {
         'do-everything': do_everything,
-        'upload-to-ia': upload_to_internet_archive,
+        'upload-pdfs-to-ia': upload_pdfs_to_internet_archive,
         'upload-non-free-pdfs-to-ia': upload_non_free_pdfs_to_internet_archive,
         'upload-oral-arguments-to-ia': upload_oral_arguments_to_internet_archive,
     }
