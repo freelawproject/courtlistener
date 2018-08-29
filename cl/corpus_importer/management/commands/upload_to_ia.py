@@ -66,7 +66,7 @@ def upload_oral_arguments_to_internet_archive(options):
         upload_audio_to_ia.si(af_pk).set(queue=q).apply_async()
 
 
-def do_everything(options):
+def do_routine_uploads(options):
     logger.info("Uploading free opinions to Internet Archive.")
     upload_pdfs_to_internet_archive(options)
     logger.info("Uploading non-free PDFs to Internet Archive.")
@@ -108,7 +108,7 @@ class Command(VerboseCommand):
         options['action'](options)
 
     VALID_ACTIONS = {
-        'do-everything': do_everything,
+        'do-routing-uploads': do_routine_uploads,
         'upload-pdfs-to-ia': upload_pdfs_to_internet_archive,
         'upload-non-free-pdfs-to-ia': upload_non_free_pdfs_to_internet_archive,
         'upload-oral-arguments-to-ia': upload_oral_arguments_to_internet_archive,
