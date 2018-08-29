@@ -1,6 +1,7 @@
 import argparse
 import os
 
+import redis
 from django.conf import settings
 from django.db.models import Q
 
@@ -9,7 +10,7 @@ from cl.audio.tasks import upload_audio_to_ia
 from cl.corpus_importer.tasks import upload_pdf_to_ia
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import RECAPDocument
+from cl.search.models import RECAPDocument, Docket
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
@@ -66,6 +67,38 @@ def upload_oral_arguments_to_internet_archive(options):
         upload_audio_to_ia.si(af_pk).set(queue=q).apply_async()
 
 
+def upload_recap_data(options):
+    """Upload RECAP data to Internet Archive."""
+    q = options['queue']
+    r = redis.StrictRedis(host=settings.REDIS_HOST,
+                          port=settings.REDIS_PORT,
+                          db=settings.REDIS_DATABASES['CACHE'])
+    redis_key = 'recap-docket-last-id'
+    last_pk = r.getset(redis_key, 0)
+    ds = Docket.objects.filter(source__in=Docket.RECAP_SOURCES,
+                               pk__gt=last_pk).order_by('pk').only('pk')
+
+    chunk_size = 100  # Small to save memory
+    previous_last_pk = None
+    while True:
+        for d in ds.filter(pk__gt=last_pk)[:chunk_size]:
+            # make and upload json
+            last_pk = d.pk
+            r.set(redis_key, last_pk)
+
+        # Detect if we've hit the end of the loop and reset it if so. We do
+        # this by keeping track of the last_pk that we saw the last time the
+        # for loop changed. If that PK doesn't change after the for loop has
+        # run again, then we know we've hit the end of the loop and we should
+        # reset it.
+        if previous_last_pk == last_pk:
+            # The PK is the same as the last time
+            # the for loop finished. Reset things.
+            last_pk = 0
+        else:
+            previous_last_pk = last_pk
+
+
 def do_routine_uploads(options):
     logger.info("Uploading free opinions to Internet Archive.")
     upload_pdfs_to_internet_archive(options)
@@ -112,4 +145,5 @@ class Command(VerboseCommand):
         'upload-pdfs-to-ia': upload_pdfs_to_internet_archive,
         'upload-non-free-pdfs-to-ia': upload_non_free_pdfs_to_internet_archive,
         'upload-oral-arguments-to-ia': upload_oral_arguments_to_internet_archive,
+        'upload-recap-data': upload_recap_data,
     }
