@@ -3,6 +3,10 @@ import hashlib
 import logging
 import os
 import shutil
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 from pyexpat import ExpatError
 from tempfile import NamedTemporaryFile
 
@@ -13,6 +17,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction, DatabaseError
+from django.db.models import Prefetch
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import ParsingException
@@ -23,6 +28,7 @@ from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
+from rest_framework.renderers import JSONRenderer
 from rest_framework.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_403_FORBIDDEN,
@@ -31,10 +37,12 @@ from rest_framework.status import (
 )
 
 from cl.celery import app
+from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_number
-from cl.lib.recap_utils import get_document_filename, get_bucket_name
+from cl.lib.recap_utils import get_document_filename, get_bucket_name, \
+    get_docket_filename
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles, \
     UPLOAD_TYPE, ProcessingQueue
@@ -47,6 +55,75 @@ from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
 from cl.search.tasks import add_or_update_recap_document
 
 logger = logging.getLogger(__name__)
+
+
+def increment_failure_count(obj):
+    if obj.ia_upload_failure_count is None:
+        obj.ia_upload_failure_count = 1
+    else:
+        obj.ia_upload_failure_count += 1
+    obj.save()
+
+
+@app.task(bind=True)
+def upload_recap_json(self, pk):
+    """Make a JSON object for a RECAP docket and upload it to IA"""
+    # This is a pretty highly optimized query that uses only 13 hits to the DB
+    # when generating a docket JSON rendering, regardless of how many related
+    # objects the docket has such as docket entries, parties, etc.
+    ds = Docket.objects.filter(pk=pk).select_related(
+        'originating_court_information',
+    ).prefetch_related(
+        'panel',
+        'parties__attorneys__roles',
+        'parties__party_types__criminal_complaints',
+        'parties__party_types__criminal_counts',
+        # Django appears to have a bug where you can't defer a field on a
+        # queryset where you prefetch the values. If you try to, it crashes.
+        # We should be able to just do the prefetch below like the ones above
+        # and then do the defer statement at the end, but that throws an error.
+        Prefetch(
+            'docket_entries__recap_documents',
+            queryset=RECAPDocument.objects.all().defer('plain_text')
+        )
+    )
+    d = ds[0]
+    renderer = JSONRenderer()
+    json_str = renderer.render(
+        IADocketSerializer(d).data,
+        accepted_media_type='application/json; indent=2',
+    )
+
+    file_name = get_docket_filename(d.court_id, d.pacer_case_id, 'json')
+    bucket_name = get_bucket_name(d.court_id, d.pacer_case_id)
+    responses = upload_to_ia(
+        self,
+        identifier=bucket_name,
+        files={file_name: StringIO(json_str)},
+        title=best_case_name(d),
+        collection=settings.IA_COLLECTIONS,
+        court_id=d.court_id,
+        source_url='https://www.courtlistener.com%s' % d.get_absolute_url(),
+        media_type='texts',
+        description="This item represents a case in PACER, the U.S. "
+                    "Government's website for federal case data. This "
+                    "information is uploaded quarterly. To see our most "
+                    "recent version please use the source url parameter, "
+                    "linked below. To see the canonical source for this data, "
+                    "please consult PACER directly.",
+    )
+    if responses is None:
+        increment_failure_count(d)
+        return
+
+    if all(r.ok for r in responses):
+        d.ia_upload_failure_count = None
+        d.filepath_ia_json = "https://archive.org/download/%s/%s" % (
+            bucket_name, file_name)
+        d.ia_needs_upload = False
+        d.save()
+    else:
+        increment_failure_count(d)
 
 
 @app.task(bind=True, max_retries=5)
@@ -252,14 +329,6 @@ def get_and_process_pdf(self, data, cookies, row_pk):
     # docs in a separate batch, but may as well do the easy ones.
     extract_recap_pdf(rd.pk, skip_ocr=True, check_if_needed=False)
     return {'result': result, 'rd_pk': rd.pk}
-
-
-def increment_failure_count(obj):
-    if obj.ia_upload_failure_count is None:
-        obj.ia_upload_failure_count = 1
-    else:
-        obj.ia_upload_failure_count += 1
-    obj.save()
 
 
 class OverloadedException(Exception):
