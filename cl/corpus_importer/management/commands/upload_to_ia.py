@@ -7,7 +7,7 @@ from django.db.models import Q
 
 from cl.audio.models import Audio
 from cl.audio.tasks import upload_audio_to_ia
-from cl.corpus_importer.tasks import upload_pdf_to_ia
+from cl.corpus_importer.tasks import upload_pdf_to_ia, upload_recap_json
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import RECAPDocument, Docket
@@ -75,8 +75,12 @@ def upload_recap_data(options):
                           db=settings.REDIS_DATABASES['CACHE'])
     redis_key = 'recap-docket-last-id'
     last_pk = r.getset(redis_key, 0)
-    ds = Docket.objects.filter(source__in=Docket.RECAP_SOURCES,
-                               pk__gt=last_pk).order_by('pk').only('pk')
+    ds = Docket.objects.filter(
+        Q(ia_upload_failure_count__lt=3) | Q(ia_upload_failure_count=None),
+        ia_needs_upload=True,
+        source__in=Docket.RECAP_SOURCES,
+        pk__gt=last_pk,
+    ).order_by('pk').only('pk')
 
     chunk_size = 100  # Small to save memory
     previous_last_pk = None
