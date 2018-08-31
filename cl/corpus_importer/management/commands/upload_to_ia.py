@@ -1,9 +1,11 @@
 import argparse
 import os
+from datetime import timedelta
 
 import redis
 from django.conf import settings
 from django.db.models import Q
+from django.utils.timezone import now
 
 from cl.audio.models import Audio
 from cl.audio.tasks import upload_audio_to_ia
@@ -85,14 +87,21 @@ def upload_recap_data(options):
     count = ds.count()
     chunk_size = 100  # Small to save memory
     i = 0
+    t1 = now()
     for d in queryset_generator(ds, chunksize=chunk_size):
         # Do this with a celery task, but don't do it async. In the future
         # we can scale this up, but for now we just use a celery task for
         # future-proofing and do these one at a time.
         upload_recap_json(d.pk)
-        if i > 0 and i % 1000 == 0:
-            logger.info("Uploaded %s/%s dockets to IA so far.", i, count)
         i += 1
+        if i % 100 == 0:
+            t2 = now()
+            elapsed_minutes = float((t2 - t1).seconds) / 60
+            rate = float(i) / elapsed_minutes
+            remaining = count - i
+            finish_date = now() + timedelta(minutes=remaining * rate)
+            logger.info("Uploaded %s/%s dockets to IA so far (%.01f/m, "
+                        "est. finish: %s)", i, count, rate, finish_date.date())
         last_pk = d.pk
         r.set(redis_key, last_pk)
 
