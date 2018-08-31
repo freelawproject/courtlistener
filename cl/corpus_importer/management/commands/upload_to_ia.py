@@ -180,7 +180,7 @@ class Command(VerboseCommand):
         options['action'](options)
 
     VALID_ACTIONS = {
-        'do-routing-uploads': do_routine_uploads,
+        'do-routine-uploads': do_routine_uploads,
         'upload-pdfs-to-ia': upload_pdfs_to_internet_archive,
         'upload-non-free-pdfs-to-ia': upload_non_free_pdfs_to_internet_archive,
         'upload-oral-arguments-to-ia': upload_oral_arguments_to_internet_archive,
