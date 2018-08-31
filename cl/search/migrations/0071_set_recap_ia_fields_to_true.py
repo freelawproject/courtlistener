@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from datetime import datetime
+
 from django.db import migrations
 
 from cl.search.models import Docket as NewDocket
@@ -16,8 +18,13 @@ def set_recap_ia_fields_true(apps, schema_editor):
         # the RECAP_SOURCES attribute.
         source__in=NewDocket.RECAP_SOURCES,
     ).update(
-        ia_needs_upload=True
+        ia_needs_upload=True,
+        ia_date_first_change=datetime(2018, 1, 1),
     )
+
+
+def do_nothing(apps, schema_editor):
+    pass
 
 
 class Migration(migrations.Migration):
@@ -27,5 +34,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(set_recap_ia_fields_true),
+        migrations.RunPython(set_recap_ia_fields_true, reverse_code=do_nothing),
     ]
