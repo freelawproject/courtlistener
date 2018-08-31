@@ -1,25 +1,29 @@
 import argparse
 import os
+from datetime import timedelta
 
+import redis
 from django.conf import settings
 from django.db.models import Q
+from django.utils.timezone import now
 
 from cl.audio.models import Audio
 from cl.audio.tasks import upload_audio_to_ia
-from cl.corpus_importer.tasks import upload_pdf_to_ia
+from cl.corpus_importer.tasks import upload_pdf_to_ia, upload_recap_json
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import RECAPDocument
+from cl.lib.db_tools import queryset_generator
+from cl.search.models import RECAPDocument, Docket
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 
 def upload_non_free_pdfs_to_internet_archive(options):
-    upload_to_internet_archive(options, do_non_free=True)
+    upload_pdfs_to_internet_archive(options, do_non_free=True)
 
 
-def upload_to_internet_archive(options, do_non_free=False):
+def upload_pdfs_to_internet_archive(options, do_non_free=False):
     """Upload items to the Internet Archive."""
     q = options['queue']
     rds = RECAPDocument.objects.filter(
@@ -66,9 +70,48 @@ def upload_oral_arguments_to_internet_archive(options):
         upload_audio_to_ia.si(af_pk).set(queue=q).apply_async()
 
 
-def do_everything(options):
+def upload_recap_data(options):
+    """Upload RECAP data to Internet Archive."""
+    r = redis.StrictRedis(host=settings.REDIS_HOST,
+                          port=settings.REDIS_PORT,
+                          db=settings.REDIS_DATABASES['CACHE'])
+    redis_key = 'recap-docket-last-id'
+    last_pk = r.getset(redis_key, 0)
+    ds = Docket.objects.filter(
+        Q(ia_upload_failure_count__lt=3) | Q(ia_upload_failure_count=None),
+        ia_needs_upload=True,
+        source__in=Docket.RECAP_SOURCES,
+        pk__gt=last_pk,
+    ).only('pk')
+
+    count = ds.count()
+    chunk_size = 100  # Small to save memory
+    i = 0
+    t1 = now()
+    for d in queryset_generator(ds, chunksize=chunk_size):
+        # Do this with a celery task, but don't do it async. In the future
+        # we can scale this up, but for now we just use a celery task for
+        # future-proofing and do these one at a time.
+        upload_recap_json(d.pk)
+        i += 1
+        if i % 100 == 0:
+            t2 = now()
+            elapsed_minutes = float((t2 - t1).seconds) / 60
+            rate = float(i) / elapsed_minutes
+            remaining = count - i
+            finish_date = now() + timedelta(minutes=remaining * rate)
+            logger.info("Uploaded %s/%s dockets to IA so far (%.01f/m, "
+                        "est. finish: %s)", i, count, rate, finish_date.date())
+        last_pk = d.pk
+        r.set(redis_key, last_pk)
+
+    logger.info("Successfully finished uploading RECAP data.")
+    r.set(redis_key, 0)
+
+
+def do_routine_uploads(options):
     logger.info("Uploading free opinions to Internet Archive.")
-    upload_to_internet_archive(options)
+    upload_pdfs_to_internet_archive(options)
     logger.info("Uploading non-free PDFs to Internet Archive.")
     upload_non_free_pdfs_to_internet_archive(options)
     logger.info("Uploading oral arguments to Internet Archive.")
@@ -108,8 +151,9 @@ class Command(VerboseCommand):
         options['action'](options)
 
     VALID_ACTIONS = {
-        'do-everything': do_everything,
-        'upload-to-ia': upload_to_internet_archive,
+        'do-routing-uploads': do_routine_uploads,
+        'upload-pdfs-to-ia': upload_pdfs_to_internet_archive,
         'upload-non-free-pdfs-to-ia': upload_non_free_pdfs_to_internet_archive,
         'upload-oral-arguments-to-ia': upload_oral_arguments_to_internet_archive,
+        'upload-recap-data-to-ia': upload_recap_data,
     }

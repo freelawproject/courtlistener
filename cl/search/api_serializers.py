@@ -64,7 +64,7 @@ class DocketSerializer(DynamicFieldsMixin,
 
     class Meta:
         model = Docket
-        exclude = ('view_count', 'parties')
+        exclude = ('view_count', 'parties', 'originating_court_information')
 
 
 class RECAPDocumentSerializer(DynamicFieldsMixin,
