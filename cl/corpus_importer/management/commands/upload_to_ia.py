@@ -10,6 +10,7 @@ from cl.audio.tasks import upload_audio_to_ia
 from cl.corpus_importer.tasks import upload_pdf_to_ia, upload_recap_json
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.db_tools import queryset_generator
 from cl.search.models import RECAPDocument, Docket
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
@@ -79,36 +80,21 @@ def upload_recap_data(options):
         ia_needs_upload=True,
         source__in=Docket.RECAP_SOURCES,
         pk__gt=last_pk,
-    ).order_by('pk').only('pk')
+    ).only('pk')
 
     count = ds.count()
     chunk_size = 100  # Small to save memory
-    previous_last_pk = None
     i = 0
-    while True:
-        for d in ds.filter(pk__gt=last_pk)[:chunk_size]:
-            # Do this with a celery task, but don't do it async. In the future
-            # we can scale this up, but for now we just use a celery task for
-            # future-proofing and do these one at a time.
-            upload_recap_json(d.pk)
-            if i > 0 and i % 1000 == 0:
-                logger.info("Uploaded %s/%s dockets to IA so far.", i, count)
-            i += 1
-            last_pk = d.pk
-            r.set(redis_key, last_pk)
-
-        # Detect if we've hit the end of the loop and reset it if so. We do
-        # this by keeping track of the last_pk that we saw the last time the
-        # for loop changed. If that PK doesn't change after the for loop has
-        # run again, then we know we've hit the end of the loop and we should
-        # reset it.
-        if previous_last_pk == last_pk:
-            # The PK is the same as the last time
-            # the for loop finished. Reset things.
-            last_pk = 0
-            r.set(redis_key, 0)
-        else:
-            previous_last_pk = last_pk
+    for d in queryset_generator(ds, chunksize=chunk_size):
+        # Do this with a celery task, but don't do it async. In the future
+        # we can scale this up, but for now we just use a celery task for
+        # future-proofing and do these one at a time.
+        upload_recap_json(d.pk)
+        if i > 0 and i % 1000 == 0:
+            logger.info("Uploaded %s/%s dockets to IA so far.", i, count)
+        i += 1
+        last_pk = d.pk
+        r.set(redis_key, last_pk)
 
 
 def do_routine_uploads(options):
