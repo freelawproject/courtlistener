@@ -451,6 +451,13 @@ class Docket(models.Model):
         blank=True,
         db_index=True,
     )
+    ia_date_first_change = models.DateTimeField(
+        help_text="The moment when this item first changed and was marked as "
+                  "needing an upload. Used for determining when to upload an "
+                  "item.",
+        null=True,
+        db_index=True,
+    )
     view_count = models.IntegerField(
         help_text="The number of times the docket has been seen.",
         default=0,
@@ -471,6 +478,10 @@ class Docket(models.Model):
 
     class Meta:
         unique_together = ('docket_number', 'pacer_case_id', 'court')
+        index_together = (
+            ('ia_upload_failure_count', 'ia_needs_upload',
+             'ia_date_first_change'),
+        )
 
     def __unicode__(self):
         if self.case_name:
