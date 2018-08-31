@@ -241,6 +241,8 @@ def process_recap_pdf(self, pk):
 
     mark_pq_successful(pq, d_id=rd.docket_entry.docket_id,
                        de_id=rd.docket_entry_id, rd_id=rd.pk)
+    rd.docket_entry.docket.ia_needs_upload = True
+    rd.docket_entry.docket.save()
     return rd
 
 
@@ -422,6 +424,7 @@ def update_docket_metadata(d, docket_data):
     or district) results.
     """
     d = update_case_names(d, docket_data['case_name'])
+    d.ia_needs_upload = True
     d.docket_number = docket_data['docket_number'] or d.docket_number
     d.date_filed = docket_data['date_filed'] or d.date_filed
     d.date_last_filing = docket_data.get(
@@ -1114,6 +1117,8 @@ def process_recap_attachment(self, pk, tag_names=None):
     mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
     process_orphan_documents(rds_created, pq.court_id,
                              main_rd.docket_entry.docket.date_filed)
+    de.docket.ia_needs_upload = True
+    de.docket.save()
 
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60,
