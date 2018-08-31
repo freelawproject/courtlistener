@@ -12,6 +12,7 @@ from cl.corpus_importer.import_columbia.parse_opinions import \
     get_state_court_object
 from cl.corpus_importer.lawbox.judge_extractor import get_judge_from_str, \
     REASONS
+from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
@@ -548,3 +549,25 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(godfrey_llp.address2, u'Suite 3800')
         self.assertEqual(godfrey_llp.city, u'Seattle')
         self.assertEqual(godfrey_llp.state, u'WA')
+
+
+class GetQuarterTest(TestCase):
+    """Can we properly figure out when the quarter that we're currently in
+    began?
+    """
+
+    def test_january(self):
+        self.assertEqual(
+            date(2018, 1, 1),
+            get_start_of_quarter(date(2018, 1, 1))
+        )
+        self.assertEqual(
+            date(2018, 1, 10),
+            get_start_of_quarter(date(2018, 1, 1))
+        )
+
+    def test_december(self):
+        self.assertEqual(
+            date(2018, 10, 1),
+            get_start_of_quarter(date(2018, 12, 1))
+        )
