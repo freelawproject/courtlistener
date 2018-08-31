@@ -146,8 +146,9 @@
                     {% endif %}
                     {% if document.pacer_url %}
                       <li>
-                        <a href="{{ document.pacer_url }}">Buy on
-                            PACER</a>
+                        <a href="{{ document.pacer_url }}"
+                           target="_blank"
+                           rel="nofollow">Buy on PACER</a>
                       </li>
                     {% endif %}
                 </ul>
@@ -155,7 +156,9 @@
                 {# We don't have it #}
                 {% if document.pacer_url %}
                   <a href="{{ document.pacer_url }}"
-                     class="btn btn-primary"><i class="fa fa-external-link"></i>Buy on PACER</a>
+                     class="btn btn-primary"
+                     target="_blank"
+                     rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
                 {% endif %}
             {% endif %}
         </div>
@@ -218,7 +221,10 @@
                 <p class="bottom">This item is not yet in the RECAP collection.
                     <span class="float-right">
                         {% if document.pacer_url %}
-                            <a class="btn btn-primary btn-sm" href="{{ document.pacer_url }}"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
+                            <a class="btn btn-primary btn-sm"
+                               href="{{ document.pacer_url }}"
+                               rel="nofollow"
+                               target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
                         {% endif %}
                         {% if not request.COOKIES.recap_install_plea %}
                           <a href="https://free.law/recap/"
