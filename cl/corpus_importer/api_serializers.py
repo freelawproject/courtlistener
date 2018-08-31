@@ -85,4 +85,4 @@ class IADocketSerializer(ModelSerializer):
     class Meta:
         model = Docket
         exclude = ('view_count', 'tags', 'originating_court_information',
-                   'ia_failure_count', 'ia_needs_upload')
+                   'ia_upload_failure_count', 'ia_needs_upload')
