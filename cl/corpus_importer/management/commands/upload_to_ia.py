@@ -87,7 +87,13 @@ def upload_recap_data(options):
     i = 0
     while True:
         for d in ds.filter(pk__gt=last_pk)[:chunk_size]:
-            # make and upload json
+            # Do this with a celery task, but don't do it async. In the future
+            # we can scale this up, but for now we just use a celery task for
+            # future-proofing and do these one at a time.
+            upload_recap_json(d.pk)
+            if i > 0 and i % 1000 == 0:
+                logger.info("Uploaded %s/%s dockets to IA so far.", i, count)
+            i += 1
             last_pk = d.pk
             r.set(redis_key, last_pk)
 
