@@ -69,7 +69,6 @@ def upload_oral_arguments_to_internet_archive(options):
 
 def upload_recap_data(options):
     """Upload RECAP data to Internet Archive."""
-    q = options['queue']
     r = redis.StrictRedis(host=settings.REDIS_HOST,
                           port=settings.REDIS_PORT,
                           db=settings.REDIS_DATABASES['CACHE'])
@@ -82,8 +81,10 @@ def upload_recap_data(options):
         pk__gt=last_pk,
     ).order_by('pk').only('pk')
 
+    count = ds.count()
     chunk_size = 100  # Small to save memory
     previous_last_pk = None
+    i = 0
     while True:
         for d in ds.filter(pk__gt=last_pk)[:chunk_size]:
             # make and upload json
@@ -99,6 +100,7 @@ def upload_recap_data(options):
             # The PK is the same as the last time
             # the for loop finished. Reset things.
             last_pk = 0
+            r.set(redis_key, 0)
         else:
             previous_last_pk = last_pk
 
@@ -149,5 +151,5 @@ class Command(VerboseCommand):
         'upload-pdfs-to-ia': upload_pdfs_to_internet_archive,
         'upload-non-free-pdfs-to-ia': upload_non_free_pdfs_to_internet_archive,
         'upload-oral-arguments-to-ia': upload_oral_arguments_to_internet_archive,
-        'upload-recap-data': upload_recap_data,
+        'upload-recap-data-to-ia': upload_recap_data,
     }
