@@ -242,6 +242,7 @@ def process_free_opinion_result(self, row_pk, cnt):
                 self.request.callbacks = None
                 return
             docket.blocked, docket.date_blocked = get_blocked_status(docket)
+            docket.ia_needs_upload = True
             docket.save()
 
             de, de_created = DocketEntry.objects.update_or_create(
