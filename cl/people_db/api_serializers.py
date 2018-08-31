@@ -138,7 +138,9 @@ class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = PartyType
-        exclude = ('party',)
+        fields = ('docket', 'name', 'date_terminated', 'extra_info',
+                  'highest_offense_level_opening',
+                  'highest_offense_level_terminated',)
 
 
 class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
