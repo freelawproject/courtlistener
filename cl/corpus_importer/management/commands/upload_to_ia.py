@@ -1,6 +1,6 @@
 import argparse
 import os
-from datetime import timedelta
+import time
 
 import redis
 from django.conf import settings
@@ -10,9 +10,9 @@ from django.utils.timezone import now
 from cl.audio.models import Audio
 from cl.audio.tasks import upload_audio_to_ia
 from cl.corpus_importer.tasks import upload_pdf_to_ia, upload_recap_json
+from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.db_tools import queryset_generator
 from cl.search.models import RECAPDocument, Docket
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
@@ -78,35 +78,64 @@ def upload_recap_data(options):
     redis_key = 'recap-docket-last-id'
     last_pk = r.getset(redis_key, 0)
     ds = Docket.objects.filter(
-        Q(ia_upload_failure_count__lt=3) | Q(ia_upload_failure_count=None),
+        Q(ia_upload_failure_count__lte=3) | Q(ia_upload_failure_count=None),
         ia_needs_upload=True,
         source__in=Docket.RECAP_SOURCES,
         pk__gt=last_pk,
-    ).only('pk')
+    ).order_by('pk').only('pk')
 
-    count = ds.count()
     chunk_size = 100  # Small to save memory
     i = 0
+    previous_i = None
+    delay_count = 0
     t1 = now()
-    for d in queryset_generator(ds, chunksize=chunk_size):
-        # Do this with a celery task, but don't do it async. In the future
-        # we can scale this up, but for now we just use a celery task for
-        # future-proofing and do these one at a time.
-        upload_recap_json(d.pk)
-        i += 1
-        if i % 100 == 0:
-            t2 = now()
-            elapsed_minutes = float((t2 - t1).seconds) / 60
-            rate = float(i) / elapsed_minutes
-            remaining = count - i
-            finish_date = now() + timedelta(minutes=remaining * rate)
-            logger.info("Uploaded %s/%s dockets to IA so far (%.01f/m, "
-                        "est. finish: %s)", i, count, rate, finish_date.date())
-        last_pk = d.pk
-        r.set(redis_key, last_pk)
+    logger.info("Sending recap dockets to Internet Archive")
+    while True:
+        # Start of quarter needs to be re-analyzed every time through the loop.
+        # This ensures that if the quarter changes while this runs, we get the
+        # new value.
+        params = {
+            'pk__gt': last_pk,
+            'ia_date_first_change__lt': get_start_of_quarter(),
+        }
+        for d in ds.filter(**params)[:chunk_size]:
+            # Do this with a celery task, but don't do it async. In the future
+            # we can scale this up, but for now we just use a celery task for
+            # future-proofing and do these one at a time.
+            upload_recap_json(d.pk)
+            i += 1
+            if i % 100 == 0:
+                # Print a useful log line with expected finish date.
+                t2 = now()
+                elapsed_minutes = float((t2 - t1).seconds) / 60
+                rate = float(i) / elapsed_minutes
+                logger.info("Uploaded %s dockets to IA so far (%.01f/m)",
+                            i, rate)
+            last_pk = d.pk
+            r.set(redis_key, last_pk)
 
-    logger.info("Successfully finished uploading RECAP data.")
-    r.set(redis_key, 0)
+        # Detect if we've hit the end of the loop and reset it if so. We do
+        # this by keeping track of the last_pk that we saw the last time the
+        # for loop changed. If that PK doesn't change after the for loop has
+        # run again, then we know we've hit the end of the loop and we should
+        # reset it.
+        empty_loop = i == previous_i
+        if empty_loop:
+            # i is the same as the last time the
+            # for loop finished. Reset things.
+            if last_pk == 0:
+                # We went through the for loop a second time and still didn't
+                # do anything. Stall with capped back off.
+                delay_count += 1
+                max_delay = 60 * 30  # Thirty minutes
+                delay = min(delay_count * 60, max_delay)
+                time.sleep(delay)
+            else:
+                delay_count = 0
+                last_pk = 0
+                r.set(redis_key, 0)
+        else:
+            previous_i = i
 
 
 def do_routine_uploads(options):
