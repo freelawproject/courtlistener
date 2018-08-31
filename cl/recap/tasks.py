@@ -9,7 +9,6 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Prefetch
-from django.utils import timezone
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
@@ -17,6 +16,7 @@ from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
 
 from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery import app
+from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.import_lib import get_candidate_judges
@@ -241,8 +241,9 @@ def process_recap_pdf(self, pk):
 
     mark_pq_successful(pq, d_id=rd.docket_entry.docket_id,
                        de_id=rd.docket_entry_id, rd_id=rd.pk)
-    rd.docket_entry.docket.ia_needs_upload = True
-    rd.docket_entry.docket.save()
+    changed = mark_ia_upload_needed(rd.docket_entry.docket)
+    if changed:
+        rd.docket_entry.docket.save()
     return rd
 
 
@@ -424,7 +425,7 @@ def update_docket_metadata(d, docket_data):
     or district) results.
     """
     d = update_case_names(d, docket_data['case_name'])
-    d.ia_needs_upload = True
+    mark_ia_upload_needed(d)
     d.docket_number = docket_data['docket_number'] or d.docket_number
     d.date_filed = docket_data['date_filed'] or d.date_filed
     d.date_last_filing = docket_data.get(
@@ -1117,8 +1118,9 @@ def process_recap_attachment(self, pk, tag_names=None):
     mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
     process_orphan_documents(rds_created, pq.court_id,
                              main_rd.docket_entry.docket.date_filed)
-    de.docket.ia_needs_upload = True
-    de.docket.save()
+    changed = mark_ia_upload_needed(de.docket)
+    if changed:
+        de.docket.save()
 
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60,

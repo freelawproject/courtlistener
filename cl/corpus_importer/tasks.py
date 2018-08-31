@@ -3,6 +3,9 @@ import hashlib
 import logging
 import os
 import shutil
+
+from cl.corpus_importer.utils import mark_ia_upload_needed
+
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -118,9 +121,10 @@ def upload_recap_json(self, pk):
 
     if all(r.ok for r in responses):
         d.ia_upload_failure_count = None
+        d.ia_date_first_changed = None
         d.filepath_ia_json = "https://archive.org/download/%s/%s" % (
             bucket_name, file_name)
-        d.ia_needs_upload = False
+        mark_ia_upload_needed(d)
         d.save()
     else:
         increment_failure_count(d)
@@ -245,7 +249,7 @@ def process_free_opinion_result(self, row_pk, cnt):
                 self.request.callbacks = None
                 return
             docket.blocked, docket.date_blocked = get_blocked_status(docket)
-            docket.ia_needs_upload = True
+            mark_ia_upload_needed(docket)
             docket.save()
 
             de, de_created = DocketEntry.objects.update_or_create(
