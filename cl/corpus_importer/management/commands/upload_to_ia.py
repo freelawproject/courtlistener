@@ -105,6 +105,9 @@ def upload_recap_data(options):
         last_pk = d.pk
         r.set(redis_key, last_pk)
 
+    logger.info("Successfully finished uploading RECAP data.")
+    r.set(redis_key, 0)
+
 
 def do_routine_uploads(options):
     logger.info("Uploading free opinions to Internet Archive.")
