@@ -189,7 +189,7 @@ def process_recap_pdf(self, pk):
                     rd = RECAPDocument(
                         docket_entry=de,
                         pacer_doc_id=pq.pacer_doc_id,
-                        date_upload=timezone.now(),
+                        date_upload=now(),
                         document_type=document_type,
                     )
 
