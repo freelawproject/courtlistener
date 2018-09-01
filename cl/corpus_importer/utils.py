@@ -37,4 +37,4 @@ def get_start_of_quarter(d=None):
         date(d_year, 7, 1),
         date(d_year, 10, 1),
     ]
-    return max([q for q in quarter_dates if q < d])
+    return max([q for q in quarter_dates if q <= d])
