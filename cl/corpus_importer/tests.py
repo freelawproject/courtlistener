@@ -562,8 +562,8 @@ class GetQuarterTest(TestCase):
             get_start_of_quarter(date(2018, 1, 1))
         )
         self.assertEqual(
-            date(2018, 1, 10),
-            get_start_of_quarter(date(2018, 1, 1))
+            date(2018, 1, 1),
+            get_start_of_quarter(date(2018, 1, 10))
         )
 
     def test_december(self):
