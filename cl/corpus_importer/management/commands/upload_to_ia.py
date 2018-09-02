@@ -102,7 +102,7 @@ def upload_recap_data(options):
         }
         for d in ds.filter(**params)[:chunk_size]:
             throttle.maybe_wait()
-            upload_recap_json.delay(d.pk)
+            upload_recap_json.apply_async(args=(d.pk,), queue=q)
             i += 1
             if i % 100 == 0:
                 # Print a useful log line with expected finish date.
