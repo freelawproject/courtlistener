@@ -109,7 +109,7 @@ def upload_recap_data(options):
                 t2 = now()
                 elapsed_minutes = float((t2 - t1).seconds) / 60
                 rate = float(i) / elapsed_minutes
-                if elapsed_minutes:
+                if elapsed_minutes > 0:
                     # Prevent ZeroDivisionError on first lap
                     logger.info("Uploaded %s dockets to IA so far (%.01f/m)",
                                 i, rate)
