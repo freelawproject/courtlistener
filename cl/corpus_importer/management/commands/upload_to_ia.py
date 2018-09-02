@@ -109,8 +109,12 @@ def upload_recap_data(options):
                 t2 = now()
                 elapsed_minutes = float((t2 - t1).seconds) / 60
                 rate = i / float(elapsed_minutes)
-                logger.info("Uploaded %s dockets to IA so far (%.01f/m)",
-                            i, rate)
+                try:
+                    logger.info("Uploaded %s dockets to IA so far (%.01f/m)",
+                                i, rate)
+                except ZeroDivisionError:
+                    # First lap through can be completed in less than 1s.
+                    pass
             last_pk = d.pk
             r.set(redis_key, last_pk)
 
