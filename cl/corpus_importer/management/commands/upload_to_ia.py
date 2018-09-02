@@ -72,6 +72,7 @@ def upload_oral_arguments_to_internet_archive(options):
 
 def upload_recap_data(options):
     """Upload RECAP data to Internet Archive."""
+    q = options['queue']
     r = redis.StrictRedis(host=settings.REDIS_HOST,
                           port=settings.REDIS_PORT,
                           db=settings.REDIS_DATABASES['CACHE'])
@@ -90,6 +91,7 @@ def upload_recap_data(options):
     delay_count = 0
     t1 = now()
     logger.info("Sending recap dockets to Internet Archive")
+    throttle = CeleryThrottle(queue_name=q, min_items=5)
     while True:
         # Start of quarter needs to be re-analyzed every time through the loop.
         # This ensures that if the quarter changes while this runs, we get the
@@ -99,10 +101,8 @@ def upload_recap_data(options):
             'ia_date_first_change__lt': get_start_of_quarter(),
         }
         for d in ds.filter(**params)[:chunk_size]:
-            # Do this with a celery task, but don't do it async. In the future
-            # we can scale this up, but for now we just use a celery task for
-            # future-proofing and do these one at a time.
-            upload_recap_json(d.pk)
+            throttle.maybe_wait()
+            upload_recap_json.delay(d.pk)
             i += 1
             if i % 100 == 0:
                 # Print a useful log line with expected finish date.
