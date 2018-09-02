@@ -108,6 +108,7 @@ def upload_recap_data(options):
                 # Print a useful log line with expected finish date.
                 t2 = now()
                 elapsed_minutes = float((t2 - t1).seconds) / 60
+                logger.info("Elapsed minutes: %s, i = %s", elapsed_minutes, i)
                 rate = float(i) / elapsed_minutes
                 logger.info("Uploaded %s dockets to IA so far (%.01f/m)",
                             i, rate)
