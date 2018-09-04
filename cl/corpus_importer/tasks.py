@@ -68,7 +68,7 @@ def increment_failure_count(obj):
     obj.save()
 
 
-@app.task(bind=True)
+@app.task(bind=True, ignore_result=True)
 def upload_recap_json(self, pk):
     """Make a JSON object for a RECAP docket and upload it to IA"""
     # This is a pretty highly optimized query that uses only 13 hits to the DB
