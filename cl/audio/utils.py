@@ -1,5 +1,7 @@
 from distutils.spawn import find_executable
 
+from django.utils.text import slugify
+
 
 def get_audio_binary():
     """Get the path to the installed binary for doing audio conversions
@@ -32,5 +34,5 @@ def get_audio_binary():
 
 def make_af_filename(court_id, docket_number, date_argued, extension):
     """Make a filename for the audio file for uploading to IA"""
-    return '.'.join(['gov', 'uscourts', court_id, docket_number,
-                     date_argued.isoformat(), extension])
+    return slugify('.'.join(['gov', 'uscourts', court_id, docket_number,
+                             date_argued.isoformat(), extension]))
