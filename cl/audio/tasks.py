@@ -7,6 +7,7 @@ from tempfile import NamedTemporaryFile
 import httplib2
 from celery.canvas import chain
 from django.conf import settings
+from django.utils.text import slugify
 from google.cloud import storage
 from google.cloud.exceptions import Forbidden, NotFound
 from google.cloud.storage import Blob
@@ -232,7 +233,7 @@ def upload_audio_to_ia(self, af_pk):
         d.date_argued,
         af.local_path_original_file.path.rsplit('.', 1)[1]
     )
-    bucket_name = get_bucket_name(d.court_id, d.docket_number)
+    bucket_name = slugify(get_bucket_name(d.court_id, d.docket_number))
     responses = upload_to_ia(
         self,
         identifier=bucket_name,
