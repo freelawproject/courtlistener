@@ -229,11 +229,11 @@ def upload_audio_to_ia(self, af_pk):
     d = af.docket
     file_name = make_af_filename(
         d.court_id,
-        d.docket_number,
+        slugify(d.docket_number),
         d.date_argued,
         af.local_path_original_file.path.rsplit('.', 1)[1]
     )
-    bucket_name = slugify(get_bucket_name(d.court_id, d.docket_number))
+    bucket_name = get_bucket_name(d.court_id, d.docket_number)
     responses = upload_to_ia(
         self,
         identifier=bucket_name,
