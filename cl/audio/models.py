@@ -188,7 +188,7 @@ class Audio(models.Model):
         super(Audio, self).save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_or_update_audio_files
-            add_or_update_audio_files.delay([self.pk], force_commit)
+            add_or_update_audio_files([self.pk], force_commit)
 
     def delete(self, *args, **kwargs):
         """
