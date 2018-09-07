@@ -173,7 +173,7 @@
                         {% elif type == 'r' %}
                             {% with matches=results.object_list.groups.docket_id.matches count=results.paginator.count %}
                             {{ count|intcomma }} Case{{ count|pluralize }} <span class="gray">&mdash;</span>
-                            {{ matches|intcomma }} Document{{ matches|pluralize }}
+                            {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
                             {% endwith %}
                         {% elif type == 'oa' %}
                             {{ results.paginator.count|intcomma }} Oral Argument{{ results.paginator.count|pluralize }}
