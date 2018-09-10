@@ -588,7 +588,7 @@ class SearchForm(forms.Form):
             if not hasattr(field, 'as_str_types'):
                 continue
             if search_type in field.as_str_types:
-                value = self.cleaned_data[field_name]
+                value = self.cleaned_data.get(field_name)
                 if value:
                     if isinstance(field, ChoiceField):
                         choices = flatten_choices(self.fields[field_name])
