@@ -7,7 +7,7 @@ from django.views.decorators.cache import never_cache
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 
-items_per_sitemap = 250
+items_per_sitemap = 50
 
 
 def make_index_params(group):
