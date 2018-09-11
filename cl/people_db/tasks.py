@@ -5,6 +5,7 @@ from django.core.files import File
 
 from cl.celery import app
 from cl.people_db.models import FinancialDisclosure
+from cl.search.models import THUMBNAIL_STATUSES
 
 
 @app.task
@@ -29,11 +30,11 @@ def make_png_thumbnail_from_pdf(pk, width=350):
         stdout, stderr = p.communicate()
 
         if p.returncode != 0:
-            fd.thumbnail_status = fd.THUMBNAIL_FAILED
+            fd.thumbnail_status = THUMBNAIL_STATUSES.FAILED
             fd.save()
             return fd.pk
 
-        fd.thumbnail_status = fd.THUMBNAIL_COMPLETE
+        fd.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
         filename = '%s.thumb.%sw.png' % (fd.person.slug, width)
         fd.thumbnail.save(filename, File(tmp))
 
