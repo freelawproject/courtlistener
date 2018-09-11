@@ -1243,8 +1243,9 @@ class FinancialDisclosure(models.Model):
     def save(self, *args, **kwargs):
         super(FinancialDisclosure, self).save(*args, **kwargs)
         if not self.pk:
-            from cl.people_db.tasks import make_png_thumbnail_from_pdf
-            make_png_thumbnail_from_pdf.delay(self.pk)
+            from cl.people_db.tasks import \
+                make_financial_disclosure_thumbnail_from_pdf
+            make_financial_disclosure_thumbnail_from_pdf.delay(self.pk)
 
 
 class PartyType(models.Model):

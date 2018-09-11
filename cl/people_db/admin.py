@@ -105,8 +105,9 @@ class FinancialDisclosureAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         obj.save()
-        from cl.people_db.tasks import make_png_thumbnail_from_pdf
-        make_png_thumbnail_from_pdf.delay(obj.pk)
+        from cl.people_db.tasks import \
+            make_financial_disclosure_thumbnail_from_pdf
+        make_financial_disclosure_thumbnail_from_pdf.delay(obj.pk)
 
 
 @admin.register(Person)
