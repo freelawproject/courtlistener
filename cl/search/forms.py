@@ -296,7 +296,7 @@ class SearchForm(forms.Form):
         )
     )
     neutral_cite.as_str_types = ['o']
-    cited_gt = forms.CharField(
+    cited_gt = forms.IntegerField(
         required=False,
         label='Min Cites',
         initial=0,
@@ -306,10 +306,10 @@ class SearchForm(forms.Form):
         )
     )
     cited_gt.as_str_types = ['o']
-    cited_lt = forms.CharField(
+    cited_lt = forms.IntegerField(
         required=False,
         label='Max Cites',
-        initial=60000,
+        initial=100000,
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
                    'autocomplete': 'off'}
