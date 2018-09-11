@@ -15,6 +15,7 @@ class FavoriteInline(admin.TabularInline):
     )
 
 
+@admin.register(Favorite)
 class FavoriteAdmin(admin.ModelAdmin):
     list_display = (
         'id',
@@ -24,7 +25,7 @@ class FavoriteAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'user',
         'cluster_id',
+        'audio_id',
+        'docket_id',
+        'recap_doc_id',
     )
-
-
-admin.site.register(Favorite, FavoriteAdmin)
