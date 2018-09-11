@@ -24,7 +24,7 @@ from cl.lib.search_index_utils import solr_list, null_map, \
     normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
-from cl.search.models import Court
+from cl.search.models import Court, THUMBNAIL_STATUSES
 
 SUFFIXES = (
     ('jr', 'Jr.'),
@@ -1206,14 +1206,6 @@ class ABARating(models.Model):
 
 class FinancialDisclosure(models.Model):
     """A simple table to hold references to financial disclosure forms"""
-    THUMBNAIL_NEEDED = 0
-    THUMBNAIL_COMPLETE = 1
-    THUMBNAIL_FAILED = 2
-    THUMBNAIL_STATUSES = (
-        (THUMBNAIL_NEEDED, "Thumbnail needed"),
-        (THUMBNAIL_COMPLETE, "Thumbnail completed successfully"),
-        (THUMBNAIL_FAILED, 'Unable to generate thumbnail'),
-    )
     person = models.ForeignKey(
         Person,
         help_text="The person that the document is associated with.",
@@ -1238,8 +1230,8 @@ class FinancialDisclosure(models.Model):
     )
     thumbnail_status = models.SmallIntegerField(
         help_text="The status of the thumbnail generation",
-        choices=THUMBNAIL_STATUSES,
-        default=0,
+        choices=THUMBNAIL_STATUSES.NAMES,
+        default=THUMBNAIL_STATUSES.NEEDED,
     )
     page_count = models.SmallIntegerField(
         help_text="The number of pages in the disclosure report",

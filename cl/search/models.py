@@ -54,6 +54,17 @@ SOURCES = (
 )
 
 
+class THUMBNAIL_STATUSES(object):
+    NEEDED = 0
+    COMPLETE = 1
+    FAILED = 2
+    NAMES = (
+        (NEEDED, "Thumbnail needed"),
+        (COMPLETE, "Thumbnail completed successfully"),
+        (FAILED, 'Unable to generate thumbnail'),
+    )
+
+
 class OriginatingCourtInformation(models.Model):
     """Lower court metadata to associate with appellate cases.
 
