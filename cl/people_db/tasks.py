@@ -68,3 +68,13 @@ def make_recap_document_thumbnail_from_pdf(pk):
         width=700,
         tmp_prefix='recap_thumb_',
     )
+
+
+def make_thumb_if_needed(rd):
+    """Check if a thumbnail exists. If it does, do not make another. If it
+    does not, make it.
+    """
+    if rd.thumbnail_status == THUMBNAIL_STATUSES.COMPLETE:
+        return
+    else:
+        make_recap_document_thumbnail_from_pdf(rd.pk)
