@@ -16,7 +16,7 @@ from django.utils.text import slugify
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.model_helpers import make_upload_path, make_recap_path, \
-    make_recap_pdf_path
+    make_recap_pdf_path, make_recap_thumb_path
 from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
     normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
@@ -875,6 +875,18 @@ class RECAPDocument(models.Model):
         help_text="Number of times the upload to the Internet Archive failed.",
         null=True,
         blank=True,
+    )
+    thumbnail = models.FileField(
+        help_text="A thumbnail of the first page of the document",
+        upload_to=make_recap_thumb_path,
+        storage=IncrementingFileSystemStorage(),
+        null=True,
+        blank=True,
+    )
+    thumbnail_status = models.SmallIntegerField(
+        help_text="The status of the thumbnail generation",
+        choices=THUMBNAIL_STATUSES.NAMES,
+        default=THUMBNAIL_STATUSES.NEEDED,
     )
     description = models.TextField(
         help_text="The short description of the docket entry that appears on "
