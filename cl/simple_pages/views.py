@@ -341,8 +341,6 @@ def serve_static_file(request, file_path=''):
         is_twitterbot = request.META.get('HTTP_USER_AGENT').startswith(
             "Twitterbot")
         og_disabled = bool(request.GET.get('no-og'))
-        # xxx - nuke post debugging!!!
-        is_twitterbot = True
         if is_twitterbot and not og_disabled:
             # Create an HTML page that wraps the PDF and serve
             # that up so Twitter can make a nice card.
