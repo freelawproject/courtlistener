@@ -1,0 +1,22 @@
+{# show the admin tools if applicable #}
+{% if perms.search.change_recapdocument or perms.search.change_docketentry or perms.search.change_docket %}
+  <div class="sidebar-section">
+    <h3><span>Admin</span></h3>
+    <p>
+      {% if perms.search.change_docket %}
+        <a
+          href="{% url 'admin:search_docket_change' document.docket_entry.docket.pk %}"
+          class="btn btn-primary btn-xs">Docket</a>
+      {% endif %}
+      {% if perms.search.change_docketentry %}
+        <a
+          href="{% url 'admin:search_docketentry_change' document.docket_entry.pk %}"
+          class="btn btn-primary btn-xs">Docket Entry</a>
+      {% endif %}
+      {% if perms.search.change_recapdocument %}
+        <a href="{% url 'admin:search_recapdocument_change' document.pk %}"
+           class="btn btn-primary btn-xs">RECAP Document</a>
+      {% endif %}
+    </p>
+  </div>
+{% endif %}
