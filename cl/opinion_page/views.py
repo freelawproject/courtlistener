@@ -27,6 +27,7 @@ from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
+from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
@@ -206,6 +207,7 @@ def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
         attachment_number=att_num,
     )
     title = make_rd_title(item)
+    make_thumb_if_needed(item)
     try:
         fave = Favorite.objects.get(recap_doc_id=item.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
