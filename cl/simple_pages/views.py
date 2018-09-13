@@ -22,9 +22,8 @@ from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
 from cl.lib import magic
 from cl.lib.decorators import track_in_piwik
-from cl.opinion_page.views import make_rd_title
+from cl.opinion_page.views import view_recap_document
 from cl.people_db.models import Person
-from cl.people_db.tasks import make_thumb_if_needed
 from cl.search.forms import SearchForm
 from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument, \
     Docket
@@ -342,20 +341,19 @@ def serve_static_file(request, file_path=''):
             "Twitterbot")
         og_disabled = bool(request.GET.get('no-og'))
         if is_twitterbot and not og_disabled:
-            # Create an HTML page that wraps the PDF and serve
-            # that up so Twitter can make a nice card.
+            # Serve up the regular HTML page, which has the twitter card info.
             try:
                 rd = RECAPDocument.objects.get(filepath_local=file_path)
             except (RECAPDocument.DoesNotExist,
                     RECAPDocument.MultipleObjectsReturned):
                 pass
             else:
-                make_thumb_if_needed(rd)
-                return render(request, 'recap_document_twitter.html', {
-                    'title': make_rd_title(rd),
-                    'document': rd,
-                    'private': True,
-                })
+                return view_recap_document(
+                    request,
+                    docket_id=rd.docket_entry.docket_id,
+                    doc_num=rd.document_number,
+                    att_num=rd.attachment_number
+                )
         # A human or unable to find the item in the DB. Create an empty object,
         # and set it to blocked. (All recap pdfs are blocked.)
         item = RECAPDocument()
