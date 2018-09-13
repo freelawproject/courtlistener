@@ -5,19 +5,8 @@
 
 {% block title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
-{% block description %}
-  {% if rd.docket_entry.description %}
-    {{ rd.docket_entry.description }}
-  {% else %}
-    {{ rd.description }}
-  {% endif %}
-{% endblock %}
-{% block og_description %}
-  {% if rd.docket_entry.description %}
-    {{ rd.docket_entry.description }}
-  {% else %}
-    {{ rd.description }}
-  {% endif %}
+{% block description %}{% if document.docket_entry.description %}{{ document.docket_entry.description }}{% else %}{{ document.description }}{% endif %}
+{% endblock %}{% block og_description %}{% if document.docket_entry.description %}{{ document.docket_entry.description }}{% else %}{{ document.description }}{% endif %}
 {% endblock %}
 
 {% block twitter_card_type %}summary_large_image{% endblock %}
