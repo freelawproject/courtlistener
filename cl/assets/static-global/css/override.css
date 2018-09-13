@@ -591,6 +591,11 @@ input.court-checkbox, input.status-checkbox {
   background-color: #f5f5f5;
 }
 
+/* Docket entry page*/
+.embed-responsive.embed-responsive-8by11 {
+  padding-bottom: 80%;
+}
+
 /* Donations page */
 #id_amount_other {
   float: none;
