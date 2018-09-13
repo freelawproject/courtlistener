@@ -16,19 +16,29 @@ def make_recap_path(instance, filename):
     return "recap/%s" % get_valid_filename(filename)
 
 
-def make_recap_pdf_path(instance, filename):
-    """Make a path for storing the a PACER document in RECAP.
+def base_recap_path(instance, filename, base_dir):
+    """Make a filepath, accepting an extra parameter for the base directory
 
     Mirrors technique used by original RECAP server to upload PDFs to IA.
     """
     return os.path.join(
-        "recap",
+        base_dir,
         get_bucket_name(
             instance.docket_entry.docket.court_id,
             instance.docket_entry.docket.pacer_case_id,
         ),
         filename,
     )
+
+
+def make_recap_pdf_path(instance, filename):
+    """Make a path for storing the a PACER document in RECAP."""
+    return base_recap_path(instance, filename, 'recap')
+
+
+def make_recap_thumb_path(instance, filename):
+    """Make a path for storing the thumbnails for a PACER document in RECAP."""
+    return base_recap_path(instance, filename, 'recap-thumbnails')
 
 
 def make_upload_path(instance, filename):
