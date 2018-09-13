@@ -22,7 +22,9 @@ from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
 from cl.lib import magic
 from cl.lib.decorators import track_in_piwik
+from cl.opinion_page.views import make_rd_title
 from cl.people_db.models import Person
+from cl.people_db.tasks import make_thumb_if_needed
 from cl.search.forms import SearchForm
 from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument, \
     Docket
@@ -334,8 +336,30 @@ def serve_static_file(request, file_path=''):
         item = get_object_or_404(Audio, local_path_mp3=file_path)
         mimetype = 'audio/mpeg'
     elif file_path.startswith('recap'):
-        # Create an empty object, and set it to blocked. No need to hit the DB
-        # since all RECAP documents are blocked.
+        # Either we serve up a special HTML file to make twitter happy, or we
+        # serve the PDF to make a human happy.
+        is_twitterbot = request.META.get('HTTP_USER_AGENT').startswith(
+            "Twitterbot")
+        og_disabled = bool(request.GET.get('no-og'))
+        # xxx - nuke post debugging!!!
+        is_twitterbot = True
+        if is_twitterbot and not og_disabled:
+            # Create an HTML page that wraps the PDF and serve
+            # that up so Twitter can make a nice card.
+            try:
+                rd = RECAPDocument.objects.get(filepath_local=file_path)
+            except (RECAPDocument.DoesNotExist,
+                    RECAPDocument.MultipleObjectsReturned):
+                pass
+            else:
+                make_thumb_if_needed(rd)
+                return render(request, 'recap_document_twitter.html', {
+                    'title': make_rd_title(rd),
+                    'document': rd,
+                    'private': True,
+                })
+        # A human or unable to find the item in the DB. Create an empty object,
+        # and set it to blocked. (All recap pdfs are blocked.)
         item = RECAPDocument()
         item.blocked = True
         mimetype = 'application/pdf'
