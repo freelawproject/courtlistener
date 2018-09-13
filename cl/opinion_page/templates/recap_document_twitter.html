@@ -10,9 +10,11 @@
 {% endblock %}
 
 {% block twitter_card_type %}summary_large_image{% endblock %}
-{% block og_image %}{% get_full_host %}/{{ document.thumbnail }}{% endblock %}
+{% block og_image %}{% get_full_host %}{{ STATIC_URL }}{{ document.thumbnail }}{% endblock %}
 {% block og_image_alt %}The first page of the document in the linked PDF{% endblock %}
 {% block og_image_width %}700{% endblock %}
+{# Guess. Only used to set the height the first time. Assumes 8.5×11 page #}
+{% block og_image_height %}1081{% endblock %}
 
 {% block navbar-r %}active{% endblock %}
 
