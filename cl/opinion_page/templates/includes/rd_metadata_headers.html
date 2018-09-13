@@ -1,0 +1,76 @@
+<h3>
+  {% if document.description %}{{ document.description }}
+    <span class="gray">&mdash;</span>
+  {% endif %}
+  Document #{{ document.document_number }}{% if document.document_type == document.ATTACHMENT %}, Attachment #{{ document.attachment_number }}{% endif %}
+</h3>
+<h4>{{ document.docket_entry.docket.court }}</h4>
+<p class="bottom">
+  <span class="meta-data-header">Docket Number:</span>
+  <span class="meta-data-value">
+    <a href="{{ document.docket_entry.docket.get_absolute_url }}">
+        {{ document.docket_entry.docket.docket_number }}
+    </a>
+  </span>
+</p>
+{% if document.docket_entry.date_filed %}
+<p class="bottom">
+  <span class="meta-data-header">Date Filed:</span>
+  <span class="meta-data-value">
+    {{ document.docket_entry.date_filed|date:"F jS, Y" }}
+  </span>
+</p>
+{% endif %}
+{% if document.date_upload %}
+<p class="bottom">
+  <span class="meta-data-header">Uploaded:</span>
+  <span class="meta-data-value">
+      {{ document.date_upload|date:"F jS, Y" }}
+  </span>
+</p>
+{% endif %}
+
+<div class="btn-group v-offset-below-3 v-offset-above-1">
+  {% if document.is_available %}
+    <a href="/{{ document.filepath_local }}"
+       role="button"
+       class="btn btn-primary">Download PDF&nbsp;<i class="fa fa-file-pdf-o"></i>
+    </a>
+    <button type="button"
+            class="btn btn-primary dropdown-toggle"
+            data-toggle="dropdown"
+            aria-haspopup="true"
+            aria-expanded="false">
+      <span class="caret"></span>
+      <span class="sr-only">Toggle Dropdown</span>
+    </button>
+    <ul class="dropdown-menu">
+      <li>
+        <a href="/{{ document.filepath_local }}">From
+            CourtListener</a>
+      </li>
+      {% if document.filepath_ia %}
+        <li>
+          <a href="{{ document.filepath_ia }}">From
+              Internet Archive</a>
+        </li>
+        <li role="separator" class="divider"></li>
+      {% endif %}
+      {% if document.pacer_url %}
+        <li>
+          <a href="{{ document.pacer_url }}"
+             target="_blank"
+             rel="nofollow">Buy on PACER</a>
+        </li>
+      {% endif %}
+    </ul>
+  {% else %}
+    {# We don't have it #}
+    {% if document.pacer_url %}
+      <a href="{{ document.pacer_url }}"
+         class="btn btn-primary"
+         target="_blank"
+         rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
+    {% endif %}
+  {% endif %}
+</div>
