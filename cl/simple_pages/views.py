@@ -21,6 +21,7 @@ from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
 from cl.lib import magic
+from cl.lib.bot_detector import is_og_bot
 from cl.lib.decorators import track_in_piwik
 from cl.opinion_page.views import view_recap_document
 from cl.people_db.models import Person
@@ -335,12 +336,10 @@ def serve_static_file(request, file_path=''):
         item = get_object_or_404(Audio, local_path_mp3=file_path)
         mimetype = 'audio/mpeg'
     elif file_path.startswith('recap'):
-        # Either we serve up a special HTML file to make twitter happy, or we
-        # serve the PDF to make a human happy.
-        is_twitterbot = request.META.get('HTTP_USER_AGENT').startswith(
-            "Twitterbot")
+        # Either we serve up a special HTML file to make open graph crawlers
+        # happy, or we serve the PDF to make a human happy.
         og_disabled = bool(request.GET.get('no-og'))
-        if is_twitterbot and not og_disabled:
+        if is_og_bot(request) and not og_disabled:
             # Serve up the regular HTML page, which has the twitter card info.
             try:
                 rd = RECAPDocument.objects.get(filepath_local=file_path)
