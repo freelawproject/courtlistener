@@ -864,6 +864,7 @@ class RECAPDocument(models.Model):
         upload_to=make_recap_pdf_path,
         storage=IncrementingFileSystemStorage(),
         max_length=1000,
+        db_index=True,
         blank=True,
     )
     filepath_ia = models.CharField(
