@@ -27,7 +27,7 @@ def make_png_thumbnail_for_instance(pk, InstanceClass, file_attr, width,
             'convert',
             # Only do the first page.
             '%s[0]' % getattr(item, file_attr).path,
-            '-resize', '%s' % width,
+            '-thumbnail', '%s' % width,
             # This and the next line handle transparency problems
             '-background', 'white',
             '-alpha', 'remove',

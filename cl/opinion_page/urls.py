@@ -1,6 +1,5 @@
 from django.conf.urls import url
 
-from cl.opinion_page.sitemap import opinion_sitemap_maker
 from cl.opinion_page.views import (
     block_item, cluster_visualizations, view_opinion, citation_redirector,
     redirect_docket_recap, view_authorities, view_docket, view_parties,
@@ -58,14 +57,6 @@ urlpatterns = [
         citation_redirector,
         name="citation_redirector",
     ),
-
-    # Sitemap
-    url(
-        r'^sitemap-opinions\.xml',
-        opinion_sitemap_maker,
-        name='opinion_sitemap',
-    ),
-
 
     # Admin tools
     url(
