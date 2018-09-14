@@ -34,7 +34,16 @@ Disallow: /api/rest/v2/
 Disallow: /api/bulk-data/
 Disallow: /static/judge_pics/
 
+# Needed for open graph crawling
 User-agent: twitterbot
+Disallow: /robots.txt
+Disallow: /assets/
+Disallow: /api/rest/v1/
+Disallow: /api/rest/v2/
+Disallow: /api/bulk-data/
+Disallow: /static/judge_pics/
+
+User-agent: facebookexternalhit
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
