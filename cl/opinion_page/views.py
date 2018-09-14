@@ -19,7 +19,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib import search_utils, sunburnt
-from cl.lib.bot_detector import is_bot
+from cl.lib.bot_detector import is_bot, is_og_bot
 from cl.lib.import_lib import map_citations_to_models
 from cl.lib.model_helpers import suppress_autotime
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
@@ -207,7 +207,8 @@ def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
         attachment_number=att_num,
     )
     title = make_rd_title(item)
-    make_thumb_if_needed(item)
+    if is_og_bot(request):
+        make_thumb_if_needed(item)
     try:
         fave = Favorite.objects.get(recap_doc_id=item.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
