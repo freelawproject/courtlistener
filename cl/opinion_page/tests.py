@@ -1,12 +1,7 @@
-from django.conf import settings
 from django.core.urlresolvers import reverse
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND, \
     HTTP_302_FOUND
-
-from cl.lib import sunburnt
-from cl.lib.test_helpers import SitemapTest
-from cl.sitemap import make_sitemap_solr_params
 
 
 class ViewDocumentTest(TestCase):
@@ -92,40 +87,3 @@ class ViewRecapDocketTest(TestCase):
             'pacer_case_id': '666666',
         }), follow=True)
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
-
-
-@override_settings(
-    SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
-    SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
-)
-class OpinionSitemapTest(SitemapTest):
-    def __init__(self, *args, **kwargs):
-        super(OpinionSitemapTest, self).__init__(*args, ** kwargs)
-        self.sitemap_url = reverse('opinion_sitemap')
-
-    def get_expected_item_count(self):
-        # OpinionsSitemap uses the solr index to generate the page, so the only
-        # accurate count comes from the index itself which will also be based on
-        # the fixtures.
-        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
-        params = make_sitemap_solr_params('dateFiled asc', 'o_sitemap')
-        params['rows'] = 1000
-
-        r = conn.raw_query(**params).execute()
-
-        # the underlying SitemapTest relies on counting url elements in the xml
-        # response...this logic mimics the creation of the xml, so we at least
-        # know what we *should* get getting for a count if the SiteMapTest's
-        # HTTP client-based test gets an HTTP 200
-        count = 0
-        for result in r:
-            if result.get('local_path'):
-                count += 2
-            else:
-                count += 1
-        return count
-
-    def test_does_the_sitemap_have_content(self):
-        # Class attributes are set, just run the test in super.
-        self.expected_item_count = self.get_expected_item_count()
-        super(OpinionSitemapTest, self).does_the_sitemap_have_content()
