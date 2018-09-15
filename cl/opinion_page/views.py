@@ -184,13 +184,14 @@ def view_parties(request, docket_id, slug):
 def make_rd_title(rd):
     de = rd.docket_entry
     d = de.docket
-    return '{desc}#{doc_num}{att_num} in {case_name}{docket_number}'.format(
+    return '{desc}#{doc_num}{att_num} in {case_name} ({court}{docket_number})'.format(
         desc='%s &ndash; ' % rd.description if rd.description else '',
         doc_num=rd.document_number,
         att_num=', Att. #%s' % rd.attachment_number if
                 rd.document_type == RECAPDocument.ATTACHMENT else '',
         case_name=best_case_name(d),
-        docket_number=' (%s)' % d.docket_number if d.docket_number else '',
+        court=d.court.citation_string,
+        docket_number=', %s' % d.docket_number if d.docket_number else '',
     )
 
 
