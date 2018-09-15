@@ -209,6 +209,7 @@ def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
     title = make_rd_title(item)
     if is_og_bot(request):
         make_thumb_if_needed(item)
+        item.refresh_from_db()
     try:
         fave = Favorite.objects.get(recap_doc_id=item.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
