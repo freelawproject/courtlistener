@@ -36,7 +36,7 @@
   <meta property="og:site_name" content="CourtListener"/>
   <meta property="og:image"
         content="{% block og_image %}{% get_full_host %}{{ STATIC_URL }}png/og-image-300x300.png{% endblock %}"/>
-  <meta property="og:image:type" content="image/png"/>
+  <meta property="og:image:type" content="{% block og_image_type %}image/png{% endblock %}"/>
   <meta property="twitter:image:alt"
         content="{% block og_image_alt %}The CourtListener logo{% endblock %}"/>
   <meta property="og:image:width" content="{% block og_image_width %}300{% endblock %}"/>
