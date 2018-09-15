@@ -10,9 +10,12 @@
 {% endblock %}
 {% block og_description %}{% if document.docket_entry.description %}{{ document.docket_entry.description }}{% else %}{{ document.description }}{% endif %}
 {% endblock %}
-{% block twitter_card_type %}summary_large_image{% endblock %}
-{% block og_image %}{% get_full_host %}{{ STATIC_URL }}{{ document.thumbnail }}{% endblock %}
-{% block og_image_alt %}The first page of the document in the linked PDF{% endblock %}
+{% block twitter_card_type %}{% if document.thumbnail %}summary_large_image{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image %}{% if document.thumbnail %}{% get_full_host %}{{ STATIC_URL }}{{ document.thumbnail }}{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_alt %}{% if document.thumbnail %}The first page of the document in the linked PDF{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_width %}{% if document.thumbnail %}826{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_height %}{% if document.thumbnail %}1068{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_type %}{% if document.thumbnail %}image/jpeg{% else %}{{ block.super }}{% endif %}{% endblock %}
 
 
 {% block navbar-r %}active{% endblock %}
