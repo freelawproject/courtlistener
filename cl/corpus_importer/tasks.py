@@ -1024,6 +1024,12 @@ def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
 
     # Save and extract, skipping OCR.
     rd.save()
+
+    # Make sure we mark the docket as needing upload
+    changed = mark_ia_upload_needed(rd.docket_entry.docket)
+    if changed:
+        rd.docket_entry.docket.save()
+
     return True, 'Saved item successfully'
 
 
