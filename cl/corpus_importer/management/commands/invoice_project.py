@@ -14,8 +14,8 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query_from_query_string
 from cl.recap.tasks import process_recap_attachment
 
-PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
-PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
+PACER_USERNAME = os.environ['PACER_USERNAME']
+PACER_PASSWORD = os.environ['PACER_PASSWORD']
 
 TAG = 'hDResWFzUBzlAOKP'
 
