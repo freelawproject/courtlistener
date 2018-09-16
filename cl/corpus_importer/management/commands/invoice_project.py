@@ -17,7 +17,12 @@ from cl.recap.tasks import process_recap_attachment
 PACER_USERNAME = os.environ['PACER_USERNAME']
 PACER_PASSWORD = os.environ['PACER_PASSWORD']
 
-TAG = 'hDResWFzUBzlAOKP'
+TAG_PHASE_1 = 'hDResWFzUBzlAOKP'
+TAG_PHASE_2 = 'sSgVwjmTsAZAFLPR'
+
+# District and bankruptcy court non-attachment
+# documents with invoice in their description.
+QS = 'q=document_type%3A"PACER+Document"+description%3Ainvoice&type=r&order_by=score+desc&court=dcd+almd+alnd+alsd+akd+azd+ared+arwd+cacd+caed+cand+casd+cod+ctd+ded+flmd+flnd+flsd+gamd+gand+gasd+hid+idd+ilcd+ilnd+ilsd+innd+insd+iand+iasd+ksd+kyed+kywd+laed+lamd+lawd+med+mdd+mad+mied+miwd+mnd+msnd+mssd+moed+mowd+mtd+ned+nvd+nhd+njd+nmd+nyed+nynd+nysd+nywd+nced+ncmd+ncwd+ndd+ohnd+ohsd+oked+oknd+okwd+ord+paed+pamd+pawd+rid+scd+sdd+tned+tnmd+tnwd+txed+txnd+txsd+txwd+utd+vtd+vaed+vawd+waed+wawd+wvnd+wvsd+wied+wiwd+wyd+gud+nmid+prd+vid+californiad+caca+circtdel+illinoised+illinoisd+indianad+orld+circtnc+ohiod+pennsylvaniad+southcarolinaed+southcarolinawd+tennessed+circttenn+canalzoned+bap1+bap2+bap6+bap8+bap9+bap10+bapme+bapma+almb+alnb+alsb+akb+arb+areb+arwb+cacb+caeb+canb+casb+cob+ctb+deb+dcb+flmb+flnb+flsb+gamb+ganb+gasb+hib+idb+ilcb+ilnb+ilsb+innb+insb+ianb+iasb+ksb+kyeb+kywb+laeb+lamb+lawb+meb+mdb+mab+mieb+miwb+mnb+msnb+mssb+moeb+mowb+mtb+nebraskab+nvb+nhb+njb+nmb+nyeb+nynb+nysb+nywb+nceb+ncmb+ncwb+ndb+ohnb+ohsb+okeb+oknb+okwb+orb+paeb+pamb+pawb+rib+scb+sdb+tneb+tnmb+tnwb+tennesseeb+txeb+txnb+txsb+txwb+utb+vtb+vaeb+vawb+waeb+wawb+wvnb+wvsb+wieb+wiwb+wyb+gub+nmib+prb+vib'
 
 
 def get_attachment_pages(options):
@@ -25,11 +30,8 @@ def get_attachment_pages(options):
     pages.
     """
     page_size = 100
-    # District and bankruptcy court non-attachment documents with invoice in
-    # their description.
-    query_string = 'q=document_type%3A"PACER+Document"+description%3Ainvoice&type=r&order_by=score+desc&court=dcd+almd+alnd+alsd+akd+azd+ared+arwd+cacd+caed+cand+casd+cod+ctd+ded+flmd+flnd+flsd+gamd+gand+gasd+hid+idd+ilcd+ilnd+ilsd+innd+insd+iand+iasd+ksd+kyed+kywd+laed+lamd+lawd+med+mdd+mad+mied+miwd+mnd+msnd+mssd+moed+mowd+mtd+ned+nvd+nhd+njd+nmd+nyed+nynd+nysd+nywd+nced+ncmd+ncwd+ndd+ohnd+ohsd+oked+oknd+okwd+ord+paed+pamd+pawd+rid+scd+sdd+tned+tnmd+tnwd+txed+txnd+txsd+txwd+utd+vtd+vaed+vawd+waed+wawd+wvnd+wvsd+wied+wiwd+wyd+gud+nmid+prd+vid+californiad+caca+circtdel+illinoised+illinoisd+indianad+orld+circtnc+ohiod+pennsylvaniad+southcarolinaed+southcarolinawd+tennessed+circttenn+canalzoned+bap1+bap2+bap6+bap8+bap9+bap10+bapme+bapma+almb+alnb+alsb+akb+arb+areb+arwb+cacb+caeb+canb+casb+cob+ctb+deb+dcb+flmb+flnb+flsb+gamb+ganb+gasb+hib+idb+ilcb+ilnb+ilsb+innb+insb+ianb+iasb+ksb+kyeb+kywb+laeb+lamb+lawb+meb+mdb+mab+mieb+miwb+mnb+msnb+mssb+moeb+mowb+mtb+nebraskab+nvb+nhb+njb+nmb+nyeb+nynb+nysb+nywb+nceb+ncmb+ncwb+ndb+ohnb+ohsb+okeb+oknb+okwb+orb+paeb+pamb+pawb+rib+scb+sdb+tneb+tnmb+tnwb+tennesseeb+txeb+txnb+txsb+txwb+utb+vtb+vaeb+vawb+waeb+wawb+wvnb+wvsb+wieb+wiwb+wyb+gub+nmib+prb+vib'
     main_query = build_main_query_from_query_string(
-        query_string,
+        QS,
         {'rows': page_size, 'fl': ['id', 'docket_id']},
         {'group': False, 'facet': False},
     )
@@ -64,7 +66,7 @@ def get_attachment_pages(options):
                 make_attachment_pq_object.s(
                     result['id'], recap_user.pk).set(queue=q),
                 # And then process that using the normal machinery.
-                process_recap_attachment.s(tag_names=[TAG]).set(queue=q),
+                process_recap_attachment.s(tag_names=[TAG_PHASE_1]).set(queue=q),
             ).apply_async()
             i += 1
         else:
