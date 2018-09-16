@@ -21,6 +21,13 @@ def is_bot(request):
 
 def is_og_bot(request):
     """Check if it's a bot that understands opengraph / twitter cards"""
-    known_bots = ['twitterbot', 'facebookexternalhit']
+    known_bots = [
+        'facebookexternalhit',
+        'iframely',  # A service for getting open graph data?
+        'LinkedInBot',
+        'skypeuripreview',
+        'slackbot-linkexpanding',
+        'twitterbot',
+    ]
     return base_bot_matcher(request, known_bots)
 
