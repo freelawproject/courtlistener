@@ -105,7 +105,20 @@
                 <object data="/{{ document.filepath_local }}?no-og=true"
                         type="application/pdf"
                         width="100%"
-                        height="100%"></object>
+                        height="100%">
+                  <div class="row">
+                    <div class="col-sm-1 col-md-2 col-lg-3"></div>
+                    <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
+                      <p>Oops! Your browser does not support embedded PDF viewing.
+                      </p>
+                      <p>
+                        {% include "includes/rd_download_button.html" %}
+                      </p>
+                    </div>
+                  </div>
+
+
+                </object>
               </div>
             </div>
             <div role="tabpanel" class="tab-pane" id="text">
