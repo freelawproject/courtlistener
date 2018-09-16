@@ -7,12 +7,15 @@ from django.core.paginator import Paginator
 from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import make_attachment_pq_object, \
-    get_attachment_page_by_rd
+    get_attachment_page_by_rd, get_pacer_doc_by_rd, add_tags
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query_from_query_string
 from cl.recap.tasks import process_recap_attachment
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.search.models import RECAPDocument
+from cl.search.tasks import add_or_update_recap_document
 
 PACER_USERNAME = os.environ['PACER_USERNAME']
 PACER_PASSWORD = os.environ['PACER_PASSWORD']
@@ -78,7 +81,60 @@ def get_attachment_pages(options):
 
 def get_documents(options):
     """Download documents from PACER if we don't already have them."""
-    pass
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q,
+                              min_items=options['queue_length'])
+    session = PacerSession(username=PACER_USERNAME,
+                           password=PACER_PASSWORD)
+    session.login()
+
+    page_size = 100
+    main_query = build_main_query_from_query_string(
+        QS,
+        {'rows': page_size, 'fl': ['id', 'docket_id']},
+        {'group': False, 'facet': False},
+    )
+    si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
+    results = si.query().add_extra(**main_query)
+
+    paginator = Paginator(results, page_size)
+    i = 0
+    for page_number in range(1, paginator.num_pages + 1):
+        paged_results = paginator.page(page_number)
+        for result in paged_results.object_list:
+            if i < options['offset']:
+                continue
+            if i >= options['limit'] > 0:
+                break
+            throttle.maybe_wait()
+
+            rd = RECAPDocument.objects.get(pk=result['id'])
+            logger.info("Doing item %s w/rd: %s, d: %s", i, rd.pk,
+                        result['docket_id'])
+
+            if rd.is_available:
+                logger.info("Already have pk %s; just tagging it.", rd.pk)
+                add_tags(rd, TAG_PHASE_2)
+                i += 1
+                continue
+
+            if not rd.pacer_doc_id:
+                logger.info("Unable to find pacer_doc_id for: %s", rd.pk)
+                i += 1
+                continue
+
+            chain(
+                get_pacer_doc_by_rd.s(rd.pk, session.cookies,
+                                      tag=TAG_PHASE_2).set(queue=q),
+                extract_recap_pdf.si(rd.pk).set(queue=q),
+                add_or_update_recap_document.si([rd.pk]).set(queue=q),
+            ).apply_async()
+            i += 1
+        else:
+            # Inner loop exited normally (didn't "break")
+            continue
+        # Inner loop broke. Break outer loop too.
+        break
 
 
 class Command(VerboseCommand):
