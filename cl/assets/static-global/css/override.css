@@ -63,6 +63,36 @@ header {
   backface-visibility: hidden; /* Fixes jumpy transition */
 }
 
+.navbar-default .navbar-nav > li > a.donate,
+.navbar-default .navbar-nav > .active > a.donate,
+.navbar-default .navbar-nav > .active > a.donate:focus {
+  color: #AE0B0B;
+  background-color: transparent;
+  font-weight: bold;
+  font-size: 110%;
+}
+
+.navbar-default .navbar-nav > .active > a.donate:hover {
+  background-color: #e7e7e7;
+  color: #AE0B0B;
+}
+
+.navbar-default .navbar-nav > li > a.donate:hover{
+  color: #d90c0c;
+}
+
+.nav .open > a,
+.nav .open > a:hover,
+.nav .open > a:focus {
+  border-color: transparent;
+}
+
+.navbar-default .navbar-nav .dropdown-menu > li > a,
+.navbar-default .navbar-nav .dropdown-menu > li > a:hover,
+.navbar-default .navbar-nav .dropdown-menu > li > a:focus {
+  border-color: transparent;
+}
+
 #search-results {
   margin-top: 23px;
 }
