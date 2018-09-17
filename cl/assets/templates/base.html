@@ -87,7 +87,7 @@
   {% endif %}
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/hopscotch.css" type="text/css"
         media="screen, projection">
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css?v=20180913" type="text/css"
+  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css?v=20180917" type="text/css"
         media="screen, projection">
   {% if DEBUG %}
     <!--<script src="{{ STATIC_PREFIX}}js/bootlint.min.js"></script>-->
@@ -255,9 +255,13 @@
                 </li>
               </ul>
             </li>
-            <li class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
-              <a href="{% url "donate" %}?referrer=navbar"
-                 tabindex="108">Donate</a>
+          </ul>
+          <ul class="nav navbar-nav navbar-right">
+            <li
+              class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
+              <a href="{% url "donate" %}?referrer=navbar-v2"
+                 tabindex="108"
+                 class="donate"><i class="fa fa-heart-o"></i>&nbsp;Donate</a>
             </li>
           </ul>
         </div>
