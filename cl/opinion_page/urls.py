@@ -1,5 +1,6 @@
 from django.conf.urls import url
 
+from cl.opinion_page.sitemap import opinion_sitemap_maker, recap_sitemap_maker
 from cl.opinion_page.views import (
     block_item, cluster_visualizations, view_opinion, citation_redirector,
     redirect_docket_recap, view_authorities, view_docket, view_parties,
@@ -56,6 +57,18 @@ urlpatterns = [
         r'^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,4})/(?P<page>\d{1,8})/)?$',
         citation_redirector,
         name="citation_redirector",
+    ),
+
+    # Sitemap
+    url(
+        r'^sitemap-opinions\.xml',
+        opinion_sitemap_maker,
+        name='opinion_sitemap',
+    ),
+    url(
+        r'^sitemap-recap\.xml',
+        recap_sitemap_maker,
+        name='recap_sitemap',
     ),
 
     # Admin tools

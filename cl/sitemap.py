@@ -108,6 +108,8 @@ def index_sitemap_maker(request):
     provides links items.
     """
     connection_string_sitemap_path_pairs = (
+        (settings.SOLR_OPINION_URL, reverse('opinion_sitemap'), False),
+        (settings.SOLR_RECAP_URL, reverse('recap_sitemap'), True),
         (settings.SOLR_AUDIO_URL, reverse('oral_argument_sitemap'), False),
         (settings.SOLR_PEOPLE_URL, reverse('people_sitemap'), False),
     )
