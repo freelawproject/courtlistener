@@ -1,0 +1,10 @@
+---
+
+- hosts: db, dev
+  tasks:
+  - include_vars: defaults.yml
+  - name: add db cache table
+    django_manage:
+        app_path={{ install_root }}
+        command=createcachetable
+        virtualenv={{ virtualenv_root }}
