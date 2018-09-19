@@ -6,6 +6,7 @@ from django.utils.encoding import smart_str
 from django.views.decorators.cache import never_cache
 
 from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.search_utils import build_court_count_query
 
 items_per_sitemap = 10000
 
@@ -116,10 +117,13 @@ def index_sitemap_maker(request):
     sites = []
     for connection_string, path, group in connection_string_sitemap_path_pairs:
         conn = ExtraSolrInterface(connection_string)
-        count = conn.query().add_extra(**make_index_params(group)).count()
-        num_pages = count / items_per_sitemap + 1
-        for i in range(1, num_pages + 1):
-            sites.append('https://www.courtlistener.com%s?p=%s' % (path, i))
+        response = conn.query().add_extra(**build_court_count_query(group)).count()
+        court_count_tuples = response.facet_counts.facet_fields['court_exact']
+        for court, count in court_count_tuples:
+            num_pages = count / items_per_sitemap + 1
+            for page in range(1, num_pages + 1):
+                sites.append('https://www.courtlistener.com%s?p=%s&court=%s' %
+                             (path, page, court))
 
     # Random additional sitemaps.
     sites.extend([
