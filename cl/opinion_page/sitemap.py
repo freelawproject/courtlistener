@@ -4,6 +4,7 @@ from django.views.decorators.cache import cache_page
 from cl.sitemap import make_sitemap_solr_params, make_solr_sitemap
 
 
+@cache_page(60 * 60 * 24 * 14, cache='db_cache')  # two weeks
 def opinion_sitemap_maker(request):
     return make_solr_sitemap(
         request,
@@ -15,7 +16,7 @@ def opinion_sitemap_maker(request):
     )
 
 
-@cache_page(60 * 60 * 24 * 7)  # A week
+@cache_page(60 * 60 * 24 * 14, cache='db_cache')  # two weeks
 def recap_sitemap_maker(request):
     return make_solr_sitemap(
         request,
