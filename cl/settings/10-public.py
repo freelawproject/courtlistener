@@ -211,6 +211,10 @@ CACHES = {
             'DB': REDIS_DATABASES['CACHE'],
         },
     },
+    'db_cache': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'django_cache',
+    }
 }
 # This sets Redis as the session backend. This is often advised against, but we
 # have pretty good persistency in Redis, so it's fairly well backed up.
