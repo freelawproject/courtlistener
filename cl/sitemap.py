@@ -102,7 +102,7 @@ def index_sitemap_maker(request):
     sites = []
     for connection_string, path, group in connection_string_sitemap_path_pairs:
         conn = ExtraSolrInterface(connection_string)
-        response = conn.query().add_extra(**build_court_count_query(group)).count()
+        response = conn.query().add_extra(**build_court_count_query(group)).execute()
         court_count_tuples = response.facet_counts.facet_fields['court_exact']
         for court, count in court_count_tuples:
             num_pages = count / items_per_sitemap + 1
