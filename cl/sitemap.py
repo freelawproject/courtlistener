@@ -11,23 +11,6 @@ from cl.lib.search_utils import build_court_count_query
 items_per_sitemap = 10000
 
 
-def make_index_params(group):
-    params = {
-        'q': '*',
-        'rows': '0',  # just need the count
-        'start': '0',
-        'caller': 'sitemap_index',
-    }
-    if group:
-        params.update({
-            'group': 'true',
-            'group.ngroups': 'true',
-            'group.field': 'docket_id',
-            'group.limit': '0',
-        })
-    return params
-
-
 def make_sitemap_solr_params(sort, caller):
     params = {
         'q': '*',
