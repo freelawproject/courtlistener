@@ -2,7 +2,7 @@
 
 - hosts: db, dev
   tasks:
-  - include_vars: defaults.yml
+  - include_vars: ../defaults.yml
   - name: add db cache table
     django_manage:
         app_path={{ install_root }}
