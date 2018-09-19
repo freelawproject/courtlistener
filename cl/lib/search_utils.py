@@ -702,8 +702,12 @@ def build_coverage_query(court, q):
     return params
 
 
-def build_court_count_query():
-    """Build a query that returns the count of cases for all courts"""
+def build_court_count_query(group=False):
+    """Build a query that returns the count of cases for all courts
+
+    :param group: Should the results be grouped? Note that grouped facets have
+    bad performance.
+    """
     params = {
         'q': '*',
         'facet': 'true',
@@ -712,4 +716,12 @@ def build_court_count_query():
         'rows': 0,
         'caller': 'build_court_count_query',
     }
+    if group:
+        params.update({
+            'group': 'true',
+            'group.ngroups': 'true',
+            'group.field': 'docket_id',
+            'group.limit': '0',
+            'group.facet': 'true',
+        })
     return params
