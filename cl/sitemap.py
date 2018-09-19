@@ -3,7 +3,7 @@ from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 from django.template import loader
 from django.utils.encoding import smart_str
-from django.views.decorators.cache import never_cache
+from django.views.decorators.cache import cache_page
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_court_count_query
@@ -84,7 +84,7 @@ def make_solr_sitemap(request, solr_url, params, changefreq, low_priority_pages,
     return response
 
 
-@never_cache
+@cache_page(60 * 60 * 24 * 7, cache='db_cache')  # One week
 def index_sitemap_maker(request):
     """Generate a sitemap index page
 
