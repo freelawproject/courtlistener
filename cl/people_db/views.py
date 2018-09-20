@@ -32,10 +32,10 @@ def make_img_path(person):
     if person.has_photo:
         p = slugify(('%s-%s' % (person.name_last, person.name_first)).lower())
         if person.date_dob:
-            static('judge_pics/%s-%s.jpeg'
+            img_path = static('judge_pics/%s-%s.jpeg'
                    % (p, granular_date(person, 'date_dob', iso=True, default='')))
         else:
-            static('judge_pics/%s.jpeg' % p)
+            img_path = static('judge_pics/%s.jpeg' % p)
 
     return img_path
 
