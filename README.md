@@ -40,6 +40,10 @@ If you want to get involved send us an email with your contact info or take a lo
 
 But in general, we're looking for all kinds of help! Get in touch if you think you have skills we could use or if you have skills you want to learn by improving CourtListener.
 
+### Contributing code
+
+See the [developer guide][developing].
+
 Finally, before we accept code from new people, we ask that they complete a `contributor_license_agreement.txt`. You can find a form to fill out for this in the root of our project. If you have any questions about that, please don't hesitate to ask. The short version is that this helps us to protect the platform.
 
 To familiarize yourself with the state of the art in the technologies we're using,
@@ -100,3 +104,4 @@ https://free.law/contact/
 [hw]: https://github.com/freelawproject/courtlistener/labels/help%20wanted
 [dq]: https://github.com/freelawproject/courtlistener/labels/data-quality
 [flp]: https://free.law/
+[developing]: https://github.com/freelawproject/courtlistener/blob/master/DEVELOPING.md
