@@ -1380,13 +1380,6 @@ class OpinionCluster(models.Model):
         db_index=False,
         null=True,
     )
-    citation_id = models.IntegerField(
-        help_text="A legacy field that holds the primary key from the old "
-                  "citation table. Used to serve legacy APIs.",
-        db_index=True,
-        null=True,
-        blank=True,
-    )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
                   "'Marsh'",
