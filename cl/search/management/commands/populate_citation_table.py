@@ -31,22 +31,22 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         qs = OpinionCluster.objects.all()
-        for i, oc in enumerate(queryset_generator(qs)):
+        for i, cluster in enumerate(queryset_generator(qs)):
             citations = []
-            with transaction.atomic():
-                for field in oc.citation_fields:
-                    citation_str = getattr(oc, field)
-                    if citation_str:
-                        # Split the citation and add it to the DB.
-                        citation_obj = get_citations(citation_str)[0]
-                        citations.append(Citation(
-                            cluster=oc,
-                            volume=citation_obj.volume,
-                            reporter=citation_obj.reporter,
-                            page=citation_obj.page,
-                            type=map_model_field_to_citation_type(field)
-                        ))
-                if citations:
+            for field in cluster.citation_fields:
+                citation_str = getattr(cluster, field)
+                if citation_str:
+                    # Split the citation and add it to the DB.
+                    citation_obj = get_citations(citation_str)[0]
+                    citations.append(Citation(
+                        cluster=cluster,
+                        volume=citation_obj.volume,
+                        reporter=citation_obj.reporter,
+                        page=citation_obj.page,
+                        type=map_model_field_to_citation_type(field)
+                    ))
+            if citations:
+                with transaction.atomic():
                     Citation.objects.bulk_create(citations)
 
             if i % 1000 == 0:
