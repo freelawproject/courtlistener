@@ -99,7 +99,7 @@ If you're going to run the full test suite, you might need to pre-configure some
 If you're using the FreeLawMachine in headless mode (e.g. you only SSH into the machine, there's no visible desktop environment), you need to do a few additional steps to run the Selenium tests without fail:
 
 1. Install [Chrome](https://google.com/chrome) or [Chromium](https://www.chromium.org) on your local machine
-2. Install or upgrade [chromedriver](chromedriver) on your local machine
+2. Install or upgrade [chromedriver][] on your local machine
 3. Launch **chromedriver** either as a service or just from a command line. The following example will start it ready to receive input from any host:
     ```bash
     chromedriver --whitelisted-ips
