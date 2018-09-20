@@ -1,8 +1,8 @@
 from django.contrib import admin
 
 from cl.search.models import (
-    Court, Docket, DocketEntry, Opinion, OpinionCluster, OpinionsCited,
-    OriginatingCourtInformation, RECAPDocument,
+    Citation, Court, Docket, DocketEntry, Opinion, OpinionCluster,
+    OpinionsCited, OriginatingCourtInformation, RECAPDocument,
 )
 
 
@@ -115,6 +115,25 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         obj.save()
         from cl.search.tasks import add_or_update_cluster
         add_or_update_cluster.delay(obj.pk)
+
+
+@admin.register(Citation)
+class CitationAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'cluster',
+    )
+    list_display = (
+        '__unicode__',
+        'type',
+    )
+    list_filter = (
+        'type',
+    )
+    search_fields = (
+        'volume',
+        'reporter',
+        'page',
+    )
 
 
 @admin.register(Court)
