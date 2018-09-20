@@ -37,7 +37,7 @@
           "name": "United States of America"
         },
         {% if img_path %}
-        "image": {{ img_path }}
+        "image": "{{ img_path }}"
         {% endif %}
         {% if person.date_dob %}
         "birthDate": "{% granular_date person 'date_dob' iso=True %}",
