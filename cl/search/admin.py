@@ -65,7 +65,6 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'date_filed',
         'date_filed_is_approximate',
         'slug',
-        'citation_id',
         'case_name_short',
         'case_name',
         'case_name_full',
