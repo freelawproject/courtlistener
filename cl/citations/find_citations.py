@@ -469,7 +469,8 @@ def disambiguate_reporters(citations):
     return unambiguous_citations
 
 
-def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
+def get_citations(text, html=True, do_post_citation=True, do_defendant=True,
+                  disambiguate=True):
     if html:
         text = get_visible_text(text)
     words = reporter_tokenizer.tokenize(text)
@@ -489,8 +490,9 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
                 add_defendant(citation, words)
             citations.append(citation)
 
-    # Disambiguate or drop all the reporters
-    citations = disambiguate_reporters(citations)
+    if disambiguate:
+        # Disambiguate or drop all the reporters
+        citations = disambiguate_reporters(citations)
 
     for citation in citations:
         if not citation.court and is_scotus_reporter(citation):
