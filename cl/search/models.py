@@ -1725,6 +1725,9 @@ class Citation(models.Model):
         return u'{volume} {reporter} {page} on {cluster_id}'.format(
             **self.__dict__)
 
+    def get_absolute_url(self):
+        return self.cluster.get_absolute_url()
+
     class Meta:
         index_together = (
             # To look up individual citations
