@@ -462,8 +462,6 @@
     <ul>
       <li>There are presently two fields, <code>judges</code> and <code>panel</code> that contain similar information. The <code>judges</code> field is simply a string field containing the names of judges that heard a case. The <code>panel</code> field is a foreign key to the <code>Judges</code> endpoint, providing more detail about a specific judge or judges. These two fields exist because we have not historically had access to good judicial data, forcing us to simply save the name of the judge as a string.
       </li>
-      <li><code>citation_id</code> can safely be ignored by new users of this API. It exists to provide backwards compatibility to an endpoint that has been merged into the <code>Opinion Cluster</code> endpoint.
-      </li>
       <li>
         <p>There are numerous citation fields such as <code>federal_cite_one</code>, <code>state_cite_two</code>, etc. These exist to hold all of the possible <a href="http://legalresearchprinciples.pbworks.com/w/page/16129937/Parallel%20Citations">parallel citations</a> that an <code>Opinion Cluster</code> may have. They are always filled sequentially for a given citation type (federal, state, specialty, etc.). After several years reorganizing our schema, we currently categorize citations into the following types:
         </p>

@@ -88,6 +88,7 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
         'sub_opinions',
         'panel',
         'non_participating_judges',
+        'citations',
     )
     serializer_class = OpinionClusterSerializer
     filter_class = OpinionClusterFilter
