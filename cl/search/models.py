@@ -1732,6 +1732,9 @@ class Citation(models.Model):
             # To generate reporter volume lists
             ('volume', 'reporter'),
         )
+        unique_together = (
+            ('cluster', 'volume', 'reporter', 'page'),
+        )
 
 
 class Opinion(models.Model):
