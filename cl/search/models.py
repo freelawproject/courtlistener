@@ -1713,8 +1713,12 @@ class Citation(models.Model):
         # reporter. This answers, "Which volumes do we have for F. 2d?"
         db_index=True,
     )
-    page = models.SmallIntegerField(
-        help_text="The page of the citation in the reporter",
+    page = models.TextField(
+        help_text="The 'page' of the citation in the reporter. Unfortunately, "
+                  "this is not an integer, but is a string-type because "
+                  "several jurisdictions do funny things with the so-called "
+                  "'page'. For example, we have seen Roman numerals in "
+                  "Nebraska, 13301-M in Connecticut, and 144M in Montana.",
     )
     type = models.SmallIntegerField(
         help_text="The type of citation that this is.",
