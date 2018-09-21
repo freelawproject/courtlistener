@@ -56,7 +56,8 @@ class Command(VerboseCommand):
                             disambiguate=False,
                         )[0]
                     except IndexError:
-                        print("Errored out on: %s" % citation_str)
+                        print("Errored out on: %s in %s" % (citation_str,
+                                                            cluster.pk))
                         exit(1)
                     try:
                         Citation.objects.create(
