@@ -37,7 +37,13 @@ class Command(VerboseCommand):
                 if citation_str:
                     # Split the citation and add it to the DB.
                     try:
-                        citation_obj = get_citations(citation_str)[0]
+                        citation_obj = get_citations(
+                            citation_str,
+                            html=False,
+                            do_post_citation=False,
+                            do_defendant=False,
+                            disambiguate=False,
+                        )[0]
                     except IndexError:
                         print("Errored out on: %s" % citation_str)
                         exit(1)
