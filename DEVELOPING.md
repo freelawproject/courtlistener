@@ -4,12 +4,12 @@ CourtListener is built upon a few key pieces of technology that needs to come to
 
 There are a few development options depending on your level of experience or comfort with a complex Django web application.
 
-1. Configure your own Ubuntu Linux environment to support running CourtListener per the [wiki instructions](wiki)
+1. Configure your own Ubuntu Linux environment to support running CourtListener per the [wiki instructions][wiki]
 2. Use [Vagrant](https://vagrantup.com) and [VirtualBox](https://virtualbox.org) to virtualize a CourtListener-ready Linux environment.
 
 # Using Vagrant and VirtualBox
 
-The recommended approach is to use the Vagrant box provided by the [FreeLawMachine](flm) project. It provides a standardized ready-to-run virtual machine, provisioned by Vagrant, pre-configured to provide:
+The recommended approach is to use the Vagrant box provided by the [FreeLawMachine][flm] project. It provides a standardized ready-to-run virtual machine, provisioned by Vagrant, pre-configured to provide:
 
 * Ubuntu 14.04.5 64-bit
 * PostgreSQL
@@ -18,7 +18,7 @@ The recommended approach is to use the Vagrant box provided by the [FreeLawMachi
 * Python 2.7 virtual environment pre-installed with CourtListener requirements
 * CourtListener github project precloned to `/var/www/courtlistener` (within the VM)
 
-Install both [Vagrant](https://vagrantup.com) and [VirtualBox](https://virtualbox.org) and check the [FreeLawMachine README](flm-readme) before continuing.
+Install both [Vagrant](https://vagrantup.com) and [VirtualBox](https://virtualbox.org) and check the [FreeLawMachine README][flm-readme] before continuing.
 
 Then, just choose one of the following boxes, grab the provided Vagrantfile, save it to a location to use for your project, and run `vagrant up`!
 
@@ -36,7 +36,7 @@ This version works great for command-line access via `vagrant ssh`, using your o
 _Note: if using a tool like PyCharm that supports a remote Python interpreter, set it to: `/home/vagrant/.virtualenvs/courtlistener/bin/python` and make sure you set the working directory to `/var/www/courtlistener`. You may also need to prevent the tool from adding the project to the PYTHONPATH, which is not needed due to the virtual environment._
 
 ## Desktop/GUI-based FreeLawBox
-[Vagrantfile](https://github.com/freelawproject/freelawmachine/blob/master/Vagrantfile.desktop)
+[Vagrantfile][vagrantfile-desktop]
 
 Preconfigured for:
 * 2 CPU cores
@@ -60,7 +60,7 @@ The `--noinput` flag tells Django to destroy any old test databases without prom
 
 The `cl` parameter is the name of the Python package to search for tests. It's not required, but a good habit to learn as you can more specifically specify tests by provided more details, such as `cl.search` to execute only tests in the search module.
 
-For more details, Django provides a lot of documentation on [testing in Django](django-testing). Make sure to read the docs related to the current release used in CourtListener. (As of 27-01-2017, that's v1.8.7.)
+For more details, Django provides a lot of documentation on [testing in Django][django-testing]. Make sure to read the docs related to the current release used in CourtListener. (As of 27-01-2017, that's v1.8.7.)
 
 ## About the Types of Tests
 
@@ -117,7 +117,7 @@ If you have issues, check the following:
   * For the port number, make sure it matches the port number printed by **chromedriver** when you start it. The default should be `9515`
 * **DJANGO_LIVE_TEST_SERVER_ADDRESS**
   * This should "just work" when set to `0.0.0.0:8081`. Make sure you didn't use `localhost` or `127.0.0.1` as for some reason that doesn't always work!
-  * If you're not using the provided FreeLawBox, make sure you have port forwarding configured in your VM such that port 8081 is being forwarded to your host machine's port 8081. See the [vagrant port forwarding docs](vagrant-ports) for more details.
+  * If you're not using the provided FreeLawBox, make sure you have port forwarding configured in your VM such that port 8081 is being forwarded to your host machine's port 8081. See the [vagrant port forwarding docs][vagrant-ports] for more details.
 
 ### Increasing the Test Timeouts
 
@@ -146,7 +146,7 @@ You should find screenshot files available in the project directory. It's recomm
 [chromedriver]: https://sites.google.com/a/chromium.org/chromedriver/downloads
 [django-testing]: https://docs.djangoproject.com/en/1.8/topics/testing/
 [vagrantfile]: https://raw.githubusercontent.com/freelawproject/freelawmachine/master/Vagrantfile
-[vagrantfile-desktop]: https://raw.githubusercontent.com/freelawproject/freelawmachine/master/Vagrantfile.desktop
+[vagrantfile-desktop]: https://github.com/freelawproject/freelawmachine/blob/master/Vagrantfile.desktop
 [flm]: https://github.com/freelawproject/freelawmachine
 [flm-readme]: https://github.com/freelawproject/freelawmachine/blob/master/README.md
 [vagrant-ports]: https://www.vagrantup.com/docs/networking/forwarded_ports.html
