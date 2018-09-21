@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db.utils import IntegrityError
 
 from cl.citations.find_citations import get_citations
 from cl.lib.command_utils import VerboseCommand, logger
@@ -32,23 +32,29 @@ class Command(VerboseCommand):
         super(Command, self).handle(*args, **options)
         qs = OpinionCluster.objects.all()
         for i, cluster in enumerate(queryset_generator(qs)):
-            citations = []
             for field in cluster.citation_fields:
                 citation_str = getattr(cluster, field)
                 if citation_str:
                     # Split the citation and add it to the DB.
-                    citation_obj = get_citations(citation_str)[0]
-                    citations.append(Citation(
-                        cluster=cluster,
-                        volume=citation_obj.volume,
-                        reporter=citation_obj.reporter,
-                        page=citation_obj.page,
-                        type=map_model_field_to_citation_type(field)
-                    ))
-            if citations:
-                with transaction.atomic():
-                    Citation.objects.bulk_create(citations)
+                    try:
+                        citation_obj = get_citations(citation_str)[0]
+                    except IndexError:
+                        print("Errored out on: %s" % citation_str)
+                        exit(1)
+                    try:
+                        Citation.objects.create(
+                            cluster=cluster,
+                            volume=citation_obj.volume,
+                            reporter=citation_obj.reporter,
+                            page=citation_obj.page,
+                            type=map_model_field_to_citation_type(field)
+                        )
+                    except IntegrityError:
+                        # Violated unique_together constraint. Fine.
+                        pass
 
             if i % 1000 == 0:
-                logger.info("Completed %s items", i)
+                msg = "Completed %s items (last: %s)"
+                print(msg & (i, cluster.pk))
+                logger.info(msg, i, cluster.pk)
 
