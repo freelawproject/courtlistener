@@ -28,10 +28,21 @@ def map_model_field_to_citation_type(field_name):
 class Command(VerboseCommand):
     help = 'Copy the citations from the old cluster fields to the new table'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--start-at',
+            type=int,
+            default=0,
+            help="Skip this many items before starting the processing."
+        )
+
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         qs = OpinionCluster.objects.all()
+        start_at = options['start_at']
         for i, cluster in enumerate(queryset_generator(qs)):
+            if i < start_at:
+                continue
             for field in cluster.citation_fields:
                 citation_str = getattr(cluster, field)
                 if citation_str:
