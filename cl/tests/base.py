@@ -43,7 +43,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         if options is None:
             options = webdriver.ChromeOptions()
             options.add_argument('headless')
-            options.binary_location = '/usr/bin/google-chrome'
             options.add_argument("silent")
 
         if 'SELENIUM_REMOTE_ADDRESS' in os.environ:
@@ -78,7 +77,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             pass
         finally:
             options = webdriver.ChromeOptions()
-            options.binary_location = '/usr/bin/google-chrome'
             options.add_argument('headless')
             self.browser = self._create_browser(options)
 
