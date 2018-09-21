@@ -106,7 +106,6 @@ class OpinionClusterFilter(FilterSet):
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_filed': DATE_LOOKUPS,
-            'citation_id': ['exact'],
             'federal_cite_one': ['exact'],
             'federal_cite_two': ['exact'],
             'federal_cite_three': ['exact'],

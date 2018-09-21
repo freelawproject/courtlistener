@@ -44,6 +44,7 @@ class Citation(object):
         self.page = page
 
         # These values are set during disambiguation.
+        # For a citation to F.2d, the canonical reporter is F.
         self.canonical_reporter = canonical_reporter
         self.lookup_index = lookup_index
 
@@ -59,8 +60,9 @@ class Citation(object):
         # linkify it with a regex.
         self.reporter_found = reporter_found
 
-        # The location of the reporter is useful for tasks like finding parallel
-        # citations, and finding supplementary info like defendants and years.
+        # The location of the reporter is useful for tasks like finding
+        # parallel citations, and finding supplementary info like defendants
+        # and years.
         self.reporter_index = reporter_index
 
         # Attributes of the matching item, for URL generation.
@@ -143,12 +145,12 @@ class Citation(object):
 
 # Adapted from nltk Penn Treebank tokenizer
 def strip_punct(text):
-    #starting quotes
+    # starting quotes
     text = re.sub(r'^[\"\']', r'', text)
     text = re.sub(r'(``)', r'', text)
     text = re.sub(r'([ (\[{<])"', r'', text)
 
-    #punctuation
+    # punctuation
     text = re.sub(r'\.\.\.', r'', text)
     text = re.sub(r'[,;:@#$%&]', r'', text)
     text = re.sub(r'([^\.])(\.)([\]\)}>"\']*)\s*$', r'\1', text)
@@ -156,11 +158,11 @@ def strip_punct(text):
 
     text = re.sub(r"([^'])' ", r"", text)
 
-    #parens, brackets, etc.
+    # parens, brackets, etc.
     text = re.sub(r'[\]\[\(\)\{\}\<\>]', r'', text)
     text = re.sub(r'--', r'', text)
 
-    #ending quotes
+    # ending quotes
     text = re.sub(r'"', "", text)
     text = re.sub(r'(\S)(\'\'?)', r'\1', text)
 
@@ -169,7 +171,8 @@ def strip_punct(text):
 
 def is_scotus_reporter(citation):
     try:
-        reporter = REPORTERS[citation.canonical_reporter][citation.lookup_index]
+        reporter = REPORTERS[
+            citation.canonical_reporter][citation.lookup_index]
     except (TypeError, KeyError):
         # Occurs when citation.lookup_index is None
         return False

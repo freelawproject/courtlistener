@@ -2,12 +2,15 @@ from collections import OrderedDict
 
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
+from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
 from cl.people_db.models import Person, PartyType
-from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
-    OpinionsCited, DocketEntry, RECAPDocument, Tag, OriginatingCourtInformation
+from cl.search.models import (
+    Citation, Court, Docket, DocketEntry, Opinion, OpinionsCited,
+    OpinionCluster, OriginatingCourtInformation, RECAPDocument, Tag,
+)
 
 
 class PartyTypeSerializer(HyperlinkedModelSerializerWithId):
@@ -160,6 +163,12 @@ class OpinionsCitedSerializer(DynamicFieldsMixin,
         fields = '__all__'
 
 
+class CitationSerializer(ModelSerializer):
+    class Meta:
+        model = Citation
+        exclude = ('id', 'cluster',)
+
+
 class OpinionClusterSerializer(DynamicFieldsMixin,
                                HyperlinkedModelSerializerWithId):
     absolute_url = serializers.CharField(source='get_absolute_url',
@@ -188,6 +197,7 @@ class OpinionClusterSerializer(DynamicFieldsMixin,
         queryset=Opinion.objects.all(),
         style={'base_template': 'input.html'},
     )
+    citations = CitationSerializer(many=True)
 
     class Meta:
         model = OpinionCluster

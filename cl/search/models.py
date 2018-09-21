@@ -1380,13 +1380,6 @@ class OpinionCluster(models.Model):
         db_index=False,
         null=True,
     )
-    citation_id = models.IntegerField(
-        help_text="A legacy field that holds the primary key from the old "
-                  "citation table. Used to serve legacy APIs.",
-        db_index=True,
-        null=True,
-        blank=True,
-    )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
                   "'Marsh'",
@@ -1684,6 +1677,61 @@ class OpinionCluster(models.Model):
         super(OpinionCluster, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
         delete_items.delay([id_cache], 'opinions')
+
+
+class Citation(models.Model):
+    """A simple class to hold citations."""
+    FEDERAL = 1
+    STATE = 2
+    STATE_REGIONAL = 3
+    SPECIALTY = 4
+    SCOTUS_EARLY = 5
+    LEXIS = 6
+    WEST = 7
+    NEUTRAL = 8
+    CITATION_TYPES = (
+        (FEDERAL, 'A federal reporter citation'),
+        (STATE, 'A citation in a state-based reporter'),
+        (STATE_REGIONAL, 'A citation in a regional reporter'),
+        (SPECIALTY, 'A citation in a specialty reporter'),
+        (SCOTUS_EARLY, 'A citation in an early SCOTUS reporter, like Wheat.'),
+        (LEXIS, 'A citation in the Lexis system'),
+        (WEST, 'A citation in the WestLaw system'),
+        (NEUTRAL, 'A vendor neutral citation'),
+    )
+    cluster = models.ForeignKey(
+        OpinionCluster,
+        help_text="The cluster that the citation applies to",
+        related_name="citations",
+    )
+    volume = models.SmallIntegerField(
+        help_text="The volume of the reporter",
+    )
+    reporter = models.TextField(
+        help_text="The abbreviation for the reporter",
+        # To generate lists of volumes for a reporter we need everything in a
+        # reporter. This answers, "Which volumes do we have for F. 2d?"
+        db_index=True,
+    )
+    page = models.SmallIntegerField(
+        help_text="The page of the citation in the reporter",
+    )
+    type = models.SmallIntegerField(
+        help_text="The type of citation that this is.",
+        choices=CITATION_TYPES,
+    )
+
+    def __unicode__(self):
+        return u'{volume} {reporter} {page} on {cluster_id}'.format(
+            **self.__dict__)
+
+    class Meta:
+        index_together = (
+            # To look up individual citations
+            ('volume', 'reporter', 'page'),
+            # To generate reporter volume lists
+            ('volume', 'reporter'),
+        )
 
 
 class Opinion(models.Model):
