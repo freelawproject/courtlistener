@@ -41,7 +41,7 @@ class Command(VerboseCommand):
         qs = OpinionCluster.objects.all()
         start_at = options['start_at']
         if start_at:
-            qs.filter(pk__gte=start_at)
+            qs = qs.filter(pk__gte=start_at)
         for i, cluster in enumerate(queryset_generator(qs)):
             for field in cluster.citation_fields:
                 citation_str = getattr(cluster, field)
