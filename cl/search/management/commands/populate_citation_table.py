@@ -55,6 +55,6 @@ class Command(VerboseCommand):
 
             if i % 1000 == 0:
                 msg = "Completed %s items (last: %s)"
-                print(msg & (i, cluster.pk))
+                print(msg % (i, cluster.pk))
                 logger.info(msg, i, cluster.pk)
 
