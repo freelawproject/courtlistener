@@ -31,6 +31,7 @@ Q_DOCS_ONLY = 'q=document_type%3A"PACER+Document"+description%3Ainvoice&type=r&o
 # with invoice in their *short* description
 Q_INVOICES = 'q=short_description%3Ainvoice&type=r&order_by=score+desc&court=dcd+almd+alnd+alsd+akd+azd+ared+arwd+cacd+caed+cand+casd+cod+ctd+ded+flmd+flnd+flsd+gamd+gand+gasd+hid+idd+ilcd+ilnd+ilsd+innd+insd+iand+iasd+ksd+kyed+kywd+laed+lamd+lawd+med+mdd+mad+mied+miwd+mnd+msnd+mssd+moed+mowd+mtd+ned+nvd+nhd+njd+nmd+nyed+nynd+nysd+nywd+nced+ncmd+ncwd+ndd+ohnd+ohsd+oked+oknd+okwd+ord+paed+pamd+pawd+rid+scd+sdd+tned+tnmd+tnwd+txed+txnd+txsd+txwd+utd+vtd+vaed+vawd+waed+wawd+wvnd+wvsd+wied+wiwd+wyd+gud+nmid+prd+vid+californiad+caca+circtdel+illinoised+illinoisd+indianad+orld+circtnc+ohiod+pennsylvaniad+southcarolinaed+southcarolinawd+tennessed+circttenn+canalzoned+bap1+bap2+bap6+bap8+bap9+bap10+bapme+bapma+almb+alnb+alsb+akb+arb+areb+arwb+cacb+caeb+canb+casb+cob+ctb+deb+dcb+flmb+flnb+flsb+gamb+ganb+gasb+hib+idb+ilcb+ilnb+ilsb+innb+insb+ianb+iasb+ksb+kyeb+kywb+laeb+lamb+lawb+meb+mdb+mab+mieb+miwb+mnb+msnb+mssb+moeb+mowb+mtb+nebraskab+nvb+nhb+njb+nmb+nyeb+nynb+nysb+nywb+nceb+ncmb+ncwb+ndb+ohnb+ohsb+okeb+oknb+okwb+orb+paeb+pamb+pawb+rib+scb+sdb+tneb+tnmb+tnwb+tennesseeb+txeb+txnb+txsb+txwb+utb+vtb+vaeb+vawb+waeb+wawb+wvnb+wvsb+wieb+wiwb+wyb+gub+nmib+prb+vib'
 
+
 def get_attachment_pages(options):
     """Find docket entries that look like invoices and get their attachment
     pages.
@@ -106,6 +107,7 @@ def get_documents(options):
         paged_results = paginator.page(page_number)
         for result in paged_results.object_list:
             if i < options['offset']:
+                i += 1
                 continue
             if i >= options['limit'] > 0:
                 break
