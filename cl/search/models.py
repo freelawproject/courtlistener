@@ -467,6 +467,7 @@ class Docket(models.Model):
                   "needing an upload. Used for determining when to upload an "
                   "item.",
         null=True,
+        blank=True,
         db_index=True,
     )
     view_count = models.IntegerField(
