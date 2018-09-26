@@ -95,7 +95,7 @@ def get_documents(options):
                            password=PACER_PASSWORD)
     session.login()
 
-    page_size = 100
+    page_size = 10000
     main_query = build_main_query_from_query_string(
         Q_INVOICES,
         {'rows': page_size, 'fl': ['id', 'docket_id']},
@@ -104,45 +104,36 @@ def get_documents(options):
     si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
     results = si.query().add_extra(**main_query)
 
-    paginator = Paginator(results, page_size)
-    i = 0
-    for page_number in range(1, paginator.num_pages + 1):
-        paged_results = paginator.page(page_number)
-        for result in paged_results.object_list:
-            if i < options['offset']:
-                i += 1
-                continue
-            if i >= options['limit'] > 0:
-                break
-            throttle.maybe_wait()
-
-            rd = RECAPDocument.objects.get(pk=result['id'])
-            logger.info("Doing item %s w/rd: %s, d: %s", i, rd.pk,
-                        result['docket_id'])
-
-            if rd.is_available:
-                logger.info("Already have pk %s; just tagging it.", rd.pk)
-                add_tags(rd, TAG_PHASE_2)
-                i += 1
-                continue
-
-            if not rd.pacer_doc_id:
-                logger.info("Unable to find pacer_doc_id for: %s", rd.pk)
-                i += 1
-                continue
-
-            chain(
-                get_pacer_doc_by_rd.s(rd.pk, session.cookies,
-                                      tag=TAG_PHASE_2).set(queue=q),
-                extract_recap_pdf.si(rd.pk).set(queue=q),
-                add_or_update_recap_document.si([rd.pk]).set(queue=q),
-            ).apply_async()
+    for i, result in enumerate(results):
+        if i < options['offset']:
             i += 1
-        else:
-            # Inner loop exited normally (didn't "break")
             continue
-        # Inner loop broke. Break outer loop too.
-        break
+        if i >= options['limit'] > 0:
+            break
+        throttle.maybe_wait()
+
+        rd = RECAPDocument.objects.get(pk=result['id'])
+        logger.info("Doing item %s w/rd: %s, d: %s", i, rd.pk,
+                    result['docket_id'])
+
+        if rd.is_available:
+            logger.info("Already have pk %s; just tagging it.", rd.pk)
+            add_tags(rd, TAG_PHASE_2)
+            i += 1
+            continue
+
+        if not rd.pacer_doc_id:
+            logger.info("Unable to find pacer_doc_id for: %s", rd.pk)
+            i += 1
+            continue
+
+        chain(
+            get_pacer_doc_by_rd.s(rd.pk, session.cookies,
+                                  tag=TAG_PHASE_2).set(queue=q),
+            extract_recap_pdf.si(rd.pk).set(queue=q),
+            add_or_update_recap_document.si([rd.pk]).set(queue=q),
+        ).apply_async()
+        i += 1
 
 
 class Command(VerboseCommand):
