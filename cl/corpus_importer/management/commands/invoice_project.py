@@ -102,7 +102,8 @@ def get_documents(options):
         {'group': False, 'facet': False},
     )
     si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-    results = si.query().add_extra(**main_query)
+    results = si.query().add_extra(**main_query).execute()
+    logger.info("Got %s search results.", results.result.numFound)
 
     for i, result in enumerate(results):
         if i < options['offset']:
