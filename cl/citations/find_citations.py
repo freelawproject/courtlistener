@@ -326,8 +326,9 @@ def extract_base_citation(words, reporter_index):
             # Some places like Nebraska have Roman numerals, e.g. in
             # '250 Neb. xxiv (1996)'. No processing needed.
             pass
-        elif re.match('\d{1,5}[-]?[a-zA-Z]{1,6}', page):
-            # Some places, like Connecticut, have pages like "13301-M"
+        elif re.match('\d{1,6}[-]?[a-zA-Z]{1,6}', page):
+            # Some places, like Connecticut, have pages like "13301-M".
+            # Other places, like Illinois have "pages" like "110311-B".
             pass
         else:
             # Not Roman, and not a weird connecticut page number.
