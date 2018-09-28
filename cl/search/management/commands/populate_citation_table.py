@@ -33,16 +33,16 @@ class Command(VerboseCommand):
             '--start-at',
             type=int,
             default=0,
-            help="Skip this many items before starting the processing."
+            help="Only do PKs above this number."
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         qs = OpinionCluster.objects.all()
         start_at = options['start_at']
+        if start_at:
+            qs = qs.filter(pk__gte=start_at)
         for i, cluster in enumerate(queryset_generator(qs)):
-            if i < start_at:
-                continue
             for field in cluster.citation_fields:
                 citation_str = getattr(cluster, field)
                 if citation_str:
@@ -56,9 +56,11 @@ class Command(VerboseCommand):
                             disambiguate=False,
                         )[0]
                     except IndexError:
-                        print("Errored out on: %s in %s" % (citation_str,
-                                                            cluster.pk))
-                        exit(1)
+                        msg = "Errored out on: %s in %s" % (citation_str,
+                                                            cluster.pk)
+                        print(msg)
+                        logger.info(msg)
+                        continue
                     try:
                         Citation.objects.create(
                             cluster=cluster,
