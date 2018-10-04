@@ -8,7 +8,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.template import loader
 from django.utils.encoding import smart_unicode
 from django.utils.text import slugify
@@ -1323,6 +1323,43 @@ class Court(models.Model):
         ordering = ["position"]
 
 
+class ClusterCitationQuerySet(models.query.QuerySet):
+    """Add filtering on citation strings.
+
+    Historically we had citations in the db as strings like, "22 U.S. 44". The
+    nice thing about that was that it was fairly easy to look them up. The new
+    way breaks citations into volume-reporter-page tuples. That's great for
+    granularity, but it makes it harder to look things up.
+
+    This class attempts to fix that by overriding the usual filter, adding an
+    additional kwarg that can be provided:
+
+        Citation.object.filter(citation='22 U.S. 44')
+
+    That makes it a lot easier to do the kinds of filtering we're used to.
+    """
+
+    def filter(self, *args, **kwargs):
+        clone = self._clone()
+        citation_str = kwargs.pop('citation', None)
+        if citation_str:
+            try:
+                from cl.citations.find_citations import get_citations
+                c = get_citations(citation_str, html=False,
+                                  do_post_citation=False, do_defendant=False,
+                                  disambiguate=False)[0]
+            except IndexError:
+                raise ValueError("Unable to parse citation '%s'" % citation_str)
+            else:
+                clone.query.add_q(Q(citations__volume=c.volume,
+                                    citations__reporter=c.reporter,
+                                    citations__page=c.page))
+
+        # Add the rest of the args & kwargs
+        clone.query.add_q(Q(*args, **kwargs))
+        return clone
+
+
 class OpinionCluster(models.Model):
     """A class representing a cluster of court opinions."""
     SCDB_DECISION_DIRECTIONS = (
@@ -1541,6 +1578,8 @@ class OpinionCluster(models.Model):
         db_index=True,
         default=False
     )
+
+    objects = ClusterCitationQuerySet.as_manager()
 
     @property
     def caption(self):
