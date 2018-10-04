@@ -1730,14 +1730,18 @@ class Citation(models.Model):
     WEST = 7
     NEUTRAL = 8
     CITATION_TYPES = (
-        (FEDERAL, 'A federal reporter citation'),
-        (STATE, 'A citation in a state-based reporter'),
-        (STATE_REGIONAL, 'A citation in a regional reporter'),
-        (SPECIALTY, 'A citation in a specialty reporter'),
-        (SCOTUS_EARLY, 'A citation in an early SCOTUS reporter, like Wheat.'),
-        (LEXIS, 'A citation in the Lexis system'),
-        (WEST, 'A citation in the WestLaw system'),
-        (NEUTRAL, 'A vendor neutral citation'),
+        (FEDERAL, 'A federal reporter citation (e.g. 5 F. 55)'),
+        (STATE, 'A citation in a state-based reporter '
+                '(e.g. Alabama Reports)'),
+        (STATE_REGIONAL, 'A citation in a regional reporter '
+                         '(e.g. Atlantic Reporter)'),
+        (SPECIALTY, 'A citation in a specialty reporter '
+                    '(e.g. Lawyers\' Edition)'),
+        (SCOTUS_EARLY, 'A citation in an early SCOTUS reporter '
+                       '(e.g. 5 Black. 55)'),
+        (LEXIS, 'A citation in the Lexis system (e.g. 5 LEXIS 55)'),
+        (WEST, 'A citation in the WestLaw system (e.g. 5 WL 55)'),
+        (NEUTRAL, 'A vendor neutral citation (e.g. 2013 FL 1)'),
     )
     cluster = models.ForeignKey(
         OpinionCluster,
