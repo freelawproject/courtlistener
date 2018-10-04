@@ -1,7 +1,8 @@
 # coding=utf-8
 import StringIO
-import datetime
 import os
+
+from datetime import date
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -22,7 +23,7 @@ from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase, \
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import Court, Docket, Opinion, OpinionCluster, \
-    RECAPDocument, DocketEntry
+    RECAPDocument, DocketEntry, Citation
 from cl.search.tasks import add_or_update_recap_document
 from cl.search.views import do_search
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
@@ -135,27 +136,76 @@ class UpdateIndexCommandTest(SolrTestCase):
 class ModelTest(TestCase):
     fixtures = ['test_court.json']
 
+    def setUp(self):
+        self.docket = Docket.objects.create(case_name=u"Blah", court_id='test',
+                                            source=Docket.DEFAULT)
+        self.oc = OpinionCluster.objects.create(
+            case_name=u"Blah", docket=self.docket, date_filed=date(2010, 1, 1))
+        self.o = Opinion.objects.create(cluster=self.oc, type='Lead Opinion')
+        self.c = Citation.objects.create(cluster=self.oc, volume=22,
+                                         reporter='U.S.', page=44,
+                                         type=Citation.FEDERAL)
+
+    def tearDown(self):
+        self.docket.delete()
+        self.oc.delete()
+        self.o.delete()
+        self.c.delete()
+
     def test_save_old_opinion(self):
         """Can we save opinions older than 1900?"""
         docket = Docket(case_name=u"Blah", court_id='test',
                         source=Docket.DEFAULT)
         docket.save()
-        oc = OpinionCluster(
-            case_name=u"Blah",
-            docket=docket,
-            date_filed=datetime.date(1899, 1, 1),
-        )
-        oc.save()
-        o = Opinion(cluster=oc, type='Lead Opinion')
+        self.oc.date_filed = date(1899, 1, 1)
+        self.oc.save()
 
         try:
             cf = ContentFile(StringIO.StringIO('blah').read())
-            o.file_with_date = datetime.date(1899, 1, 1)
-            o.local_path.save('file_name.pdf', cf, save=False)
-            o.save(index=False)
+            self.o.file_with_date = date(1899, 1, 1)
+            self.o.local_path.save('file_name.pdf', cf, save=False)
+            self.o.save(index=False)
         except ValueError as e:
             raise ValueError("Unable to save a case older than 1900. Did you "
                              "try to use `strftime`...again?")
+
+    def test_custom_manager_simple_filters(self):
+        """Do simple queries on our custom manager work?"""
+        expected_count = 1
+        cluster_count = OpinionCluster.objects.filter(
+            citation='22 U.S. 44').count()
+        self.assertEqual(cluster_count, expected_count)
+
+        expected_count = 0
+        cluster_count = OpinionCluster.objects.filter(
+            docket__case_name="Wrong case name").count()
+        self.assertEqual(cluster_count, expected_count)
+
+    def test_custom_manager_kwargs_filter(self):
+        """Can we do filters that involve additional kwargs?"""
+        expected_count = 1
+        cluster_count = OpinionCluster.objects.filter(
+            citation="22 U.S. 44", docket__case_name="Blah").count()
+        self.assertEqual(cluster_count, expected_count)
+
+    def test_custom_manager_chained_filter(self):
+        """Do chained filters work?"""
+        expected_count = 1
+        cluster_count = OpinionCluster.objects.filter(
+            citation="22 U.S. 44",
+        ).exclude(
+            # Note this doesn't actually exclude anything,
+            # but it helps ensure chaining is working.
+            docket__case_name="Not the right case name",
+        ).count()
+        self.assertEqual(cluster_count, expected_count)
+
+        cluster_count = OpinionCluster.objects.filter(
+            citation="22 U.S. 44",
+        ).filter(
+            docket__case_name=u"Blah",
+        ).count()
+        self.assertEqual(cluster_count, expected_count)
 
 
 class DocketValidationTest(TestCase):
@@ -693,7 +743,7 @@ class JurisdictionFeedTest(TestCase):
             'absolute_url': 'http://absolute_url',
             'caseName': 'Case Name',
             'status': 'Precedential',
-            'dateFiled': datetime.date(2015, 12, 25),
+            'dateFiled': date(2015, 12, 25),
             'local_path': 'txt/2015/12/28/opinion_text.txt'
         }
         self.zero_item = self.good_item.copy()
