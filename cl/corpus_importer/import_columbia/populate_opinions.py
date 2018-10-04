@@ -178,7 +178,7 @@ def make_and_save(item, skipdupes=False, min_dates=None, start_dates=None, testi
         docket_number=item['docket'] or ''
     )
 
-    # get citations in the form of, e.g. {'federal_cite_one': '1 U.S. 1', ...}
+    # get citation objects in a list for addition to the cluster
     found_citations = []
     for c in item['citations']:
         found = get_citations(c)
@@ -197,8 +197,9 @@ def make_and_save(item, skipdupes=False, min_dates=None, start_dates=None, testi
                 if docket_no and docket_no in c.lower():
                     continue
 
-            # there are a trivial number of letters (except for months and a few
-            # trivial words) in the citation, then it's not a citation at all
+            # there are a trivial number of letters (except for
+            # months and a few trivial words) in the citation,
+            # then it's not a citation at all
             non_trivial = c.lower()
             for trivial in TRIVIAL_CITE_WORDS:
                 non_trivial = non_trivial.replace(trivial, '')
@@ -206,8 +207,8 @@ def make_and_save(item, skipdupes=False, min_dates=None, start_dates=None, testi
             if num_letters < 3:
                 continue
 
-            # if there is a string that's known to indicate a bad citation, then
-            # it's not a citation
+            # if there is a string that's known to indicate
+            # a bad citation, then it's not a citation
             if any(bad in c for bad in BAD_CITES):
                 continue
             # otherwise, this is a problem
@@ -216,8 +217,7 @@ def make_and_save(item, skipdupes=False, min_dates=None, start_dates=None, testi
                                 c, item['court_id'], item['docket']
                             ))
         else:
-            found_citations.extend(found)
-    citations_map = map_citations_to_models(found_citations)
+            found_citations.extend(found.to_model())
 
     cluster = OpinionCluster(
         judges=item.get('judges', '') or "",
@@ -229,7 +229,6 @@ def make_and_save(item, skipdupes=False, min_dates=None, start_dates=None, testi
         source='Z',
         attorneys=item['attorneys'] or '',
         posture=item['posture'] or '',
-        **citations_map
     )
     panel = [find_person(n, item['court_id'], case_date=panel_date) for n in
              item['panel']]
@@ -275,6 +274,9 @@ def make_and_save(item, skipdupes=False, min_dates=None, start_dates=None, testi
             docket.save()
             cluster.docket = docket
             cluster.save(index=False)
+            for citation in found_citations:
+                citation.cluster = cluster
+                citation.save()
             for member in panel:
                 cluster.panel.add(member)
             for opinion, joined_by in opinions:
