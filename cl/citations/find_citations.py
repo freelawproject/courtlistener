@@ -9,6 +9,7 @@ from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 
 from cl.citations import reporter_tokenizer
 from cl.lib.roman import isroman
+from cl.search.models import Citation as ModelCitation
 from cl.search.models import Court
 
 FORWARD_SEEK = 20
@@ -101,6 +102,40 @@ class Citation(object):
             data_attr = ''
         return u'<span class="%s"%s>%s</span>' % \
                (span_class, data_attr, inner_html)
+
+    def _get_cite_type(self):
+        """Figure out the Citation.type value."""
+        cite_type = (REPORTERS[self.canonical_reporter][self.lookup_index]
+                     ['cite_type'])
+        if cite_type == 'federal':
+            return ModelCitation.FEDERAL
+        elif cite_type == 'state':
+            return ModelCitation.STATE
+        elif cite_type == 'state_regional':
+            return ModelCitation.STATE_REGIONAL
+        elif cite_type == 'specialty':
+            return ModelCitation.SPECIALTY
+        elif cite_type == 'specialty_lexis':
+            return ModelCitation.LEXIS
+        elif cite_type == 'specialty_west':
+            return ModelCitation.WEST
+        elif cite_type == 'scotus_early':
+            return ModelCitation.SCOTUS_EARLY
+        elif cite_type == 'neutral_citation':
+            return ModelCitation.NEUTRAL
+
+    def to_model(self):
+        # Create a citation object as in our models. Eventually, the version in
+        # our models should probably be the only object named "Citation". Until
+        # then, this function helps map from this object to the Citation object
+        # in the models.
+        c = ModelCitation(**{
+            key: value for key, value in
+            self.__dict__.items() if
+            key in ModelCitation._meta.get_all_field_names()
+        })
+        c.type = self._get_cite_type()
+        return c
 
     def __repr__(self):
         print_string = self.base_citation()
