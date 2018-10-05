@@ -23,7 +23,7 @@ from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase, \
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import Court, Docket, Opinion, OpinionCluster, \
-    RECAPDocument, DocketEntry, Citation
+    RECAPDocument, DocketEntry, Citation, sort_cites
 from cl.search.tasks import add_or_update_recap_document
 from cl.search.views import do_search
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
@@ -1155,3 +1155,62 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         bootstrap_btns = self.browser.find_elements_by_css_selector('a.btn')
         self.assertIn('Sign Back In', [btn.text for btn in bootstrap_btns])
 
+
+class CaptionTest(TestCase):
+    """Can we make good looking captions?"""
+    def test_simple_caption(self):
+        c, _ = Court.objects.get_or_create(pk='ca1', defaults={'position': 1})
+        d = Docket.objects.create(source=0, court=c)
+        cluster = OpinionCluster.objects.create(
+            case_name='foo', docket=d, date_filed=date(1984, 1, 1),
+            federal_cite_one='22 F.2d 44')
+        Citation.objects.create(cluster=cluster, type=Citation.FEDERAL,
+                                volume=22, reporter='F.2d', page='44')
+        self.assertEqual(
+            'foo, 22 F.2d 44&nbsp;(1st&nbsp;Cir.&nbsp;1984)',
+            cluster.caption,
+        )
+
+    def test_scotus_caption(self):
+        c, _ = Court.objects.get_or_create(pk='scotus',
+                                           defaults={'position': 2})
+        d = Docket.objects.create(source=0, court=c)
+        cluster = OpinionCluster.objects.create(
+            case_name='foo', docket=d, date_filed=date(1984, 1, 1),
+            federal_cite_one='22 U.S. 44')
+        Citation.objects.create(cluster=cluster, type=Citation.FEDERAL,
+                                volume=22, reporter='U.S.', page='44')
+        self.assertEqual('foo, 22 U.S. 44', cluster.caption, )
+
+    def test_neutral_cites(self):
+        c, _ = Court.objects.get_or_create(pk='ca1', defaults={'position': 1})
+        d = Docket.objects.create(source=0, court=c)
+        cluster = OpinionCluster.objects.create(
+            case_name='foo', docket=d, date_filed=date(1984, 1, 1),
+            federal_cite_one='22 U.S. 44')
+        Citation.objects.create(cluster=cluster, type=Citation.NEUTRAL,
+                                volume=22, reporter='IL', page='44')
+        self.assertEqual('foo, 22 IL 44', cluster.caption)
+
+    def test_citation_sorting(self):
+        # A list of citations ordered properly
+        cs = [
+            Citation(volume=22, reporter='IL', page='44',
+                     type=Citation.NEUTRAL),
+            Citation(volume=22, reporter='U.S.', page='44',
+                     type=Citation.FEDERAL),
+            Citation(volume=22, reporter='S. Ct.', page='33',
+                     type=Citation.FEDERAL),
+            Citation(volume=22, reporter='Alt.', page='44',
+                     type=Citation.STATE_REGIONAL),
+        ]
+
+        # Mess up the ordering of the list above.
+        cs_shuffled = cs[:]
+        last = cs_shuffled.pop()
+        cs_shuffled.insert(0, last)
+        self.assertNotEqual(cs, cs_shuffled)
+
+        # Now sort the messed up list, and check if it worked.
+        cs_sorted = sorted(cs_shuffled, key=sort_cites)
+        self.assertEqual(cs, cs_sorted)
