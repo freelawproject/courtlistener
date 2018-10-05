@@ -1623,29 +1623,6 @@ class OpinionCluster(models.Model):
         return caption
 
     @property
-    def citation_fields(self):
-        """The fields that are used for citations, as a list.
-
-        The order of the items in this list follows BlueBook order, so our
-        citations aren't just willy nilly.
-        """
-        return [
-            'neutral_cite', 'federal_cite_one', 'federal_cite_two',
-            'federal_cite_three', 'scotus_early_cite', 'specialty_cite_one',
-            'state_cite_regional', 'state_cite_one', 'state_cite_two',
-            'state_cite_three', 'westlaw_cite', 'lexis_cite'
-        ]
-
-    @property
-    def citation_list(self):
-        """Make a citation list
-
-        This function creates a series of citations that can be listed as meta
-        data for an opinion.
-        """
-        return [getattr(self, field) for field in self.citation_fields]
-
-    @property
     def citation_string(self):
         """Make a citation string, joined by commas"""
         citations = sorted(self.citations.all(), key=sort_cites)
@@ -2014,9 +1991,7 @@ class Opinion(models.Model):
             ],
             'judge': self.cluster.judges,
             'lexisCite': self.cluster.lexis_cite,
-            'citation': [
-                cite for cite in
-                self.cluster.citation_list if cite],  # Nuke '' and None
+            'citation': [str(cite) for cite in self.cluster.citations],
             'neutralCite': self.cluster.neutral_cite,
             'scdb_id': self.cluster.scdb_id,
             'source': self.cluster.source,
