@@ -5,8 +5,8 @@ from cl.api.utils import (
     INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS, ALL_TEXT_LOOKUPS
 )
 from cl.search.models import (
-    Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES,
-    DocketEntry, RECAPDocument, Tag,
+    Citation, Court, Docket, DocketEntry, Opinion, OpinionsCited,
+    OpinionCluster, RECAPDocument, SOURCES, Tag,
 )
 
 
@@ -90,6 +90,17 @@ class OpinionFilter(FilterSet):
         }
 
 
+class CitationFilter(FilterSet):
+    class Meta:
+        model = Citation
+        fields = {
+            'volume': ['exact'],
+            'reporter': ['exact'],
+            'page': ['exact'],
+            'type': ['exact'],
+        }
+
+
 class OpinionClusterFilter(FilterSet):
     docket = filters.RelatedFilter(DocketFilter)
     panel = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
@@ -98,6 +109,7 @@ class OpinionClusterFilter(FilterSet):
     )
     sub_opinions = filters.RelatedFilter(OpinionFilter)
     source = filters.MultipleChoiceFilter(choices=SOURCES)
+    citations = filters.RelatedFilter(CitationFilter)
 
     class Meta:
         model = OpinionCluster
