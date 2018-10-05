@@ -114,11 +114,12 @@ class CoverageTests(IndexedSolrTestCase):
 class ApiQueryCountTests(TransactionTestCase):
     """Check that the number of queries for an API doesn't explode
 
-    I expect these tests to regularly need updating as new features are added to
-    the APIs, but in the meantime, they're important checks because of how easy
-    it is to explode the APIs. The issue that happens here is that if you're not
-    careful, adding a related field to a model will add at least 20 queries to
-    each API request, one per returned item. This *kills* performance.
+    I expect these tests to regularly need updating as new features are added
+    to the APIs, but in the meantime, they're important checks because of how
+    easy it is to explode the APIs. The issue that happens here is that if
+    you're not careful, adding a related field to a model will add at least 20
+    queries to each API request, one per returned item. This *kills*
+    performance.
     """
     fixtures = ['test_objects_query_counts.json', 'attorney_party.json',
                 'user_with_recap_api_access.json', 'test_objects_audio.json',
@@ -549,7 +550,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.assertCountInResults(0)
 
 
-class DRFSearchAndAudioAppsApiFilterTest(TestCase, FilteringCountTestCase):
+class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json',
                 'test_objects_audio.json', 'authtest_data.json']
 
@@ -568,6 +569,12 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase, FilteringCountTestCase):
         self.assertCountInResults(1)
         self.q['sub_opinions__author'] = 2
         self.assertCountInResults(4)
+
+        # Citation filters
+        self.q = {'citations__volume': 56,
+                  'citations__reporter': 'F.2d',
+                  'citations__page': '9'}
+        self.assertCountInResults(1)
 
         # Integer lookups
         self.q = dict()
