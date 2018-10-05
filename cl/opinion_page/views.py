@@ -352,35 +352,19 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
             })
 
         else:
-            # We have a citation. Look it up, redirect the user or show
-            # disambiguation.
+            # We have a citation. Look it up, redirect
+            # the user or show disambiguation.
             citation_str = " ".join([volume, reporter, page])
             try:
-                citation = get_citations(citation_str)[0]
-                citation_str = citation.base_citation()  # Corrects typos/variations.
-                lookup_fields = [map_citations_to_models([citation]).keys()[0]]
-            except IndexError:
-                # Unable to disambiguate the citation. Try looking in *all*
-                # citation fields.
-                lookup_fields = OpinionCluster().citation_fields
-
-            # We were able to get a match, expand it if it's a federal/state
-            # match.
-            if (len(lookup_fields) == 1 and
-                    lookup_fields[0] == 'federal_cite_one'):
-                lookup_fields = ['federal_cite_one', 'federal_cite_two',
-                                 'federal_cite_three']
-            elif (len(lookup_fields) == 1 and
-                    lookup_fields[0] == 'state_cite_one'):
-                lookup_fields = ['state_cite_one', 'state_cite_two',
-                                 'state_cite_three']
-            q = Q()
-            for lookup_field in lookup_fields:
-                q |= Q(**{lookup_field: citation_str})
-            clusters = OpinionCluster.objects.filter(q)
+                clusters = OpinionCluster.objects.filter(citation=citation_str)
+            except ValueError:
+                # Unable to parse the citation.
+                cluster_count = 0
+            else:
+                cluster_count = clusters.count()
 
             # Show the correct page....
-            if clusters.count() == 0:
+            if cluster_count == 0:
                 # No results for an otherwise valid citation.
                 return render(
                     request,
@@ -393,13 +377,13 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
                     status=HTTP_404_NOT_FOUND,
                 )
 
-            elif clusters.count() == 1:
+            elif cluster_count == 1:
                 # Total success. Redirect to correct location.
                 return HttpResponseRedirect(
                     clusters[0].get_absolute_url()
                 )
 
-            elif clusters.count() > 1:
+            elif cluster_count > 1:
                 # Multiple results. Show them.
                 return render(request, 'citation_redirect_info_page.html', {
                     'too_many': True,
