@@ -1648,7 +1648,8 @@ class OpinionCluster(models.Model):
     @property
     def citation_string(self):
         """Make a citation string, joined by commas"""
-        return ', '.join([cite for cite in self.citation_list if cite])
+        citations = sorted(self.citations.all(), key=sort_cites)
+        return ', '.join(str(c) for c in citations)
 
     @property
     def authorities(self):
