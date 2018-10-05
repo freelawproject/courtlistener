@@ -1583,41 +1583,43 @@ class OpinionCluster(models.Model):
 
     @property
     def caption(self):
-        """Make a proper caption"""
+        """Make a proper caption
+
+        This selects the best case name, then combines it with the best one or
+        two citations we have in our system. Finally, if it's not a SCOTUS
+        opinion, it adds the court abbreviation to the end. The result is
+        something like:
+
+            Plessy v. Ferguson, 410 U.S. 113
+
+        or
+
+            Lenore Foman v. Elvira A. Davis (1st Cir. 1961)
+
+        Note that nbsp; are used liberally to prevent the end from getting
+        broken up across lines.
+        """
         caption = best_case_name(self)
-        if self.neutral_cite:
-            caption += ", %s" % self.neutral_cite
-            # neutral cites lack the parentheses, so we're done here.
-            return caption
-        elif self.federal_cite_one:
-            caption += ", %s" % self.federal_cite_one
-        elif self.federal_cite_two:
-            caption += ", %s" % self.federal_cite_two
-        elif self.federal_cite_three:
-            caption += ", %s" % self.federal_cite_three
-        elif self.specialty_cite_one:
-            caption += ", %s" % self.specialty_cite_one
-        elif self.state_cite_regional:
-            caption += ", %s" % self.state_cite_regional
-        elif self.state_cite_one:
-            caption += ", %s" % self.state_cite_one
-        elif self.westlaw_cite and self.lexis_cite:
-            # If both WL and LEXIS
-            caption += ", %s, %s" % (self.westlaw_cite, self.lexis_cite)
-        elif self.westlaw_cite:
-            # If only WL
-            caption += ", %s" % self.westlaw_cite
-        elif self.lexis_cite:
-            # If only LEXIS
-            caption += ", %s" % self.lexis_cite
-        elif self.docket.docket_number:
+        citations = sorted(self.citations.all(), key=sort_cites)
+        if not citations:
             caption += ", %s" % self.docket.docket_number
-        caption += ' ('
-        if self.docket.court.citation_string != 'SCOTUS':
-            caption += re.sub(' ', '&nbsp;', self.docket.court.citation_string)
-            caption += '&nbsp;'
-            # b/c strftime f's up before 1900.
-            caption += '%s)' % self.date_filed.isoformat().split('-')[0]
+        else:
+            if citations[0].type == Citation.NEUTRAL:
+                caption += ", %s" % citations[0]
+                # neutral cites lack the parentheses, so we're done here.
+                return caption
+            elif citations[0].type == Citation.WEST and \
+                                citations[1].type == Citation.LEXIS:
+                caption += ", %s, %s" % (citations[0], citations[1])
+            else:
+                caption += ", %s" % citations[0]
+
+        if self.docket.court_id != 'scotus':
+            court = re.sub(u' ', u'&nbsp;', self.docket.court.citation_string)
+            # Strftime fails before 1900. Do it this way instead.
+            year = self.date_filed.isoformat().split('-')[0]
+            caption += '&nbsp;({court}&nbsp;{year})'.format(court=court,
+                                                            year=year)
         return caption
 
     @property
@@ -1770,8 +1772,8 @@ class Citation(models.Model):
     )
 
     def __unicode__(self):
-        return u'{volume} {reporter} {page} on {cluster_id}'.format(
-            **self.__dict__)
+        # Note this representation is used in the front end.
+        return u'{volume} {reporter} {page}'.format(**self.__dict__)
 
     def get_absolute_url(self):
         return self.cluster.get_absolute_url()
@@ -1786,6 +1788,50 @@ class Citation(models.Model):
         unique_together = (
             ('cluster', 'volume', 'reporter', 'page'),
         )
+
+
+def sort_cites(c):
+    """Sort a list or QuerySet of citations according to BlueBook ordering.
+
+    This is intended as a parameter to the 'key' argument of a sorting method
+    like `sort` or `sorted`. It intends to take a single citation and give it a
+    numeric score as to where it should occur in a list of other citations.
+
+    For example:
+
+        cs = Citation.objects.filter(cluser_id=222)
+        cs = sorted(cs, key=sort_cites)
+
+    That'd give you the list of the Citation items sorted by their priority.
+
+    :param c: A Citation object to score.
+    :return: A score for the Citation passed in.
+    """
+    if c.type == Citation.NEUTRAL:
+        return 0
+    if c.type == Citation.FEDERAL:
+        if c.reporter == 'U.S.':
+            return 1.1
+        elif c.reporter == 'S. Ct.':
+            return 1.2
+        elif 'L. Ed.' in c.reporter:
+            return 1.3
+        else:
+            return 1.4
+    elif c.type == Citation.SCOTUS_EARLY:
+        return 2
+    elif c.type == Citation.SPECIALTY:
+        return 3
+    elif c.type == Citation.STATE_REGIONAL:
+        return 4
+    elif c.type == Citation.STATE:
+        return 5
+    elif c.type == Citation.WEST:
+        return 6
+    elif c.type == Citation.LEXIS:
+        return 7
+    else:
+        return 8
 
 
 class Opinion(models.Model):
