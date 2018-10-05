@@ -192,6 +192,64 @@
 
   {
     "fields": {
+      "volume": 33,
+      "reporter": "state",
+      "page": "1",
+      "type": 1,
+      "cluster": 1
+    },
+    "model": "search.citation",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "volume": 22,
+      "reporter": "AL",
+      "page": "339",
+      "type": 2,
+      "cluster": 2
+    },
+    "model": "search.citation",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "volume": 33,
+      "reporter": "state",
+      "page": "1",
+      "type": 1,
+      "cluster": 2
+    },
+    "model": "search.citation",
+    "pk": 3
+  },
+  {
+    "fields": {
+      "volume": 1,
+      "reporter": "Yeates",
+      "page": "1",
+      "type": 5,
+      "cluster": 2
+    },
+    "model": "search.citation",
+    "pk": 4
+  },
+  {
+    "fields": {
+      "volume": 56,
+      "reporter": "F.2d",
+      "page": "9",
+      "type": 1,
+      "cluster": 2
+    },
+    "model": "search.citation",
+    "pk": 5
+  },
+
+
+
+  {
+    "fields": {
       "sha1": "asdfasdfasdfasdfasdfasddf",
       "date_modified": "2015-08-15T14:10:56.801Z",
       "extracted_by_ocr": false,
