@@ -5,7 +5,7 @@ import sys
 from celery.canvas import group
 from django.conf import settings
 from django.core.management import call_command, CommandError
-from reporters_db import REPORTERS
+from django.db import IntegrityError
 
 from cl.citations.find_citations import Citation
 from cl.citations.match_citations import get_years_from_reporter, \
@@ -104,71 +104,6 @@ class Command(VerboseCommand):
         # Query Solr
         return self.conn.raw_query(**main_params).execute()
 
-    def add_citation_to_cluster(self, citation, cluster):
-        """Update a cluster object to have the new value.
-
-        Start by looking up the citation type in the reporters DB, then using
-        that value, attempt to put the new citation in the correct field. Only
-        add it, however, if there's not already a value!
-        """
-        cite_type = (REPORTERS[citation.canonical_reporter]
-                     [citation.lookup_index]
-                     ['cite_type'])
-        logger.info("    Citation type is: %s\n" % cite_type)
-        cite_attr = None
-        if cite_type in ['federal', 'state', 'specialty']:
-            for number in ['one', 'two', 'three']:
-                cite_attr = '%s_cite_%s' % (cite_type, number)
-                if not getattr(cluster, cite_attr):
-                    break
-        else:
-            if cite_type == 'state_regional':
-                cite_attr = 'state_cite_regional'
-            elif cite_type == 'scotus_early':
-                cite_attr = 'scotus_early_cite'
-            elif cite_type == 'specialty_lexis':
-                cite_attr = 'lexis_cite'
-            elif cite_type == 'specialty_west':
-                cite_attr = 'westlaw_cite'
-            elif cite_type == 'neutral':
-                cite_attr = 'neutral_cite'
-
-        has_empty_field = not getattr(cluster, cite_attr)
-        if cite_attr is not None and has_empty_field:
-            setattr(cluster, cite_attr, citation.base_citation())
-            logger.info("    Set %s attribute of cluster %s to %s.\n" % (
-                cite_attr,
-                cluster.pk,
-                citation.base_citation(),
-            ))
-            self.update_count += 1
-        else:
-            logger.info("    Unable to find empty space in cluster %s for "
-                        "citation %s.\n" % (
-                cluster.pk,
-                citation.base_citation()
-            ))
-
-    def _update_cluster_with_citation(self, cluster, citation):
-        """Update the cluster with the citation object."""
-        logger.info("  Updating cluster %s with value %s" %
-                    (cluster.pk, citation.base_citation()()))
-
-        # Make sure we don't get an item that has the citation already.
-        # Just a safety check.
-        lookup_fields = OpinionCluster().citation_fields
-        problem = False
-        for field in lookup_fields:
-            if getattr(cluster, field) == citation.base_citation():
-                problem = True
-                break
-
-        if not problem:
-            self.add_citation_to_cluster(
-                citation=citation,
-                cluster=cluster,
-            )
-
     def handle_subgraph(self, sub_graph, options):
         """Add edges to the database if significant.
 
@@ -247,11 +182,22 @@ class Command(VerboseCommand):
         if oc is not None:
             # Update the cluster with all the nodes that had no results.
             for node, results in result_sets:
-                if len(results) == 0:
-                    # add the citation to the cluster.
-                    self._update_cluster_with_citation(oc, node)
-            if options['update_database']:
-                oc.save()
+                if len(results) != 0:
+                    continue
+
+                # Create citation objects
+                c = node.to_model()
+                c.cluster = oc
+                self.update_count += 1
+                if not options['update_database']:
+                    continue
+
+                try:
+                    c.save()
+                except IntegrityError:
+                    logger.info("Unable to save '%s' to cluster '%s' due to "
+                                "an IntegrityError. Probably the cluster "
+                                "already has this citation", c, oc)
 
     def add_groups_to_network(self, citation_groups):
         """Add the citation groups from an opinion to the global network
