@@ -4,7 +4,6 @@ from django.test import TestCase, override_settings
 from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND, \
     HTTP_302_FOUND
 
-from cl.lib import sunburnt
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.test_helpers import SitemapTest
 from cl.sitemap import make_sitemap_solr_params, items_per_sitemap
