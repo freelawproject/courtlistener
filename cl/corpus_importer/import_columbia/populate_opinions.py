@@ -304,15 +304,15 @@ def find_dups(docket, cluster):
     :param docket: A `Docket` instance.
     :param cluster: An `OpinionCluster` instance.
     """
-    cites = [c for c in cluster.citation_list if c]
-    if not cites:
-        # if there aren't any citations, assume for now that there's no duplicate
+    if not cluster.citations.exists():
+        # if there aren't any citations, assume
+        # for now that there's no duplicate
         return []
     params = {
         'fq': [
             'court_id:%s' % docket.court_id,
             'citation:(%s)' % ' OR '.join('"%s"~5' % c for c in
-                                          cluster.citation_list if c)
+                                          cluster.citations.all() if c)
         ],
         'rows': 100,
         'caller': 'corpus_importer.import_columbia.populate_opinions'
