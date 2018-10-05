@@ -137,20 +137,20 @@ class Command(VerboseCommand):
         return ok
 
     @staticmethod
-    def do_federal_citations(cluster, scdb_info):
+    def do_citations(cluster, scdb_info):
         """
-        Handle the federal citation fields differently, since they may have the
-        values in any order.
+        Handle the citation fields.
 
         :param cluster: The Cluster to be changed.
         :param scdb_info: A dict with the SCDB information.
         """
         fields = {
-            'usCite': "U.S.",
-            'sctCite': "S. Ct.",
-            'ledCite': "L. Ed."
+            'usCite': ("U.S.", Citation.FEDERAL),
+            'sctCite': ("S. Ct.", Citation.FEDERAL),
+            'ledCite': ("L. Ed.", Citation.FEDERAL),
+            'lexisCite': ("U.S. LEXIS", Citation.LEXIS),
         }
-        for scdb_field, reporter_str in fields.items():
+        for scdb_field, reporter_info in fields.items():
             try:
                 citation_obj = get_citations(
                     scdb_info[scdb_field],
@@ -163,7 +163,7 @@ class Command(VerboseCommand):
                 logger.warn("Unable to parse citation for: %s",
                             scdb_info[scdb_field])
             else:
-                cite = cluster.citations.filter(reporter=reporter_str)
+                cite = cluster.citations.filter(reporter=reporter_info[0])
                 if cite:
                     # Update the existing citation.
                     cite.volume = citation_obj.volume
@@ -178,7 +178,7 @@ class Command(VerboseCommand):
                             volume=citation_obj.volume,
                             reporter=citation_obj.reporter,
                             page=citation_obj.page,
-                            type=Citation.FEDERAL,
+                            type=reporter_info[1],
                         )
                     except IntegrityError:
                         # Violated unique_together constraint. Fine.
@@ -203,12 +203,10 @@ class Command(VerboseCommand):
         for attribute_tuple in attribute_tuples:
             self.set_if_falsy(*attribute_tuple)
 
-        self.do_federal_citations(cluster, scdb_info)
+        self.do_citations(cluster, scdb_info)
         scdb_ok = self.set_if_falsy(cluster, 'scdb_id', scdb_info['caseId'])
-        lexis_ok = self.set_if_falsy(cluster, 'lexis_cite',
-                                     scdb_info['lexisCite'])
 
-        if all([scdb_ok, lexis_ok]):
+        if scdb_ok:
             logger.info("Saving to database (or faking if debug=True)")
             if not self.debug:
                 cluster.docket.save()
@@ -216,8 +214,7 @@ class Command(VerboseCommand):
         else:
             logger.info(
                 "Item not saved due to collision or error. Please edit by "
-                "hand: scdb_ok: {scdb}, lexis_ok: {lexis}".format(
-                    scdb=scdb_ok, lexis=lexis_ok)
+                "hand: scdb_ok: {scdb}".format(scdb=scdb_ok)
             )
 
     @staticmethod
