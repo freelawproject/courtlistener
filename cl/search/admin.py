@@ -54,9 +54,36 @@ class OpinionAdmin(admin.ModelAdmin):
         delete_items.delay([obj.pk], 'opinions')
 
 
+@admin.register(Citation)
+class CitationAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'cluster',
+    )
+    list_display = (
+        '__unicode__',
+        'type',
+    )
+    list_filter = (
+        'type',
+    )
+    search_fields = (
+        'volume',
+        'reporter',
+        'page',
+    )
+
+
+class CitationInline(admin.TabularInline):
+    model = Citation
+    extra = 1
+
+
 @admin.register(OpinionCluster)
 class OpinionClusterAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['case_name']}
+    inlines = (
+        CitationInline,
+    )
     raw_id_fields = (
         'docket',
         'panel',
@@ -76,25 +103,6 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         obj.save()
         from cl.search.tasks import add_or_update_cluster
         add_or_update_cluster.delay(obj.pk)
-
-
-@admin.register(Citation)
-class CitationAdmin(admin.ModelAdmin):
-    raw_id_fields = (
-        'cluster',
-    )
-    list_display = (
-        '__unicode__',
-        'type',
-    )
-    list_filter = (
-        'type',
-    )
-    search_fields = (
-        'volume',
-        'reporter',
-        'page',
-    )
 
 
 @admin.register(Court)
