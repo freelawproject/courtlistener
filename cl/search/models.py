@@ -1990,7 +1990,6 @@ class Opinion(models.Model):
                 self.cluster.non_participating_judges.all()
             ],
             'judge': self.cluster.judges,
-            'lexisCite': self.cluster.lexis_cite,
             'citation': [str(cite) for cite in self.cluster.citations.all()],
             'scdb_id': self.cluster.scdb_id,
             'source': self.cluster.source,
@@ -2000,6 +1999,12 @@ class Opinion(models.Model):
             'status': self.cluster.get_precedential_status_display(),
             'status_exact': self.cluster.get_precedential_status_display(),
         })
+        try:
+            out['lexisCite'] = str(self.cluster.citations.filter(
+                type=Citation.LEXIS)[0])
+        except IndexError:
+            pass
+
         try:
             out['neutralCite'] = str(self.cluster.citations.filter(
                 type=Citation.NEUTRAL)[0])
