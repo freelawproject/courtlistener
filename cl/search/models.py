@@ -1991,8 +1991,7 @@ class Opinion(models.Model):
             ],
             'judge': self.cluster.judges,
             'lexisCite': self.cluster.lexis_cite,
-            'citation': [str(cite) for cite in self.cluster.citations],
-            'neutralCite': self.cluster.neutral_cite,
+            'citation': [str(cite) for cite in self.cluster.citations.all()],
             'scdb_id': self.cluster.scdb_id,
             'source': self.cluster.source,
             'attorney': self.cluster.attorneys,
@@ -2001,6 +2000,12 @@ class Opinion(models.Model):
             'status': self.cluster.get_precedential_status_display(),
             'status_exact': self.cluster.get_precedential_status_display(),
         })
+        try:
+            out['neutralCite'] = str(self.cluster.citations.filter(
+                type=Citation.NEUTRAL)[0])
+        except IndexError:
+            pass
+
         if self.cluster.date_filed is not None:
             out['dateFiled'] = datetime.combine(
                 self.cluster.date_filed,
