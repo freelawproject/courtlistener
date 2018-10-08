@@ -206,7 +206,7 @@
       "volume": 22,
       "reporter": "AL",
       "page": "339",
-      "type": 2,
+      "type": 8,
       "cluster": 2
     },
     "model": "search.citation",
@@ -245,7 +245,6 @@
     "model": "search.citation",
     "pk": 5
   },
-
 
 
   {
