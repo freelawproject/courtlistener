@@ -45,20 +45,33 @@
     <p>An <code>OPTIONS</code> request is typically the best way to understand the API, however as of v3.1 we also offer an experimental <a href="{% url "swagger_schema" %}">swagger interface</a> and a <a href="{% url "core_api_schema" %}">Core API representation</a> of the API. These endpoints can be used with <a href="http://www.django-rest-framework.org/topics/api-clients/">a variety of bindings</a> to incorporate the API into your code.
     </p>
 
-    <p>The following representation of our database shows how these endpoints work together:
+    <h3>Data Modeling</h3>
+    <p>The two images below show how these endpoints work together. The first image shows the models we use for people and the second shows the models we use for documents and metadata about them. You can see that these models currently link together on the Docket, Person, and Court tables. (<a
+      href="{{ STATIC_PREFIX }}png/complete-model-v3.6.png"
+      target="_blank">Here's a version of this diagram that shows everything all at once</a>.)
     </p>
     <p>
-      <a href="{{ STATIC_PREFIX }}png/schema-design-v3.png"
+      <a href="{{ STATIC_PREFIX }}png/people-model-v3.6.png"
          target="_blank"
          title="Click to see details.">
-          <img src="{{ STATIC_PREFIX }}png/schema-design-v3-small.png"
-               width="640"
-               height="423"
-               class="img-responsive img-rounded">
+        <img src="{{ STATIC_PREFIX }}png/people-model-v3.6-small.png"
+             width="640"
+             height="306"
+             class="img-responsive img-rounded">
+      </a>
+    </p>
+    <p>
+      <a href="{{ STATIC_PREFIX }}png/search-model-v3.6.png"
+         target="_blank"
+         title="Click to see details.">
+        <img src="{{ STATIC_PREFIX }}png/search-model-v3.6-small.png"
+             width="640"
+             height="754"
+             class="img-responsive img-rounded">
       </a>
     </p>
 
-    <p>In addition to the relations above, the basic ideas are:</p>
+    <p>In general the basic ideas are:</p>
     <ul>
       <li><code>Dockets</code> are the top-level objects and they contain <code>Opinion Clusters</code>, <code>Audio</code> files, and <code>Docket Entries</code>. <code>Dockets</code> are the highest level object in the API, serving to group other objects together.
       </li>
