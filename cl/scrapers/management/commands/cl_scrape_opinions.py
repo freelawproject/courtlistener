@@ -33,6 +33,18 @@ from cl.search.models import OpinionCluster
 die_now = False
 
 
+def make_citation(cite_str, cluster, cite_type):
+    """Create and return a citation object for the input values."""
+    citation_obj = get_citations(cite_str)[0]
+    return Citation(
+        cluster=cluster,
+        volume=citation_obj.volume,
+        reporter=citation_obj.reporter,
+        page=citation_obj.page,
+        type=cite_type,
+    )
+
+
 class Command(VerboseCommand):
     help = 'Runs the Juriscraper toolkit against one or many jurisdictions.'
 
@@ -122,33 +134,13 @@ class Command(VerboseCommand):
             syllabus=item.get('summaries', ''),
         )
         citations = []
-        if west_cite_str:
-            citation_obj = get_citations(west_cite_str)[0]
-            citations.append(Citation(
-                cluster=cluster,
-                volume=citation_obj.volume,
-                reporter=citation_obj.reporter,
-                page=citation_obj.page,
-                type=Citation.WEST,
-            ))
-        if state_cite_str:
-            citation_obj = get_citations(state_cite_str)[0]
-            citations.append(Citation(
-                cluster=cluster,
-                volume=citation_obj.volume,
-                reporter=citation_obj.reporter,
-                page=citation_obj.page,
-                type=Citation.STATE,
-            ))
-        if neutral_cite_str:
-            citation_obj = get_citations(neutral_cite_str)[0]
-            citations.append(Citation(
-                cluster=cluster,
-                volume=citation_obj.volume,
-                reporter=citation_obj.reporter,
-                page=citation_obj.page,
-                type=Citation.NEUTRAL,
-            ))
+        cite_types = [
+            (west_cite_str, Citation.WEST),
+            (state_cite_str, Citation.STATE),
+            (neutral_cite_str, Citation.NEUTRAL),
+        ]
+        for cite_str, cite_type in cite_types:
+            citations.append(make_citation(cite_str, cluster, cite_type))
         opinion = Opinion(
             type='010combined',
             sha1=sha1_hash,
