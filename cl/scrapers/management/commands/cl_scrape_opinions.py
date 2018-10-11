@@ -140,7 +140,8 @@ class Command(VerboseCommand):
             (neutral_cite_str, Citation.NEUTRAL),
         ]
         for cite_str, cite_type in cite_types:
-            citations.append(make_citation(cite_str, cluster, cite_type))
+            if cite_str:
+                citations.append(make_citation(cite_str, cluster, cite_type))
         opinion = Opinion(
             type='010combined',
             sha1=sha1_hash,
