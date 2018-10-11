@@ -394,8 +394,17 @@ def reporter_or_volume_handler(request, reporter, volume=None):
                 'private': True,
             })
 
+        paginator = Paginator(cases_in_volume, 250, orphans=5)
+        page = request.GET.get('page')
+        try:
+            cases = paginator.page(page)
+        except PageNotAnInteger:
+            cases = paginator.page(1)
+        except EmptyPage:
+            cases = paginator.page(paginator.num_pages)
+
         return render(request, 'volumes_for_reporter.html', {
-            'cases': cases_in_volume,
+            'cases': cases,
             'reporter': reporter,
             'variation_names': variation_names,
             'volume': volume,
