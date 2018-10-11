@@ -74,6 +74,23 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTP_404_NOT_FOUND)
 
+    def test_volume_page(self):
+        r = self.client.get(
+            reverse('citation_redirector', kwargs={
+                'reporter': 'F.2d',
+            })
+        )
+        self.assertStatus(r, HTTP_200_OK)
+
+    def test_case_page(self):
+        r = self.client.get(
+            reverse('citation_redirector', kwargs={
+                'reporter': 'F.2d',
+                'volume': '56',
+            })
+        )
+        self.assertStatus(r, HTTP_200_OK)
+
 
 class ViewRecapDocketTest(TestCase):
     fixtures = ['test_objects_search.json', 'judge_judy.json']
