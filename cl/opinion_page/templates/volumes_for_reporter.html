@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load text_filters %}
+{% load partition_util %}
+
+
+{% block sidebar %}{% endblock %}
+
+{% block navbar-o %}active{% endblock %}
+
+{% block title %}
+  {% if no_reporters %}
+    Reporter '{{ reporter }}' Not Found (404) – CourtListener.com
+  {% elif no_volumes or no_cases %}
+    No Cases Found for {{ volumes_names.0 }} (404) – CourtListener.com
+  {% elif volumes %}
+    {{ reporter }}, {{ volume_names.0 }} – CourtListener.com
+  {% elif cases %}
+    Vol. {{ volume }} of {{ volume_names.0 }} ({{ reporter }}) – CourtListener.com
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
+  {% if no_reporters %}
+    <div class="col-xs-12 col-md-10 col-lg-8">
+      <h1>Unable to Find Reporter with Abbreviation of '{{ reporter|nbsp }}'</h1>
+      <p>This can sometimes happen if you have a typo in the URL you typed in, or when we have a bug in our system.
+      </p>
+      <p>Sorry about this. Please try again or try looking up a different reporter abbreviation.
+      </p>
+      <p class="v-offset-above-2">
+        <a href="{% url "citation_redirector" %}"
+           class="btn btn-primary btn-lg">Look Up Another Citation</a></p>
+    </div>
+  {% elif no_volumes or no_cases %}
+    <div class="col-xs-12 col-md-10 col-lg-8">
+      <h1>Unable to Find any Citations for {{ volume_names|oxford_join:"or" }} ({{ reporter|nbsp }})
+      </h1>
+      <p>This usually means that <em>{{ reporter }}</em> is a valid reporter abbreviation, but that we don't have any cases properly identified in that reporter.
+      </p>
+      <p>Sorry about this.</p>
+      <p class="v-offset-above-2">
+        <a href="{% url "citation_redirector" %}"
+           class="btn btn-primary btn-lg">Look Up Another Citation</a></p>
+    </div>
+  {% elif volumes %}
+    {# This lists the volumes in a given reporter #}
+    <div class="col-xs-12 col-md-10 col-lg-8">
+      <h1>Volumes of {{ volume_names|oxford_join }} ({{ reporter|nbsp }})</h1>
+      {% include "includes/reporter_variations.html" %}
+    </div>
+    <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
+    <div class="clearfix"></div>
+    <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
+    <div class="col-xs-12 col-md-10 col-lg-8">
+      <div class="row v-offset-above-2">
+        {% for volume in volumes %}
+          <div class="col-xs-2">
+            <h4><a href="{% url "citation_redirector" reporter volume %}">{{ volume }}</a></h4>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% elif cases %}
+    {# This lists the cases in a given reporter & volume #}
+    <div class="col-xs-12 col-md-10 col-lg-8">
+      <h1>Volume {{ volume }} of {{ volume_names|oxford_join }} ({{ reporter|nbsp }})</h1>
+      {% include "includes/reporter_variations.html" %}
+    </div>
+    <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
+    <div class="clearfix"></div>
+    <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
+    <div class="col-xs-12 col-md-10 col-lg-8">
+    {% for case in cases %}
+      <article>
+      <h3 class="bottom serif">
+        <a href="{{ case.get_absolute_url }}" class="visitable">{{ case|best_case_name|safe|v_wrapper }}</a>
+      </h3>
+      <div class="bottom">
+        <div class="inline-block">
+          <span class="meta-data-header">Date Filed:</span>
+          <time class="meta-data-value" datetime="{{ case.date_filed|date:"Y-m-d" }}">{{ case.date_filed|date:"F jS, Y"|default:"Unknown Date" }}
+          </time>
+        </div>
+        <div class="inline-block">
+          <span class="meta-data-header">Citations:</span>
+          <span class="meta-data-value">{{ case.citation_string }}</span>
+        </div>
+        <div class="inline-block">
+          <span class="meta-data-header">Docket Number:</span>
+          <span class="meta-data-value">{{ case.docket.docket_number }}</span>
+        </div>
+      </div>
+      </article>
+    {% endfor %}
+    </div>
+  {% endif %}
+  <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
+{% endblock %}
