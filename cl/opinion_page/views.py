@@ -1,3 +1,4 @@
+from collections import defaultdict, OrderedDict
 from itertools import groupby
 
 from django.conf import settings
@@ -11,16 +12,17 @@ from django.shortcuts import get_object_or_404, render
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
+from reporters_db import EDITIONS, NAMES_TO_EDITIONS, REPORTERS, \
+    VARIATIONS_ONLY
+
 from rest_framework.status import HTTP_404_NOT_FOUND
 
 from cl.alerts.models import DocketAlert
-from cl.citations.find_citations import get_citations
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib import search_utils, sunburnt
 from cl.lib.bot_detector import is_bot, is_og_bot
-from cl.lib.import_lib import map_citations_to_models
 from cl.lib.model_helpers import suppress_autotime
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import make_get_string
@@ -29,7 +31,7 @@ from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import Docket, OpinionCluster, RECAPDocument
+from cl.search.models import Citation, Docket, OpinionCluster, RECAPDocument
 
 
 def redirect_docket_recap(request, court, pacer_case_id):
@@ -319,6 +321,154 @@ def cluster_visualizations(request, pk, slug):
     })
 
 
+def throw_404(request, context):
+    return render(request, 'volumes_for_reporter.html', context,
+                  status=HTTP_404_NOT_FOUND)
+
+
+def reporter_or_volume_handler(request, reporter, volume=None):
+    """Show all the volumes for a given reporter abbreviation or all the cases
+    for a reporter-volume dyad.
+
+    Two things going on here:
+    1. We don't know which reporter the user actually wants when they provide
+       an ambiguous abbreviation. Just show them all.
+    2. We want to also show off that we know all these reporter abbreviations.
+    """
+    root_reporter = EDITIONS.get(reporter)
+    if not root_reporter:
+        return throw_404(request, {
+            'no_reporters': True,
+            'reporter': reporter,
+            'private': True,
+        })
+
+    volume_names = [r['name'] for r in REPORTERS[root_reporter]]
+    variation_names = {}
+    variation_abbrevs = VARIATIONS_ONLY.get(reporter, [])
+    for abbrev in variation_abbrevs:
+        for r in REPORTERS[abbrev]:
+            if r['name'] not in volume_names:
+                variation_names[r['name']] = abbrev
+
+    if volume is None:
+        # Show all the volumes for the case
+        volumes_in_reporter = list(Citation.objects
+                                   .filter(reporter=reporter)
+                                   .order_by('reporter', 'volume')
+                                   .values_list('volume', flat=True)
+                                   .distinct())
+
+        if not volumes_in_reporter:
+            return throw_404(request, {
+                'no_volumes': True,
+                'reporter': reporter,
+                'volume_names': volume_names,
+                'private': True,
+            })
+
+        return render(
+            request,
+            'volumes_for_reporter.html',
+            {
+                'reporter': reporter,
+                'volume_names': volume_names,
+                'volumes': volumes_in_reporter,
+                'variation_names': variation_names,
+                'private': False,
+            },
+        )
+    else:
+        # Show all the cases for a volume-reporter dyad
+        cases_in_volume = (OpinionCluster.objects
+                           .filter(citations__reporter=reporter,
+                                   citations__volume=volume)
+                           .order_by('citations__page', 'date_filed'))
+
+        if not cases_in_volume:
+            return throw_404(request, {
+                'no_cases': True,
+                'reporter': reporter,
+                'volume_names': volume_names,
+                'volume': volume,
+                'private': True,
+            })
+
+        return render(request, 'volumes_for_reporter.html', {
+            'cases': cases_in_volume,
+            'reporter': reporter,
+            'variation_names': variation_names,
+            'volume': volume,
+            'volume_names': volume_names,
+            'private': True,
+        })
+
+
+def make_reporter_dict():
+    """Make a dict of reporter names and abbreviations
+
+    The format here is something like:
+
+        {
+            "Atlantic Reporter": ['A.', 'A.2d', 'A.3d'],
+        }
+    """
+    reporters_in_db = list(Citation.objects
+                           .order_by('reporter')
+                           .values_list('reporter', flat=True)
+                           .distinct())
+
+    reporters = defaultdict(list)
+    for name, abbrev_list in NAMES_TO_EDITIONS.items():
+        for abbrev in abbrev_list:
+            if abbrev in reporters_in_db:
+                reporters[name].append(abbrev)
+    reporters = OrderedDict(sorted(reporters.items(), key=lambda t: t[0]))
+    return reporters
+
+
+def citation_handler(request, reporter, volume, page):
+    """Load the page when somebody looks up a complete citation"""
+
+    citation_str = " ".join([volume, reporter, page])
+    try:
+        clusters = OpinionCluster.objects.filter(citation=citation_str)
+    except ValueError:
+        # Unable to parse the citation.
+        cluster_count = 0
+    else:
+        cluster_count = clusters.count()
+
+    # Show the correct page....
+    if cluster_count == 0:
+        # No results for an otherwise valid citation.
+        return render(
+            request,
+            'citation_redirect_info_page.html',
+            {
+                'none_found': True,
+                'citation_str': citation_str,
+                'private': True,
+            },
+            status=HTTP_404_NOT_FOUND,
+        )
+
+    elif cluster_count == 1:
+        # Total success. Redirect to correct location.
+        return HttpResponseRedirect(
+            clusters[0].get_absolute_url()
+        )
+
+    elif cluster_count > 1:
+        # Multiple results. Show them.
+        return render(request, 'citation_redirect_info_page.html', {
+            'too_many': True,
+            'citation_str': citation_str,
+            'clusters': clusters,
+            'private': True,
+        })
+
+
 def citation_redirector(request, reporter=None, volume=None, page=None):
     """Take a citation URL and use it to redirect the user to the canonical page
     for that citation.
@@ -345,52 +495,22 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
         if all(_ is None for _ in (reporter, volume, page)):
             # No parameters. Show the standard page.
             form = CitationRedirectorForm()
+            reporter_dict = make_reporter_dict()
             return render(request, 'citation_redirect_info_page.html', {
                 'show_homepage': True,
+                'reporter_dict': reporter_dict,
                 'form': form,
                 'private': False,
             })
-
         else:
-            # We have a citation. Look it up, redirect
-            # the user or show disambiguation.
-            citation_str = " ".join([volume, reporter, page])
-            try:
-                clusters = OpinionCluster.objects.filter(citation=citation_str)
-            except ValueError:
-                # Unable to parse the citation.
-                cluster_count = 0
-            else:
-                cluster_count = clusters.count()
-
-            # Show the correct page....
-            if cluster_count == 0:
-                # No results for an otherwise valid citation.
-                return render(
-                    request,
-                    'citation_redirect_info_page.html',
-                    {
-                        'none_found': True,
-                        'citation_str': citation_str,
-                        'private': True,
-                    },
-                    status=HTTP_404_NOT_FOUND,
-                )
-
-            elif cluster_count == 1:
-                # Total success. Redirect to correct location.
-                return HttpResponseRedirect(
-                    clusters[0].get_absolute_url()
-                )
-
-            elif cluster_count > 1:
-                # Multiple results. Show them.
-                return render(request, 'citation_redirect_info_page.html', {
-                    'too_many': True,
-                    'citation_str': citation_str,
-                    'clusters': clusters,
-                    'private': True,
-                })
+            # We have a reporter (show volumes in it), a volume (show cases in
+            # it), or a citation (show matching citation(s))
+            if reporter and volume and page:
+                return citation_handler(request, reporter, volume, page)
+            elif reporter and volume and page is None:
+                return reporter_or_volume_handler(request, reporter, volume)
+            elif reporter and volume is None and page is None:
+                return reporter_or_volume_handler(request, reporter)
 
 
 @ensure_csrf_cookie
