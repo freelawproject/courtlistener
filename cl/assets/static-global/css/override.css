@@ -237,6 +237,9 @@ a.button:active {
 .large {
   font-size: 21px;
 }
+.medium {
+  font-size: 15px;
+}
 
 .btn-xl {
   padding: 15px 22px;
