@@ -223,8 +223,23 @@
       <div class="container-fluid">
         <div>
           <ul class="nav navbar-nav">
-            <li class="{% block navbar-o %}inactive{% endblock %}" id="navbar-o">
-              <a href="{% url "advanced_o" %}" tabindex="100">Opinions</a>
+            <li class="dropdown {% block navbar-o %}inactive{% endblock %}"
+                id="navbar-o">
+              <a href="#"
+                 class="dropdown-toggle"
+                 tabindex="100"
+                 data-toggle="dropdown">Opinions&nbsp;<span
+                class="caret"></span>
+              </a>
+              <ul class="dropdown-menu" role="menu">
+                <li>
+                  <a href="{% url "advanced_o" %}" tabindex="101">Advanced Search</a>
+                </li>
+                <li>
+                  <a href="{% url "citation_redirector" %}"
+                     tabindex="102">Citation Look Up</a>
+                </li>
+              </ul>
             </li>
             <li class="{% block navbar-r %}inactive{% endblock %}" id="navbar-r">
               <a href="{% url "advanced_r" %}" tabindex="101">RECAP Archive</a>
