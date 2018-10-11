@@ -46,7 +46,7 @@
   {% elif volumes %}
     {# This lists the volumes in a given reporter #}
     <div class="col-xs-12 col-md-10 col-lg-8">
-      <h1>Volumes of {{ volume_names|oxford_join }} ({{ reporter|nbsp }})</h1>
+      <h1>Volumes of {{ volume_names|oxford_join }}&nbsp;({{ reporter|nbsp }})</h1>
       {% include "includes/reporter_variations.html" %}
     </div>
     <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
@@ -64,7 +64,7 @@
   {% elif cases.paginator.count %}
     {# This lists the cases in a given reporter & volume #}
     <div class="col-xs-12 col-md-10 col-lg-8">
-      <h1>Volume {{ volume }} of {{ volume_names|oxford_join }} ({{ reporter|nbsp }})</h1>
+      <h1>Volume {{ volume }} of {{ volume_names|oxford_join }}&nbsp;({{ reporter|nbsp }})</h1>
       {% include "includes/reporter_variations.html" %}
       {% if cases.paginator.num_pages > 1 %}
         {% include "includes/pagination.html" with results=cases %}
