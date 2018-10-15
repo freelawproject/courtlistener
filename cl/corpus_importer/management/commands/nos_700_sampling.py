@@ -44,7 +44,7 @@ def get_dockets(options):
     throttle = CeleryThrottle(queue_name=q)
     session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
     session.login()
-    for i, row in items:
+    for i, row in enumerate(items):
         if i < options['offset']:
             continue
         if i >= options['limit'] > 0:
