@@ -41,7 +41,6 @@ def get_dockets(options):
     ).order_by('?')[:sample_size]
 
     q = options['queue']
-    task = options['task']
     throttle = CeleryThrottle(queue_name=q)
     session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
     session.login()
