@@ -25,12 +25,13 @@ def get_dockets(options):
     """Download a sample of dockets from PACER matching the 7xx series of NOS
     codes.
     """
-    nos_codes = nos_codes = [LABOR_LITIGATION_OTHER,
-                             LABOR_MANAGEMENT_RELATIONS_ACT,
-                             LABOR_MANAGEMENT_REPORT_DISCLOSURE,
-                             FAIR_LABOR_STANDARDS_ACT_CV, RAILWAY_LABOR_ACT,
-                             FAMILY_AND_MEDICAL_LEAVE_ACT,
-                             EMPLOYEE_RETIREMENT_INCOME_SECURITY_ACT]
+    nos_codes = [LABOR_LITIGATION_OTHER,
+                 LABOR_MANAGEMENT_RELATIONS_ACT,
+                 LABOR_MANAGEMENT_REPORT_DISCLOSURE,
+                 FAIR_LABOR_STANDARDS_ACT_CV,
+                 RAILWAY_LABOR_ACT,
+                 FAMILY_AND_MEDICAL_LEAVE_ACT,
+                 EMPLOYEE_RETIREMENT_INCOME_SECURITY_ACT]
     sample_size = 300
     items = FjcIntegratedDatabase.objects.filter(
         nature_of_suit__in=nos_codes,
