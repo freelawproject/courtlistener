@@ -105,4 +105,4 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         logger.info("Using PACER username: %s" % PACER_USERNAME)
-
+        get_dockets(options)
