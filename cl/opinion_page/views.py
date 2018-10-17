@@ -383,7 +383,7 @@ def reporter_or_volume_handler(request, reporter, volume=None):
         cases_in_volume = (OpinionCluster.objects
                            .filter(citations__reporter=reporter,
                                    citations__volume=volume)
-                           .order_by('citations__page', 'date_filed'))
+                           .order_by('date_filed', 'citations__page'))
 
         if not cases_in_volume:
             return throw_404(request, {
