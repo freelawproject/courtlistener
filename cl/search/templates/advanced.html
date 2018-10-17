@@ -13,6 +13,18 @@
     {% endif %}
 {% endblock %}
 
+{% block og_title %}
+  {% if search_form.type.value == 'o' %}
+    Advanced Legal Opinion Search – CourtListener.com
+  {% elif search_form.type.value == 'r' %}
+    Advanced RECAP Archive Search for PACER – CourtListener.com
+  {% elif search_form.type.value == 'oa' %}
+    Advanced Oral Argument Search – CourtListener.com
+  {% elif search_form.type.value == 'p' %}
+    Advanced Judge Search – CourtListener.com
+  {% endif %}
+{% endblock %}
+
 {% block footer-scripts %}
     <script type="text/javascript">
         $(document).ready(function () {
