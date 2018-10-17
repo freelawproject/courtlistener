@@ -20,6 +20,26 @@
     {% endif %}
 {% endblock %}
 
+{% block og_title %}
+  {% if show_homepage %}
+    Citation Lookup Tool – CourtListener.com
+  {% else %}
+    {% if none_found %}
+      Citation Not Found (404) – CourtListener.com
+    {% elif too_many %}
+      Several Citations Found – CourtListener.com
+    {% endif %}
+  {% endif %}
+{% endblock %}
+
+{% block description %}
+  Use our citation look up tool to find opinions by citation or to browse reporters. Our unique database of reporters and our extensive collection of citations makes for a powerful combination.
+{% endblock %}
+
+{% block og_description %}
+  Use our citation look up tool to find opinions by citation or to browse reporters. Our unique database of reporters and our extensive collection of citations makes for a powerful combination.
+{% endblock %}
+
 
 {% block content %}
     {% if show_homepage %}
