@@ -449,6 +449,8 @@
     <h3 id="docket-entry-endpoint">{% url "docketentry-list" version="v3" %} <span class="alt">&amp;</span> {% url "recapdocument-list" version="v3" %}</h3>
     <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain nested <code>RECAP Document</code> objects. This follows the design on PACER, in which a single row on a docket may represent a document and several additional attachments.
     </p>
+    <p>One comment about the <code>entry_number</code> field. In district courts, this number is consistently provided by the court, and is usually a number between zero and the low thousands (depending on the length of the case). In appellate court, this number is not provided by PACER, and so we use the internal PACER document ID to populate this field.
+    </p>
     <p>The field, filtering, and ordering parameters for <code>Docket Entry</code> and <code>RECAP Document</code> objects can be found via an <code>OPTIONS</code> request.
     </p>
     {% if not perms.search.has_recap_api_access %}
