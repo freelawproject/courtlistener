@@ -744,7 +744,9 @@ class DocketEntry(models.Model):
         blank=True,
     )
     entry_number = models.BigIntegerField(
-        help_text="# on the PACER docket page.",
+        help_text="# on the PACER docket page. For appellate cases, this may "
+                  "be the internal PACER ID for the document, when an entry "
+                  "ID is otherwise unavailable.",
     )
     description = models.TextField(
         help_text="The text content of the docket entry that appears in the "
