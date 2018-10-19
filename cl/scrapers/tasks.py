@@ -12,7 +12,8 @@ from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
+from django.utils.encoding import smart_text, DjangoUnicodeDecodeError, \
+    force_text
 from django.utils.timezone import now
 from eyed3 import id3
 from lxml.etree import XMLSyntaxError
@@ -65,11 +66,19 @@ def extract_from_html(path):
     try:
         content = open(path).read()
         content = get_clean_body_content(content)
-        err = False
+        encodings = ['utf-8', 'ISO8859', 'cp1252']
+        for encoding in encodings:
+            try:
+                content = force_text(content, encoding=encoding)
+            except DjangoUnicodeDecodeError:
+                continue
+            else:
+                return content, False
+
+        # Fell through, therefore unable to decode the string.
+        return '', True
     except:
-        content = ''
-        err = True
-    return content, err
+        return '', True
 
 
 def make_pdftotext_process(path):
