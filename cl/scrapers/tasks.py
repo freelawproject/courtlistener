@@ -58,6 +58,17 @@ def extract_from_doc(path):
     return content, err
 
 
+def extract_from_docx(path):
+    """Extract text from docx files
+
+    We use docx2txt to pull out the text. Pretty simple.
+    """
+    process = subprocess.Popen(['docx2txt', path, '-'], shell=False,
+                               stdout=subprocess.PIPE, stderr=DEVNULL)
+    content, err = process.communicate()
+    return content, err
+
+
 def extract_from_html(path):
     """Extract from html.
 
@@ -216,8 +227,10 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
     path = opinion.local_path.path
 
     extension = path.split('.')[-1]
-    if extension in ['doc', 'docx']:
+    if extension == 'doc':
         content, err = extract_from_doc(path)
+    elif extension == 'docx':
+        content, err = extract_from_docx(path)
     elif extension == 'html':
         content, err = extract_from_html(path)
     elif extension == 'pdf':
