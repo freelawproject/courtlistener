@@ -207,7 +207,7 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
     path = opinion.local_path.path
 
     extension = path.split('.')[-1]
-    if extension == 'doc':
+    if extension in ['doc', 'docx']:
         content, err = extract_from_doc(path)
     elif extension == 'html':
         content, err = extract_from_html(path)
