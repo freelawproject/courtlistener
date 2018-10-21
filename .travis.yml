@@ -1,0 +1,38 @@
+language: python
+
+python:
+  - "2.7"
+
+sudo: required
+
+before_install:
+  # TODO (dxia) put into script
+  # Install ansible
+  - sudo apt-get update
+  - sudo apt-get install software-properties-common
+  - sudo apt-add-repository ppa:ansible/ansible -y
+  - sudo apt-get update
+  - sudo apt-get install ansible
+  # Remove pre-installed postgres so we can ensure a specific version when running tests.
+  - sudo /etc/init.d/postgresql stop
+  # /home/vagrant is symlinked to /home/travis for some reason.
+  # Delete it so we don't have permission errors later.
+  - sudo rm -fr /home/vagrant && sudo useradd --create-home vagrant
+  - sudo apt-get --purge remove postgresql\*
+  - sudo rm -fr /etc/postgresql/ || true
+  - sudo rm -fr /etc/postgresql-common/ || true
+  - sudo rm -fr /var/lib/postgresql/ || true
+  - sudo userdel -r postgres || true
+  - sudo groupdel postgres || true
+
+install:
+  # TODO (dxia) put into script
+  - cd $TRAVIS_BUILD_DIR && git clone https://github.com/davidxia/freelawmachine && cd freelawmachine/ansible && ./freelawmachine.yml -i config/hosts_local --tags 'postgres,courtlistener' && cd -
+
+before_script:
+  - sudo chown -R $(whoami):$(whoami) /var/log/courtlistener /var/log/juriscraper
+  - cp cl/settings/05-private.example cl/settings/05-private.py
+  - source /home/vagrant/.virtualenvs/courtlistener/bin/activate
+
+script:
+  - ./manage.py test --noinput cl.corpus_importer
