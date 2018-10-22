@@ -1,12 +1,11 @@
 import json
-from datetime import datetime
-from datetime import time
 
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
 from django.template import loader
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
     normalize_search_dicts
@@ -211,20 +210,12 @@ class Audio(models.Model):
         # Docket
         docket = {'docketNumber': self.docket.docket_number}
         if self.docket.date_argued is not None:
-            docket['dateArgued'] = datetime.combine(
-                self.docket.date_argued,
-                time()
-            )
+            docket['dateArgued'] = midnight_pst(self.docket.date_argued)
         if self.docket.date_reargued is not None:
-            docket['dateReargued'] = datetime.combine(
-                self.docket.date_reargued,
-                time()
-            )
+            docket['dateReargued'] = midnight_pst(self.docket.date_reargued)
         if self.docket.date_reargument_denied is not None:
-            docket['dateReargumentDenied'] = datetime.combine(
-                self.docket.date_reargument_denied,
-                time()
-            )
+            docket['dateReargumentDenied'] = midnight_pst(
+                self.docket.date_reargument_denied)
         out.update(docket)
 
         # Court

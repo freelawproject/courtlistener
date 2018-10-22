@@ -1,4 +1,3 @@
-import datetime
 import os
 
 from django.conf import settings
@@ -7,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed
 
 from cl.lib import search_utils
+from cl.lib.date_time import midnight_pst
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.forms import SearchForm
@@ -69,8 +69,7 @@ class SearchFeed(Feed):
         return get_item(item)['court']
 
     def item_pubdate(self, item):
-        return datetime.datetime.combine(get_item(item)['dateFiled'],
-                                         datetime.time())
+        return midnight_pst(get_item(item)['dateFiled'])
 
     def item_title(self, item):
         return get_item(item)['caseName']
@@ -113,8 +112,7 @@ class JurisdictionFeed(Feed):
         return get_item(item)['court']
 
     def item_pubdate(self, item):
-        return datetime.datetime.combine(get_item(item)['dateFiled'],
-                                         datetime.time())
+        return midnight_pst(get_item(item)['dateFiled'])
 
     def item_title(self, item):
         return get_item(item)['caseName']

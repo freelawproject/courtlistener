@@ -1,7 +1,6 @@
 # coding=utf-8
 import os
 import re
-from datetime import datetime, time
 
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
@@ -15,6 +14,7 @@ from django.utils.text import slugify
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
+from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path, make_recap_path, \
     make_recap_pdf_path, make_recap_thumb_path
 from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
@@ -579,12 +579,11 @@ class Docket(models.Model):
             'jurisdictionType': self.jurisdiction_type,
         }
         if self.date_argued is not None:
-            out['dateArgued'] = datetime.combine(self.date_argued, time())
+            out['dateArgued'] = midnight_pst(self.date_argued)
         if self.date_filed is not None:
-            out['dateFiled'] = datetime.combine(self.date_filed, time())
+            out['dateFiled'] = midnight_pst(self.date_filed)
         if self.date_terminated is not None:
-            out['dateTerminated'] = datetime.combine(
-                self.date_terminated, time())
+            out['dateTerminated'] = midnight_pst(self.date_terminated)
         try:
             out['docket_absolute_url'] = self.get_absolute_url()
         except NoReverseMatch:
@@ -634,8 +633,7 @@ class Docket(models.Model):
             if de.entry_number is not None:
                 out['entry_number'] = de.entry_number
             if de.date_filed is not None:
-                out['entry_date_filed'] = datetime.combine(de.date_filed,
-                                                           time())
+                out['entry_date_filed'] = midnight_pst(de.date_filed)
             rds = de.recap_documents.all()
 
             if len(rds) == 0:
@@ -1061,12 +1059,11 @@ class RECAPDocument(models.Model):
             'jurisdictionType': docket.jurisdiction_type,
         })
         if docket.date_argued is not None:
-            out['dateArgued'] = datetime.combine(docket.date_argued, time())
+            out['dateArgued'] = midnight_pst(docket.date_argued)
         if docket.date_filed is not None:
-            out['dateFiled'] = datetime.combine(docket.date_filed, time())
+            out['dateFiled'] = midnight_pst(docket.date_filed)
         if docket.date_terminated is not None:
-            out['dateTerminated'] = datetime.combine(docket.date_terminated,
-                                                     time())
+            out['dateTerminated'] = midnight_pst(docket.date_terminated)
         try:
             out['docket_absolute_url'] = docket.get_absolute_url()
         except NoReverseMatch:
@@ -1159,10 +1156,8 @@ class RECAPDocument(models.Model):
         if self.docket_entry.entry_number is not None:
             out['entry_number'] = self.docket_entry.entry_number
         if self.docket_entry.date_filed is not None:
-            out['entry_date_filed'] = datetime.combine(
-                self.docket_entry.date_filed,
-                time()
-            )
+            out['entry_date_filed'] = midnight_pst(
+                self.docket_entry.date_filed)
 
         text_template = loader.get_template('indexes/dockets_text.txt')
         out['text'] = text_template.render({'item': self}).translate(null_map)
@@ -2014,10 +2009,7 @@ class Opinion(models.Model):
             pass
 
         if self.cluster.date_filed is not None:
-            out['dateFiled'] = datetime.combine(
-                self.cluster.date_filed,
-                time()
-            )  # Midnight, PST
+            out['dateFiled'] = midnight_pst(self.cluster.date_filed)
         try:
             out['absolute_url'] = self.cluster.get_absolute_url()
         except NoReverseMatch:
@@ -2030,20 +2022,14 @@ class Opinion(models.Model):
         # Docket
         docket = {'docketNumber': self.cluster.docket.docket_number}
         if self.cluster.docket.date_argued is not None:
-            docket['dateArgued'] = datetime.combine(
-                self.cluster.docket.date_argued,
-                time(),
-            )
+            docket['dateArgued'] = midnight_pst(
+                self.cluster.docket.date_argued)
         if self.cluster.docket.date_reargued is not None:
-            docket['dateReargued'] = datetime.combine(
-                self.cluster.docket.date_reargued,
-                time(),
-            )
+            docket['dateReargued'] = midnight_pst(
+                self.cluster.docket.date_reargued)
         if self.cluster.docket.date_reargument_denied is not None:
-            docket['dateReargumentDenied'] = datetime.combine(
-                self.cluster.docket.date_reargument_denied,
-                time(),
-            )
+            docket['dateReargumentDenied'] = midnight_pst(
+                self.cluster.docket.date_reargument_denied)
         out.update(docket)
 
         court = {
