@@ -8,6 +8,7 @@ from django.utils.text import slugify
 from localflavor.us import models as local_models
 
 from cl.custom_filters.templatetags.extras import granular_date
+from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
     validate_has_full_name,
@@ -278,9 +279,9 @@ class Person(models.Model):
 
         # Dates
         if self.date_dob is not None:
-            out['dob'] = datetime.combine(self.date_dob, time())
+            out['dob'] = midnight_pst(self.date_dob)
         if self.date_dod is not None:
-            out['dod'] = datetime.combine(self.date_dod, time())
+            out['dod'] = midnight_pst(self.date_dod)
 
         # Joined Values. Brace yourself.
         positions = self.positions.all()
