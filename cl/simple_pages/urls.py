@@ -26,13 +26,11 @@ urlpatterns = [
     url(r'^help/markdown/$', markdown_help, name="markdown_help"),
     url(r'^help/alerts/$', alert_help, name="alert_help"),
     url(r'^help/donations/$', donation_help, name="donation_help"),
+    url(r'^help/search-operators/$', advanced_search, name="advanced_search"),
 
-    # Advanced search page
-    url(
-        r'^search/advanced-techniques/$',
-        advanced_search,
-        name='advanced_search'
-    ),
+    # Added 2018-10-23
+    url(r'^search/advanced-techniques/$',
+        RedirectView.as_view(pattern_name='advanced_search', permanent=True)),
 
     url(r'^terms/v/(\d{1,2})/$', old_terms, name='old_terms'),
     url(r'^terms/$', latest_terms, name='terms'),
