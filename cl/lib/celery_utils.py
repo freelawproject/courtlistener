@@ -116,6 +116,8 @@ class CeleryThrottle(object):
                 self.first_run = False
                 self.last_measurement = now()
             self.count_to_do -= 1
+            if self.min_wait:
+                time.sleep(self.min_wait)
             return
 
         self._add_latest_rate()
