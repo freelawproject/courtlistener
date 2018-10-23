@@ -6,7 +6,7 @@ python:
 sudo: required
 
 before_install:
-  # TODO (dxia) put into script
+  # TODO (davidxia) put into script
   # Install ansible
   - sudo apt-get update
   - sudo apt-get install software-properties-common
@@ -26,8 +26,8 @@ before_install:
   - sudo groupdel postgres || true
 
 install:
-  # TODO (dxia) put into script
-  - cd $TRAVIS_BUILD_DIR && git clone https://github.com/davidxia/freelawmachine && cd freelawmachine/ansible && ./freelawmachine.yml -i config/hosts_local --tags 'postgres,courtlistener' && cd -
+  # TODO (davidxia) put into script
+  - cd $TRAVIS_BUILD_DIR && git clone https://github.com/freelawproject/freelawmachine && cd freelawmachine/ansible && ./freelawmachine.yml -i config/hosts_local --tags 'postgres,courtlistener' && cd -
 
 before_script:
   - sudo chown -R $(whoami):$(whoami) /var/log/courtlistener /var/log/juriscraper
