@@ -70,6 +70,20 @@
     <h2>Range Queries: <code>[ ]</code></h2>
     <p>Ranges can be queried by using brackets. For example, a search for <code>[1939 TO 1945]</code> would find all cases that contained the numbers 1939 to 1945, inclusive. Range queries can also be fielded, allowing searches like <code>citation:([22 TO 23] F2)</code>, which would find all cases from volumes 22 and 23 of the second series of the Federal Reporter. In range queries, the word 'TO' must be uppercase.
     </p>
+
+    <h2>Date Queries</h2>
+    <p>Unfortunately, date queries are difficult to place at present, requiring the full <a href="https://en.wikipedia.org/wiki/ISO_8601" target="_blank" rel="nofollow">ISO-8601 standard</a> date formatting. This means that dates must be formatted as follows:
+    </p>
+    <p>
+      <code>YYYY-MM-DDTHH-MM-SSZ</code>
+    </p>
+    <p>In English that's year-month-day-T-hour-minute-second-Z. For example, here's a date range that finds all opinions from October, 2018:
+    </p>
+    <p>
+      <code><a href="{% url "advanced_o" %}?q=dateFiled%3A[2018-10-01T00%3A00%3A00Z+TO+2018-10-31T00%3A00%3A00Z]">dateFiled:[2018-10-01T00:00:00Z TO 2018-10-31T00:00:00Z]</a>
+      </code>
+    </p>
+    <p>We are working to make this easier for our users.</p>
   </div>
   <div class="col-sm-3">
     {% include "includes/operators_quick_list.html" %}
