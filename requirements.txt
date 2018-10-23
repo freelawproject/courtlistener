@@ -58,7 +58,7 @@ Pillow~=3.3
 psycopg2==2.6.1
 pycparser==2.14
 pydot==1.1.0
-pyinotify==0.9.6
+pyinotify==0.9.6; sys_platform != 'darwin'
 pylint==1.4.3
 pyOpenSSL
 pyparsing==2.1.10
