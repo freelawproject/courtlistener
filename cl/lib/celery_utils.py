@@ -58,7 +58,7 @@ def get_queue_length(queue_name='celery'):
 class CeleryThrottle(object):
     """A class for throttling celery."""
 
-    def __init__(self, min_items=100, queue_name='celery'):
+    def __init__(self, min_items=100, min_wait=0, queue_name='celery'):
         """Create a throttle to prevent celery run aways.
         
         :param min_items: The minimum number of items that should be enqueued. 
@@ -66,9 +66,12 @@ class CeleryThrottle(object):
         guaranteed and so a number slightly higher than your max concurrency 
         should be used. Note that this number includes all tasks unless you use
         a specific queue for your processing.
+        :param min_wait: The minimum amount of time that should be waited every
+        time `maybe_wait()` is called.
         """
         self.min = min_items
         self.max = self.min * 2
+        self.min_wait = min_wait
 
         # Variables used to track the queue and wait-rate
         self.last_processed_count = 0
@@ -122,6 +125,9 @@ class CeleryThrottle(object):
             # long + 5% to ensure we're below self.min on next iteration.
             surplus_task_count = task_count - self.min
             wait_time = (surplus_task_count / self.avg_rate) * 1.05
+            # Account for minimum wait time
+            if self.min_wait:
+                wait_time = max(wait_time, self.min_wait)
             time.sleep(wait_time)
 
             # Assume we're below self.min due to waiting; max out the queue.
@@ -132,4 +138,6 @@ class CeleryThrottle(object):
         elif task_count <= self.min:
             # Add more items.
             self.count_to_do = self.max - task_count
+            if self.min_wait > 0:
+                time.sleep(self.min_wait)
             return
