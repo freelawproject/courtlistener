@@ -1,0 +1,2 @@
+localhost:5432:*:{{ pg_super_user }}:{{ pg_super_password }}
+localhost:5432:{{ pg_cl_database }}:{{ pg_cl_user }}:{{ pg_cl_password }}

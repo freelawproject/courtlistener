@@ -1,0 +1,11 @@
+---
+pg_super_user: postgres
+pg_super_password: password
+pg_cl_user: django
+pg_cl_password: your-password
+pg_cl_database: courtlistener
+socket_method: md5
+ipv4_address: "127.0.0.1/32"
+ipv4_method: md5
+ipv6_address: "::1/128"
+ipv6_method: md5

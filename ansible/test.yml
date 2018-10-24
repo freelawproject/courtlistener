@@ -1,0 +1,10 @@
+#!/usr/bin/env ansible-playbook
+---
+- name: install test dependencies
+  hosts: localhost
+  vars:
+    cl_user: root
+    run_tests: true
+  roles:
+    - postgres
+    - courtlistener

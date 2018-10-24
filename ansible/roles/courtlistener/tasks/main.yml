@@ -1,0 +1,65 @@
+---
+- name: configure courtlistener directories
+  become: yes
+  become_user: root
+  file:
+    state: directory
+    path: "{{ item }}"
+    owner: "{{ cl_user }}"
+    group: "{{ cl_user }}"
+  with_items:
+    - "{{ install_root }}"
+    - "{{ log_directory }}"
+
+- name: install required debian packages
+  become: yes
+  become_user: root
+  apt:
+    pkg:
+      - libpq-dev
+      - libxml2-dev
+      - libxslt1-dev
+      - python-dev
+      - python-pip
+    state: latest
+
+- name: pip install virtualenv
+  pip:
+    name: virtualenv
+    executable: pip
+
+- name: install judge-pics
+  become_user: "{{ cl_user }}"
+  pip:
+    name: "git+https://github.com/freelawproject/judge-pics@master"
+    editable: False
+    virtualenv: "{{ virtualenv_root }}"
+
+- name: clone courtlistener
+  become_user: "{{ cl_user }}"
+  git:
+    repo: https://github.com/davidxia/courtlistener
+    dest: "{{ install_root }}"
+    update: yes
+  ignore_errors: true
+  register: clone_result
+
+- name: pip install courtlistener requirements
+  become_user: "{{ cl_user }}"
+  pip:
+    requirements: "{{ install_root }}/requirements.txt"
+    virtualenv: "{{ virtualenv_root }}"
+
+- name: pip install courtlistener test requirements
+  when: run_tests is defined
+  become_user: "{{ cl_user }}"
+  pip:
+    requirements: "{{ install_root }}/requirements-test.txt"
+    virtualenv: "{{ virtualenv_root }}"
+
+- name: copy django settings example file
+  become_user: "{{ cl_user }}"
+  copy:
+    remote_src: true
+    src: "{{ install_root }}/cl/settings/05-private.example"
+    dest: "{{ install_root }}/cl/settings/05-private.py"

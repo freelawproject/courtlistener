@@ -1,0 +1,74 @@
+---
+- name: apt-get install postgres
+  become: yes
+  become_user: root
+  apt:
+    pkg:
+      - postgresql-9.3
+      - postgresql-contrib-9.3
+      - python-psycopg2
+    state: latest
+    update_cache: yes
+    cache_valid_time: 3600
+    autoremove: yes
+
+- name: start postgresq
+  become: yes
+  become_user: root
+  service:
+    name: postgresql
+    state: started
+    enabled: yes
+
+# Do this first before we change pg_hba.conf so we can guarantee we have the right password.
+- name: configure {{ pg_super_user }} super user
+  become: yes
+  become_user: "{{ pg_super_user }}"
+  postgresql_user:
+    name: "{{ pg_super_user }}"
+    password: "{{ pg_super_password }}"
+    login_password: "{{ pg_super_password }}"
+
+- name: configure postgres pg_hba.conf
+  become: yes
+  become_user: root
+  template:
+    src: pg_hba.conf
+    dest: /etc/postgresql/9.3/main/pg_hba.conf
+
+- name: create .pgpass for {{ cl_user }}
+  template:
+    src: pgpass
+    dest: $HOME/.pgpass
+
+- name: fix .pgpass permissions
+  file:
+    path: $HOME/.pgpass
+    owner: "{{ cl_user }}"
+    group: "{{ cl_user }}"
+    mode: 0600
+
+- name: restart postgres
+  become: yes
+  become_user: root
+  service:
+      name: postgresql
+      state: restarted
+      enabled: yes
+
+- name: configure {{ pg_cl_user }} postgres user
+  postgresql_user:
+      name: "{{ pg_cl_user }}"
+      password: "{{ pg_cl_password }}"
+      login_user: "{{ pg_super_user }}"
+      login_password: "{{ pg_super_password }}"
+      role_attr_flags: "CREATEDB,NOSUPERUSER"
+
+- name: create courtlistener db
+  postgresql_db:
+      name: "{{ pg_cl_database }}"
+      encoding: UTF-8
+      template: template0
+      owner: "{{ pg_cl_user }}"
+      login_user: "{{ pg_super_user }}"
+      login_password: "{{ pg_super_password }}"
