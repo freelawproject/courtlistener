@@ -20,7 +20,8 @@ STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
                "remanded", "see", "granted", "dismissed"]
 
 # Store court values to avoid repeated DB queries
-if not set(sys.argv).isdisjoint(['test', 'syncdb', 'shell', 'migrate']):
+if (not set(sys.argv).isdisjoint(['test', 'syncdb', 'shell', 'migrate'])
+        or any('pytest' in s for s in set(sys.argv))):
     # If it's a test, we can't count on the database being prepped, so we have
     # to load lazily
     ALL_COURTS = Court.objects.all().values('citation_string', 'pk')
