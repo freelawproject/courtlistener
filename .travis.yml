@@ -1,0 +1,16 @@
+language: python
+
+python:
+  - "2.7"
+
+sudo: required
+
+before_install:
+  - ./travis.sh install_ansible
+  - ./travis.sh purge_postgres
+
+install:
+  - ansible/./test.yml -i ansible/hosts --extra-vars "cl_user=travis"
+
+script:
+  - source /var/www/.virtualenvs/courtlistener/bin/activate && cd /var/www/courtlistener && pytest cl/corpus_importer/tests.py

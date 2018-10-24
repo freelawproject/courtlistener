@@ -1,0 +1,4 @@
+---
+install_root: /var/www/courtlistener
+log_directory: /var/log/courtlistener
+virtualenv_root: /var/www/.virtualenvs/courtlistener
