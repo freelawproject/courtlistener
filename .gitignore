@@ -31,6 +31,6 @@ Solr/data_person/
 .idea
 
 # Dev personal stuff - never check in these things with keys or codes!
-cl/settings/05-private.py
+cl/settings/*private.py
 cl/settings/google_auth.json
 .DS_Store
