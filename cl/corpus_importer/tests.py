@@ -1,7 +1,9 @@
 # coding=utf-8
 import os
+import unittest
 from datetime import date
 
+import pytest
 from django.conf import settings
 from django.test import TestCase
 
@@ -17,7 +19,7 @@ from cl.recap.tasks import find_docket_object
 from cl.search.models import Docket, RECAPDocument
 
 
-class JudgeExtractionTest(TestCase):
+class JudgeExtractionTest(unittest.TestCase):
     def test_get_judge_from_string_columbia(self):
         """Can we cleanly get a judge value from a string?"""
         tests = ((
@@ -35,7 +37,7 @@ class JudgeExtractionTest(TestCase):
             self.assertEqual(find_judge_names(q), a)
 
 
-class CourtMatchingTest(TestCase):
+class CourtMatchingTest(unittest.TestCase):
     """Tests related to converting court strings into court objects."""
 
     def test_get_court_object_from_string(self):
@@ -282,6 +284,7 @@ class CourtMatchingTest(TestCase):
             )
 
 
+@pytest.mark.django_db
 class PacerDocketParserTest(TestCase):
     """Can we parse RECAP dockets successfully?"""
     NUM_PARTIES = 3
@@ -362,7 +365,7 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(godfrey_llp.state, u'WA')
 
 
-class GetQuarterTest(TestCase):
+class GetQuarterTest(unittest.TestCase):
     """Can we properly figure out when the quarter that we're currently in
     began?
     """
