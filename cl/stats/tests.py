@@ -1,5 +1,7 @@
 from unittest import TestCase
 
+import pytest
+
 from cl.stats.models import Stat
 from cl.stats.utils import get_milestone_range
 from cl.stats.utils import tally_stat
@@ -13,6 +15,7 @@ class MilestoneTests(TestCase):
         self.assertEqual(numbers[-1], 5e4)
 
 
+@pytest.mark.django_db
 class StatTests(TestCase):
 
     def setUp(self):
