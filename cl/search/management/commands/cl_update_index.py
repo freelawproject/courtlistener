@@ -221,7 +221,7 @@ class Command(VerboseCommand):
                               'index.\n')
             sys.exit(1)
 
-    def process_queryset(self, items, count, chunksize=50,):
+    def process_queryset(self, items, count, chunksize=5,):
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
         """
