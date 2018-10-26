@@ -141,6 +141,26 @@ export SELENIUM_DEBUG=1
 
 You should find screenshot files available in the project directory. It's recommend you run the test suite with the `--failfast` option so it stops executing the rest of the tests if it encounters a failure. Currently, the screenshot is named after the test class and you may overwrite a screenshot if you continue through more tests in the same class.
 
+## CI/CD
+
+This Github project is configured to run tests for every pull request.
+A webhook triggers [CircleCI][circleci-cl-builds] to run `.circleci/config.yml`.
+`config.yml` makes CircleCI run tests inside a Docker container. The custom
+Docker image used to run tests is built from `.circleci/Dockerfile` and pushed
+to [Docker Hub][hub-cl-testing].
+
+### Updating the testing container
+
+If you add new dependencies, remember to update the testing container with the following steps.
+
+1. Have `docker` and `make` CLI tools installed.
+2. Have a Docker Hub account that's a member of the [freelawproject organization][hub-flp].
+3. `docker login` with your credentials for the Hub account above.
+4. Increase the version in `version.txt`.
+5. `make push --file .circleci/Makefile`
+6. **Increment `version.txt` and append `-SNAPSHOT` to the version string.**
+```
+
 
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux
 [chromedriver]: https://sites.google.com/a/chromium.org/chromedriver/downloads
@@ -150,3 +170,6 @@ You should find screenshot files available in the project directory. It's recomm
 [flm]: https://github.com/freelawproject/freelawmachine
 [flm-readme]: https://github.com/freelawproject/freelawmachine/blob/master/README.md
 [vagrant-ports]: https://www.vagrantup.com/docs/networking/forwarded_ports.html
+[circleci-cl-builds]: https://circleci.com/gh/freelawproject/courtlistener
+[hub-cl-testing]: https://hub.docker.com/r/freelawproject/courtlistener-testing/
+[hub-flp]: https://hub.docker.com/u/freelawproject/dashboard/
