@@ -159,7 +159,6 @@ If you add new dependencies, remember to update the testing container with the f
 4. Increase the version in `version.txt`.
 5. `make push --file .circleci/Makefile`
 6. **Increment `version.txt` and append `-SNAPSHOT` to the version string.**
-```
 
 
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux
