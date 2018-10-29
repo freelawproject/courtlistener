@@ -910,6 +910,10 @@ class RECAPDocument(models.Model):
         help_text="Is this item freely available as an opinion on PACER?",
         db_index=True,
     )
+    is_sealed = models.NullBooleanField(
+        help_text="Is this item sealed or otherwise unavailable on PACER?",
+        db_index=True,
+    )
 
     class Meta:
         unique_together = ('docket_entry', 'document_number',
