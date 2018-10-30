@@ -156,9 +156,13 @@ If you add new dependencies, remember to update the testing container with the f
 1. Have `docker` and `make` CLI tools installed.
 2. Have a Docker Hub account that's a member of the [freelawproject organization][hub-flp].
 3. `docker login` with your credentials for the Hub account above.
-4. Increase the version in `version.txt`.
-5. `make push --file .circleci/Makefile`
-6. **Increment `version.txt` and append `-SNAPSHOT` to the version string.**
+4. Set the version in `version.txt` to whatever makes sense according to
+   semantic versioning. Most of the time incrementing the patch version is enough.
+   Also remove `-SNAPSHOT`.
+5. `make push --file .circleci/Makefile` 6. **Increment `version.txt` and
+   append `-SNAPSHOT` to the version string to prepare for the next SNAPSHOT
+   release. This is to prevent someone from accidentially overwriting a stable
+   release.**
 
 
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux
