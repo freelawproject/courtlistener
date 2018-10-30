@@ -153,22 +153,31 @@
             </div>
           </div>
         {% else %}
-          <div class="col-sm-12 alert-warning alert">
-            <p class="bottom">This item is not yet in the RECAP collection.
-              <span class="float-right">
-                {% if document.pacer_url %}
-                  <a class="btn btn-primary btn-sm"
-                     href="{{ document.pacer_url }}"
-                     rel="nofollow"
-                     target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
-                {% endif %}
-                {% if not request.COOKIES.recap_install_plea %}
-                  <a href="https://free.law/recap/"
-                     class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
-                {% endif %}
-              </span>
-            </p>
-          </div>
+
+          {% if document.is_sealed %}
+            <div class="col-sm-12 alert-danger alert">
+              <p class="bottom">
+                <i class="fa fa-ban"></i> This item is unavailable in PACER. This is usually caused by the court sealing the document.
+              </p>
+            </div>
+          {% else %}
+            <div class="col-sm-12 alert-warning alert">
+              <p class="bottom">This item is not yet in the RECAP collection.
+                <span class="float-right">
+                  {% if document.pacer_url %}
+                    <a class="btn btn-primary btn-sm"
+                       href="{{ document.pacer_url }}"
+                       rel="nofollow"
+                       target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
+                  {% endif %}
+                  {% if not request.COOKIES.recap_install_plea %}
+                    <a href="https://free.law/recap/"
+                       class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
+                  {% endif %}
+                </span>
+              </p>
+            </div>
+          {% endif %}
         {% endif %}
       </div>
     </article>

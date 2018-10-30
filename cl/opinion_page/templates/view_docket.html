@@ -165,11 +165,15 @@
                         </ul>
                       {% else %}
                         {# We don't have it #}
-                        {% if rd.pacer_url %}
-                          <a href="{{ rd.pacer_url }}"
-                             class="btn btn-default btn-xs"
-                             target="_blank"
-                             rel="nofollow">Buy<span class="hidden-xs"> on PACER</span></a>
+                        {% if rd.is_sealed %}
+                          <span class="btn btn-primary btn-xs disabled">Sealed on PACER</span>
+                        {% else %}
+                          {% if rd.pacer_url %}
+                            <a href="{{ rd.pacer_url }}"
+                               class="btn btn-default btn-xs"
+                               target="_blank"
+                               rel="nofollow">Buy on PACER</a>
+                          {% endif %}
                         {% endif %}
                       {% endif %}
                     </div>
@@ -182,12 +186,19 @@
                         </a>
                       {% else %}
                         {# We don't have it #}
-                        {% if rd.pacer_url %}
-                          <a href="{{ rd.pacer_url }}"
-                             class="btn btn-primary btn-xs"
-                             target="_blank"
-                             rel="nofollow"
-                             title="Buy on PACER"><i class="fa fa-download"></i></a>
+                        {% if rd.is_sealed %}
+                          <span class="btn btn-primary btn-xs disabled"
+                                title="Sealed on PACER">
+                            <i class="fa fa-ban"></i>
+                          </span>
+                        {% else %}
+                          {% if rd.pacer_url %}
+                            <a href="{{ rd.pacer_url }}"
+                               class="btn btn-primary btn-xs"
+                               target="_blank"
+                               rel="nofollow"
+                               title="Buy on PACER"><i class="fa fa-download"></i></a>
+                          {% endif %}
                         {% endif %}
                       {% endif %}
                     </div>
