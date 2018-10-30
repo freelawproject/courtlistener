@@ -35,11 +35,15 @@
     </ul>
   {% else %}
     {# We don't have it #}
-    {% if document.pacer_url %}
-      <a href="{{ document.pacer_url }}"
-         class="btn btn-primary"
-         target="_blank"
-         rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
+    {% if document.is_sealed %}
+      <span class="btn btn-primary disabled">This Item is Sealed</span>
+    {% else %}
+      {% if document.pacer_url %}
+        <a href="{{ document.pacer_url }}"
+           class="btn btn-primary"
+           target="_blank"
+           rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
+      {% endif %}
     {% endif %}
   {% endif %}
 </div>
