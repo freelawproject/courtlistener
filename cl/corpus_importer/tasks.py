@@ -68,13 +68,17 @@ def increment_failure_count(obj):
     obj.save()
 
 
-@app.task(bind=True, ignore_result=True)
-def upload_recap_json(self, pk):
-    """Make a JSON object for a RECAP docket and upload it to IA"""
-    # This is a pretty highly optimized query that uses only 13 hits to the DB
+def generate_ia_json(d_pk):
+    """Generate JSON for upload to Internet Archive
+
+    :param d_pk: The PK of the docket to generate JSON for
+    :return: A tuple of the docket object requested and a string of json data
+    to upload.
+    """
+    # This is a pretty highly optimized query that minimizes the hits to the DB
     # when generating a docket JSON rendering, regardless of how many related
     # objects the docket has such as docket entries, parties, etc.
-    ds = Docket.objects.filter(pk=pk).select_related(
+    ds = Docket.objects.filter(pk=d_pk).select_related(
         'originating_court_information',
     ).prefetch_related(
         'panel',
@@ -88,7 +92,7 @@ def upload_recap_json(self, pk):
         Prefetch(
             'docket_entries__recap_documents',
             queryset=RECAPDocument.objects.all().defer('plain_text')
-        )
+        ),
     )
     d = ds[0]
     renderer = JSONRenderer()
@@ -96,6 +100,13 @@ def upload_recap_json(self, pk):
         IADocketSerializer(d).data,
         accepted_media_type='application/json; indent=2',
     )
+    return d, json_str
+
+
+@app.task(bind=True, ignore_result=True)
+def upload_recap_json(self, pk):
+    """Make a JSON object for a RECAP docket and upload it to IA"""
+    d, json_str = generate_ia_json(pk)
 
     file_name = get_docket_filename(d.court_id, d.pacer_case_id, 'json')
     bucket_name = get_bucket_name(d.court_id, d.pacer_case_id)
