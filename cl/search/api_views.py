@@ -41,7 +41,8 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = (
         'date_created', 'date_modified', 'date_argued', 'date_reargued',
         'date_reargument_denied', 'date_blocked', 'date_cert_granted',
-        'date_cert_denied', 'date_filed', 'date_terminated', 'date_last_filing',
+        'date_cert_denied', 'date_filed', 'date_terminated',
+        'date_last_filing',
     )
 
 
@@ -126,8 +127,8 @@ class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class SearchViewSet(LoggingMixin, viewsets.ViewSet):
-    # Default permissions use Django permissions, so here we AllowAny, but folks
-    # will need to log in to get past the thresholds.
+    # Default permissions use Django permissions, so here we AllowAny,
+    # but folks will need to log in to get past the thresholds.
     permission_classes = (permissions.AllowAny,)
 
     def list(self, request, *args, **kwargs):
