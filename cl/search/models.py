@@ -168,6 +168,9 @@ class OriginatingCourtInformation(models.Model):
     def __unicode__(self):
         return "<OriginatingCourtInformation: %s>" % self.pk
 
+    def get_absolute_url(self):
+        return self.docket.get_absolute_url()
+
     class Meta:
         verbose_name_plural = 'Originating Court Information'
 
