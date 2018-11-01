@@ -1,4 +1,5 @@
 # coding=utf-8
+import json
 import os
 import unittest
 from datetime import date
@@ -11,6 +12,7 @@ from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.corpus_importer.import_columbia.parse_opinions import \
     get_state_court_object
+from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
@@ -385,3 +387,58 @@ class GetQuarterTest(unittest.TestCase):
             date(2018, 10, 1),
             get_start_of_quarter(date(2018, 12, 1))
         )
+
+
+@pytest.mark.django_db
+class IAUploaderTest(TestCase):
+    """Tests related to uploading docket content to the Internet Archive"""
+
+    fixtures = ['test_objects_query_counts.json',
+                'attorney_party_dup_roles.json']
+
+    def test_correct_json_generated(self):
+        """Do we generate the correct JSON for a handful of tricky dockets?
+
+        The most important thing here is that we don't screw up how we handle
+        m2m relationships, which have a tendency of being tricky.
+        """
+        d, j_str = generate_ia_json(1)
+        j = json.loads(j_str)
+        parties = j['parties']
+        first_party = parties[0]
+        first_party_attorneys = first_party['attorneys']
+        expected_num_attorneys = 1
+        actual_num_attorneys = len(first_party_attorneys)
+        self.assertEqual(
+            expected_num_attorneys,
+            actual_num_attorneys,
+            msg="Got wrong number of attorneys when making IA JSON. "
+                "Got %s, expected %s" % (actual_num_attorneys,
+                                         expected_num_attorneys)
+        )
+
+        first_attorney = first_party_attorneys[0]
+        attorney_roles = first_attorney['roles']
+        expected_num_roles = 1
+        actual_num_roles = len(attorney_roles)
+        self.assertEqual(
+            actual_num_roles,
+            expected_num_roles,
+            msg="Got wrong number of roles on attorneys when making IA JSON. "
+                "Got %s, expected %s" % (actual_num_roles, expected_num_roles)
+        )
+
+    def test_num_queries_ok(self):
+        """Have we regressed the number of queries it takes to make the JSON
+
+        It's very easy to use the DRF in a way that generates a LOT of queries.
+        Let's avoid that.
+        """
+        with self.assertNumQueries(10):
+            generate_ia_json(1)
+
+        with self.assertNumQueries(4):
+            generate_ia_json(2)
+
+        with self.assertNumQueries(4):
+            generate_ia_json(3)
