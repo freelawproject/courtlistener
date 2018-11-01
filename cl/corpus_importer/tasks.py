@@ -5,6 +5,7 @@ import os
 import shutil
 
 from cl.corpus_importer.utils import mark_ia_upload_needed
+from cl.people_db.models import Attorney, Role
 
 try:
     from cStringIO import StringIO
@@ -82,7 +83,6 @@ def generate_ia_json(d_pk):
         'originating_court_information',
     ).prefetch_related(
         'panel',
-        'parties__attorneys__roles',
         'parties__party_types__criminal_complaints',
         'parties__party_types__criminal_counts',
         # Django appears to have a bug where you can't defer a field on a
@@ -92,6 +92,19 @@ def generate_ia_json(d_pk):
         Prefetch(
             'docket_entries__recap_documents',
             queryset=RECAPDocument.objects.all().defer('plain_text')
+        ),
+        Prefetch(
+            # Only attorneys in the docket.
+            'parties__attorneys',
+            queryset=Attorney.objects.filter(
+                roles__docket_id=d_pk,
+            ).distinct().prefetch_related(
+                Prefetch(
+                    # Only roles for those attorneys in the docket.
+                    'roles',
+                    queryset=Role.objects.filter(docket_id=d_pk)
+                )
+            ),
         ),
     )
     d = ds[0]
