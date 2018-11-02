@@ -6,7 +6,7 @@ from cl.simple_pages.views import (
     about, advanced_search, browser_warning, contact, contact_thanks,
     contribute, coverage_graph, donation_help, faq, feeds, humans,
     latest_terms,
-    alert_help, markdown_help, old_terms, podcasts, robots, tools_page,
+    alert_help, markdown_help, old_terms, podcasts, robots,
     validate_for_bing, validate_for_google, validate_for_google2,
     validate_for_wot,
 )
@@ -36,11 +36,6 @@ urlpatterns = [
     url(r'^terms/$', latest_terms, name='terms'),
 
     # Randoms
-    url(
-        r'^tools/$',
-        tools_page,
-        name='tools',
-    ),
     url(
         r'^bad-browser/$',
         browser_warning,

@@ -126,7 +126,6 @@ class SimplePagesTest(TestCase):
             {'viewname': 'old_terms', 'args': ['1']},
             {'viewname': 'old_terms', 'args': ['2']},
             {'viewname': 'terms'},
-            {'viewname': 'tools'},
             {'viewname': 'bad_browser'},
             {'viewname': 'robots'},
             {'viewname': 'humans'},
