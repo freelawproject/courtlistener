@@ -146,9 +146,9 @@ def upload_recap_json(self, pk):
     if all(r.ok for r in responses):
         d.ia_upload_failure_count = None
         d.ia_date_first_changed = None
+        d.ia_needs_upload = False
         d.filepath_ia_json = "https://archive.org/download/%s/%s" % (
             bucket_name, file_name)
-        mark_ia_upload_needed(d)
         d.save()
     else:
         increment_failure_count(d)
