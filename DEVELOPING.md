@@ -159,7 +159,8 @@ If you add new dependencies, remember to update the testing container with the f
 4. Set the version in `version.txt` to whatever makes sense according to
    semantic versioning. Most of the time incrementing the patch version is enough.
    Also remove `-SNAPSHOT`.
-5. `make push --file .circleci/Makefile` 6. **Increment `version.txt` and
+5. `make push --file .circleci/Makefile` 
+6. **Increment `version.txt` and
    append `-SNAPSHOT` to the version string to prepare for the next SNAPSHOT
    release. This is to prevent someone from accidentially overwriting a stable
    release.**
