@@ -13,6 +13,7 @@ def make_url_dict(view_name, changefreq='yearly', priority=0.5):
 
 
 def sitemap_maker(request):
+
     urls = [
         # API
         make_url_dict('api_index', priority=0.7),
@@ -28,11 +29,17 @@ def sitemap_maker(request):
         make_url_dict('citation_redirector', priority=0.6, changefreq='never'),
         make_url_dict('coverage', priority=0.4),
         make_url_dict('feeds_info', priority=0.4, changefreq='never'),
+        make_url_dict('podcasts', priority=0.6, changefreq='never'),
         make_url_dict('contribute', priority=0.6, changefreq='never'),
         make_url_dict('contact', priority=0.5),
-        make_url_dict('markdown_help', priority=0.4, changefreq='never'),
-        make_url_dict('advanced_search', priority=0.5),
         make_url_dict('terms', priority=0.1),
+
+        # Help pages
+        make_url_dict('markdown_help', priority=0.4, changefreq='never'),
+        make_url_dict('alert_help', priority=0.4, changefreq='monthly'),
+        make_url_dict('donation_help', priority=0.4, changefreq='monthly'),
+        make_url_dict('delete_help', priority=0.3, changefreq='monthly'),
+        make_url_dict('advanced_search', priority=0.5),
 
         # Search
         make_url_dict('advanced_o', priority=0.7, changefreq='weekly'),
@@ -50,6 +57,5 @@ def sitemap_maker(request):
         make_url_dict('new_visualization', priority=0.4),
         make_url_dict('viz_gallery', priority=0.6, changefreq='hourly'),
     ]
-
     xml = smart_str(loader.render_to_string('sitemap.xml', {'urlset': urls}))
     return HttpResponse(xml, content_type='application/xml')
