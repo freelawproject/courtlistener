@@ -3,11 +3,10 @@ from django.views.generic import RedirectView
 
 from cl.simple_pages.sitemap import sitemap_maker
 from cl.simple_pages.views import (
-    about, advanced_search, browser_warning, contact, contact_thanks,
-    contribute, coverage_graph, donation_help, faq, feeds, humans,
-    latest_terms,
-    alert_help, markdown_help, old_terms, podcasts, robots,
-    validate_for_bing, validate_for_google, validate_for_google2,
+    about, advanced_search, alert_help, browser_warning, contact,
+    contact_thanks, contribute, coverage_graph, delete_help, donation_help,
+    faq, feeds, humans, latest_terms, markdown_help, old_terms, podcasts,
+    robots, validate_for_bing, validate_for_google, validate_for_google2,
     validate_for_wot,
 )
 
@@ -26,6 +25,7 @@ urlpatterns = [
     url(r'^help/markdown/$', markdown_help, name="markdown_help"),
     url(r'^help/alerts/$', alert_help, name="alert_help"),
     url(r'^help/donations/$', donation_help, name="donation_help"),
+    url(r'^help/delete-account/$', delete_help, name="delete_help"),
     url(r'^help/search-operators/$', advanced_search, name="advanced_search"),
 
     # Added 2018-10-23
