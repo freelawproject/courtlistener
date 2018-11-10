@@ -1,0 +1,1 @@
+{% load text_filters %}{% load humanize %}New alert hit{{hits|pluralize}}:{% for alert, type, results in hits %}{% for result in results %}{% if forloop.first %} {{results.result.numFound|intcomma}} {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% endif %} {{alert.name}}{% endfor %}
