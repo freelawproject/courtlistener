@@ -53,11 +53,11 @@ def get_cut_off_date(rate, d=datetime.date.today()):
 
 
 def send_alert(user_profile, hits):
-    subject = 'New hits for your alerts'
-
+    subject_template = loader.get_template('alert_email_subject.txt')
     txt_template = loader.get_template('alert_email.txt')
     html_template = loader.get_template('alert_email.html')
     context = {'hits': hits}
+    subject = subject_template.render(context)
     txt = txt_template.render(context)
     html = html_template.render(context)
     msg = EmailMultiAlternatives(subject, txt, settings.DEFAULT_ALERTS_EMAIL,
