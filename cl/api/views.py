@@ -74,6 +74,12 @@ def api_index(request):
     })
 
 
+def replication_docs(request):
+    return render(request, 'replication.html', {
+        'private': False,
+    })
+
+
 def bulk_data_index(request):
     """Shows an index page for the dumps."""
     courts = make_court_variable()
