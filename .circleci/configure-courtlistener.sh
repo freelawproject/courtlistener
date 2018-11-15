@@ -11,7 +11,8 @@ apt-get update -qq && apt-get install -y --no-install-recommends \
   libxml2-dev \
   libxslt1-dev \
   python-dev \
-  python-pip
+  python-pip \
+  zlib1g-dev
 
 # Install, create, and activate a virtualenv.
 pip install virtualenv
