@@ -164,7 +164,6 @@ def cache_hash(item_hash):
         return True
 
 
-
 @app.task
 def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
     """Merge the rss feed contents into CourtListener
@@ -182,6 +181,7 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
                                                   len(rss_feed.data)))
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
+    d_pks_to_alert = []
     for docket in rss_feed.data:
         item_hash = hash_item(docket)
         if is_cached(item_hash):
@@ -209,13 +209,16 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
                 d, docket['docket_entries'])
 
         if content_updated and docket_count > 0:
-            enqueue_docket_alert(d.pk, start_time)
+            newly_enqueued = enqueue_docket_alert(d.pk, start_time)
+            if newly_enqueued:
+                d_pks_to_alert.append((d.pk, start_time))
 
         all_rds_created.extend([rd.pk for rd in rds_created])
 
-    logger.info("%s: Sending %s new RECAP documents to Solr for indexing." %
-                (feed_status.court_id, len(all_rds_created)))
-    return all_rds_created
+    logger.info("%s: Sending %s new RECAP documents to Solr for indexing and "
+                "sending %s dockets for alerts.", feed_status.court_id,
+                len(all_rds_created), len(d_pks_to_alert))
+    return {'d_pks_to_alert': d_pks_to_alert, 'rds_for_solr': all_rds_created}
 
 
 @app.task
