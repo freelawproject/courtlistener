@@ -6,7 +6,7 @@ from django.utils.timezone import now
 from timeout_decorator import timeout_decorator
 
 from cl.alerts.models import Alert, DocketAlert
-from cl.alerts.tasks import enqueue_docket_alert
+from cl.alerts.tasks import send_docket_alert
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
@@ -99,14 +99,14 @@ class DocketAlertTest(TestCase):
 
     def test_triggering_docket_alert(self):
         """Does the alert trigger when it should?"""
-        enqueue_docket_alert(self.docket.pk, self.before)
+        send_docket_alert(self.docket.pk, self.before)
 
         # Does the alert go out? It should.
         self.assertEqual(len(mail.outbox), 1)
 
     def test_nothing_happens_for_timers_after_de_creation(self):
         """Do we avoid sending alerts for timers after the de was created?"""
-        enqueue_docket_alert(self.docket.pk, self.after)
+        send_docket_alert(self.docket.pk, self.after)
 
         # Do zero emails go out? None should.
         self.assertEqual(len(mail.outbox), 0)
