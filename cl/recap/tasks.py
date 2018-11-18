@@ -14,7 +14,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
     DocketHistoryReport, DocketReport
 
-from cl.alerts.tasks import enqueue_docket_alert
+from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
 from cl.celery import app
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
@@ -985,7 +985,9 @@ def process_recap_docket(self, pk):
     add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated and docket_count > 0:
-        enqueue_docket_alert(d.pk, start_time)
+        newly_enqueued = enqueue_docket_alert(d.pk)
+        if newly_enqueued:
+            send_docket_alert(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         'docket_pk': d.pk,
@@ -1193,7 +1195,9 @@ def process_recap_docket_history_report(self, pk):
         d, data['docket_entries'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated and docket_count > 0:
-        enqueue_docket_alert(d.pk, start_time)
+        newly_enqueued = enqueue_docket_alert(d.pk)
+        if newly_enqueued:
+            send_docket_alert(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         'docket_pk': d.pk,
@@ -1278,7 +1282,9 @@ def process_recap_appellate_docket(self, pk):
     add_parties_and_attorneys(d, data['parties'])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated and docket_count > 0:
-        enqueue_docket_alert(d.pk, start_time)
+        newly_enqueued = enqueue_docket_alert(d.pk)
+        if newly_enqueued:
+            send_docket_alert(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         'docket_pk': d.pk,
