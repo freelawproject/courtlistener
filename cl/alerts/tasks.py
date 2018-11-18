@@ -17,11 +17,10 @@ def make_alert_key(d_pk):
     return 'docket.alert.enqueued:%s' % d_pk
 
 
-def enqueue_docket_alert(d_pk, since):
+def enqueue_docket_alert(d_pk):
     """Enqueue a docket alert or punt it if there's already a task for it.
 
     :param d_pk: The ID of the docket we're going to send alerts for.
-    :param since: We'll send alerts for any item that happened since this time.
     :return: True if we enqueued the item, false if not.
     """
     # Create an expiring semaphor in redis or check if there's already one
@@ -40,7 +39,6 @@ def enqueue_docket_alert(d_pk, since):
     # semaphor *will* eventually go away even if our task or server crashes.
     safety_expiration_timeout = 10 * 60
     r.expire(key, safety_expiration_timeout)
-    send_docket_alert.delay(d_pk, since)
     return True
 
 
@@ -51,8 +49,7 @@ def send_docket_alert(d_pk, since):
 
     :param d_pk: The docket PK that was modified
     :param since: If we run alerts, notify users about items *since* this time.
-    :return: The dict that was passed in as data is simply passed through. The
-    next task in the chain needs the same information.
+    :return: None
     """
     email_addresses = User.objects.filter(
         docket_alerts__docket_id=d_pk,
@@ -101,3 +98,25 @@ def send_docket_alert(d_pk, since):
                           port=settings.REDIS_PORT,
                           db=settings.REDIS_DATABASES['ALERTS'])
     r.delete(make_alert_key(d_pk))
+
+
+@app.task(ignore_result=True)
+def send_docket_alerts(data):
+    """Send many docket alerts at one time without making numerous calls
+    to the send_docket_alert function.
+
+    :param data: A dict with up to two keys:
+
+      d_pks_to_alert: A list of tuples. Each tuple contains the docket ID, and
+                      a time. The time indicates that alerts should be sent for
+                      items *after* that point.
+        rds_for_solr: A list of RECAPDocument ids that need to be sent to Solr
+                      to be made searchable.
+    :returns: Simply passes through the rds_for_solr list, in case it is
+    consumed by the next task. If rds_for_solr is not provided, returns an
+    empty list.
+    """
+    for args in data['d_pks_to_alert']:
+        send_docket_alert(*args)
+
+    return data.get('rds_for_solr', [])
