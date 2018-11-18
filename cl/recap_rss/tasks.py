@@ -209,7 +209,7 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
                 d, docket['docket_entries'])
 
         if content_updated and docket_count > 0:
-            newly_enqueued = enqueue_docket_alert(d.pk, start_time)
+            newly_enqueued = enqueue_docket_alert(d.pk)
             if newly_enqueued:
                 d_pks_to_alert.append((d.pk, start_time))
 
