@@ -243,10 +243,15 @@ class Command(VerboseCommand, CommandUtils):
         for k, v in row.items():
             if k in self.field_mappings:
                 values[self.field_mappings[k]] = v
-        FjcIntegratedDatabase.objects.create(
+        _, created = FjcIntegratedDatabase.objects.update_or_create(
+            district=values['district'],
+            docket_number=values['docket_number'],
             dataset_source=source,
-            **values
+            defaults=values,
         )
+        verb = "Created new " if created else "Updated "
+        logger.info("%s row for docket number %s in court %s.",
+                    verb, values['docket_number'], values['district'])
 
     def import_appellate_row(self, row, source):
         pass
