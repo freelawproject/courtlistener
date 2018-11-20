@@ -694,3 +694,6 @@ class FjcIntegratedDatabase(models.Model):
 
     class Meta:
         verbose_name_plural = 'FJC Integrated Database Entries'
+        index_together = (
+            ('district', 'docket_number'),
+        )
