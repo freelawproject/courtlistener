@@ -248,7 +248,8 @@ def make_check_donation(request):
         donation_form = DonationForm(data)
         # Get the user, if we can. Else, set up the form to create a new user.
         try:
-            user = User.objects.get(email__iexact=request.POST.get('email'))
+            email = request.POST.get('email').strip()
+            user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             user = None
             user_form = UserForm(request.POST)
