@@ -118,7 +118,10 @@ def get_first_missing_de_number(d):
     docket has no entries, returns 1. If the docket has entries, returns the
     value of the lowest missing item.
     """
-    de_numbers = list(d.docket_entries.all().order_by(
+    # Get docket entry numbers for items that *have* docket entry descriptions.
+    # This ensures that we don't count RSS items towards the docket being
+    # complete, since we only have the short description for those.
+    de_numbers = list(d.docket_entries.exclude(description='').order_by(
         'entry_number'
     ).values_list('entry_number', flat=True))
 
