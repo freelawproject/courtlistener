@@ -16,7 +16,8 @@ from cl.search.models import Court
 
 
 class Command(VerboseCommand, CommandUtils):
-    help = 'Import a tab-separated file as produced by FJC for their IDB'
+    help = 'Import a tab-separated file as produced by FJC for their IDB. ' \
+           'Do not check for duplicates.'
     BAD_CHARS = re.compile(u'[\u0000\u001E]')
 
     def add_arguments(self, parser):
@@ -156,15 +157,14 @@ class Command(VerboseCommand, CommandUtils):
             self.normalize_booleans(row)
             self.normalize_dates(row)
             self.normalize_ints(row)
-            if options['filetype'] in [CV_OLD, CR_OLD, APP_OLD, BANKR_2017]:
-                raise NotImplementedError("This file type not yet implemented.")
+            if options['filetype'] in [CV_OLD, CR_OLD, APP_OLD, BANKR_2017,
+                                       APP_2017]:
+                raise NotImplementedError(
+                    "This file type not yet implemented.")
             elif options['filetype'] == CV_2017:
-                #self.import_row(row, CV_2017)
                 batch.append(self.create_row_obj(row, CV_2017))
             elif options['filetype'] == CR_2017:
-                self.import_row(row, CR_2017)
-            elif options['filetype'] == APP_2017:
-                self.import_appellate_row(row, APP_2017)
+                batch.append(self.create_row_obj(row, CR_2017))
 
             if len(batch) == batch_size:
                 logger.info("Saving %s items to the DB.", batch_size)
@@ -250,30 +250,14 @@ class Command(VerboseCommand, CommandUtils):
                 raise Exception("Unable to match DISTRICT column value %s to "
                                 "Court object" % row['DISTRICT'])
 
-    def import_row(self, row, source):
-        values = {}
-        for k, v in row.items():
-            if k in self.field_mappings:
-                values[self.field_mappings[k]] = v
-        _, created = FjcIntegratedDatabase.objects.update_or_create(
-            district=values['district'],
-            docket_number=values['docket_number'],
-            dataset_source=source,
-            defaults=values,
-        )
-        verb = "Created new" if created else "Updated"
-        logger.info("%s row for docket number %s in court %s.",
-                    verb, values['docket_number'], values['district'])
-
     def create_row_obj(self, row, source):
+        # Just create an obj, so we can do a bulk_update. This is much faster
+        # than doing an insert for every item.
         values = {}
         for k, v in row.items():
             if k in self.field_mappings:
                 values[self.field_mappings[k]] = v
         return FjcIntegratedDatabase(dataset_source=source, **values)
-
-    def import_appellate_row(self, row, source):
-        pass
 
     def build_field_data(self):
         """Build up fields for the selected filetype."""
