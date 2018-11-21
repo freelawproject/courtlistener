@@ -139,6 +139,8 @@ class Command(VerboseCommand, CommandUtils):
         f = io.open(options['input_file'], mode='r', encoding='cp1252',
                     newline="\r\n")
         col_headers = f.next().strip().split('\t')
+        batch_size = 1000
+        batch = []
         for i, line in enumerate(f):
             sys.stdout.write('\rDoing line: %s' % i)
             sys.stdout.flush()
@@ -157,11 +159,21 @@ class Command(VerboseCommand, CommandUtils):
             if options['filetype'] in [CV_OLD, CR_OLD, APP_OLD, BANKR_2017]:
                 raise NotImplementedError("This file type not yet implemented.")
             elif options['filetype'] == CV_2017:
-                self.import_row(row, CV_2017)
+                #self.import_row(row, CV_2017)
+                batch.append(self.create_row_obj(row, CV_2017))
             elif options['filetype'] == CR_2017:
                 self.import_row(row, CR_2017)
             elif options['filetype'] == APP_2017:
                 self.import_appellate_row(row, APP_2017)
+
+            if len(batch) == batch_size:
+                logger.info("Saving %s items to the DB.", batch_size)
+                FjcIntegratedDatabase.objects.bulk_create(batch)
+                batch = []
+
+        # Do any trailing items as well.
+        FjcIntegratedDatabase.objects.bulk_create(batch)
+
         f.close()
 
     def normalize_nulls(self, row):
@@ -252,6 +264,13 @@ class Command(VerboseCommand, CommandUtils):
         verb = "Created new" if created else "Updated"
         logger.info("%s row for docket number %s in court %s.",
                     verb, values['docket_number'], values['district'])
+
+    def create_row_obj(self, row, source):
+        values = {}
+        for k, v in row.items():
+            if k in self.field_mappings:
+                values[self.field_mappings[k]] = v
+        return FjcIntegratedDatabase(dataset_source=source, **values)
 
     def import_appellate_row(self, row, source):
         pass
