@@ -4,15 +4,13 @@ import os
 
 from celery.canvas import chain
 from django.conf import settings
-from django.contrib.auth.models import User
 from juriscraper.pacer import PacerSession
 
+from cl.corpus_importer.task_canvases import get_district_attachment_pages
 from cl.corpus_importer.tasks import get_appellate_docket_by_docket_number, \
-    get_pacer_case_id_and_title, get_docket_by_pacer_case_id, \
-    get_attachment_page_by_rd, make_attachment_pq_object
+    get_pacer_case_id_and_title, get_docket_by_pacer_case_id
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.recap.tasks import process_recap_attachment
 from cl.search.models import RECAPDocument, Court
 from cl.search.tasks import add_or_update_recap_docket
 
@@ -88,17 +86,7 @@ def get_dockets(options):
             ).apply_async()
 
 
-def get_district_attachment_pages(options):
-    """Get the attachment page information for all of the items on the dockets
-
-    :param options: The options returned by argparse.
-    :type options: dict
-    """
-    q = options['queue']
-    recap_user = User.objects.get(username='recap')
-    throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
-    session.login()
+def get_att_pages(options):
     rd_pks = RECAPDocument.objects.filter(
         tags__name=TAG,
         docket_entry__docket__court__jurisdiction__in=[
@@ -106,19 +94,10 @@ def get_district_attachment_pages(options):
             Court.FEDERAL_BANKRUPTCY,
         ],
     ).values_list('pk', flat=True)
-    for i, rd_pk in enumerate(rd_pks):
-        if i < options['offset']:
-            continue
-        if i >= options['limit'] > 0:
-            break
-        if i % 100 == 0:
-            logger.info("Doing item %s: %s", i, rd_pk)
-        throttle.maybe_wait()
-        chain(
-            get_attachment_page_by_rd.s(rd_pk, session.cookies).set(queue=q),
-            make_attachment_pq_object.s(rd_pk, recap_user.pk).set(queue=q),
-            process_recap_attachment.s(tag_names=[TAG]).set(queue=q),
-        ).apply_async()
+    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session.login()
+    get_district_attachment_pages(options=options, rd_pks=rd_pks,
+                                  tag_names=[TAG], session=session)
 
 
 class Command(VerboseCommand):
