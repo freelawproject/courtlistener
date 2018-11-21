@@ -249,7 +249,7 @@ class Command(VerboseCommand, CommandUtils):
             dataset_source=source,
             defaults=values,
         )
-        verb = "Created new " if created else "Updated "
+        verb = "Created new" if created else "Updated"
         logger.info("%s row for docket number %s in court %s.",
                     verb, values['docket_number'], values['district'])
 
