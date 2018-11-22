@@ -7,6 +7,7 @@ mkdir -p /var/log/courtlistener
 apt-get update -qq && apt-get install -y --no-install-recommends \
   build-essential \
   git \
+  libmagic-dev \
   libpq-dev \
   libxml2-dev \
   libxslt1-dev \

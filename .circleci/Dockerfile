@@ -12,6 +12,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 COPY .circleci /var/circleci
 COPY requirements.txt requirements-test.txt /tmp/
 
-RUN /var/circleci/configure-postgres.sh && /var/circleci/configure-courtlistener.sh
+RUN /var/circleci/configure-postgres.sh && \
+    /var/circleci/configure-redis.sh && \
+    /var/circleci/configure-courtlistener.sh
 
 ENTRYPOINT ["/var/circleci/activate.sh"]
