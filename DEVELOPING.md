@@ -160,6 +160,7 @@ If you add new dependencies, remember to update the testing container with the f
    semantic versioning. Most of the time incrementing the patch version is enough.
    Also remove `-SNAPSHOT`.
 5. `make push --file .circleci/Makefile` 
+6. Use new Docker image in CircleCI tests by updating the [tag in config.yml][circleci-test-container-tag].
 6. **Increment `version.txt` and
    append `-SNAPSHOT` to the version string to prepare for the next SNAPSHOT
    release. This is to prevent someone from accidentially overwriting a stable
@@ -177,3 +178,4 @@ If you add new dependencies, remember to update the testing container with the f
 [circleci-cl-builds]: https://circleci.com/gh/freelawproject/courtlistener
 [hub-cl-testing]: https://hub.docker.com/r/freelawproject/courtlistener-testing/
 [hub-flp]: https://hub.docker.com/u/freelawproject/dashboard/
+[circleci-test-container-tag]: https://github.com/freelawproject/courtlistener/blob/360c259f7d427700c2de9bf8fd53a73a33ff2eed/.circleci/config.yml#L5
