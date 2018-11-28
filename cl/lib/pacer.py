@@ -104,7 +104,7 @@ def lookup_and_save(new, debug=False):
     return d
 
 
-def get_first_missing_de_number(d):
+def get_first_missing_de_date(d):
     """When buying dockets use this function to figure out which docket entries
     we already have, starting at the first item. Since PACER only allows you to
     do a range of docket entries, this allows us to figure out a later starting
@@ -114,27 +114,34 @@ def get_first_missing_de_number(d):
     money by only getting items 33 and on.
 
     :param d: The Docket object to check.
-    :returns int: The starting point that should be used in your query. If the
-    docket has no entries, returns 1. If the docket has entries, returns the
-    value of the lowest missing item.
+    :returns date: The starting date that should be used in your query. If the
+    docket has no entries, returns 1960/1/1. If the docket has entries, returns
+    the date of the highest available item.
     """
     # Get docket entry numbers for items that *have* docket entry descriptions.
     # This ensures that we don't count RSS items towards the docket being
     # complete, since we only have the short description for those.
-    de_numbers = list(d.docket_entries.exclude(description='').order_by(
+    de_number_tuples = list(d.docket_entries.exclude(description='').order_by(
         'entry_number'
-    ).values_list('entry_number', flat=True))
+    ).values_list('entry_number', 'date_filed'))
+    de_numbers = [i[0] for i in de_number_tuples]
 
     if len(de_numbers) > 0:
         # Get the earliest missing item
         end = de_numbers[-1]
         missing_items = sorted(set(range(1, end + 1)).difference(de_numbers))
         if missing_items:
-            return missing_items[0]
+            if missing_items[0] == 1:
+                return date(1960, 1, 1)
+            else:
+                previous = missing_items[0] - 1
+                for entry_number, entry_date in de_number_tuples:
+                    if entry_number == previous:
+                        return entry_date
         else:
             # None missing, but we can start after the highest de we know.
-            return end + 1
-    return 1
+            return de_number_tuples[-1][1]
+    return date(1960, 1, 1)
 
 
 def get_blocked_status(docket, count_override=None):
