@@ -535,18 +535,13 @@ def delete_pacer_row(data, pk):
     return [data['rd_pk']]
 
 
-@app.task(bind=True, max_retries=2, interval_start=5 * 60,
-          interval_step=10 * 60, ignore_result=True)
-def get_pacer_case_id_for_idb_row(self, pk, cookies):
-    """Populate the pacer_case_id field in the FJC IDB table for an item in the
-    IDB table
+def make_fjc_idb_lookup_params(item):
+    """Given an IDB row, generate good params for looking up that item in the
+    PossibleCaseNumberApi.
 
-    :param pk: The primary key of the IDB row to get.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
+    :param item: The FjcIntegratedDatabase row you wish to work with.
+    :returns: A dict with params you can pass to get_pacer_case_id_and_title.
     """
-    logger.info("Getting pacer_case_id for IDB item with pk %s" % pk)
-    item = FjcIntegratedDatabase.objects.get(pk=pk)
     params = {
         'office_number': item.office if item.office else None,
     }
@@ -559,7 +554,22 @@ def get_pacer_case_id_for_idb_row(self, pk, cookies):
             params['docket_number_letters'] = 'cr'
     elif item.dataset_source in [CV_2017, CV_OLD]:
         params['docket_number_letters'] = 'cv'
+    return params
 
+
+@app.task(bind=True, max_retries=2, interval_start=5 * 60,
+          interval_step=10 * 60, ignore_result=True)
+def get_pacer_case_id_for_idb_row(self, pk, cookies):
+    """Populate the pacer_case_id field in the FJC IDB table for an item in the
+    IDB table
+
+    :param pk: The primary key of the IDB row to get.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
+    """
+    logger.info("Getting pacer_case_id for IDB item with pk %s" % pk)
+    item = FjcIntegratedDatabase.objects.get(pk=pk)
+    params = make_fjc_idb_lookup_params(item)
     lookup_result = get_pacer_case_id_and_title(
         docket_number=item.docket_number,
         court_id=item.district_id,
