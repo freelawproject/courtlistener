@@ -63,9 +63,15 @@ def get_dockets(options, sample_size=0):
         if i >= options['limit'] > 0:
             break
 
+        if i % 5000 == 0:
+            # Re-authenticate just in case the auto-login mechanism isn't
+            # working.
+            session = PacerSession(username=PACER_USERNAME,
+                                   password=PACER_PASSWORD)
+            session.login()
+
         # All tests pass. Get the docket.
         logger.info("Doing row %s: %s", i, row)
-        logger.info("This case is from year: %s", row.date_filed.year)
 
         throttle.maybe_wait()
         params = make_fjc_idb_lookup_params(row)
