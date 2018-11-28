@@ -734,6 +734,11 @@ def filter_docket_by_tags(self, data, tags, court_id):
     :return: None if a tagged docket is found, else passes through the data
     parameter.
     """
+    if data is None:
+        logger.info("Empty data argument. Terminating chains and exiting.")
+        self.request.callbacks = None
+        return
+
     ds = Docket.objects.filter(
         pacer_case_id=data['pacer_case_id'],
         court_id=court_id,
@@ -773,8 +778,7 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     """
     s = PacerSession(cookies=cookies)
     if data is None:
-        logger.info("Empty data argument. Terminating "
-                    "chains and exiting.")
+        logger.info("Empty data argument. Terminating chains and exiting.")
         self.request.callbacks = None
         return
 
