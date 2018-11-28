@@ -44,7 +44,7 @@ from cl.celery import app
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import lookup_and_save, get_blocked_status, \
-    map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_number
+    map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_date
 from cl.lib.recap_utils import get_document_filename, get_bucket_name, \
     get_docket_filename
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
@@ -799,10 +799,8 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
             d = None
 
     if d is not None:
-        first_missing_id = get_first_missing_de_number(d)
-        if first_missing_id > 1:
-            # We don't have to get the whole thing!
-            kwargs.setdefault('doc_num_start', first_missing_id)
+        first_missing_date = get_first_missing_de_date(d)
+        kwargs.setdefault('date_start', first_missing_date)
 
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
     report.query(pacer_case_id, **kwargs)
