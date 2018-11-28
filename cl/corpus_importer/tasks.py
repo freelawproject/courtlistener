@@ -721,6 +721,32 @@ def do_case_query_by_pacer_case_id(self, data, court_id, cookies,
     }
 
 
+@app.task(bind=True, ignore_result=True)
+def filter_docket_by_tags(self, data, tags, court_id):
+    """Stop the chain if the docket that'll be updated is already tagged.
+
+    This is useful for if you're running a bulk download a second time and want
+    to avoid downloading items you already purchased in the previous run.
+
+    :param data: The data from the previous task in the chain
+    :param tags: A list of tag names.
+    :param court_id: The CL court ID for the item.
+    :return: None if a tagged docket is found, else passes through the data
+    parameter.
+    """
+    ds = Docket.objects.filter(
+        pacer_case_id=data['pacer_case_id'],
+        court_id=court_id,
+        tags__name__in=tags,
+    ).distinct()
+
+    if ds.count() > 0:
+        # We've got an item tagged with one of the tags. Kill the chain.
+        self.request.callbacks = None
+        return None
+    return data
+
+
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60, ignore_result=True)
 def get_docket_by_pacer_case_id(self, data, court_id, cookies,
