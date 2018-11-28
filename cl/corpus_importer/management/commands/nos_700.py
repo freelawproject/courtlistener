@@ -6,7 +6,7 @@ from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.task_canvases import get_district_attachment_pages
 from cl.corpus_importer.tasks import get_pacer_case_id_and_title, \
-    get_docket_by_pacer_case_id
+    get_docket_by_pacer_case_id, make_fjc_idb_lookup_params
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.recap.constants import LABOR_MANAGEMENT_RELATIONS_ACT, \
@@ -68,13 +68,13 @@ def get_dockets(options, sample_size=0):
         logger.info("This case is from year: %s", row.date_filed.year)
 
         throttle.maybe_wait()
-        case_name = '%s v. %s' % (row.plaintiff, row.defendant)
+        params = make_fjc_idb_lookup_params(row)
         chain(
             get_pacer_case_id_and_title.s(
                 docket_number=row.docket_number,
                 court_id=row.district_id,
                 cookies=session.cookies,
-                case_name=case_name,
+                **params
             ).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id=row.district_id,
