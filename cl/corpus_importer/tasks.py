@@ -758,7 +758,8 @@ def filter_docket_by_tags(self, data, tags, court_id):
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60, ignore_result=True)
 def get_docket_by_pacer_case_id(self, data, court_id, cookies,
-                                tag_names=None, **kwargs):
+                                tag_names=None, use_existing_entries=True,
+                                **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -773,6 +774,11 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     logged-in PACER user.
     :param tag_names: A list of tag names that should be stored with the item
     in the DB.
+    :param use_existing_entries: Whether existing docket entries should be
+    used. If True, then we'll check which docket entries we already have and
+    we'll avoid downloading those again. That's great, but the trade off is
+    that you do not get unnumbered minute entries when you do this. If you want
+    those as well, be sure to set this to False.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     :return: A dict indicating if we need to update Solr.
     """
@@ -788,17 +794,20 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     if data.get('docket_pk') is not None:
         d = Docket.objects.get(pk=data['docket_pk'])
     else:
-        try:
-            d = Docket.objects.get(
-                pacer_case_id=pacer_case_id,
-                court_id=court_id,
-            )
-        except Docket.DoesNotExist:
-            d = None
-        except Docket.MultipleObjectsReturned:
+        if use_existing_entries:
+            try:
+                d = Docket.objects.get(
+                    pacer_case_id=pacer_case_id,
+                    court_id=court_id,
+                )
+            except Docket.DoesNotExist:
+                d = None
+            except Docket.MultipleObjectsReturned:
+                d = None
+        else:
             d = None
 
-    if d is not None:
+    if d is not None and use_existing_entries:
         first_missing_id = get_first_missing_de_number(d)
         if first_missing_id > 1:
             # We don't have to get the whole thing!
