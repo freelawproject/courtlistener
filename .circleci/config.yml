@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: freelawproject/courtlistener-testing:0.1.0
+      - image: freelawproject/courtlistener-testing:0.1.3
 
     steps:
     - checkout
@@ -10,4 +10,7 @@ jobs:
     # TODO (davidxia): Not sure how to get circleCI to respect docker image's entrypoint, even if `command` is specified above.
     # See https://circleci.com/docs/2.0/configuration-reference/#docker--machine--macosexecutor.
     - run: /etc/init.d/postgresql start
-    - run: source ~/virtualenvs/courtlistener/bin/activate && pytest cl/corpus_importer/tests.py cl/custom_filters/tests.py cl/stats/tests.py
+    - run: source ~/virtualenvs/courtlistener/bin/activate &&
+          pytest cl/corpus_importer/tests.py
+          cl/custom_filters/tests.py
+          cl/stats/tests.py

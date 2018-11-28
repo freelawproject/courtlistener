@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
-/etc/init.d/postgresql start
+service postgresql start
+service redis-server start
 source ~/virtualenvs/courtlistener/bin/activate
 exec "$@"
