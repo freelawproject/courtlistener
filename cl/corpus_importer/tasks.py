@@ -740,8 +740,10 @@ def filter_docket_by_tags(self, data, tags, court_id):
         tags__name__in=tags,
     ).distinct()
 
-    if ds.count() > 0:
-        # We've got an item tagged with one of the tags. Kill the chain.
+    count = ds.count()
+    if count > 0:
+        logger.info("Found %s dockets that were already tagged. Aborting "
+                    "chain", count)
         self.request.callbacks = None
         return None
     return data
