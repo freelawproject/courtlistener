@@ -751,7 +751,7 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
 
     pacer_case_id = data.get('pacer_case_id')
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
-    logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
+
     if data.get('docket_pk') is not None:
         d = Docket.objects.get(pk=data['docket_pk'])
     else:
@@ -771,6 +771,7 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
             # We don't have to get the whole thing!
             kwargs.setdefault('doc_num_start', first_missing_id)
 
+    logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
     report.query(pacer_case_id, **kwargs)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s.%s" % (court_id,
