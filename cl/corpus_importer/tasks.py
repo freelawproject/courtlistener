@@ -742,8 +742,9 @@ def filter_docket_by_tags(self, data, tags, court_id):
 
     count = ds.count()
     if count > 0:
-        logger.info("Found %s dockets that were already tagged. Aborting "
-                    "chain", count)
+        logger.info("Found %s dockets that were already tagged for "
+                    "pacer_case_id '%s'. Aborting chain", count,
+                    data['pacer_case_id'])
         self.request.callbacks = None
         return None
     return data
