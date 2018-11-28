@@ -88,7 +88,6 @@ def get_dockets(options, sample_size=0):
                 court_id=row.district_id,
                 cookies=session.cookies,
                 tag_names=tags,
-                use_existing_entries=False,
                 **{
                     'show_parties_and_counsel': True,
                     'show_terminated_parties': True,
