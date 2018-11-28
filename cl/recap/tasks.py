@@ -328,7 +328,7 @@ def add_attorney(atty, p, d):
 
 
 def find_docket_object(court_id, pacer_case_id, docket_number):
-    """Attempt to find the docket based on the uploaded data. If cannot be
+    """Attempt to find the docket based on the parsed docket data. If cannot be
     found, create a new docket. If multiple are found, return all of them.
 
     :param court_id: The CourtListener court_id to lookup
