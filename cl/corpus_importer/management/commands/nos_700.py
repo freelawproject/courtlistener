@@ -6,7 +6,8 @@ from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.task_canvases import get_district_attachment_pages
 from cl.corpus_importer.tasks import get_pacer_case_id_and_title, \
-    get_docket_by_pacer_case_id, make_fjc_idb_lookup_params
+    get_docket_by_pacer_case_id, make_fjc_idb_lookup_params, \
+    filter_docket_by_tags
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.recap.constants import LABOR_MANAGEMENT_RELATIONS_ACT, \
@@ -82,6 +83,7 @@ def get_dockets(options, sample_size=0):
                 cookies=session.cookies,
                 **params
             ).set(queue=q),
+            filter_docket_by_tags.s(tags, row.district_id).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id=row.district_id,
                 cookies=session.cookies,
