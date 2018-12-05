@@ -44,6 +44,7 @@ PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 TAG_NOS_700 = 'pQuGjNMncnYealSvVjwL'
 TAG_SAMPLE = 'KzulifmXjVaknYcKpFxz'
 TAG_CAND = 'fgnKcGohaYWvGCdmueCB'
+TAG_CAND_SAMPLE = 'HaWCdtXimxSfAgGKfJRe'
 
 
 def get_nos_700_items():
@@ -62,20 +63,7 @@ def get_nos_700_items():
     return items
 
 
-def get_nos_700_docket_sample(options):
-    sample_size = 1000
-    items = get_nos_700_items()
-    tags = [TAG_NOS_700, TAG_SAMPLE]
-    get_dockets(options, items, tags, sample_size)
-
-
-def get_nos_700_full(options):
-    items = get_nos_700_items()
-    tags = [TAG_NOS_700]
-    get_dockets(options, items, tags)
-
-
-def get_cand_full(options):
+def get_cand_items():
     # See email on 2018-12-05 for details
     nos_codes = {
         # Contract
@@ -121,6 +109,31 @@ def get_cand_full(options):
         date_terminated__gt='2009-01-01',
         date_filed__gt='2009-01-01',
     )
+    return items
+
+
+def get_nos_700_docket_sample(options):
+    sample_size = 1000
+    items = get_nos_700_items()
+    tags = [TAG_NOS_700, TAG_SAMPLE]
+    get_dockets(options, items, tags, sample_size)
+
+
+def get_nos_700_full(options):
+    items = get_nos_700_items()
+    tags = [TAG_NOS_700]
+    get_dockets(options, items, tags)
+
+
+def get_cand_docket_sample(options):
+    sample_size = 654
+    items = get_cand_items()
+    tags = [TAG_CAND, TAG_CAND_SAMPLE]
+    get_dockets(options, items, tags, sample_size)
+
+
+def get_cand_full(options):
+    items = get_cand_items()
     tags = [TAG_CAND]
     get_dockets(options, items, tags)
 
@@ -200,6 +213,7 @@ class Command(VerboseCommand):
         'dockets_nos_700_sample',
         'dockets_nos_700_all',
         'attachments_nos_700',
+        'dockets_cand_sample',
         'dockets_cand_all',
         'attachments_cand',
     ]
@@ -239,6 +253,8 @@ class Command(VerboseCommand):
             get_nos_700_full(options)
         elif options['task'] == 'attachments_nos_700':
             get_attachment_pages(options, TAG_NOS_700)
+        elif options['task'] == 'dockets_cand_sample':
+            get_cand_docket_sample(options)
         elif options['task'] == 'dockets_cand_all':
             get_cand_full(options)
         elif options['task'] == 'attachments_cand':
