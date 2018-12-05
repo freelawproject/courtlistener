@@ -541,6 +541,8 @@ def add_docket_entries(d, docket_entries, tags=None):
     rds_created = []
     content_updated = False
     for docket_entry in docket_entries:
+        if not docket_entry['document_number']:
+            continue
         try:
             de, de_created = DocketEntry.objects.get_or_create(
                 docket=d,
