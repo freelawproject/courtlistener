@@ -98,6 +98,10 @@ def donation_help(request):
     return render(request, 'help/donation_help.html', {'private': False})
 
 
+def delete_help(request):
+    return render(request, 'help/delete_account_help.html', {'private': False})
+
+
 def markdown_help(request):
     return render(request, 'help/markdown_help.html', {'private': False})
 
