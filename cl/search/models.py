@@ -748,6 +748,34 @@ class DocketEntry(models.Model):
         help_text="# on the PACER docket page. For appellate cases, this may "
                   "be the internal PACER ID for the document, when an entry "
                   "ID is otherwise unavailable.",
+        null=True,
+        blank=True,
+    )
+    recap_sequence_number = models.CharField(
+        help_text="A field used for ordering the docket entries on a docket. "
+                  "You might wonder, \"Why not use the docket entry "
+                  "numbers?\" That's a reasonable question, and prior to late "
+                  "2018, this was the method we used. However, dockets often "
+                  "have \"unnumbered\" docket entries, and so knowing where "
+                  "to put those was only possible if you had another "
+                  "sequencing field, since they lacked an entry number. This "
+                  "field is populated by a combination of the date for the "
+                  "entry and a sequence number indicating the order that the "
+                  "unnumbered entries occur.",
+        db_index=True,
+        max_length=50,
+        blank=True,
+    )
+    pacer_sequence_number = models.SmallIntegerField(
+        help_text="The de_seqno value pulled out of dockets, RSS feeds, and "
+                  "sundry other pages in PACER. The place to find this is "
+                  "currently in the onclick attribute of the links in PACER. "
+                  "Because we do not have this value for all items in the DB, "
+                  "we do not use this value for anything. Still, we collect "
+                  "it for good measure.",
+        db_index=True,
+        null=True,
+        blank=True,
     )
     description = models.TextField(
         help_text="The text content of the docket entry that appears in the "
@@ -756,9 +784,9 @@ class DocketEntry(models.Model):
     )
 
     class Meta:
-        unique_together = ('docket', 'entry_number')
         verbose_name_plural = 'Docket Entries'
-        ordering = ('entry_number',)
+        index_together = ('recap_sequence_number', 'entry_number')
+        ordering = ('recap_sequence_number', 'entry_number')
         permissions = (
             ("has_recap_api_access", "Can work with RECAP API"),
         )
@@ -829,6 +857,7 @@ class RECAPDocument(models.Model):
                   "document_number in RECAP docket.",
         max_length=32,
         db_index=True,
+        blank=True,  # To support unnumbered minute entries
     )
     attachment_number = models.SmallIntegerField(
         help_text="If the file is an attachment, the number is the attachment "
