@@ -84,9 +84,10 @@ def view_docket(request, pk, slug):
         if cd.get('filed_before'):
             de_list = de_list.filter(date_filed__lte=cd['filed_before'])
         if cd.get('order_by') == DocketEntryFilterForm.DESCENDING:
-            de_list = de_list.order_by('-entry_number')
+            de_list = de_list.order_by('-recap_sequence_number',
+                                       '-entry_number')
 
-    paginator = Paginator(de_list, 100, orphans=5)
+    paginator = Paginator(de_list, 200, orphans=10)
     page = request.GET.get('page')
     try:
         docket_entries = paginator.page(page)
