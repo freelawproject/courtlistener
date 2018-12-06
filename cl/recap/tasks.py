@@ -8,7 +8,7 @@ from celery.canvas import chain
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
@@ -24,7 +24,7 @@ from cl.lib.pacer import get_blocked_status, map_cl_to_pacer_id, \
     normalize_attorney_contact, normalize_attorney_role, map_pacer_to_cl_id
 from cl.lib.recap_utils import get_document_filename
 from cl.lib.string_utils import anonymize
-from cl.lib.utils import remove_duplicate_dicts
+from cl.lib.utils import remove_duplicate_dicts, previous_and_next
 from cl.people_db.models import Attorney, AttorneyOrganization, \
     AttorneyOrganizationAssociation, CriminalComplaint, CriminalCount, \
     Party, PartyType, Role
@@ -529,6 +529,86 @@ def update_docket_appellate_metadata(d, docket_data):
             d_og_info.ordering_judge = judges[0]
 
     return d, d_og_info
+
+
+def get_order_of_docket(docket_entries):
+    """Determine whether the docket is ascending or descending or whether
+    that is knowable.
+    """
+    order = None
+    for _, de, nxt in previous_and_next(docket_entries):
+        try:
+            current_num = int(de['document_number'])
+            nxt_num = int(de['document_number'])
+        except (TypeError, ValueError):
+            # One or the other can't be cast to an int. Continue until we have
+            # two consecutive ints we can compare.
+            continue
+
+        if current_num == nxt_num:
+            # Not sure if this is possible. No known instances in the wild.
+            continue
+        elif current_num < nxt_num:
+            order = 'asc'
+        elif current_num > nxt_num:
+            order = 'desc'
+        break
+    return order
+
+
+def make_recap_sequence_number(de):
+    """Make a sequence number using a date and index."""
+    template = "%s.%03d"
+    return template % (de['date_filed'].isoformat(),
+                       de['recap_sequence_index'])
+
+
+def calculate_recap_sequence_numbers(docket_entries):
+    """Figure out the RECAP sequence number values for docket entries
+    returned by a parser.
+
+    Writ large, this is pretty simple, but for some items you need to perform
+    disambiguation using neighboring docket entries. For example, if you get
+    the following docket entries, you need to use the neighboring items to
+    figure out which is first:
+
+           Date     | No. |  Description
+        2014-01-01  |     |  Some stuff
+        2014-01-01  |     |  More stuff
+        2014-01-02  |  1  |  Still more
+
+    For those first two items, you have the date, but that's it. No numbers,
+    no de_seqno, no nuthin'. The way to handle this is to start by ensuring
+    that the docket is in ascending order and correct it if not. With that
+    done, you can use the values of the previous items to sort out each item
+    in turn.
+
+    :param docket_entries: A list of docket entry dicts from juriscraper or
+    another parser containing information about docket entries for a docket
+    :return None, but sets the recap_sequence_number for all items.
+    """
+    # Determine the sort order of the docket entries and normalize it
+    order = get_order_of_docket(docket_entries)
+    if order == 'desc':
+        docket_entries.reverse()
+
+    # Assign sequence numbers
+    for prev, de, _ in previous_and_next(docket_entries):
+        if prev is not None and de['date_filed'] == prev['date_filed']:
+            # Previous item has same date. Increment the sequence number.
+            de['recap_sequence_index'] = prev['recap_sequence_index'] + 1
+            de['recap_sequence_number'] = make_recap_sequence_number(de)
+            continue
+        else:
+            # prev is None --> First item on the list; OR
+            # current is different than previous --> Changed date.
+            # Take same action: Reset the index & assign it.
+            de['recap_sequence_index'] = 1
+            de['recap_sequence_number'] = make_recap_sequence_number(de)
+            continue
+
+    # Cleanup
+    [de.pop('recap_sequence_index', None) for de in docket_entries]
 
 
 def add_docket_entries(d, docket_entries, tags=None):
