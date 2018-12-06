@@ -121,6 +121,7 @@ class SimplePagesTest(TestCase):
             {'viewname': 'contact'},
             {'viewname': 'contact_thanks'},
             {'viewname': 'alert_help'},
+            {'viewname': 'delete_help'},
             {'viewname': 'markdown_help'},
             {'viewname': 'advanced_search'},
             {'viewname': 'old_terms', 'args': ['1']},
