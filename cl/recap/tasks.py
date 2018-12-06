@@ -614,27 +614,63 @@ def calculate_recap_sequence_numbers(docket_entries):
 def add_docket_entries(d, docket_entries, tags=None):
     """Update or create the docket entries and documents.
 
+    :param d: The docket object to add things to and use for lookups.
     :param docket_entries: A list of dicts containing docket entry data.
     :param tags: A list of tag objects to apply to the recap documents and
     docket entries created or updated in this function.
     """
     rds_created = []
     content_updated = False
+    calculate_recap_sequence_numbers(docket_entries)
     for docket_entry in docket_entries:
-        try:
-            de, de_created = DocketEntry.objects.get_or_create(
-                docket=d,
-                entry_number=docket_entry['document_number'],
-            )
-        except DocketEntry.MultipleObjectsReturned:
-            logger.error(
-                "Multiple docket entries found for document entry number '%s' "
-                "while processing '%s'" % (docket_entry['document_number'], d)
-            )
-            continue
+        if docket_entry['document_number']:
+            try:
+                de, de_created = DocketEntry.objects.get_or_create(
+                    docket=d,
+                    entry_number=docket_entry['document_number'],
+                )
+            except DocketEntry.MultipleObjectsReturned:
+                logger.error("Multiple docket entries found for document "
+                             "entry number '%s' while processing '%s'",
+                             docket_entry['document_number'], d)
+                continue
+        else:
+            # Unnumbered entry. The only thing we can be sure we have is a
+            # date. Try to find it by date and description (short or long)
+            query = Q()
+            if docket_entry.get('description'):
+                query |= Q(description=docket_entry['description'])
+            if docket_entry.get('short_description'):
+                query |= Q(recap_documents__description=
+                           docket_entry['short_description'])
+            try:
+                de = DocketEntry.objects.get(
+                    query,
+                    docket=d,
+                    date_filed=docket_entry['date_filed'],
+                    entry_number=docket_entry['document_number'],
+                )
+                de_created = False
+            except DocketEntry.DoesNotExist:
+                de = DocketEntry(
+                    docket=d,
+                    entry_number=docket_entry['document_number'],
+                )
+                de_created = True
+            except DocketEntry.MultipleObjectsReturned:
+                logger.error(
+                    "Multiple docket entries returned for unnumbered docket "
+                    "entry on date: %s, with pacer_sequence_number %s while "
+                    "processing %s", docket_entry['date_filed'],
+                    docket_entry['pacer_seq_no'], d,
+                )
+                continue
 
         de.description = docket_entry['description'] or de.description
         de.date_filed = docket_entry['date_filed'] or de.date_filed
+        de.pacer_sequence_number = docket_entry.get('pacer_seq_no') or \
+            de.pacer_sequence_number
+        de.recap_sequence_number = docket_entry['recap_sequence_number']
         de.save()
         if tags:
             for tag in tags:
@@ -648,8 +684,15 @@ def add_docket_entries(d, docket_entries, tags=None):
         # or throw an error.
         params = {
             'docket_entry': de,
-            'document_number': docket_entry['document_number'],
+            # Normalize to "" here. Unsure why, but RECAPDocuments have a
+            # char field for this field while DocketEntries have a integer
+            # field.
+            'document_number': docket_entry['document_number'] or '',
         }
+        if not docket_entry['document_number'] and \
+                docket_entry.get('short_description'):
+            params['description'] = docket_entry['short_description']
+
         if docket_entry.get('attachment_number'):
             params['document_type'] = RECAPDocument.ATTACHMENT
             params['attachment_number'] = docket_entry['attachment_number']
