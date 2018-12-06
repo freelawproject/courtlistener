@@ -10,6 +10,7 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.urlresolvers import reverse
 from django.test import TestCase
+from juriscraper.pacer import PacerRssFeed
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -25,7 +26,8 @@ from cl.recap.models import ProcessingQueue, UPLOAD_TYPE
 from cl.recap.tasks import process_recap_pdf, add_attorney, \
     process_recap_docket, process_recap_attachment, \
     add_parties_and_attorneys, update_case_names, \
-    process_recap_appellate_docket
+    process_recap_appellate_docket, find_docket_object, add_docket_entries, \
+    update_docket_metadata
 from cl.search.models import Docket, RECAPDocument, DocketEntry, \
     OriginatingCourtInformation
 
@@ -715,6 +717,99 @@ class TerminatedEntitiesTest(TestCase):
         # are extraneous or don't have attys.
         role_count = Role.objects.filter(docket=self.d).count()
         self.assertEqual(role_count, 2)
+
+
+class RecapMinuteEntriesTest(TestCase):
+    """Can we ingest minute and numberless entries properly?"""
+
+    @staticmethod
+    def make_path(filename):
+        return os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                            'test_assets', filename)
+
+    def make_pq(self, filename='azd.html', upload_type=UPLOAD_TYPE.DOCKET):
+        """Make a simple pq object for processing"""
+        path = self.make_path(filename)
+        with open(path, 'r') as f:
+            f = SimpleUploadedFile(filename, f.read())
+        return ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=self.user,
+            pacer_case_id='asdf',
+            filepath_local=f,
+            upload_type=upload_type,
+        )
+
+    def setUp(self):
+        self.user = User.objects.get(username='recap')
+
+    def tearDown(self):
+        pqs = ProcessingQueue.objects.all()
+        for pq in pqs:
+            pq.filepath_local.delete()
+            pq.delete()
+        Docket.objects.all().delete()
+
+    def test_all_entries_ingested_without_duplicates(self):
+        """Are all of the docket entries ingested?"""
+        expected_entry_count = 23
+
+        pq = self.make_pq()
+        returned_data = process_recap_docket(pq.pk)
+        d1 = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d1.docket_entries.count(), expected_entry_count)
+
+        pq = self.make_pq()
+        returned_data = process_recap_docket(pq.pk)
+        d2 = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d1.pk, d2.pk)
+        self.assertEqual(d2.docket_entries.count(), expected_entry_count)
+
+    def test_multiple_numberless_entries_multiple_times(self):
+        """Do we get the right number of entries when we add multiple
+        numberless entries multiple times?
+        """
+        expected_entry_count = 25
+        pq = self.make_pq('azd_multiple_unnumbered.html')
+        returned_data = process_recap_docket(pq.pk)
+        d1 = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d1.docket_entries.count(), expected_entry_count)
+
+        pq = self.make_pq('azd_multiple_unnumbered.html')
+        returned_data = process_recap_docket(pq.pk)
+        d2 = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d1.pk, d2.pk)
+        self.assertEqual(d2.docket_entries.count(), expected_entry_count)
+
+    def test_appellate_cases_ok(self):
+        """Do appellate cases get ordered/handled properly?"""
+        expected_entry_count = 16
+        pq = self.make_pq('ca1.html',
+                          upload_type=UPLOAD_TYPE.APPELLATE_DOCKET)
+        returned_data = process_recap_appellate_docket(pq.pk)
+        d1 = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d1.docket_entries.count(), expected_entry_count)
+
+    def test_rss_feed_ingestion(self):
+        """Can we ingest RSS feeds without creating duplicates?"""
+        court_id = 'scotus'
+        rss_feed = PacerRssFeed(court_id)
+        rss_feed.is_bankruptcy = True  # Needed because we say SCOTUS above.
+        with open(self.make_path('rss_sample_unnumbered_mdb.xml')) as f:
+            text = f.read().decode('utf-8')
+        rss_feed._parse_text(text)
+        docket = rss_feed.data[0]
+        d, docket_count = find_docket_object(
+            court_id, docket['pacer_case_id'], docket['docket_number'])
+        update_docket_metadata(d, docket)
+        d.save()
+        self.assertTrue(docket_count == 0)
+
+        expected_count = 1
+        add_docket_entries(d, docket['docket_entries'])
+        self.assertEqual(d.docket_entries.count(), expected_count)
+        add_docket_entries(d, docket['docket_entries'])
+        self.assertEqual(d.docket_entries.count(), expected_count)
 
 
 class RecapDocketTaskTest(TestCase):
