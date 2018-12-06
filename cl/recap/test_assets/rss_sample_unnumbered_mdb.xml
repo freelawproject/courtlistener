@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<rss version="2.0">
+    <channel>
+        <title>District of Maryland - Recent Entries</title>
+        <link>https://ecf.mdb.uscourts.gov</link>
+        <description>Docket entries of type: all</description>
+        <lastBuildDate>Tue, 24 Apr 2018 22:30:01 GMT</lastBuildDate>
+
+        <item>
+            <title>18-00079 Dozier v. CN of Dundalk, Inc. d/b/a CNAC of D
+            </title>
+            <link>https://ecf.mdb.uscourts.gov/cgi-bin/DktRpt.pl?711557</link>
+            <description>Type: ap Office: 1 Chapter: [Close Adversary Case]
+            </description>
+            <guid isPermaLink="true">
+                https://ecf.mdb.uscourts.gov/cgi-bin/DktRpt.pl?711557-19
+            </guid>
+            <pubDate>Tue, 24 Apr 2018 11:25:12 GMT</pubDate>
+        </item>
+    </channel>
+</rss>
