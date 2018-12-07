@@ -766,7 +766,7 @@ class DocketEntry(models.Model):
         max_length=50,
         blank=True,
     )
-    pacer_sequence_number = models.SmallIntegerField(
+    pacer_sequence_number = models.IntegerField(
         help_text="The de_seqno value pulled out of dockets, RSS feeds, and "
                   "sundry other pages in PACER. The place to find this is "
                   "currently in the onclick attribute of the links in PACER. "
