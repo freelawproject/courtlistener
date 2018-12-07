@@ -106,6 +106,10 @@ class PACERFreeDocumentRow(models.Model):
     pacer_doc_id = models.CharField(
         max_length=32,
     )
+    pacer_seq_no = models.IntegerField(
+        null=True,
+        blank=True,
+    )
     document_number = models.CharField(
         max_length=32,
     )
