@@ -660,7 +660,7 @@ class Docket(models.Model):
                 out.update({
                     'short_description': rd.description,
                     'document_type': rd.get_document_type_display(),
-                    'document_number': rd.document_number,
+                    'document_number': rd.document_number or None,
                     'attachment_number': rd.attachment_number,
                     'is_available': rd.is_available,
                     'page_count': rd.page_count,
@@ -1171,7 +1171,7 @@ class RECAPDocument(models.Model):
         out.update({
             'short_description': self.description,
             'document_type': self.get_document_type_display(),
-            'document_number': self.document_number,
+            'document_number': self.document_number or None,
             'attachment_number': self.attachment_number,
             'is_available': self.is_available,
             'page_count': self.page_count,
