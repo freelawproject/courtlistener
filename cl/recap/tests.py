@@ -27,7 +27,7 @@ from cl.recap.tasks import process_recap_pdf, add_attorney, \
     process_recap_docket, process_recap_attachment, \
     add_parties_and_attorneys, update_case_names, \
     process_recap_appellate_docket, find_docket_object, add_docket_entries, \
-    update_docket_metadata
+    update_docket_metadata, normalize_long_description
 from cl.search.models import Docket, RECAPDocument, DocketEntry, \
     OriginatingCourtInformation
 
@@ -810,6 +810,39 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(d.docket_entries.count(), expected_count)
         add_docket_entries(d, docket['docket_entries'])
         self.assertEqual(d.docket_entries.count(), expected_count)
+
+
+class DescriptionCleanupTest(TestCase):
+
+    def test_has_entered_date_at_end(self):
+        desc = 'test (Entered: 01/01/2000)'
+        docket_entry = {'description': desc}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'], 'test')
+
+    def test_has_entered_date_in_middle(self):
+        desc = 'test (Entered: 01/01/2000) test'
+        docket_entry = {'description': desc}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'], desc)
+
+    def test_has_entered_date_in_middle_and_end(self):
+        desc = 'test (Entered: 01/01/2000) and stuff (Entered: 01/01/2000)'
+        docket_entry = {'description': desc}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'],
+                         'test (Entered: 01/01/2000) and stuff')
+
+    def test_has_no_entered_date(self):
+        desc = 'test stuff'
+        docket_entry = {'description': 'test stuff'}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'], desc)
+
+    def test_no_description(self):
+        docket_entry = {}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry, {})
 
 
 class RecapDocketTaskTest(TestCase):
