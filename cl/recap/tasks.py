@@ -2,6 +2,7 @@
 import hashlib
 import logging
 import os
+import re
 from datetime import timedelta
 
 from celery.canvas import chain
@@ -611,6 +612,27 @@ def calculate_recap_sequence_numbers(docket_entries):
     [de.pop('recap_sequence_index', None) for de in docket_entries]
 
 
+def normalize_long_description(docket_entry):
+    """Ensure that the docket entry description is normalized
+
+    This is important because the long descriptions from the DocketHistory
+    report and the Docket report vary, with the latter appending something like
+    "(Entered: 01/01/2014)" on the end of every entry. Having this value means
+    that our merging algorithms fail since the *only* unique thing we have for
+    a unnumbered minute entry is the description itself.
+
+    :param docket_entry: The scraped dict from Juriscraper for the docket
+    entry.
+    :return None (the item is modified in place)
+    """
+    if not docket_entry.get('description'):
+        return
+
+    desc = docket_entry['description']
+    desc = re.sub(r'(.*) \(Entered: .*\)$', r'\1', desc)
+    docket_entry['description'] = desc
+
+
 def get_or_make_docket_entry(d, docket_entry):
     """Lookup or create a docket entry to match the one that was scraped.
 
@@ -636,6 +658,7 @@ def get_or_make_docket_entry(d, docket_entry):
     else:
         # Unnumbered entry. The only thing we can be sure we have is a
         # date. Try to find it by date and description (short or long)
+        normalize_long_description(docket_entry)
         query = Q()
         if docket_entry.get('description'):
             query |= Q(description=docket_entry['description'])
