@@ -25,19 +25,15 @@ class Command(VerboseCommand):
         super(Command, self).handle(*args, **options)
 
         ds = Docket.objects.filter(
-            source__in=Docket.RECAP_SOURCES
-        ).only(
-            'pk',
-            'case_name',
-        )
+            source__in=Docket.RECAP_SOURCES).only('pk', 'case_name')
+        if options['start_pk']:
+            ds = ds.filter(pk__gte=options['start_pk'])
         count = ds.count()
         xml_error_ids = []
         for i, d in enumerate(queryset_generator(ds, chunksize=50000)):
             sys.stdout.write('\rDoing docket: %s of %s, with pk: %s' %
                              (i, count, d.pk))
             sys.stdout.flush()
-            if d.pk < options['start_pk'] > 0:
-                continue
 
             try:
                 d.reprocess_recap_content(do_original_xml=True)
