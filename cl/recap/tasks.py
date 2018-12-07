@@ -611,6 +611,62 @@ def calculate_recap_sequence_numbers(docket_entries):
     [de.pop('recap_sequence_index', None) for de in docket_entries]
 
 
+def get_or_make_docket_entry(d, docket_entry):
+    """Lookup or create a docket entry to match the one that was scraped.
+
+    :param d: The docket we expect to find it in.
+    :param docket_entry: The scraped dict from Juriscraper for the docket
+    entry.
+    :return Tuple of (de, de_created) or None, where:
+     - de is the DocketEntry object
+     - de_created is a boolean stating whether de was created or not
+     - None is returned when things fail.
+    """
+    if docket_entry['document_number']:
+        try:
+            de, de_created = DocketEntry.objects.get_or_create(
+                docket=d,
+                entry_number=docket_entry['document_number'],
+            )
+        except DocketEntry.MultipleObjectsReturned:
+            logger.error("Multiple docket entries found for document "
+                         "entry number '%s' while processing '%s'",
+                         docket_entry['document_number'], d)
+            return None
+    else:
+        # Unnumbered entry. The only thing we can be sure we have is a
+        # date. Try to find it by date and description (short or long)
+        query = Q()
+        if docket_entry.get('description'):
+            query |= Q(description=docket_entry['description'])
+        if docket_entry.get('short_description'):
+            query |= Q(recap_documents__description=
+                       docket_entry['short_description'])
+        try:
+            de = DocketEntry.objects.get(
+                query,
+                docket=d,
+                date_filed=docket_entry['date_filed'],
+                entry_number=docket_entry['document_number'],
+            )
+            de_created = False
+        except DocketEntry.DoesNotExist:
+            de = DocketEntry(
+                docket=d,
+                entry_number=docket_entry['document_number'],
+            )
+            de_created = True
+        except DocketEntry.MultipleObjectsReturned:
+            logger.error(
+                "Multiple docket entries returned for unnumbered docket "
+                "entry on date: %s, with pacer_sequence_number %s while "
+                "processing %s", docket_entry['date_filed'],
+                docket_entry['pacer_seq_no'], d,
+            )
+            return None
+    return de, de_created
+
+
 def add_docket_entries(d, docket_entries, tags=None):
     """Update or create the docket entries and documents.
 
@@ -623,48 +679,11 @@ def add_docket_entries(d, docket_entries, tags=None):
     content_updated = False
     calculate_recap_sequence_numbers(docket_entries)
     for docket_entry in docket_entries:
-        if docket_entry['document_number']:
-            try:
-                de, de_created = DocketEntry.objects.get_or_create(
-                    docket=d,
-                    entry_number=docket_entry['document_number'],
-                )
-            except DocketEntry.MultipleObjectsReturned:
-                logger.error("Multiple docket entries found for document "
-                             "entry number '%s' while processing '%s'",
-                             docket_entry['document_number'], d)
-                continue
+        response = get_or_make_docket_entry(d, docket_entry)
+        if response is None:
+            continue
         else:
-            # Unnumbered entry. The only thing we can be sure we have is a
-            # date. Try to find it by date and description (short or long)
-            query = Q()
-            if docket_entry.get('description'):
-                query |= Q(description=docket_entry['description'])
-            if docket_entry.get('short_description'):
-                query |= Q(recap_documents__description=
-                           docket_entry['short_description'])
-            try:
-                de = DocketEntry.objects.get(
-                    query,
-                    docket=d,
-                    date_filed=docket_entry['date_filed'],
-                    entry_number=docket_entry['document_number'],
-                )
-                de_created = False
-            except DocketEntry.DoesNotExist:
-                de = DocketEntry(
-                    docket=d,
-                    entry_number=docket_entry['document_number'],
-                )
-                de_created = True
-            except DocketEntry.MultipleObjectsReturned:
-                logger.error(
-                    "Multiple docket entries returned for unnumbered docket "
-                    "entry on date: %s, with pacer_sequence_number %s while "
-                    "processing %s", docket_entry['date_filed'],
-                    docket_entry['pacer_seq_no'], d,
-                )
-                continue
+            de, de_created = response[0], response[1]
 
         de.description = docket_entry['description'] or de.description
         de.date_filed = docket_entry['date_filed'] or de.date_filed
