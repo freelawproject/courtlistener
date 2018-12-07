@@ -121,9 +121,15 @@
                         </p>
                       </div>
                     {% endif %}
-                    <div class="col-xs-6 col-sm-5 col-md-6">
-                      <p>{{ rd.description|safe|default:'' }}</p>
-                    </div>
+                    {% if rd.document_number %}
+                      <div class="col-xs-6 col-sm-5 col-md-6">
+                        <p>{{ rd.description|safe|default:'' }}</p>
+                      </div>
+                    {% else %}
+                      <div class="col-xs-8 col-lg-7">
+                        <p>{{ rd.description|safe|default:'' }}</p>
+                      </div>
+                    {% endif %}
 
                     {% if rd.document_number %}
                       {# Hide this if an unnumbered minute entry #}
