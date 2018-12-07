@@ -239,6 +239,7 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
             case_name=row.case_name,
             date_filed=row.date_filed,
             pacer_doc_id=row.pacer_doc_id,
+            pacer_seq_no=row.pacer_seq_no,
             document_number=row.document_number,
             description=row.description,
             nature_of_suit=row.nature_of_suit,
