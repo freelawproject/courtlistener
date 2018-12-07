@@ -101,107 +101,112 @@
               {% if de.recap_documents.count %}
                 {% for rd in de.recap_documents.all %}
                   <div class="row recap-documents">
-                    <div class="col-xs-3">
-                      <p>
-                        {% if rd.document_type == rd.ATTACHMENT %}
-                          {% if rd.filepath_local.name %}
-                            <a href="{{ rd.get_absolute_url }}">Att<span
-                              class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}</a>
+                    {% if rd.document_number %}
+                      <div class="col-xs-3">
+                        <p>
+                          {% if rd.document_type == rd.ATTACHMENT %}
+                            {% if rd.filepath_local.name %}
+                              <a href="{{ rd.get_absolute_url }}">Att<span
+                                class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}</a>
+                            {% else %}
+                              Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
+                            {% endif %}
                           {% else %}
-                            Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
+                            {% if rd.filepath_local.name %}
+                              <a href="{{ rd.get_absolute_url }}">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
+                            {% else %}
+                              Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
+                            {% endif %}
                           {% endif %}
-                        {% else %}
-                          {% if rd.filepath_local.name %}
-                            <a href="{{ rd.get_absolute_url }}">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
-                          {% else %}
-                            Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
-                          {% endif %}
-                        {% endif %}
-                      </p>
-                    </div>
+                        </p>
+                      </div>
+                    {% endif %}
                     <div class="col-xs-6 col-sm-5 col-md-6">
                       <p>{{ rd.description|safe|default:'' }}</p>
                     </div>
 
-                    <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print flex">
-                      {% if rd.filepath_local %}
-                        <a href="/{{ rd.filepath_local }}"
-                           role="button"
-                           class="btn btn-primary btn-xs"
-                          {% if rd.date_upload %}
-                           title="Uploaded {{ rd.date_upload }}"
-                          {% endif %}>
-                          Download PDF
-                        </a>
-                        <button type="button"
-                                class="btn btn-primary btn-xs dropdown-toggle"
-                                data-toggle="dropdown"
-                                aria-haspopup="true"
-                                aria-expanded="false">
-                          <span class="caret"></span>
-                          <span class="sr-only">Toggle Dropdown</span>
-                        </button>
-                        <ul class="dropdown-menu">
-                          <li>
-                            <a href="/{{ rd.filepath_local }}">From
-                              CourtListener</a>
-                          </li>
-                          {% if rd.filepath_ia %}
+                    {% if rd.document_number %}
+                      {# Hide this if an unnumbered minute entry #}
+                      <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print flex">
+                        {% if rd.filepath_local %}
+                          <a href="/{{ rd.filepath_local }}"
+                             role="button"
+                             class="btn btn-primary btn-xs"
+                            {% if rd.date_upload %}
+                             title="Uploaded {{ rd.date_upload }}"
+                            {% endif %}>
+                            Download PDF
+                          </a>
+                          <button type="button"
+                                  class="btn btn-primary btn-xs dropdown-toggle"
+                                  data-toggle="dropdown"
+                                  aria-haspopup="true"
+                                  aria-expanded="false">
+                            <span class="caret"></span>
+                            <span class="sr-only">Toggle Dropdown</span>
+                          </button>
+                          <ul class="dropdown-menu">
                             <li>
-                              <a href="{{ rd.filepath_ia }}"
-                                 rel="nofollow">From
-                                Internet Archive</a>
+                              <a href="/{{ rd.filepath_local }}">From
+                                CourtListener</a>
                             </li>
-                            <li role="separator" class="divider"></li>
-                          {% endif %}
-                          {% if rd.pacer_url %}
-                            <li>
+                            {% if rd.filepath_ia %}
+                              <li>
+                                <a href="{{ rd.filepath_ia }}"
+                                   rel="nofollow">From
+                                  Internet Archive</a>
+                              </li>
+                              <li role="separator" class="divider"></li>
+                            {% endif %}
+                            {% if rd.pacer_url %}
+                              <li>
+                                <a href="{{ rd.pacer_url }}"
+                                   target="_blank"
+                                   rel="nofollow">Buy on
+                                  PACER</a>
+                              </li>
+                            {% endif %}
+                          </ul>
+                        {% else %}
+                          {# We don't have it #}
+                          {% if rd.is_sealed %}
+                            <span class="btn btn-primary btn-xs disabled">Sealed on PACER</span>
+                          {% else %}
+                            {% if rd.pacer_url %}
                               <a href="{{ rd.pacer_url }}"
+                                 class="btn btn-default btn-xs"
                                  target="_blank"
-                                 rel="nofollow">Buy on
-                                PACER</a>
-                            </li>
-                          {% endif %}
-                        </ul>
-                      {% else %}
-                        {# We don't have it #}
-                        {% if rd.is_sealed %}
-                          <span class="btn btn-primary btn-xs disabled">Sealed on PACER</span>
-                        {% else %}
-                          {% if rd.pacer_url %}
-                            <a href="{{ rd.pacer_url }}"
-                               class="btn btn-default btn-xs"
-                               target="_blank"
-                               rel="nofollow">Buy on PACER</a>
+                                 rel="nofollow">Buy on PACER</a>
+                            {% endif %}
                           {% endif %}
                         {% endif %}
-                      {% endif %}
-                    </div>
-                    <div class="col-xs-3 hidden-sm hidden-md hidden-lg hidden-print">
-                      {% if rd.filepath_local %}
-                        <a href="/{{ rd.filepath_local }}"
-                           role="button"
-                           class="btn btn-primary btn-xs"
-                           title="Download PDF"><i class="fa fa-download"></i>
-                        </a>
-                      {% else %}
-                        {# We don't have it #}
-                        {% if rd.is_sealed %}
-                          <span class="btn btn-primary btn-xs disabled"
-                                title="Sealed on PACER">
-                            <i class="fa fa-ban"></i>
-                          </span>
+                      </div>
+                      <div class="col-xs-3 hidden-sm hidden-md hidden-lg hidden-print">
+                        {% if rd.filepath_local %}
+                          <a href="/{{ rd.filepath_local }}"
+                             role="button"
+                             class="btn btn-primary btn-xs"
+                             title="Download PDF"><i class="fa fa-download"></i>
+                          </a>
                         {% else %}
-                          {% if rd.pacer_url %}
-                            <a href="{{ rd.pacer_url }}"
-                               class="btn btn-primary btn-xs"
-                               target="_blank"
-                               rel="nofollow"
-                               title="Buy on PACER"><i class="fa fa-download"></i></a>
+                          {# We don't have it #}
+                          {% if rd.is_sealed %}
+                            <span class="btn btn-primary btn-xs disabled"
+                                  title="Sealed on PACER">
+                              <i class="fa fa-ban"></i>
+                            </span>
+                          {% else %}
+                            {% if rd.pacer_url %}
+                              <a href="{{ rd.pacer_url }}"
+                                 class="btn btn-primary btn-xs"
+                                 target="_blank"
+                                 rel="nofollow"
+                                 title="Buy on PACER"><i class="fa fa-download"></i></a>
+                            {% endif %}
                           {% endif %}
                         {% endif %}
-                      {% endif %}
-                    </div>
+                      </div>
+                    {% endif %}
                   </div>
                 {% endfor %}
               {% endif %}
