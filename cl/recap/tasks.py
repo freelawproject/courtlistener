@@ -633,6 +633,22 @@ def normalize_long_description(docket_entry):
     docket_entry['description'] = desc
 
 
+def merge_unnumbered_docket_entries(des):
+    """Unnumbered docket entries come from many sources, with different data.
+    This sometimes results in two docket entries when there should be one. The
+    docket history report is the one source that sometimes has the long and
+    the short descriptions. When this happens, we have an opportunity to put
+    them back together again, deleting the duplicate items.
+
+    :param des: A QuerySet of DocketEntries that we believe are the same.
+    :return The winning DocketEntry
+    """
+    # Choose the earliest as the winner; delete the rest
+    winner = des.earliest('date_created')
+    des.exclude(pk=winner.pk).delete()
+    return winner
+
+
 def get_or_make_docket_entry(d, docket_entry):
     """Lookup or create a docket entry to match the one that was scraped.
 
@@ -665,28 +681,33 @@ def get_or_make_docket_entry(d, docket_entry):
         if docket_entry.get('short_description'):
             query |= Q(recap_documents__description=
                        docket_entry['short_description'])
-        try:
-            de = DocketEntry.objects.get(
-                query,
-                docket=d,
-                date_filed=docket_entry['date_filed'],
-                entry_number=docket_entry['document_number'],
-            )
-            de_created = False
-        except DocketEntry.DoesNotExist:
+
+        des = DocketEntry.objects.filter(
+            query,
+            docket=d,
+            date_filed=docket_entry['date_filed'],
+            entry_number=docket_entry['document_number'],
+        )
+        count = des.count()
+        if count == 0:
             de = DocketEntry(
                 docket=d,
                 entry_number=docket_entry['document_number'],
             )
             de_created = True
-        except DocketEntry.MultipleObjectsReturned:
-            logger.error(
+        elif count == 1:
+            de = des[0]
+            de_created = False
+        else:
+            logger.warning(
                 "Multiple docket entries returned for unnumbered docket "
-                "entry on date: %s, with pacer_sequence_number %s while "
-                "processing %s", docket_entry['date_filed'],
-                docket_entry['pacer_seq_no'], d,
+                "entry on date: %s while processing %s. Attempting merge",
+                docket_entry['date_filed'], d,
             )
-            return None
+            # There's so little metadata with unnumbered des that if there's
+            # more than one match, we can just select the oldest as canonical.
+            de = merge_unnumbered_docket_entries(des)
+            de_created = False
     return de, de_created
 
 
