@@ -811,6 +811,48 @@ class RecapMinuteEntriesTest(TestCase):
         add_docket_entries(d, docket['docket_entries'])
         self.assertEqual(d.docket_entries.count(), expected_count)
 
+    def test_dhr_merges_separate_docket_entries(self):
+        """Does the docket history report merge separate minute entries if
+        one entry has a short description, and the other has a long
+        description?
+        """
+        # Create two unnumbered docket entries, one with a short description
+        # and one with a long description. Then see what happens when you try
+        # to add a DHR result (it should merge them).
+        short_desc = 'Entry one short description'
+        long_desc = 'Entry one long desc'
+        date_filed = date(2014, 11, 16)
+        d = Docket.objects.create(source=0, court_id='scotus')
+        de1 = DocketEntry.objects.create(
+            docket=d, entry_number=None, description=long_desc,
+            date_filed=date_filed)
+        RECAPDocument.objects.create(
+            docket_entry=de1,
+            document_number='',
+            description='',
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        de2 = DocketEntry.objects.create(
+            docket=d, entry_number=None, description='', date_filed=date_filed)
+        RECAPDocument.objects.create(
+            docket_entry=de2,
+            document_number='',
+            description=short_desc,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        # Add a docket entry that spans the two above. Same date, same short
+        # and long description. This should trigger a merge.
+        add_docket_entries(d, [{
+            "date_filed": date_filed,
+            "description": long_desc,
+            "document_number": None,
+            "pacer_doc_id": None,
+            "pacer_seq_no": None,
+            "short_description": short_desc,
+        }])
+        expected_item_count = 1
+        self.assertEqual(d.docket_entries.count(), expected_item_count)
+
 
 class DescriptionCleanupTest(TestCase):
 
