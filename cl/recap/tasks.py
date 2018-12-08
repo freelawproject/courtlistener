@@ -725,6 +725,9 @@ def add_docket_entries(d, docket_entries, tags=None):
     :param tags: A list of tag objects to apply to the recap documents and
     docket entries created or updated in this function.
     """
+    # Remove items without a date filed value.
+    docket_entries = [de for de in docket_entries if de.get('date_filed')]
+
     rds_created = []
     content_updated = False
     calculate_recap_sequence_numbers(docket_entries)
