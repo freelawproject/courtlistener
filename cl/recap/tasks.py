@@ -628,8 +628,14 @@ def normalize_long_description(docket_entry):
     if not docket_entry.get('description'):
         return
 
+    # Remove the entry info from the end of the long descriptions
     desc = docket_entry['description']
     desc = re.sub(r'(.*) \(Entered: .*\)$', r'\1', desc)
+
+    # Remove any brakets around numbers (this happens on the DHR long
+    # descriptions).
+    desc = re.sub(r'\[(\d+)\]', r'\1', desc)
+
     docket_entry['description'] = desc
 
 
