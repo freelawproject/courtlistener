@@ -886,6 +886,17 @@ class DescriptionCleanupTest(TestCase):
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry, {})
 
+    def test_removing_brackets(self):
+        docket_entry = {'description': 'test [10] stuff'}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'], 'test 10 stuff')
+
+    def test_only_remove_brackets_on_numbers(self):
+        desc = 'test [asdf 10] stuff'
+        docket_entry = {'description': desc}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'], desc)
+
 
 class RecapDocketTaskTest(TestCase):
     def setUp(self):
