@@ -91,7 +91,12 @@
     </div>
     {% for de in docket_entries %}
         <div class="row {% cycle "odd" "even" %}"
-             id="entry-{{ de.entry_number }}">
+             {% if de.entry_number %}
+                id="#entry-{{ de.entry_number }}"
+             {% else %}
+                id="#minute-entry-{{ de.pk }}"
+             {% endif %}
+            >
             <div class="col-xs-1 text-center"><p>{{ de.entry_number|default_if_none:"" }}</p></div>
             <div class="col-xs-3 col-sm-2"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
             <div class="col-xs-8 col-lg-7">
@@ -218,7 +223,12 @@
               {% endif %}
             </div>
             <div class="hidden-xs col-sm-1 col-lg-2 right">
-              <a href="#entry-{{ de.entry_number }}"
+              <a
+                {% if de.entry_number %}
+                  href="#entry-{{ de.entry_number }}"
+                {% else %}
+                  href="#minute-entry-{{ de.pk }}"
+                {% endif %}
                  data-toggle="tooltip"
                  data-placement="top"
                  title="Get direct link to this row">
