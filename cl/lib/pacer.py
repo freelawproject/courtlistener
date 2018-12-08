@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from juriscraper.lib.string_utils import titlecase
 from juriscraper.pacer import AppellateDocketReport, DocketReport, \
-    DocketHistoryReport, InternetArchive
+    DocketHistoryReport, InternetArchive, CaseQuery
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
@@ -202,6 +202,8 @@ def process_docket_data(d, filepath, report_type):
         report = AppellateDocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == UPLOAD_TYPE.IA_XML_FILE:
         report = InternetArchive()
+    elif report_type == UPLOAD_TYPE.CASE_REPORT_PAGE:
+        report = CaseQuery(map_cl_to_pacer_id(d.court_id))
     with open(filepath, 'r') as f:
         text = f.read().decode('utf-8')
     report._parse_text(text)
@@ -214,7 +216,8 @@ def process_docket_data(d, filepath, report_type):
         og_info.save()
         d.originating_court_information = og_info
     d.save()
-    add_docket_entries(d, data['docket_entries'])
+    if data.get('docket_entries'):
+        add_docket_entries(d, data['docket_entries'])
     if report_type in (UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.APPELLATE_DOCKET,
                        UPLOAD_TYPE.IA_XML_FILE):
         add_parties_and_attorneys(d, data['parties'])
