@@ -262,7 +262,6 @@ MIN_DONATION = {
     'rt_alerts': 10,
     'docket_alerts': 5,
 }
-FUNDRAISING_MODE = False
 MAX_FREE_DOCKET_ALERTS = 5
 DOCKET_ALERT_RECAP_BONUS = 10
 
