@@ -558,10 +558,21 @@ def get_order_of_docket(docket_entries):
 
 
 def make_recap_sequence_number(de):
-    """Make a sequence number using a date and index."""
+    """Make a sequence number using a date and index.
+
+    :param de: A docket entry provided as either a Juriscraper dict or
+    DocketEntry object. Regardless of which is provided, there must be a
+    key/attribute named recap_sequence_index, which will be used to populate
+    the returned sequence number.
+    :return a str to use as the recap_sequence_number
+    """
     template = "%s.%03d"
-    return template % (de['date_filed'].isoformat(),
-                       de['recap_sequence_index'])
+    if type(de) == dict:
+        return template % (de['date_filed'].isoformat(),
+                           de['recap_sequence_index'])
+    elif type(de) == DocketEntry:
+        return template % (de.date_filed.isoformat(),
+                           de.recap_sequence_index)
 
 
 def calculate_recap_sequence_numbers(docket_entries):
