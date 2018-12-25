@@ -570,7 +570,7 @@ def make_recap_sequence_number(de):
     if type(de) == dict:
         return template % (de['date_filed'].isoformat(),
                            de['recap_sequence_index'])
-    elif type(de) == DocketEntry:
+    elif isinstance(de, DocketEntry):
         return template % (de.date_filed.isoformat(),
                            de.recap_sequence_index)
 
