@@ -1918,8 +1918,10 @@ class Opinion(models.Model):
         null=True,
     )
     download_url = models.URLField(
-        help_text="The URL on the court website where the document was "
-                  "originally scraped",
+        help_text="The URL where the item was originally scraped. Note that "
+                  "these URLs may often be dead due to the court or the bulk "
+                  "provider changing their website. We keep the original link "
+                  "here given that it often contains valuable metadata.",
         max_length=500,
         db_index=True,
         null=True,
