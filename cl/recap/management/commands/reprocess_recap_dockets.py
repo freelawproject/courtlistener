@@ -2,6 +2,7 @@ from __future__ import print_function
 import sys
 
 from django.db import IntegrityError
+from django.db.models import Q
 from lxml.etree import XMLSyntaxError
 
 from cl.lib.command_utils import VerboseCommand
@@ -25,7 +26,12 @@ class Command(VerboseCommand):
         super(Command, self).handle(*args, **options)
 
         ds = Docket.objects.filter(
-            source__in=Docket.RECAP_SOURCES).only('pk', 'case_name')
+            # Only do ones that have HTML files *or* that have an IA XML file.
+            # The latter is defined by ones that *don't* have blank
+            # filepath_local fields.
+            Q(html_documents__isnull=False) | ~Q(filepath_local=''),
+            source__in=Docket.RECAP_SOURCES,
+        ).only('pk', 'case_name')
         if options['start_pk']:
             ds = ds.filter(pk__gte=options['start_pk'])
         count = ds.count()
