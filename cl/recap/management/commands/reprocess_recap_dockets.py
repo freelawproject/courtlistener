@@ -31,7 +31,7 @@ class Command(VerboseCommand):
             # filepath_local fields.
             Q(html_documents__isnull=False) | ~Q(filepath_local=''),
             source__in=Docket.RECAP_SOURCES,
-        ).only('pk', 'case_name')
+        ).distinct().only('pk', 'case_name')
         if options['start_pk']:
             ds = ds.filter(pk__gte=options['start_pk'])
         count = ds.count()
