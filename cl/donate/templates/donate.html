@@ -26,7 +26,9 @@
 
         if (response.error) {
             // Show the errors on the form
-            $form.find('.payment-errors').text(response.error.message);
+            $form.find('.payment-errors')
+              .text(response.error.message)
+              .addClass('alert alert-danger');
             $form.find('button').prop('disabled', false);
         } else {
             // token contains id, last4, and card type
@@ -422,33 +424,44 @@
       </div>
 
       <div id="cc-info">
-        <!-- Stripe's custom form, sans name attributes -->
+        <!--
+          Stripe's custom form. Note that we *must* not put name attributes
+          on these inputs or else our server will be sent credit card info we
+          don't want.
+        -->
         <p>
             <span class="payment-errors help-block"></span>
         </p>
         <div class="row">
-          <div class="col-sm-5">
+          <div class="col-sm-6">
             <div class="form-group">
-              <label>Card Number</label>
-              <input class="form-control" type="text" size="20" data-stripe="number"/>
+              <label for="cc-number">Card Number</label>
+              <input class="form-control" type="text" size="20"
+                     data-stripe="number" autocomplete="cc-number"
+                     id="cc-number"/>
             </div>
           </div>
-          <div class="col-sm-3">
+          <div class="col-sm-2">
             <div class="form-group">
-              <label>CVC</label>
-              <input class="form-control" type="text" size="4" data-stripe="cvc"/>
+              <label for="cc-cvc">CVC</label>
+              <input class="form-control" type="text" size="4" data-stripe="cvc"
+                     autocomplete="cc-csc" id="cc-cvc" maxlength="3"/>
             </div>
           </div>
           <div class="col-sm-2">
             <div class="form-group">
               <label for="cc-month-field">Exp Month</label>
-              <input class="form-control" id="cc-month-field" type="text" data-stripe="exp-month" placeholder="MM"/>
+              <input class="form-control" id="cc-month-field" type="text"
+                     data-stripe="exp-month" placeholder="MM"
+                     autocomplete="cc-exp-month"/>
             </div>
           </div>
           <div class="col-sm-2">
-            <div form-group>
+            <div class="form-group">
               <label for="cc-year-field">Year</label>
-              <input class="form-control" id="cc-year-field" type="text" data-stripe="exp-year" placeholder="YYYY"/>
+              <input class="form-control" id="cc-year-field" type="text"
+                     data-stripe="exp-year" placeholder="YYYY"
+                     autocomplete="cc-exp-year"/>
             </div>
           </div>
         </div>
