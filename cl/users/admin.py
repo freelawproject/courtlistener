@@ -3,6 +3,7 @@ from django.contrib.auth.models import Permission, User
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
+from cl.donate.admin import DonationInline, MonthlyDonationInline
 from cl.favorites.admin import FavoriteInline
 from cl.lib.admin import CSSAdminMixin
 from cl.users.models import UserProfile, BarMembership
@@ -29,6 +30,8 @@ class UserProfileInline(admin.StackedInline):
 class UserAdmin(admin.ModelAdmin, CSSAdminMixin):
     inlines = (
         UserProfileInline,
+        DonationInline,
+        MonthlyDonationInline,
         AlertInline,
         DocketAlertInline,
         FavoriteInline,
