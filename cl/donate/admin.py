@@ -27,6 +27,11 @@ class DonationAdmin(admin.ModelAdmin):
     )
 
 
+class DonationInline(admin.StackedInline):
+    model = Donation
+    extra = 1
+
+
 @admin.register(MonthlyDonation)
 class MonthlyDonationAdmin(admin.ModelAdmin):
     readonly_fields = (
@@ -47,3 +52,8 @@ class MonthlyDonationAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'donor',
     )
+
+
+class MonthlyDonationInline(admin.TabularInline):
+    model = MonthlyDonation
+    extra = 1
