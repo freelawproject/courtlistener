@@ -29,7 +29,7 @@ class DonationAdmin(admin.ModelAdmin):
 
 class DonationInline(admin.StackedInline):
     model = Donation
-    extra = 1
+    extra = 0
 
 
 @admin.register(MonthlyDonation)
@@ -56,4 +56,4 @@ class MonthlyDonationAdmin(admin.ModelAdmin):
 
 class MonthlyDonationInline(admin.TabularInline):
     model = MonthlyDonation
-    extra = 1
+    extra = 0
