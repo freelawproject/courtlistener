@@ -104,7 +104,9 @@ def generate_ia_json(d_pk, database='default'):
     # table. See notes in #901. Doing this way makes for a very large query,
     # but one that is fairly efficient since the double-join, while still
     # there, appears to be ignored by the query planner.
-    party_ids = [p.pk for p in d.parties.all().using(database)]
+    # Do not add a `using` method here, it causes an additional (unnecessary)
+    # query to be run. I think this is a Django bug.
+    party_ids = [p.pk for p in d.parties.all()]
     attorney_prefetch = Prefetch(
         'parties__attorneys',
         queryset=Attorney.objects.filter(
