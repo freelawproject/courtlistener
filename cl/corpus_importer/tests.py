@@ -413,8 +413,9 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-                "Got %s, expected %s" % (actual_num_attorneys,
-                                         expected_num_attorneys)
+                "Got %s, expected %s: \n%s" % (actual_num_attorneys,
+                                               expected_num_attorneys,
+                                               first_party_attorneys)
         )
 
         first_attorney = first_party_attorneys[0]
@@ -434,11 +435,11 @@ class IAUploaderTest(TestCase):
         It's very easy to use the DRF in a way that generates a LOT of queries.
         Let's avoid that.
         """
-        with self.assertNumQueries(10):
+        with self.assertNumQueries(11):
             generate_ia_json(1)
 
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(5):
             generate_ia_json(2)
 
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(5):
             generate_ia_json(3)
