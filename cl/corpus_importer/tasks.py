@@ -22,6 +22,7 @@ from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction, DatabaseError
 from django.db.models import Prefetch
+from django.db.models.query import prefetch_related_objects
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import ParsingException
@@ -84,8 +85,7 @@ def generate_ia_json(d_pk):
         'originating_court_information',
     ).prefetch_related(
         'panel',
-        'parties__party_types__criminal_complaints',
-        'parties__party_types__criminal_counts',
+        'parties',
         # Django appears to have a bug where you can't defer a field on a
         # queryset where you prefetch the values. If you try to, it crashes.
         # We should be able to just do the prefetch below like the ones above
@@ -94,21 +94,35 @@ def generate_ia_json(d_pk):
             'docket_entries__recap_documents',
             queryset=RECAPDocument.objects.all().defer('plain_text')
         ),
-        Prefetch(
-            # Only attorneys in the docket.
-            'parties__attorneys',
-            queryset=Attorney.objects.filter(
-                roles__docket_id=d_pk,
-            ).distinct().prefetch_related(
-                Prefetch(
-                    # Only roles for those attorneys in the docket.
-                    'roles',
-                    queryset=Role.objects.filter(docket_id=d_pk)
-                )
-            ),
-        ),
     )
     d = ds[0]
+
+    # Prefetching attorneys needs to be done in a second pass where we can
+    # access the party IDs identified above. If we don't do it this way, Django
+    # generates a bad query that double-joins the attorney table to the role
+    # table. See notes in #901. Doing this way makes for a very large query,
+    # but one that is fairly efficient since the double-join, while still
+    # there, appears to be ignored by the query planner.
+    party_ids = [p.pk for p in d.parties.all()]
+    attorney_prefetch = Prefetch(
+        'parties__attorneys',
+        queryset=Attorney.objects.filter(
+            roles__docket_id=d_pk,
+            parties__id__in=party_ids,
+        ).distinct().prefetch_related(
+            Prefetch(
+                # Only roles for those attorneys in the docket.
+                'roles',
+                queryset=Role.objects.filter(docket_id=d_pk)
+            )
+        ),
+    )
+    prefetch_related_objects([d], [
+        'parties__party_types__criminal_complaints',
+        'parties__party_types__criminal_counts',
+        attorney_prefetch
+    ])
+
     renderer = JSONRenderer()
     json_str = renderer.render(
         IADocketSerializer(d).data,
