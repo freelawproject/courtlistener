@@ -73,6 +73,7 @@ def upload_oral_arguments_to_internet_archive(options):
 def upload_recap_data(options):
     """Upload RECAP data to Internet Archive."""
     q = options['queue']
+    database = options['database']
     r = redis.StrictRedis(host=settings.REDIS_HOST,
                           port=settings.REDIS_PORT,
                           db=settings.REDIS_DATABASES['CACHE'])
@@ -102,7 +103,7 @@ def upload_recap_data(options):
         }
         for d in ds.filter(**params)[:chunk_size]:
             throttle.maybe_wait()
-            upload_recap_json.apply_async(args=(d.pk,), queue=q)
+            upload_recap_json.apply_async(args=(d.pk, database), queue=q)
             i += 1
             if i % 100 == 0:
                 # Print a useful log line with expected finish date.
@@ -177,6 +178,12 @@ class Command(VerboseCommand):
             '--queue',
             default='batch1',
             help="The celery queue where the tasks should be processed.",
+        )
+        parser.add_argument(
+            '--database',
+            default='default',
+            help="The database name to use when querying (currently only "
+                 "supported by the upload-recap-data-to-ia task).",
         )
 
     def handle(self, *args, **options):

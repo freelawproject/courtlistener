@@ -71,10 +71,11 @@ def increment_failure_count(obj):
     obj.save()
 
 
-def generate_ia_json(d_pk):
+def generate_ia_json(d_pk, database='default'):
     """Generate JSON for upload to Internet Archive
 
     :param d_pk: The PK of the docket to generate JSON for
+    :param database: The name of the database to use for the queries
     :return: A tuple of the docket object requested and a string of json data
     to upload.
     """
@@ -94,7 +95,7 @@ def generate_ia_json(d_pk):
             'docket_entries__recap_documents',
             queryset=RECAPDocument.objects.all().defer('plain_text')
         ),
-    )
+    ).using(database)
     d = ds[0]
 
     # Prefetching attorneys needs to be done in a second pass where we can
@@ -103,7 +104,7 @@ def generate_ia_json(d_pk):
     # table. See notes in #901. Doing this way makes for a very large query,
     # but one that is fairly efficient since the double-join, while still
     # there, appears to be ignored by the query planner.
-    party_ids = [p.pk for p in d.parties.all()]
+    party_ids = [p.pk for p in d.parties.all().using(database)]
     attorney_prefetch = Prefetch(
         'parties__attorneys',
         queryset=Attorney.objects.filter(
@@ -132,9 +133,9 @@ def generate_ia_json(d_pk):
 
 
 @app.task(bind=True, ignore_result=True)
-def upload_recap_json(self, pk):
+def upload_recap_json(self, pk, database='default'):
     """Make a JSON object for a RECAP docket and upload it to IA"""
-    d, json_str = generate_ia_json(pk)
+    d, json_str = generate_ia_json(pk, database=database)
 
     file_name = get_docket_filename(d.court_id, d.pacer_case_id, 'json')
     bucket_name = get_bucket_name(d.court_id, d.pacer_case_id)
