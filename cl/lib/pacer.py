@@ -124,7 +124,7 @@ def get_first_missing_de_date(d):
     de_number_tuples = list(d.docket_entries.exclude(description='').order_by(
         'entry_number'
     ).values_list('entry_number', 'date_filed'))
-    de_numbers = [i[0] for i in de_number_tuples]
+    de_numbers = [i[0] for i in de_number_tuples if i[0]]
 
     if len(de_numbers) > 0:
         # Get the earliest missing item
