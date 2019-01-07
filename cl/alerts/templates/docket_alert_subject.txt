@@ -1,1 +1,1 @@
-{{ count }} New Docket Entr{{ count|pluralize:"y,ies" }} for {{ case_name }}{% if docket.docket_number %} ({{ docket.docket_number }}){% endif %}
+{{ count }} New Docket Entr{{ count|pluralize:"y,ies" }} for {{ case_name|safe }}{% if docket.docket_number %} ({{ docket.docket_number }}){% endif %}
