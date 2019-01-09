@@ -589,33 +589,6 @@ def make_fjc_idb_lookup_params(item):
     return params
 
 
-@app.task(bind=True, max_retries=2, interval_start=5 * 60,
-          interval_step=10 * 60, ignore_result=True)
-def get_pacer_case_id_for_idb_row(self, pk, cookies):
-    """Populate the pacer_case_id field in the FJC IDB table for an item in the
-    IDB table
-
-    :param pk: The primary key of the IDB row to get.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
-    """
-    logger.info("Getting pacer_case_id for IDB item with pk %s" % pk)
-    item = FjcIntegratedDatabase.objects.get(pk=pk)
-    params = make_fjc_idb_lookup_params(item)
-    lookup_result = get_pacer_case_id_and_title(
-        docket_number=item.docket_number,
-        court_id=item.district_id,
-        cookies=cookies,
-        **params
-    )
-    if lookup_result is None:
-        item.pacer_case_id = "Error"
-    else:
-        item.pacer_case_id = lookup_result['pacer_case_id']
-        item.case_name = lookup_result['title']
-    item.save()
-
-
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60)
 def get_pacer_case_id_and_title(self, docket_number, court_id, cookies,
