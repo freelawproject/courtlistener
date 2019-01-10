@@ -316,6 +316,7 @@ def process_free_opinion_result(self, row_pk, cnt):
             })
             de.recap_sequence_number = de.recap_sequence_number or \
                 recap_sequence_number
+            de.save()
             rd, rd_created = RECAPDocument.objects.update_or_create(
                 docket_entry=de,
                 document_number=result.document_number,
