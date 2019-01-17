@@ -1082,17 +1082,39 @@ class RECAPDocument(models.Model):
         if self.attachment_number is None:
             # Validate that we don't already have such an entry. This is needed
             # because None values in SQL are all considered different.
-            exists = RECAPDocument.objects.exclude(pk=self.pk).filter(
+            others = RECAPDocument.objects.exclude(pk=self.pk).filter(
                 document_number=self.document_number,
                 attachment_number=self.attachment_number,
                 docket_entry=self.docket_entry,
-            ).exists()
-            if exists:
-                raise ValidationError(
-                    "Duplicate values violate save constraint. An object with "
-                    "this document_number and docket_entry already exists: "
-                    "(%s, %s)" % (self.document_number, self.docket_entry_id)
-                )
+            )
+            if others.exists():
+                # Keep only the better item. This situation occurs during race
+                # conditions since the check we do here doesn't have the kinds
+                # of database guarantees we would like. Items are duplicates if
+                # they have the same pacer_doc_id. The worse one is the one
+                # that is *not* being updated here.
+                if others.count() > 1:
+                    raise ValidationError(
+                        "Duplicate values violate save constraint and we are "
+                        "unable to fix it automatically for rd: %s" % self.pk
+                    )
+                else:
+                    other = others[0]
+                if other.pacer_doc_id == self.pacer_doc_id:
+                    # Delete "other"; the new one probably has better data.
+                    # Lots of code could be written here to merge "other" into
+                    # self, but it's nasty stuff because it happens when saving
+                    # new data and requires merging a lot of fields. This
+                    # situation only occurs rarely, so just delete "other" and
+                    # hope that "self" has the best, latest data.
+                    other.delete()
+                else:
+                    raise ValidationError(
+                        "Duplicate values violate save constraint and we are "
+                        "unable to fix it because the items have different "
+                        "pacer_doc_id values. The rds are %s and %s " %
+                        (self.pk, other.pk)
+                    )
 
         super(RECAPDocument, self).save(*args, **kwargs)
         tasks = []
