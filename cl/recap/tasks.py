@@ -378,6 +378,14 @@ def add_recap_source(d):
         d.source = Docket.COLUMBIA_AND_RECAP
     elif d.source == Docket.COLUMBIA_AND_SCRAPER:
         d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
+    elif d.source == Docket.IDB:
+        d.source = Docket.RECAP_AND_IDB
+    elif d.source == Docket.SCRAPER_AND_IDB:
+        d.source = Docket.RECAP_AND_SCRAPER_AND_IDB
+    elif d.source == Docket.COLUMBIA_AND_IDB:
+        d.source = Docket.COLUMBIA_AND_RECAP_AND_IDB
+    elif d.source == Docket.COLUMBIA_AND_SCRAPER_AND_IDB:
+        d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB
 
 
 def update_case_names(d, new_case_name):
