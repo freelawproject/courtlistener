@@ -21,6 +21,7 @@ from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
     normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
+from cl.recap.models import FjcIntegratedDatabase
 
 DOCUMENT_STATUSES = (
     ('Published', 'Precedential'),
@@ -191,6 +192,14 @@ class Docket(models.Model):
     COLUMBIA_AND_RECAP = 5
     COLUMBIA_AND_SCRAPER = 6
     COLUMBIA_AND_RECAP_AND_SCRAPER = 7
+    IDB = 8
+    RECAP_AND_IDB = 9
+    SCRAPER_AND_IDB = 10
+    RECAP_AND_SCRAPER_AND_IDB = 11
+    COLUMBIA_AND_IDB = 12
+    COLUMBIA_AND_RECAP_AND_IDB = 13
+    COLUMBIA_AND_SCRAPER_AND_IDB = 14
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB = 15
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -200,9 +209,20 @@ class Docket(models.Model):
         (COLUMBIA_AND_SCRAPER, "Columbia and Scraper"),
         (COLUMBIA_AND_RECAP, 'Columbia and RECAP'),
         (COLUMBIA_AND_RECAP_AND_SCRAPER, "Columbia, RECAP and Scraper"),
+        (IDB, "Integrated Database"),
+        (RECAP_AND_IDB, "RECAP and IDB"),
+        (SCRAPER_AND_IDB, "Scraper and IDB"),
+        (RECAP_AND_SCRAPER_AND_IDB, "RECAP, Scraper, and IDB"),
+        (COLUMBIA_AND_IDB, "Columbia and IDB"),
+        (COLUMBIA_AND_RECAP_AND_IDB, "Columbia, RECAP, and IDB"),
+        (COLUMBIA_AND_SCRAPER_AND_IDB, "Columbia, Scraper, and IDB"),
+        (COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
+         "Columbia, RECAP, Scraper, and IDB"),
     )
     RECAP_SOURCES = [RECAP, RECAP_AND_SCRAPER, COLUMBIA_AND_RECAP,
-                     COLUMBIA_AND_RECAP_AND_SCRAPER]
+                     COLUMBIA_AND_RECAP_AND_SCRAPER, RECAP_AND_IDB,
+                     RECAP_AND_SCRAPER_AND_IDB, COLUMBIA_AND_RECAP_AND_IDB,
+                     COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB]
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
@@ -237,6 +257,14 @@ class Docket(models.Model):
     originating_court_information = models.OneToOneField(
         OriginatingCourtInformation,
         help_text="Lower court information for appellate dockets",
+        related_name="docket",
+        blank=True,
+        null=True,
+    )
+    idb_data = models.OneToOneField(
+        FjcIntegratedDatabase,
+        help_text="Data from the FJC Integrated Database associated with this "
+                  "case.",
         related_name="docket",
         blank=True,
         null=True,
@@ -386,6 +414,21 @@ class Docket(models.Model):
         max_length=5000,  # was 50, 100, 300, 1000
         blank=True,
         null=True,
+        db_index=True,
+    )
+    docket_number_core = models.CharField(
+        help_text="For federal dockets, this is the most distilled docket "
+                  "number available. In this field, the docket number is "
+                  "stripped down to only the year and serial digits, "
+                  "eliminating the office at the beginning, letters in the "
+                  "middle, and the judge at the end. Thus, a docket number "
+                  "like 2:07-cv-34911-MJL becomes simply 0734911. This is the "
+                  "format that is provided by the IDB and is useful for "
+                  "de-duplication types of activities which otherwise get "
+                  "messy. We use a char field here to preserve leading zeros.",
+        # PACER doesn't do consolidated case numbers, so this can be small.
+        max_length=20,
+        blank=True,
         db_index=True,
     )
     pacer_case_id = fields.CharNullField(
