@@ -440,16 +440,6 @@ class FjcIntegratedDatabase(models.Model):
                   "track of where a row came from originally.",
         choices=DATASET_SOURCES,
     )
-    case_name = models.TextField(
-        help_text="The standard name of the case",
-        blank=True,
-    )
-    pacer_case_id = models.CharField(
-        help_text="The cased ID provided by PACER.",
-        max_length=100,
-        blank=True,
-        db_index=True,
-    )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
