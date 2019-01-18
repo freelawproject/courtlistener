@@ -417,14 +417,14 @@ class Docket(models.Model):
         db_index=True,
     )
     docket_number_core = models.CharField(
-        help_text="For federal dockets, this is the most distilled docket "
-                  "number available. In this field, the docket number is "
-                  "stripped down to only the year and serial digits, "
-                  "eliminating the office at the beginning, letters in the "
-                  "middle, and the judge at the end. Thus, a docket number "
-                  "like 2:07-cv-34911-MJL becomes simply 0734911. This is the "
-                  "format that is provided by the IDB and is useful for "
-                  "de-duplication types of activities which otherwise get "
+        help_text="For federal district court dockets, this is the most "
+                  "distilled docket number available. In this field, the "
+                  "docket number is stripped down to only the year and serial "
+                  "digits, eliminating the office at the beginning, letters "
+                  "in the middle, and the judge at the end. Thus, a docket "
+                  "number like 2:07-cv-34911-MJL becomes simply 0734911. This "
+                  "is the format that is provided by the IDB and is useful "
+                  "for de-duplication types of activities which otherwise get "
                   "messy. We use a char field here to preserve leading zeros.",
         # PACER doesn't do consolidated case numbers, so this can be small.
         max_length=20,
