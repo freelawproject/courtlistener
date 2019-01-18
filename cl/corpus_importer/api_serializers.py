@@ -3,6 +3,7 @@ from rest_framework.serializers import ModelSerializer
 
 from cl.people_db.models import Party, Role, PartyType, Attorney, \
     CriminalCount, CriminalComplaint
+from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
 from cl.search.models import RECAPDocument, Docket, DocketEntry, \
     OriginatingCourtInformation
 
@@ -80,6 +81,7 @@ class IADocketSerializer(ModelSerializer):
     original_court_info = OriginalCourtInformationSerializer(
         source='originating_court_information',
     )
+    idb_data = FjcIntegratedDatabaseSerializer()
     absolute_url = CharField(source='get_absolute_url', read_only=True)
 
     class Meta:
