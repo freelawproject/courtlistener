@@ -1,10 +1,38 @@
 import contextlib
 import os
+import re
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
 
 from cl.lib.recap_utils import get_bucket_name
+
+
+def make_docket_number_core(docket_number):
+    """Make a core docket number from an existing docket number.
+
+    Converts docket numbers like:
+
+        2:12-cv-01032
+        12-cv-01032
+
+    Into:
+
+        1201032
+
+    :param docket_number: A docket number to condense
+    :return empty string if no change possible, or the condensed version if it
+    worked. Note that all values returned are strings. We cannot return an int
+    because that'd strip leading zeroes, which we need.
+    """
+    if docket_number is None:
+        return ''
+
+    m = re.search(r'(?:\d:)?(\d\d)-..-(\d+)', docket_number)
+    if m:
+        return m.group(1) + m.group(2)
+    else:
+        return ''
 
 
 def make_recap_path(instance, filename):
