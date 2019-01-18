@@ -7,6 +7,7 @@ from rest_framework.serializers import ModelSerializer
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
 from cl.people_db.models import Person, PartyType
+from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
 from cl.search.models import (
     Citation, Court, Docket, DocketEntry, Opinion, OpinionsCited,
     OpinionCluster, OriginatingCourtInformation, RECAPDocument, Tag,
@@ -38,6 +39,7 @@ class DocketSerializer(DynamicFieldsMixin,
     original_court_info = OriginalCourtInformationSerializer(
         source='originating_court_information',
     )
+    idb_data = FjcIntegratedDatabaseSerializer()
     clusters = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='opinioncluster-detail',
