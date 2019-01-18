@@ -192,6 +192,7 @@ class DocketAdmin(admin.ModelAdmin):
         'assigned_to',
         'referred_to',
         'originating_court_information',
+        'idb_data',
     )
 
 
