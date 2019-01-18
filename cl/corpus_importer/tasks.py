@@ -1,3 +1,4 @@
+# coding=utf-8
 import copy
 import hashlib
 import logging
@@ -316,6 +317,7 @@ def process_free_opinion_result(self, row_pk, cnt):
             })
             de.recap_sequence_number = de.recap_sequence_number or \
                 recap_sequence_number
+            de.save()
             rd, rd_created = RECAPDocument.objects.update_or_create(
                 docket_entry=de,
                 document_number=result.document_number,
@@ -578,7 +580,14 @@ def make_fjc_idb_lookup_params(item):
         'office_number': item.office if item.office else None,
     }
     if item.plaintiff or item.defendant:
+        # Note that criminal data lacks plaintiff or defendant info in IDB. We
+        # could try using "United States" as the plaintiff, but in many cases
+        # the plaintiff takes the form of a state. E.g. "Arizona, State of v.
+        # Luenig". For a random sample, see:
+        # https://www.courtlistener.com/?q=docketNumber%3Acr+AND+-case_name%3Aunited&type=r&order_by=random_123+desc.
+        # ∴ not much we can do here for criminal cases
         params['case_name'] = '%s v. %s' % (item.plaintiff, item.defendant)
+
     if item.dataset_source in [CR_2017, CR_OLD]:
         if item.multidistrict_litigation_docket_number:
             params['docket_number_letters'] = 'md'
