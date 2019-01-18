@@ -2,7 +2,7 @@ from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from cl.recap.models import ProcessingQueue, UPLOAD_TYPE
+from cl.recap.models import FjcIntegratedDatabase, ProcessingQueue, UPLOAD_TYPE
 from cl.search.models import Court, RECAPDocument
 
 
@@ -109,3 +109,10 @@ class PacerDocIdLookUpSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = RECAPDocument
         fields = ('pacer_doc_id', 'filepath_local', 'id',)
+
+
+class FjcIntegratedDatabaseSerializer(serializers.HyperlinkedModelSerializer):
+
+    class Meta:
+        model = FjcIntegratedDatabase
+        fields = '__all__'
