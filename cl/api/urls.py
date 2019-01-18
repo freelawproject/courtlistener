@@ -41,6 +41,8 @@ router.register(r'attorneys', people_views.AttorneyViewSet)
 router.register(r'recap', recap_views.PacerProcessingQueueViewSet)
 router.register(r'recap-query', recap_views.PacerDocIdLookupViewSet,
                 base_name='fast-recapdocument')
+router.register(r'fjc-integrated-database',
+                recap_views.FjcIntegratedDatabaseViewSet)
 
 API_TITLE = "CourtListener Legal Data API"
 core_api_schema_view = get_schema_view(title=API_TITLE)
