@@ -85,6 +85,7 @@ def generate_ia_json(d_pk, database='default'):
     # objects the docket has such as docket entries, parties, etc.
     ds = Docket.objects.filter(pk=d_pk).select_related(
         'originating_court_information',
+        'idb_data',
     ).prefetch_related(
         'panel',
         'parties',
