@@ -16,7 +16,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path, make_recap_path, \
-    make_recap_pdf_path, make_recap_thumb_path
+    make_recap_pdf_path, make_recap_thumb_path, make_docket_number_core
 from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
     normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
@@ -548,6 +548,7 @@ class Docket(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
+        self.docket_number_core = make_docket_number_core(self.docket_number)
         if self.source in self.RECAP_SOURCES:
             for field in ['pacer_case_id', 'docket_number']:
                 if not getattr(self, field, None):
