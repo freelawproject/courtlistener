@@ -15,7 +15,7 @@ from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 from cl.lib.db_tools import queryset_generator
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
-from cl.lib.model_helpers import make_upload_path
+from cl.lib.model_helpers import make_upload_path, make_docket_number_core
 from cl.lib.pacer import normalize_attorney_role, normalize_attorney_contact, \
     normalize_us_state, make_address_lookup_key, get_blocked_status
 from cl.lib.search_utils import make_fq
@@ -217,6 +217,35 @@ class TestModelHelpers(TestCase):
         self.opinion.file_with_date = datetime.date(2015, 12, 14)
         path = make_upload_path(self.opinion, 'hotline_bling.mp3')
         self.assertEqual(expected, path)
+
+    def test_making_docket_number_core(self):
+        self.assertEqual(
+            make_docket_number_core('2:12-cv-01032-JKG-MJL'),
+            '1201032'
+        )
+        self.assertEqual(
+            make_docket_number_core('12-cv-01032-JKG-MJL'),
+            '1201032'
+        )
+        self.assertEqual(
+            make_docket_number_core('2:12-cv-01032'),
+            '1201032'
+        )
+        self.assertEqual(
+            make_docket_number_core('12-cv-01032'),
+            '1201032'
+        )
+        self.assertEqual(
+            # Probably an appellate court. Skip it.
+            make_docket_number_core('12-01032'),
+            '',
+        )
+        self.assertEqual(
+            # docket_number fields can be null. If so, the core value should be
+            # an empty string.
+            make_docket_number_core(None),
+            '',
+        )
 
 
 class UUIDFileSystemStorageTest(SimpleTestCase):
