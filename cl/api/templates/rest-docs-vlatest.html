@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load extras %}
 
-{% block title %}REST API, v3.6 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v3.7 &ndash; CourtListener.com{% endblock %}
 {% block description %}
   REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.
 {% endblock %}
@@ -17,7 +17,7 @@
 
 {% block content %}
   <div class="col-sm-7">
-    <h1 id="about">REST API &ndash; v3.6</h1>
+    <h1 id="about">REST API &ndash; v3.7</h1>
     <h2 id="api-overview">Getting Started &amp; Overview</h2>
 
     <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
@@ -443,6 +443,20 @@
     <p>Some systems may normalize this data by linking the lower and upper courts on the database level rather than storing this information in a separate table, but CourtListener does not. Because we get information about the lower court case from the appellate court website, we prefer to keep it separate. This keeps the information acquired from each court compartmentalized so that when we get data from one case, it does not affect the data in the other.
     </p>
     <p>Cross-walking from the upper court docket to the lower is still possible using the the <code>docket_number</code> and <code>appeal_from</code> fields.
+    </p>
+
+
+    <h3 id="idb-data-endpoint">{% url 'fjcintegrateddatabase-list' version='v3' %}</h3>
+    <p><code>FJC Integrated Database</code> objects represent the information available in the Federal Judicial Center's Integrated Database, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:
+    </p>
+    <ul>
+      <li><a href="https://www.fjc.gov/research/idb">The FJC IDB Homepage</a></li>
+      <li><a href="https://free.law/idb-facts/">Our datasheet on the IDB</a></li>
+      <li>The various codebooks for <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Civil%20Codebook%201988%20Forward_0.pdf">civil</a>, <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Criminal%20Code%20Book%201996%20Forward.pdf">criminal</a>, <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Appeals%20Codebook%202008%20Forward.pdf">appellate</a>, and <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Bankruptcy%20Codebook%202008%20Forward%20(Rev%20January%202018).pdf">bankruptcy</a> datasets.</li>
+    </ul>
+    <p>As always, you can find our interpretations of these fields by performing an <code>OPTIONS</code> request on this endpoint.
+    </p>
+    <p>Pending further support, this endpoint should be considered <em>experimental</em> quality. It is not guaranteed to have all of the available data sets, may not have the latest quarterly data, and indeed may have bugs. If you encounter any bugs, please let us know. If you would like better guarantees about the quality of this endpoint, we are enthusiastic about finding partners to better support it.
     </p>
 
 
