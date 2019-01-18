@@ -3,9 +3,9 @@ from rest_framework.viewsets import ModelViewSet
 from cl.api.utils import RECAPUploaders, LoggingMixin, RECAPUsersReadOnly, \
     BigPagination
 from cl.recap.api_serializers import ProcessingQueueSerializer, \
-    PacerDocIdLookUpSerializer
-from cl.recap.filters import ProcessingQueueFilter
-from cl.recap.models import ProcessingQueue
+    PacerDocIdLookUpSerializer, FjcIntegratedDatabaseSerializer
+from cl.recap.filters import ProcessingQueueFilter, FjcIntegratedDatabaseFilter
+from cl.recap.models import ProcessingQueue, FjcIntegratedDatabase
 from cl.recap.tasks import process_recap_upload
 from cl.search.filters import RECAPDocumentFilter
 from cl.search.models import RECAPDocument
@@ -50,3 +50,13 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         if suffix:
             name += ' ' + suffix
         return name
+
+
+class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
+    queryset = FjcIntegratedDatabase.objects.all()
+    serializer_class = FjcIntegratedDatabaseSerializer
+    filter_class = FjcIntegratedDatabaseFilter
+    ordering_fields = (
+        'date_created', 'date_modified', 'date_filed',
+
+    )
