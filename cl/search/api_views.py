@@ -30,6 +30,7 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
         'assigned_to',
         'referred_to',
         'originating_court_information',
+        'idb_data',
     ).prefetch_related(
         'panel',
         'clusters',
