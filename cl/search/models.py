@@ -21,7 +21,6 @@ from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
     normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
-from cl.recap.models import FjcIntegratedDatabase
 
 DOCUMENT_STATUSES = (
     ('Published', 'Precedential'),
@@ -262,7 +261,7 @@ class Docket(models.Model):
         null=True,
     )
     idb_data = models.OneToOneField(
-        FjcIntegratedDatabase,
+        'recap.FjcIntegratedDatabase',
         help_text="Data from the FJC Integrated Database associated with this "
                   "case.",
         related_name="docket",
