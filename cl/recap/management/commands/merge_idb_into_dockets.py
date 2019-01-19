@@ -138,10 +138,11 @@ class Command(VerboseCommand, CommandUtils):
                 logger.info("%s: Merging Docket %s with IDB row: %s",
                             i, d, idb_row)
                 merge_docket_with_idb(d, idb_row)
-                add_or_update_recap_docket({
-                    'docket_pk': d.pk,
-                    'content_updated': True,
-                })
+                if d.source in d.RECAP_SOURCES:
+                    add_or_update_recap_docket({
+                        'docket_pk': d.pk,
+                        'content_updated': True,
+                    })
             elif count > 1:
                 logger.warn("%s: Unable to merge. Got %s dockets for row: %s",
                             i, count, idb_row)
