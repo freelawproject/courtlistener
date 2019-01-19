@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
 
 from cl.lib.recap_utils import get_bucket_name
+from cl.search.models import Docket
 
 
 def make_docket_number_core(docket_number):
@@ -33,6 +34,19 @@ def make_docket_number_core(docket_number):
         return m.group(1) + m.group(2)
     else:
         return ''
+
+
+def add_recap_source(d):
+    # Add RECAP as a source if it's not already.
+    if d.source == Docket.DEFAULT:
+        d.source = Docket.RECAP_AND_SCRAPER
+    elif d.source in [
+        Docket.SCRAPER, Docket.COLUMBIA, Docket.COLUMBIA_AND_SCRAPER,
+        Docket.IDB, Docket.SCRAPER_AND_IDB, Docket.COLUMBIA_AND_IDB,
+        Docket.COLUMBIA_AND_SCRAPER_AND_IDB,
+    ]:
+        # Simply add the RECAP value to the other value.
+        d.source = d.source + Docket.RECAP
 
 
 def make_recap_path(instance, filename):
