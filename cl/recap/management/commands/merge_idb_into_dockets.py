@@ -118,6 +118,8 @@ class Command(VerboseCommand, CommandUtils):
                 logger.info("%s: Creating new docket for IDB row: %s",
                             i, idb_row)
                 d = create_new_docket_from_idb(idb_row)
+                logger.info("%s: Created docket %s for IDB row: %s",
+                            i, d.pk, idb_row)
 
                 # Item created. Now get the pacer_case_id, and docket number
                 params = make_fjc_idb_lookup_params(idb_row)
