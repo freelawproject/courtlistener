@@ -29,7 +29,8 @@ from cl.lib.utils import remove_duplicate_dicts, previous_and_next
 from cl.people_db.models import Attorney, AttorneyOrganization, \
     AttorneyOrganizationAssociation, CriminalComplaint, CriminalCount, \
     Party, PartyType, Role
-from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE
+from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE, \
+    FjcIntegratedDatabase
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import Docket, DocketEntry, RECAPDocument, \
     OriginatingCourtInformation, Court, Tag
@@ -1500,3 +1501,68 @@ def process_recap_appellate_attachment(self, pk):
     msg = "Appellate attachment pages not yet supported. Coming soon."
     mark_pq_status(pq, msg, pq.PROCESSING_FAILED)
     return None
+
+
+@app.task
+def create_new_docket_from_idb(idb_pk):
+    """Create a new docket for the IDB item found. Populate it with all
+    applicable fields.
+
+    :param idb_pk: An FjcIntegratedDatabase object pk with which to create a
+    Docket.
+    :return Docket: The created Docket object.
+    """
+    idb_row = FjcIntegratedDatabase.objects.get(pk=idb_pk)
+    case_name = idb_row.plaintiff + ' v. ' + idb_row.defendant
+    d = Docket.objects.create(
+        source=Docket.IDB,
+        court=idb_row.district,
+        idb_data=idb_row,
+        date_filed=idb_row.date_filed,
+        date_terminated=idb_row.date_terminated,
+        case_name=case_name,
+        case_name_short=cnt.make_case_name_short(case_name),
+        docket_number_core=idb_row.docket_number,
+        nature_of_suit=idb_row.get_nature_of_suit_display(),
+        jurisdiction_type=idb_row.get_jurisdiction_display(),
+    )
+    d.save()
+    logger.info("Created docket %s for IDB row: %s", d.pk, idb_row)
+    return d.pk
+
+
+@app.task
+def merge_docket_with_idb(d_pk, idb_pk):
+    """Merge an existing docket with an idb_row.
+
+    :param d_pk: A Docket object pk to update.
+    :param idb_pk: A FjcIntegratedDatabase object pk to use as a source for
+    updates.
+    :return None
+    """
+    d = Docket.objects.get(pk=d_pk)
+    idb_row = FjcIntegratedDatabase.objects.get(pk=idb_pk)
+    d.add_idb_source()
+    d.idb_data = idb_row
+    d.date_filed = d.date_filed or idb_row.date_filed
+    d.date_terminated = d.date_terminated or idb_row.date_terminated
+    d.nature_of_suit = d.nature_of_suit or idb_row.get_nature_of_suit_display()
+    d.jurisdiction_type = d.jurisdiction_type or \
+                          idb_row.get_jurisdiction_display()
+    d.save()
+
+
+@app.task
+def update_docket_from_hidden_api(data):
+    """Update the docket based on the result of a lookup in the hidden API.
+
+    :param data: A dict as returned by get_pacer_case_id_and_title_with_docket
+    :return None
+    """
+    if data['lookup_result'] is None:
+        return None
+
+    d = Docket.objects.get(pk=data['pass_through'])
+    d.docket_number = data['docket_number']
+    d.pacer_case_id = data['pacer_case_id']
+    d.save()
