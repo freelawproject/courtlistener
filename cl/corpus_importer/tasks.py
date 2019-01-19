@@ -55,7 +55,6 @@ from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
     find_docket_object, add_docket_entries, \
     process_orphan_documents, update_docket_appellate_metadata, \
     make_recap_sequence_number
-from cl.lib.model_helpers import add_recap_source
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
@@ -710,7 +709,7 @@ def do_case_query_by_pacer_case_id(self, data, court_id, cookies,
         if count > 1:
             d = d.earliest('date_created')
 
-    add_recap_source(d)
+    d.add_recap_source()
     update_docket_metadata(d, docket_data)
     d.save()
 
@@ -835,7 +834,7 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
         if count > 1:
             d = d.earliest('date_created')
 
-    add_recap_source(d)
+    d.add_recap_source()
     update_docket_metadata(d, docket_data)
     d.save()
     tags = []
@@ -919,7 +918,7 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
         if count > 1:
             d = d.earliest('date_created')
 
-    add_recap_source(d)
+    d.add_recap_source()
     update_docket_metadata(d, docket_data)
     d, og_info = update_docket_appellate_metadata(d, docket_data)
     if not d.pacer_case_id:

@@ -560,6 +560,27 @@ class Docket(models.Model):
     def get_absolute_url(self):
         return reverse('view_docket', args=[self.pk, self.slug])
 
+    def add_recap_source(self):
+        if self.source == self.DEFAULT:
+            self.source = self.RECAP_AND_SCRAPER
+        elif self.source in [
+            self.SCRAPER, self.COLUMBIA, self.COLUMBIA_AND_SCRAPER, self.IDB,
+            self.SCRAPER_AND_IDB, self.COLUMBIA_AND_IDB,
+            self.COLUMBIA_AND_SCRAPER_AND_IDB,
+        ]:
+            # Simply add the RECAP value to the other value.
+            self.source = self.source + self.RECAP
+
+    def add_idb_source(self):
+        if self.source == self.DEFAULT:
+            self.source = self.IDB
+        elif self.source in [
+            self.RECAP, self.SCRAPER, self.RECAP_AND_SCRAPER,
+            self.COLUMBIA, self.COLUMBIA_AND_RECAP,
+            self.COLUMBIA_AND_SCRAPER, self.COLUMBIA_AND_RECAP_AND_SCRAPER,
+        ]:
+            self.source = self.source + self.IDB
+
     @property
     def pacer_url(self):
         if not self.pacer_case_id:
