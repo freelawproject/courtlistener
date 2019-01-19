@@ -111,7 +111,7 @@ class Command(VerboseCommand, CommandUtils):
 
             ds = Docket.objects.filter(
                 docket_number_core=idb_row.docket_number,
-                court=idb_row.court,
+                court=idb_row.district,
             )
             count = ds.count()
             if count == 0:
