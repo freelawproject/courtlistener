@@ -1557,9 +1557,10 @@ def update_docket_from_hidden_api(data):
     """Update the docket based on the result of a lookup in the hidden API.
 
     :param data: A dict as returned by get_pacer_case_id_and_title_with_docket
+    or None if looking up the item failed.
     :return None
     """
-    if data['lookup_result'] is None:
+    if data is None:
         return None
 
     d = Docket.objects.get(pk=data['pass_through'])
