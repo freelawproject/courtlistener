@@ -14,8 +14,9 @@ from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery import app
 from cl.lib.crypto import sha1
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.recap.tasks import find_docket_object, add_recap_source, \
-    update_docket_metadata, add_docket_entries
+from cl.recap.tasks import find_docket_object, update_docket_metadata, \
+    add_docket_entries
+from cl.lib.model_helpers import add_recap_source
 from cl.recap_rss.models import RssFeedStatus, RssItemCache
 
 logger = logging.getLogger(__name__)

@@ -21,6 +21,7 @@ from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.import_lib import get_candidate_judges
+from cl.lib.model_helpers import add_recap_source
 from cl.lib.pacer import get_blocked_status, map_cl_to_pacer_id, \
     normalize_attorney_contact, normalize_attorney_role, map_pacer_to_cl_id
 from cl.lib.recap_utils import get_document_filename
@@ -368,24 +369,6 @@ def find_docket_object(court_id, pacer_case_id, docket_number):
         return d, 0
 
     return d, 1
-
-
-def add_recap_source(d):
-    # Add RECAP as a source if it's not already.
-    if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
-        d.source = Docket.RECAP_AND_SCRAPER
-    elif d.source == Docket.COLUMBIA:
-        d.source = Docket.COLUMBIA_AND_RECAP
-    elif d.source == Docket.COLUMBIA_AND_SCRAPER:
-        d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
-    elif d.source == Docket.IDB:
-        d.source = Docket.RECAP_AND_IDB
-    elif d.source == Docket.SCRAPER_AND_IDB:
-        d.source = Docket.RECAP_AND_SCRAPER_AND_IDB
-    elif d.source == Docket.COLUMBIA_AND_IDB:
-        d.source = Docket.COLUMBIA_AND_RECAP_AND_IDB
-    elif d.source == Docket.COLUMBIA_AND_SCRAPER_AND_IDB:
-        d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB
 
 
 def update_case_names(d, new_case_name):

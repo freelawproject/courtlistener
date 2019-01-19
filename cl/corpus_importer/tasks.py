@@ -50,12 +50,12 @@ from cl.lib.pacer import lookup_and_save, get_blocked_status, \
 from cl.lib.recap_utils import get_document_filename, get_bucket_name, \
     get_docket_filename
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
-from cl.recap.models import FjcIntegratedDatabase, PacerHtmlFiles, \
-    UPLOAD_TYPE, ProcessingQueue
+from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
 from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
-    find_docket_object, add_recap_source, add_docket_entries, \
+    find_docket_object, add_docket_entries, \
     process_orphan_documents, update_docket_appellate_metadata, \
     make_recap_sequence_number
+from cl.lib.model_helpers import add_recap_source
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
