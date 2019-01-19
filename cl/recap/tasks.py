@@ -21,7 +21,6 @@ from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.import_lib import get_candidate_judges
-from cl.lib.model_helpers import add_recap_source
 from cl.lib.pacer import get_blocked_status, map_cl_to_pacer_id, \
     normalize_attorney_contact, normalize_attorney_role, map_pacer_to_cl_id
 from cl.lib.recap_utils import get_document_filename
@@ -1157,7 +1156,7 @@ def process_recap_docket(self, pk):
                     docket_count)
         d = d.earliest('date_created')
 
-    add_recap_source(d)
+    d.add_recap_source()
     update_docket_metadata(d, data)
     if not d.pacer_case_id:
         d.pacer_case_id = pq.pacer_case_id
@@ -1357,7 +1356,7 @@ def process_recap_docket_history_report(self, pk):
                     docket_count)
         d = d.earliest('date_created')
 
-    add_recap_source(d)
+    d.add_recap_source()
     update_docket_metadata(d, data)
 
     if pq.debug:
@@ -1450,7 +1449,7 @@ def process_recap_appellate_docket(self, pk):
                     docket_count)
         d = d.earliest('date_created')
 
-    add_recap_source(d)
+    d.add_recap_source()
     update_docket_metadata(d, data)
     d, og_info = update_docket_appellate_metadata(d, data)
     if not d.pacer_case_id:

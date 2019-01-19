@@ -7,7 +7,6 @@ from cl.corpus_importer.tasks import get_pacer_case_id_and_title, \
     make_fjc_idb_lookup_params
 from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
 from cl.lib.db_tools import queryset_generator
-from cl.lib.model_helpers import add_idb_source
 from cl.recap.constants import CV_2017
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Docket
@@ -55,7 +54,7 @@ def merge_docket_with_idb(d, idb_row):
     updates.
     :return None
     """
-    add_idb_source(d)
+    d.add_idb_source()
     d.idb_data = idb_row
     d.date_filed = d.date_filed or idb_row.date_filed
     d.date_terminated = d.date_terminated or idb_row.date_terminated

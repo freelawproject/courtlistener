@@ -16,7 +16,6 @@ from cl.lib.crypto import sha1
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.recap.tasks import find_docket_object, update_docket_metadata, \
     add_docket_entries
-from cl.lib.model_helpers import add_recap_source
 from cl.recap_rss.models import RssFeedStatus, RssItemCache
 
 logger = logging.getLogger(__name__)
@@ -201,7 +200,7 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
                             "oldest." % docket_count)
                 d = d.earliest('date_created')
 
-            add_recap_source(d)
+            d.add_recap_source()
             update_docket_metadata(d, docket)
             if not d.pacer_case_id:
                 d.pacer_case_id = docket['pacer_case_id']
