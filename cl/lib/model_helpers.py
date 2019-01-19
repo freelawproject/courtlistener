@@ -49,6 +49,17 @@ def add_recap_source(d):
         d.source = d.source + Docket.RECAP
 
 
+def add_idb_source(d):
+    if d.source == Docket.DEFAULT:
+        d.source = Docket.IDB
+    elif d.source in [
+        Docket.RECAP, Docket.SCRAPER, Docket.RECAP_AND_SCRAPER,
+        Docket.COLUMBIA, Docket.COLUMBIA_AND_RECAP,
+        Docket.COLUMBIA_AND_SCRAPER, Docket.COLUMBIA_AND_RECAP_AND_SCRAPER,
+    ]:
+        d.source = d.source + Docket.IDB
+
+
 def make_recap_path(instance, filename):
     """Make a path to a good location on the local system for RECAP files.
 
