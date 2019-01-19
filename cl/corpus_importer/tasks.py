@@ -655,7 +655,8 @@ def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
     try:
         result = report.data(case_name=case_name, office_number=office_number,
                              docket_number_letters=docket_number_letters)
-        result['pass_through'] = pass_through
+        if result is not None:
+            result['pass_through'] = pass_through
         return result
     except ParsingException:
         return None
