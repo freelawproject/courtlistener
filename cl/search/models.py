@@ -548,7 +548,9 @@ class Docket(models.Model):
 
     def save(self, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        self.docket_number_core = make_docket_number_core(self.docket_number)
+        if self.docket_number:
+            self.docket_number_core = make_docket_number_core(
+                self.docket_number)
         if self.source in self.RECAP_SOURCES:
             for field in ['pacer_case_id', 'docket_number']:
                 if not getattr(self, field, None):
