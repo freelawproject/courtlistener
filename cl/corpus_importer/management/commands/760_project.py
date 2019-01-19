@@ -67,6 +67,7 @@ def get_dockets(options):
         elif task == 'district':
             chain(
                 get_pacer_case_id_and_title.s(
+                    pass_through=None,
                     docket_number=row['Cleaned case_No'],
                     court_id=row['fjc_court_id'],
                     cookies=session.cookies,

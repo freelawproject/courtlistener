@@ -238,6 +238,7 @@ def download_dockets(options):
                                       jurisdiction=Court.FEDERAL_DISTRICT)
             chain(
                 get_pacer_case_id_and_title.s(
+                    pass_through=None,
                     docket_number=docket_number,
                     court_id=court.pk,
                     cookies=session.cookies,

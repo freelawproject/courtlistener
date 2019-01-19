@@ -66,6 +66,7 @@ def download_dockets(options):
         else:
             chain(
                 get_pacer_case_id_and_title.s(
+                    pass_through=None,
                     docket_number=row['docket_no1'],
                     court_id=row['cl_court'],
                     cookies=session.cookies,

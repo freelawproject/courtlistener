@@ -93,6 +93,7 @@ def get_dockets(options, items, tags, sample_size=0):
         params = make_fjc_idb_lookup_params(row)
         chain(
             get_pacer_case_id_and_title.s(
+                pass_through=None,
                 docket_number=row.docket_number,
                 court_id=row.district_id,
                 cookies=session.cookies,

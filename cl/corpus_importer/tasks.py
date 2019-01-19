@@ -600,9 +600,9 @@ def make_fjc_idb_lookup_params(item):
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60)
-def get_pacer_case_id_and_title(self, docket_number, court_id, cookies,
-                                case_name=None, office_number=None,
-                                docket_number_letters=None, ):
+def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
+                                cookies, case_name=None, office_number=None,
+                                docket_number_letters=None, extra_data=None):
     """Get the pacer_case_id and title values for a district court docket. Use
     heuristics to disambiguate the results.
 
@@ -612,6 +612,8 @@ def get_pacer_case_id_and_title(self, docket_number, court_id, cookies,
     have this data all separated out, so it helps not to try to recreate docket
     numbers from data that comes all pulled apart.
 
+    :param pass_through: This data will be passed through as a key to the
+    returned dict for downstream tasks to receive.
     :param docket_number: The docket number to look up. This is a flexible
     field that accepts a variety of docket number styles.
     :param court_id: The CourtListener court ID for the docket number
@@ -632,6 +634,7 @@ def get_pacer_case_id_and_title(self, docket_number, court_id, cookies,
             u'docket_number': force_unicode(node.xpath('./@number')[0]),
             u'pacer_case_id': force_unicode(node.xpath('./@id')[0]),
             u'title': force_unicode(node.xpath('./@title')[0]),
+            u'pass_through': pass_through,
         }
     """
     logger.info("Getting pacer_case_id for docket_number %s in court %s",
@@ -650,8 +653,10 @@ def get_pacer_case_id_and_title(self, docket_number, court_id, cookies,
         raise self.retry(exc=exc)
 
     try:
-        return report.data(case_name=case_name, office_number=office_number,
-                           docket_number_letters=docket_number_letters)
+        result = report.data(case_name=case_name, office_number=office_number,
+                             docket_number_letters=docket_number_letters)
+        result['pass_through'] = pass_through
+        return result
     except ParsingException:
         return None
 
