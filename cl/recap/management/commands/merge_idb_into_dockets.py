@@ -2,6 +2,7 @@ import os
 
 from celery.canvas import chain
 from django.conf import settings
+from django.db.models import Q
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import PacerSession
 
@@ -21,6 +22,19 @@ cnt = CaseNameTweaker()
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
+
+
+def remove_leading_zeros(docket_number_core):
+    """Convert a core docket number from something like 8900123 to 89123
+
+    This is needed because sometimes the docket number itself is more like:
+    89-cv-123, and so it got an automatically generated value of 89123 in the
+    DB. If we lookup our longer values against those shorter values, we get  no
+    results, so we need to have this value too.
+    """
+    year = docket_number_core[0:2]
+    rest = int(docket_number_core[2:])
+    return "%s%s" % (year, rest)
 
 
 class Command(VerboseCommand, CommandUtils):
@@ -76,8 +90,10 @@ class Command(VerboseCommand, CommandUtils):
                 session.login()
 
             throttle.maybe_wait()
+            docket_number_no_0s = remove_leading_zeros(idb_row.docket_number)
             ds = Docket.objects.filter(
-                docket_number_core=idb_row.docket_number,
+                Q(docket_number_core=idb_row.docket_number) |
+                Q(docket_number_core=docket_number_no_0s),
                 court=idb_row.district,
             )
             count = ds.count()
