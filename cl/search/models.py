@@ -222,6 +222,10 @@ class Docket(models.Model):
                      COLUMBIA_AND_RECAP_AND_SCRAPER, RECAP_AND_IDB,
                      RECAP_AND_SCRAPER_AND_IDB, COLUMBIA_AND_RECAP_AND_IDB,
                      COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB]
+    IDB_SOURCES = [IDB, RECAP_AND_IDB, SCRAPER_AND_IDB,
+                   RECAP_AND_SCRAPER_AND_IDB, COLUMBIA_AND_IDB,
+                   COLUMBIA_AND_RECAP_AND_IDB, COLUMBIA_AND_SCRAPER_AND_IDB,
+                   COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB]
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.",
