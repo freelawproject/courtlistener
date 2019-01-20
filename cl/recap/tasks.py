@@ -1556,7 +1556,7 @@ def merge_docket_with_idb(d_pk, idb_pk):
 def update_docket_from_hidden_api(data):
     """Update the docket based on the result of a lookup in the hidden API.
 
-    :param data: A dict as returned by get_pacer_case_id_and_title_with_docket
+    :param data: A dict as returned by get_pacer_case_id_and_title
     or None if looking up the item failed.
     :return None
     """
@@ -1566,4 +1566,20 @@ def update_docket_from_hidden_api(data):
     d = Docket.objects.get(pk=data['pass_through'])
     d.docket_number = data['docket_number']
     d.pacer_case_id = data['pacer_case_id']
-    d.save()
+    try:
+        d.save()
+    except IntegrityError:
+        # This is a difficult spot. The IDB data has cases that are not in
+        # PACER. For example, in IDB there are two rows for 6:92-cv-657 in
+        # oked, but in PACER, there is just one. In IDB the two rows *are*
+        # distinct, with different filing dates, for example. So what happens
+        # is, we try to find the docket for the first one, get none, and start
+        # creating it. Meanwhile, via a race condition, we try to get the
+        # second one, fail, and then start creating *it*. The first finishes,
+        # then the second tries to lookup the pacer_case_id. Unfortunately, b/c
+        # there's only one item in PACER for the docket number looked up, that
+        # is returned, and we get an integrity error since we can't have the
+        # same pacer_case_id, docket_number pair in a single court. Solution?
+        # Delete the second one, which was created via race condition, and
+        # shouldn't have existed anyway.
+        d.delete()
