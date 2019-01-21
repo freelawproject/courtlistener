@@ -43,6 +43,9 @@ class Command(VerboseCommand, CommandUtils):
            'create one.'
 
     def add_arguments(self, parser):
+        # XXX add two new tasks here. One for going through and getting PACER
+        # case ID values for every item, and the other for updating Solr with
+        # the updated merged values.
         parser.add_argument(
             '--queue',
             default='batch1',
@@ -71,9 +74,6 @@ class Command(VerboseCommand, CommandUtils):
         ).order_by('pk')
         q = options['queue']
         throttle = CeleryThrottle(queue_name=q)
-        session = PacerSession(username=PACER_USERNAME,
-                               password=PACER_PASSWORD)
-        session.login()
         for i, idb_row in enumerate(queryset_generator(idb_rows)):
             # Iterate over all items in the IDB and find them in the Docket
             # table. If they're not there, create a new item.
@@ -81,13 +81,6 @@ class Command(VerboseCommand, CommandUtils):
                 continue
             if i >= options['limit'] > 0:
                 break
-
-            if i % 5000 == 0:
-                # Re-authenticate just in case the auto-login mechanism isn't
-                # working.
-                session = PacerSession(username=PACER_USERNAME,
-                                       password=PACER_PASSWORD)
-                session.login()
 
             throttle.maybe_wait()
             docket_number_no_0s = remove_leading_zeros(idb_row.docket_number)
@@ -100,19 +93,6 @@ class Command(VerboseCommand, CommandUtils):
             if count == 0:
                 logger.info("%s: Creating new docket for IDB row: %s",
                             i, idb_row)
-                # For now, disable network requests. Too many PACER servers are
-                # down. We'll do these in a second pass, later.
-                # params = make_fjc_idb_lookup_params(idb_row)
-                # chain(
-                #     create_new_docket_from_idb.s(idb_row.pk).set(queue=q),
-                #     get_pacer_case_id_and_title.s(
-                #         docket_number=idb_row.docket_number,
-                #         court_id=idb_row.district_id,
-                #         cookies=session.cookies,
-                #         **params
-                #     ).set(queue=q),
-                #     update_docket_from_hidden_api.s().set(queue=q)
-                # ).apply_async()
                 create_new_docket_from_idb.apply_async(
                     args=(idb_row.pk,),
                     queue=q,
