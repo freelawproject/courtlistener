@@ -100,17 +100,23 @@ class Command(VerboseCommand, CommandUtils):
             if count == 0:
                 logger.info("%s: Creating new docket for IDB row: %s",
                             i, idb_row)
-                params = make_fjc_idb_lookup_params(idb_row)
-                chain(
-                    create_new_docket_from_idb.s(idb_row.pk).set(queue=q),
-                    get_pacer_case_id_and_title.s(
-                        docket_number=idb_row.docket_number,
-                        court_id=idb_row.district_id,
-                        cookies=session.cookies,
-                        **params
-                    ).set(queue=q),
-                    update_docket_from_hidden_api.s().set(queue=q)
-                ).apply_async()
+                # For now, disable network requests. Too many PACER servers are
+                # down. We'll do these in a second pass, later.
+                # params = make_fjc_idb_lookup_params(idb_row)
+                # chain(
+                #     create_new_docket_from_idb.s(idb_row.pk).set(queue=q),
+                #     get_pacer_case_id_and_title.s(
+                #         docket_number=idb_row.docket_number,
+                #         court_id=idb_row.district_id,
+                #         cookies=session.cookies,
+                #         **params
+                #     ).set(queue=q),
+                #     update_docket_from_hidden_api.s().set(queue=q)
+                # ).apply_async()
+                create_new_docket_from_idb.apply_async(
+                    args=(idb_row.pk,),
+                    queue=q,
+                )
 
             elif count == 1:
                 d = ds[0]
