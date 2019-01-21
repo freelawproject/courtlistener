@@ -102,17 +102,8 @@ class Command(VerboseCommand, CommandUtils):
                 d = ds[0]
                 logger.info("%s: Merging Docket %s with IDB row: %s",
                             i, d, idb_row)
-                tasks = [
-                    merge_docket_with_idb.s(d.pk, idb_row.pk).set(queue=q)
-                ]
-                if d.source in d.RECAP_SOURCES:
-                    tasks.append(
-                        add_or_update_recap_docket.si({
-                            'docket_pk': d.pk,
-                            'content_updated': True,
-                        }).set(queue=q)
-                    )
-                chain(*tasks).apply_async()
+                merge_docket_with_idb.apply_async(args=(d.pk, idb_row.pk),
+                                                  queue=q)
             elif count > 1:
                 logger.warn("%s: Unable to merge. Got %s dockets for row: %s",
                             i, count, idb_row)
