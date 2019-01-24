@@ -152,8 +152,6 @@ class Command(VerboseCommand, CommandUtils):
             ).exclude(
                 case_name__icontains='suppressed'
             ).exclude(
-                case_name__istartswith='united states'
-            ).exclude(
                 case_name__icontains='search warrant'
             )
             count = ds.count()
