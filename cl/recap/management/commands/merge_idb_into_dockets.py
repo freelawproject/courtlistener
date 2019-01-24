@@ -3,7 +3,7 @@ import os
 from celery.canvas import chain
 from django.conf import settings
 from django.db.models import Q
-from juriscraper.lib.string_utils import CaseNameTweaker
+from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import make_fjc_idb_lookup_params, \
@@ -11,6 +11,7 @@ from cl.corpus_importer.tasks import make_fjc_idb_lookup_params, \
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
 from cl.lib.db_tools import queryset_generator
+from cl.lib.string_diff import find_best_match
 from cl.recap.constants import CV_2017
 from cl.recap.models import FjcIntegratedDatabase
 from cl.recap.tasks import merge_docket_with_idb, create_new_docket_from_idb, \
@@ -67,8 +68,13 @@ class Command(VerboseCommand, CommandUtils):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
-
+        logger.info("Using PACER username: %s"% PACER_USERNAME)
+        if options['task'] == 'first_pass':
+            self.do_first_pass(options)
+        if options['task'] == 'second_pass':
+            self.do_second_pass(options)
+    @staticmethod
+    def do_first_pass(options):
         idb_rows = FjcIntegratedDatabase.objects.filter(
             dataset_source=CV_2017,
         ).order_by('pk')
@@ -107,3 +113,83 @@ class Command(VerboseCommand, CommandUtils):
             elif count > 1:
                 logger.warn("%s: Unable to merge. Got %s dockets for row: %s",
                             i, count, idb_row)
+
+    @staticmethod
+    def do_second_pass(options):
+        """In the first pass, we ignored the duplicates that we got, prefering
+        to let them stack up for later analysis. In this pass, we attempt to
+        merge those failed items into the DB by more aggressive filtering and
+        algorithmic selection.
+        """
+        idb_rows = FjcIntegratedDatabase.objects.filter(
+            dataset_source=CV_2017,
+            docket__isnull=True,
+        ).order_by('pk')
+        for i, idb_row in enumerate(queryset_generator(idb_rows)):
+            # Iterate over all items in the IDB and find them in the Docket
+            # table. If they're not there, create a new item.
+            if i < options['offset']:
+                continue
+            if i >= options['limit'] > 0:
+                break
+
+            docket_number_no_0s = remove_leading_zeros(idb_row.docket_number)
+            ds = Docket.objects.filter(
+                Q(docket_number_core=idb_row.docket_number) |
+                Q(docket_number_core=docket_number_no_0s),
+                court=idb_row.district,
+                docket_number__startswith='%s:' % idb_row.office
+            ).exclude(
+                docket_number__icontains='cr'
+            ).exclude(
+                case_name__icontains="sealed"
+            ).exclude(
+                case_name__icontains='suppressed'
+            ).exclude(
+                case_name__istartswith='united states'
+            ).exclude(
+                case_name__icontains='search warrant'
+            )
+            count = ds.count()
+
+            if count == 0:
+                logger.info("%s: Creating new docket for IDB row: %s",
+                            i, idb_row)
+                create_new_docket_from_idb(idb_row.pk)
+            elif count == 1:
+                d = ds[0]
+                logger.info("%s: Merging Docket %s with IDB row: %s",
+                            i, d, idb_row)
+                merge_docket_with_idb(d.pk, idb_row.pk)
+
+            logger.info("%s: Still have %s results after office and civil "
+                        "docket number filtering. Filtering further.",
+                        i, count, idb_row)
+
+            case_names = []
+            for d in ds:
+                case_name = harmonize(d.case_name)
+                parts = case_name.lower().split(' v. ')
+                if len(parts) == 1:
+                    case_names.append(case_name)
+                elif len(parts) == 2:
+                    plaintiff, defendant = parts[0], parts[1]
+                    case_names.append(
+                        '%s v. %s' % (plaintiff[0:30], defendant[0:30])
+                    )
+                elif len(parts) > 2:
+                    case_names.append(case_name)
+            idb_case_name = harmonize('%s v. %s' % (idb_row.plaintiff,
+                                                    idb_row.defendant))
+            results = find_best_match(case_names, idb_case_name,
+                                      case_sensitive=False)
+
+            if results['ratio'] > 0.65:
+                logger.info("%s Found good match by case name for %s: %s",
+                            i, idb_case_name, results['match_str'])
+                d = ds[results['match_index']]
+                merge_docket_with_idb(d.pk, idb_row.pk)
+            else:
+                logger.info("%s No good match after office and case name "
+                            "filtering. Creating new item: %s" % i, idb_row)
+                create_new_docket_from_idb(idb_row.pk)
