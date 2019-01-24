@@ -170,7 +170,7 @@ class Command(VerboseCommand, CommandUtils):
 
             logger.info("%s: Still have %s results after office and civil "
                         "docket number filtering. Filtering further.",
-                        i, count, idb_row)
+                        i, count)
 
             case_names = []
             for d in ds:
