@@ -162,11 +162,13 @@ class Command(VerboseCommand, CommandUtils):
                 logger.info("%s: Creating new docket for IDB row: %s",
                             i, idb_row)
                 create_new_docket_from_idb(idb_row.pk)
+                continue
             elif count == 1:
                 d = ds[0]
                 logger.info("%s: Merging Docket %s with IDB row: %s",
                             i, d, idb_row)
                 merge_docket_with_idb(d.pk, idb_row.pk)
+                continue
 
             logger.info("%s: Still have %s results after office and civil "
                         "docket number filtering. Filtering further.",
