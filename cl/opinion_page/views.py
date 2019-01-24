@@ -41,13 +41,19 @@ def redirect_docket_recap(request, court, pacer_case_id):
                                                              docket.slug]))
 
 
-def core_docket_data(request, pk):
-    """Gather the core data for a docket, party, or IDB page."""
+@ratelimit_if_not_whitelisted
+def view_docket(request, pk, slug):
     docket = get_object_or_404(Docket, pk=pk)
     title = ', '.join([s for s in [
         trunc(best_case_name(docket), 100, ellipsis="..."),
         docket.docket_number,
     ] if s.strip()])
+    if not is_bot(request):
+        with suppress_autotime(docket, ['date_modified']):
+            cached_count = docket.view_count
+            docket.view_count = F('view_count') + 1
+            docket.save()
+            docket.view_count = cached_count + 1
 
     try:
         fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
@@ -64,26 +70,6 @@ def core_docket_data(request, pk):
     if request.user.is_authenticated():
         has_alert = DocketAlert.objects.filter(docket=docket,
                                                user=request.user).exists()
-
-    return docket, {
-        'docket': docket,
-        'title': title,
-        'favorite_form': favorite_form,
-        'has_alert': has_alert,
-        'timezone': COURT_TIMEZONES.get(docket.court_id, 'US/Eastern'),
-        'private': docket.blocked,
-    }
-
-
-@ratelimit_if_not_whitelisted
-def view_docket(request, pk, slug):
-    docket, context = core_docket_data(request, pk)
-    if not is_bot(request):
-        with suppress_autotime(docket, ['date_modified']):
-            cached_count = docket.view_count
-            docket.view_count = F('view_count') + 1
-            docket.save()
-            docket.view_count = cached_count + 1
 
     de_list = docket.docket_entries.all().prefetch_related('recap_documents')
     form = DocketEntryFilterForm(request.GET)
@@ -110,18 +96,42 @@ def view_docket(request, pk, slug):
     except EmptyPage:
         docket_entries = paginator.page(paginator.num_pages)
 
-    return render(request, 'view_docket.html', context.update({
+    return render(request, 'view_docket.html', {
+        'docket': docket,
+        'title': title,
         'parties': docket.parties.exists(),  # Needed to show/hide parties tab.
         'docket_entries': docket_entries,
         'form': form,
+        'favorite_form': favorite_form,
+        'has_alert': has_alert,
         'get_string': make_get_string(request),
-    }))
+        'timezone': COURT_TIMEZONES.get(docket.court_id, 'US/Eastern'),
+        'private': docket.blocked,
+    })
 
 
 @ratelimit_if_not_whitelisted
 def view_parties(request, docket_id, slug):
     """Show the parties and attorneys tab on the docket."""
-    docket, context = core_docket_data(request, docket_id)
+    docket = get_object_or_404(Docket, pk=docket_id)
+    title = ', '.join([s for s in [
+        trunc(best_case_name(docket), 100, ellipsis="..."),
+        docket.docket_number,
+    ] if s.strip()])
+    try:
+        fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
+    except (ObjectDoesNotExist, TypeError):
+        # Not favorited or anonymous user
+        favorite_form = FavoriteForm(initial={
+            'docket_id': docket.pk,
+            'name': trunc(best_case_name(docket), 100, ellipsis='...'),
+        })
+    else:
+        favorite_form = FavoriteForm(instance=fave)
+    has_alert = False
+    if request.user.is_authenticated():
+        has_alert = DocketAlert.objects.filter(docket=docket,
+                                               user=request.user).exists()
 
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
@@ -163,15 +173,15 @@ def view_parties(request, docket_id, slug):
             'party_type_objects': party_types
         })
 
-    return render(request, 'docket_parties.html', context.update({
+    return render(request, 'docket_parties.html', {
+        'docket': docket,
+        'title': title,
         'parties': parties,
-    }))
-
-
-@ratelimit_if_not_whitelisted
-def docket_idb_data(request, docket_id, slug):
-    docket, context = core_docket_data(request, docket_id)
-    return render(request, 'docket_idb_data.html', context)
+        'favorite_form': favorite_form,
+        'has_alert': has_alert,
+        'timezone': COURT_TIMEZONES.get(docket.court_id, 'US/Eastern'),
+        'private': docket.blocked,
+    })
 
 
 def make_rd_title(rd):

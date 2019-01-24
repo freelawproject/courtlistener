@@ -459,7 +459,7 @@
     </div>
   {% endif %}
 
-  {% if docket_entries.paginator.count or parties or docket.idb_data %}
+  {% if docket_entries.paginator.count or parties %}
     <div class="col-xs-12">
       <ul class="nav nav-tabs v-offset-below-2 v-offset-above-3" role="tablist">
         <li class="{% block nav-de %}inactive{% endblock %}"
@@ -477,15 +477,6 @@
         <li class="{% block nav-parties %}inactive{% endblock %}"
             role="presentation">
           <a href="{% url "docket_parties" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-users gray"></i>&nbsp;Parties and Attorneys</a>
-        </li>
-        {% endif %}
-
-        {% if docket.idb_data %}
-        <li class="{% block nav-idb %}inactive{% endblock %}"
-            role="presentation">
-          <a href="{% url "docket_idb_data" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-info-circle"></i>&nbsp;FJC Integrated Database
-          <!-- xxx Make this work on small screens-->
-          </a>
         </li>
         {% endif %}
       </ul>
