@@ -1524,7 +1524,7 @@ def create_new_docket_from_idb(idb_pk):
         case_name_short=cnt.make_case_name_short(case_name),
         docket_number_core=idb_row.docket_number,
         nature_of_suit=idb_row.get_nature_of_suit_display(),
-        jurisdiction_type=idb_row.get_jurisdiction_display(),
+        jurisdiction_type=idb_row.get_jurisdiction_display() or '',
     )
     d.save()
     logger.info("Created docket %s for IDB row: %s", d.pk, idb_row)
