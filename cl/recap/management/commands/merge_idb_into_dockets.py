@@ -66,6 +66,12 @@ class Command(VerboseCommand, CommandUtils):
             help="After doing this number, stop. This number is not additive "
                  "with the offset parameter. Default is to do all of them.",
         )
+        parser.add_argument(
+            '--task',
+            type=str,
+            required=True,
+            help="What task are we doing at this point?",
+        )
 
     def handle(self, *args, **options):
         logger.info("Using PACER username: %s"% PACER_USERNAME)
