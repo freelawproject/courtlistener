@@ -197,5 +197,5 @@ class Command(VerboseCommand, CommandUtils):
                 merge_docket_with_idb(d.pk, idb_row.pk)
             else:
                 logger.info("%s No good match after office and case name "
-                            "filtering. Creating new item: %s" % i, idb_row)
+                            "filtering. Creating new item: %s", i, idb_row)
                 create_new_docket_from_idb(idb_row.pk)
