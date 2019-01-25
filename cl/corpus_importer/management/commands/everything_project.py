@@ -50,13 +50,20 @@ def get_everything_sample(options):
     get_dockets(options, items, tags, sample_size)
 
 
+def price_sample(options, de_upper_bound):
+    items = get_fjc_rows()
+    tags = [TAG, TAG_SAMPLE]
+    get_dockets(options, items, tags, sample_size=50,
+                doc_num_end=de_upper_bound)
+
+
 def get_everything_full(options):
     items = get_fjc_rows()
     tags = [TAG]
     get_dockets(options, items, tags)
 
 
-def get_dockets(options, items, tags, sample_size=0):
+def get_dockets(options, items, tags, sample_size=0, doc_num_end=''):
     """Download dockets from PACER.
 
     :param options: Options provided by argparse
@@ -64,6 +71,9 @@ def get_dockets(options, items, tags, sample_size=0):
     :param tags: A list of tag names to associate with the purchased content.
     :param sample_size: The number of items to get. If 0, get them all. Else,
     get only this many and do it randomly.
+    :param doc_num_end: Only get docket numbers up to this value to constrain
+    costs. If set to an empty string, no constraints are applied. Note that
+    applying this value means no unnumbered entries will be retrieved by PACER.
     """
 
     if sample_size > 0:
@@ -107,7 +117,8 @@ def get_dockets(options, items, tags, sample_size=0):
                 **{
                     'show_parties_and_counsel': True,
                     'show_terminated_parties': True,
-                    'show_list_of_member_cases': True
+                    'show_list_of_member_cases': True,
+                    'doc_num_end': doc_num_end,
                 }
             ).set(queue=q),
             add_or_update_recap_docket.s().set(queue=q),
@@ -155,3 +166,9 @@ class Command(VerboseCommand):
             get_everything_full(options)
         elif options['task'] == 'everything_sample':
             get_everything_sample(options)
+        elif options['task'] == 'price_sample_30':
+            price_sample(options, '30')
+        elif options['task'] == 'price_sample_40':
+            price_sample(options, '40')
+        elif options['task'] == 'price_sample_50':
+            price_sample(options, '50')
