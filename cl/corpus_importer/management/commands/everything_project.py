@@ -43,10 +43,9 @@ def get_fjc_rows():
     return items
 
 
-def get_everything_sample(options):
+def get_everything_sample(options, sample_size):
     items = get_fjc_rows()
     tags = [TAG, TAG_SAMPLE]
-    sample_size = 10000  # See email dated 2019-01-06
     get_dockets(options, items, tags, sample_size)
 
 
@@ -164,8 +163,11 @@ class Command(VerboseCommand):
         logger.info("Using PACER username: %s" % PACER_USERNAME)
         if options['task'] == 'everything':
             get_everything_full(options)
-        elif options['task'] == 'everything_sample':
-            get_everything_sample(options)
+        elif options['task'] == 'everything_sample_50':
+            get_everything_sample(options, 50)
+        elif options['task'] == 'everything_sample_10000':
+            # See email dated 2019-01-06
+            get_everything_sample(options, 1000)
         elif options['task'] == 'price_sample_30':
             price_sample(options, '30')
         elif options['task'] == 'price_sample_40':
