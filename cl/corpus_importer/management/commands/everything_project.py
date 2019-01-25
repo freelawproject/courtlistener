@@ -117,7 +117,7 @@ def get_dockets(options, items, tags, sample_size=0, doc_num_end=''):
                 **{
                     'show_parties_and_counsel': True,
                     'show_terminated_parties': True,
-                    'show_list_of_member_cases': True,
+                    'show_list_of_member_cases': False,
                     'doc_num_end': doc_num_end,
                 }
             ).set(queue=q),
