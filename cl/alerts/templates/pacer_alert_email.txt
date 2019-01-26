@@ -1,0 +1,18 @@
+***********************
+CourtListener.com Alert
+***********************
+
+
+The PG&E bankruptcy appears to be available on PACER:
+
+  https://ecf.canb.uscourts.gov/cgi-bin/DktRpt.pl?{{ report.data.0.pacer_case_id }}
+
+
+
+--------
+This alert brought to you by the 501(c)(3) non-profit Free Law Project
+ - Blog: https://free.law
+ - Twitter: http://twitter.com/freelawproject
+ - Donate: https://www.courtlistener.com{% url "donate" %}?referrer=pacer-alert-service
+
+Thank you for supporting our work.
