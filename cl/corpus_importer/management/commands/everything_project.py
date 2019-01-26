@@ -167,7 +167,7 @@ class Command(VerboseCommand):
             get_everything_sample(options, 50)
         elif options['task'] == 'everything_sample_10000':
             # See email dated 2019-01-06
-            get_everything_sample(options, 1000)
+            get_everything_sample(options, 10000)
         elif options['task'] == 'price_sample_30':
             price_sample(options, '30')
         elif options['task'] == 'price_sample_40':
