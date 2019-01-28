@@ -2,7 +2,6 @@ import os
 
 from celery.canvas import chain
 from django.conf import settings
-from django.db.models import Q
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import PacerSession
 
@@ -24,28 +23,12 @@ PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 
-def remove_leading_zeros(docket_number_core):
-    """Convert a core docket number from something like 8900123 to 89123
-
-    This is needed because sometimes the docket number itself is more like:
-    89-cv-123, and so it got an automatically generated value of 89123 in the
-    DB. If we lookup our longer values against those shorter values, we get  no
-    results, so we need to have this value too.
-    """
-    year = docket_number_core[0:2]
-    rest = int(docket_number_core[2:])
-    return "%s%s" % (year, rest)
-
-
 class Command(VerboseCommand, CommandUtils):
     help = 'Iterate over the IDB data and merge it into our existing ' \
            'datasets. Where we lack a Docket object for an item in the IDB, ' \
            'create one.'
 
     def add_arguments(self, parser):
-        # XXX add two new tasks here. One for going through and getting PACER
-        # case ID values for every item, and the other for updating Solr with
-        # the updated merged values.
         parser.add_argument(
             '--queue',
             default='batch1',
@@ -97,10 +80,8 @@ class Command(VerboseCommand, CommandUtils):
                 break
 
             throttle.maybe_wait()
-            docket_number_no_0s = remove_leading_zeros(idb_row.docket_number)
             ds = Docket.objects.filter(
-                Q(docket_number_core=idb_row.docket_number) |
-                Q(docket_number_core=docket_number_no_0s),
+                docket_number_core=idb_row.docket_number,
                 court=idb_row.district,
             )
             count = ds.count()
@@ -141,10 +122,8 @@ class Command(VerboseCommand, CommandUtils):
             if i >= options['limit'] > 0:
                 break
 
-            docket_number_no_0s = remove_leading_zeros(idb_row.docket_number)
             ds = Docket.objects.filter(
-                Q(docket_number_core=idb_row.docket_number) |
-                Q(docket_number_core=docket_number_no_0s),
+                docket_number_core=idb_row.docket_number,
                 court=idb_row.district,
                 docket_number__startswith='%s:' % idb_row.office
             ).exclude(
