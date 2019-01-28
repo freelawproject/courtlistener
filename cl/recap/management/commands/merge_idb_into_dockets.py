@@ -17,7 +17,6 @@ from cl.recap.models import FjcIntegratedDatabase
 from cl.recap.tasks import merge_docket_with_idb, create_new_docket_from_idb, \
     update_docket_from_hidden_api
 from cl.search.models import Docket
-from cl.search.tasks import add_or_update_recap_docket
 
 cnt = CaseNameTweaker()
 
@@ -77,8 +76,11 @@ class Command(VerboseCommand, CommandUtils):
         logger.info("Using PACER username: %s"% PACER_USERNAME)
         if options['task'] == 'first_pass':
             self.do_first_pass(options)
-        if options['task'] == 'second_pass':
+        elif options['task'] == 'second_pass':
             self.do_second_pass(options)
+        elif options['task'] == 'update_case_ids':
+            self.update_any_missing_pacer_case_ids(options)
+
     @staticmethod
     def do_first_pass(options):
         idb_rows = FjcIntegratedDatabase.objects.filter(
@@ -122,7 +124,7 @@ class Command(VerboseCommand, CommandUtils):
 
     @staticmethod
     def do_second_pass(options):
-        """In the first pass, we ignored the duplicates that we got, prefering
+        """In the first pass, we ignored the duplicates that we got, preferring
         to let them stack up for later analysis. In this pass, we attempt to
         merge those failed items into the DB by more aggressive filtering and
         algorithmic selection.
@@ -199,3 +201,45 @@ class Command(VerboseCommand, CommandUtils):
                 logger.info("%s No good match after office and case name "
                             "filtering. Creating new item: %s", i, idb_row)
                 create_new_docket_from_idb(idb_row.pk)
+
+    @staticmethod
+    def update_any_missing_pacer_case_ids(options):
+        """The network requests were making things far too slow and had to be
+        disabled during the first pass. With this method, we update any items
+        that are missing their pacer case ID value.
+        """
+        ds = Docket.objects.filter(
+            idb_data__isnull=False,
+            pacer_case_id=None,
+        )
+        q = options['queue']
+        throttle = CeleryThrottle(queue_name=q)
+        session = PacerSession(username=PACER_USERNAME,
+                               password=PACER_PASSWORD)
+        session.login()
+        for i, d in enumerate(queryset_generator(ds)):
+            if i < options['offset']:
+                continue
+            if i >= options['limit'] > 0:
+                break
+
+            if i % 5000 == 0:
+                # Re-authenticate just in case the auto-login mechanism isn't
+                # working.
+                session = PacerSession(username=PACER_USERNAME,
+                                       password=PACER_PASSWORD)
+                session.login()
+
+            throttle.maybe_wait()
+            logger.info("Getting pacer_case_id for item %s")
+            params = make_fjc_idb_lookup_params(d.idb_data)
+            chain(
+                get_pacer_case_id_and_title.s(
+                    pass_through=d.pk,
+                    docket_number=d.idb_data.docket_number,
+                    court_id=d.idb_data.district_id,
+                    cookies=session.cookies,
+                    **params
+                ).set(queue=q),
+                update_docket_from_hidden_api.s().set(queue=q),
+            ).apply_async()
