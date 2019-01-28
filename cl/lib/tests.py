@@ -219,33 +219,24 @@ class TestModelHelpers(TestCase):
         self.assertEqual(expected, path)
 
     def test_making_docket_number_core(self):
-        self.assertEqual(
-            make_docket_number_core('2:12-cv-01032-JKG-MJL'),
-            '1201032'
-        )
-        self.assertEqual(
-            make_docket_number_core('12-cv-01032-JKG-MJL'),
-            '1201032'
-        )
-        self.assertEqual(
-            make_docket_number_core('2:12-cv-01032'),
-            '1201032'
-        )
-        self.assertEqual(
-            make_docket_number_core('12-cv-01032'),
-            '1201032'
-        )
-        self.assertEqual(
-            # Probably an appellate court. Skip it.
-            make_docket_number_core('12-01032'),
-            '',
-        )
-        self.assertEqual(
-            # docket_number fields can be null. If so, the core value should be
-            # an empty string.
-            make_docket_number_core(None),
-            '',
-        )
+        expected = '1201032'
+        self.assertEqual(make_docket_number_core('2:12-cv-01032-JKG-MJL'),
+                         expected)
+        self.assertEqual(make_docket_number_core('12-cv-01032-JKG-MJL'),
+                         expected)
+        self.assertEqual(make_docket_number_core('2:12-cv-01032'),
+                         expected)
+        self.assertEqual(make_docket_number_core('12-cv-01032'),
+                         expected)
+
+        # Do we automatically zero-pad short docket numbers?
+        self.assertEqual(make_docket_number_core('12-cv-1032'),
+                         expected)
+        # Do we skip appellate courts?
+        self.assertEqual(make_docket_number_core('12-01032'), '')
+        # docket_number fields can be null. If so, the core value should be
+        # an empty string.
+        self.assertEqual(make_docket_number_core(None), '')
 
 
 class UUIDFileSystemStorageTest(SimpleTestCase):
