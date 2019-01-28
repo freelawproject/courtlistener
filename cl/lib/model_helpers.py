@@ -30,7 +30,7 @@ def make_docket_number_core(docket_number):
 
     m = re.search(r'(?:\d:)?(\d\d)-..-(\d+)', docket_number)
     if m:
-        return m.group(1) + m.group(2)
+        return m.group(1) + "{:05d}".format(int(m.group(2)))
     else:
         return ''
 
