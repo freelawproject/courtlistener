@@ -1,0 +1,195 @@
+{% extends "docket_tabs.html" %}
+
+{% block title %}FJC IDB Information for {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}FJC IDB Information for {{ title }} - CourtListener.com{% endblock %}
+{% block description %}FJC IDB Information for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block og_description %}FJC IDB Information for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+
+{% block nav-idb %}active{% endblock %}
+
+{% block tab-content %}
+<div class="visible-md visible-lg col-md-1 col-lg-2"></div>
+<div class="col-xs-12 col-md-10 col-lg-8">
+  <div class="well">
+    <p>This information is provided by the <a href="https://www.fjc.gov/research/idb/">Integrated Database provided by the Federal Judicial Center</a> (FJC). The FJC is the research and education agency of the judicial branch of the U.S. government. It is updated quarterly but due to deficiencies in their data, it can only be matched to dockets via automated systems, which we cannot guarantee.
+    </p>
+    <p>We make every effort to ensure this data is accurate, but it may be out of date and it may be matched to the wrong docket. If you encounter any errors, please <a href="{% url "contact" %}">let us know</a> and we will endeavor to make things right.
+    </p>
+    <p>All fields and their descriptions are available in the code books on the <a href="https://www.fjc.gov/research/idb/">FJC Integrated Database website</a>.
+    </p>
+  </div>
+  {% with docket.idb_data as idb_data %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead>
+      <tr>
+        <th>Field</th>
+        <th>Value</th>
+        <th>Hints</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td><strong>Office&nbsp;Number</strong></td>
+        <td>{{ idb_data.office|default:"Unknown" }}</td>
+        <td>Office codes are listed in the <a href="https://free.law/xlsx/fjc/integrated-database/office-codes.xlsx">Guide to Judiciary Policies and Procedures, Appendix A</a>.</td>
+      </tr>
+      <tr>
+        <td><strong>Origin</strong></td>
+        <td>
+          {% if idb_data.origin %}
+            ({{ idb_data.origin }}) {{ idb_data.get_origin_display }}
+          {% else %}
+            Unknown
+          {% endif %}
+        </td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Date&nbsp;Filed</strong></td>
+        <td>{{ idb_data.date_filed|default:"Unknown" }}</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Date&nbsp;Terminated</strong></td>
+        <td>{{ idb_data.date_terminated|default:"Unknown" }}</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Jurisdiction</strong></td>
+        <td>
+          {% if idb_data.jurisdiction %}
+            ({{ idb_data.jurisdiction }}) {{ idb_data.get_jurisdiction_display }}
+          {% else %}
+            Unknown
+          {% endif %}
+        </td>
+        <td>The basis for U.S. district court jurisdiction in the case.</td>
+      </tr>
+      <tr>
+        <td><strong>Nature of Suit</strong></td>
+        <td>
+          {% if idb_data.nature_of_suit %}
+            ({{ idb_data.nature_of_suit }}) {{ idb_data.get_nature_of_suit_display }}
+          {% else %}
+            Unknown
+          {% endif %}
+        </td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Title</strong></td>
+        <td>{{ idb_data.title|default:"Unknown" }}</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Section</strong></td>
+        <td>{{ idb_data.section|default:"Unknown" }}</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Subsection</strong></td>
+        <td>{{ idb_data.subsection|default:"Unknown" }}</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Diversity&nbsp;of&nbsp;Residence</strong></td>
+        <td>{{ idb_data.diversity_of_residence|default:"Unknown" }}</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Class&nbsp;Action&nbsp;Status</strong></td>
+        <td>{{ idb_data.class_action|default:"Unknown" }}</td>
+        <td>If true, designates that the case involves an allegation by the plaintiff that the complaint meets the prerequisites of "Class Action" as provided in Rule 23.</td>
+      </tr>
+      <tr>
+        <td><strong>Termination&nbsp;Class&nbsp;Action&nbsp;Status</strong></td>
+        <td>{{ idb_data.get_termination_class_action_status_display|default:"Unknown" }}</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Monetary&nbsp;Demand</strong></td>
+        <td>{{ idb_data.monetary_demand|default:"Unknown" }}</td>
+        <td>The monetary amount sought by the plaintiff (in thousands). Amounts less than $500 appear as 1 and amounts over $10k appear as 9999. See notes in codebook for details.</td>
+      </tr>
+      <tr>
+        <td><strong>County&nbsp;of&nbsp;Residence</strong></td>
+        <td>{{ idb_data.county_of_residence|default:"Unknown" }}</td>
+        <td>The code for the county of residence for the first listed plaintiff (see notes in codebook).</td>
+      </tr>
+      <tr>
+        <td><strong>Arbitration&nbsp;at&nbsp;Filing</strong></td>
+        <td>{{ idb_data.get_arbitration_at_filing_display|default:"Unknown" }}</td>
+        <td>Only used by courts participating in the Formal Arbitration Program.</td>
+      </tr>
+      <tr>
+        <td><strong>Arbitration&nbsp;at&nbsp;Termination</strong></td>
+        <td>{{ idb_data.get_arbitration_at_termination_display|default:"Unknown" }}</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><strong>Multidistrict&nbsp;Litigation&nbsp;Number</strong></td>
+        <td>{{ idb_data.multidistrict_litigation_number|default:"Unknown" }}</td>
+        <td>A four digit multidistrict litigation number.</td>
+      </tr>
+      <tr>
+        <td><strong>Plaintiff</strong></td>
+        <td>{{ idb_data.plaintiff|default:"Unknown" }}</td>
+        <td>The first listed plaintiff in the case. Cut off by FJC at 30 characters.</td>
+      </tr>
+      <tr>
+        <td><strong>Defendant</strong></td>
+        <td>{{ idb_data.defendant|default:"Unknown" }}</td>
+        <td>The first listed defendant in the case. Cut off by FJC at 30 characters.</td>
+      </tr>
+      <tr>
+        <td><strong>Date&nbsp;of&nbsp;Transfer</strong></td>
+        <td>{{ idb_data.date_transfer|default:"Unknown" }}</td>
+        <td>The date when the papers for the case were received by the receiving district for a transferred case.</td>
+      </tr>
+      <tr>
+        <td><strong>Transfer&nbsp;Docket&nbsp;Number</strong></td>
+        <td>{{ idb_data.transfer_docket_number|default:"Unknown" }}</td>
+        <td>The docket number of the case in the source district.</td>
+      </tr>
+      <tr>
+        <td><strong>Transfer&nbsp;Origin</strong></td>
+        <td>{{ idb_data.transfer_origin|default:"Unknown" }}</td>
+        <td>The origin number of the case in the source district.</td>
+      </tr>
+      <tr>
+        <td><strong>Procedural&nbsp;Progress</strong></td>
+        <td>{{ idb_data.get_procedural_progress_display|default:"Unknown" }}</td>
+        <td>The point to which the case had progressed when it was disposed of (see notes in codebook).</td>
+      </tr>
+      <tr>
+        <td><strong>Disposition</strong></td>
+        <td>{{ idb_data.get_disposition_display|default:"Unknown" }}</td>
+        <td>The manner in which the case was disposed of.</td>
+      </tr>
+      <tr>
+        <td><strong>Nature&nbsp;of&nbsp;Judgment</strong></td>
+        <td>{{ idb_data.get_nature_of_judgment_display|default:"Unknown"|default:"Unknown" }}</td>
+        <td>Cases disposed of by an entry of a final judgment.</td>
+      </tr>
+      <tr>
+        <td><strong>Amount&nbsp;Received</strong></td>
+        <td>{{ idb_data.amount_received|default:"Unknown" }}</td>
+        <td>Dollar amount received (in thousands) when appropriate. Field not uniformally used; see codebook.</td>
+      </tr>
+      <tr>
+        <td><strong>Judgment</strong></td>
+        <td>{{ idb_data.get_judgment_display|default:"Unknown" }}</td>
+        <td>Which party the case was disposed in favor of.</td>
+      </tr>
+      <tr>
+        <td><strong>Pro&nbsp;Se</strong></td>
+        <td>{{ idb_data.get_pro_se_display|default:"Unknown" }}</td>
+        <td>The parties that filed pro se in the case. (See codebook for more details.)</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endwith %}
+</div>
+{% endblock %}
