@@ -597,7 +597,7 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
     )
     transfer_docket_number = models.TextField(
-        help_text="The docket number of the case int he losing district",
+        help_text="The docket number of the case in the losing district",
         blank=True,
     )
     transfer_origin = models.TextField(
