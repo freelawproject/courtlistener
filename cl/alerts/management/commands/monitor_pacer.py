@@ -81,4 +81,5 @@ class Command(VerboseCommand):
             min_login_frequency = 60 * 30  # thirty minutes
             if (t2 - t1).seconds > min_login_frequency:
                 print("Logging in again.")
+                s.login()
                 t1 = now()
