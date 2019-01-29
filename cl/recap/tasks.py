@@ -21,6 +21,7 @@ from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.import_lib import get_candidate_judges
+from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import get_blocked_status, map_cl_to_pacer_id, \
     normalize_attorney_contact, normalize_attorney_role, map_pacer_to_cl_id
 from cl.lib.recap_utils import get_document_filename
@@ -344,11 +345,12 @@ def find_docket_object(court_id, pacer_case_id, docket_number):
     # Attempt several lookups of decreasing specificity. Note that
     # pacer_case_id is required for Docket and Docket History uploads.
     d = None
+    docket_number_core = make_docket_number_core(docket_number)
     for kwargs in [{'pacer_case_id': pacer_case_id,
-                    'docket_number': docket_number},
+                    'docket_number_core': docket_number_core},
                    {'pacer_case_id': pacer_case_id},
-                   {'docket_number': docket_number,
-                    'pacer_case_id': None}]:
+                   {'pacer_case_id': None,
+                    'docket_number_code': docket_number_core}]:
         ds = Docket.objects.filter(court_id=court_id, **kwargs)
         count = ds.count()
         if count == 0:
