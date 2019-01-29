@@ -210,7 +210,7 @@ class Command(VerboseCommand, CommandUtils):
                 session.login()
 
             throttle.maybe_wait()
-            logger.info("Getting pacer_case_id for item %s")
+            logger.info("Getting pacer_case_id for item %s", d)
             params = make_fjc_idb_lookup_params(d.idb_data)
             chain(
                 get_pacer_case_id_and_title.s(
