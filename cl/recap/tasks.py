@@ -350,7 +350,7 @@ def find_docket_object(court_id, pacer_case_id, docket_number):
                     'docket_number_core': docket_number_core},
                    {'pacer_case_id': pacer_case_id},
                    {'pacer_case_id': None,
-                    'docket_number_code': docket_number_core}]:
+                    'docket_number_core': docket_number_core}]:
         ds = Docket.objects.filter(court_id=court_id, **kwargs)
         count = ds.count()
         if count == 0:
