@@ -50,24 +50,30 @@ class Command(VerboseCommand):
         report = CaseQueryAdvancedBankruptcy('canb', s)
         t1 = now()
         while True:
+            query = 'Pacific'
             report.query(
-                name_last='Pacific',
+                name_last=query,
                 filed_from=datetime.date(2019, 1, 28),
                 filed_to=datetime.date(2019, 1, 30),
             )
-            if len(report.data) > 0:
+            num_results = len(report.data)
+            print("Checked '%s' and got %s results" % (query, num_results))
+            if num_results > 0:
+                print("Sending emails and exiting!")
                 send_emails(report, recipients)
-                print("Got %s results and sent emails" % len(report.metadata))
                 exit(0)
 
+            query = 'PG&E'
             report.query(
-                name_last='PG&E',
+                name_last=query,
                 filed_from=datetime.date(2019, 1, 28),
                 filed_to=datetime.date(2019, 1, 30),
             )
-            if len(report.data) > 0:
+            num_results = len(report.data)
+            print("Checked '%s' and got %s results" % (query, num_results))
+            if num_results > 0:
+                print("Sending emails and exiting!")
                 send_emails(report, recipients)
-                print("Got %s results and sent emails" % len(report.metadata))
                 exit(0)
 
             time.sleep(options['sleep'])
