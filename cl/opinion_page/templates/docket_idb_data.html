@@ -68,13 +68,7 @@
       </tr>
       <tr>
         <td><strong>Nature of Suit</strong></td>
-        <td>
-          {% if idb_data.nature_of_suit %}
-            ({{ idb_data.nature_of_suit }}) {{ idb_data.get_nature_of_suit_display }}
-          {% else %}
-            Unknown
-          {% endif %}
-        </td>
+        <td>{{ idb_data.get_nature_of_suit_display|default:"Unknown" }}</td>
         <td></td>
       </tr>
       <tr>
