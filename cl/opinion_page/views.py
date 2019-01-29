@@ -171,6 +171,9 @@ def view_parties(request, docket_id, slug):
 @ratelimit_if_not_whitelisted
 def docket_idb_data(request, docket_id, slug):
     docket, context = core_docket_data(request, docket_id)
+    context.update({
+        'parties': docket.parties.exists(),  # Needed to show/hide parties tab.
+    })
     return render(request, 'docket_idb_data.html', context)
 
 
