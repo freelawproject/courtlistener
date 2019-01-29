@@ -243,14 +243,16 @@
     <p class="lead">There are no entries for this docket in the RECAP Archive. Please download the latest from PACER while using the RECAP Extension.
     </p>
   </div>
-  <div class="col-sm-4 right">
-    <p>
-      <a href="{{ docket.pacer_url }}"
-         class="btn btn-lg btn-primary"
-         target="_blank"
-         rel="nofollow"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
-    </p>
-  </div>
+  {% if docket.pacer_url %}
+    <div class="col-sm-4 right">
+      <p>
+        <a href="{{ docket.pacer_url }}"
+           class="btn btn-lg btn-primary"
+           target="_blank"
+           rel="nofollow"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
+      </p>
+    </div>
+  {% endif %}
 </div>
 {% endif %}
 
