@@ -5,6 +5,7 @@ import re
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
 
+from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
 
 
@@ -286,6 +287,20 @@ def flatten_choices(self):
         else:
             flat.append((choice, value))
     return flat
+
+
+def choices_to_csv(obj, field_name):
+    """Produce a CSV of possible choices for a field on an object.
+
+    :param obj: The object type you want to inspect
+    :param field_name: The field on the object you want to get the choices for
+    :return s: A comma-separated list of possible values for the field
+    """
+    field = obj._meta.get_field(field_name)
+    flat_choices = flatten_choices(field)
+    # Get the second value in the choices tuple
+    choice_values = [t for s, t in flat_choices]
+    return oxford_join(choice_values, conjunction='or', separator=";")
 
 
 def disable_auto_now_fields(*models):
