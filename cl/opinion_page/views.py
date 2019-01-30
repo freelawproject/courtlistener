@@ -23,7 +23,7 @@ from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib import search_utils, sunburnt
 from cl.lib.bot_detector import is_bot, is_og_bot
-from cl.lib.model_helpers import suppress_autotime
+from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
@@ -173,6 +173,19 @@ def docket_idb_data(request, docket_id, slug):
     docket, context = core_docket_data(request, docket_id)
     context.update({
         'parties': docket.parties.exists(),  # Needed to show/hide parties tab.
+        'origin_csv': choices_to_csv(docket.idb_data, 'origin'),
+        'jurisdiction_csv': choices_to_csv(docket.idb_data, 'jurisdiction'),
+        'arbitration_csv': choices_to_csv(docket.idb_data,
+                                          'arbitration_at_filing'),
+        'class_action_csv': choices_to_csv(docket.idb_data,
+                                           'termination_class_action_status'),
+        'procedural_progress_csv': choices_to_csv(docket.idb_data,
+                                                  'procedural_progress'),
+        'disposition_csv': choices_to_csv(docket.idb_data, 'disposition'),
+        'nature_of_judgment_csv': choices_to_csv(docket.idb_data,
+                                                 'nature_of_judgement'),
+        'judgment_csv': choices_to_csv(docket.idb_data, 'judgment'),
+        'pro_se_csv': choices_to_csv(docket.idb_data, 'pro_se'),
     })
     return render(request, 'docket_idb_data.html', context)
 

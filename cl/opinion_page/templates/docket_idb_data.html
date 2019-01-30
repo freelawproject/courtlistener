@@ -44,7 +44,7 @@
             Not Provided
           {% endif %}
         </td>
-        <td></td>
+        <td>Possible values: {{ origin_csv }}.</td>
       </tr>
       <tr>
         <td><strong>Date&nbsp;Filed</strong></td>
@@ -65,7 +65,10 @@
             Not Provided
           {% endif %}
         </td>
-        <td>The basis for U.S. district court jurisdiction in the case.</td>
+        <td>
+          <p>The basis for U.S. district court jurisdiction in the case.</p>
+          <p>Possible values: {{ jurisdiction_csv }}.</p>
+        </td>
       </tr>
       <tr>
         <td><strong>Nature of Suit</strong></td>
@@ -100,7 +103,7 @@
       <tr>
         <td><strong>Termination&nbsp;Class&nbsp;Action&nbsp;Status</strong></td>
         <td>{{ idb_data.get_termination_class_action_status_display|default:"Not Provided" }}</td>
-        <td></td>
+        <td>Possible values: {{ class_action_csv }}.</td>
       </tr>
       <tr>
         <td><strong>Monetary&nbsp;Demand</strong></td>
@@ -117,12 +120,15 @@
       <tr>
         <td><strong>Arbitration&nbsp;at&nbsp;Filing</strong></td>
         <td>{{ idb_data.get_arbitration_at_filing_display|default:"Not Provided" }}</td>
-        <td>Only used by courts participating in the Formal Arbitration Program.</td>
+        <td>
+          <p>Only used by courts participating in the Formal Arbitration Program.</p>
+          <p>Possible values: {{ arbitration_csv }}.</p>
+        </td>
       </tr>
       <tr>
         <td><strong>Arbitration&nbsp;at&nbsp;Termination</strong></td>
         <td>{{ idb_data.get_arbitration_at_termination_display|default:"Not Provided" }}</td>
-        <td></td>
+        <td>Possible values: {{ arbitration_csv }}.</td>
       </tr>
       <tr>
         <td><strong>Multidistrict&nbsp;Litigation&nbsp;Number</strong></td>
@@ -157,18 +163,26 @@
       <tr>
         <td><strong>Procedural&nbsp;Progress</strong></td>
         <td>{{ idb_data.get_procedural_progress_display|default:"Not Provided" }}</td>
-        <td>The point to which the case had progressed when it was disposed of (see notes in
-          <a href="https://www.fjc.gov/research/idb/">codebook on FJC website</a>).</td>
+        <td>
+          <p>The point to which the case had progressed when it was disposed of (see notes in <a href="https://www.fjc.gov/research/idb/">codebook on FJC website</a>).</p>
+          <p>Possible values: {{ procedural_progress_csv }}.</p>
+        </td>
       </tr>
       <tr>
         <td><strong>Disposition</strong></td>
         <td>{{ idb_data.get_disposition_display|default:"Not Provided" }}</td>
-        <td>The manner in which the case was disposed of.</td>
+        <td>
+          <p>The manner in which the case was disposed of.</p>
+          <p>Possible values: {{ disposition_csv }}.</p>
+        </td>
       </tr>
       <tr>
         <td><strong>Nature&nbsp;of&nbsp;Judgment</strong></td>
         <td>{{ idb_data.get_nature_of_judgment_display|default:"Not Provided"|default:"Not Provided" }}</td>
-        <td>Cases disposed of by an entry of a final judgment.</td>
+        <td>
+          <p>Cases disposed of by an entry of a final judgment.</p>
+          <p>Possible values: {{ nature_of_judgment_csv }}.</p>
+        </td>
       </tr>
       <tr>
         <td><strong>Amount&nbsp;Received</strong></td>
@@ -179,12 +193,18 @@
       <tr>
         <td><strong>Judgment</strong></td>
         <td>{{ idb_data.get_judgment_display|default:"Not Provided" }}</td>
-        <td>Which party the case was disposed in favor of.</td>
+        <td>
+          <p>Which party the case was disposed in favor of.</p>
+          <p>Possible values: {{ judgment_csv }}.</p>
+        </td>
       </tr>
       <tr>
         <td><strong>Pro&nbsp;Se</strong></td>
         <td>{{ idb_data.get_pro_se_display|default:"Not Provided" }}</td>
-        <td>The parties that filed pro se in the case. See <a href="https://www.fjc.gov/research/idb/">codebook on IDB  website</a> for more details.</td>
+        <td>
+          <p>The parties that filed pro se in the case. See <a href="https://www.fjc.gov/research/idb/">codebook on IDB  website</a> for more details.</p>
+          <p>Possible values: {{ pro_se_csv }}.</p>
+        </td>
       </tr>
       </tbody>
     </table>
