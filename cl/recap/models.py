@@ -284,7 +284,7 @@ class FjcIntegratedDatabase(models.Model):
         (FIFTH_REOPEN, "Fifth reopen"),
         (SIXTH_REOPEN, "Sixth reopen"),
         (MULTI_DIST_ORIG, "Multi district litigation originating in the "
-                          "district (valid beginning July 1, 2016) "),
+                          "district (valid beginning July 1, 2016)"),
     )
     GOV_PLAIN = 1
     GOV_DEF = 2
