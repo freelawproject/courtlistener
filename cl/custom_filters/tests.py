@@ -23,6 +23,14 @@ class TestTextFilters(TestCase):
     def test_oxford_three_items(self):
         self.assertEqual(oxford_join(['a', 'b', 'c']), 'a, b, and c')
 
+    def test_oxford_separator(self):
+        self.assertEqual(oxford_join(['a', 'b', 'c'], separator=';'),
+                         'a; b; and c')
+
+    def test_oxford_conjunction(self):
+        self.assertEqual(oxford_join(['a', 'b', 'c'], conjunction='or'),
+                         'a, b, or c')
+
 
 class TestNaturalDuration(TestCase):
 
