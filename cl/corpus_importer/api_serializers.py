@@ -3,7 +3,7 @@ from rest_framework.serializers import ModelSerializer
 
 from cl.people_db.models import Party, Role, PartyType, Attorney, \
     CriminalCount, CriminalComplaint
-from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
+from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import RECAPDocument, Docket, DocketEntry, \
     OriginatingCourtInformation
 
@@ -72,6 +72,12 @@ class OriginalCourtInformationSerializer(ModelSerializer):
 
     class Meta:
         model = OriginatingCourtInformation
+        fields = '__all__'
+
+
+class FjcIntegratedDatabaseSerializer(ModelSerializer):
+    class Meta:
+        model = FjcIntegratedDatabase
         fields = '__all__'
 
 
