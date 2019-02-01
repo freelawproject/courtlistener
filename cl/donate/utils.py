@@ -13,14 +13,16 @@ emails = {
         'subject': 'Thanks for your donation to Free Law Project!',
         'body': ('Hello %s,\n\n'
                  
-                 'Thanks for your donation of $%0.2f to Free '
+                 'Thank you for your donation of $%0.2f to Free '
                  'Law Project. We are currently using donations like yours '
                  'for a variety of important projects that would never exist '
                  'without your help.\n\n'
 
                  'We are a federally-recognized 501(c)(3) public charity '
                  'and a California non-profit public benefit corporation. '
-                 'Our EIN is %s.\n\n'
+                 'Our EIN is %s. This letter may serve as a record of your '
+                 'donation. No goods or services were provided, in whole or '
+                 'in part, for this contribution.\n\n'
 
                  'If you have any questions about your donation, please '
                  'don\'t hesitate to get in touch.\n\n'
