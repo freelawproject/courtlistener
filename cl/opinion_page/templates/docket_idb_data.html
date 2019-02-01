@@ -11,10 +11,9 @@
 <div class="visible-md visible-lg col-md-1 col-lg-2"></div>
 <div class="col-xs-12 col-md-10 col-lg-8">
   <div class="well">
-    <p>This information was retrieved from the <a
-      href="https://www.fjc.gov/research/idb/">Integrated Database hosted by the Federal Judicial Center (FJC)</a>. The FJC is the research and education agency of the judicial branch of the U.S. government. This data is updated quarterly but due to gaps in it, we can only match data to dockets via fuzzy automated systems that cannot be guaranteed. The FJC maintains the the Integrated Database, but had no part in incorporating it here.
+    <p>This information was retrieved from the <a href="https://www.fjc.gov/research/idb/">Integrated Database (IDB)</a>, a repository of federal civil,  criminal, and bankruptcy cases maintained and hosted by the Federal Judicial Center (FJC). The FJC is the research and education agency of the judicial branch of the U.S. government. Under a working arrangement with the Administrative Office of the United States Courts (AOUSC), the FJC receives quarterly updates of the case-related data routinely reported by the courts to the AOUSC. The FJC then post-processes the data into a unified database, the IDB, which we share here. The FJC and the AOUSC were not actively involved in incorporating the data into CourtListener.
     </p>
-    <p>We make every effort to ensure this data is accurate, but it may be out of date and it may be matched to the wrong docket. If you encounter any errors, please <a href="{% url "contact" %}">let us know</a> and we will endeavor to make things right.
+    <p>We make every effort to ensure this data is accurate, but it may be out of date and it may be matched to the wrong docket. Despite our best efforts, due to gaps in this data, we can only match data to dockets via fuzzy automated systems that cannot be guaranteed. If you encounter any errors, please <a href="{% url "contact" %}">let us know</a> and we will endeavor to make things right.
     </p>
     <p>All fields and their descriptions are available in the code books on the <a href="https://www.fjc.gov/research/idb/">FJC Integrated Database website</a>.
     </p>
@@ -139,12 +138,12 @@
       <tr>
         <td><strong>Plaintiff</strong></td>
         <td>{{ idb_data.plaintiff|default:"Not Provided" }}</td>
-        <td>The first listed plaintiff in the case. Cut off by FJC at 30 characters.</td>
+        <td>The first listed plaintiff in the case. Field truncated to 30 characters upon extraction by the AOUSC source system.</td>
       </tr>
       <tr>
         <td><strong>Defendant</strong></td>
         <td>{{ idb_data.defendant|default:"Not Provided" }}</td>
-        <td>The first listed defendant in the case. Cut off by FJC at 30 characters.</td>
+        <td>The first listed defendant in the case. Field truncated to 30 characters upon extraction by the AOUSC source system.</td>
       </tr>
       <tr>
         <td><strong>Date&nbsp;of&nbsp;Transfer</strong></td>
