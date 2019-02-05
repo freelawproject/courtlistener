@@ -51,7 +51,7 @@
                               │ App. │ Dist. │ Bank. │ State │ Special │
                               ├──────┼───────┼───────┼───────┼─────────┤
                      opinions │   X  │   X   │   X   │   X   │    X    │
-                        recap │   X  │   X   │   X   │       │         │
+                        recap │   X  │   X   │   X   │       │    X    │
                     oral args │   X  │       │       │       │         │
                        people │   X  │   X   │       │   X   │    X    │
                               └──────┴───────┴───────┴───────┴─────────┘
@@ -87,6 +87,8 @@
                             <a href="#tab-state"
                                data-toggle="tab">State</a>
                         </li>
+                    {% endif %}
+                    {% if v != 'oa' %}
                         <li>
                             <a href="#tab-special"
                                data-toggle="tab">Special</a>
