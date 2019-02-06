@@ -197,7 +197,6 @@ def merge_form_with_courts(courts, search_form):
     court_tabs = {
         'federal': [],
         'district': [],
-        'bankruptcy': [],
         'state': [],
         'special': [],
     }
@@ -229,11 +228,14 @@ def merge_form_with_courts(courts, search_form):
         elif court.jurisdiction in [Court.FEDERAL_SPECIAL, Court.COMMITTEE,
                                     Court.INTERNATIONAL]:
             court_tabs['special'].append(court)
-    state_bundles.append(state_bundle)  # append the final state bundle after the loop ends. Hack?
+
+    # append the final state bundle after the loop ends. Hack?
+    state_bundles.append(state_bundle)
 
     # Put the bankruptcy bundles in the courts dict
-    court_tabs['bankruptcy'].append(bap_bundle)
-    court_tabs['bankruptcy'].append(b_bundle)
+    if bap_bundle:
+        court_tabs['bankruptcy_panel'] = [bap_bundle]
+    court_tabs['bankruptcy'] = [b_bundle]
 
     # Divide the state bundles into the correct partitions
     court_tabs['state'].append(state_bundles[:17])

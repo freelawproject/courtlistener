@@ -1,0 +1,15 @@
+<div class="checkbox {% if indent %}appeals-court{% endif %}">
+  <label for="id_{{ court.pk }}">
+    <input
+      id="id_{{ court.pk }}"
+      name="{{ court.pk }}"
+      {% if court.checked %}checked="checked"{% endif %}
+      type="checkbox"
+      class="external-input court-checkbox">
+    {{ court.short_name }}&nbsp;{% spaceless %}
+    {% if court.end_date %}
+      <span class="gray">({% if not hide_term_str %}Terminated&nbsp;{% endif %}{{ court.end_date.year }})</span>
+    {% endif %}
+    {% endspaceless %}
+  </label>
+</div>
