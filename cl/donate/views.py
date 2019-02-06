@@ -54,7 +54,7 @@ def add_monthly_donations(cd_donation_form, user, customer):
     monthly_donation.save()
 
 
-def donate(request):
+def make_payment_page_context(request):
     """Load the donate page or process a submitted donation.
 
     This page has several branches. The logic is as follows:
@@ -73,8 +73,7 @@ def donate(request):
 
             We now have an account. Process the payment and associate it.
     """
-
-    message = None
+    stub_account = False
     if request.method == 'POST':
         donation_form = DonationForm(request.POST)
 
@@ -90,7 +89,6 @@ def donate(request):
             except User.DoesNotExist:
                 # Either a regular account or an email address we've never
                 # seen before. Create a new user from the POST data.
-                stub_account = False
                 user_form = UserForm(request.POST)
                 profile_form = ProfileForm(request.POST)
             else:
@@ -107,67 +105,12 @@ def donate(request):
             user_form = UserForm(request.POST, instance=request.user)
             profile_form = ProfileForm(request.POST,
                                        instance=request.user.profile)
-
-        if all([donation_form.is_valid(),
-                user_form.is_valid(),
-                profile_form.is_valid()]):
-            # Process the data in form.cleaned_data
-            cd_donation_form = donation_form.cleaned_data
-            cd_user_form = user_form.cleaned_data
-            cd_profile_form = profile_form.cleaned_data
-            stripe_token = request.POST.get('stripeToken')
-            frequency = request.POST.get('frequency')
-
-            # Route the payment to a payment provider
-            try:
-                if frequency == 'once':
-                    response = route_and_process_donation(
-                        cd_donation_form, cd_user_form, {'card': stripe_token})
-                elif frequency == 'monthly':
-                    customer = create_stripe_customer(stripe_token,
-                                                      cd_user_form['email'])
-                    response = route_and_process_donation(
-                        cd_donation_form, cd_user_form,
-                        {'customer': customer.id,
-                         'metadata': {'recurring': True}},
-                    )
-            except PaymentFailureException as e:
-                logger.critical("Payment failed. Message was: %s", e.message)
-                message = e.message
-                response = {'status': 'Failed'}
-            else:
-                logger.info("Payment routed with response: %s", response)
-
-            if response['status'] == Donation.AWAITING_PAYMENT:
-                if request.user.is_anonymous() and not stub_account:
-                    # Create a stub account with an unusable password
-                    user, profile = create_stub_account(cd_user_form,
-                                                        cd_profile_form)
-                    user.save()
-                    profile.save()
-                else:
-                    # Logged in user or an existing stub account.
-                    user = user_form.save()
-                    profile_form.save()
-
-                donation = donation_form.save(commit=False)
-                donation.status = response['status']
-                donation.payment_id = response['payment_id']
-                # Will only work for Paypal:
-                donation.transaction_id = response.get('transaction_id')
-                donation.donor = user
-                donation.save()
-
-                if frequency == 'monthly':
-                    add_monthly_donations(cd_donation_form, user, customer)
-
-                return HttpResponseRedirect(response['redirect'])
     else:
         # Loading the page...
+        donation_form = DonationForm(initial={
+            'referrer': request.GET.get('referrer')
+        })
         try:
-            donation_form = DonationForm(initial={
-                'referrer': request.GET.get('referrer')
-            })
             user_form = UserForm(initial={
                 'first_name': request.user.first_name,
                 'last_name': request.user.last_name,
@@ -187,14 +130,80 @@ def donate(request):
             user_form = UserForm()
             profile_form = ProfileForm()
 
-    return render(request, 'donate.html', {
+    return {
         'donation_form': donation_form,
         'user_form': user_form,
         'profile_form': profile_form,
-        'private': False,
-        'message': message,
-        'stripe_public_key': settings.STRIPE_PUBLIC_KEY
-    })
+        'stripe_public_key': settings.STRIPE_PUBLIC_KEY,
+        'stub_account': stub_account,
+    }
+
+
+def process_donation_forms(request, context):
+    donation_form = context['donation_form']
+    user_form = context['user_form']
+    profile_form = context['profile_form']
+    if all([donation_form.is_valid(), user_form.is_valid(),
+            profile_form.is_valid()]):
+        # Process the data in form.cleaned_data
+        cd_donation_form = donation_form.cleaned_data
+        cd_user_form = user_form.cleaned_data
+        cd_profile_form = profile_form.cleaned_data
+        stripe_token = request.POST.get('stripeToken')
+        frequency = request.POST.get('frequency')
+
+        # Route the payment to a payment provider
+        try:
+            if frequency == 'once':
+                response = route_and_process_donation(
+                    cd_donation_form, cd_user_form, {'card': stripe_token})
+            elif frequency == 'monthly':
+                customer = create_stripe_customer(stripe_token,
+                                                  cd_user_form['email'])
+                response = route_and_process_donation(
+                    cd_donation_form, cd_user_form,
+                    {'customer': customer.id,
+                     'metadata': {'recurring': True}},
+                )
+        except PaymentFailureException as e:
+            logger.critical("Payment failed. Message was: %s", e.message)
+            context['message'] = e.message
+            response = {'status': 'Failed'}
+        else:
+            logger.info("Payment routed with response: %s", response)
+
+        if response['status'] == Donation.AWAITING_PAYMENT:
+            if request.user.is_anonymous() and not context['stub_account']:
+                # Create a stub account with an unusable password
+                user, profile = create_stub_account(cd_user_form,
+                                                    cd_profile_form)
+                user.save()
+                profile.save()
+            else:
+                # Logged in user or an existing stub account.
+                user = user_form.save()
+                profile_form.save()
+
+            donation = donation_form.save(commit=False)
+            donation.status = response['status']
+            donation.payment_id = response['payment_id']
+            # Will only work for Paypal:
+            donation.transaction_id = response.get('transaction_id')
+            donation.donor = user
+            donation.save()
+
+            if frequency == 'monthly':
+                add_monthly_donations(cd_donation_form, user, customer)
+
+            return HttpResponseRedirect(response['redirect'])
+
+    return render(request, 'donate.html', context)
+
+
+def donate(request):
+    context = make_payment_page_context(request)
+    context['private'] = False
+    return process_donation_forms(request, context)
 
 
 def donate_complete(request):
