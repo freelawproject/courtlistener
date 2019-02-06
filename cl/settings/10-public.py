@@ -256,7 +256,6 @@ BULK_DATA_DIR = os.path.join(INSTALL_ROOT, 'cl/assets/media/bulk-data/')
 PAYPAL_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/paypal/'
 PAYPAL_REDIRECT = 'https://www.courtlistener.com/donate/paypal/complete/'
 PAYPAL_CANCELLATION = 'https://www.courtlistener.com/donate/paypal/cancel/'
-STRIPE_REDIRECT = 'https://www.courtlistener.com/donate/stripe/complete/'
 
 MIN_DONATION = {
     'rt_alerts': 10,
