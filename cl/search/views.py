@@ -57,6 +57,12 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
         elif cd['type'] == 'r':
             si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
             results = si.query().add_extra(**build_main_query(cd, facet=facet))
+            courts = courts.filter(
+                pacer_court_id__isnull=False,
+                end_date__isnull=True,
+            ).exclude(
+                jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL,
+            )
         elif cd['type'] == 'oa':
             si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
             results = si.query().add_extra(**build_main_query(cd, facet=facet))
@@ -333,8 +339,15 @@ def advanced(request):
         render_dict['search_form'] = SearchForm({'type': obj_type})
         return render(request, 'advanced.html', render_dict)
     else:
+        courts = Court.objects.filter(in_use=True)
         if request.path == reverse('advanced_r'):
             obj_type = 'r'
+            courts = courts.filter(
+                pacer_court_id__isnull=False,
+                end_date__isnull=True,
+            ).exclude(
+                jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL,
+            )
         elif request.path == reverse('advanced_oa'):
             obj_type = 'oa'
         elif request.path == reverse('advanced_p'):
@@ -342,7 +355,6 @@ def advanced(request):
         else:
             raise NotImplementedError("Unknown path: %s" % request.path)
 
-        courts = Court.objects.filter(in_use=True)
         search_form = SearchForm({'type': obj_type})
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form)

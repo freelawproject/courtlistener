@@ -101,20 +101,7 @@
                             {% for row in courts.federal|rows:4 %}
                                 <div class="col-sm-3">
                                     {% for court in row %}
-                                        <div class="checkbox">
-                                            <label for="id_{{ court.pk }}">
-                                                <input
-                                                    id="id_{{ court.pk }}"
-                                                    name="{{ court.pk }}"
-                                                    {% if court.checked %}checked="checked"{% endif %}
-                                                    type="checkbox"
-                                                    class="external-input court-checkbox">
-                                                {{ court.short_name }}
-                                                {% if court.end_date %}
-                                                    <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
-                                                {% endif %}
-                                            </label>
-                                        </div>
+                                      {% include "includes/court_checkbox.html" %}
                                     {% endfor %}
                                 </div>
                             {% endfor %}
@@ -137,18 +124,7 @@
                                     {% for row in group.list|rows:4 %}
                                         <div class="col-sm-3">
                                             {% for court in row %}
-                                                <div class="checkbox">
-                                                    <label for="id_{{ court.pk }}">
-                                                        <input
-                                                                id="id_{{ court.pk }}"
-                                                                name="{{ court.pk }}"
-                                                                {% if court.checked %}checked="checked"{% endif %}
-                                                                type="checkbox"
-                                                                class="external-input court-checkbox">
-                                                        {{ court.short_name }}&nbsp;{% if court.end_date %}<span class="gray">({{ court.end_date.year }})</span>
-                                                        {% endif %}
-                                                    </label>
-                                                </div>
+                                                {% include "includes/court_checkbox.html" with hide_term_str=True %}
                                             {% endfor %}
                                         </div>
                                     {% endfor %}
@@ -159,67 +135,61 @@
 
                     {% if v == 'o' or v == 'r' %}
                         <div class="tab-pane" id="tab-bankruptcy">
-                            {% for bank_bundle in courts.bankruptcy %}
-                                <h3 class="bottom inline">
-                                    {% if forloop.counter == 1 %}
-                                        Bankruptcy Appellate Panels
-                                    {% else %}
-                                        Bankruptcy District Courts
-                                    {% endif %}
-                                </h3>
-                                <div class="row">
-                                    {% for row in bank_bundle|rows:4 %}
-                                        <div class="col-sm-3">
-                                            {% for court in row %}
-                                                <div class="checkbox">
-                                                    <label for="id_{{ court.pk }}">
-                                                    <input
-                                                            id="id_{{ court.pk }}"
-                                                            name="{{ court.pk }}"
-                                                            {% if court.checked %}checked="checked"{% endif %}
-                                                            type="checkbox"
-                                                            class="external-input court-checkbox">
-                                                        {{ court.short_name }}
-                                                        {% if court.end_date %}
-                                                            <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
-                                                        {% endif %}
-                                                    </label>
-                                                </div>
-                                            {% endfor %}
-                                        </div>
+                          {% if courts.bankruptcy_panel %}
+                            <h3 class="bottom inline">
+                              Bankruptcy Appellate Panels
+                            </h3>
+                            {% for bank_bundle in courts.bankruptcy_panel %}
+                              <div class="row">
+                                {% for row in bank_bundle|rows:4 %}
+                                  <div class="col-sm-3">
+                                    {% for court in row %}
+                                      {% include "includes/court_checkbox.html" %}
                                     {% endfor %}
-                                </div>
+                                  </div>
+                                {% endfor %}
+                              </div>
                             {% endfor %}
+                          {% endif %}
+                          {% if courts.bankruptcy %}
+                            <h3 class="bottom inline">
+                              Bankruptcy District Courts
+                            </h3>
+                            {% for bank_bundle in courts.bankruptcy %}
+                              <div class="row">
+                                {% for row in bank_bundle|rows:4 %}
+                                  <div class="col-sm-3">
+                                    {% for court in row %}
+                                      {% include "includes/court_checkbox.html" %}
+                                    {% endfor %}
+                                  </div>
+                                {% endfor %}
+                              </div>
+                            {% endfor %}
+                          {% endif %}
                         </div>
                     {% endif %}
 
                     {% if v == 'o' or v == 'p' %}
-                        <div class="tab-pane" id="tab-state">
-                            <div class="row">
-                                {% for col_bundle in courts.state %}
-                                    <div class="col-sm-4">
-                                        {% for court_bundle in col_bundle %}
-                                            {% for court in court_bundle %}
-                                                <div class="checkbox {% if court.jurisdiction == 'SA' or court.jurisdiction == 'SS' or court.jurisdiction == 'ST' or court.jurisdiction == 'SAG' %}appeals-court{% endif %}">
-                                                    <label for="id_{{ court.pk }}">
-                                                    <input
-                                                            id="id_{{ court.pk }}"
-                                                            name="{{ court.pk }}"
-                                                            {% if court.checked %}checked="checked"{% endif %}
-                                                            type="checkbox"
-                                                            class="external-input court-checkbox">
-                                                        {{ court.short_name }}
-                                                        {% if court.end_date %}
-                                                            <span class="gray">(Terminated&nbsp;{{ court.end_date.year }})</span>
-                                                        {% endif %}
-                                                    </label>
-                                                </div>
-                                            {% endfor %}
-                                        {% endfor %}
-                                    </div>
+                      <div class="tab-pane" id="tab-state">
+                        <div class="row">
+                          {% for col_bundle in courts.state %}
+                            <div class="col-sm-4">
+                                {% for court_bundle in col_bundle %}
+                                  {% for court in court_bundle %}
+                                    {% if court.jurisdiction == 'S' %}
+                                      {% include "includes/court_checkbox.html" %}
+                                    {% else %}
+                                      {% include "includes/court_checkbox.html" with indent=True %}
+                                    {% endif %}
+                                  {% endfor %}
                                 {% endfor %}
                             </div>
+                          {% endfor %}
                         </div>
+                      </div>
+                    {% endif %}
+                    {% if v != 'oa' %}
                         <div class="tab-pane" id="tab-special">
                             {# Regroup into closed/open courts #}
                             {% regroup  courts.special|dictsort:"is_terminated" by is_terminated as special_courts %}
