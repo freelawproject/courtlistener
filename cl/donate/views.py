@@ -20,7 +20,8 @@ from cl.users.utils import create_stub_account
 logger = logging.getLogger(__name__)
 
 
-def route_and_process_donation(cd_donation_form, cd_user_form, kwargs):
+def route_and_process_payment(request, cd_donation_form, cd_user_form,
+                              frequency):
     """Routes the donation to the correct payment provider, then normalizes
     its response.
 
@@ -29,16 +30,28 @@ def route_and_process_donation(cd_donation_form, cd_user_form, kwargs):
      - status: The status of the payment for the database
      - payment_id: The ID of the payment
     """
-    if cd_donation_form['payment_provider'] == PROVIDERS.PAYPAL:
+    customer = None
+    payment_provider = cd_donation_form['payment_provider']
+    if payment_provider == PROVIDERS.PAYPAL:
         response = process_paypal_payment(cd_donation_form)
-    elif cd_donation_form['payment_provider'] == PROVIDERS.CREDIT_CARD:
+    elif payment_provider == PROVIDERS.CREDIT_CARD:
+        stripe_token = request.POST.get('stripeToken')
+        if frequency == 'once':
+            stripe_args = {'card': stripe_token}
+        elif frequency == 'monthly':
+            customer = create_stripe_customer(stripe_token,
+                                              cd_user_form['email'])
+            stripe_args = {
+                'customer': customer.id,
+                'metadata': {'recurring': True},
+            }
+
         # Calculate the amount in cents
         amount = int(float(cd_donation_form['amount']) * 100)
-        response = process_stripe_payment(amount, cd_user_form['email'],
-                                          kwargs)
-    else:
-        response = None
-    return response
+        response = process_stripe_payment(
+            amount, cd_user_form['email'], stripe_args)
+
+    return response, customer
 
 
 def add_monthly_donations(cd_donation_form, user, customer):
@@ -149,22 +162,12 @@ def process_donation_forms(request, context):
         cd_donation_form = donation_form.cleaned_data
         cd_user_form = user_form.cleaned_data
         cd_profile_form = profile_form.cleaned_data
-        stripe_token = request.POST.get('stripeToken')
         frequency = request.POST.get('frequency')
 
         # Route the payment to a payment provider
         try:
-            if frequency == 'once':
-                response = route_and_process_donation(
-                    cd_donation_form, cd_user_form, {'card': stripe_token})
-            elif frequency == 'monthly':
-                customer = create_stripe_customer(stripe_token,
-                                                  cd_user_form['email'])
-                response = route_and_process_donation(
-                    cd_donation_form, cd_user_form,
-                    {'customer': customer.id,
-                     'metadata': {'recurring': True}},
-                )
+            response, customer = route_and_process_payment(
+                request, cd_donation_form, cd_user_form, frequency)
         except PaymentFailureException as e:
             logger.critical("Payment failed. Message was: %s", e.message)
             context['message'] = e.message
