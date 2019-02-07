@@ -152,7 +152,7 @@ def make_payment_page_context(request):
     }
 
 
-def process_donation_forms(request, context):
+def process_donation_forms(request, template_name, context):
     donation_form = context['donation_form']
     user_form = context['user_form']
     profile_form = context['profile_form']
@@ -200,13 +200,19 @@ def process_donation_forms(request, context):
 
             return HttpResponseRedirect(response['redirect'])
 
-    return render(request, 'donate.html', context)
+    return render(request, template_name, context)
 
 
 def donate(request):
     context = make_payment_page_context(request)
     context['private'] = False
-    return process_donation_forms(request, context)
+    return process_donation_forms(request, 'donate.html', context)
+
+
+def cc_payment(request):
+    context = make_payment_page_context(request)
+    context['private'] = True
+    return process_donation_forms(request, 'cc_payment.html', context)
 
 
 def donate_complete(request):
