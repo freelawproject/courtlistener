@@ -46,6 +46,10 @@ def route_and_process_payment(request, cd_donation_form, cd_user_form,
                 'metadata': {'recurring': True},
             }
 
+        else:
+            raise NotImplementedError("Unknown frequency value: %s" %
+                                      frequency)
+
         # Calculate the amount in cents
         amount = int(float(cd_donation_form['amount']) * 100)
         response = process_stripe_payment(
