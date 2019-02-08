@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
-from django.db.models import F, Q, Prefetch
+from django.db.models import F, Prefetch
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
@@ -164,7 +164,10 @@ def view_parties(request, docket_id, slug):
             'party_type_objects': party_types
         })
 
-    context.update({'parties': parties})
+    context.update({
+        'parties': parties,
+        'docket_entries': docket.docket_entries.exists(),
+    })
     return render(request, 'docket_parties.html', context)
 
 
@@ -173,6 +176,7 @@ def docket_idb_data(request, docket_id, slug):
     docket, context = core_docket_data(request, docket_id)
     context.update({
         'parties': docket.parties.exists(),  # Needed to show/hide parties tab.
+        'docket_entries': docket.docket_entries.exists(),
         'origin_csv': choices_to_csv(docket.idb_data, 'origin'),
         'jurisdiction_csv': choices_to_csv(docket.idb_data, 'jurisdiction'),
         'arbitration_csv': choices_to_csv(docket.idb_data,
