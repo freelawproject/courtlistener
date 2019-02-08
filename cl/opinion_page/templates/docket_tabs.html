@@ -100,7 +100,7 @@
 
     <h2>{{ docket.court }}</h2>
 
-    {% if docket.pacer_url or docket_entries.paginator.count %}
+    {% if docket.pacer_url or docket_entries %}
       <div class="v-offset-above-2">
         {% if docket.pacer_url %}
           <div class="left">
@@ -110,7 +110,7 @@
                rel="nofollow"><i class="fa fa-external-link"></i> View on PACER</a>&nbsp;</p>
           </div>
         {% endif %}
-        {% if docket_entries.paginator.count %}
+        {% if docket_entries or docket_entries %}
           <div class="left">
             <p><a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
                class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>&nbsp;</p>
@@ -464,7 +464,7 @@
     </div>
   {% endif %}
 
-  {% if docket_entries.paginator.count or parties or docket.idb_data %}
+  {% if docket_entries or parties or docket.idb_data %}
     <div class="col-xs-12">
       <ul class="nav nav-tabs v-offset-below-2 v-offset-above-3" role="tablist">
         <li class="{% block nav-de %}inactive{% endblock %}"
