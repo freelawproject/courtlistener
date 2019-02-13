@@ -191,7 +191,6 @@ def send_thank_you_email(donation, payment_type, recurring=False):
             send_mail(email['subject'], body, email['from'], [user.email])
 
 
-
 def send_failed_subscription_email(m_donation):
     """Send an email to the user to tell them their subscription failed.
 
