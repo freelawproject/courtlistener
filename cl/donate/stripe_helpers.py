@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from datetime import datetime
 
 import stripe
@@ -32,10 +33,25 @@ def process_stripe_callback(request):
         if event['type'].startswith('charge') and \
                 event['livemode'] != settings.PAYMENT_TESTING_MODE:
             charge = event['data']['object']
-            try:
-                d = Donation.objects.get(payment_id=charge['id'])
-            except Donation.DoesNotExist:
-                d = None
+
+            # Sometimes stripe can process a transaction and call our callback
+            # faster than we can even save things to our own DB. If that
+            # happens wait a second up to five times until it works.
+            retry_count = 5
+            d = None
+            while retry_count > 0:
+                try:
+                    d = Donation.objects.get(payment_id=charge['id'])
+                except Donation.DoesNotExist:
+                    time.sleep(1)
+                    retry_count -= 1
+                else:
+                    break
+
+            if d is None:
+                # Couldn't get the item from our DB. Something is wrong.
+                raise PaymentFailureException(
+                    "Couldn't find stripe charge ID of: %s" % charge['id'])
 
             # See: https://stripe.com/docs/api#event_types
             if event['type'].endswith('succeeded'):
