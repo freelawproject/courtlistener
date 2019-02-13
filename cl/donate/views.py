@@ -248,6 +248,18 @@ def cc_payment(request):
     )
 
 
+def badge_signup(request):
+    context = make_payment_page_context(request)
+    context['private'] = True
+    return process_donation_forms(
+        request,
+        template_name='badge_signup.html',
+        stripe_redirect_url=reverse('badge_signup_complete'),
+        context=context,
+        payment_type=PAYMENT_TYPES.BADGE_SIGNUP,
+    )
+
+
 def payment_complete(request, template_name):
     error = None
     if len(request.GET) > 0:
