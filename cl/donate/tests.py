@@ -81,7 +81,7 @@ class DonationFormSubmissionTest(TestCase):
     def test_paypal_with_regular_value_as_anonymous(self):
         """Can a stripe donation go through using the "Other" field?"""
         self.params.update({
-            'amount': '10',
+            'amount': '25',
         })
         r = self.client.post(
             reverse('donate'),
