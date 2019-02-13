@@ -12,7 +12,7 @@ from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
 
 from cl.donate.management.commands.cl_send_donation_reminders import Command
-from cl.donate.models import Donation
+from cl.donate.models import Donation, FREQUENCIES
 
 # From: https://stripe.com/docs/testing#cards
 stripe_test_numbers = {
@@ -221,7 +221,7 @@ class StripeTest(TestCase):
         token, r = self.make_a_donation(
             stripe_test_numbers['good']['visa'],
             amount='25',
-            param_overrides={'frequency': 'monthly'}
+            param_overrides={'frequency': FREQUENCIES.MONTHLY}
         )
         # Redirect after a successful POST?
         self.assertEqual(r.status_code, HTTP_302_FOUND)

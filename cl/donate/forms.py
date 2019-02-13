@@ -5,7 +5,7 @@ from django.forms import ModelForm
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
-from cl.donate.models import Donation, PROVIDERS
+from cl.donate.models import Donation, PROVIDERS, FREQUENCIES
 from cl.users.models import UserProfile
 
 AMOUNTS = (
@@ -17,11 +17,6 @@ AMOUNTS = (
     ('50', '$50'),
     ('25', '$25'),
     ('other', 'Other: $'),
-)
-
-FREQUENCIES = (
-    ('once', 'Once'),
-    ('monthly', 'Monthly'),
 )
 
 
@@ -112,7 +107,7 @@ class DonationForm(ModelForm):
     )
     frequency = forms.ChoiceField(
         widget=forms.RadioSelect,
-        choices=FREQUENCIES,
+        choices=FREQUENCIES.NAMES,
         required=False,
         initial='once',
     )

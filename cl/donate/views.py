@@ -10,7 +10,8 @@ from django.shortcuts import render
 from django.utils.timezone import now
 
 from cl.donate.forms import DonationForm, UserForm, ProfileForm
-from cl.donate.models import Donation, MonthlyDonation, PROVIDERS
+from cl.donate.models import Donation, MonthlyDonation, PROVIDERS, \
+    PAYMENT_TYPES, FREQUENCIES
 from cl.donate.paypal import process_paypal_payment
 from cl.donate.stripe_helpers import process_stripe_payment, \
     create_stripe_customer
@@ -36,9 +37,10 @@ def route_and_process_payment(request, cd_donation_form, cd_user_form,
         response = process_paypal_payment(cd_donation_form)
     elif payment_provider == PROVIDERS.CREDIT_CARD:
         stripe_token = request.POST.get('stripeToken')
-        if frequency == 'once':
-            stripe_args = {'card': stripe_token}
-        elif frequency == 'monthly':
+        stripe_args = {'metadata': {'type': payment_type}}
+        if frequency == FREQUENCIES.ONCE:
+            stripe_args['card'] = stripe_token
+        elif frequency == FREQUENCIES.MONTHLY:
             customer = create_stripe_customer(stripe_token,
                                               cd_user_form['email'])
             stripe_args = {
@@ -199,7 +201,7 @@ def process_donation_forms(request, template_name, context):
             donation.donor = user
             donation.save()
 
-            if frequency == 'monthly':
+            if frequency == FREQUENCIES.MONTHLY:
                 add_monthly_donations(cd_donation_form, user, customer)
 
             return HttpResponseRedirect(response['redirect'])
