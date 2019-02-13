@@ -103,6 +103,9 @@ class UserForm(ModelForm):
 
 class DonationForm(ModelForm):
     reference = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control'
+        }),
         required=False,
     )
     frequency = forms.ChoiceField(
@@ -139,6 +142,7 @@ class DonationForm(ModelForm):
             'payment_provider',
             'send_annual_reminder',
             'referrer',
+            'reference',
         )
         widgets = {
             'referrer': forms.HiddenInput(),
