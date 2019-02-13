@@ -22,9 +22,20 @@ logger = logging.getLogger(__name__)
 
 
 def route_and_process_payment(request, cd_donation_form, cd_user_form,
-                              frequency):
+                              payment_provider, frequency,
+                              stripe_redirect_url, payment_type):
     """Routes the donation to the correct payment provider, then normalizes
     its response.
+
+
+    :param request: The WSGI request from Django
+    :param cd_donation_form: The donation form with cleaned data
+    :param cd_user_form: The user form with cleaned data
+    :param payment_provider: The payment provider for the payment
+    :param frequency: Whether monthly or one-time payment/donation
+    :param stripe_redirect_url: Where to redirect a stripe payment after
+    success
+    :param payment_type: Whether it's a donation or payment
 
     Returns a dict with:
      - message: Any error messages that apply
@@ -32,7 +43,6 @@ def route_and_process_payment(request, cd_donation_form, cd_user_form,
      - payment_id: The ID of the payment
     """
     customer = None
-    payment_provider = cd_donation_form['payment_provider']
     if payment_provider == PROVIDERS.PAYPAL:
         response = process_paypal_payment(cd_donation_form)
     elif payment_provider == PROVIDERS.CREDIT_CARD:
@@ -43,11 +53,8 @@ def route_and_process_payment(request, cd_donation_form, cd_user_form,
         elif frequency == FREQUENCIES.MONTHLY:
             customer = create_stripe_customer(stripe_token,
                                               cd_user_form['email'])
-            stripe_args = {
-                'customer': customer.id,
-                'metadata': {'recurring': True},
-            }
-
+            stripe_args['customer'] = customer.id
+            stripe_args['metadata'].update({'recurring': True})
         else:
             raise NotImplementedError("Unknown frequency value: %s" %
                                       frequency)
@@ -55,7 +62,7 @@ def route_and_process_payment(request, cd_donation_form, cd_user_form,
         # Calculate the amount in cents
         amount = int(float(cd_donation_form['amount']) * 100)
         response = process_stripe_payment(
-            amount, cd_user_form['email'], stripe_args)
+            amount, cd_user_form['email'], stripe_args, stripe_redirect_url)
 
     return response, customer
 
@@ -158,7 +165,8 @@ def make_payment_page_context(request):
     }
 
 
-def process_donation_forms(request, template_name, context):
+def process_donation_forms(request, template_name, stripe_redirect_url,
+                           context, payment_type):
     donation_form = context['donation_form']
     user_form = context['user_form']
     profile_form = context['profile_form']
@@ -171,9 +179,11 @@ def process_donation_forms(request, template_name, context):
         frequency = request.POST.get('frequency')
 
         # Route the payment to a payment provider
+        payment_provider = cd_donation_form['payment_provider']
         try:
             response, customer = route_and_process_payment(
-                request, cd_donation_form, cd_user_form, frequency)
+                request, cd_donation_form, cd_user_form, payment_provider,
+                frequency, stripe_redirect_url, payment_type)
         except PaymentFailureException as e:
             logger.critical("Payment failed. Message was: %s", e.message)
             context['message'] = e.message
@@ -212,16 +222,28 @@ def process_donation_forms(request, template_name, context):
 def donate(request):
     context = make_payment_page_context(request)
     context['private'] = False
-    return process_donation_forms(request, 'donate.html', context)
+    return process_donation_forms(
+        request,
+        template_name='donate.html',
+        stripe_redirect_url=reverse('donate_complete'),
+        context=context,
+        payment_type=PAYMENT_TYPES.DONATION,
+    )
 
 
 def cc_payment(request):
     context = make_payment_page_context(request)
     context['private'] = True
-    return process_donation_forms(request, 'cc_payment.html', context)
+    return process_donation_forms(
+        request,
+        template_name='cc_payment.html',
+        stripe_redirect_url=reverse('payment_complete'),
+        context=context,
+        payment_type=PAYMENT_TYPES.PAYMENT,
+    )
 
 
-def donate_complete(request):
+def payment_complete(request, template_name):
     error = None
     if len(request.GET) > 0:
         # We've gotten some information from the payment provider
@@ -235,7 +257,7 @@ def donate_complete(request):
                 'private': True,
             })
 
-    return render(request, 'donate_complete.html', {
+    return render(request, template_name, {
         'error': error,
         'private': True,
     })
@@ -301,7 +323,7 @@ def make_check_donation(request):
             d.donor = user
             d.save()
             if user.email:
-                send_thank_you_email(d)
+                send_thank_you_email(d, PAYMENT_TYPES.DONATION)
 
             return HttpResponseRedirect(reverse('check_complete'))
     else:
