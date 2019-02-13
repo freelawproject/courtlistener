@@ -10,7 +10,7 @@ from django.shortcuts import render
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 
-from cl.donate.models import Donation
+from cl.donate.models import Donation, PAYMENT_TYPES
 from cl.donate.utils import send_thank_you_email, PaymentFailureException
 
 logger = logging.getLogger(__name__)
@@ -96,8 +96,8 @@ def process_paypal_payment(cd_donation_form):
     data = {
         'intent': 'sale',
         'redirect_urls': {
-            'return_url': settings.PAYPAL_CALLBACK,
-            'cancel_url': settings.PAYPAL_CANCELLATION,
+            'return_url': reverse('paypal_callback'),
+            'cancel_url': reverse('paypal_cancel'),
         },
         'payer': {'payment_method': 'paypal'},
         'transactions': [
