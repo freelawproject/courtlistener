@@ -59,6 +59,10 @@ def route_and_process_payment(request, cd_donation_form, cd_user_form,
             raise NotImplementedError("Unknown frequency value: %s" %
                                       frequency)
 
+        if cd_donation_form['reference']:
+            stripe_args['metadata'].update(
+                {'reference': cd_donation_form['reference']})
+
         # Calculate the amount in cents
         amount = int(float(cd_donation_form['amount']) * 100)
         response = process_stripe_payment(
@@ -134,7 +138,8 @@ def make_payment_page_context(request):
     else:
         # Loading the page...
         donation_form = DonationForm(initial={
-            'referrer': request.GET.get('referrer')
+            'referrer': request.GET.get('referrer'),
+            'reference': request.GET.get('reference'),
         })
         try:
             user_form = UserForm(initial={
