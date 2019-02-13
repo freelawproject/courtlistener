@@ -7,6 +7,7 @@ from django.db import models
 class PAYMENT_TYPES(object):
     DONATION = 'donation'
     PAYMENT = 'payment'
+    BADGE_SIGNUP = 'badge_signup'
 
 
 class FREQUENCIES(object):
