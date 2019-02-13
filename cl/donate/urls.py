@@ -14,17 +14,13 @@ urlpatterns = [
     url(
         r'^donate/complete/$',
         payment_complete,
-        {
-            'template_name': 'donate_complete.html',
-        },
+        {'template_name': 'donate_complete.html'},
         name='donate_complete'
     ),
     url(
         r'^pay/complete/$',
         payment_complete,
-        {
-            'template_name': 'payment_complete.html',
-        },
+        {'template_name': 'payment_complete.html'},
         name='payment_complete'
     ),
     url(
