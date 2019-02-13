@@ -85,7 +85,7 @@ def process_paypal_callback(request):
         d.status = Donation.UNKNOWN_ERROR
         d.save()
     # Finally, show them the thank you page
-    return HttpResponseRedirect(reverse('paypal_complete'))
+    return HttpResponseRedirect(reverse('donate_complete'))
 
 
 def process_paypal_payment(cd_donation_form):
