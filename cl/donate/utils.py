@@ -108,6 +108,7 @@ emails = {
                  'Michael Lissner and Brian Carver\n'
                  'Founders of Free Law Project\n'
                  'https://free.law/contact/'),
+        'from': settings.DEFAULT_FROM_EMAIL,
     },
     'user_bad_subscription': {
         'subject': "We have disabled your monthly contributions to Free Law "
