@@ -17,6 +17,12 @@ class PROVIDERS(object):
         (CHECK, 'Check'),
         (BITCOIN, 'Bitcoin'),
     )
+    ACTIVE_NAMES = (
+        (PAYPAL, 'PayPal'),
+        (CREDIT_CARD, 'Credit Card'),
+        (CHECK, 'Check'),
+        (BITCOIN, 'Bitcoin'),
+    )
 
 
 class Donation(models.Model):
