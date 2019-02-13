@@ -9,6 +9,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.status import HTTP_201_CREATED, HTTP_200_OK
 
 from cl.donate.models import Donation, PAYMENT_TYPES
 from cl.donate.utils import send_thank_you_email, PaymentFailureException
@@ -34,7 +35,7 @@ def get_paypal_access_token():
         ),
         data={'grant_type': 'client_credentials'}
     )
-    if r.status_code == 200:
+    if r.status_code == HTTP_200_OK:
         logger.info("Got paypal token successfully.")
     else:
         logger.critical("Problem getting paypal token status_code was: %s, "
@@ -68,7 +69,7 @@ def process_paypal_callback(request):
         },
         data=json.dumps({'payer_id': request.GET['PayerID']}),
     )
-    if r.status_code == 200:
+    if r.status_code == HTTP_200_OK:
         d.clearing_date = now()
         # Technically, this should be d.status = 2 (Completed, awaiting
         # processing) and we should await a webhook to tell us that the
@@ -93,11 +94,13 @@ def process_paypal_payment(cd_donation_form):
     if not access_token:
         raise PaymentFailureException('NO_ACCESS_TOKEN')
 
+    return_url = 'https://www.courtlistener.com%s' % reverse('paypal_callback')
+    cancel_url = 'https://www.courtlistener.com%s' % reverse('paypal_cancel')
     data = {
         'intent': 'sale',
         'redirect_urls': {
-            'return_url': reverse('paypal_callback'),
-            'cancel_url': reverse('paypal_cancel'),
+            'return_url': return_url,
+            'cancel_url': cancel_url,
         },
         'payer': {'payment_method': 'paypal'},
         'transactions': [
@@ -119,7 +122,7 @@ def process_paypal_payment(cd_donation_form):
         data=json.dumps(data)
     )
 
-    if r.status_code == 201:  # "Created"
+    if r.status_code == HTTP_201_CREATED:
         r_content_as_dict = json.loads(r.content)
         # Get the redirect value from the 'links' attribute. Links look like:
         #   [{u'href': u'https://api.sandbox.paypal.com/v1/payments/payment/PAY-8BC403022U6413151KIQPC2I',
