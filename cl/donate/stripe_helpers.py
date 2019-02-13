@@ -100,6 +100,8 @@ def process_stripe_payment(amount, email, kwargs, stripe_redirect_url):
     and customer is an object returned by stripe's customer creation server-
     side library.
 
+    :param stripe_redirect_url: Where to send the user after a successful
+    transaction
     :return: response object with information about whether the transaction
     succeeded.
     """
@@ -116,7 +118,7 @@ def process_stripe_payment(amount, email, kwargs, stripe_redirect_url):
         response = {
             'status': Donation.AWAITING_PAYMENT,
             'payment_id': charge.id,
-            'redirect': reverse('stripe_complete'),
+            'redirect': stripe_redirect_url,
         }
     except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
         logger.warn("Stripe was unable to process the payment: %s" % e)
