@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.forms import ModelForm
 from localflavor.us.forms import USStateField, USZipCodeField
@@ -18,10 +19,15 @@ AMOUNTS = (
     ('other', 'Other: $'),
 )
 
+FREQUENCIES = (
+    ('once', 'Once'),
+    ('monthly', 'Monthly'),
+)
 
-class DecimalOrOtherField(forms.DecimalField):
+
+class DecimalOrOtherChoiceField(forms.ChoiceField):
     def __init__(self, *args, **kwargs):
-        super(DecimalOrOtherField, self).__init__(*args, **kwargs)
+        super(DecimalOrOtherChoiceField, self).__init__(*args, **kwargs)
 
     def to_python(self, value):
         """Makes sure that the value returned is either returned as a decimal
@@ -31,13 +37,13 @@ class DecimalOrOtherField(forms.DecimalField):
         if value == 'other':
             return value
         else:
-            return super(DecimalOrOtherField, self).to_python(value)
+            return super(DecimalOrOtherChoiceField, self).to_python(value)
 
     def validate(self, value):
         if value == 'other':
             return value
         else:
-            return super(DecimalOrOtherField, self).validate(value)
+            return super(DecimalOrOtherChoiceField, self).validate(value)
 
 
 class ProfileForm(ModelForm):
@@ -101,14 +107,27 @@ class UserForm(ModelForm):
 
 
 class DonationForm(ModelForm):
-    amount_other = forms.DecimalField(
+    reference = forms.CharField(
         required=False,
     )
-    amount = DecimalOrOtherField(
-        widget=forms.RadioSelect(
-            choices=AMOUNTS,
-        ),
+    frequency = forms.ChoiceField(
+        widget=forms.RadioSelect,
+        choices=FREQUENCIES,
+        required=False,
+        initial='once',
+    )
+    amount = DecimalOrOtherChoiceField(
+        widget=forms.RadioSelect,
+        choices=AMOUNTS,
         initial='50',
+    )
+    placeholder = 'Amount (min $%s)' % settings.MIN_DONATION['docket_alerts']
+    amount_other = forms.DecimalField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': placeholder,
+            'class': 'form-control'
+        }),
     )
     payment_provider = forms.ChoiceField(
         widget=forms.RadioSelect,
@@ -121,6 +140,7 @@ class DonationForm(ModelForm):
         fields = (
             'amount_other',
             'amount',
+            'frequency',
             'payment_provider',
             'send_annual_reminder',
             'referrer',
