@@ -4,7 +4,6 @@ from datetime import datetime
 
 import stripe
 from django.conf import settings
-from django.core.urlresolvers import reverse
 from django.http import HttpResponseNotAllowed, HttpResponse
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
@@ -43,10 +42,11 @@ def process_stripe_callback(request):
                 d.clearing_date = datetime.utcfromtimestamp(
                     charge['created']).replace(tzinfo=utc)
                 d.status = Donation.PROCESSED
+                payment_type = charge['metadata']['type']
                 if charge['metadata'].get('recurring'):
-                    send_thank_you_email(d, recurring=True)
+                    send_thank_you_email(d, payment_type, recurring=True)
                 else:
-                    send_thank_you_email(d)
+                    send_thank_you_email(d, payment_type)
             elif event['type'].endswith('failed'):
                 if not d:
                     return HttpResponse('<h1>200: No matching object in the '
@@ -81,7 +81,7 @@ def process_stripe_callback(request):
         )
 
 
-def process_stripe_payment(amount, email, kwargs):
+def process_stripe_payment(amount, email, kwargs, stripe_redirect_url):
     """
     Process a stripe payment.
 
