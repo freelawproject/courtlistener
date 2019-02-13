@@ -58,19 +58,16 @@
   {% endif %}
   <div class="row">
     <div class="col-xs-12">
-      <div class="form-group">
+      <div class="form-group form-group-lg">
+        <input id="id_amount_7"
+               name="amount"
+               type="radio"
+               value="other"
+               hidden="hidden"
+               checked="checked">
         <div class="input-group">
-          <input id="id_amount_7"
-                 name="amount"
-                 type="radio"
-                 value="other"
-                 hidden="hidden"
-                 checked="checked">
           <div class="input-group-addon">$</div>
-          <input type="text" class="form-control"
-                 id="id_amount_other"
-                 placeholder="Amount (USD)"
-                 name="amount_other">
+          {{ donation_form.amount_other }}
         </div>
       </div>
     </div>
