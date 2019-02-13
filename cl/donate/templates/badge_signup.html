@@ -1,0 +1,62 @@
+{% extends "cc_payment.html" %}
+
+{% block title %}Become a Free Law Project Supporter – CourtListener.com{% endblock %}
+
+{% block donate_header %}
+<div id="heading" class="text-center v-offset-below-3">
+  <h1>Become an Ongoing Supporter of Free Law&nbsp;Project</h1>
+</div>
+
+<p class="lead">Free Law Project is on a mission to make the legal world more fair, open, and competitive. We advocate for neutral citations, improved court technology, and open court records.
+</p>
+<p>We use technology to gather and share millions of court records. Through our work, journalists and researchers are empowered, legal service providers can compete on price and features instead of data, and the public is better informed.
+</p>
+<p>For <strong>$25/month</strong>, you can be a Free Law Project supporter. We will place a badge on a Justia profile of your choice, and we will use your support to continue our mission of creating a legal system that's more fair, open, and competitive.
+</p>
+
+{% endblock %}
+
+
+{% block donation_frequency %}
+<input type="radio"
+       id="id_frequency_0"
+       value="monthly"
+       name="frequency"
+       checked="checked"
+       hidden="hidden"/>
+{% endblock %}
+
+
+{% block donation_how_much %}
+<input name="amount"
+       type="radio"
+       value="25"
+       hidden="hidden"
+       checked="checked">
+{% endblock %}
+
+{% block donation_reference %}
+  <div class="row">
+    <div class="col-sm-12">
+      <div class="form-group">
+        <h3>Justia Profile Link:</h3>
+        {{ donation_form.reference }}
+        {% if donation_form.reference.errors %}
+          <p class="help-block">
+            {% for error in donation_form.reference.errors %}
+              {{ error|escape }}
+            {% endfor %}
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block payment_button %}
+<button type="submit"
+        class="btn btn-primary btn-lg"
+        name="donate"
+        id="donate-button"><i class="fa fa-heart"></i>&nbsp;Support Us!
+</button>
+{% endblock %}
