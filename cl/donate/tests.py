@@ -392,6 +392,10 @@ class DonationIntegrationTest(TestCase):
     #
     # Test redirection and emails
     #
+    # Paypal does some annoying redirection stuff that requires a log-in and
+    # makes it nearly impossible to test as we do Stripe. Below we should have
+    # a test for email and redirection of paypal payments, but it just wasn't
+    # possible without undue effort. This is why we like Stripe.
     def test_email_and_redirection_regular_donation_stripe(self):
         self.set_stripe_params()
         self.client.logout()
