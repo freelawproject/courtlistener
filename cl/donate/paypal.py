@@ -77,7 +77,7 @@ def process_paypal_callback(request):
         # completed (2), it'll get processed (4).
         d.status = Donation.PROCESSED
         d.save()
-        send_thank_you_email(d)
+        send_thank_you_email(d, payment_type=PAYMENT_TYPES.DONATION)
     else:
         logger.critical("Unable to execute PayPal transaction. Status code %s "
                         "with data: %s" % (r.status_code, r.content))
