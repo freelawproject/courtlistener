@@ -77,6 +77,38 @@ emails = {
                  'https://free.law/contact/'),
         'from': settings.DEFAULT_FROM_EMAIL,
     },
+    'badge_thanks': {
+        'subject': 'Thanks for becoming a Free Law Project supporter!',
+        'body': ('Dear %s,\n\n'
+                 
+                 'Your decision to support Free Law Project is one you won\'t '
+                 'regret. We are a small non-profit that is working hard to '
+                 'make the legal ecosystem more fair, open, and competitive. '
+                 'Your ongoing support of Free Law Project allows us to '
+                 'continue making high quality legal data and tools widely '
+                 'available.\n\n'
+                 
+                 'Simply put, we would not be able to do our work without '
+                 'your help and that of others like you.\n\n'
+                 
+                 'As a thank you, over the next few days, we will work with '
+                 'Justia to upgrade your profile with the Free Law Project '
+                 'supporter badge. Watch for it soon!\n\n'
+
+                 'We are a federally-recognized 501(c)(3) public charity '
+                 'and a California non-profit public benefit corporation. '
+                 'Our EIN is %s. This letter may serve as a record of your '
+                 'donation. No goods or services were provided, in whole or '
+                 'in part, for this contribution.\n\n'
+
+                 'If you have any questions about your donation or need any '
+                 'help, please contact us at info@free.law. Thank you for '
+                 'supporting our work!\n\n'
+
+                 'Michael Lissner and Brian Carver\n'
+                 'Founders of Free Law Project\n'
+                 'https://free.law/contact/'),
+    },
     'user_bad_subscription': {
         'subject': "We have disabled your monthly contributions to Free Law "
                    "Project",
@@ -137,10 +169,15 @@ def send_thank_you_email(donation, payment_type, recurring=False):
     """
     user = donation.donor
     if recurring:
-        email = emails['donation_thanks_recurring']
-        body = email['body'] % (user.first_name, donation.amount,
-                                settings.EIN_SECRET)
-        send_mail(email['subject'], body, email['from'], [user.email])
+        if payment_type == PAYMENT_TYPES.DONATION:
+            email = emails['donation_thanks_recurring']
+            body = email['body'] % (user.first_name, donation.amount,
+                                    settings.EIN_SECRET)
+            send_mail(email['subject'], body, email['from'], [user.email])
+        elif payment_type == PAYMENT_TYPES.BADGE_SIGNUP:
+            email = emails['badge_thanks']
+            body = email['body'] % (user.first_name, settings.EIN_SECRET)
+            send_mail(email['subject'], body, email['from'], [user.email])
     else:
         if payment_type == PAYMENT_TYPES.DONATION:
             email = emails['donation_thanks']
@@ -152,6 +189,7 @@ def send_thank_you_email(donation, payment_type, recurring=False):
             body = email['body'] % (user.first_name, donation.amount,
                                     donation.pk)
             send_mail(email['subject'], body, email['from'], [user.email])
+
 
 
 def send_failed_subscription_email(m_donation):
