@@ -4,6 +4,20 @@ from django.core.validators import MinValueValidator
 from django.db import models
 
 
+class PAYMENT_TYPES(object):
+    DONATION = 'donation'
+    PAYMENT = 'payment'
+
+
+class FREQUENCIES(object):
+    ONCE = 'once'
+    MONTHLY = 'monthly'
+    NAMES = (
+        (ONCE, 'Once'),
+        (MONTHLY, 'Monthly'),
+    )
+
+
 class PROVIDERS(object):
     DWOLLA = 'dwolla'
     PAYPAL = 'paypal'
