@@ -2,6 +2,8 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.core.urlresolvers import reverse
 
+from cl.donate.models import PAYMENT_TYPES
+
 
 class PaymentFailureException(Exception):
     def __init__(self, message):
@@ -43,6 +45,12 @@ emails = {
                  'to continue making high quality legal data and tools widely '
                  'available. We would be unable to do our work without '
                  'your help.\n\n'
+
+                 'We are a federally-recognized 501(c)(3) public charity '
+                 'and a California non-profit public benefit corporation. '
+                 'Our EIN is %s. This letter may serve as a record of your '
+                 'donation. No goods or services were provided, in whole or '
+                 'in part, for this contribution.\n\n'
                  
                  'If you have any questions about your donation or need any '
                  'help, please contact us at info@free.law. Thank you for '
@@ -50,11 +58,23 @@ emails = {
                  
                  'Michael Lissner and Brian Carver\n'
                  'Founders of Free Law Project\n'
-                 'https://free.law/contact/\n\n'
+                 'https://free.law/contact/'),
+        'from': settings.DEFAULT_FROM_EMAIL,
+    },
+    'payment_thanks': {
+        'subject': 'Receipt for your payment to Free Law Project',
+        'body': ('Dear %s,\n\n'
                  
-                 'PS: Free Law Project is a U.S. 501(c)(3) non-profit, with '
-                 'tax ID of %s. Your gift is tax deductible as allowed by '
-                 'law.'),
+                 'Your payment of $%0.2f was successfully charged with '
+                 'charge ID %s.\n\n'
+                 
+                 'If you have any questions about this payment or need any '
+                 'help, please contact us at info@free.law. Thank you for '
+                 'supporting our work!\n\n'
+
+                 'Michael Lissner and Brian Carver\n'
+                 'Founders of Free Law Project\n'
+                 'https://free.law/contact/'),
         'from': settings.DEFAULT_FROM_EMAIL,
     },
     'user_bad_subscription': {
@@ -107,7 +127,14 @@ emails = {
 }
 
 
-def send_thank_you_email(donation, recurring=False):
+def send_thank_you_email(donation, payment_type, recurring=False):
+    """Send an appropriate email for the payment or donation.
+
+    :param donation: The donation object to process
+    :param payment_type: A payment type in the PAYMENT_TYPES object
+    :param recurring: Whether it's a recurring payment
+    :return: None
+    """
     user = donation.donor
     if recurring:
         email = emails['donation_thanks_recurring']
@@ -115,10 +142,16 @@ def send_thank_you_email(donation, recurring=False):
                                 settings.EIN_SECRET)
         send_mail(email['subject'], body, email['from'], [user.email])
     else:
-        email = emails['donation_thanks']
-        body = email['body'] % (user.first_name, donation.amount,
-                                settings.EIN_SECRET)
-        send_mail(email['subject'], body, email['from'], [user.email])
+        if payment_type == PAYMENT_TYPES.DONATION:
+            email = emails['donation_thanks']
+            body = email['body'] % (user.first_name, donation.amount,
+                                    settings.EIN_SECRET)
+            send_mail(email['subject'], body, email['from'], [user.email])
+        elif payment_type == PAYMENT_TYPES.PAYMENT:
+            email = emails['payment_thanks']
+            body = email['body'] % (user.first_name, donation.amount,
+                                    donation.pk)
+            send_mail(email['subject'], body, email['from'], [user.email])
 
 
 def send_failed_subscription_email(m_donation):
