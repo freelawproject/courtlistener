@@ -140,6 +140,8 @@ def make_payment_page_context(request):
         donation_form = DonationForm(initial={
             'referrer': request.GET.get('referrer'),
             'reference': request.GET.get('reference'),
+            'amount': request.GET.get('amount'),
+            'amount_other': request.GET.get('amount_other'),
         })
         try:
             user_form = UserForm(initial={
