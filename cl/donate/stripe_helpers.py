@@ -48,11 +48,6 @@ def process_stripe_callback(request):
                 else:
                     break
 
-            if d is None:
-                # Couldn't get the item from our DB. Something is wrong.
-                raise PaymentFailureException(
-                    "Couldn't find stripe charge ID of: %s" % charge['id'])
-
             # See: https://stripe.com/docs/api#event_types
             if event['type'].endswith('succeeded'):
                 d.clearing_date = datetime.utcfromtimestamp(
