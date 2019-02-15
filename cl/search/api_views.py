@@ -25,7 +25,7 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
 
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Docket.objects.select_related(
+    queryset = Docket.objects.using('replica').select_related(
         'court',
         'assigned_to',
         'referred_to',
