@@ -7,7 +7,7 @@ from cl.audio.models import Audio
 
 
 class AudioViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Audio.objects.select_related(
+    queryset = Audio.objects.using('replica').select_related(
         'docket',
     ).prefetch_related(
         'panel',
