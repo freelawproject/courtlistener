@@ -342,6 +342,28 @@
     </p>
 
 
+    <h3 id="performance-tips">Performance Tips</h3>
+    <p>A few things to consider that may increase your performance:</p>
+    <ol>
+      <li>
+        <p>When doing deep crawls of the data, going to very high page numbers will incur increasingly bad performance. This is common in databases because to go to a high page number means sorting the entire data set, then counting to the correct location. Page 50 isn't a big deal. Page 2,000 starts getting slower.
+        </p>
+        <p>The fix to this solution is often to work with "slices" of the data. Instead of paginating across the whole result set, use a date field or another range-type field to only paginate over a smaller set of the data. For example, you could slice a large result set by the month of the date filing field to prevent deep pagination.
+        </p>
+        <p>Be careful to slice using a field with a normal distribution. Do not use one like <code>date_created</code>, which could have extreme spikes of activity.
+        </p>
+      </li>
+      <li>
+        <p>In general less data is easier and faster to get than more. Could you use a field to filter your result set down to something smaller?
+        </p>
+      </li>
+      <li>
+        <p>When using the <code>search</code> endpoint, smaller result sets are faster. It isn't always possible to tweak your query to return fewer results, but sometimes it is possible to do a more precise query first, thus making a more broad query unnecessary. For example, a search for an individual in their expected jurisdiction will be faster than doing it in the entire corpus, and may be worthwhile even if it fails and requires the second, broader query some percentage of the time. This will benefit from profiling in your use case and application.
+        </p>
+      </li>
+    </ol>
+
+
     <h3 id="field-details">Field Details</h3>
     <h4 id="date-formats">Date Formats</h4>
     <p>As <a href="http://xkcd.com/1179/">required by an influential comic strip</a>, all date formats are set to <a href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601 format</a>.
