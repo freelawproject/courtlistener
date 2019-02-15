@@ -27,7 +27,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = RECAPDocument.objects.filter(
+    queryset = RECAPDocument.objects.using('replica').filter(
         is_available=True,
     ).only(
         'pk',
@@ -53,7 +53,7 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
 
 
 class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
-    queryset = FjcIntegratedDatabase.objects.all()
+    queryset = FjcIntegratedDatabase.objects.using('replica').all()
     serializer_class = FjcIntegratedDatabaseSerializer
     filter_class = FjcIntegratedDatabaseFilter
     ordering_fields = (

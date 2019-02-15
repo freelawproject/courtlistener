@@ -20,7 +20,7 @@ from cl.search.models import (
 
 
 class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
-    queryset = OriginatingCourtInformation.objects.all()
+    queryset = OriginatingCourtInformation.objects.using('replica').all()
     serializer_class = OriginalCourtInformationSerializer
 
 
@@ -48,7 +48,7 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = DocketEntry.objects.select_related(
+    queryset = DocketEntry.objects.using('replica').select_related(
         'docket',   # For links back to dockets
     ).prefetch_related(
         'recap_documents',        # Sub items
@@ -65,7 +65,7 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
 class RECAPDocumentViewSet(LoggingMixin, CacheListMixin,
                            viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = RECAPDocument.objects.select_related(
+    queryset = RECAPDocument.objects.using('replica').select_related(
         'docket_entry',
         'docket_entry__docket',
     ).prefetch_related(
@@ -88,7 +88,7 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = OpinionCluster.objects.prefetch_related(
+    queryset = OpinionCluster.objects.using('replica').prefetch_related(
         'sub_opinions',
         'panel',
         'non_participating_judges',
@@ -103,7 +103,7 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Opinion.objects.select_related(
+    queryset = Opinion.objects.using('replica').select_related(
         'cluster',
         'author',
     ).prefetch_related(
@@ -118,14 +118,14 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = OpinionsCited.objects.all()
+    queryset = OpinionsCited.objects.using('replica').all()
     serializer_class = OpinionsCitedSerializer
     filter_class = OpinionsCitedFilter
 
 
 class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = Tag.objects.all()
+    queryset = Tag.objects.using('replica').all()
     serializer_class = TagSerializer
 
 
