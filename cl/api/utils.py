@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from collections import OrderedDict, defaultdict
 from datetime import date
@@ -35,6 +36,8 @@ INTEGER_LOOKUPS = ['exact', 'gte', 'gt', 'lte', 'lt', 'range']
 BASIC_TEXT_LOOKUPS = ['exact', 'iexact', 'startswith', 'istartswith',
                       'endswith', 'iendswith']
 ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ['contains', 'icontains']
+
+logger = logging.getLogger(__name__)
 
 
 class HyperlinkedModelSerializerWithId(serializers.HyperlinkedModelSerializer):
@@ -151,9 +154,39 @@ class LoggingMixin(object):
     def initial(self, request, *args, **kwargs):
         super(LoggingMixin, self).initial(request, *args, **kwargs)
 
+        # For logging the timing in self.finalize_response
+        self.requested_at = now()
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super(LoggingMixin, self).finalize_response(
+            request, response, *args, **kwargs)
+
+        if not response.exception:
+            # Don't log things like 401, 403, etc.,
+            # noinspection PyBroadException
+            try:
+                results = self._log_request(request)
+                self._handle_events(results, request.user)
+            except Exception as e:
+                logger.exception("Unable to log API response timing info: %s",
+                                 e.message)
+        return response
+
+    def _get_response_ms(self):
+        """
+        Get the duration of the request response cycle in milliseconds.
+        In case of negative duration 0 is returned.
+        """
+        response_timedelta = now() - self.requested_at
+        response_ms = int(response_timedelta.total_seconds() * 1000)
+
+        return max(response_ms, 0)
+
+    def _log_request(self, request):
         d = date.today().isoformat()
         user = request.user
         endpoint = request.resolver_match.url_name
+        response_ms = self._get_response_ms()
 
         r = redis.StrictRedis(
             host=settings.REDIS_HOST,
@@ -165,6 +198,8 @@ class LoggingMixin(object):
         # Global and daily tallies for all URLs.
         pipe.incr('api:v3.count')
         pipe.incr('api:v3.d:%s.count' % d)
+        pipe.incr('api:v3.timing', response_ms)
+        pipe.incr('api:v3.d:%s.timing' % d, response_ms)
 
         # Use a sorted set to store the user stats, with the score representing
         # the number of queries the user made total or on a given day.
@@ -176,7 +211,17 @@ class LoggingMixin(object):
         pipe.zincrby('api:v3.endpoint.counts', endpoint)
         pipe.zincrby('api:v3.endpoint.d:%s.counts' % d, endpoint)
 
+        # We create a per-day key in redis for timings. Inside the key we have
+        # members for every endpoint, with score of the total time. So to get
+        # the average for an endpoint you need to get the number of requests
+        # and the total time for the endpoint and divide.
+        timing_key = 'api:v3.endpoint.d:%s.timings' % d
+        pipe.zincrby(timing_key, endpoint, response_ms)
+
         results = pipe.execute()
+        return results
+
+    def _handle_events(self, results, user):
         total_count = results[0]
         user_count = results[2]
 
