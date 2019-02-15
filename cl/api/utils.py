@@ -477,6 +477,29 @@ def invert_user_logs(start, end):
     return out
 
 
+def get_avg_ms_for_endpoint(endpoint, d):
+    """
+
+    :param endpoint: The endpoint to get the average timing for. Typically
+    something like 'docket-list' or 'docket-detail'
+    :param d: The date to get the timing for (a date object)
+    :return: The average number of ms that endpoint used to serve requests on
+    that day.
+    """
+    d_str = d.isoformat()
+    r = redis.StrictRedis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        db=settings.REDIS_DATABASES['STATS'],
+    )
+    pipe = r.pipeline()
+    pipe.zscore('api:v3.endpoint.d:%s.timings' % d_str, endpoint)
+    pipe.zscore('api:v3.endpoint.d:%s.counts' % d_str, endpoint)
+    results = pipe.execute()
+
+    return results[0] / results[1]
+
+
 emails = {
     'new_api_user': {
         'subject': "Welcome to the CourtListener API from Free Law Project",
