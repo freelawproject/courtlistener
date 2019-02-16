@@ -8,10 +8,15 @@ from juriscraper.lib.html_utils import get_visible_text
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 
 from cl.citations import reporter_tokenizer
-from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.roman import isroman
-from cl.search.models import Citation as ModelCitation
 from cl.search.models import Court
+from cl.citations.models import (
+    FullCitation,
+    IdCitation,
+    SupraCitation,
+    ShortformCitation,
+)
+
 
 FORWARD_SEEK = 20
 
@@ -42,160 +47,6 @@ else:
     # list() forces early evaluation of the queryset so we don't have issues
     # with closed cursors.
     ALL_COURTS = list(Court.objects.all().values("citation_string", "pk"))
-
-
-class Citation(object):
-    """Convenience class which represents a single citation found in a
-    document.
-    """
-
-    def __init__(
-        self,
-        reporter,
-        page,
-        volume,
-        canonical_reporter=None,
-        lookup_index=None,
-        extra=None,
-        defendant=None,
-        plaintiff=None,
-        court=None,
-        year=None,
-        match_url=None,
-        match_id=None,
-        reporter_found=None,
-        reporter_index=None,
-    ):
-
-        # Core data.
-        self.reporter = reporter
-        self.volume = volume
-        self.page = page
-
-        # These values are set during disambiguation.
-        # For a citation to F.2d, the canonical reporter is F.
-        self.canonical_reporter = canonical_reporter
-        self.lookup_index = lookup_index
-
-        # Supplementary data, if possible.
-        self.extra = extra
-        self.defendant = defendant
-        self.plaintiff = plaintiff
-        self.court = court
-        self.year = year
-
-        # The reporter found in the text is often different from the reporter
-        # once it's normalized. We need to keep the original value so we can
-        # linkify it with a regex.
-        self.reporter_found = reporter_found
-
-        # The location of the reporter is useful for tasks like finding
-        # parallel citations, and finding supplementary info like defendants
-        # and years.
-        self.reporter_index = reporter_index
-
-        # Attributes of the matching item, for URL generation.
-        self.match_url = match_url
-        self.match_id = match_id
-
-        self.equality_attributes = [
-            "reporter",
-            "volume",
-            "page",
-            "canonical_reporter",
-            "lookup_index",
-        ]
-
-    def base_citation(self):
-        return u"%d %s %s" % (self.volume, self.reporter, self.page)
-
-    def as_regex(self):
-        return r"%d(\s+)%s(\s+)%s" % (
-            self.volume,
-            re.escape(self.reporter_found),
-            self.page,
-        )
-
-    # TODO: Update css for no-link citations
-    def as_html(self):
-        # Uses reporter_found so that we don't update the text. This guards us
-        # against accidentally updating things like docket number 22 Cr. 1 as
-        # 22 Cranch 1, which is totally wrong.
-        template = (
-            u'<span class="volume">%(volume)d</span>\\1'
-            u'<span class="reporter">%(reporter)s</span>\\2'
-            u'<span class="page">%(page)s</span>'
-        )
-        inner_html = template % self.__dict__
-        span_class = "citation"
-        if self.match_url:
-            inner_html = u'<a href="%s">%s</a>' % (self.match_url, inner_html)
-            data_attr = u' data-id="%s"' % self.match_id
-        else:
-            span_class += " no-link"
-            data_attr = ""
-        return u'<span class="%s"%s>%s</span>' % (
-            span_class,
-            data_attr,
-            inner_html,
-        )
-
-    def to_model(self):
-        # Create a citation object as in our models. Eventually, the version in
-        # our models should probably be the only object named "Citation". Until
-        # then, this function helps map from this object to the Citation object
-        # in the models.
-        c = ModelCitation(
-            **{
-                key: value
-                for key, value in self.__dict__.items()
-                if key in ModelCitation._meta.get_all_field_names()
-            }
-        )
-        canon = REPORTERS[self.canonical_reporter]
-        cite_type = canon[self.lookup_index]["cite_type"]
-        c.type = map_reporter_db_cite_type(cite_type)
-        return c
-
-    def __repr__(self):
-        print_string = self.base_citation()
-        if self.defendant:
-            print_string = u" ".join([self.defendant, print_string])
-            if self.plaintiff:
-                print_string = u" ".join([self.plaintiff, "v.", print_string])
-        if self.extra:
-            print_string = u" ".join([print_string, self.extra])
-        if self.court and self.year:
-            paren = u"(%s %d)" % (self.court, self.year)
-        elif self.year:
-            paren = u"(%d)" % self.year
-        elif self.court:
-            paren = u"(%s)" % self.court
-        else:
-            paren = ""
-        print_string = u" ".join([print_string, paren])
-        return print_string.encode("utf-8")
-
-    def __eq__(self, other):
-        return self.__dict__ == other.__dict__
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def fuzzy_hash(self):
-        """Used to test equality in dicts.
-
-        Overridden here to simplify away some of the attributes that can differ
-        for the same citation.
-        """
-        s = ""
-        for attr in self.equality_attributes:
-            s += str(getattr(self, attr, None))
-        return hash(s)
-
-    def fuzzy_eq(self, other):
-        """Used to override the __eq__ function."""
-        return self.fuzzy_hash() == other.fuzzy_hash()
 
 
 # Adapted from nltk Penn Treebank tokenizer
