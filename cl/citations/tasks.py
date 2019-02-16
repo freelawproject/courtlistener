@@ -1,5 +1,6 @@
 import re
 from httplib import ResponseNotReady
+from collections import Counter
 
 from cl.celery import app
 from cl.citations import find_citations, match_citations
@@ -93,52 +94,33 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
     """
     opinions = Opinion.objects.filter(pk__in=opinion_pks)
     for opinion in opinions:
+        # Returns a list of Citation objects, i.e., something like
+        # [FullCitation, FullCitation, ShortformCitation, FullCitation,
+        #   SupraCitation, SupraCitation, ShortformCitation, FullCitation]
         citations = get_document_citations(opinion)
 
-        # List used so we can do one simple update to the citing opinion.
-        opinions_cited = set()
-        for citation in citations:
-            try:
-                matches = match_citations.match_citation(
-                    citation, citing_doc=opinion
-                )
-            except ResponseNotReady as e:
-                # Threading problem in httplib, which is used in the Solr query.
-                raise self.retry(exc=e, countdown=2)
+        # Match all those different Citation objects to Opinion objects, using
+        # a variety of hueristics.
+        try:
+            citation_matches = match_citations.get_citation_matches(
+                opinion, citations
+            )
+        except ResponseNotReady as e:
+            # Threading problem in httplib, which is used in the Solr query.
+            raise self.retry(exc=e, countdown=2)
 
-            # TODO: Figure out what to do if there's more than one
-            if len(matches) == 1:
-                match_id = matches[0]["id"]
-                try:
-                    matched_opinion = Opinion.objects.get(pk=match_id)
+        # Consolidate duplicate matches, keeping a counter of how often each
+        # match appears (so we know how many times an opinion cites another).
+        # keys = opinion
+        # values = number of times that opinion is cited
+        grouped_matches = Counter(citation_matches)
 
-                    # Increase citation count for matched cluster if it hasn't
-                    # already been cited by this opinion.
-                    if matched_opinion not in opinion.opinions_cited.all():
-                        matched_opinion.cluster.citation_count += 1
-                        matched_opinion.cluster.save(index=index)
-
-                    # Add citation match to the citing opinion's list of cases
-                    # it cites. opinions_cited is a set so duplicates aren't an
-                    # issue
-                    opinions_cited.add(matched_opinion.pk)
-
-                    # URL field will be used for generating inline citation
-                    # html
-                    citation.match_url = (
-                        matched_opinion.cluster.get_absolute_url()
-                    )
-                    citation.match_id = matched_opinion.pk
-                except Opinion.DoesNotExist:
-                    # No Opinions returned. Press on.
-                    continue
-                except Opinion.MultipleObjectsReturned:
-                    # Multiple Opinions returned. Press on.
-                    continue
-            else:
-                # No match found for citation
-                # create_stub([citation])
-                pass
+        for matched_opinion in grouped_matches:
+            # Increase citation count for matched cluster if it hasn't
+            # already been cited by this opinion.
+            if matched_opinion not in opinion.opinions_cited.all():
+                matched_opinion.cluster.citation_count += 1
+                matched_opinion.cluster.save(index=index)
 
         # Only update things if we found citations
         if citations:
@@ -151,9 +133,11 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
             OpinionsCited.objects.bulk_create(
                 [
                     OpinionsCited(
-                        citing_opinion_id=opinion.pk, cited_opinion_id=pk
+                        citing_opinion_id=opinion.pk,
+                        cited_opinion_id=matched_opinion.pk,
+                        depth=grouped_matches[matched_opinion],
                     )
-                    for pk in opinions_cited
+                    for matched_opinion in grouped_matches
                 ]
             )
 
