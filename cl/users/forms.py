@@ -1,4 +1,4 @@
-from disposable_email_domains import blacklist
+from disposable_email_domains import blocklist
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm, \
     PasswordResetForm, SetPasswordForm
@@ -70,8 +70,6 @@ class ProfileForm(ModelForm):
                 'class': 'form-control',
                 'autocomplete': 'address-level2',
             }),
-    #        'wants_newsletter': forms.TextInput(attrs={'class': 'form-control'}),
-    #        'plaintext_preferred': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
 
@@ -105,7 +103,7 @@ class UserForm(ModelForm):
     def clean_email(self):
         email = self.cleaned_data.get('email')
         user_part, domain_part = email.rsplit('@', 1)
-        if domain_part in blacklist:
+        if domain_part in blocklist:
             raise forms.ValidationError(
                 '%s is a blocked email provider' % domain_part,
                 code="bad_email_domain"
@@ -167,7 +165,7 @@ class UserCreationFormExtended(UserCreationForm):
     def clean_email(self):
         email = self.cleaned_data.get('email')
         user_part, domain_part = email.rsplit('@', 1)
-        if domain_part in blacklist:
+        if domain_part in blocklist:
             raise forms.ValidationError(
                 '%s is a blocked email provider' % domain_part,
                 code="bad_email_domain"
