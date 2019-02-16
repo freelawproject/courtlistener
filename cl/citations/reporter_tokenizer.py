@@ -13,7 +13,7 @@ from reporters_db import EDITIONS, VARIATIONS_ONLY
 REGEX_LIST = EDITIONS.keys() + VARIATIONS_ONLY.keys()
 REGEX_LIST.sort(key=len, reverse=True)
 REGEX_STR = "|".join(map(re.escape, REGEX_LIST))
-REPORTER_RE = re.compile("(^|\s)(%s)\s" % REGEX_STR)
+REPORTER_RE = re.compile(r"(^|\s)(%s)(\s|,)" % REGEX_STR)
 
 
 def normalize_variation(string):

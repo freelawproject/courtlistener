@@ -228,40 +228,8 @@ def add_defendant(citation, words):
         )
 
 
-def extract_base_citation(words, reporter_index):
-    """Construct and return a citation object from a list of "words"
-
-    Given a list of words and the index of a federal reporter, look before and
-    after for volume and page.  If found, construct and return a
-    Citation object.
-
-    If we are given neutral, tax court opinions we treat them differently.
-    The formats often follow {REPORTER} {YEAR}-{ITERATIVE_NUMBER}
-    ex. T.C. Memo. 2019-13
-    """
-    reporter = words[reporter_index]
-    neutral_tc_reporter = is_neutral_tc_reporter(reporter)
-    if neutral_tc_reporter:
-        volume, page = (
-            words[reporter_index + 1]
-            .encode("utf-8")
-            .replace("–", "-")
-            .split("-")
-        )
-    else:
-        # "Normal" reporter: XX F.2d YY
-        if reporter_index == 0:
-            return None
-        volume = strip_punct(words[reporter_index - 1])
-        page = strip_punct(words[reporter_index + 1])
-
-    # Normalize volume and page
-    if volume.isdigit():
-        volume = int(volume)
-    else:
-        # No volume, therefore not a valid citation
-        return None
-
+def parse_page(page):
+    page = strip_punct(page)
     if page.isdigit():
         # Most page numbers will be digits.
         page = int(page)
@@ -269,23 +237,145 @@ def extract_base_citation(words, reporter_index):
         if isroman(page):
             # Some places like Nebraska have Roman numerals, e.g. in
             # '250 Neb. xxiv (1996)'. No processing needed.
-            pass
+            page = page.encode("utf-8")
         elif re.match(r"\d{1,6}[-]?[a-zA-Z]{1,6}", page):
             # Some places, like Connecticut, have pages like "13301-M".
             # Other places, like Illinois have "pages" like "110311-B".
-            pass
+            page = page.encode("utf-8")
         else:
             # Not Roman, and not a weird connecticut page number. Thus a bad
             # value. Abort.
-            return None
+            page = None
 
-    return Citation(
+    return page
+
+
+def extract_full_citation(words, reporter_index):
+    """Given a list of words and the index of a federal reporter, look before
+    and after for volume and page. If found, construct and return a
+    FullCitation object.
+
+    Example full citation: Adarand Constructors, Inc. v. Peña, 515 U.S. 200, 240
+
+    If we are given neutral, tax court opinions we treat them differently.
+    The formats often follow {REPORTER} {YEAR}-{ITERATIVE_NUMBER}
+    ex. T.C. Memo. 2019-13
+    """
+    # Get reporter
+    reporter = words[reporter_index]
+
+    # Handle tax citations
+    is_tax_citation = is_neutral_tc_reporter(reporter)
+    if is_tax_citation:
+        volume, page = (
+            words[reporter_index + 1]
+            .encode("utf-8")
+            .replace("–", "-")
+            .split("-")
+        )
+    else:
+        # Is a "normal" citation, e.g., XX F.2d YY
+        if reporter_index == 0:
+            return None
+        volume = strip_punct(words[reporter_index - 1])
+        page = strip_punct(words[reporter_index + 1])
+
+    # Get volume
+    if volume.isdigit():
+        volume = int(volume)
+    else:
+        # No volume, therefore not a valid citation
+        return None
+
+    # Get page
+    page = parse_page(page)
+    if not page:
+        return None
+
+    # Return FullCitation
+    return FullCitation(
         reporter,
         page,
         volume,
         reporter_found=reporter,
         reporter_index=reporter_index,
     )
+
+
+def extract_shortform_citation(words, reporter_index):
+    """Given a list of words and the index of a federal reporter, look before
+    and after to see if this is a short form citation. If found, construct
+    and return a ShortformCitation object.
+
+    Shortform 1: Adarand, 515 U.S., at 241
+    Shortform 2: 515 U.S., at 241
+    """
+    # Don't check if we are the beginning of a string
+    if reporter_index == 0:
+        return None
+
+    # Get volume
+    volume = strip_punct(words[reporter_index - 1])
+    if volume.isdigit():
+        volume = int(volume)
+    else:
+        # No volume, therefore not a valid citation
+        return None
+
+    # Get page
+    page = parse_page(words[reporter_index + 2])
+    if not page:
+        # There might be a comma in the way, so try one more index
+        page = parse_page(words[reporter_index + 3])
+        if not page:
+            # No page, therefore not a valid citation
+            return None
+
+    # Get antecedent
+    antecedent_guess = words[reporter_index - 2]
+    if antecedent_guess == ",":
+        antecedent_guess = words[reporter_index - 3] + ","
+
+    # Get reporter
+    reporter = words[reporter_index]
+
+    # Return ShortformCitation
+    return ShortformCitation(
+        reporter,
+        page,
+        volume,
+        antecedent_guess,
+        reporter_found=reporter,
+        reporter_index=reporter_index,
+    )
+
+
+def extract_supra_citation(words, supra_index):
+    """Given a list of words and the index of a supra token, look before
+    and after to see if this is a supra citation. If found, construct
+    and return a SupraCitation object.
+
+    Supra 1: Adarand, supra, at 240
+    Supra 2: Adarand, 515 supra, at 240
+    Supra 3: Adarand, supra, somethingelse
+    Supra 4: Adrand, supra. somethingelse
+    """
+    # Get volume
+    volume = None
+
+    # Get page
+    page = parse_page(words[supra_index + 2])
+
+    # Get antecedent
+    antecedent_guess = words[supra_index - 1]
+    if antecedent_guess.isdigit():
+        volume = int(antecedent_guess)
+        antecedent_guess = words[supra_index - 2]
+    elif antecedent_guess == ",":
+        antecedent_guess = words[supra_index - 2] + ","
+
+    # Return SupraCitation
+    return SupraCitation(antecedent_guess, page=page, volume=volume)
 
 
 def is_date_in_reporter(editions, year):
@@ -332,8 +422,15 @@ def disambiguate_reporters(citations):
     """
     unambiguous_citations = []
     for citation in citations:
+        # Only disambiguate citations with a reporter
+        if isinstance(citation, SupraCitation) or isinstance(
+            citation, IdCitation
+        ):
+            unambiguous_citations.append(citation)
+            continue
+
         # Non-variant items (P.R.R., A.2d, Wash., etc.)
-        if REPORTERS.get(EDITIONS.get(citation.reporter)) is not None:
+        elif REPORTERS.get(EDITIONS.get(citation.reporter)) is not None:
             citation.canonical_reporter = EDITIONS[citation.reporter]
             if len(REPORTERS[EDITIONS[citation.reporter]]) == 1:
                 # Single reporter, easy-peasy.
@@ -452,27 +549,63 @@ def get_citations(
         text = get_visible_text(text)
     words = reporter_tokenizer.tokenize(text)
     citations = []
-    # Exclude first and last tokens when looking for reporters, because valid
-    # citations must have a volume before and a page after the reporter.
+
     for i in xrange(0, len(words) - 1):
-        # Find reporter
-        if words[i] in (EDITIONS.keys() + VARIATIONS_ONLY.keys()):
-            citation = extract_base_citation(words, i)
-            if citation is None:
-                # Not a valid citation; continue looking
-                continue
-            if do_post_citation:
-                add_post_citation(citation, words)
-            if do_defendant:
-                add_defendant(citation, words)
-            citations.append(citation)
+        citation_token = words[i]
+
+        # CASE 1: Citation token is a reporter (e.g., "U. S.").
+        # In this case, first try extracting it as a standard, full citation,
+        # and if that fails try extracting it as a short form citation.
+        if citation_token in (EDITIONS.keys() + VARIATIONS_ONLY.keys()):
+            citation = extract_full_citation(words, i)
+            if citation:
+                # CASE 1A: Standard citation found, try to add additional data
+                if do_post_citation:
+                    add_post_citation(citation, words)
+                if do_defendant:
+                    add_defendant(citation, words)
+            else:
+                # CASE 1B: Standard citation not found, so see if this
+                # reference to a reporter is a short form citation instead
+                citation = extract_shortform_citation(words, i)
+
+                if not citation:
+                    # Neither a full nor short form citation
+                    continue
+
+        # CASE 2: Citation token is an "Ibid." or "Id." reference.
+        # In this case, the citation is simply to the immediately previous
+        # document, but for safety we won't make that resolution until the
+        # previous citation has been successfully matched to an opinion.
+        elif citation_token.lower() in {"ibid.", "id.", "id.,"}:
+            citation = IdCitation(
+                id_token=citation_token, after_tokens=words[i + 1 : i + 4]
+            )
+
+        # CASE 3: Citation token is a "supra" reference.
+        # In this case, we're not sure yet what the citation's antecedent is.
+        # It could be any of the previous citations above. Thus, like an Id.
+        # citation, we won't be able to resolve this reference until the
+        # previous citations are actually matched to opinions.
+        elif strip_punct(citation_token.lower()) == "supra":
+            citation = extract_supra_citation(words, i)
+
+        # CASE 4: The token is not a citation.
+        else:
+            continue
+
+        citations.append(citation)
 
     if disambiguate:
-        # Disambiguate or drop all the reporters
+        # Disambiguate each citation's reporter
         citations = disambiguate_reporters(citations)
 
     for citation in citations:
         if not citation.court and is_scotus_reporter(citation):
             citation.court = "scotus"
 
+    # Returns a list of citations ordered in the sequence that they appear in
+    # the document. The ordering of this list is important because we will
+    # later rely on that order to reconstruct the references of the
+    # ShortformCitation, SupraCitation, and IdCitation objects.
     return citations
