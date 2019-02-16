@@ -2768,12 +2768,12 @@ class OpinionsCited(models.Model):
     cited_opinion = models.ForeignKey(
         Opinion, related_name="citing_opinions", on_delete=models.CASCADE,
     )
-    #  depth = models.IntegerField(
-    #      help_text='The number of times the cited opinion was cited '
-    #                'in the citing opinion',
-    #      default=1,
-    #      db_index=True,
-    #  )
+    depth = models.IntegerField(
+        help_text="The number of times the cited opinion was cited "
+        "in the citing opinion",
+        default=1,
+        db_index=True,
+    )
     #  quoted = models.BooleanField(
     #      help_text='Equals true if previous case was quoted directly',
     #      default=False,
