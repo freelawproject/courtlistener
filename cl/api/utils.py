@@ -341,8 +341,7 @@ class BulkJsonHistory(object):
 
     def __init__(self, obj_type_str, bulk_dir):
         self.obj_type_str = obj_type_str
-        self.path = os.path.join(bulk_dir, 'tmp', obj_type_str,
-                                 'info.json')
+        self.path = os.path.join(bulk_dir, obj_type_str, 'info.json')
         self.json = self.load_json_file()
         super(BulkJsonHistory, self).__init__()
 
