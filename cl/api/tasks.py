@@ -34,7 +34,7 @@ def make_bulk_data_and_swap_it_in(courts, bulk_dir, kwargs):
 
         print('   - Swapping in the new %s archives...' %
               kwargs['obj_type_str'])
-        swap_archives(kwargs['obj_type_str'], bulk_dir)
+        swap_archives(kwargs['obj_type_str'], bulk_dir, tmp_bulk_dir)
 
 
 def swap_archives(obj_type_str, bulk_dir, tmp_bulk_dir):
