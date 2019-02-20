@@ -1,9 +1,10 @@
 from datetime import timedelta
 
 from django.core.mail import send_mail
+from django.core.urlresolvers import reverse
 from django.utils.timezone import now
 
-from cl.donate.models import MonthlyDonation, Donation
+from cl.donate.models import MonthlyDonation, Donation, PAYMENT_TYPES
 from cl.donate.stripe_helpers import process_stripe_payment
 from cl.donate.utils import emails, PaymentFailureException, \
     send_failed_subscription_email
@@ -37,7 +38,9 @@ class Command(VerboseCommand):
                     int(m_donation.monthly_donation_amount * 100),
                     m_donation.donor.email,
                     {'customer': m_donation.stripe_customer_id,
-                     'metadata': {'recurring': True}},
+                     'metadata': {'recurring': True,
+                                  'type': PAYMENT_TYPES.DONATION}},
+                    reverse('donate_complete'),
                 )
             except PaymentFailureException as e:
                 m_donation.failure_count += 1
