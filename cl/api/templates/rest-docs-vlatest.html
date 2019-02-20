@@ -155,7 +155,7 @@
     <p>Using curl, this looks like:</p>
     <pre class="scrollable">curl {% get_full_host %}{% url "opinioncluster-list" version="v3" %} --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
     <p>Note that quotes are used to enclose the whitespace in the header.</p>
-    <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Careful!</strong> The most common mistake we see is forgetting the word "Token" in the token authentication header value. Remember that the header name is <code>Authentication</code> and the value is <code>Token&nbsp;{% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</code></p>
+    <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Careful!</strong> The most common mistake we see is forgetting the word "Token" in the token authentication header value. Remember that the header name is <code>Authorization</code> and the value is <code>Token&nbsp;{% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</code></p>
     {% if user.is_authenticated %}
       <p>Your permanent token for use with this API is being used in the examples above, is at the top of this page, and is:</p>
       <pre class="scrollable">{{ user.auth_token }}</pre>
