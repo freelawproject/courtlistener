@@ -294,6 +294,7 @@ REST_FRAMEWORK = {
         'safetynet': '100/hour',
 
         # Throttling up.
+        'mlissner': '1000000/hour',  # Needed for benchmarking (not greed)
         'gpilapil': '10000/hour',
         'peidelman': '20000/hour',
         'waldo': '10000/hour',
