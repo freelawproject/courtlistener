@@ -40,8 +40,10 @@ router.register(r'political-affiliations',
                 people_views.PoliticalAffiliationViewSet)
 router.register(r'sources', people_views.SourceViewSet)
 router.register(r'aba-ratings', people_views.ABARatingViewSet)
-router.register(r'parties', people_views.PartyViewSet)
-router.register(r'attorneys', people_views.AttorneyViewSet)
+router.register(r'parties', people_views.PartyViewSet,
+                base_name='party')
+router.register(r'attorneys', people_views.AttorneyViewSet,
+                base_name='attorney')
 
 # RECAP
 router.register(r'recap', recap_views.PacerProcessingQueueViewSet)

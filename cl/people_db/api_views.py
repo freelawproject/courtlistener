@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 
+from cl.api.routers import get_api_read_db
 from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
 from cl.people_db.api_serializers import (
     PersonSerializer, PositionSerializer,
@@ -88,24 +89,28 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = Party.objects.using('replica').prefetch_related(
-        'party_types',
-        'roles',
-    )
     serializer_class = PartySerializer
     filter_class = PartyFilter
     ordering_fields = (
         'date_created', 'date_modified',
     )
 
+    def get_queryset(self):
+        return Party.objects.using(get_api_read_db()).prefetch_related(
+            'party_types',
+            'roles',
+        )
+
 
 class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = Attorney.objects.using('replica').prefetch_related(
-        'roles',
-    )
     serializer_class = AttorneySerializer
     filter_class = AttorneyFilter
     ordering_fields = (
         'date_created', 'date_modified',
     )
+
+    def get_queryset(self):
+        return Attorney.objects.using(get_api_read_db()).prefetch_related(
+            'roles',
+        )
