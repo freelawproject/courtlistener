@@ -96,7 +96,7 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
 
     def get_queryset(self):
-        return Party.objects.using(get_api_read_db()).prefetch_related(
+        return Party.objects.using('replica').prefetch_related(
             'party_types',
             'roles',
         )
@@ -111,6 +111,6 @@ class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
 
     def get_queryset(self):
-        return Attorney.objects.using(get_api_read_db()).prefetch_related(
+        return Attorney.objects.using('replica').prefetch_related(
             'roles',
         )
