@@ -13,17 +13,22 @@ router = DefaultRouter()
 # Search & Audio
 router.register(r'dockets', search_views.DocketViewSet, base_name='docket')
 router.register(r'originating-court-information',
-                search_views.OriginatingCourtInformationViewSet)
-router.register(r'docket-entries', search_views.DocketEntryViewSet)
-router.register(r'recap-documents', search_views.RECAPDocumentViewSet)
-router.register(r'courts', search_views.CourtViewSet)
+                search_views.OriginatingCourtInformationViewSet,
+                base_name='originatingcourtinformation')
+router.register(r'docket-entries', search_views.DocketEntryViewSet,
+                base_name='docketentry')
+router.register(r'recap-documents', search_views.RECAPDocumentViewSet,
+                base_name='recapdocument')
+router.register(r'courts', search_views.CourtViewSet, base_name='court')
 router.register(r'audio', audio_views.AudioViewSet, base_name='audio')
 router.register(r'clusters', search_views.OpinionClusterViewSet,
                 base_name='opinioncluster')
-router.register(r'opinions', search_views.OpinionViewSet)
-router.register(r'opinions-cited', search_views.OpinionsCitedViewSet)
+router.register(r'opinions', search_views.OpinionViewSet,
+                base_name='opinion')
+router.register(r'opinions-cited', search_views.OpinionsCitedViewSet,
+                base_name='opinionscited')
 router.register(r'search', search_views.SearchViewSet, base_name='search')
-router.register(r'tag', search_views.TagViewSet)
+router.register(r'tag', search_views.TagViewSet, base_name='tag')
 
 # People & Entities
 router.register(r'people', people_views.PersonViewSet)
