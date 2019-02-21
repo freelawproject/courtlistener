@@ -11,14 +11,15 @@ from cl.search import api_views as search_views
 
 router = DefaultRouter()
 # Search & Audio
-router.register(r'dockets', search_views.DocketViewSet)
+router.register(r'dockets', search_views.DocketViewSet, base_name='docket')
 router.register(r'originating-court-information',
                 search_views.OriginatingCourtInformationViewSet)
 router.register(r'docket-entries', search_views.DocketEntryViewSet)
 router.register(r'recap-documents', search_views.RECAPDocumentViewSet)
 router.register(r'courts', search_views.CourtViewSet)
 router.register(r'audio', audio_views.AudioViewSet, base_name='audio')
-router.register(r'clusters', search_views.OpinionClusterViewSet)
+router.register(r'clusters', search_views.OpinionClusterViewSet,
+                base_name='opinioncluster')
 router.register(r'opinions', search_views.OpinionViewSet)
 router.register(r'opinions-cited', search_views.OpinionsCitedViewSet)
 router.register(r'search', search_views.SearchViewSet, base_name='search')
