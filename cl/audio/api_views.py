@@ -8,13 +8,15 @@ from cl.audio.models import Audio
 
 
 class AudioViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Audio.objects.using(get_api_read_db()).select_related(
-        'docket',
-    ).prefetch_related(
-        'panel',
-    ).order_by()
     serializer_class = AudioSerializer
     filter_class = AudioFilter
     ordering_fields = (
         'date_created', 'date_modified', 'date_blocked',
     )
+
+    def get_queryset(self):
+        return Audio.objects.using(get_api_read_db()).select_related(
+            'docket',
+        ).prefetch_related(
+            'panel',
+        ).order_by()

@@ -17,7 +17,7 @@ router.register(r'originating-court-information',
 router.register(r'docket-entries', search_views.DocketEntryViewSet)
 router.register(r'recap-documents', search_views.RECAPDocumentViewSet)
 router.register(r'courts', search_views.CourtViewSet)
-router.register(r'audio', audio_views.AudioViewSet)
+router.register(r'audio', audio_views.AudioViewSet, base_name='audio')
 router.register(r'clusters', search_views.OpinionClusterViewSet)
 router.register(r'opinions', search_views.OpinionViewSet)
 router.register(r'opinions-cited', search_views.OpinionsCitedViewSet)
