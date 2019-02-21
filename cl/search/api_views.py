@@ -89,7 +89,7 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = OpinionCluster.objects.using(get_api_read_db()).prefetch_related(
+    queryset = OpinionCluster.objects.using('replica').prefetch_related(
         'sub_opinions',
         'panel',
         'non_participating_judges',
