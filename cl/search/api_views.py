@@ -1,6 +1,5 @@
 from rest_framework import status, pagination, viewsets, permissions, response
 
-from cl.api.routers import get_api_read_db
 from cl.api.utils import LoggingMixin, RECAPUsersReadOnly, CacheListMixin
 from cl.search import api_utils
 from cl.search.api_serializers import (
@@ -26,7 +25,7 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
 
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Docket.objects.using(get_api_read_db()).select_related(
+    queryset = Docket.objects.using('replica').select_related(
         'court',
         'assigned_to',
         'referred_to',
