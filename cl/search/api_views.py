@@ -21,8 +21,11 @@ from cl.search.models import (
 
 
 class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
-    queryset = OriginatingCourtInformation.objects.using('replica').all()
     serializer_class = OriginalCourtInformationSerializer
+
+    def get_queryset(self):
+        return OriginatingCourtInformation.objects.using(
+            get_api_read_db()).all()
 
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -51,43 +54,47 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = DocketEntry.objects.using('replica').select_related(
-        'docket',   # For links back to dockets
-    ).prefetch_related(
-        'recap_documents',        # Sub items
-        'recap_documents__tags',  # Sub-sub items
-        'tags',                   # Tags on docket entries
-    ).order_by()
-
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = DocketEntrySerializer
     filter_class = DocketEntryFilter
     ordering_fields = ('date_created', 'date_modified', 'date_filed')
 
+    def get_queryset(self):
+        return DocketEntry.objects.using(get_api_read_db()).select_related(
+            'docket',  # For links back to dockets
+        ).prefetch_related(
+            'recap_documents',        # Sub items
+            'recap_documents__tags',  # Sub-sub items
+            'tags',                   # Tags on docket entries
+        ).order_by()
+
 
 class RECAPDocumentViewSet(LoggingMixin, CacheListMixin,
                            viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = RECAPDocument.objects.using('replica').select_related(
-        'docket_entry',
-        'docket_entry__docket',
-    ).prefetch_related(
-        'tags',
-    ).order_by()
     serializer_class = RECAPDocumentSerializer
     filter_class = RECAPDocumentFilter
     ordering_fields = ('date_created', 'date_modified', 'date_upload')
 
+    def get_queryset(self):
+        return RECAPDocument.objects.using(get_api_read_db()).select_related(
+            'docket_entry',
+            'docket_entry__docket',
+        ).prefetch_related(
+            'tags',
+        ).order_by()
+
 
 class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Court.objects.using(
-        'replica'
-    ).exclude(jurisdiction=Court.TESTING_COURT)
     serializer_class = CourtSerializer
     filter_class = CourtFilter
     ordering_fields = (
         'date_modified', 'position', 'start_date', 'end_date',
     )
+
+    def get_queryset(self):
+        return Court.objects.using(get_api_read_db()).exclude(
+            jurisdiction=Court.TESTING_COURT)
 
 
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -99,7 +106,9 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
 
     def get_queryset(self):
-        return OpinionCluster.objects.using(get_api_read_db()).prefetch_related(
+        return OpinionCluster.objects.using(
+            get_api_read_db()
+        ).prefetch_related(
             'sub_opinions',
             'panel',
             'non_participating_judges',
@@ -108,30 +117,36 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Opinion.objects.using('replica').select_related(
-        'cluster',
-        'author',
-    ).prefetch_related(
-        'opinions_cited',
-        'joined_by',
-    )
     serializer_class = OpinionSerializer
     filter_class = OpinionFilter
     ordering_fields = (
         'id', 'date_created', 'date_modified',
     )
 
+    def get_queryset(self):
+        return Opinion.objects.using(get_api_read_db()).select_related(
+            'cluster',
+            'author',
+        ).prefetch_related(
+            'opinions_cited',
+            'joined_by',
+        )
+
 
 class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = OpinionsCited.objects.using('replica').all()
     serializer_class = OpinionsCitedSerializer
     filter_class = OpinionsCitedFilter
+
+    def get_queryset(self):
+        return OpinionsCited.objects.using(get_api_read_db()).all()
 
 
 class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = Tag.objects.using('replica').all()
     serializer_class = TagSerializer
+
+    def get_queryset(self):
+        return Tag.objects.using(get_api_read_db()).all()
 
 
 class SearchViewSet(LoggingMixin, viewsets.ViewSet):
