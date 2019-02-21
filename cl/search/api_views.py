@@ -1,5 +1,6 @@
 from rest_framework import status, pagination, viewsets, permissions, response
 
+from cl.api.routers import get_api_read_db
 from cl.api.utils import LoggingMixin, RECAPUsersReadOnly, CacheListMixin
 from cl.search import api_utils
 from cl.search.api_serializers import (
@@ -25,18 +26,6 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
 
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Docket.objects.using('replica').select_related(
-        'court',
-        'assigned_to',
-        'referred_to',
-        'originating_court_information',
-        'idb_data',
-    ).prefetch_related(
-        'panel',
-        'clusters',
-        'audio_files',
-        'tags',
-    )
     serializer_class = DocketSerializer
     filter_class = DocketFilter
     ordering_fields = (
@@ -45,6 +34,20 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
         'date_cert_denied', 'date_filed', 'date_terminated',
         'date_last_filing',
     )
+
+    def get_queryset(self):
+        return Docket.objects.using(get_api_read_db()).select_related(
+            'court',
+            'assigned_to',
+            'referred_to',
+            'originating_court_information',
+            'idb_data',
+        ).prefetch_related(
+            'panel',
+            'clusters',
+            'audio_files',
+            'tags',
+        )
 
 
 class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -88,18 +91,20 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = OpinionCluster.objects.using('replica').prefetch_related(
-        'sub_opinions',
-        'panel',
-        'non_participating_judges',
-        'citations',
-    )
     serializer_class = OpinionClusterSerializer
     filter_class = OpinionClusterFilter
     ordering_fields = (
         'date_created', 'date_modified', 'date_filed', 'citation_count',
         'date_blocked',
     )
+
+    def get_queryset(self):
+        return OpinionCluster.objects.using(get_api_read_db()).prefetch_related(
+            'sub_opinions',
+            'panel',
+            'non_participating_judges',
+            'citations',
+        )
 
 
 class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
