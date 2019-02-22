@@ -108,6 +108,8 @@ INSTALLED_APPS = [
     'cl.visualizations',
 ]
 
+DATABASE_ROUTERS = ('multidb.MasterSlaveRouter',)
+
 if DEVELOPMENT:
     INSTALLED_APPS.append('django_extensions')
 
