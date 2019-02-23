@@ -108,8 +108,6 @@ INSTALLED_APPS = [
     'cl.visualizations',
 ]
 
-DATABASE_ROUTERS = ('multidb.MasterSlaveRouter',)
-
 if DEVELOPMENT:
     INSTALLED_APPS.append('django_extensions')
 
@@ -266,7 +264,6 @@ DOCKET_ALERT_RECAP_BONUS = 10
 #######
 # API #
 #######
-API_READ_DATABASES = ['default', 'replica']
 REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,
     # or allow read-only access for unauthenticated users.
