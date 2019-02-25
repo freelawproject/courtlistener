@@ -5,18 +5,21 @@ import json
 import shutil
 from datetime import timedelta, date
 
+import redis
 from django.conf import settings
 from django.contrib.auth.models import User, Permission
-from django.core.urlresolvers import reverse
+from django.core import mail
+from django.core.urlresolvers import reverse, ResolverMatch
 from django.http import HttpRequest, JsonResponse
-from django.test import Client, TestCase, override_settings, \
+from django.test import Client, override_settings, RequestFactory, TestCase, \
     TransactionTestCase
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 
 from cl.api.management.commands.cl_make_bulk_data import Command
-from cl.api.utils import BulkJsonHistory
+from cl.api.utils import BulkJsonHistory, SEND_API_WELCOME_EMAIL_COUNT
 from cl.api.views import coverage_data
+from cl.audio.api_views import AudioViewSet
 from cl.audio.models import Audio
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
@@ -24,6 +27,7 @@ from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
 from cl.scrapers.test_assets import test_oral_arg_scraper
 from cl.search.models import Docket, Court, Opinion, OpinionCluster, \
     OpinionsCited
+from cl.stats.models import Event
 
 
 class BasicAPIPageTest(TestCase):
@@ -176,6 +180,69 @@ class ApiQueryCountTests(TransactionTestCase):
         with self.assertNumQueries(5):
             path = reverse('fast-recapdocument-list', kwargs={'version': 'v3'})
             self.client.get(path)
+
+
+class ApiEventCreationTestCase(TestCase):
+    """Check that events are created properly."""
+
+    fixtures = ['user_with_recap_api_access.json']
+
+    @staticmethod
+    def flush_stats():
+        # Flush existing stats (else previous tests cause issues)
+        r = redis.StrictRedis(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            db=settings.REDIS_DATABASES['STATS'],
+        )
+        r.flushdb()
+
+    def setUp(self):
+        # Add the permissions to the user.
+        self.user = User.objects.get(pk=6)
+        ps = Permission.objects.filter(codename='has_recap_api_access')
+        self.user.user_permissions.add(*ps)
+        self.flush_stats()
+
+    def tearDown(self):
+        Event.objects.all().delete()
+        self.flush_stats()
+
+    def hit_the_api(self):
+        path = reverse('audio-list', kwargs={'version': 'v3'})
+        request = RequestFactory().get(path)
+
+        # Create the view and change the milestones to be something we can test
+        # (Otherwise, we need to make 1,000 requests in this test)
+        view = AudioViewSet.as_view({'get': 'list'})
+        view.milestones = [1]
+
+        # Set the attributes needed in the absence of middleware
+        request.user = self.user
+        request.resolver_match = ResolverMatch(
+            view,
+            {'version': 'v3'},
+            'audio-list',
+        )
+
+        view(request)
+
+    def test_is_the_welcome_email_sent(self):
+        """Do we send welcome emails for new API users?"""
+        # Create correct number of API requests
+        for _ in range(0, SEND_API_WELCOME_EMAIL_COUNT):
+            self.hit_the_api()
+
+        # Did the email get sent?
+        expected_email_count = 1
+        self.assertEqual(expected_email_count, len(mail.outbox))
+
+    def test_are_events_created_properly(self):
+        """Are event objects created as API requests are made?"""
+        self.hit_the_api()
+
+        expected_event_count = 1
+        self.assertEqual(expected_event_count, Event.objects.count())
 
 
 class DRFOrderingTests(TestCase):
