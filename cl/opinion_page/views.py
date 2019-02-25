@@ -25,7 +25,6 @@ from cl.lib import search_utils, sunburnt
 from cl.lib.bot_detector import is_bot, is_og_bot
 from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
-from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
@@ -114,7 +113,7 @@ def view_docket(request, pk, slug):
         'parties': docket.parties.exists(),  # Needed to show/hide parties tab.
         'docket_entries': docket_entries,
         'form': form,
-        'get_string': make_get_string(request),
+        'get_string': search_utils.make_get_string(request),
     })
     return render(request, 'view_docket.html', context)
 
@@ -277,20 +276,24 @@ def view_opinion(request, pk, _):
     else:
         favorite_form = FavoriteForm(instance=fave)
 
-    # Get the citing results from Solr for speed.
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
-    q = {
-        'q': 'cites:({ids})'.format(
-            ids=' OR '.join([str(pk) for pk in
-                             (cluster.sub_opinions
-                              .values_list('pk', flat=True))])
-        ),
-        'rows': 5,
-        'start': 0,
-        'sort': 'citeCount desc',
-        'caller': 'view_opinion',
-    }
-    citing_clusters = conn.raw_query(**q).execute()
+    if not is_bot(request):
+        # Get the citing results from Solr for speed. Only do this for humans
+        # to save on disk usage.
+        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        q = {
+            'q': 'cites:({ids})'.format(
+                ids=' OR '.join([str(pk) for pk in
+                                 (cluster.sub_opinions
+                                  .values_list('pk', flat=True))])
+            ),
+            'rows': 5,
+            'start': 0,
+            'sort': 'citeCount desc',
+            'caller': 'view_opinion',
+        }
+        citing_clusters = conn.raw_query(**q).execute()
+    else:
+        citing_clusters = None
 
     return render(request, 'view_opinion.html', {
         'title': title,
