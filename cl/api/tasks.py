@@ -4,7 +4,6 @@ import shutil
 import tarfile
 from os.path import join
 
-from django.conf import settings
 from django.test import RequestFactory
 from rest_framework.renderers import JSONRenderer
 from rest_framework.versioning import URLPathVersioning
