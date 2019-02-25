@@ -39,7 +39,7 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
 
     def get_queryset(self):
-        return Docket.objects.using('replica').select_related(
+        return Docket.objects.using(get_api_read_db()).select_related(
             'court',
             'assigned_to',
             'referred_to',
@@ -107,7 +107,7 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         return OpinionCluster.objects.using(
-            'replica'
+            get_api_read_db(),
         ).prefetch_related(
             'sub_opinions',
             'panel',
@@ -124,7 +124,7 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
 
     def get_queryset(self):
-        return Opinion.objects.using('replica').select_related(
+        return Opinion.objects.using(get_api_read_db()).select_related(
             'cluster',
             'author',
         ).prefetch_related(
