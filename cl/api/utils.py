@@ -134,6 +134,9 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         return actions
 
 
+SEND_API_WELCOME_EMAIL_COUNT = 5
+
+
 class LoggingMixin(object):
     """Log requests to Redis
 
@@ -223,7 +226,7 @@ class LoggingMixin(object):
 
     def _handle_events(self, results, user):
         total_count = results[0]
-        user_count = results[2]
+        user_count = results[4]
 
         if total_count in MILESTONES_FLAT:
             Event.objects.create(description="API has logged %s total requests."
@@ -235,7 +238,7 @@ class LoggingMixin(object):
                                 (user.username, intcomma(ordinal(user_count))),
                     user=user,
                 )
-            if user_count == 5:
+            if user_count == SEND_API_WELCOME_EMAIL_COUNT:
                 email = emails['new_api_user']
                 send_mail(
                     email['subject'],
