@@ -13,12 +13,13 @@ from cl.search.models import Docket
 from cl.search.tasks import add_or_update_recap_docket
 
 # Do not order by score!
-QUERY_STRING = 'q=&type=r&order_by=dateFiled+asc&description=%22Vacat*%22+AND+2255+AND+%22Granted%22+NOT+%22Denied%22+NOT+%22Dismiss*%22&court=dcd+almd+alnd+alsd+akd+azd+ared+arwd+cacd+caed+cand+casd+cod+ctd+ded+flmd+flnd+flsd+gamd+gand+gasd+hid+idd+ilcd+ilnd+ilsd+innd+insd+iand+iasd+ksd+kyed+kywd+laed+lamd+lawd+med+mdd+mad+mied+miwd+mnd+msnd+mssd+moed+mowd+mtd+ned+nvd+nhd+njd+nmd+nyed+nynd+nysd+nywd+nced+ncmd+ncwd+ndd+ohnd+ohsd+oked+oknd+okwd+ord+paed+pamd+pawd+rid+scd+sdd+tned+tnmd+tnwd+txed+txnd+txsd+txwd+utd+vtd+vaed+vawd+waed+wawd+wvnd+wvsd+wied+wiwd+wyd+gud+nmid+prd+vid'
+QUERY_STRING = 'q=entry_date_filed%3A%5B2018-05-01T00%3A00%3A00Z+TO+*%5D&type=r&order_by=dateFiled+asc&description=%22Vacat*%22+AND+2255+AND+%22Granted%22+NOT+%22Denied%22+NOT+%22Dismiss*%22&court=dcd+almd+alnd+alsd+akd+azd+ared+arwd+cacd+caed+cand+casd+cod+ctd+ded+flmd+flnd+flsd+gamd+gand+gasd+hid+idd+ilcd+ilnd+ilsd+innd+insd+iand+iasd+ksd+kyed+kywd+laed+lamd+lawd+med+mdd+mad+mied+miwd+mnd+msnd+mssd+moed+mowd+mtd+ned+nvd+nhd+njd+nmd+nyed+nynd+nysd+nywd+nced+ncmd+ncwd+ndd+ohnd+ohsd+oked+oknd+okwd+ord+paed+pamd+pawd+rid+scd+sdd+tned+tnmd+tnwd+txed+txnd+txsd+txwd+utd+vtd+vaed+vawd+waed+wawd+wvnd+wvsd+wied+wiwd+wyd+gud+nmid+prd+vid'
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 BAL_TAG = 'AKHBLTIIGFYYGKKY'
+BAL_TAG_2019 = 'AKHBLTIIGFYYGKKY-2019'
 
 
 def get_docket_ids(main_query):
@@ -37,7 +38,7 @@ def get_docket_ids(main_query):
     return docket_ids
 
 
-def get_pacer_dockets(options, docket_pks, tag):
+def get_pacer_dockets(options, docket_pks, tags):
     """Get the pacer dockets identified by the FJC IDB rows"""
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
@@ -56,12 +57,14 @@ def get_pacer_dockets(options, docket_pks, tag):
         d = Docket.objects.get(pk=docket_pk)
         chain(
             get_docket_by_pacer_case_id.s(
-                {'pacer_case_id': d.pacer_case_id},
+                {'pacer_case_id': d.pacer_case_id,
+                 'docket_pk': d.pk},
                 d.court_id,
                 cookies=pacer_session.cookies,
-                **{'tag_names': [tag], 'show_parties_and_counsel': True,
+                tag_names=tags,
+                **{'show_parties_and_counsel': True,
                    'show_terminated_parties': True,
-                   'show_list_of_member_cases': True}
+                   'show_list_of_member_cases': False}
             ).set(queue=q),
             add_or_update_recap_docket.s().set(queue=q),
         ).apply_async()
@@ -100,4 +103,4 @@ class Command(VerboseCommand):
             {'group': False, 'facet': False},
         )
         docket_ids = get_docket_ids(main_query)
-        get_pacer_dockets(options, docket_ids, BAL_TAG)
+        get_pacer_dockets(options, docket_ids, [BAL_TAG, BAL_TAG_2019])
