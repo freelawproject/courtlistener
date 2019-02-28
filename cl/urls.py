@@ -20,6 +20,7 @@ urlpatterns = [
     url('', include('cl.api.urls')),
     url('', include('cl.donate.urls')),
     url('', include('cl.visualizations.urls')),
+    url('', include('cl.stats.urls')),
 
     # Sitemaps
     url(r'^sitemap\.xml$', index_sitemap_maker),
