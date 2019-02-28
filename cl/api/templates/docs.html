@@ -16,30 +16,90 @@
 
 <div class="hidden-xs col-sm-1 col-md-2"></div>
 <div class="col-xs-12 col-sm-10 col-md-8">
-  <p>We currently have two types of APIs available to developers using our platform. If you are interested in obtaining large quantities of our data, we recommend using our <a href="{% url "bulk_data_index" %}">bulk API</a>, which provides compressed JSON files of our entire collection, by object type and jurisdiction. If you wish to query our data programatically, we recommend using our <a href="{% url "rest_docs" %}">REST APIs</a>.
+  <p>We currently have four services available to researchers and organizations using our platform:
   </p>
-  <p>We also offer <a href="https://free.law/data-consulting/">custom data services</a> and custom bulk file creation, with hourly and project-based rates.
+  <ol>
+    <li>
+      <p>For those that need the fastest and most granular form of our data, we <a href="{% url "replication_docs" %}">offer our database replication service</a>. This service provides a logical replica of our PostgreSQL database onto a server where you can query it.
+      </p>
+    </li>
+    <li>
+      <p>If you are interested in obtaining large quantities of our data, we <a
+        href="{% url "bulk_data_index" %}">recommend using bulk data files</a>. These provide compressed JSON files of our opinion and people databases, by object type and jurisdiction
+      </p>
+    </li>
+    <li>
+      <p>For usages that require less data, such as keeping up to date with the latest filings, accessing a subset of the data or performing RECAP uploads, we <a href="{% url "rest_docs" %}">recommend using our REST APIs</a>.
+      </p>
+    </li>
+    <li>
+      <p>Finally, we also <a href="https://free.law/data-consulting/">offer custom data services</a> and custom bulk file creation, with hourly and project-based rates.
+      </p>
+    </li>
+  </ol>
+  <p>We make these services available to the public according to means-based pricing. This allows a variety of researchers, journalists, and organizations to access this information.
   </p>
-  <p>We make these APIs available to the public according to means-based pricing so that a variety of researchers and organizations can access this information. If you are a researcher, individual, or journalist, we do not typically charge for access to these APIs. If you are a law firm or other for-profit organization, we try to identify a price point that is fair to everybody. The goal of these charges is to provide ongoing support for these APIs and for <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP. We hope you'll agree that that is an important cause.
+  <p>The goal of these charges is to provide ongoing support for these APIs and for <a href="https://free.law" target="_blank">Free Law Project</a>, the 501(c)(3) non-profit supporting CourtListener and RECAP. We hope you'll agree that that is an important cause.
   </p>
-  <p>Organizations that support Free Law Project typically do so through monthly subscriptions or one time contributions, according to what makes sense for the organization and the project.
+  <p>Depending on what makes sense for the organization and the project, support for Free Law Project can take the form of monthly subscriptions, one time fees for service, or revenue share agreements.
   </p>
+</div>
+<div class="hidden-xs col-sm-1 col-md-2"></div>
+<div class="clearfix"></div>
+
+<div class="hidden-xs col-sm-1 col-md-2"></div>
+<div class="col-xs-12 col-sm-10 col-md-8">
+  <div class="row v-offset-below-3 v-offset-above-3">
+    <table class="table table-responsive table-striped text-center">
+      <tbody>
+      <tr>
+        <td class="align-middle"><h3 class="top">Learn More About&hellip;</h3></td>
+        <td class="align-middle"><h4 class="top">Update<br>Speed</h4></td>
+        <td class="align-middle"><h4 class="top">Data<br>Quantity</h4></td>
+        <td class="align-middle"><h4 class="top">Query<br>Flexibility</h4></td>
+        <td class="align-middle"><h4 class="top">Learning<br>Curve</h4></td>
+        <td class="align-middle"><h4 class="top">Setup</h4></td>
+      </tr>
+      <tr>
+        <td><a href="{% url "replication_docs" %}"
+               class="btn btn-lg btn-primary btn-block">Replication</a></td>
+        <td class="align-middle">Instant</td>
+        <td class="align-middle">Complete</td>
+        <td class="align-middle">Unlimited<br>SQL Queries</td>
+        <td class="align-middle">Short</td>
+        <td class="align-middle">Complex</td>
+      </tr>
+      <tr>
+        <td><a href="{% url "bulk_data_index" %}"
+               class="btn btn-lg btn-primary btn-block">Bulk Data</a></td>
+        <td class="align-middle">Slow</td>
+        <td class="align-middle">Great</td>
+        <td class="align-middle">None</td>
+        <td class="align-middle">Short</td>
+        <td class="align-middle">None</td>
+      </tr>
+      <tr>
+        <td><a href="{% url "rest_docs" %}"
+               class="btn btn-lg btn-primary btn-block">REST APIs</a></td>
+        <td class="align-middle">Fast</td>
+        <td class="align-middle">Good</td>
+        <td class="align-middle">Filters &amp;<br> Joins</td>
+        <td class="align-middle">Longer</td>
+        <td class="align-middle">None</td>
+      </tr>
+      <tr>
+        <td><a href="https://free.law/data-consulting/"
+               class="btn btn-lg btn-success btn-block">Data Services</a></td>
+        <td colspan="5" class="text-left">The most flexibility through an engagement Free Law Project.
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 <div class="hidden-xs col-sm-1 col-md-2"></div>
 
 <div class="col-xs-12">
-  <div class="row v-offset-below-3">
-    <div class="col-md-4 text-center v-offset-above-3">
-      <a href="{% url "bulk_data_index" %}" class="btn btn-xl btn-primary">Check out the Bulk Data API</a>
-    </div>
-    <div class="col-md-4 text-center v-offset-above-3">
-      <a href="{% url "rest_docs" %}" class="btn btn-xl btn-primary">Check out the REST APIs</a>
-    </div>
-    <div class="col-md-4 text-center v-offset-above-3">
-      <a href="https://free.law/data-consulting/" class="btn btn-xl btn-success">Learn About Data Services</a>
-    </div>
-  </div>
-
   <div class="row">
     <div class="col-sm-6">
       <h2 id="pride">We're Proud of our Data</h2>
@@ -76,7 +136,7 @@
 
     <div class="col-sm-6">
       <h2 id="privacy">Privacy of Court Materials</h2>
-      <p>As is <a href="{% url "terms" %}#removal">explained in our removal policy</a>, we have blocked public search engines from indexing many of the cases available in our data. We do this through a combination of automatic and manual procedures.
+      <p>As is <a href="{% url "terms" %}#removal">explained in our removal policy</a>, we block public search engines from indexing many of the cases available in our data. We do this through a combination of automatic and manual procedures.
       </p>
       <p>As you work with this data, it is essential that you be cognizant of the privacy and safety issues involved with legal documents. This impacts real people with real privacy concerns. This includes jailed confidential informants, the victims of stalkers, foreign citizens with rejected asylum requests, children who were named incidentally in a case about their parent's wrongdoings, exhonorated individuals, and the list goes on.
       </p>
@@ -116,7 +176,7 @@
       <h2>Feedback and Updates</h2>
       <p>To stay up to date about our APIs please follow the <a href="https://twitter.com/courtlistener">CourtListener Twitter account</a> and the <a href="https://free.law/">Free Law Project blog</a>, where updates will be posted. To give us feedback, <a href="{% url "contact" %}">simply send us an email</a>.
       </p>
-      <p><a href="https://twitter.com/courtlistener" class="btn btn-primary btn-lg"><i class="fa fa-twitter"></i>&nbsp;Follow CourtListener</a></p>
+      <p><a href="https://twitter.com/freelawproject" class="btn btn-primary btn-lg"><i class="fa fa-twitter"></i>&nbsp;Follow Free Law Project</a></p>
     </div>
     <div class="col-sm-4">
       <h2 id="copyright">Copyright</h2>
@@ -125,7 +185,7 @@
           <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png" alt="Public Domain Mark" height="31" width="88"/>
         </a>
       </p>
-      <p>For a more nuanced analysis of copyright in the RECAP Archive please see <a href="http://localhost:8080/recap/faq/#is-sharing-court-doc">our FAQ on the topic</a>.
+      <p>For a more nuanced analysis of copyright in the RECAP Archive please see <a href="https://free.law/recap/faq/#is-sharing-court-documents-a-violation-o">our FAQ on the topic</a>.
       </p>
     </div>
   </div>

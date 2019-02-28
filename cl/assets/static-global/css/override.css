@@ -359,6 +359,10 @@ a.black-link:focus {
   vertical-align: top;
 }
 
+.table > tbody > tr > td.align-middle {
+  vertical-align: middle;
+}
+
 .left {
   float: left;
 }
