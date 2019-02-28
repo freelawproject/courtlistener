@@ -19,6 +19,7 @@ def sitemap_maker(request):
         make_url_dict('api_index', priority=0.7),
         make_url_dict('rest_docs', priority=0.6),
         make_url_dict('bulk_data_index', priority=0.6),
+        make_url_dict('replication_docs', priority=0.6),
 
         # Donation
         make_url_dict('donate', priority=0.7),
