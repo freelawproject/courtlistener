@@ -130,6 +130,7 @@ class SimplePagesTest(TestCase):
             {'viewname': 'bad_browser'},
             {'viewname': 'robots'},
             {'viewname': 'humans'},
+            {'viewname': 'check_redis_writes'},
         ]
         for reverse_param in reverse_params:
             path = reverse(**reverse_param)
