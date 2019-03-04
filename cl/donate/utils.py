@@ -91,9 +91,9 @@ emails = {
                  'Simply put, we would not be able to do our work without '
                  'your help and that of others like you.\n\n'
                  
-                 'As a thank you, over the next few days, we will work with '
-                 'Justia to upgrade your profile with the Free Law Project '
-                 'supporter badge. Watch for it soon!\n\n'
+                 'As a thank you, over the next few business days, we will '
+                 'work with Justia to upgrade your profile with the Free Law '
+                 'Project supporter badge. Watch for it soon!\n\n'
 
                  'We are a federally-recognized 501(c)(3) public charity '
                  'and a California non-profit public benefit corporation. '
