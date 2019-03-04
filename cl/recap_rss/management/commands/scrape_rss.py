@@ -121,7 +121,7 @@ class Command(VerboseCommand):
                 if all([
                     options['sweep'] is False,
                     feed_status.status == RssFeedStatus.PROCESSING_IN_PROGRESS,
-                    feed_status.date_created < processing_cutoff
+                    feed_status.date_created > processing_cutoff
                 ]):
                     continue
 
