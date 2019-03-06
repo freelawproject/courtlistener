@@ -559,7 +559,7 @@ class Docket(models.Model):
             for field in ['pacer_case_id', 'docket_number']:
                 if not getattr(self, field, None):
                     raise ValidationError("'%s' cannot be Null or empty in "
-                                          "RECAP documents." % field)
+                                          "RECAP dockets." % field)
 
         super(Docket, self).save(*args, **kwargs)
 
@@ -1122,10 +1122,12 @@ class RECAPDocument(models.Model):
                 # that is *not* being updated here.
                 if others.count() > 1:
                     raise ValidationError(
-                        "Duplicate values violate save constraint and we are "
-                        "unable to fix it automatically for rd: %s" % self.pk
+                        "Multiple duplicate values violate save constraint "
+                        "and we are unable to fix it automatically for "
+                        "rd: %s" % self.pk
                     )
                 else:
+                    # Only one duplicate. Attempt auto-resolution.
                     other = others[0]
                 if other.pacer_doc_id == self.pacer_doc_id:
                     # Delete "other"; the new one probably has better data.
