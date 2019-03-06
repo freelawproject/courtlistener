@@ -318,16 +318,31 @@ def process_free_opinion_result(self, row_pk, cnt):
             de.recap_sequence_number = de.recap_sequence_number or \
                 recap_sequence_number
             de.save()
-            rd, rd_created = RECAPDocument.objects.update_or_create(
+            rds = RECAPDocument.objects.filter(
                 docket_entry=de,
                 document_number=result.document_number,
                 attachment_number=None,
-                defaults={
-                    'pacer_doc_id': result.pacer_doc_id,
-                    'document_type': RECAPDocument.PACER_DOCUMENT,
-                    'is_free_on_pacer': True,
-                }
             )
+            rd_count = rds.count()
+            if rd_count == 0:
+                rd = RECAPDocument.objects.create(
+                    docket_entry=de,
+                    document_number=result.document_number,
+                    attachment_number=None,
+                    pacer_doc_id=result.pacer_doc_id,
+                    document_type=RECAPDocument.PACER_DOCUMENT,
+                    is_free_on_pacer=True,
+                )
+                rd_created = True
+            elif rd_count > 0:
+                # Could be one item (great!) or more than one (not great).
+                # Choose the earliest item and upgrade it.
+                rd = rds.earliest('date_created')
+                rd.pacer_doc_id = result.pacer_doc_id
+                rd.document_type = RECAPDocument.PACER_DOCUMENT
+                rd.is_free_on_pacer = True
+                rd.save()
+                rd_created = False
     except IntegrityError as e:
         msg = "Raised IntegrityError: %s" % e
         logger.error(msg)
