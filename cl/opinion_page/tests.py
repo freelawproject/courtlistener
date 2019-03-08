@@ -2,10 +2,11 @@ from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.test import TestCase, override_settings
 from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND, \
-    HTTP_302_FOUND
+    HTTP_302_FOUND, HTTP_300_MULTIPLE_CHOICES
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.test_helpers import SitemapTest
+from cl.search.models import Citation
 from cl.sitemap import make_sitemap_solr_params, items_per_sitemap
 
 
@@ -22,6 +23,7 @@ class ViewDocumentTest(TestCase):
 class CitationRedirectorTest(TestCase):
     """Tests to make sure that the basic citation redirector is working."""
     fixtures = ['test_objects_search.json', 'judge_judy.json']
+    citation = {'reporter': 'F.2d', 'volume': '56', 'page': '9'}
 
     def assertStatus(self, r, status):
         self.assertEqual(
@@ -36,21 +38,32 @@ class CitationRedirectorTest(TestCase):
         r = self.client.get(reverse('citation_redirector'))
         self.assertStatus(r, HTTP_200_OK)
 
-        citation = {'reporter': 'F.2d', 'volume': '56', 'page': '9'}
-
         # Are we redirected to the correct place when we use GET or POST?
         r = self.client.get(
-            reverse('citation_redirector', kwargs=citation),
+            reverse('citation_redirector', kwargs=self.citation),
             follow=True,
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
         r = self.client.post(
             reverse('citation_redirector'),
-            citation,
+            self.citation,
             follow=True,
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+
+    def test_multiple_results(self):
+        """Do we return a 300 status code when there are multiple results?"""
+        # Duplicate the citation and add it to another cluster instead.
+        f2_cite = Citation.objects.get(**self.citation)
+        f2_cite.pk = None
+        f2_cite.cluster_id = 3
+        f2_cite.save()
+        r = self.client.get(
+            reverse('citation_redirector', kwargs=self.citation)
+        )
+        self.assertStatus(r, HTTP_300_MULTIPLE_CHOICES)
+        f2_cite.delete()
 
     def test_unknown_citation(self):
         """Do we get a 404 message if we don't know the citation?"""

@@ -9,13 +9,14 @@ from django.db.models import F, Prefetch
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
+from django.template import loader
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from reporters_db import EDITIONS, NAMES_TO_EDITIONS, REPORTERS, \
     VARIATIONS_ONLY
 
-from rest_framework.status import HTTP_404_NOT_FOUND
+from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_300_MULTIPLE_CHOICES
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -484,12 +485,18 @@ def citation_handler(request, reporter, volume, page):
 
     elif cluster_count > 1:
         # Multiple results. Show them.
-        return render(request, 'citation_redirect_info_page.html', {
-            'too_many': True,
-            'citation_str': citation_str,
-            'clusters': clusters,
-            'private': True,
-        })
+        return HttpResponse(
+            content=loader.render_to_string(
+                'citation_redirect_info_page.html', {
+                    'too_many': True,
+                    'citation_str': citation_str,
+                    'clusters': clusters,
+                    'private': True,
+                },
+                request=request
+            ),
+            status=HTTP_300_MULTIPLE_CHOICES,
+        )
 
 
 def citation_redirector(request, reporter=None, volume=None, page=None):
