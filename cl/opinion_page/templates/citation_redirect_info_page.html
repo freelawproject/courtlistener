@@ -15,7 +15,7 @@
         {% if none_found %}
             Citation Not Found (404) – CourtListener.com
         {% elif too_many %}
-            Several Citations Found – CourtListener.com
+          {{ citation_str }}: Several Citations Found – CourtListener.com
         {% endif %}
     {% endif %}
 {% endblock %}
@@ -27,7 +27,7 @@
     {% if none_found %}
       Citation Not Found (404) – CourtListener.com
     {% elif too_many %}
-      Several Citations Found – CourtListener.com
+      {{ citation_str }}: Several Citations Found – CourtListener.com
     {% endif %}
   {% endif %}
 {% endblock %}
