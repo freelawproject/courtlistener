@@ -344,7 +344,7 @@ def make_check_donation(request):
             if user.email:
                 send_thank_you_email(d, PAYMENT_TYPES.DONATION)
 
-            return HttpResponseRedirect(reverse('check_complete'))
+            return HttpResponseRedirect(reverse('donate_complete'))
     else:
         donation_form = DonationForm()
         user_form = UserForm()
