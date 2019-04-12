@@ -33,6 +33,14 @@ from cl.visualizations.models import SCOTUSMap
 logger = logging.getLogger(__name__)
 
 
+def check_pagination_depth(page_number):
+    """Check if the pagination is too deep (indicating a crawler)"""
+    max_search_pagination_depth = 100
+    if page_number > max_search_pagination_depth:
+        return True
+    return False
+
+
 def do_search(request, rows=20, order_by=None, type=None, facet=True):
 
     query_citation = None
@@ -70,27 +78,33 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
             si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
             results = si.query().add_extra(**build_main_query(cd, facet=facet))
 
-        # Set up pagination
-        try:
-            if cd['type'] == 'r':
-                rows = 10
-            paginator = Paginator(results, rows)
-            page = request.GET.get('page', 1)
-            try:
-                paged_results = paginator.page(page)
-            except PageNotAnInteger:
-                paged_results = paginator.page(1)
-            except EmptyPage:
-                # Page is out of range (e.g. 9999), deliver last page.
-                paged_results = paginator.page(paginator.num_pages)
-        except Exception as e:
-            # Catches any Solr errors, and aborts.
-            logger.warning("Error loading pagination on search page with "
-                           "request: %s" % request.GET)
-            logger.warning("Error was: %s" % e)
-            if settings.DEBUG is True:
-                traceback.print_exc()
+        # Run the query and set up pagination
+        page = int(request.GET.get('page', 1))
+        too_deep = check_pagination_depth(page)
+        if too_deep:
+            logger.warning("Query depth of %s denied access (probably a "
+                           "crawler)", page)
             error = True
+        else:
+            try:
+                if cd['type'] == 'r':
+                    rows = 10
+                paginator = Paginator(results, rows)
+                try:
+                    paged_results = paginator.page(page)
+                except PageNotAnInteger:
+                    paged_results = paginator.page(1)
+                except EmptyPage:
+                    # Page is out of range (e.g. 9999), deliver last page.
+                    paged_results = paginator.page(paginator.num_pages)
+            except Exception as e:
+                # Catches any Solr errors, and aborts.
+                logger.warning("Error loading pagination on search page with "
+                               "request: %s" % request.GET)
+                logger.warning("Error was: %s" % e)
+                if settings.DEBUG is True:
+                    traceback.print_exc()
+                error = True
 
         # Post processing of the results
         regroup_snippets(paged_results)
