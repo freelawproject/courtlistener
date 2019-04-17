@@ -15,7 +15,6 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from reporters_db import EDITIONS, NAMES_TO_EDITIONS, REPORTERS, \
     VARIATIONS_ONLY
-
 from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_300_MULTIPLE_CHOICES
 
 from cl.alerts.models import DocketAlert
@@ -293,8 +292,13 @@ def view_opinion(request, pk, _):
             'caller': 'view_opinion',
         }
         citing_clusters = conn.raw_query(**q).execute()
+
+        # Get recommendations with MoreLikeThis query
+        mlt_query = conn.query(id=pk).mlt('text').field_limit(fields=['id', 'caseName', 'absolute_url'])
+        recommendations = mlt_query.execute().more_like_this.docs
     else:
         citing_clusters = None
+        recommendations = None
 
     return render(request, 'view_opinion.html', {
         'title': title,
@@ -305,6 +309,7 @@ def view_opinion(request, pk, _):
         'private': cluster.blocked,
         'citing_clusters': citing_clusters,
         'top_authorities': cluster.authorities[:5],
+        'recommendations': recommendations,
     })
 
 

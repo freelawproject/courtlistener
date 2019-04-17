@@ -72,3 +72,74 @@ class ExtraOptions(Options):
 
     def options(self):
         return self.option_dict
+
+
+class MoreLikeThisHighlightsSolrSearch(ExtraSolrSearch):
+    """
+    By default Solr MoreLikeThis queries do not support highlighting. Thus, we need to produce the highlights in Python.
+
+    A MoreLikeThis search with highlight fields that are taken directly from search results
+    """
+
+    # Limit length of text field
+    text_max_length = 500
+
+    # highlight fields (from search_utils)
+    highlight_fields = [
+        'caseName',
+        'citation',
+        'court_citation_string',
+        'docketNumber',
+        'judge',
+        'lexisCite',
+        'neutralCite',
+        'suitNature',
+        'text'
+    ]
+
+    def execute(self, constructor=None):
+        """
+        Execute MLT-query.
+
+        Solr-URL: self.interface.conn.mlt_url + '?' + urllib.urlencode(self.options(), doseq=True)
+        """
+        ret = self.interface.mlt_search(**self.options())
+
+        # Add solr_highlighting to mlt results
+        for doc in ret:
+            # Initialize empty highlights dict
+            doc['solr_highlights'] = {}
+
+            # Copy each highlight field
+            for field_name in self.highlight_fields:
+                if field_name in doc:
+                    if field_name == 'text':  # max text length
+                        doc[field_name] = doc[field_name][:self.text_max_length]
+
+                    doc['solr_highlights'][field_name] = [doc[field_name]]
+
+        if constructor:
+            ret = self.constructor(ret, constructor)
+
+        return ret
+
+
+class MoreLikeThisHighlightsSolrInterface(ExtraSolrInterface):
+    """
+    A search interface especially for MoreLikeThis queries (with highlights)
+    """
+    def __init__(self, *args, **kwargs):
+        super(MoreLikeThisHighlightsSolrInterface, self).__init__(*args, **kwargs)
+
+    def query(self, *args, **kwargs):
+        """
+        :returns: MoreLikeThisHighlightsSolrSearch -- A MoreLikeThis search with highlights.
+
+        Build a solr MLT query
+        """
+
+        q = MoreLikeThisHighlightsSolrSearch(self)
+        if len(args) + len(kwargs) > 0:
+            return q.query(*args, **kwargs)
+        else:
+            return q
