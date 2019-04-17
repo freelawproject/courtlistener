@@ -148,6 +148,29 @@
             </div>
         {% endif %}
 
+        {# Recommendations #}
+        {% if recommendations %}
+            <div id="recommendations" class="sidebar-section">
+                <h3><span>Related Opinions</span></h3>
+                <p class="bottom">The following opinions cover similar topics:</p>
+                <ul>
+                    {% for rec in recommendations %}
+                        <li>
+                            <a href="{{ rec.absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                {{ rec.caseName|safe|truncatewords:10|v_wrapper }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <p>
+                    <a href="{% url 'show_results' %}?q=related:opinion{{ cluster.pk }}"
+                       class="btn btn-default">
+                        View Full List
+                    </a>
+                </p>
+            </div>
+        {% endif %}
+
         {% include "includes/social_links.html" %}
         {% include "includes/donate_sidebar.html" with referrer="o-donate-now" %}
     </div>

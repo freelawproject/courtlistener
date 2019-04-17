@@ -497,13 +497,15 @@ div.shown ul {
 /* cited by and authorities styling */
 #authorities hr,
 #cited-by hr,
-#visualizations hr {
+#visualizations hr,
+#recommendations hr{
   margin-bottom: 2px;
 }
 
 #authorities ul,
 #cited-by ul,
 #visualizations ul,
+#recommendations ul,
 #citation-redirect ul,
 #referers ul {
   padding: 0;
@@ -513,6 +515,7 @@ div.shown ul {
 #authorities ul li,
 #cited-by ul li,
 #visualizations ul li,
+#recommendations ul li,
 #citation-redirect ul li,
 #referers ul li {
   list-style-type: none;
