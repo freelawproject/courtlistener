@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from cl.recap.models import ProcessingQueue
+from cl.recap.models import ProcessingQueue, FjcIntegratedDatabase
 
 
 @admin.register(ProcessingQueue)
@@ -30,3 +30,5 @@ class ProcessingQueueAdmin(admin.ModelAdmin):
         'recap_document',
     )
 
+
+admin.site.register(FjcIntegratedDatabase)

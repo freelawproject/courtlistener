@@ -2,22 +2,28 @@
 
 import re
 
-# three digits dash two digits dash four digits, not proceeded or followed
-# by digits. Proceeding start of line (^) or following end of line ($) OK.
-SSN_AND_ITIN = re.compile('([^0-9A-Za-z-]|^)(\d{3}-\d{2}-\d{4})([^0-9A-Za-z-]|$)')
-EIN = re.compile('([^0-9A-Za-z-]|^)(\d{2}-\d{7})([^0-9A-Za-z-]|$)')
-def anonymize(string):
+
+def anonymize(s):
     """Anonymizes private information.
 
-    Converts SSNs, EIN and alienIDs to X's. Reports whether a modification was
-    made, as a boolean.
+    Converts SSNs, EINs, and A-Numbers to X's. Reports whether a modification
+    was made, as a boolean.
 
-    TODO: Sometimes is over-eager when text like No. CV 12-4564456 comes along. Pull examples from DB and write tests.
+    For more information about A-Numbers, see:
+      https://www.uscis.gov/tools/glossary/number
+
+    SSNs can be much more complicated than the implementation here. For
+    details, see:
+      http://rion.io/2013/09/10/validating-social-security-numbers-through-regular-expressions-2/
     """
-    string, ssn_replacements = re.subn(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", string)
-    string, ien_replacements = re.subn(EIN, r"\1XX-XXXXXXX\3", string)
-    modified = bool(ssn_replacements + ien_replacements)
-    return string, modified
+    ssn_re = re.compile(r'\b(\d{3}-\d{2}-\d{4})\b', flags=re.VERBOSE)
+    ein_re = re.compile(r'\b(\d{2}-\d{7})\b')
+    a_number_re = re.compile(r'\b(A\d{8,9})\b')
+    s, ssn_count = re.subn(ssn_re, r"XXX-XX-XXXX", s)
+    s, ien_count = re.subn(ein_re, r"XX-XXXXXXX", s)
+    s, a_number_count = re.subn(a_number_re, r"AXXXXXXXX", s)
+    modified = bool(ssn_count + ien_count + a_number_count)
+    return s, modified
 
 
 def trunc(s, length, ellipsis=None):

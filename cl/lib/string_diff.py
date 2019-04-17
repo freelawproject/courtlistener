@@ -28,9 +28,12 @@ def remove_words(phrase):
 
 def gen_diff_ratio(left, right):
     """
-    Generates a difference between two strings
+    Generates a difference between two strings.
     Returns a value between 0 and 1. 0 means the strings are totally different.
     1 means they are identical.
+
+    This is a case sensitive comparison. If you want case-insensitive, ensure
+    that you run lower() on your strings before passing them in.
     """
     # Remove common strings from all case names /before/ comparison.
     # Doing so lowers the opportunity for false positives.
@@ -43,20 +46,34 @@ def gen_diff_ratio(left, right):
     return diff
 
 
-def find_best_match(results, case_name):
-    """Returns the closest match to within a Solr result set to a known
-    string.
+def find_best_match(items, s, case_sensitive=True):
+    """Find the string in the list that is the closest match to the string
+
+    :param items: The list to search within
+    :param s: The string to attempt to match
+    :param case_sensitive: Whether comparisons should honor case
+    :return dict with the index of the best matching value, its value, and its
+    match ratio.
     """
     diff_ratios = []
-    for result in results:
+    if not case_sensitive:
+        s = s.lower()
+
+    for item in items:
         # Calculate its diff_ratio, and add it to an array
-        diff = gen_diff_ratio(result['caseName'], case_name)
+        if not case_sensitive:
+            item = item.lower()
+        diff = gen_diff_ratio(item, s)
         diff_ratios.append(diff)
 
     # Find the max ratio, and grab the corresponding result
     max_ratio = max(diff_ratios)
     i = diff_ratios.index(max_ratio)
-    return results[i], max_ratio
+    return {
+        'match_index': i,
+        'match_str': items[i],
+        'ratio': max_ratio,
+    }
 
 
 def find_confidences(results, case_name):

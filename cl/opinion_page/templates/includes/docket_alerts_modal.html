@@ -1,0 +1,35 @@
+{% load humanize %}
+<div id="modal-no-more-alerts"
+     class="modal hidden-print"
+     role="dialog"
+     aria-hidden="true"
+     tabindex="-1">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal"
+                aria-label="Close"><span aria-hidden="true">&times;</span>
+        </button>
+        <h2 class="modal-title">Please Become a Monthly Donor <span class="recap_install_plea">or Install RECAP</span> to Make More&nbsp;Alerts</h2>
+      </div>
+
+      <div class="modal-body">
+        <p>Docket alerts are an advanced feature of CourtListener. Monthly donors can create unlimited docket alerts. If you are not a monthly donor, we allow <span class="bold">{{ MAX_FREE_DOCKET_ALERTS|apnumber }}</span> alerts and give a bonus of <span class="bold">{{ DOCKET_ALERT_RECAP_BONUS|apnumber }}</span> alerts to anybody with the RECAP Extension installed.
+        </p>
+        <p>You currently have <span class="bold">{{ user.docket_alerts.count|apnumber }}</span> alerts. To create additional alerts, please install the RECAP Extension or become a monthly donor.
+        </p>
+        <p>We can sometimes provide need-based exceptions to these rules. If you might need an exception, <a href="{% url "contact" %}">please let us know</a>.
+        </p>
+      </div>
+
+      <div class="modal-footer">
+        <p>
+          <a href="https://free.law/recap/"
+             class="btn btn-default">Install RECAP</a>
+          <a href="{% url "donate" %}?referrer=more-docket-alerts"
+             class="btn btn-danger float-right"><i class="fa fa-heart-o"></i> Become a Monthly Donor</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

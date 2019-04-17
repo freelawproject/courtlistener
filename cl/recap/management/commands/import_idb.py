@@ -1,13 +1,12 @@
 import io
-import os
 import re
 import sys
-
 from datetime import date
+
 from dateutil import parser
 from django.core.management import CommandError
 
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
 from cl.recap.constants import (
     DATASET_SOURCES, CV_OLD, CV_2017, CR_OLD, CR_2017, APP_2017, APP_OLD,
     BANKR_2017, IDB_FIELD_DATA
@@ -16,8 +15,9 @@ from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Court
 
 
-class Command(VerboseCommand):
-    help = 'Import a tab-separated file as produced by FJC for their IDB'
+class Command(VerboseCommand, CommandUtils):
+    help = 'Import a tab-separated file as produced by FJC for their IDB. ' \
+           'Do not check for duplicates.'
     BAD_CHARS = re.compile(u'[\u0000\u001E]')
 
     def add_arguments(self, parser):
@@ -51,18 +51,34 @@ class Command(VerboseCommand):
         self.nullable_fields = None
 
     @staticmethod
-    def ensure_file_ok(file_path):
-        if not os.path.exists(file_path):
-            raise CommandError("Unable to find file at %s" % file_path)
-        if not os.access(file_path, os.R_OK):
-            raise CommandError("Unable to read file at %s" % file_path)
-
-    @staticmethod
     def ensure_filetype_ok(filetype):
         allowed_types = [d[0] for d in DATASET_SOURCES]
         if filetype not in allowed_types:
             raise CommandError("%s not a valid filetype. Valid types are: %s" %
                                (filetype, allowed_types))
+
+    # noinspection PySingleQuotedDocstring
+    @staticmethod
+    def _normalize_row_value(value):
+        '''Normalize a TSV value.
+
+        Some examples include:
+            "VESSEL ""HORIZONTE"""
+            "M/V ""THEODORA MARIA"" HER ENGIN"
+
+        According to RFC 4180, double quotes in a CSV field get escaped by
+        being doubled up as double-double-quotes. The solution is to strip one
+        double quote off either end, and then replace double-double quotes with
+        singles.
+
+        That makes the above:
+            VESSEL "HORIZONTE"
+            M/V "THEODORA MARIA" HER ENGIN
+        '''
+        value = re.sub(r'"$', '', value)
+        value = re.sub(r'^"', '', value)
+        value = re.sub(r'""', '"', value)
+        return value
 
     def make_csv_row_dict(self, line, col_headers):
         """Because the PACER data is so nasty, we need our own CSV parser. I
@@ -87,15 +103,17 @@ class Command(VerboseCommand):
         for value in row_values:
             if merging_cells:
                 if value.endswith('"'):
-                    merging_cells = False
                     merged_contents += value
-                    row.append(merged_contents.strip('"'))
+                    row.append(self._normalize_row_value(merged_contents))
+                    merging_cells = False
+                    merged_contents = ''
                 else:
                     merged_contents += value
             elif value.startswith('"'):
                 if value.endswith('"') and len(value) > 1:
                     # Just a value in quotes, like "TOYS 'R US". And not just
                     # the " character.
+                    value = self._normalize_row_value(value)
                     row.append(value)
                 else:
                     merging_cells = True
@@ -122,6 +140,8 @@ class Command(VerboseCommand):
         f = io.open(options['input_file'], mode='r', encoding='cp1252',
                     newline="\r\n")
         col_headers = f.next().strip().split('\t')
+        batch_size = 1000
+        batch = []
         for i, line in enumerate(f):
             sys.stdout.write('\rDoing line: %s' % i)
             sys.stdout.flush()
@@ -137,14 +157,23 @@ class Command(VerboseCommand):
             self.normalize_booleans(row)
             self.normalize_dates(row)
             self.normalize_ints(row)
-            if options['filetype'] in [CV_OLD, CR_OLD, APP_OLD, BANKR_2017]:
-                raise NotImplementedError("This file type not yet implemented.")
+            if options['filetype'] in [CV_OLD, CR_OLD, APP_OLD, BANKR_2017,
+                                       APP_2017]:
+                raise NotImplementedError(
+                    "This file type not yet implemented.")
             elif options['filetype'] == CV_2017:
-                self.import_row(row, CV_2017)
+                batch.append(self.create_row_obj(row, CV_2017))
             elif options['filetype'] == CR_2017:
-                self.import_row(row, CR_2017)
-            elif options['filetype'] == APP_2017:
-                self.import_appellate_row(row, APP_2017)
+                batch.append(self.create_row_obj(row, CR_2017))
+
+            if len(batch) == batch_size:
+                logger.info("Saving %s items to the DB.", batch_size)
+                FjcIntegratedDatabase.objects.bulk_create(batch)
+                batch = []
+
+        # Do any trailing items as well.
+        FjcIntegratedDatabase.objects.bulk_create(batch)
+
         f.close()
 
     def normalize_nulls(self, row):
@@ -221,18 +250,14 @@ class Command(VerboseCommand):
                 raise Exception("Unable to match DISTRICT column value %s to "
                                 "Court object" % row['DISTRICT'])
 
-    def import_row(self, row, source):
+    def create_row_obj(self, row, source):
+        # Just create an obj, so we can do a bulk_update. This is much faster
+        # than doing an insert for every item.
         values = {}
         for k, v in row.items():
             if k in self.field_mappings:
                 values[self.field_mappings[k]] = v
-        FjcIntegratedDatabase.objects.create(
-            dataset_source=source,
-            **values
-        )
-
-    def import_appellate_row(self, row, source):
-        pass
+        return FjcIntegratedDatabase(dataset_source=source, **values)
 
     def build_field_data(self):
         """Build up fields for the selected filetype."""

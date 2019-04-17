@@ -3,8 +3,10 @@ import json
 import logging
 import os
 import re
+from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.mail import EmailMessage
 from django.core.urlresolvers import reverse
 from django.db.models import Count, Sum
@@ -12,18 +14,21 @@ from django.http import HttpResponse
 from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render, get_object_or_404
 from django.template import loader
+from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
 from cl.lib import magic
-from cl.lib.bot_detector import is_bot
+from cl.lib.bot_detector import is_og_bot
+from cl.lib.decorators import track_in_piwik
+from cl.opinion_page.views import view_recap_document
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
-from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument
+from cl.search.models import Court, OpinionCluster, Opinion, RECAPDocument, \
+    Docket
 from cl.simple_pages.forms import ContactForm
-from cl.stats.utils import tally_stat
 
 logger = logging.getLogger(__name__)
 
@@ -35,19 +40,24 @@ def about(request):
 
 def faq(request):
     """Loads the FAQ page"""
-    template_data = {
-        'scraped_court_count': Court.objects.filter(
-            in_use=True,
-            has_opinion_scraper=True
-        ).count(),
-        'total_opinion_count': OpinionCluster.objects.all().count(),
-        'total_recap_count': RECAPDocument.objects.filter(
-            is_available=True).count(),
-        'total_oa_minutes': (Audio.objects.aggregate(
-            Sum('duration')
-        )['duration__sum'] or 0) / 60,
-        'total_judge_count': Person.objects.all().count(),
-    }
+    faq_cache_key = 'faq-stats'
+    template_data = cache.get(faq_cache_key)
+    if template_data is None:
+        template_data = {
+            'scraped_court_count': Court.objects.filter(
+                in_use=True,
+                has_opinion_scraper=True
+            ).count(),
+            'total_opinion_count': OpinionCluster.objects.all().count(),
+            'total_recap_count': RECAPDocument.objects.filter(
+                is_available=True).count(),
+            'total_oa_minutes': (Audio.objects.aggregate(
+                Sum('duration')
+            )['duration__sum'] or 0) / 60,
+            'total_judge_count': Person.objects.all().count(),
+        }
+        five_days = 60 * 60 * 24 * 5
+        cache.set(faq_cache_key, template_data, five_days)
 
     return contact(
         request,
@@ -57,8 +67,43 @@ def faq(request):
     )
 
 
+def alert_help(request):
+    no_feeds = Court.objects.filter(
+        jurisdiction__in=[
+            Court.FEDERAL_BANKRUPTCY,
+            Court.FEDERAL_DISTRICT,
+        ],
+        pacer_has_rss_feed=False,
+    )
+    cache_key = 'alert-help-stats'
+    data = cache.get(cache_key)
+    if data is None:
+        data = {
+            'd_update_count': Docket.objects.filter(
+                date_modified__gte=now() - timedelta(days=1)).count(),
+            'de_update_count': RECAPDocument.objects.filter(
+                date_modified__gte=now() - timedelta(days=1)).count(),
+        }
+        one_day = 60 * 60 * 24
+        cache.set(cache_key, data, one_day)
+    context = {
+        'no_feeds': no_feeds,
+        'private': False,
+    }
+    context.update(data)
+    return render(request, 'help/alert_help.html', context)
+
+
+def donation_help(request):
+    return render(request, 'help/donation_help.html', {'private': False})
+
+
+def delete_help(request):
+    return render(request, 'help/delete_account_help.html', {'private': False})
+
+
 def markdown_help(request):
-    return render(request, 'markdown_help.html', {'private': False})
+    return render(request, 'help/markdown_help.html', {'private': False})
 
 
 def build_court_dicts(courts):
@@ -74,42 +119,56 @@ def build_court_dicts(courts):
 
 
 def coverage_graph(request):
-    courts = Court.objects.filter(in_use=True)
-    courts_json = json.dumps(build_court_dicts(courts))
+    coverage_cache_key = 'coverage-data-v2'
+    coverage_data = cache.get(coverage_cache_key)
+    if coverage_data is None:
+        courts = Court.objects.filter(in_use=True)
+        courts_json = json.dumps(build_court_dicts(courts))
 
-    search_form = SearchForm(request.GET)
-    precedential_statuses = [field for field in
-        search_form.fields.keys() if field.startswith('stat_')]
+        search_form = SearchForm(request.GET)
+        precedential_statuses = [field for field in
+            search_form.fields.keys() if field.startswith('stat_')]
 
-    # Build up the sourcing stats.
-    counts = OpinionCluster.objects.values('source').annotate(Count('source'))
-    count_pro = 0
-    count_lawbox = 0
-    count_scraper = 0
-    for d in counts:
-        if 'R' in d['source']:
-            count_pro += d['source__count']
-        if 'C' in d['source']:
-            count_scraper += d['source__count']
-        if 'L' in d['source']:
-            count_lawbox += d['source__count']
+        # Build up the sourcing stats.
+        counts = OpinionCluster.objects.values('source').annotate(Count('source'))
+        count_pro = 0
+        count_lawbox = 0
+        count_scraper = 0
+        for d in counts:
+            if 'R' in d['source']:
+                count_pro += d['source__count']
+            if 'C' in d['source']:
+                count_scraper += d['source__count']
+            if 'L' in d['source']:
+                count_lawbox += d['source__count']
 
-    opinion_courts = Court.objects.filter(
-        in_use=True,
-        has_opinion_scraper=True)
-    oral_argument_courts = Court.objects.filter(
-        in_use=True,
-        has_oral_argument_scraper=True)
-    return render(request, 'coverage_graph.html', {
-        'sorted_courts': courts_json,
-        'precedential_statuses': precedential_statuses,
-        'count_pro': count_pro,
-        'count_lawbox': count_lawbox,
-        'count_scraper': count_scraper,
-        'courts_with_opinion_scrapers': opinion_courts,
-        'courts_with_oral_argument_scrapers': oral_argument_courts,
-        'private': False
-    })
+        opinion_courts = Court.objects.filter(
+            in_use=True,
+            has_opinion_scraper=True)
+        oral_argument_courts = Court.objects.filter(
+            in_use=True,
+            has_oral_argument_scraper=True)
+
+        oa_duration = Audio.objects.aggregate(
+            Sum('duration'))['duration__sum']
+        if oa_duration:
+            oa_duration /= 60  # Avoids a "unsupported operand type" error
+
+        coverage_data = {
+            'sorted_courts': courts_json,
+            'precedential_statuses': precedential_statuses,
+            'oa_duration': oa_duration,
+            'count_pro': count_pro,
+            'count_lawbox': count_lawbox,
+            'count_scraper': count_scraper,
+            'courts_with_opinion_scrapers': opinion_courts,
+            'courts_with_oral_argument_scrapers': oral_argument_courts,
+            'private': False
+        }
+        one_day = 60 * 60 * 24
+        cache.set(coverage_cache_key, coverage_data, one_day)
+
+    return render(request, 'coverage.html', coverage_data)
 
 
 def feeds(request):
@@ -251,10 +310,6 @@ def validate_for_wot(request):
     return HttpResponse('bcb982d1e23b7091d5cf4e46826c8fc0')
 
 
-def tools_page(request):
-    return render(request, 'tools.html', {'private': False})
-
-
 def browser_warning(request):
     return render(request, 'browser_warning.html', {'private': True})
 
@@ -264,6 +319,7 @@ def ratelimited(request, exception):
                   status=HTTP_429_TOO_MANY_REQUESTS)
 
 
+@track_in_piwik
 def serve_static_file(request, file_path=''):
     """Sends a static file to a user.
 
@@ -280,8 +336,25 @@ def serve_static_file(request, file_path=''):
         item = get_object_or_404(Audio, local_path_mp3=file_path)
         mimetype = 'audio/mpeg'
     elif file_path.startswith('recap'):
-        # Create an empty object, and set it to blocked. No need to hit the DB
-        # since all RECAP documents are blocked.
+        # Either we serve up a special HTML file to make open graph crawlers
+        # happy, or we serve the PDF to make a human happy.
+        og_disabled = bool(request.GET.get('no-og'))
+        if is_og_bot(request) and not og_disabled:
+            # Serve up the regular HTML page, which has the twitter card info.
+            try:
+                rd = RECAPDocument.objects.get(filepath_local=file_path)
+            except (RECAPDocument.DoesNotExist,
+                    RECAPDocument.MultipleObjectsReturned):
+                pass
+            else:
+                return view_recap_document(
+                    request,
+                    docket_id=rd.docket_entry.docket_id,
+                    doc_num=rd.document_number,
+                    att_num=rd.attachment_number
+                )
+        # A human or unable to find the item in the DB. Create an empty object,
+        # and set it to blocked. (All recap pdfs are blocked.)
         item = RECAPDocument()
         item.blocked = True
         mimetype = 'application/pdf'
@@ -305,6 +378,4 @@ def serve_static_file(request, file_path=''):
     response['Content-Disposition'] = 'inline; filename="%s"' % \
                                       file_name.encode('utf-8')
     response['Content-Type'] = mimetype
-    if not is_bot(request):
-        tally_stat('case_page.static_file.served')
     return response

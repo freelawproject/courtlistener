@@ -16,7 +16,7 @@ from cl.search.models import Opinion, OpinionCluster, RECAPDocument, Docket
 
 
 @app.task
-def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
+def add_or_update_items(items, solr_object_type):
     """Adds an item to a solr index.
 
     This function is for use with the update_index command. It's slightly
@@ -25,13 +25,20 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
     not passing objects around, but thread safety shouldn't be an issue since
     this is only used by the update_index command, and we want to get the
     objects in the task, not in its caller.
+
+    :param items: A list of items or a single item to add or update in Solr
+    :param solr_object_type: The solr object type being updated so that the URL
+    can be pulled from the settings file. This is essential since different
+    celery workers may connect to solr on different machines.
+    :return None
     """
-    si = scorched.SolrInterface(solr_url, mode='w')
     if hasattr(items, "items") or not hasattr(items, "__iter__"):
         # If it's a dict or a single item make it a list
         items = [items]
     search_item_list = []
     for item in items:
+        si = scorched.SolrInterface(settings.SOLR_URLS[solr_object_type],
+                                    mode='w')
         try:
             if type(item) == Opinion:
                 search_item_list.append(item.as_search_dict())
@@ -56,6 +63,10 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
         si.add(search_item_list)
     except socket.error as exc:
         add_or_update_items.retry(exc=exc, countdown=120)
+    else:
+        if type(item) == Docket:
+            item.date_last_index = now()
+            item.save()
 
 
 @app.task
@@ -76,20 +87,23 @@ def add_or_update_recap_docket(data, force_commit=False,
     update unless we know the docket has something new.
 
     :param data: A dictionary containing the a key for 'docket_pk' and
-    'needs_solr_update'. 'docket_pk' will be used to find the docket to modify.
-    'needs_solr_update' is a boolean indicating whether the docket must be
+    'content_updated'. 'docket_pk' will be used to find the docket to modify.
+    'content_updated' is a boolean indicating whether the docket must be
     updated.
     :param force_commit: Whether to send a commit to Solr (this is usually not
     needed).
     :param update_threshold: Items staler than this number of seconds will be
     updated. Items fresher than this number will be a no-op.
     """
+    if data is None:
+        return
+
     si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode='w')
     some_time_ago = now() - timedelta(seconds=update_threshold)
     d = Docket.objects.get(pk=data['docket_pk'])
     too_fresh = d.date_last_index is not None and \
                       (d.date_last_index > some_time_ago)
-    update_not_required = not data.get('needs_solr_update', False)
+    update_not_required = not data.get('content_updated', False)
     if all([too_fresh, update_not_required]):
         return
     else:
@@ -176,8 +190,8 @@ def add_or_update_recap_document(item_pks, coalesce_docket=False,
 
 
 @app.task
-def delete_items(items, solr_url, force_commit=False):
-    si = scorched.SolrInterface(solr_url, mode='w')
+def delete_items(items, solr_obj_type, force_commit=False):
+    si = scorched.SolrInterface(settings.SOLR_URLS[solr_obj_type], mode='w')
     try:
         si.delete_by_ids(list(items))
         if force_commit:

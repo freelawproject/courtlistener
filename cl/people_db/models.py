@@ -8,6 +8,7 @@ from django.utils.text import slugify
 from localflavor.us import models as local_models
 
 from cl.custom_filters.templatetags.extras import granular_date
+from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
     validate_has_full_name,
@@ -20,10 +21,11 @@ from cl.lib.model_helpers import (
     validate_at_most_n,
     validate_supervisor,
 )
-from cl.lib.search_index_utils import solr_list, null_map, normalize_search_dicts
+from cl.lib.search_index_utils import solr_list, null_map, \
+    normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
-from cl.search.models import Court
+from cl.search.models import Court, THUMBNAIL_STATUSES
 
 SUFFIXES = (
     ('jr', 'Jr.'),
@@ -277,9 +279,9 @@ class Person(models.Model):
 
         # Dates
         if self.date_dob is not None:
-            out['dob'] = datetime.combine(self.date_dob, time())
+            out['dob'] = midnight_pst(self.date_dob)
         if self.date_dod is not None:
-            out['dod'] = datetime.combine(self.date_dod, time())
+            out['dod'] = midnight_pst(self.date_dod)
 
         # Joined Values. Brace yourself.
         positions = self.positions.all()
@@ -1205,14 +1207,6 @@ class ABARating(models.Model):
 
 class FinancialDisclosure(models.Model):
     """A simple table to hold references to financial disclosure forms"""
-    THUMBNAIL_NEEDED = 0
-    THUMBNAIL_COMPLETE = 1
-    THUMBNAIL_FAILED = 2
-    THUMBNAIL_STATUSES = (
-        (THUMBNAIL_NEEDED, "Thumbnail needed"),
-        (THUMBNAIL_COMPLETE, "Thumbnail completed successfully"),
-        (THUMBNAIL_FAILED, 'Unable to generate thumbnail'),
-    )
     person = models.ForeignKey(
         Person,
         help_text="The person that the document is associated with.",
@@ -1237,8 +1231,8 @@ class FinancialDisclosure(models.Model):
     )
     thumbnail_status = models.SmallIntegerField(
         help_text="The status of the thumbnail generation",
-        choices=THUMBNAIL_STATUSES,
-        default=0,
+        choices=THUMBNAIL_STATUSES.NAMES,
+        default=THUMBNAIL_STATUSES.NEEDED,
     )
     page_count = models.SmallIntegerField(
         help_text="The number of pages in the disclosure report",
@@ -1250,8 +1244,9 @@ class FinancialDisclosure(models.Model):
     def save(self, *args, **kwargs):
         super(FinancialDisclosure, self).save(*args, **kwargs)
         if not self.pk:
-            from cl.people_db.tasks import make_png_thumbnail_from_pdf
-            make_png_thumbnail_from_pdf.delay(self.pk)
+            from cl.people_db.tasks import \
+                make_financial_disclosure_thumbnail_from_pdf
+            make_financial_disclosure_thumbnail_from_pdf.delay(self.pk)
 
 
 class PartyType(models.Model):
@@ -1283,6 +1278,17 @@ class PartyType(models.Model):
     extra_info = models.TextField(
         help_text="Additional info from PACER",
         db_index=True,
+        blank=True,
+    )
+    highest_offense_level_opening = models.TextField(
+        help_text="In a criminal case, the highest offense level at the "
+                  "opening of the case.",
+        blank=True,
+    )
+    highest_offense_level_terminated = models.TextField(
+        help_text="In a criminal case, the highest offense level at the end "
+                  "of the case.",
+        blank=True,
     )
 
     class Meta:
@@ -1295,6 +1301,65 @@ class PartyType(models.Model):
             self.name,
             self.docket_id,
         )
+
+
+class CriminalCount(models.Model):
+    """The criminal counts associated with a PartyType object (i.e., associated
+    with a party in a docket.
+    """
+    PENDING = 1
+    TERMINATED = 2
+    COUNT_STATUSES = (
+        (PENDING, "Pending"),
+        (TERMINATED, "Terminated"),
+    )
+    party_type = models.ForeignKey(
+        PartyType,
+        help_text="The docket and party the counts are associated with.",
+        related_name="criminal_counts",
+    )
+    name = models.TextField(
+        help_text="The name of the count, such as '21:952 and 960 - "
+                  "Importation of Marijuana(1)'.",
+    )
+    disposition = models.TextField(
+        help_text="The disposition of the count, such as 'Custody of BOP for "
+                  "60 months, followed by 4 years supervised release. No "
+                  "fine. $100 penalty assessment.",
+        # Can be blank if no disposition yet.
+        blank=True,
+    )
+    status = models.SmallIntegerField(
+        help_text="Whether the count is pending or terminated.",
+        choices=COUNT_STATUSES,
+    )
+
+    @staticmethod
+    def normalize_status(status_str):
+        """Convert a status string into one of COUNT_STATUSES"""
+        if status_str == 'pending':
+            return CriminalCount.PENDING
+        elif status_str == 'terminated':
+            return CriminalCount.TERMINATED
+
+
+class CriminalComplaint(models.Model):
+    """The criminal complaints associated with a PartyType object (i.e.,
+    associated with a party in a docket.
+    """
+    party_type = models.ForeignKey(
+        PartyType,
+        help_text="The docket and party the complaints are associated with.",
+        related_name="criminal_complaints",
+    )
+    name = models.TextField(
+        help_text="The name of the criminal complaint, for example, '8:1326 "
+                  "Reentry of Deported Alien'",
+    )
+    disposition = models.TextField(
+        help_text="The disposition of the criminal complaint.",
+        blank=True,
+    )
 
 
 class Party(models.Model):
@@ -1371,9 +1436,16 @@ class Role(models.Model):
                   "role.",
     )
     role = models.SmallIntegerField(
-        help_text="The name of the attorney's role.",
+        help_text="The name of the attorney's role. Used primarily in "
+                  "district court cases.",
         choices=ATTORNEY_ROLES,
         db_index=True,
+        null=True,
+    )
+    role_raw = models.TextField(
+        help_text="The raw value of the role, as a string. Items prior to "
+                  "2018-06-06 may not have this value.",
+        blank=True,
     )
     date_action = models.DateField(
         help_text="The date the attorney was disbarred, suspended, "

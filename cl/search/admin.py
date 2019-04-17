@@ -1,9 +1,8 @@
-from django.conf import settings
 from django.contrib import admin
 
 from cl.search.models import (
-    Docket, OpinionsCited, Court, Opinion, OpinionCluster,
-    DocketEntry, RECAPDocument
+    Citation, Court, Docket, DocketEntry, Opinion, OpinionCluster,
+    OpinionsCited, OriginatingCourtInformation, RECAPDocument,
 )
 
 
@@ -52,50 +51,38 @@ class OpinionAdmin(admin.ModelAdmin):
     def delete_model(self, request, obj):
         obj.delete()
         from cl.search.tasks import delete_items
-        delete_items.delay([obj.pk], settings.SOLR_OPINION_URL)
+        delete_items.delay([obj.pk], 'opinions')
+
+
+@admin.register(Citation)
+class CitationAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'cluster',
+    )
+    list_display = (
+        '__unicode__',
+        'type',
+    )
+    list_filter = (
+        'type',
+    )
+    search_fields = (
+        'volume',
+        'reporter',
+        'page',
+    )
+
+
+class CitationInline(admin.TabularInline):
+    model = Citation
+    extra = 1
 
 
 @admin.register(OpinionCluster)
 class OpinionClusterAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['case_name']}
-    fields = (
-        'docket',
-        'panel',
-        'non_participating_judges',
-        'judges',
-        'date_filed',
-        'date_filed_is_approximate',
-        'slug',
-        'citation_id',
-        'case_name_short',
-        'case_name',
-        'case_name_full',
-        'federal_cite_one',
-        'federal_cite_two',
-        'federal_cite_three',
-        'state_cite_one',
-        'state_cite_two',
-        'state_cite_three',
-        'state_cite_regional',
-        'specialty_cite_one',
-        'scotus_early_cite',
-        'lexis_cite',
-        'westlaw_cite',
-        'neutral_cite',
-        'scdb_id',
-        'scdb_decision_direction',
-        'scdb_votes_majority',
-        'scdb_votes_minority',
-        'source',
-        'procedural_history',
-        'attorneys',
-        'nature_of_suit',
-        'posture',
-        'syllabus',
-        'citation_count',
-        'precedential_status',
-        'date_blocked',
-        'blocked',
+    inlines = (
+        CitationInline,
     )
     raw_id_fields = (
         'docket',
@@ -182,6 +169,14 @@ class DocketEntryInline(admin.TabularInline):
     extra = 1
 
 
+@admin.register(OriginatingCourtInformation)
+class OriginatingCourtInformationAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'assigned_to',
+        'ordering_judge',
+    )
+
+
 @admin.register(Docket)
 class DocketAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['case_name']}
@@ -196,6 +191,8 @@ class DocketAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'assigned_to',
         'referred_to',
+        'originating_court_information',
+        'idb_data',
     )
 
 

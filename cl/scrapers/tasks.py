@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
+
 import os
 import subprocess
 import traceback
@@ -11,7 +12,8 @@ from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
+from django.utils.encoding import smart_text, DjangoUnicodeDecodeError, \
+    force_text
 from django.utils.timezone import now
 from eyed3 import id3
 from lxml.etree import XMLSyntaxError
@@ -19,6 +21,7 @@ from lxml.html.clean import Cleaner
 from seal_rookery import seals_data, seals_root
 
 from cl.audio.models import Audio
+from cl.audio.utils import get_audio_binary
 from cl.celery import app
 from cl.citations.tasks import update_document_by_id
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -55,6 +58,17 @@ def extract_from_doc(path):
     return content, err
 
 
+def extract_from_docx(path):
+    """Extract text from docx files
+
+    We use docx2txt to pull out the text. Pretty simple.
+    """
+    process = subprocess.Popen(['docx2txt', path, '-'], shell=False,
+                               stdout=subprocess.PIPE, stderr=DEVNULL)
+    content, err = process.communicate()
+    return content, err
+
+
 def extract_from_html(path):
     """Extract from html.
 
@@ -63,11 +77,19 @@ def extract_from_html(path):
     try:
         content = open(path).read()
         content = get_clean_body_content(content)
-        err = False
+        encodings = ['utf-8', 'ISO8859', 'cp1252']
+        for encoding in encodings:
+            try:
+                content = force_text(content, encoding=encoding)
+            except DjangoUnicodeDecodeError:
+                continue
+            else:
+                return content, False
+
+        # Fell through, therefore unable to decode the string.
+        return '', True
     except:
-        content = ''
-        err = True
-    return content, err
+        return '', True
 
 
 def make_pdftotext_process(path):
@@ -192,14 +214,6 @@ def get_page_count(path, extension):
 
 
 @app.task
-def set_recap_page_count(rd_pk):
-    rd = RECAPDocument.objects.get(pk=rd_pk)
-    rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
-    rd.save()
-    return rd.pk
-
-
-@app.task
 def extract_doc_content(pk, callback=None, citation_countdown=0):
     """
     Given a document, we extract it, sniffing its extension, then store its
@@ -215,6 +229,8 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
     extension = path.split('.')[-1]
     if extension == 'doc':
         content, err = extract_from_doc(path)
+    elif extension == 'docx':
+        content, err = extract_from_docx(path)
     elif extension == 'html':
         content, err = extract_from_html(path)
     elif extension == 'pdf':
@@ -462,20 +478,19 @@ def process_audio_file(pk):
     """
     af = Audio.objects.get(pk=pk)
     tmp_path = os.path.join('/tmp', 'audio_' + uuid.uuid4().hex + '.mp3')
-    avconv_command = [
-        'avconv', '-i', af.local_path_original_file.path,
+    av_path = get_audio_binary()
+    av_command = [
+        av_path, '-i', af.local_path_original_file.path,
         '-ar', '22050',  # sample rate (audio samples/s) of 22050Hz
         '-ab', '48k',    # constant bit rate (sample resolution) of 48kbps
         tmp_path
     ]
     try:
-        _ = subprocess.check_output(
-            avconv_command,
-            stderr=subprocess.STDOUT
-        )
+        _ = subprocess.check_output(av_command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        print('avconv failed command: %s\nerror code: %s\noutput: %s\n%s' %
-              (avconv_command, e.returncode, e.output, traceback.format_exc()))
+        print('%s failed command: %s\nerror code: %s\noutput: %s\n%s' %
+              (av_path, av_command, e.returncode, e.output,
+               traceback.format_exc()))
         raise
 
     set_mp3_meta_data(af, tmp_path)

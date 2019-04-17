@@ -7,7 +7,7 @@
 
 {% block content %}
     <div class="col-xs-12">
-        <h2 id="qs">Frequently Asked Questions</h2>
+        <h1 id="qs">Frequently Asked Questions</h1>
     </div>
 
     <div class="col-sm-5">
@@ -27,7 +27,6 @@
             <a href="#how-different">What makes this site different from other sites that put legal documents
                 online?</a><br>
             <a href="#explain-alerts">What are alerts and how do they work?</a><br>
-            <a href="#real-time-alerts">What are Real Time Alerts?</a><br>
             <a href="#explain-citations">How do you identify citations?</a><br>
             <a href="#oral-args">How do you get the oral arguments you have?</a><br>
         </p>
@@ -97,8 +96,8 @@
 
 
 
-    <h3 id="general">General</h3>
-    <h4 id="who-and-what">What Is This Site? Who Runs It?</h4>
+    <h2 id="general">General</h2>
+    <h3 id="who-and-what">What Is This Site? Who Runs It?</h3>
     <p>CourtListener is a legal research website and data provider currently containing:</p>
     <ul>
         <li><a href="{% url "coverage" %}">{{ total_opinion_count|intcomma }}</a> legal opinions from federal, state, and specialty courts.</li>
@@ -110,21 +109,21 @@
     </p>
 
 
-    <h4 id="legal-advice">Can you provide me with legal advice or help me with my case?</h4>
+    <h3 id="legal-advice">Can you provide me with legal advice or help me with my case?</h3>
     <p>We're sorry, but we are unable to provide legal advice. You may wish to contact a qualified attorney. Many local bar associations, such as your local county bar association may operate a lawyer referral service through which you may be able to receive a no-cost or low-cost initial consultation. Justia <a href="https://www.justia.com/lawyers">maintains a lawyer directory</a> you may wish to look at, and their site also has a substantial amount of no-cost legal information.
     </p>
     <p>Additionally, many counties operate a law library open to the general public. You may be able to receive general assistance with legal research questions from the law librarians there. Alternatively, if there is law school near you, the law librarians there may be able to assist you with general legal research questions.
     </p>
 
 
-    <h4 id="submit-documents">Can I send you documents from my case?</h4>
+    <h3 id="submit-documents">Can I send you documents from my case?</h3>
     <p>In general, no, we can't accept documents from you about your case. As you might expect, people occasionally create fraudulent documents and that's a risk we cannot take. If your case in a <a href="{% url "coverage" %}#scraped-jurisdictions">jurisdiction that we cover</a>, we will eventually receive the opinion directly from the court itself.
     </p>
     <p>The exception to this is that if your documents are on PACER, it's possible for you to use our <a href="https://free.law/recap/">RECAP Project</a> to get us copies of the documents. Do to so, simply install either our Firefox or Chrome extension, and then purchase the documents from PACER.
     </p>
 
 
-    <h4 id="contact">How Do I Contact You?</h4>
+    <h3 id="contact">How Do I Contact You?</h3>
     <p>We can be contacted via the address on our <a href="{% url "contact" %}">contact form</a>, or via email at
         <a href="mailto:info@free.law">info@free.law</a>. If you require a secure channel when
         contacting us, please use the PGP key listed
@@ -133,16 +132,16 @@
 
 
 
-    <h3 id="features">Features</h3>
-    <h4 id="why-use">Why Should I Use This Site (And Not Something Else)?</h4>
+    <h2 id="features">Features</h2>
+    <h3 id="why-use">Why Should I Use This Site (And Not Something Else)?</h3>
     <p>While Free Law Project seeks to put the entirety of United States case law online, for the
         public, for free, we have not reached that goal yet. So, we hope you find what you are looking
         for here, but if not, you should absolutely use other sites too! Other no-cost sites include
         <a href="http://scholar.google.com/">Google Scholar</a> and <a href="http://www.justia.com/">
             Justia</a>. There are many fee-based sites too, such as <a href="http://fastcase.com/">Fastcase</a>.
 
-    <h4 id="how-different">What Makes This Site Different from Other Sites that
-        Put Legal Documents online?</h4>
+    <h3 id="how-different">What Makes This Site Different from Other Sites that
+        Put Legal Documents online?</h3>
     <p>Our site has a citator that shows you which subsequent opinions have cited to the opinion you
         are viewing, an important tool in researching whether a given precedent is still good law. Many free
         sites lack such a tool. We also think our search filters, advanced search options, and relevancy
@@ -158,7 +157,7 @@
             href="https://en.wikipedia.org/wiki/Open_source">open source</a> and <a
             href="https://en.wikipedia.org/wiki/Open_access">open access</a>.
         Anyone can download all the source code we use to operate this site and run their own site that does exactly
-        the same thing. And since our bulk downloads provide free access to our entire collection of opinions, we hope
+        the same thing. And since our bulk downloads provide access to our entire collection of opinions, we hope
         we've given our effort its own life that can continue no matter what. Many <a
                 href="https://en.wikipedia.org/wiki/AltLaw">people</a> <a
                 href="http://library2.lawschool.cornell.edu/insiteasp/public/display_browse.asp?style=st_browse&id=1542&prevpage=1Legal">have</a> <a
@@ -169,28 +168,17 @@
         can build upon this effort.</p>
 
 
-    <h4 id="explain-alerts">What Are Alerts and How Do They Work?</h4>
+    <h3 id="explain-alerts">What Are Alerts and How Do They Work?</h3>
     <p>You can sign up to receive free daily, weekly or monthly email alerts for
         any search query that interests you. When a new opinion matches your
         search, you'll get an email alert at about 5:30 Pacific time. If you
         have donated at least $10 in the last year, you can also set up real
         time alerts to get notified even more quickly.</p>
 
-    <p>Get started by running a search and the "Create an Alert" option will be
-        in the sidebar next to your results.
-    </p>
-    <p>Note that alerts are only currently supported in <a href="{% url "coverage" %}#scraped-jurisdictions">
-        {{ scraped_court_count }} jurisdictions</a>.</p>
-
-    <h4 id="real-time-alerts">What Are Real Time Alerts?</h4>
-    <p>Real Time alerts are alerts that are triggered as soon as we find an
-        item on a court website. Unlike regular alerts, these are sent out
-        throughout the day, which takes considerable processing power (and thus
-        expense). These alerts are only usually triggered within about half an
-        hour from when an item appears on a court website.
+    <p>To see more about alerts, <a href="{% url "alert_help" %}">see their documentation</a>.
     </p>
 
-    <h4 id="explain-citations">How Do You Identify Citations?</h4>
+    <h3 id="explain-citations">How Do You Identify Citations?</h3>
     <p>It's not easy. Currently we only detect citaitons to court opinions. Citations to statutes, law
         review articles, or other resources are currently ignored. When a new document is added, we search
         the document text for standard case law citation formats and if we can match what we find with one (and
@@ -200,7 +188,7 @@
         to try to resolve the citation. The case name from each potential match is searched in the original document
         and if there is only one match, then that becomes the linked citation.</p>
 
-    <h4 id="oral-args">How Do You Get the Oral Arguments That You Have?</h4>
+    <h3 id="oral-args">How Do You Get the Oral Arguments That You Have?</h3>
     <p>We get oral arguments by looking at court websites on approximately an
         hourly basis. We currently only check the sites listed on our <a
             href="{% url "coverage" %}#scraped-jurisdictions">coverage page</a>. Once we
@@ -211,8 +199,8 @@
 
 
 
-    <h3 id="recap-archive">RECAP Archive and Extensions</h3>
-    <h4 id="what-is-recap-pacer">What is RECAP and What is PACER?</h4>
+    <h2 id="recap-archive">RECAP Archive and Extensions</h2>
+    <h3 id="what-is-recap-pacer">What is RECAP and What is PACER?</h3>
     <p>PACER is a website run by the federal judiciary that makes public court records available to the general public. There are over one billion court records in PACER. PACER is typically used by lawyers and automated programs run by commercial ventures. The general public is not a big user of PACER because the site is too difficult to use and because it has a paywall that makes the documents very expensive.
     </p>
     <p><a href="https://free.law/recap/">RECAP is an extension for Firefox or Chrome</a> that makes PACER cheaper and easier to use. If you install the RECAP extension, you will donate the documents you purchase on PACER to our public collection, which we call the RECAP Archive. In addition, if you have the extension installed and try to download an item from PACER that we already have, you will instead get it for free from our archive.
@@ -220,40 +208,40 @@
     <p>If you use PACER, we recommend you install RECAP &mdash; it will save you money:</p>
     <p><a href="https://free.law/recap/" class="btn btn-primary">Install the Extensions&nbsp;<i class="fa fa-external-link"></i></a></p>
 
-    <h4 id="where-recap">Where does the content in the RECAP Archive come from?</h4>
+    <h3 id="where-recap">Where does the content in the RECAP Archive come from?</h3>
     <p>The content in the RECAP Archive comes from a variety of sources, including tools we use for automated data gathering, and from the <a href="https://free.law/recap/">RECAP extensions for Firefox and Chrome</a>.
     </p>
 
-    <h4 id="how-fast">How quickly does an item appear here?</h4>
+    <h3 id="how-fast">How quickly does an item appear here?</h3>
     <p>There can be a delay between when you contribute an item using the RECAP extensions and when it appears here. Generally the delay is less than 24 hours.
     </p>
 
-    <h4 id="recap-privacy">How do you handle privacy of RECAP content?</h4>
+    <h3 id="recap-privacy">How do you handle privacy of RECAP content?</h3>
     <p>We make decisions about the privacy of documents on a case by case basis. To learn more, please see our <a href="{% url "terms" %}#removal">removal policy</a>.
     </p>
 
-    <h4 id="learn-more">Where can I learn more about PACER and RECAP?</h4>
+    <h3 id="learn-more">Where can I learn more about PACER and RECAP?</h3>
     <p>We have <a href="https://free.law/recap/faq/">a more detailed FAQ specifically about RECAP</a> at <a href="https://free.law/recap/">its homepage on the Free Law Project website</a>.
     </p>
 
 
-    <h3 id="supreme-court-networks">Supreme Court Citation Networks</h3>
-    <h4 id="circles-change-size">Why do the case circles change size?</h4>
+    <h2 id="supreme-court-networks">Supreme Court Citation Networks</h2>
+    <h3 id="circles-change-size">Why do the case circles change size?</h3>
     <p>Circles change size based on the number of citations to it by other cases in the network. The more cases that cite to <i>Case A</i>, the larger it will be. The only exception to this rule is the rightmost case on network (with the most recent date). For visual clarity, this anchor case is always represented with a large circle.</p>
 
-    <h4 id="what-cases-mean">How can I find out what the cases in my network mean?</h4>
+    <h3 id="what-cases-mean">How can I find out what the cases in my network mean?</h3>
     <p>This tool will not read the cases for you but it will make your reading more efficient. You can read opinion text directly by clicking on opinions in the visualization. You can see all the Supreme Court Database information for a case. Information will open in a separate window and includes issue area, legal provision involved, and detailed voting information. By using SCDB information and skimming opinion text, you can figure out what is going on in the case fairly quickly. Some networks also have helpful user descriptions. </p>
 
-    <h4 id="default-two-degree">Why did my network default to 2-degrees?</h4>
+    <h3 id="default-two-degree">Why did my network default to 2-degrees?</h3>
     <p>We do not generate 3-degree networks when it will contain more than 70 cases. We have found networks larger than 70 are too unwieldy and so default those networks to 2-degrees.</p>
 
-    <h4 id="case-missing">Why is a case missing from my network?</h4>
+    <h3 id="case-missing">Why is a case missing from my network?</h3>
     <p>When the Supreme Court cites to recently decided cases, the citation form is non-standard such as citing to <i>Slip. Op</i> or <i>555 S.Ct ___</i>. This currently confounds our automatic citation parser. It's a problem we're working on.</p>
 
-    <h4 id="embed-network">How do I embed a network in my blog?</h4>
+    <h3 id="embed-network">How do I embed a network in my blog?</h3>
     <p>On the network display page, the "Embed" box is on the right side of the page. Click in the box and copy the HTML code. You can then put this code in your WordPress blog (or Liguides site, or etc) just as you would embed a video from YouTube.</p>
 
-    <h4 id="dod">What do you mean by "Degree of Dissent"?</h4>
+    <h3 id="dod">What do you mean by "Degree of Dissent"?</h3>
     <p>We use <em>Degree of Dissent</em> (DoD) in our <a
             href="{% url "mapper_homepage" %}">visualizations of Supreme Court
         networks</a> to indicate the average level of disagreement in the cases
@@ -267,9 +255,9 @@
     </p>
 
 
-    <h3 id="coverage-and-content">Coverage and Content</h3>
-    <h4 id="what-coverage-exists">What Is Your Coverage of Legal Materials and
-        How Comprehensive Is It?</h4>
+    <h2 id="coverage-and-content">Coverage and Content</h2>
+    <h3 id="what-coverage-exists">What Is Your Coverage of Legal Materials and
+        How Comprehensive Is It?</h3>
     <p>See our <a href="{% url "coverage" %}">coverage</a> page for all the details. We are
         constantly working to fill gaps in our coverage, but until we have the entirety of United States case law,
         you should consult additional sources for any important legal research task.</p>
@@ -277,8 +265,8 @@
         confirm that we have every opinion that appears in the bound volumes of case law. Once that audit is complete,
         we will be able to post even more details about our coverage.</p>
 
-    <h4 id="why-many-copies">Why Do Some Opinions Show Up More Than Once In
-        Search Results?</h4>
+    <h3 id="why-many-copies">Why Do Some Opinions Show Up More Than Once In
+        Search Results?</h3>
     <p>CourtListener uses an automatic process to find and download opinions on court websites. This is an extremely
         efficient and effective method of finding new opinions as they are posted, but in some cases, a court will post
         several edits to an opinion. Sometimes these edits are for seemingly minor typos, but other times they can be
@@ -289,15 +277,15 @@
     <p>We've discussed this topic in more depth <a
             href="https://free.law/2014/05/03/detecting-judicial-corrections/">on our blog</a>.</p>
 
-    <h4 id="why-my-case">Why Is The Opinion In My Case Appearing On This Site?</h4>
+    <h3 id="why-my-case">Why Is The Opinion In My Case Appearing On This Site?</h3>
     <p>Court opinions are public records and create the precedents that determine the results in future cases.
         Court opinions contain statements of the law and legal reasoning that guide legal researchers. We are
         attempting to build a site useful to legal researchers. If you have a concern about information from one
         of these opinions appearing in search engines, such as Google, you should review our <a
                 href="{% url "terms" %}#removal">removal policy</a>.</p>
 
-    <h4 id="non-precedential">Why Does This Site Contain Documents That Say "Not for Publication",
-        "Unpublished", Etc?</h4>
+    <h3 id="non-precedential">Why Does This Site Contain Documents That Say "Not for Publication",
+        "Unpublished", Etc?</h3>
     <p>In many jurisdictions of the United States, these statements do not mean that the case should not be
         published. Instead, it means that the issuing court is claiming they should not be used as a precedent in
         subsequent cases. You can read more about this policy <a
@@ -305,14 +293,14 @@
             Wikipedia</a>, if you are interested in the details.
     </p>
 
-    <h4 id="explain-pin-cites">What Are the Gray Numbers That Appear in the
-        Middle of Many Opinions?</h4>
+    <h3 id="explain-pin-cites">What Are the Gray Numbers That Appear in the
+        Middle of Many Opinions?</h3>
     <p>These numbers correspond to the page numbers in the original books where these opinions were first published,
         and are commonly known as <a href="https://en.wikipedia.org/wiki/Legal_citation">pin-cites</a>.
     </p>
 
-    <h4 id="explain-neutral-citations">What Are Neutral Citations and Why Do
-        You Promote Them?</h4>
+    <h3 id="explain-neutral-citations">What Are Neutral Citations and Why Do
+        You Promote Them?</h3>
     <p>Historically, citations have corresponded to the location in a book where an opinion could be found. But for
         online systems like CourtListener this presents a number of problems. First, there's the obvious problem that
         when an opinion is created by a court and posted on its website, there is no way to refer to it until it is
@@ -335,14 +323,14 @@
             href="http://universalcitation.org/">the website where they are being promoted</a>.
     </p>
 
-    <h4 id="why-bulk">Why Do You Provide Bulk Data Files?</h4>
+    <h3 id="why-bulk">Why Do You Provide Bulk Data Files?</h3>
     <p>Two groups tend to find this useful. First are academic researchers who wish to do empirical research
         on large portions of U.S. case law. They often cannot answer certain questions with full generality without
         including all or almost all opinions in their research. Second are legal technology startups or those who
         want to test out some new legal research tool. These groups can use the documents we have collected to test
         out a prototype of their new tools. Most regular users will not need to use our bulk downloads.</p>
 
-    <h4 id="explain-fingerprint">What Is the "Fingerprint" of the Document?</h4>
+    <h3 id="explain-fingerprint">What Is the "Fingerprint" of the Document?</h3>
     <p>We generate these digital fingerprints for each document we retrieve from court websites. The algorithm that
         generates the fingerprint guarantees that the fingerprint generated will be unique for every file. If even
         one character is changed in a document, a different fingerprint will be generated. This helps us in our document
@@ -358,39 +346,28 @@
     </p>
 
 
-    <h3 id="contributions">Contributions</h3>
-    <h4 id="kinds-of-help">What Kinds of Help Do You Need?</h4>
-    <p>As a start-up non-profit, we always need many varieties of help. Our
-        biggest goals revolve around new features for the site, which you can
-        see in our <a href="https://trello.com/b/F3jrqway/flp-projects">feature
-            tracker</a>. We also need the help of designers, lawyers, legal
-        researchers and non-profit fundraisers. If you think you can help,
-        please <a href="{% url "contact" %}">get in touch</a>. We would love to hear from
-        you.
+    <h2 id="contributions">Contributions</h2>
+    <h3 id="kinds-of-help">What Kinds of Help Do You Need?</h3>
+    <p>As a start-up non-profit, we always need many varieties of help. Our biggest goals revolve around new features for the site. We also need the help of designers, lawyers, legal researchers and non-profit fundraisers. If you think you can help, please <a href="{% url "contact" %}">get in touch</a>. We would love to hear from you.
     </p>
     <p>Another simple way to help is to <a
             href="{% url "donate" %}?referrer=faq">support our efforts
         financially</a>.
     </p>
 
-    <h4 id="how-supported">How is the Project Supported?</h4>
-    <p>CourtListener and Free Law Project are currently supported by volunteer
-        contributors who donate their time to making the legal landscape more
-        fair. Financially, we are in the running for several startup seeds and
-        we rely on sustaining donations from our users. We also recently added
-        advertising to the site, but it only accounts for less than 5% of our
-        budget.
+    <h3 id="how-supported">How is the Project Supported?</h3>
+      <p>CourtListener, RECAP, and Free Law Project are supported by several sources of revenue including user donations, corporate sponsorships, grants that we join or author, <a href="https://free.law/data-consulting/">client work that aligns with our mission</a>, and API contributions, which some users of the APIs provide.
     </p>
 
-    <h4 id="can-i-contribute">Can I Contribute to the Project Somehow?</h4>
+    <h3 id="can-i-contribute">Can I Contribute to the Project Somehow?</h3>
     <p>Yes! Absolutely. Read our <a href="{% url "contribute" %}">page about getting
         involved</a> or simply <a
             href="mailto:volunteer@free.law">send us an email</a>
         with how you think you might be able to help.
     </p>
 
-    <h3 id="past-and-future">Past and Future</h3>
-    <h4 id="orgin-story">What's the History of CourtListener?</h4>
+    <h2 id="past-and-future">Past and Future</h2>
+    <h3 id="orgin-story">What's the History of CourtListener?</h3>
     <p>CourtListener was Michael Lissner's capstone project while a student at
         the <a href="http://ischool.berkeley.edu">University of California,
             Berkeley, School of Information</a>, where he was advised by
@@ -407,7 +384,7 @@
         efforts.
     </p>
 
-    <h4 id="future">What Plans or Features Are In the Works?</h4>
+    <h3 id="future">What Plans or Features Are In the Works?</h3>
     <p>All of the planning for CourtListener is done in the open on <a
             href="https://trello.com/b/F3jrqway/flp-projects">our feature and bug tracker</a>. If you have ideas for
         the project that are not mentioned there, please tell us! We'd love to <a href="{% url "contact" %}">hear your ideas</a>
@@ -415,7 +392,7 @@
     </p>
 
 
-    <h3 id="other">Something Else?</h3>
+    <h2 id="other">Something Else?</h2>
 
     <p>If you have another question, don't hesitate to get in touch using the
         form below.

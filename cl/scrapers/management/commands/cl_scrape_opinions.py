@@ -14,6 +14,7 @@ from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.alerts.models import RealTimeQueue
+from cl.citations.find_citations import get_citations
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.import_lib import get_candidate_judges
 from cl.lib.string_utils import trunc
@@ -23,13 +24,25 @@ from cl.scrapers.tasks import extract_doc_content, extract_by_ocr
 from cl.scrapers.utils import (
     get_extension, get_binary_content, signal_handler
 )
-from cl.search.models import Court
+from cl.search.models import Citation, Court
 from cl.search.models import Docket
 from cl.search.models import Opinion
 from cl.search.models import OpinionCluster
 
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
+
+
+def make_citation(cite_str, cluster, cite_type):
+    """Create and return a citation object for the input values."""
+    citation_obj = get_citations(cite_str)[0]
+    return Citation(
+        cluster=cluster,
+        volume=citation_obj.volume,
+        reporter=citation_obj.reporter,
+        page=citation_obj.page,
+        type=cite_type,
+    )
 
 
 class Command(VerboseCommand):
@@ -100,6 +113,9 @@ class Command(VerboseCommand):
             source=Docket.SCRAPER,
         )
 
+        west_cite_str = item.get('west_citations', '')
+        state_cite_str = item.get('west_state_citations', '')
+        neutral_cite_str = item.get('neutral_citations', '')
         cluster = OpinionCluster(
             judges=item.get('judges', ''),
             date_filed=item['case_dates'],
@@ -111,11 +127,21 @@ class Command(VerboseCommand):
             nature_of_suit=item.get('nature_of_suit', ''),
             blocked=blocked,
             date_blocked=date_blocked,
-            federal_cite_one=item.get('west_citations', ''),
-            state_cite_one=item.get('west_state_citations', ''),
-            neutral_cite=item.get('neutral_citations', ''),
+            # These three fields are replaced below.
+            federal_cite_one=west_cite_str,
+            state_cite_one=state_cite_str,
+            neutral_cite=neutral_cite_str,
             syllabus=item.get('summaries', ''),
         )
+        citations = []
+        cite_types = [
+            (west_cite_str, Citation.WEST),
+            (state_cite_str, Citation.STATE),
+            (neutral_cite_str, Citation.NEUTRAL),
+        ]
+        for cite_str, cite_type in cite_types:
+            if cite_str:
+                citations.append(make_citation(cite_str, cluster, cite_type))
         opinion = Opinion(
             type='010combined',
             sha1=sha1_hash,
@@ -137,15 +163,21 @@ class Command(VerboseCommand):
             ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
             error = True
 
-        return docket, opinion, cluster, error
+        return docket, opinion, cluster, citations, error
 
     def save_everything(self, items, index=False, backscrape=False):
         """Saves all the sub items and associates them as appropriate.
         """
-        docket, cluster, opinion = items['docket'], items['cluster'], items['opinion']
+        docket, cluster = items['docket'], items['cluster']
+        opinion, citations = items['opinion'], items['citations']
         docket.save()
         cluster.docket = docket
         cluster.save(index=False)  # Index only when the opinion is associated.
+
+        for citation in citations:
+            citation.cluster_id = cluster.pk
+            citation.save()
+
         if cluster.judges:
             candidate_judges = get_candidate_judges(
                 cluster.judges,
@@ -222,7 +254,7 @@ class Command(VerboseCommand):
                                 item['download_urls'].encode('utf-8'))
                     dup_checker.reset()
 
-                    docket, opinion, cluster, error = self.make_objects(
+                    docket, opinion, cluster, citations, error = self.make_objects(
                         item, court, sha1_hash, content
                     )
 
@@ -234,7 +266,8 @@ class Command(VerboseCommand):
                         items={
                             'docket': docket,
                             'opinion': opinion,
-                            'cluster': cluster
+                            'cluster': cluster,
+                            'citations': citations,
                         },
                         index=False
                     )

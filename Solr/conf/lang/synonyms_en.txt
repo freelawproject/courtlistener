@@ -33,7 +33,10 @@ sen => senator,senegal
 st => state,street
 tel => telephone,telegraph
 tr => trustee,trust
-trans => translation,translator,transgender
+# "trans" is used much more to mean transgender than the other words, and we've
+# gotten a complaint from a user about this synonym. Removing it, but adding a
+# synonym between trans and transgender instead (below).
+# trans => translation,translator,transgender
 
 # Units
 GB,gib,gigabyte,gigabytes
@@ -168,7 +171,9 @@ consol,consolidated
 const,constitution,constitutional
 constr,construction
 contemp,contemporary
-cont,contract
+# This synonym means that whenever you search for 'contract' you get results
+# for "continued". Removing this.
+# cont,contract
 conv,conveyancer
 coop,cooperative
 corp,corporate
@@ -419,6 +424,7 @@ tex,texas
 thai,thailand
 tit,title
 twp,township
+trans,transgender
 transcon,transcontinental
 transp,transportation
 trib,tribune

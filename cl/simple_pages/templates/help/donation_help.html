@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Help with Donations to Free Law Project – CourtListener.com{% endblock %}
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+{% block sidebar %}{% endblock %}
+
+
+{% block content %}
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+  <div class="col-xs-12 col-sm-8 col-md-6">
+    <h1>Help with Donations to Free Law&nbsp;Project</h1>
+    <p class="lead">CourtListener is a publicly supported 501(c)(3) non-profit based out of Emeryville, CA. Most of the donations we receive are used to pay for our staff and computer expenses.
+    </p>
+    <p class="lead">Below we have a number of FAQs that you may have about your donation.</p>
+
+    <h2>General Questions</h2>
+    <h3>Where does the money go and why does it matter?</h3>
+    <p>Free Law Project is funded by a blend of user donations, client work, and grants. Almost all of the money that Free Law Project receives goes towards funding either our staff or our infrastructure (servers, hard drives, etc.). Less than 1% of our income goes towards HR, accounting, or other administrative expenses.
+    </p>
+    <p>Your donations are critical and sustain CourtListener, RECAP, and all of the other services we offer. Without your contributions, we won't be able to offer the services we do.
+    </p>
+
+    <h3>What is Free Law Project's history?</h3>
+    <p>CourtListener was created by Michael Lissner in 2010 as a final project while at <a href="https://ischool.berkeley.edu" rel="nofollow">UC Berkeley's School of Information</a>. At that time, it was a small, simple alerting tool for circuit courts.
+    </p>
+    <p>RECAP was created at <a href="https://citp.princeton.edu" rel="nofollow">Princeton's Center for Information Technology Policy</a> around the same time. In 2014, Free Law Project <a href="https://free.law/2014/05/19/our-recap-partnership-with-princeton-universitys-citp/">partnered with CITP</a> to continue supporting and maintaining RECAP.
+    </p>
+    <p>Free Law Project was <a href="https://free.law/2013/09/24/non-profit-free-law-project-formed-to-create-an-open-legal-ecosystem/">founded in 2013</a>.
+    </p>
+
+    <h3>What is Free Law Project's tax ID number?</h3>
+    <p>Our tax id number is {{ EIN_SECRET }}.</p>
+
+
+    <hr>
+    <h2>Questions about Donations</h2>
+    <h3>Do accept checks?</h3>
+    <p>Yes, we do. Please <a href="{% url "contact" %}">send us an email</a> if you're interested and we'll follow up from there. Unfortunately, due to the nature of our work, we no longer publish our address online.
+    </p>
+
+    <h3>Do you accept BitCoint or other Alt Coins?</h3>
+    <p>We do accept BitCoin, yes. You can make a bitcoin donation using the following QR code or bitcoin address:</p>
+    <img src="{{ STATIC_PREFIX }}png/bitcoin-qr-code.png"
+         width="200"
+         height="200"
+         class="img-responsive img-rounded center-block">
+    <p class="text-center"><a
+      href="bitcoin:18zToeKZZyqMP39WiNpCd6V6c1Fc1MbR27">18zToeKZZyqMP39WiNpCd6V6c1Fc1MbR27</a>
+    </p>
+    <p>We don't support any other altcoins at this time.
+    </p>
+
+
+    <hr>
+    <h2>Recurring Donations</h2>
+    <h3>When are recurring donations charged?</h3>
+    <p>Recurring donations are charged monthly on the day that you set up your original monthly contribution. If that day is on the 29th, 30th, or 31st of the month, we will charge you on the 28th of each month instead.
+    </p>
+
+    <h3>What if the credit card I'm using for monthly donations is stolen or expires?</h3>
+    <p>For American credit cards, our credit card processor is usually able to handle these issues seamlessly. If not, we'll send you an email when your card fails.
+    </p>
+
+    <h3>How do I cancel or pause a monthly donation?</h3>
+    <p>If you set up the monthly donation while logged into your CourtListener account, you will be able to <a href="{% url "profile_donations" %}">see and cancel it via your profile</a>. If not, we will be happy to help you cancel or pause the donation if you <a href="{% url "contact" %}">send us a brief note</a>.
+    </p>
+
+    <h3>How do I update my credit card information or use a different card?</h3>
+    <p>If you want to update your credit card information, the best way is to just cancel your current monthly donation and create a new one.
+    </p>
+  </div>
+{% endblock %}

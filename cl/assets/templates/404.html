@@ -7,22 +7,55 @@
 
 
 {% block content %}
-    <div class="hidden-xs col-sm-2 col-md-3"></div>
-    <div class="col-xs-12 col-sm-8 col-md-6">
-        <h2>Sorry, that page does not exist...</h2>
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+  <div class="col-xs-12 col-sm-8 col-md-6">
+    <h1>404 U.S. ___, Page Not Found</h1>
+    <h3 class="caps gray">Sorry, that page does not exist&hellip;</h3>
 
-        <p>You've got a few options:</p>
-        <ul>
-            <li>Return <a href="/">home</a>, where you can start fresh</li>
-            <li><a href="{% url "contact" %}">Let us know</a> it's missing, so we can fix
-                things
-            </li>
-            <li><a href="{% url "contribute" %}#bugs">File a bug</a>, if you think it's
-                something we should fix
-            </li>
-        </ul>
-        <p>Sorry about this. If you continue having problems, please do let us
-            know.</p>
-    </div>
-    <div class="hidden-xs col-sm-2 col-med-3"></div>
+    <p>You've got a few options:</p>
+    <ul>
+      <li>
+        <p>Do a new search in the <a href="{% url "advanced_o" %}">Opinions database</a>, <a href="{% url "advanced_r" %}">RECAP Archive</a>, <a href="{% url "advanced_oa" %}">Oral Arguments database</a>, or <a href="{% url "advanced_p" %}">Judge database</a>.
+        </p>
+      </li>
+      <li>
+        <p>If you're trying to find something by citation, you can try our <a href="{% url "citation_redirector" %}">Citation Lookup tool</a>.
+        </p>
+      </li>
+      <li>
+        <p><a href="{% url "contact" %}">Let us know</a> it's missing. Sometimes we can help.
+        </p>
+      </li>
+      <li>
+        <p><a href="{% url "faq" %}#explain-neutral-citations">Learn about neutral citations</a> so we can avoid citations like <strong>"404 U.S. ___"</strong> in the future.
+        </p>
+      </li>
+    </ul>
+    <p>Sorry about this. If you continue having problems, please do let us know.</p>
+    <p class="v-offset-above-2">
+      {% url "advanced_o" as o_url %}
+      {% url "advanced_r" as r_url %}
+      {% url "advanced_oa" as oa_url %}
+      {% url "advanced_p" as p_url %}
+      {% if o_url in request_path %}
+        <a href="{{ o_url }}"
+           class="btn btn-lg btn-primary">Do a New Opinion Search</a>
+      {% elif r_url in request_path %}
+        <a href="{{ r_url }}"
+           class="btn btn-lg btn-primary">Do a New Search in the RECAP Archive</a>
+      {% elif oa_url in request_path %}
+        <a href="{{ oa_url }}"
+           class="btn btn-lg btn-primary">Do a New Oral Argument Search</a>
+      {% elif p_url in request_path %}
+        <a href="{{ p_url }}"
+           class="btn btn-lg btn-primary">Do a New Judge Search</a>
+      {% else %}
+        <div class="well v-offset-above-3">
+          <strong><i class="fa fa-lightbulb-o grey"></i> Quick Tip!
+          </strong>{{ TIP|safe }}
+        </div>
+      {% endif %}
+    </p>
+  </div>
+  <div class="hidden-xs col-sm-2 col-med-3"></div>
 {% endblock %}

@@ -1,11 +1,12 @@
-from cl.donate.models import Donation
-from cl.users.models import UserProfile
 from django import forms
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.forms import ModelForm
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
+from cl.donate.models import Donation, PROVIDERS, FREQUENCIES
+from cl.users.models import UserProfile
 
 AMOUNTS = (
     ('5000', '$5,000'),
@@ -19,9 +20,9 @@ AMOUNTS = (
 )
 
 
-class DecimalOrOtherField(forms.DecimalField):
+class DecimalOrOtherChoiceField(forms.ChoiceField):
     def __init__(self, *args, **kwargs):
-        super(DecimalOrOtherField, self).__init__(*args, **kwargs)
+        super(DecimalOrOtherChoiceField, self).__init__(*args, **kwargs)
 
     def to_python(self, value):
         """Makes sure that the value returned is either returned as a decimal
@@ -31,13 +32,13 @@ class DecimalOrOtherField(forms.DecimalField):
         if value == 'other':
             return value
         else:
-            return super(DecimalOrOtherField, self).to_python(value)
+            return super(DecimalOrOtherChoiceField, self).to_python(value)
 
     def validate(self, value):
         if value == 'other':
             return value
         else:
-            return super(DecimalOrOtherField, self).validate(value)
+            return super(DecimalOrOtherChoiceField, self).validate(value)
 
 
 class ProfileForm(ModelForm):
@@ -101,14 +102,35 @@ class UserForm(ModelForm):
 
 
 class DonationForm(ModelForm):
-    amount_other = forms.DecimalField(
+    reference = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control'
+        }),
         required=False,
     )
-    amount = DecimalOrOtherField(
-        widget=forms.RadioSelect(
-            choices=AMOUNTS,
-        ),
+    frequency = forms.ChoiceField(
+        widget=forms.RadioSelect,
+        choices=FREQUENCIES.NAMES,
+        required=False,
+        initial='once',
+    )
+    amount = DecimalOrOtherChoiceField(
+        widget=forms.RadioSelect,
+        choices=AMOUNTS,
         initial='50',
+    )
+    placeholder = 'Amount (min $%s)' % settings.MIN_DONATION['docket_alerts']
+    amount_other = forms.DecimalField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': placeholder,
+            'class': 'form-control'
+        }),
+    )
+    payment_provider = forms.ChoiceField(
+        widget=forms.RadioSelect,
+        choices=PROVIDERS.ACTIVE_NAMES,
+        initial=PROVIDERS.CREDIT_CARD,
     )
 
     class Meta:
@@ -116,12 +138,13 @@ class DonationForm(ModelForm):
         fields = (
             'amount_other',
             'amount',
+            'frequency',
             'payment_provider',
             'send_annual_reminder',
             'referrer',
+            'reference',
         )
         widgets = {
-            'payment_provider': forms.RadioSelect(),
             'referrer': forms.HiddenInput(),
         }
 
@@ -129,7 +152,7 @@ class DonationForm(ModelForm):
         """
         Handles validation fixes that need to be performed across fields.
         """
-        # 1. Set the Amount = to other field
+        # 1. Set the amount field to amount_other field's value
         if self.cleaned_data.get('amount') == 'other':
             self.cleaned_data['amount'] = self.cleaned_data.get('amount_other')
         return self.cleaned_data

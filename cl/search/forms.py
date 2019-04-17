@@ -7,7 +7,8 @@ from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.model_helpers import flatten_choices
 from cl.people_db.models import Position, PoliticalAffiliation
-from cl.search.fields import CeilingDateField, FloorDateField, RandomChoiceField
+from cl.search.fields import CeilingDateField, FloorDateField, \
+    RandomChoiceField
 from cl.search.models import Court
 from cl.search.models import DOCUMENT_STATUSES
 
@@ -140,7 +141,7 @@ class SearchForm(forms.Form):
     # RECAP fields
     #
     available_only = forms.BooleanField(
-        label="Exclude items not in RECAP",
+        label="Only show results with PDFs",
         label_suffix='',
         required=False,
         widget=forms.CheckboxInput(attrs={
@@ -295,7 +296,7 @@ class SearchForm(forms.Form):
         )
     )
     neutral_cite.as_str_types = ['o']
-    cited_gt = forms.CharField(
+    cited_gt = forms.IntegerField(
         required=False,
         label='Min Cites',
         initial=0,
@@ -305,10 +306,10 @@ class SearchForm(forms.Form):
         )
     )
     cited_gt.as_str_types = ['o']
-    cited_lt = forms.CharField(
+    cited_lt = forms.IntegerField(
         required=False,
         label='Max Cites',
-        initial=60000,
+        initial=100000,
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
                    'autocomplete': 'off'}
@@ -587,7 +588,7 @@ class SearchForm(forms.Form):
             if not hasattr(field, 'as_str_types'):
                 continue
             if search_type in field.as_str_types:
-                value = self.cleaned_data[field_name]
+                value = self.cleaned_data.get(field_name)
                 if value:
                     if isinstance(field, ChoiceField):
                         choices = flatten_choices(self.fields[field_name])

@@ -23,8 +23,8 @@
         <date>2013/06/13</date>
         <status>Published</status>
         <docket_number>11-889</docket_number>
-        <neutral_cite>2013 SCOTUS 44</neutral_cite>
-        <federal_cite>4 fake_west 44</federal_cite>
+        <neutral_cite>2013 WY 44</neutral_cite>
+        <federal_cite>4 F.2d 44</federal_cite>
         <west_state_cite>4 Neb. 33</west_state_cite>
         <nature_of_suit>copyright</nature_of_suit>
         <judge>david</judge>
@@ -36,8 +36,8 @@
         <date>2013/06/12</date>
         <status>Published</status>
         <docket_number>Misc. 13-01</docket_number>
-        <neutral_cite>2013 FISC 1</neutral_cite>
-        <federal_cite>2 fake_west 4</federal_cite>
+        <neutral_cite>2013 WY 1</neutral_cite>
+        <federal_cite>2 F.2d 4</federal_cite>
         <nature_of_suit>social welfare</nature_of_suit>
         <judge>Jalal</judge>
     </opinion>
@@ -48,8 +48,8 @@
         <date>2005/05/04</date>
         <status>Published</status>
         <docket_number>49S00-0308-DP-392</docket_number>
-        <neutral_cite>2005 IN 442</neutral_cite>
-        <federal_cite>23 fake_west 449</federal_cite>
+        <neutral_cite>2005 FL 442</neutral_cite>
+        <federal_cite>23 F.2d 449</federal_cite>
         <nature_of_suit>family relations</nature_of_suit>
         <judge>gaby</judge>
     </opinion>
@@ -60,7 +60,7 @@
         <date>2002/01/26</date>
         <status>Published</status>
         <docket_number>11 S.Ct. 283</docket_number>
-        <neutral_cite>None</neutral_cite>
+        <neutral_cite>22 WY 22</neutral_cite>
         <federal_cite>138 U.S. 109</federal_cite>
         <nature_of_suit>applesauce</nature_of_suit>
         <judge>namir</judge>
@@ -72,8 +72,8 @@
         <date>1999/11/12</date>
         <status>Unpublished</status>
         <docket_number>20S00-9810-CR-611</docket_number>
-        <neutral_cite>1999 IN 441</neutral_cite>
-        <federal_cite>445 fake_west 332</federal_cite>
+        <neutral_cite>1999 FL 441</neutral_cite>
+        <federal_cite>445 U.S. 332</federal_cite>
         <nature_of_suit>grape jelly</nature_of_suit>
         <judge>Khaled</judge>
     </opinion>
@@ -84,8 +84,8 @@
         <date>1997/11/07</date>
         <status>Published</status>
         <docket_number>96-7169</docket_number>
-        <neutral_cite>None</neutral_cite>
-        <federal_cite>23 fake 398</federal_cite>
+        <neutral_cite>22 WY 22</neutral_cite>
+        <federal_cite>23 F.2d 398</federal_cite>
         <nature_of_suit>gay marriage</nature_of_suit>
         <judge>Steph</judge>
     </opinion>

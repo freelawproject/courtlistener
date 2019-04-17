@@ -1,16 +1,16 @@
 import json
 import logging
+import time
 from datetime import datetime
 
 import stripe
 from django.conf import settings
-from django.core.urlresolvers import reverse
 from django.http import HttpResponseNotAllowed, HttpResponse
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
 
 from cl.donate.models import Donation
-from cl.donate.utils import send_thank_you_email
+from cl.donate.utils import send_thank_you_email, PaymentFailureException
 
 logger = logging.getLogger(__name__)
 
@@ -28,22 +28,36 @@ def process_stripe_callback(request):
         # Now use the API to call back.
         stripe.api_key = settings.STRIPE_SECRET_KEY
         event = json.loads(str(stripe.Event.retrieve(event_id)))
-        logger.info('Stripe callback triggered. See webhook documentation for '
-                    'details.')
+        logger.info('Stripe callback triggered with event id of %s. See '
+                    'webhook documentation for details.', event_id)
         if event['type'].startswith('charge') and \
                 event['livemode'] != settings.PAYMENT_TESTING_MODE:
             charge = event['data']['object']
-            try:
-                d = Donation.objects.get(payment_id=charge['id'])
-            except Donation.DoesNotExist:
-                d = None
+
+            # Sometimes stripe can process a transaction and call our callback
+            # faster than we can even save things to our own DB. If that
+            # happens wait a second up to five times until it works.
+            retry_count = 5
+            d = None
+            while retry_count > 0:
+                try:
+                    d = Donation.objects.get(payment_id=charge['id'])
+                except Donation.DoesNotExist:
+                    time.sleep(1)
+                    retry_count -= 1
+                else:
+                    break
 
             # See: https://stripe.com/docs/api#event_types
             if event['type'].endswith('succeeded'):
                 d.clearing_date = datetime.utcfromtimestamp(
                     charge['created']).replace(tzinfo=utc)
                 d.status = Donation.PROCESSED
-                send_thank_you_email(d)
+                payment_type = charge['metadata']['type']
+                if charge['metadata'].get('recurring'):
+                    send_thank_you_email(d, payment_type, recurring=True)
+                else:
+                    send_thank_you_email(d, payment_type)
             elif event['type'].endswith('failed'):
                 if not d:
                     return HttpResponse('<h1>200: No matching object in the '
@@ -78,40 +92,63 @@ def process_stripe_callback(request):
         )
 
 
-def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
+def process_stripe_payment(amount, email, kwargs, stripe_redirect_url):
+    """
+    Process a stripe payment.
+
+    :param amount: The amount, in pennies, that you wish to charge
+    :param email: The email address of the person being charged
+    :param kwargs: Keyword arguments to pass to Stripe's `create` method. Some
+    functioning options for this dict are:
+
+        {'card': stripe_token}
+
+    And:
+
+        {'customer': customer.id}
+
+    Where stripe_token is a token returned by Stripe's client-side JS library,
+    and customer is an object returned by stripe's customer creation server-
+    side library.
+
+    :param stripe_redirect_url: Where to send the user after a successful
+    transaction
+    :return: response object with information about whether the transaction
+    succeeded.
+    """
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
     # Create the charge on Stripe's servers
     try:
         charge = stripe.Charge.create(
-            amount=int(float(cd_donation_form['amount']) * 100),  # amount in cents, watch yourself
+            amount=amount,
             currency="usd",
-            card=stripe_token,
-            description=cd_user_form['email'],
+            description=email,
+            **kwargs
         )
         response = {
-            'message': None,
             'status': Donation.AWAITING_PAYMENT,
             'payment_id': charge.id,
-            'redirect': reverse('stripe_complete'),
+            'redirect': stripe_redirect_url,
         }
-    except stripe.error.CardError as e:
+    except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
         logger.warn("Stripe was unable to process the payment: %s" % e)
-        response = {
-            'message': 'Oops, we had a problem processing your card: '
-                       '<strong>%s</strong>' % e.json_body['error']['message'],
-            'status': Donation.UNKNOWN_ERROR,
-            'payment_id': None,
-            'redirect': None,
-        }
-    except stripe.error.InvalidRequestError as e:
-        logger.warn("Stripe was unable to process the payment: %s" % e)
-        response = {
-            'message': 'Oops, we had an error with your donation: '
-                       '<strong>%s</strong>' % e.json_body['error']['message'],
-            'status': Donation.UNKNOWN_ERROR,
-            'payment_id': None,
-            'redirect': None,
-        }
+        message = ('Oops, we had an error with your donation: '
+                   '<strong>%s</strong>' % e.json_body['error']['message'])
+        raise PaymentFailureException(message)
 
     return response
+
+
+def create_stripe_customer(source, email):
+    """Create a stripe customer so that we can charge this person more than
+    once
+    """
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    try:
+        return stripe.Customer.create(source=source, email=email)
+    except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
+        logger.warn("Stripe was unable to create the customer: %s" % e)
+        message = ('Oops, we had an error with your donation: '
+                   '<strong>%s</strong>' % e.json_body['error']['message'])
+        raise PaymentFailureException(message)

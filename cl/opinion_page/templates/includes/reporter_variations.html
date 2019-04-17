@@ -1,0 +1,15 @@
+{% if variation_names %}
+  <div class="medium">
+    <p>"{{ reporter }}" is also sometimes used as an abbreviation in:</p>
+    <ul>
+      {% for name, abbrev in variation_names.items %}
+        <li>
+          <p><a
+            href="{% url "citation_redirector" abbrev %}">{{ name }} ({{ abbrev }})</a>
+          </p>
+        </li>
+      {% endfor %}
+    </ul>
+    <p>To find a case in {{ variation_names.items|pluralize:"this,those" }} reporter{{ variation_names.items|pluralize }}, click the link{{ variation_names.items|pluralize }} above.</p>
+  </div>
+{% endif %}

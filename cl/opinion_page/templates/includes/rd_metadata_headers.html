@@ -1,0 +1,33 @@
+<h3>
+  {% if document.description %}{{ document.description }}
+    <span class="gray">&mdash;</span>
+  {% endif %}
+  Document #{{ document.document_number }}{% if document.document_type == document.ATTACHMENT %}, Attachment #{{ document.attachment_number }}{% endif %}
+</h3>
+<h4>{{ document.docket_entry.docket.court }}</h4>
+<p class="bottom">
+  <span class="meta-data-header">Docket Number:</span>
+  <span class="meta-data-value">
+    <a href="{{ document.docket_entry.docket.get_absolute_url }}">
+        {{ document.docket_entry.docket.docket_number }}
+    </a>
+  </span>
+</p>
+{% if document.docket_entry.date_filed %}
+<p class="bottom">
+  <span class="meta-data-header">Date Filed:</span>
+  <span class="meta-data-value">
+    {{ document.docket_entry.date_filed|date:"F jS, Y" }}
+  </span>
+</p>
+{% endif %}
+{% if document.date_upload %}
+<p class="bottom">
+  <span class="meta-data-header">Uploaded:</span>
+  <span class="meta-data-value">
+      {{ document.date_upload|date:"F jS, Y" }}
+  </span>
+</p>
+{% endif %}
+
+{% include "includes/rd_download_button.html" %}

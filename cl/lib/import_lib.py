@@ -130,9 +130,9 @@ def get_candidate_judges(judge_str, court_id, event_date):
     :param judge_str: A string containing the judge's name.
     :param court_id: A CL Court ID where the case occurred.
     :param event_date: The date of the case.
-    :return: Tuple consisting of (Judge, judge_str), where Judge is a judge 
-    object or None if a judge cannot be identified, and s is the original string 
-    passed in.
+    :return: Tuple consisting of (Judge, judge_str), where Judge is a judge
+    object or None if a judge cannot be identified, and s is the original
+    string passed in.
     """
     if not judge_str:
         return None
@@ -183,6 +183,7 @@ def get_path_list():
                 .exclude(local_path='')
                 .values_list('local_path', flat=True)))
 
+
 def get_courtdates():
     """returns a dictionary with key-value (courtid, founding date)"""
     start_dates = {}
@@ -200,18 +201,7 @@ def get_min_nocite():
     """
     min_dates = {}
     courts = (Court.objects
-              .filter(dockets__clusters__federal_cite_one="",
-                      dockets__clusters__federal_cite_two="",
-                      dockets__clusters__federal_cite_three="",
-                      dockets__clusters__state_cite_one="",
-                      dockets__clusters__state_cite_two="",
-                      dockets__clusters__state_cite_three="",
-                      dockets__clusters__state_cite_regional="",
-                      dockets__clusters__specialty_cite_one="",
-                      dockets__clusters__scotus_early_cite="",
-                      dockets__clusters__lexis_cite="",
-                      dockets__clusters__westlaw_cite="",
-                      dockets__clusters__neutral_cite="")
+              .filter(dockets__clusters__citations__isnull=True)
               .annotate(earliest_date=Min('dockets__clusters__date_filed')))
     for court in courts:
         min_dates[court.pk] = court.earliest_date

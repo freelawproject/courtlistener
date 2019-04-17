@@ -27,6 +27,14 @@ DATABASES = {
         'CONN_MAX_AGE': 600,
     },
 }
+API_READ_DATABASES = ['replica']
+
+
+SOLR_HOST = 'http://127.0.0.1:8983'
+SOLR_RECAP_HOST = SOLR_HOST
+
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379
 
 # Make these unique, and don't share it with anybody.
 SECRET_KEY = 'your-secret-key'
@@ -61,6 +69,12 @@ FTM_LAST_UPDATED = date.today()
 IA_ACCESS_KEY = ''
 IA_SECRET_KEY = ''
 IA_COLLECTIONS = []
+IA_OA_COLLECTIONS = ['uscourtsoralargumentsdev']
+
+
+# Mailchimp secret (used for webhook URLs)
+MAILCHIMP_SECRET = ''
+MAILCHIMP_API_KEY = ''
 
 # PACER
 PACER_USERNAME = ''
@@ -78,3 +92,5 @@ GOOGLE_AUTH = {
 # If running in a Windows environment this must be set to the same as your
 # system time zone.
 TIME_ZONE = 'America/Los_Angeles'
+
+FUNDRAISING_MODE = False

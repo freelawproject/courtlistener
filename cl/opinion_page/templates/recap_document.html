@@ -6,10 +6,17 @@
 
 {% block title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
-{% block description %}{{ title|safe|striptags }} — Brought to you by the RECAP Initiative and Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
-{% block og_description %}{{ title|safe|striptags }} — Brought to you by the
-  RECAP Initiative and Free Law Project, a non-profit dedicated to creating
-  high quality open legal information.{% endblock %}
+{% block description %}{% if document.docket_entry.description %}{{ document.docket_entry.description }}{% else %}{{ document.description }}{% endif %}
+{% endblock %}
+{% block og_description %}{% if document.docket_entry.description %}{{ document.docket_entry.description }}{% else %}{{ document.description }}{% endif %}
+{% endblock %}
+{% block twitter_card_type %}{% if document.thumbnail %}summary_large_image{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image %}{% if document.thumbnail %}{% get_full_host %}{{ STATIC_URL }}{{ document.thumbnail }}{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_alt %}{% if document.thumbnail %}The first page of the document in the linked PDF{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_width %}{% if document.thumbnail %}826{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_height %}{% if document.thumbnail %}1068{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_type %}{% if document.thumbnail %}image/jpeg{% else %}{{ block.super }}{% endif %}{% endblock %}
+
 
 {% block navbar-r %}active{% endblock %}
 
@@ -29,26 +36,7 @@
             </h4>
         </div>
 
-        {# show the admin tools if applicable #}
-        {% if perms.search.change_recapdocument or perms.search.change_docketentry or perms.search.change_docket %}
-            <div class="sidebar-section">
-                <h3><span>Admin</span></h3>
-                <p>
-                    {% if perms.search.change_docket %}
-                        <a href="{% url 'admin:search_docket_change' document.docket_entry.docket.pk %}"
-                           class="btn btn-primary btn-xs">Docket</a>
-                    {% endif %}
-                    {% if perms.search.change_docketentry %}
-                        <a href="{% url 'admin:search_docketentry_change' document.docket_entry.pk %}"
-                           class="btn btn-primary btn-xs">Docket Entry</a>
-                    {% endif %}
-                    {% if perms.search.change_recapdocument %}
-                        <a href="{% url 'admin:search_recapdocument_change' document.pk %}"
-                           class="btn btn-primary btn-xs">RECAP Document</a>
-                    {% endif %}
-                </p>
-            </div>
-        {% endif %}
+        {% include "includes/rd_admin_tools.html" %}
 
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not favorite_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
@@ -76,146 +64,121 @@
 
 {% block content %}
     <article class="col-sm-9">
-        <i id="favorites-star"
-           class="{% if favorite_form.instance.recap_doc_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
-           data-toggle="modal"
-           data-target="#modal-save-favorite, #modal-logged-out"
-           title="{% if favorite_form.instance.recap_doc_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
-        <h2 class="inline"><a
-                href="{{ document.docket_entry.docket.get_absolute_url }}"
-                class="no-underline black-link">{{ document.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
-        {% include "includes/favorites_modal.html" %}
+      <i id="favorites-star"
+         class="{% if favorite_form.instance.recap_doc_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
+         data-toggle="modal"
+         data-target="#modal-save-favorite, #modal-logged-out"
+         title="{% if favorite_form.instance.recap_doc_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
+      <h2 class="inline"><a
+              href="{{ document.docket_entry.docket.get_absolute_url }}"
+              class="no-underline black-link">{{ document.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
+      {% include "includes/favorites_modal.html" %}
 
-        <h3>
-            {% if document.description %}{{ document.description }}
-                <span class="gray">&mdash;</span>
-            {% endif %}
-            Document #{{ document.document_number }}{% if document.document_type == document.ATTACHMENT %}, Attachment #{{ document.attachment_number }}{% endif %}
-        </h3>
-        <h4>{{ document.docket_entry.docket.court }}</h4>
-        <p class="bottom">
-            <span class="meta-data-header">Docket Number:</span>
-            <span class="meta-data-value">
-                <a href="{{ document.docket_entry.docket.get_absolute_url }}">
-                    {{ document.docket_entry.docket.docket_number }}
-                </a>
-            </span>
-        </p>
-        {% if document.date_upload %}
-        <p class="bottom">
-            <span class="meta-data-header">Uploaded:</span>
-            <span class="meta-data-value">
-                {{ document.date_upload|date:"F jS, Y" }}
-            </span>
-        </p>
+      {% include "includes/rd_metadata_headers.html" %}
+      <br>
+
+      <div>
+        {% if document.docket_entry.description %}
+        <div class="well well-sm">
+            <h4>Description</h4>
+            <p>{{ document.docket_entry.description }}</p>
+        </div>
         {% endif %}
 
-        <div class="btn-group v-offset-below-3 v-offset-above-1">
-            {% if document.is_available %}
-                <a href="/{{ document.filepath_local }}"
-                   role="button"
-                   class="btn btn-primary">Download PDF&nbsp;<i class="fa fa-file-pdf-o"></i>
-                </a>
-                <button type="button"
-                        class="btn btn-primary dropdown-toggle"
-                        data-toggle="dropdown"
-                        aria-haspopup="true"
-                        aria-expanded="false">
-                    <span class="caret"></span>
-                    <span class="sr-only">Toggle Dropdown</span>
-                </button>
-                <ul class="dropdown-menu">
-                    <li>
-                        <a href="/{{ document.filepath_local }}">From
-                            CourtListener</a>
-                    </li>
-                    {% if document.filepath_ia %}
-                        <li>
-                            <a href="{{ document.filepath_ia }}">From
-                                Internet Archive</a>
-                        </li>
-                        <li role="separator" class="divider"></li>
-                    {% endif %}
-                    <li>
-                        <a href="{{ document.pacer_url }}">Buy on
-                            PACER</a>
-                    </li>
-                </ul>
-            {% else %}
-                {# We don't have it #}
-                <a href="{{ document.pacer_url }}"
-                   class="btn btn-primary btn-xs">Buy on PACER</a>
-            {% endif %}
-        </div>
-
-        <br>
+        {% if document.is_available %}
+          <ul class="nav nav-tabs v-offset-below-1" role="tablist">
+            <li role="presentation" class="active">
+              <a href="#pdf"
+                 aria-controls="home"
+                 role="tab"
+                 data-toggle="tab">PDF</a>
+            </li>
+            <li role="presentation">
+              <a href="#text"
+                 aria-controls="profile"
+                 role="tab"
+                 data-toggle="tab">Text</a></li>
+          </ul>
+          <div class="tab-content">
+            <div role="tabpanel" class="tab-pane active" id="pdf">
+              <div class="embed-responsive embed-responsive-8by11">
+                <object data="/{{ document.filepath_local }}?no-og=true"
+                        type="application/pdf"
+                        width="100%"
+                        height="100%">
+                  <div class="row">
+                    <div class="col-sm-1 col-md-2 col-lg-3"></div>
+                    <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center">
+                      <p>Oops! Your browser does not support embedded PDF viewing.
+                      </p>
+                      <p>
+                        {% include "includes/rd_download_button.html" %}
+                      </p>
+                    </div>
+                  </div>
 
 
-        <div>
-            {% if document.docket_entry.description %}
-            <div class="well well-sm">
-                <h4>Description</h4>
-                <p>{{ document.docket_entry.description }}</p>
+                </object>
+              </div>
             </div>
-            {% endif %}
-
-            {% if document.is_available %}
-            {% if document.ocr_status and document.ocr_status != document.OCR_UNNECESSARY %}
+            <div role="tabpanel" class="tab-pane" id="text">
+              {% if document.ocr_status and document.ocr_status != document.OCR_UNNECESSARY %}
                 <div class="col-sm-12 alert-warning alert">
-                    {% if document.ocr_status == document.OCR_COMPLETE %}
-                        <p class="bottom">The text of this document was
-                            obtained by analyzing a scanned document
-                            provided by the court. As a result it may have
-                            typos, and you may prefer <a
-                                    href="/{{ document.filepath_local }}"
-                                    class="visitable">reading the
-                                original PDF</a>.
-                        </p>
-                    {% elif document.ocr_status == document.OCR_FAILED %}
-                        <p class="bottom">We were unable to extract text from this document. Please <a
-                                    href="/{{ document.filepath_local }}"
-                                    class="visitable">download and read the
-                                original PDF</a>.
-                        </p>
-                    {% elif document.ocr_status == document.OCR_NEEDED %}
-                        <p class="bottom">We have not yet extracted text from
-                            this document. Please <a
-                                    href="/{{ document.filepath_local }}"
-                                    class="visitable">download and read the
-                                original PDF</a>.
-                        </p>
-                    {% endif %}
+                  {% if document.ocr_status == document.OCR_COMPLETE %}
+                    <p class="bottom">The text of this document was obtained by analyzing a scanned document provided by the court. As a result it may have typos, and you may prefer <a href="/{{ document.filepath_local }}" class="visitable">reading theoriginal PDF</a>.
+                    </p>
+                  {% elif document.ocr_status == document.OCR_FAILED %}
+                    <p class="bottom">We were unable to extract text from this document. Please <a href="/{{ document.filepath_local }}" class="visitable">download and read the original PDF</a>.
+                    </p>
+                  {% elif document.ocr_status == document.OCR_NEEDED %}
+                    <p class="bottom">We have not yet extracted text from this document. Please <a href="/{{ document.filepath_local }}" class="visitable">download and read the original PDF</a>.
+                    </p>
+                  {% endif %}
                 </div>
                 <div class="clearfix"></div>
-            {% endif %}
+              {% endif %}
 
-            <div id='default-text'>
+              <div id='default-text'>
                 <div id="opinion-content"> {# used by Zotero, Juris-M #}
-                    {% if document.plain_text %}
-                        <pre>{{ document.plain_text }}</pre>
-                    {% else %}
-                        <div class="col-sm-12 alert-warning alert">
-                            <p>Text not yet extracted from this document. Please <a href="/{{ document.filepath_local }}" class="visitable">download and read the original PDF</a>.
-                            </p>
-                        </div>
-                    {% endif %}
+                  {% if document.plain_text %}
+                    <pre>{{ document.plain_text }}</pre>
+                  {% else %}
+                    <div class="col-sm-12 alert-warning alert">
+                      <p>Text not yet extracted from this document. Please <a href="/{{ document.filepath_local }}" class="visitable">download and read the original PDF</a>.
+                      </p>
+                    </div>
+                  {% endif %}
                 </div>
+              </div>
             </div>
-            {% else %}
+          </div>
+        {% else %}
+
+          {% if document.is_sealed %}
+            <div class="col-sm-12 alert-danger alert">
+              <p class="bottom">
+                <i class="fa fa-ban"></i> This item is unavailable in PACER. This is usually caused by the court sealing the document.
+              </p>
+            </div>
+          {% else %}
             <div class="col-sm-12 alert-warning alert">
-                <p class="bottom">This item is not yet in the RECAP collection.
-                    <span class="float-right">
-                        {% if document.pacer_url %}
-                            <a class="btn btn-primary btn-sm" href="{{ document.pacer_url }}"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
-                        {% endif %}
-                        {% if not request.COOKIES.recap_install_plea %}
-                          <a href="https://free.law/recap/"
-                             class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
-                        {% endif %}
-                    </span>
-                </p>
+              <p class="bottom">This item is not yet in the RECAP collection.
+                <span class="float-right">
+                  {% if document.pacer_url %}
+                    <a class="btn btn-primary btn-sm"
+                       href="{{ document.pacer_url }}"
+                       rel="nofollow"
+                       target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
+                  {% endif %}
+                  {% if not request.COOKIES.recap_install_plea %}
+                    <a href="https://free.law/recap/"
+                       class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
+                  {% endif %}
+                </span>
+              </p>
             </div>
-            {% endif %}
-        </div>
+          {% endif %}
+        {% endif %}
+      </div>
     </article>
 {% endblock %}

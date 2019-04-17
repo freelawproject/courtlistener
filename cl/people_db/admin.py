@@ -1,13 +1,16 @@
-from django.conf import settings
 from django.contrib import admin
 
 from cl.lib.admin import CSSAdminMixin
+# Judge DB imports
 from cl.people_db.models import (
-    Education, School, Person, Position, RetentionEvent, Race,
-    PoliticalAffiliation, Source, ABARating, PartyType,
-    Party, Role, Attorney, AttorneyOrganization,
-    AttorneyOrganizationAssociation,
-    FinancialDisclosure)
+    ABARating, Education, Person, PoliticalAffiliation, Position,
+    Race, RetentionEvent, School, Source, FinancialDisclosure,
+)
+# RECAP imports
+from cl.people_db.models import (
+    Attorney, AttorneyOrganization, AttorneyOrganizationAssociation,
+    CriminalComplaint, CriminalCount, PartyType, Party, Role,
+)
 
 
 class RetentionEventInline(admin.TabularInline):
@@ -102,8 +105,9 @@ class FinancialDisclosureAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         obj.save()
-        from cl.people_db.tasks import make_png_thumbnail_from_pdf
-        make_png_thumbnail_from_pdf.delay(obj.pk)
+        from cl.people_db.tasks import \
+            make_financial_disclosure_thumbnail_from_pdf
+        make_financial_disclosure_thumbnail_from_pdf.delay(obj.pk)
 
 
 @admin.register(Person)
@@ -145,7 +149,7 @@ class PersonAdmin(admin.ModelAdmin, CSSAdminMixin):
     def delete_model(self, request, obj):
         obj.delete()
         from cl.search.tasks import delete_items
-        delete_items.delay([obj.pk], settings.SOLR_PEOPLE_URL)
+        delete_items.delay([obj.pk], 'person')
 
 
 @admin.register(Race)
@@ -167,6 +171,20 @@ class PartyTypeAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'party',
         'docket',
+    )
+
+
+@admin.register(CriminalComplaint)
+class CriminalComplaintAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'party_type',
+    )
+
+
+@admin.register(CriminalCount)
+class CriminalCountAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'party_type',
     )
 
 
@@ -222,6 +240,7 @@ class AttorneyOrganizationAdmin(admin.ModelAdmin):
         'city',
         'zip_code',
     )
+
 
 admin.site.register(PoliticalAffiliation)
 admin.site.register(RetentionEvent)

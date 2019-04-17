@@ -13,258 +13,487 @@
 {% block footer-scripts %}
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/save-favorites.js"></script>
+    {% if request.user.is_authenticated %}
+      <script defer type="text/javascript"
+              src="{{ STATIC_URL }}js/toggle_settings.js"></script>
+    {% endif %}
     {% if request.user.is_staff %}
         <script defer type="text/javascript"
                 src="{{ STATIC_URL }}js/admin_tools.js"></script>
-        {% if DEBUG %}
-            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
-        {% else %}
-            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
-        {% endif %}
     {% endif %}
+  <script type="text/javascript">
+    $(document).ready(function () {
+      window.addEventListener("message", function (event){
+        // If RECAP is installed, check whether we should allow this person to
+        // make more alerts. If so, tweak the events on the button to create
+        // the alert, not to show the "too many alerts" modal. Note that this
+        // is pretty nasty because we're introducing Django variables into our
+        // JavaScript code.
+        let max_free_docket_alerts = {{ MAX_FREE_DOCKET_ALERTS }},
+            user_alert_count = {{ user.docket_alerts.count|default:"0" }},
+            recap_bonus = {{ DOCKET_ALERT_RECAP_BONUS }},
+            bad_class = 'no-more-alerts-modal-trigger';
+        if (recapIsInstalled(event)){
+          console.log("You have RECAP installed. Applying docket alert bonus.");
+          let total_allowed_alerts = max_free_docket_alerts + recap_bonus;
+          if (user_alert_count < total_allowed_alerts){
+            // Disable the "Too many alerts" popup, and enable the function to
+            // toggle settings.
+            anchors = $('.' + bad_class);
+            anchors.off();
+            anchors.on("click", toggleSettings);
+          }
+        }
+      });
+    });
+
+    // If we have classes indicating too many alerts or logged out users,
+    // activate their modals.
+    $(".no-more-alerts-modal-trigger").click(function(e){
+      e.preventDefault();
+      $("#modal-no-more-alerts").modal('toggle');
+    });
+    $(".logged-out-modal-trigger").click(function(e) {
+      e.preventDefault();
+      $("#modal-logged-out").modal('toggle');
+    });
+  </script>
 {% endblock %}
 
 {% block nav %}
-    <div class="col-xs-12">
-        {% if perms.search.change_docket %}
-            <p class="float-right">
-                <a href="{% url 'admin:search_docket_change' docket.id %}"
-                   class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;({{ docket.view_count }} views)&nbsp;<i
-                        class="fa fa-pencil"></i>
-                </a>
-                {% if request.user.is_superuser %}
-                    {% if private %}
-                        &nbsp;<span class="btn btn-danger btn-xs">Blocked <i
-                            class="fa fa-ban"></i></span>
+  <div class="col-xs-12">
+    {% if perms.search.change_docket %}
+      <p class="float-right">
+        <a href="{% url 'admin:search_docket_change' docket.id %}"
+           class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;({{ docket.view_count }} views)&nbsp;<i class="fa fa-pencil"></i>
+        </a>
+        {% if request.user.is_superuser %}
+          {% if private %}
+            &nbsp;<span class="btn btn-danger btn-xs">Blocked <i
+              class="fa fa-ban"></i></span>
+          {% else %}
+            <a class="btn btn-success btn-xs block-item"
+               data-id="{{ docket.pk }}"
+               data-type="docket">Block This Docket <i class="fa fa-ban"></i>
+            </a>
+          {% endif %}
+        {% endif %}
+      </p>
+    {% endif %}
+    <i id="favorites-star"
+       class="{% if favorite_form.instance.docket_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline hidden-print"
+       data-toggle="modal"
+       data-target="#modal-save-favorite, #modal-logged-out"
+       title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
+
+    <h1 class="bottom inline">
+      {{ docket|best_case_name|safe|v_wrapper }}
+      {% if docket.docket_number %}
+        ({{ docket.docket_number }})
+      {% endif %}
+    </h1>
+    {% include "includes/favorites_modal.html" %}
+    {% include "includes/docket_alerts_modal.html" %}
+
+    <h2>{{ docket.court }}</h2>
+
+    {% if docket.pacer_url or docket_entries %}
+      <div class="v-offset-above-2">
+        {% if docket.pacer_url %}
+          <div class="left">
+            <p><a href="{{ docket.pacer_url }}"
+               class="btn btn-primary"
+               target="_blank"
+               rel="nofollow"><i class="fa fa-external-link"></i> View on PACER</a>&nbsp;</p>
+          </div>
+        {% endif %}
+        {% if docket_entries or docket_entries %}
+          <div class="left">
+            <p><a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+               class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>&nbsp;</p>
+          </div>
+        {% endif %}
+
+        {% if docket.pacer_url %}
+          <div class="left">
+            <a href="{% url "toggle_docket_alert" %}"
+                  data-id="{{ docket.pk }}"
+                  data-enable-message="Get Alerts"
+                  data-disable-message="Disable Alerts"
+                  rel="nofollow"
+                  class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %}
+                  {% if user.is_authenticated %}
+                    {% if has_alert or user.profile.unlimited_docket_alerts or user.profile.is_monthly_donor or user.docket_alerts.count < MAX_FREE_DOCKET_ALERTS %}
+                      {% comment %}
+                      Either it already has an alert, they get things for free,
+                      they are a monthly donor, or they don't have too many
+                      alerts. Make clicking do ajax.
+                      {% endcomment %}
+                      toggle-docket-alert
                     {% else %}
-                        <a class="btn btn-success btn-xs block-item"
-                           data-id="{{ docket.pk }}"
-                           data-type="docket">Block This Docket <i
-                                class="fa fa-ban"></i>
-                        </a>
+                      {% comment %}
+                      Too many alerts, not free, and doesn't already have one.
+                      Block for now, but perhaps we'll get a message that RECAP
+                      is installed, and we'll unblock as a result.
+                      {% endcomment %}
+                      no-more-alerts-modal-trigger
                     {% endif %}
-                {% endif %}
-            </p>
+                  {% else %}
+                    logged-out-modal-trigger
+                  {% endif %}">
+               {% if has_alert %}
+                 <i class="fa fa-bell-slash-o"
+                    data-enable-icon-class="fa-bell"
+                    data-disable-icon-class="fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Disable Alerts</span>
+               {% else %}
+                 <i class="fa fa-bell"
+                    data-enable-icon-class="fa-bell"
+                    data-disable-icon-class="fa-bell-slash-o"></i>&nbsp;<span class="alert_btn_txt">Get Alerts</span>
+               {% endif %}
+            </a>
+          </div>
+          <div class="left">
+            <a href="{% url "alert_help" %}#recap-alerts"
+               class="btn btn-link btn-close"
+               data-toggle="tooltip"
+               data-placement="right"
+               title="Learn about docket alerts"><i
+              class="fa fa-question-circle fa-lg gray"></i></a>
+          </div>
         {% endif %}
-        <i id="favorites-star"
-           class="{% if favorite_form.instance.docket_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline hidden-print"
-           data-toggle="modal"
-           data-target="#modal-save-favorite, #modal-logged-out"
-           title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
+      </div>
+      <div class="clearfix"></div>
+    {% endif %}
 
-        <h2 class="bottom inline">
-            {{ docket|best_case_name|safe|v_wrapper }}
-            {% if docket.docket_number %}
-                ({{ docket.docket_number }})
+    {% if docket.source in docket.RECAP_SOURCES %}
+      <p class="bottom">
+        <span class="meta-data-header">Last Updated:</span>
+        <span class="meta-data-value cursor-help dotted"
+              data-toggle="tooltip"
+              data-placement="right"
+              data-html="true"
+              title="This docket was collected as part of the RECAP Project. Therefore, it is updated when users of the RECAP Extension download the docket from PACER. To see the most up to date version of this docket, click the button above to &quot;View on PACER.&quot;">{{ docket.date_modified|timezone:timezone }}</span>
+      </p>
+    {% endif %}
+
+    {% with og_info=docket.originating_court_information %}
+    {% if docket.panel_str %}
+      <p class="bottom">
+        <span class="meta-data-header">Panel:</span>
+        <span class="meta-data-value">{{ docket.panel_str }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.assigned_to or docket.assigned_to_str %}
+      <p class="bottom">
+        <span class="meta-data-header">Assigned To:</span>
+        <span class="meta-data-value">
+          {% if docket.assigned_to %}
+            <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
+          {% elif docket.assigned_to_str %}
+            <a href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;">{{ docket.assigned_to_str }}</a>
+          {% endif %}
+        </span>
+      </p>
+    {% endif %}
+
+    {% if docket.referred_to or docket.referred_to_str %}
+      <p class="bottom">
+        <span class="meta-data-header">Referred To:</span>
+        <span class="meta-data-value">
+          {% if docket.referred_to %}
+            <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
+          {% elif docket.referred_to_str %}
+            <a href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;">{{ docket.referred_to_str }}</a>
+          {% endif %}
+        </span>
+      </p>
+    {% endif %}
+
+    {% if docket.date_cert_granted %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Certiorari Granted:</span>
+        <span class="meta-data-value">{{ docket.date_cert_granted }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.cert_denied %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Certiorari Denied:</span>
+        <span class="meta-data-value">{{ docket.date_cert_denied }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.date_argued %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Argued:</span>
+        <span class="meta-data-value">{{ docket.date_argued }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.date_reargued %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Reargued:</span>
+        <span class="meta-data-value">{{ docket.date_reargued }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.date_reargument_denied %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Reargument Denied:</span>
+        <span class="meta-data-value">{{ docket.date_reargument_denied }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.date_filed %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Filed:</span>
+        <span class="meta-data-value">{{ docket.date_filed }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.date_terminated %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Terminated:</span>
+        <span class="meta-data-value">{{ docket.date_terminated }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.date_last_filing %}
+      <p class="bottom">
+        <span class="meta-data-header">Date of Last Known Filing:</span>
+        <span class="meta-data-value">{{ docket.date_last_filing }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.cause %}
+      <p class="bottom">
+        <span class="meta-data-header">Cause:</span>
+        <span class="meta-data-value">
+          <a href="/?type=r&amp;cause=&quot;{{ docket.cause }}&quot;">{{ docket.cause }}</a>
+        </span>
+      </p>
+    {% endif %}
+
+    {% if docket.nature_of_suit %}
+        <p class="bottom">
+          <span class="meta-data-header">Nature of Suit:</span>
+          <span class="meta-data-value">
+            <a href="/?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;">{{ docket.nature_of_suit }}</a>
+          </span>
+        </p>
+    {% endif %}
+
+    {% if docket.jury_demand %}
+      <p class="bottom">
+        <span class="meta-data-header">Jury Demand:</span>
+        <span class="meta-data-value">
+          <a href="/?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;">{{ docket.jury_demand }}</a>
+        </span>
+      </p>
+    {% endif %}
+
+    {% if docket.jurisdiction_type %}
+      <p class="bottom">
+        <span class="meta-data-header">Jurisdiction Type:</span>
+        <span class="meta-data-value">{{ docket.jurisdiction_type }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.mdl_status %}
+      <p class="bottom">
+        <span class="meta-data-header">MLD Status:</span>
+        <span class="meta-data-value">{{ docket.mdl_status }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.appellate_fee_status %}
+      <p class="bottom">
+        <span class="meta-data-header">Fee Status:</span>
+        <span class="meta-data-value">{{ docket.appellate_fee_status }}</span>
+      </p>
+    {% endif %}
+
+    {% if docket.appellate_case_type_information %}
+      <p class="bottom">
+        <span class="meta-data-header">Case Type Information:</span>
+        <span class="meta-data-value">{{ docket.appellate_case_type_information }}</span>
+      </p>
+    {% endif %}
+
+    {% if og_info %}
+      <h3 class="v-offset-above-3">Originating Court Information</h3>
+      <hr class="top">
+      {% if docket.appeal_from or docket.appeal_from_str %}
+        <span class="meta-data-header">Appealed From:</span>
+        <span class="meta-data-value">
+          {% if docket.appeal_from %}
+            {{ docket.appeal_from.short_name }}
+          {% elif docket.appeal_from_str %}
+            {{ docket.appeal_from_str }}
+          {% endif %}
+            {% if og_info.docket_number %}
+              {% if docket.appeal_from %}
+                (<a
+                href="/?type=r&amp;docket_number={{ og_info.docket_number }}&amp;court={{ docket.appeal_from.pk }}"
+                data-toggle="tooltip"
+                data-placement="right"
+                title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }})</a>
+              {% else %}
+                ({{ og_info.docket_number }})
+              {% endif %}
             {% endif %}
-        </h2>
-        {% include "includes/favorites_modal.html" %}
+        </span>
+      {% endif %}
 
-        <h3>{{ docket.court }}</h3>
+      {% if og_info.court_reporter %}
+        <p class="bottom">
+          <span class="meta-data-header">Court Reporter:</span>
+          <span class="meta-data-value">{{ og_info.court_reporter }}</span>
+        </p>
+      {% endif %}
+      {% if og_info.assigned_to or og_info.assigned_to_str %}
+        <p class="bottom">
+          <span class="meta-data-header">Trial Judge:</span>
+          <span class="meta-data-value">
+            {% if og_info.assigned_to %}
+              <a href="{{ og_info.assigned_to.get_absolute_url }}">{{ og_info.assigned_to.name_full }}</a>
+            {% elif og_info.assigned_to_str %}
+              <a
+                href="/?type=r&amp;assigned_to=&quot;{{ og_info.assigned_to_str }}&quot;">{{ og_info.assigned_to_str }}</a>
+            {% endif %}
+          </span>
+        </p>
+      {% endif %}
 
-        {% if docket.source in docket.RECAP_SOURCES %}
-            <p class="v-offset-above-1">
-                {% if docket.pacer_url %}
-                    <a href="{{ docket.pacer_url }}"
-                       class="btn btn-primary"
-                       target="_blank">View on PACER</a>
-                {% endif %}
-                <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
-                   class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
-            </p>
-        {% endif %}
+      {% if og_info.ordering_judge or og_info.ordering_judge_str %}
+        <p class="bottom">
+          <span class="meta-data-header">Ordering Judge:</span>
+          <span class="meta-data-value">
+            {% if og_info.ordering_judge %}
+              <a
+                href="{{ og_info.ordering_judge.get_absolute_url }}">{{ og_info.ordering_judge.name_full }}</a>
+            {% elif og_info.assigned_to_str %}
+              <a
+                href="/?type=r&amp;assigned_to=&quot;{{ og_info.ordering_judge_str }}&quot;">{{ og_info.ordering_judge_str }}</a>
+            {% endif %}
+          </span>
+        </p>
+      {% endif %}
+    {% endif %}
 
-        {% if docket.source in docket.RECAP_SOURCES %}
-            <p class="bottom">
-                <span class="meta-data-header">Last updated:</span>
-                <span class="meta-data-value cursor-help dotted"
-                      data-toggle="tooltip"
-                      data-placement="right"
-                      data-html="true"
-                      title="This docket was collected as part of the RECAP Project. Therefore, it is updated when users of the RECAP Extension download the docket from PACER. To see the most up to date version of this docket, click the button above to &quot;View on PACER.&quot;">{{ docket.date_modified|timezone:timezone }}</span>
-            </p>
-        {% endif %}
+    {% if og_info.date_filed %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Filed:</span>
+        <span class="meta-data-value">{{ og_info.date_filed }}</span>
+      </p>
+    {% endif %}
 
-        {% if docket.assigned_to or docket.assigned_to_str %}
-            <p class="bottom">
-                <span class="meta-data-header">Assigned To:</span>
-                <span class="meta-data-value">
-                    {% if docket.assigned_to %}
-                        <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
-                    {% elif docket.assigned_to_str %}
-                        <a href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;">{{ docket.assigned_to_str }}</a>
-                    {% endif %}
-                </span>
-            </p>
-        {% endif %}
+    {% if og_info.date_judgment %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Order/Judgment:</span>
+        <span class="meta-data-value">{{ og_info.date_judgment }}</span>
+      </p>
+    {% endif %}
+    {% if og_info.date_judgment_eod %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Order/Judgment EOD:</span>
+        <span class="meta-data-value">{{ og_info.date_judgment_eod }}</span>
+      </p>
+    {% endif %}
+    {% if og_info.date_filed_noa %}
+      <p class="bottom">
+        <span class="meta-data-header">Date NOA Filed:</span>
+        <span class="meta-data-value">{{ og_info.date_filed_noa }}</span>
+      </p>
+    {% endif %}
+    {% if og_info.date_received_coa %}
+      <p class="bottom">
+        <span class="meta-data-header">Date Rec'd COA:</span>
+        <span class="meta-data-value">{{ og_info.date_received_coa }}</span>
+      </p>
+    {% endif %}
+    {% endwith %}{# No more og_info variable #}
+  </div>
 
-        {% if docket.referred_to or docket.referred_to_str %}
-            <p class="bottom">
-                <span class="meta-data-header">Referred To:</span>
-                <span class="meta-data-value">
-                    {% if docket.referred_to %}
-                        <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
-                    {% elif docket.referred_to_str %}
-                        <a href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;">{{ docket.referred_to_str }}</a>
-                    {% endif %}
-                </span>
-            </p>
-        {% endif %}
 
-        {% if docket.date_cert_granted %}
-            <p class="bottom">
-                <span class="meta-data-header">Date Certiorari Granted:</span>
-                <span class="meta-data-value">{{ docket.date_cert_granted }}</span>
-            </p>
-        {% endif %}
-
-        {% if docket.cert_denied %}
-            <p class="bottom">
-                <span class="meta-data-header">Date Certiorari Denied:</span>
-                <span class="meta-data-value">{{ docket.date_cert_denied }}</span>
-            </p>
-        {% endif %}
-
-        {% if docket.date_argued %}
-            <p class="bottom">
-                <span class="meta-data-header">Date Argued:</span>
-                <span class="meta-data-value">{{ docket.date_argued }}</span>
-            </p>
-        {% endif %}
-
-        {% if docket.date_reargued %}
-            <p class="bottom">
-                <span class="meta-data-header">Date Reargued:</span>
-                <span class="meta-data-value">{{ docket.date_reargued }}</span>
-            </p>
-        {% endif %}
-
-        {% if docket.date_reargument_denied %}
-            <p class="bottom">
-                <span class="meta-data-header">Date Reargument Denied:</span>
-                <span class="meta-data-value">{{ docket.date_reargument_denied }}</span>
-            </p>
-        {% endif %}
-
-        {% if docket.date_filed %}
-            <p class="bottom">
-                <span class="meta-data-header">Date Filed:</span>
-                <span class="meta-data-value">{{ docket.date_filed }}</span>
-            </p>
-        {% endif %}
-
-        {% if docket.date_terminated %}
-            <p class="bottom">
-                <span class="meta-data-header">Date Terminated:</span>
-                <span class="meta-data-value">{{ docket.date_terminated }}</span>
-            </p>
-        {% endif %}
-
-        {% if docket.date_last_filing %}
-            <p class="bottom">
-                <span class="meta-data-header">Date of Last Known Filing:</span>
-                <span class="meta-data-value">{{ docket.date_last_filing }}</span>
-            </p>
-        {% endif %}
-
-        {% if docket.cause %}
-            <p class="bottom">
-                <span class="meta-data-header">Cause:</span>
-                <span class="meta-data-value">
-                        <a href="/?type=r&amp;cause=&quot;{{ docket.cause }}&quot;">{{ docket.cause }}</a>
-                    </span>
-            </p>
-        {% endif %}
-
-        {% if docket.nature_of_suit %}
-            <p class="bottom">
-                <span class="meta-data-header">Nature of Suit:</span>
-                <span class="meta-data-value">
-                        <a href="/?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;">{{ docket.nature_of_suit }}</a>
-                    </span>
-            </p>
-        {% endif %}
-
-        {% if docket.jury_demand %}
-            <p class="bottom">
-                <span class="meta-data-header">Jury Demand:</span>
-                <span class="meta-data-value">
-                        <a href="/?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;">{{ docket.jury_demand }}</a>
-                    </span>
-            </p>
-        {% endif %}
+  {% if docket.clusters.count %}
+    <div class="col-xs-6">
+      <h3>Opinions Outside of RECAP Collection</h3>
+      <hr class="top">
+      <ul>
+        {% for cluster in docket.clusters.all %}
+          <li>
+            <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                {{ cluster.caption|safe|v_wrapper }}
+            </a>
+            {% if perms.search.change_document %}
+              <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
+                 class="btn btn-primary btn-xs">Edit</a>
+            {% endif %}
+            <br/>
+            {{ cluster.date_filed }}
+          </li>
+        {% endfor %}
+      </ul>
     </div>
+  {% endif %}
 
+  {% if docket.audio_files.count %}
+    <div class="col-xs-6">
+      <h3>Oral Argument Recordings</h3>
+      <hr class="top">
+      <ul>
+        {% for af in docket.audio_files.all %}
+          <li>
+            <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                {{ af|best_case_name|safe|v_wrapper }}
+            </a>
+            {% if perms.audio.change_audio %}
+              <a href="{% url 'admin:audio_audio_change' af.pk %}"
+                 class="btn btn-primary btn-xs">Edit</a>
+            {% endif %}
+            <br/>
+            {{ af.docket.date_argued|default_if_none:"" }}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
 
-    {% if docket.clusters.count %}
-        <div class="col-xs-6">
-            <h3>Opinions Outside of RECAP Collection</h3>
-            <hr>
-            <ul>
-                {% for cluster in docket.clusters.all %}
-                    <li>
-                        <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                            {{ cluster.caption|safe|v_wrapper }}
-                        </a>
-                        {% if perms.search.change_document %}
-                            <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
-                               class="btn btn-primary btn-xs">Edit</a>
-                        {% endif %}
-                        <br/>
-                        {{ cluster.date_filed }}
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
-    {% endif %}
+  {% if docket_entries or parties or docket.idb_data %}
+    <div class="col-xs-12">
+      <ul class="nav nav-tabs v-offset-below-2 v-offset-above-3" role="tablist">
+        <li class="{% block nav-de %}inactive{% endblock %}"
+            role="presentation">
+          <a href="{{  docket.get_absolute_url }}"><i
+                  class="fa fa-th-list gray"></i>&nbsp;Docket Entries
+              {% if docket_entries.paginator.num_pages > 1 %}
+                (Page {{ docket_entries.number|intcomma }} of
+                {{ docket_entries.paginator.num_pages|intcomma }})
+              {% endif %}
+          </a>
+        </li>
 
-    {% if docket.audio_files.count %}
-        <div class="col-xs-6">
-            <h3>Oral Argument Recordings</h3>
-            <hr>
-            <ul>
-                {% for af in docket.audio_files.all %}
-                    <li>
-                        <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                            {{ af|best_case_name|safe|v_wrapper }}
-                        </a>
-                        {% if perms.audio.change_audio %}
-                            <a href="{% url 'admin:audio_audio_change' af.pk %}"
-                               class="btn btn-primary btn-xs">Edit</a>
-                        {% endif %}
-                        <br/>
-                        {{ af.docket.date_argued|default_if_none:"" }}
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
-    {% endif %}
+        {% if parties %}
+        <li class="{% block nav-parties %}inactive{% endblock %}"
+            role="presentation">
+          <a href="{% url "docket_parties" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-users gray"></i>&nbsp;Parties and Attorneys</a>
+        </li>
+        {% endif %}
 
-    {% if docket_entries.paginator.count or parties %}
-        <div class="col-xs-12">
-            <ul class="nav nav-tabs v-offset-below-2 v-offset-above-3" role="tablist">
-                <li class="{% block nav-de %}inactive{% endblock %}"
-                    role="presentation">
-                    <a href="{{  docket.get_absolute_url }}"><i
-                            class="fa fa-th-list gray"></i>&nbsp;Docket Entries
-                        {% if docket_entries.paginator.num_pages > 1 %}
-                            (Page {{ docket_entries.number|intcomma }} of
-                            {{ docket_entries.paginator.num_pages|intcomma }})
-                        {% endif %}
-                    </a>
-                </li>
-
-                {% if parties %}
-                <li class="{% block nav-parties %}inactive{% endblock %}"
-                    role="presentation">
-                    <a href="{% url "docket_parties" docket_id=docket.pk slug=docket.slug %}"><i
-                            class="fa fa-users gray"></i>&nbsp;Parties and Attorneys</a>
-                </li>
-                {% endif %}
-            </ul>
-            {% block tab-content %}{% endblock %}
-        </div>
-    {% endif %}
+        {% if docket.idb_data %}
+        <li class="{% block nav-idb %}inactive{% endblock %}"
+            role="presentation">
+          <a href="{% url "docket_idb_data" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-info-circle"></i>&nbsp;FJC Integrated Database
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+      {% block tab-content %}{% endblock %}
+    </div>
+  {% endif %}
 {% endblock %}

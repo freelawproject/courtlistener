@@ -9,6 +9,7 @@ from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 
 from cl.citations import reporter_tokenizer
 from cl.lib.roman import isroman
+from cl.search.models import Citation as ModelCitation
 from cl.search.models import Court
 
 FORWARD_SEEK = 20
@@ -19,7 +20,8 @@ STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
                "remanded", "see", "granted", "dismissed"]
 
 # Store court values to avoid repeated DB queries
-if not set(sys.argv).isdisjoint(['test', 'syncdb', 'shell', 'migrate']):
+if (not set(sys.argv).isdisjoint(['test', 'syncdb', 'shell', 'migrate'])
+        or any('pytest' in s for s in set(sys.argv))):
     # If it's a test, we can't count on the database being prepped, so we have
     # to load lazily
     ALL_COURTS = Court.objects.all().values('citation_string', 'pk')
@@ -44,6 +46,7 @@ class Citation(object):
         self.page = page
 
         # These values are set during disambiguation.
+        # For a citation to F.2d, the canonical reporter is F.
         self.canonical_reporter = canonical_reporter
         self.lookup_index = lookup_index
 
@@ -59,8 +62,9 @@ class Citation(object):
         # linkify it with a regex.
         self.reporter_found = reporter_found
 
-        # The location of the reporter is useful for tasks like finding parallel
-        # citations, and finding supplementary info like defendants and years.
+        # The location of the reporter is useful for tasks like finding
+        # parallel citations, and finding supplementary info like defendants
+        # and years.
         self.reporter_index = reporter_index
 
         # Attributes of the matching item, for URL generation.
@@ -99,6 +103,40 @@ class Citation(object):
             data_attr = ''
         return u'<span class="%s"%s>%s</span>' % \
                (span_class, data_attr, inner_html)
+
+    def _get_cite_type(self):
+        """Figure out the Citation.type value."""
+        cite_type = (REPORTERS[self.canonical_reporter][self.lookup_index]
+                     ['cite_type'])
+        if cite_type == 'federal':
+            return ModelCitation.FEDERAL
+        elif cite_type == 'state':
+            return ModelCitation.STATE
+        elif cite_type == 'state_regional':
+            return ModelCitation.STATE_REGIONAL
+        elif cite_type == 'specialty':
+            return ModelCitation.SPECIALTY
+        elif cite_type == 'specialty_lexis':
+            return ModelCitation.LEXIS
+        elif cite_type == 'specialty_west':
+            return ModelCitation.WEST
+        elif cite_type == 'scotus_early':
+            return ModelCitation.SCOTUS_EARLY
+        elif cite_type == 'neutral_citation':
+            return ModelCitation.NEUTRAL
+
+    def to_model(self):
+        # Create a citation object as in our models. Eventually, the version in
+        # our models should probably be the only object named "Citation". Until
+        # then, this function helps map from this object to the Citation object
+        # in the models.
+        c = ModelCitation(**{
+            key: value for key, value in
+            self.__dict__.items() if
+            key in ModelCitation._meta.get_all_field_names()
+        })
+        c.type = self._get_cite_type()
+        return c
 
     def __repr__(self):
         print_string = self.base_citation()
@@ -143,12 +181,12 @@ class Citation(object):
 
 # Adapted from nltk Penn Treebank tokenizer
 def strip_punct(text):
-    #starting quotes
+    # starting quotes
     text = re.sub(r'^[\"\']', r'', text)
     text = re.sub(r'(``)', r'', text)
     text = re.sub(r'([ (\[{<])"', r'', text)
 
-    #punctuation
+    # punctuation
     text = re.sub(r'\.\.\.', r'', text)
     text = re.sub(r'[,;:@#$%&]', r'', text)
     text = re.sub(r'([^\.])(\.)([\]\)}>"\']*)\s*$', r'\1', text)
@@ -156,11 +194,11 @@ def strip_punct(text):
 
     text = re.sub(r"([^'])' ", r"", text)
 
-    #parens, brackets, etc.
+    # parens, brackets, etc.
     text = re.sub(r'[\]\[\(\)\{\}\<\>]', r'', text)
     text = re.sub(r'--', r'', text)
 
-    #ending quotes
+    # ending quotes
     text = re.sub(r'"', "", text)
     text = re.sub(r'(\S)(\'\'?)', r'\1', text)
 
@@ -169,7 +207,8 @@ def strip_punct(text):
 
 def is_scotus_reporter(citation):
     try:
-        reporter = REPORTERS[citation.canonical_reporter][citation.lookup_index]
+        reporter = REPORTERS[
+            citation.canonical_reporter][citation.lookup_index]
     except (TypeError, KeyError):
         # Occurs when citation.lookup_index is None
         return False
@@ -323,8 +362,9 @@ def extract_base_citation(words, reporter_index):
             # Some places like Nebraska have Roman numerals, e.g. in
             # '250 Neb. xxiv (1996)'. No processing needed.
             pass
-        elif re.match('\d{1,5}[-]?[a-zA-Z]{1,6}', page):
-            # Some places, like Connecticut, have pages like "13301-M"
+        elif re.match('\d{1,6}[-]?[a-zA-Z]{1,6}', page):
+            # Some places, like Connecticut, have pages like "13301-M".
+            # Other places, like Illinois have "pages" like "110311-B".
             pass
         else:
             # Not Roman, and not a weird connecticut page number.
@@ -466,7 +506,8 @@ def disambiguate_reporters(citations):
     return unambiguous_citations
 
 
-def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
+def get_citations(text, html=True, do_post_citation=True, do_defendant=True,
+                  disambiguate=True):
     if html:
         text = get_visible_text(text)
     words = reporter_tokenizer.tokenize(text)
@@ -486,8 +527,9 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
                 add_defendant(citation, words)
             citations.append(citation)
 
-    # Disambiguate or drop all the reporters
-    citations = disambiguate_reporters(citations)
+    if disambiguate:
+        # Disambiguate or drop all the reporters
+        citations = disambiguate_reporters(citations)
 
     for citation in citations:
         if not citation.court and is_scotus_reporter(citation):

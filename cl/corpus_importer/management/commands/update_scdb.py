@@ -21,12 +21,13 @@ import string
 from datetime import datetime
 
 from django.core.management import CommandError
-from django.db.models import Q
+from django.db import IntegrityError
 from django.utils.encoding import force_bytes
 
+from cl.citations.find_citations import get_citations
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import gen_diff_ratio
-from cl.search.models import OpinionCluster
+from cl.search.models import OpinionCluster, Citation
 
 
 # Relevant numbers:
@@ -135,73 +136,53 @@ class Command(VerboseCommand):
                             "the same: %s" % (attribute, new_value))
         return ok
 
-    def do_federal_citations(self, cluster, scdb_info):
+    @staticmethod
+    def do_citations(cluster, scdb_info):
         """
-        Handle the federal_cite fields differently, since they may have the
-        values in any order.
+        Handle the citation fields.
 
         :param cluster: The Cluster to be changed.
         :param scdb_info: A dict with the SCDB information.
-        :return: save: A boolean indicating whether the item should be saved.
         """
-        save = True
-        us_done, sct_done, led_done = False, False, False
-        us_ok, sct_ok, led_ok = True, True, True
-        available_fields = []
-        for field in ['federal_cite_one', 'federal_cite_two',
-                      'federal_cite_three']:
-            # Update the value in place (ie, replace the U.S. citation with a
-            # U.S. citation. Identify available fields.
-            value = getattr(cluster, field).strip()
-            if not value:
-                available_fields.append(field)
-                continue
-
-            if "U.S." in value:
-                us_ok = self.set_if_falsy(cluster, field, scdb_info['usCite'])
-                us_done = True
-            elif "S. Ct." in value:
-                sct_ok = self.set_if_falsy(cluster, field, scdb_info['sctCite'])
-                sct_done = True
-            elif "L. Ed." in value:
-                led_ok = self.set_if_falsy(cluster, field, scdb_info['ledCite'])
-                led_done = True
+        fields = {
+            'usCite': ("U.S.", Citation.FEDERAL),
+            'sctCite': ("S. Ct.", Citation.FEDERAL),
+            'ledCite': ("L. Ed.", Citation.FEDERAL),
+            'lexisCite': ("U.S. LEXIS", Citation.LEXIS),
+        }
+        for scdb_field, reporter_info in fields.items():
+            try:
+                citation_obj = get_citations(
+                    scdb_info[scdb_field],
+                    html=False,
+                    do_post_citation=False,
+                    do_defendant=False,
+                    disambiguate=False,
+                )[0]
+            except IndexError:
+                logger.warn("Unable to parse citation for: %s",
+                            scdb_info[scdb_field])
             else:
-                logger.warn("WARNING: Fell through search for citation: %s" % value)
-                save = False
-        if not all([us_ok, sct_ok, led_ok]):
-            save = False
-
-        num_undone_fields = sum([f for f in [us_done, sct_done, led_done] if
-                                 f is False])
-        if num_undone_fields > len(available_fields):
-            logger.warn("WARNING: More values were found than there were "
-                        "slots to put them in. Time to create "
-                        "federal_cite_four?")
-            save = False
-        else:
-            # Save undone values into available fields. Any value that wasn't
-            # updated above gets slotted into the fields that remain.
-            for field in available_fields:
-                if not us_done:
-                    us_done = True
-                    if scdb_info['usCite']:
-                        self.set_if_falsy(cluster, field, scdb_info['usCite'])
-                        # Continue if the value got set. Otherwise, fall let
-                        # the next value fill the available field.
-                        continue
-                if not sct_done:
-                    sct_done = True
-                    if scdb_info['sctCite']:
-                        self.set_if_falsy(cluster, field, scdb_info['sctCite'])
-                        continue
-                if not led_done:
-                    led_done = True
-                    if scdb_info['ledCite']:
-                        self.set_if_falsy(cluster, field, scdb_info['ledCite'])
-                        continue
-
-        return save
+                cite = cluster.citations.filter(reporter=reporter_info[0])
+                if cite:
+                    # Update the existing citation.
+                    cite.volume = citation_obj.volume
+                    cite.reporter = citation_obj.reporter
+                    cite.page = citation_obj.page
+                    cite.save()
+                else:
+                    try:
+                        # Create a new citation
+                        Citation.objects.create(
+                            cluster=cluster,
+                            volume=citation_obj.volume,
+                            reporter=citation_obj.reporter,
+                            page=citation_obj.page,
+                            type=reporter_info[1],
+                        )
+                    except IntegrityError:
+                        # Violated unique_together constraint. Fine.
+                        pass
 
     def enhance_item_with_scdb(self, cluster, scdb_info):
         """Good news: A single Cluster object was found for the SCDB record.
@@ -222,12 +203,10 @@ class Command(VerboseCommand):
         for attribute_tuple in attribute_tuples:
             self.set_if_falsy(*attribute_tuple)
 
-        federal_ok = self.do_federal_citations(cluster, scdb_info)
+        self.do_citations(cluster, scdb_info)
         scdb_ok = self.set_if_falsy(cluster, 'scdb_id', scdb_info['caseId'])
-        lexis_ok = self.set_if_falsy(cluster, 'lexis_cite',
-                                     scdb_info['lexisCite'])
 
-        if all([federal_ok, scdb_ok, lexis_ok]):
+        if scdb_ok:
             logger.info("Saving to database (or faking if debug=True)")
             if not self.debug:
                 cluster.docket.save()
@@ -235,12 +214,7 @@ class Command(VerboseCommand):
         else:
             logger.info(
                 "Item not saved due to collision or error. Please edit by "
-                "hand: federal_ok: {federal}, scdb_ok: {scdb}, lexis_ok: "
-                "{lexis}".format(**{
-                    'federal': federal_ok,
-                    'scdb': scdb_ok,
-                    'lexis': lexis_ok,
-                })
+                "hand: scdb_ok: {scdb}".format(scdb=scdb_ok)
             )
 
     @staticmethod
@@ -381,12 +355,9 @@ class Command(VerboseCommand):
                 # None found by scdb_id. Try by citation number. Only do these
                 # lookups if there is a usCite value, as newer cases don't yet
                 # have citations.
-                logger.info("Checking by federal_cite_one, _two, or "
-                            "_three...")
+                logger.info("Checking by federal citation")
                 clusters = OpinionCluster.objects.filter(
-                    Q(federal_cite_one=d['usCite']) |
-                    Q(federal_cite_two=d['usCite']) |
-                    Q(federal_cite_three=d['usCite']),
+                    citation=d['usCite'],
                     scdb_id='',
                 )
                 logger.info("%s matches found." % clusters.count())

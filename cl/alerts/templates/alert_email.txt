@@ -1,0 +1,32 @@
+{% load text_filters %}{% load humanize %}*****************
+CourtListener.com
+*****************
+{% comment %}
+    # hits is a multidimensional array. Ugh.
+    # it consists of alerts, paired with a list of documents, of the form:
+    # [[alert1, type, [result1, result2, result3, result4]], [alert2...]]
+{% endcomment %}
+-------------------------------------------------------
+We have news regarding your alerts at CourtListener.com
+-------------------------------------------------------
+
+{% for alert, type, results in hits %}{% for result in results %}{% if forloop.first %}Your {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% endif %} alert -- {{alert.name}} -- had {{results.result.numFound|intcomma}} hit{{results|pluralize}}:
+-------------------------------------------------------
+Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/
+Disable this Alert (one click): https://www.courtlistener.com{% url "disable_alert" alert.secret_key %}{% endif %}
+
+{{forloop.counter}}. {{ result.solr_highlights.caseName.0|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|striptags }} {% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
+{% if type == 'o' or type == 'oa' %}{% for frag in result.solr_highlights.text %}...{{ frag|safe|striptags|underscore_to_space|compress_whitespace }}...
+{% endfor %}{% endif %}~~~~~
+ - View this item on our site: https://www.courtlistener.com{{result.absolute_url}}
+{% if result.download_url %} - Download original from the court: {{result.download_url}}
+{% endif %}{% if result.local_path %} - Download the original from our backup: https://www.courtlistener.com/{{ result.local_path }}{% endif %}{% endfor %}
+
+{% endfor %}
+************************
+This alert brought to you by the 501(c)(3) non-profit Free Law Project
+ - Blog: https://free.law
+ - Twitter: http://twitter.com/freelawproject
+ - Donate: https://www.courtlistener.com{% url "donate" %}?referrer=pt-email
+
+Please donate to support our work.

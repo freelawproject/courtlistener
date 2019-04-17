@@ -14,7 +14,7 @@ def get_docketxml_url(court, pacer_case_id):
     return "%s/%s/%s" % (
         BASE_DOWNLOAD_URL,
         get_bucket_name(court, pacer_case_id),
-        get_docket_filename(court, pacer_case_id),
+        get_docket_filename(court, pacer_case_id, 'xml'),
     )
 
 
@@ -67,9 +67,9 @@ def get_pdf_url(court, pacer_case_id, filename):
     )
 
 
-def get_docket_filename(court, pacer_case_id):
+def get_docket_filename(court, pacer_case_id, ext):
     return ".".join(["gov", "uscourts", unicode(court), unicode(pacer_case_id),
-                     "docket.xml"])
+                     "docket.%s" % ext])
 
 
 def get_document_filename(court, pacer_case_id, document_number,

@@ -1,0 +1,57 @@
+[
+  {
+    "fields": {
+      "party": 1,
+      "attorney": 1,
+      "role": 1,
+      "docket": 1,
+      "date_action": "2017-04-25"
+    },
+    "model": "people_db.role",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "party": 1,
+      "attorney": 1,
+      "role": 1,
+      "docket": 2,
+      "date_action": "2017-04-25"
+    },
+    "model": "people_db.role",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "fax": "555-555-5555",
+      "name": "Juneau",
+      "date_modified": "2017-04-25T23:52:43.497Z",
+      "contact_raw": "Juneau\r\nAlaska",
+      "phone": "555-555-5555",
+      "date_created": "2017-04-25T23:52:43.497Z",
+      "email": "j@me.com"
+    },
+    "model": "people_db.attorney",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_created": "2017-04-25T23:53:11.745Z",
+      "extra_info": "",
+      "name": "Honker",
+      "date_modified": "2017-04-25T23:53:11.745Z"
+    },
+    "model": "people_db.party",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "party": 1,
+      "docket": 1,
+      "name": "Defendant",
+      "extra_info": "Klaxon"
+    },
+    "model": "people_db.partytype",
+    "pk": 1
+  }
+]

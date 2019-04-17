@@ -1,6 +1,14 @@
 ---
 
 # Run this whenever you want the latest code pulled and loaded.
+- hosts: celery
+  tasks:
+  - name: stop celeryd
+    become: yes
+    become_user: root
+    service:
+        name=celeryd
+        state=stopped
 
 - hosts: all
   tasks:
@@ -18,7 +26,7 @@
     pip:
       virtualenv={{ virtualenv_root }}
       requirements={{ install_root }}/requirements.txt
-      extra_args='--upgrade'
+      extra_args='--upgrade --no-cache-dir'
     tags:
      - dependencies
   - name: update seals
@@ -54,9 +62,9 @@
 
 - hosts: celery
   tasks:
-  - name: restart celeryd
+  - name: start celeryd
     become: yes
     become_user: root
     service:
-      name=celeryd
-      state=restarted
+        name=celeryd
+        state=started

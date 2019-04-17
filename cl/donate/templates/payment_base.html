@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+
+{% block footer-scripts %}
+  <script type="text/javascript" src="https://js.stripe.com/v2/"></script>
+  <script type="text/javascript">
+    // This identifies your website in the createToken call below
+    Stripe.setPublishableKey('{{ stripe_public_key }}');
+
+    var stripeResponseHandler = function(status, response) {
+        var $form = $('#donate-form');
+
+        if (response.error) {
+            // Show the errors on the form
+            $form.find('.payment-errors')
+              .text(response.error.message)
+              .addClass('alert alert-danger');
+            $form.find('button').prop('disabled', false);
+        } else {
+            // token contains id, last4, and card type
+            var token = response.id;
+            // Insert the token into the form so it gets submitted to the server
+            $form.append($('<input type="hidden" name="stripeToken" />').val(token));
+            // and re-submit
+            $form.get(0).submit();
+        }
+    };
+
+    jQuery(function($) {
+      $('#donate-form').submit(function(e) {
+        if ($('input[name=payment_provider]:checked', '#donate-form').val() == 'cc'){
+          var $form = $(this);
+          // Disable the submit button to prevent repeated clicks
+          $form.find('button').prop('disabled', true);
+          Stripe.createToken($form, stripeResponseHandler);
+
+          // Prevent the form from submitting with the default action
+          return false;
+        }
+      });
+    });
+
+    $("#id_amount_other").click(function () {
+      // Make the "Other amount" input box select the "Other" radio input.
+      $(".radio-list li:last-child input[type=radio]").prop('checked', true);
+    });
+  </script>
+
+  {% block extra_js %}{% endblock %}
+{% endblock %}
+
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="hidden-xs col-sm-2 col-md-3"></div>
+<div class="col-xs-12 col-sm-8 col-md-6">
+  {% block donate_header %}{% endblock %}
+
+  <hr class="v-offset-above-3 v-offset-below-3">
+
+  {% if message %}
+    <div class="alert bg-danger" role="alert">
+      <p class="bottom">{{ message|safe }}</p>
+    </div>
+  {% endif %}
+  <form role="form" action="" method="post" id="donate-form">
+    {% csrf_token %}
+    {% if donation_form.non_field_errors or user_form.non_field_errors or profile_form.non_field_errors %}
+      <span class="alert alert-danger">
+        {% for error in donation_form.non_field_errors %}
+          {{ error|escape }}
+        {% endfor %}
+        {% for error in user_form.non_field_errors %}
+          {{ error|escape }}
+        {% endfor %}
+        {% for error in profile_form.non_field_errors %}
+          {{ error|escape }}
+        {% endfor %}
+      </span>
+    {% endif %}
+
+    {% block donation_reference %}{% endblock %}
+
+    {% block donation_frequency %}{% endblock %}
+
+    {% block donation_how_much %}{% endblock %}
+
+    {% block donation_how %}{% endblock %}
+
+    {% block donor_info %}
+    <div id="donor-info" class="v-offset-above-2">
+      <div class="row">
+        <div class="col-sm-6">
+          <div class="form-group">
+            <label for="id_first_name">First Name</label>
+            {{ user_form.first_name }}
+            {% if user_form.first_name.errors %}
+              <p class="help-block">
+                  {% for error in user_form.first_name.errors %}
+                      {{ error|escape }}
+                  {% endfor %}
+              </p>
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-sm-6">
+          <div class="form-group">
+            <label for="id_last_name">Last Name</label>
+            {{ user_form.last_name }}
+            {% if user_form.last_name.errors %}
+              <p class="help-block">
+                {% for error in user_form.last_name.errors %}
+                  {{ error|escape }}
+                {% endfor %}
+              </p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="id_address1">Mailing Address 1</label>
+        {{ profile_form.address1 }}
+        {% if profile_form.address1.errors %}
+          <p class="help-block">
+            {% for error in profile_form.address1.errors %}
+              {{ error|escape }}
+            {% endfor %}
+          </p>
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <label for="id_address2">Mailing Address 2</label>
+        {{ profile_form.address2 }}
+        {% if profile_form.address1.errors %}
+          <p class="help-block">
+            {% for error in profile_form.address2.errors %}
+              {{ error|escape }}
+            {% endfor %}
+          </p>
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <label for="id_city">City</label>
+        {{ profile_form.city }}
+        {% if profile_form.city.errors %}
+          <p class="help-block">
+            {% for error in profile_form.city.errors %}
+              {{ error|escape }}
+            {% endfor %}
+          </p>
+        {% endif %}
+      </div>
+      <div class="row">
+        <div class="col-sm-7">
+          <div class="form-group">
+            <label for="id_state">State</label>
+            {{ profile_form.state }}
+            {% if profile_form.state.errors %}
+              <p class="help-block">
+                {% for error in profile_form.state.errors %}
+                  {{ error|escape }}
+                {% endfor %}
+              </p>
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-sm-5">
+          <div class="form-group">
+            <label for="id_zip_code">Zip</label>
+            {{ profile_form.zip_code }}
+            {% if profile_form.zip_code.errors %}
+              <p class="help-block">
+                {% for error in profile_form.zip_code.errors %}
+                  {{ error|escape }}
+                {% endfor %}
+              </p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="id_email">E-Mail Address</label>
+        {% comment %}
+        Disabled fields are what we show to the user, but they
+        aren't submitted. Thus, we have to have a disabled and a
+        hidden field, or a regular field, depending on how the field
+        is populated.
+        {% endcomment %}
+        {% if request.user.email %}
+          <input type="text"
+                 class="form-control"
+                 disabled=""
+                 value="{{ request.user.email }}"
+                 maxlength="75">
+          <input type="hidden"
+                 id="id_email"
+                 name="email"
+                 value="{{ request.user.email }}">
+        {% else %}
+          <input id="id_email"
+                 class="form-control"
+                 name="email"
+                 value="{{ user_form.email.value|default_if_none:"" }}"
+                 maxlength="75"
+                 type="text">
+        {% endif %}
+        {% if user_form.email.errors %}
+          <p class="help-block">
+            {% for error in user_form.email.errors %}
+              {{ error|escape }}
+            {% endfor %}
+          </p>
+        {% endif %}
+      </div>
+
+      {% block cc_info %}
+      <div id="cc-info">
+        <!--
+          Stripe's custom form. Note that we *must* not put name attributes
+          on these inputs or else our server will be sent credit card info we
+          don't want.
+        -->
+        <p>
+            <span class="payment-errors help-block"></span>
+        </p>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label for="cc-number">Card Number</label>
+              <input class="form-control" type="text" size="20"
+                     data-stripe="number" autocomplete="cc-number"
+                     id="cc-number"/>
+            </div>
+          </div>
+          <div class="col-sm-2">
+            <div class="form-group">
+              <label for="cc-cvc">CVC</label>
+              <input class="form-control" type="text" size="4" data-stripe="cvc"
+                     autocomplete="cc-csc" id="cc-cvc" maxlength="3"/>
+            </div>
+          </div>
+          <div class="col-sm-2">
+            <div class="form-group">
+              <label for="cc-month-field">Exp Month</label>
+              <input class="form-control" id="cc-month-field" type="text"
+                     data-stripe="exp-month" placeholder="MM"
+                     autocomplete="cc-exp-month"/>
+            </div>
+          </div>
+          <div class="col-sm-2">
+            <div class="form-group">
+              <label for="cc-year-field">Year</label>
+              <input class="form-control" id="cc-year-field" type="text"
+                     data-stripe="exp-year" placeholder="YYYY"
+                     autocomplete="cc-exp-year"/>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endblock %}
+
+      {% block donation_annual_reminder %}{% endblock %}
+
+      {% block newsletter_sign_up %}{% endblock %}
+
+      {{ donation_form.referrer }}
+
+      {% block payment_button %}{% endblock %}
+    </div>
+
+    {% block donate_footer %}{% endblock %}
+
+    {% endblock %}
+  </form>
+
+  {% block check_info %}{% endblock %}
+  {% block bitcoin_info %}{% endblock %}
+</div>
+{% endblock %}

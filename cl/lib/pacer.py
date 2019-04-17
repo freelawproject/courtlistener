@@ -8,13 +8,14 @@ from dateutil import parser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from juriscraper.lib.string_utils import titlecase
-from juriscraper.pacer import DocketReport, DocketHistoryReport, InternetArchive
+from juriscraper.pacer import AppellateDocketReport, DocketReport, \
+    DocketHistoryReport, InternetArchive, CaseQuery
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
-from cl.search.models import Court, Docket
 from cl.people_db.models import Role, AttorneyOrganization
-from cl.recap.models import DOCKET_HISTORY_REPORT, DOCKET, IA_XML_FILE
+from cl.recap.models import UPLOAD_TYPE
+from cl.search.models import Court, Docket
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ def lookup_and_save(new, debug=False):
     return d
 
 
-def get_first_missing_de_number(d):
+def get_first_missing_de_date(d):
     """When buying dockets use this function to figure out which docket entries
     we already have, starting at the first item. Since PACER only allows you to
     do a range of docket entries, this allows us to figure out a later starting
@@ -113,24 +114,34 @@ def get_first_missing_de_number(d):
     money by only getting items 33 and on.
 
     :param d: The Docket object to check.
-    :returns int: The starting point that should be used in your query. If the
-    docket has no entries, returns 1. If the docket has entries, returns the
-    value of the lowest missing item.
+    :returns date: The starting date that should be used in your query. If the
+    docket has no entries, returns 1960/1/1. If the docket has entries, returns
+    the date of the highest available item.
     """
-    de_numbers = list(d.docket_entries.all().order_by(
+    # Get docket entry numbers for items that *have* docket entry descriptions.
+    # This ensures that we don't count RSS items towards the docket being
+    # complete, since we only have the short description for those.
+    de_number_tuples = list(d.docket_entries.exclude(description='').order_by(
         'entry_number'
-    ).values_list('entry_number', flat=True))
+    ).values_list('entry_number', 'date_filed'))
+    de_numbers = [i[0] for i in de_number_tuples if i[0]]
 
     if len(de_numbers) > 0:
         # Get the earliest missing item
         end = de_numbers[-1]
         missing_items = sorted(set(range(1, end + 1)).difference(de_numbers))
         if missing_items:
-            return missing_items[0]
+            if missing_items[0] == 1:
+                return date(1960, 1, 1)
+            else:
+                previous = missing_items[0] - 1
+                for entry_number, entry_date in de_number_tuples:
+                    if entry_number == previous:
+                        return entry_date
         else:
             # None missing, but we can start after the highest de we know.
-            return end + 1
-    return 1
+            return de_number_tuples[-1][1]
+    return date(1960, 1, 1)
 
 
 def get_blocked_status(docket, count_override=None):
@@ -166,7 +177,9 @@ def get_blocked_status(docket, count_override=None):
     else:
         count = docket.docket_entries.all().count()
     small_case = count <= bankruptcy_privacy_threshold
-    if all([small_case, docket.court in Court.BANKRUPTCY_JURISDICTIONS]):
+    bankruptcy_court = docket.court.jurisdiction in \
+                                    Court.BANKRUPTCY_JURISDICTIONS
+    if all([small_case, bankruptcy_court]):
         return True, date.today()
     return False, None
 
@@ -180,13 +193,17 @@ def process_docket_data(d, filepath, report_type):
     :param report_type: Whether it's a docket or a docket history report.
     """
     from cl.recap.tasks import update_docket_metadata, add_docket_entries, \
-        add_parties_and_attorneys
-    if report_type == DOCKET:
+        add_parties_and_attorneys, update_docket_appellate_metadata
+    if report_type == UPLOAD_TYPE.DOCKET:
         report = DocketReport(map_cl_to_pacer_id(d.court_id))
-    elif report_type == DOCKET_HISTORY_REPORT:
+    elif report_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         report = DocketHistoryReport(map_cl_to_pacer_id(d.court_id))
-    elif report_type == IA_XML_FILE:
+    elif report_type == UPLOAD_TYPE.APPELLATE_DOCKET:
+        report = AppellateDocketReport(map_cl_to_pacer_id(d.court_id))
+    elif report_type == UPLOAD_TYPE.IA_XML_FILE:
         report = InternetArchive()
+    elif report_type == UPLOAD_TYPE.CASE_REPORT_PAGE:
+        report = CaseQuery(map_cl_to_pacer_id(d.court_id))
     with open(filepath, 'r') as f:
         text = f.read().decode('utf-8')
     report._parse_text(text)
@@ -194,16 +211,22 @@ def process_docket_data(d, filepath, report_type):
     if data == {}:
         return None
     update_docket_metadata(d, data)
+    d, og_info = update_docket_appellate_metadata(d, data)
+    if og_info is not None:
+        og_info.save()
+        d.originating_court_information = og_info
     d.save()
-    add_docket_entries(d, data['docket_entries'])
-    if report_type in (DOCKET, IA_XML_FILE):
+    if data.get('docket_entries'):
+        add_docket_entries(d, data['docket_entries'])
+    if report_type in (UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.APPELLATE_DOCKET,
+                       UPLOAD_TYPE.IA_XML_FILE):
         add_parties_and_attorneys(d, data['parties'])
     return d.pk
 
 
 def normalize_attorney_role(r):
     """Normalize attorney roles into the valid set"""
-    role = {'role': None, 'date_action': None}
+    role = {'role': None, 'date_action': None, 'role_raw': r}
 
     r = r.lower()
     # Bad values we can expect. Nuke these early so they don't cause problems.
@@ -235,10 +258,7 @@ def normalize_attorney_role(r):
     except ValueError:
         role['date_action'] = None
 
-    if role['role'] is None:
-        raise ValueError(u"Unable to match role: %s" % r)
-    else:
-        return role
+    return role
 
 
 def normalize_us_phone_number(phone):
@@ -274,8 +294,8 @@ def make_address_lookup_key(address_info):
 
      - Sort the fields alphabetically
      - Strip anything that's not a character or number
-     - Remove/normalize a variety of words that add little meaning and are often
-       omitted.
+     - Remove/normalize a variety of words that add little meaning and
+       are often omitted.
     """
     sorted_info = OrderedDict(sorted(address_info.items()))
     fixes = {

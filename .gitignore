@@ -13,6 +13,7 @@ cl/assets/media/mp3/
 cl/assets/media/pdf/
 cl/assets/media/recap/
 cl/assets/media/sitemaps/
+cl/assets/media/recap-thumbnails/
 cl/assets/media/txt/
 cl/assets/media/wma/
 cl/assets/media/wpd/
@@ -30,6 +31,6 @@ Solr/data_person/
 .idea
 
 # Dev personal stuff - never check in these things with keys or codes!
-cl/settings/05-private.py
+cl/settings/*private.py
 cl/settings/google_auth.json
 .DS_Store

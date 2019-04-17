@@ -3,28 +3,12 @@ from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 from django.template import loader
 from django.utils.encoding import smart_str
-from django.views.decorators.cache import never_cache
+from django.views.decorators.cache import cache_page
 
 from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.search_utils import build_court_count_query
 
-items_per_sitemap = 250
-
-
-def make_index_params(group):
-    params = {
-        'q': '*',
-        'rows': '0',  # just need the count
-        'start': '0',
-        'caller': 'sitemap_index',
-    }
-    if group:
-        params.update({
-            'group': 'true',
-            'group.ngroups': 'true',
-            'group.field': 'docket_id',
-            'group.limit': '0',
-        })
-    return params
+items_per_sitemap = 10000
 
 
 def make_sitemap_solr_params(sort, caller):
@@ -44,9 +28,13 @@ def make_sitemap_solr_params(sort, caller):
     }
     if caller == 'r_sitemap':
         params.update({
+            # Use groups so we only get one result per docket,
+            # not one per document.
             'group': 'true',
             'group.ngroups': 'true',
             'group.field': 'docket_id',
+            # Smaller groups for performance
+            'group.limit': 1,
         })
     return params
 
@@ -67,7 +55,9 @@ def make_solr_sitemap(request, solr_url, params, changefreq, low_priority_pages,
                       url_field):
     solr = ExtraSolrInterface(solr_url)
     page = int(request.GET.get('p', 1))
+    court = request.GET['court']
     params['start'] = (page - 1) * items_per_sitemap
+    params['fq'] = ['court_exact:%s' % court]
     results = solr.query().add_extra(**params).execute()
 
     urls = []
@@ -96,7 +86,7 @@ def make_solr_sitemap(request, solr_url, params, changefreq, low_priority_pages,
     return response
 
 
-@never_cache
+@cache_page(60 * 60 * 24 * 7, cache='db_cache')  # One week
 def index_sitemap_maker(request):
     """Generate a sitemap index page
 
@@ -112,10 +102,13 @@ def index_sitemap_maker(request):
     sites = []
     for connection_string, path, group in connection_string_sitemap_path_pairs:
         conn = ExtraSolrInterface(connection_string)
-        count = conn.query().add_extra(**make_index_params(group)).count()
-        num_pages = count / items_per_sitemap + 1
-        for i in range(1, num_pages + 1):
-            sites.append('https://www.courtlistener.com%s?p=%s' % (path, i))
+        response = conn.query().add_extra(**build_court_count_query(group)).execute()
+        court_count_tuples = response.facet_counts.facet_fields['court_exact']
+        for court, count in court_count_tuples:
+            num_pages = count / items_per_sitemap + 1
+            for page in range(1, num_pages + 1):
+                sites.append('https://www.courtlistener.com%s?p=%s&court=%s' %
+                             (path, page, court))
 
     # Random additional sitemaps.
     sites.extend([

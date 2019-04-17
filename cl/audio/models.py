@@ -1,15 +1,14 @@
 import json
-from datetime import datetime
-from datetime import time
 
-from django.conf import settings
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
 from django.template import loader
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path
-from cl.lib.search_index_utils import InvalidDocumentError, null_map, normalize_search_dicts
+from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
+    normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person
@@ -108,6 +107,16 @@ class Audio(models.Model):
         storage=IncrementingFileSystemStorage(),
         db_index=True,
     )
+    filepath_ia = models.CharField(
+        help_text="The URL of the file in IA",
+        max_length=1000,
+        blank=True,
+    )
+    ia_upload_failure_count = models.SmallIntegerField(
+        help_text="Number of times the upload to the Internet Archive failed.",
+        null=True,
+        blank=True,
+    )
     duration = models.SmallIntegerField(
         help_text="the length of the item, in seconds",
         null=True,
@@ -178,7 +187,7 @@ class Audio(models.Model):
         super(Audio, self).save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_or_update_audio_files
-            add_or_update_audio_files.delay([self.pk], force_commit)
+            add_or_update_audio_files([self.pk], force_commit)
 
     def delete(self, *args, **kwargs):
         """
@@ -187,7 +196,7 @@ class Audio(models.Model):
         id_cache = self.pk
         super(Audio, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], settings.SOLR_AUDIO_URL)
+        delete_items.delay([id_cache], 'audio')
 
     def as_search_dict(self):
         """Create a dict that can be ingested by Solr"""
@@ -201,20 +210,12 @@ class Audio(models.Model):
         # Docket
         docket = {'docketNumber': self.docket.docket_number}
         if self.docket.date_argued is not None:
-            docket['dateArgued'] = datetime.combine(
-                self.docket.date_argued,
-                time()
-            )
+            docket['dateArgued'] = midnight_pst(self.docket.date_argued)
         if self.docket.date_reargued is not None:
-            docket['dateReargued'] = datetime.combine(
-                self.docket.date_reargued,
-                time()
-            )
+            docket['dateReargued'] = midnight_pst(self.docket.date_reargued)
         if self.docket.date_reargument_denied is not None:
-            docket['dateReargumentDenied'] = datetime.combine(
-                self.docket.date_reargument_denied,
-                time()
-            )
+            docket['dateReargumentDenied'] = midnight_pst(
+                self.docket.date_reargument_denied)
         out.update(docket)
 
         # Court

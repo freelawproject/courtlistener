@@ -1,5 +1,6 @@
 from django.contrib import admin
-from cl.alerts.models import Alert, RealTimeQueue
+
+from cl.alerts.models import Alert, RealTimeQueue, DocketAlert
 
 
 @admin.register(Alert)
@@ -22,6 +23,29 @@ class AlertInline(admin.TabularInline):
     model = Alert
     extra = 1
 
+
+@admin.register(DocketAlert)
+class DocketAlertAdmin(admin.ModelAdmin):
+    list_display = (
+        '__str__',
+        'user',
+        'docket',
+        'date_created',
+    )
+    raw_id_fields = (
+        'docket',
+        'user',
+    )
+
+
+class DocketAlertInline(admin.TabularInline):
+    model = DocketAlert
+    extra = 1
+
+    raw_id_fields = (
+        'user',
+        'docket',
+    )
 
 @admin.register(RealTimeQueue)
 class RealTimeQueueAdmin(admin.ModelAdmin):

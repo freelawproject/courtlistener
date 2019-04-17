@@ -1,0 +1,12 @@
+---
+
+# Install docx2txt
+- hosts: all
+  tasks:
+  - include_vars: ../defaults.yml
+  - name: install docx2txt
+    become: yes
+    become_user: root
+    apt:
+        pkg="docx2txt"
+        state=latest

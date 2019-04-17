@@ -1,0 +1,85 @@
+{% extends "payment_base.html" %}
+
+{% block title %}Make a Payment to Free Law Project – CourtListener.com{% endblock %}
+{% block description %}
+  CourtListener is an initiative of Free Law Project, a Federal
+  501(c)(3) non-profit. Use this page to make payments to Free Law Project
+  for services rendered.
+{% endblock %}
+{% block og_description %}
+  CourtListener is an initiative of Free Law Project, a Federal
+  501(c)(3) non-profit. Use this page to make payments to Free Law Project
+  for services rendered.
+{% endblock %}
+
+{% block donate_header %}
+<div id="heading" class="text-center v-offset-below-3">
+  <h1>Make a Payment to Free Law&nbsp;Project</h1>
+</div>
+<p class="lead">This page is for making payments for services provided by Free Law Project, the organization sponsoring CourtListener and RECAP. If you are trying to make a donation instead, <a href="{% url "donate" %}">please use the donation page</a>.
+</p>
+<p class="lead">Thank you for engaging with us to make high quality legal data widely available.
+</p>
+{% endblock %}
+
+
+{% block donation_how %}
+<div id="how-donate">
+  <input type="radio"
+         id="id_payment_provider_1"
+         value="cc"
+         name="payment_provider"
+         checked="checked"
+         hidden="hidden"
+  />
+</div>
+{% endblock %}
+
+
+{% block donation_frequency %}
+<input type="radio"
+       id="id_frequency_0"
+       value="once"
+       name="frequency"
+       checked="checked"
+       hidden="hidden"/>
+{% endblock %}
+
+
+{% block donation_how_much %}
+<div id="how-much-donate">
+  <h3>Payment Amount:</h3>
+  {% if donation_form.amount.errors %}
+    <p class="help-block">
+      {% for error in donation_form.amount.errors %}
+        {{ error|escape }}
+      {% endfor %}
+    </p>
+  {% endif %}
+  <div class="row">
+    <div class="col-xs-12">
+      <div class="form-group form-group-lg">
+        <input id="id_amount_7"
+               name="amount"
+               type="radio"
+               value="other"
+               hidden="hidden"
+               checked="checked">
+        <div class="input-group">
+          <div class="input-group-addon">$</div>
+          {{ donation_form.amount_other }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+
+{% block payment_button %}
+<button type="submit"
+        class="btn btn-primary btn-lg"
+        name="donate"
+        id="donate-button">Submit Payment
+</button>
+{% endblock %}

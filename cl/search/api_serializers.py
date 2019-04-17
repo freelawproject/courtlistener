@@ -2,12 +2,16 @@ from collections import OrderedDict
 
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
+from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
 from cl.people_db.models import Person, PartyType
-from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
-    OpinionsCited, DocketEntry, RECAPDocument, Tag
+from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
+from cl.search.models import (
+    Citation, Court, Docket, DocketEntry, Opinion, OpinionsCited,
+    OpinionCluster, OriginatingCourtInformation, RECAPDocument, Tag,
+)
 
 
 class PartyTypeSerializer(HyperlinkedModelSerializerWithId):
@@ -18,6 +22,13 @@ class PartyTypeSerializer(HyperlinkedModelSerializerWithId):
         fields = ('party', 'party_type',)
 
 
+class OriginalCourtInformationSerializer(HyperlinkedModelSerializerWithId):
+
+    class Meta:
+        model = OriginatingCourtInformation
+        fields = '__all__'
+
+
 class DocketSerializer(DynamicFieldsMixin,
                        HyperlinkedModelSerializerWithId):
     court = serializers.HyperlinkedRelatedField(
@@ -25,6 +36,10 @@ class DocketSerializer(DynamicFieldsMixin,
         view_name='court-detail',
         queryset=Court.objects.exclude(jurisdiction=Court.TESTING_COURT),
     )
+    original_court_info = OriginalCourtInformationSerializer(
+        source='originating_court_information',
+    )
+    idb_data = FjcIntegratedDatabaseSerializer()
     clusters = serializers.HyperlinkedRelatedField(
         many=True,
         view_name='opinioncluster-detail',
@@ -54,7 +69,7 @@ class DocketSerializer(DynamicFieldsMixin,
 
     class Meta:
         model = Docket
-        exclude = ('view_count', 'parties')
+        exclude = ('view_count', 'parties', 'originating_court_information')
 
 
 class RECAPDocumentSerializer(DynamicFieldsMixin,
@@ -150,6 +165,12 @@ class OpinionsCitedSerializer(DynamicFieldsMixin,
         fields = '__all__'
 
 
+class CitationSerializer(ModelSerializer):
+    class Meta:
+        model = Citation
+        exclude = ('id', 'cluster',)
+
+
 class OpinionClusterSerializer(DynamicFieldsMixin,
                                HyperlinkedModelSerializerWithId):
     absolute_url = serializers.CharField(source='get_absolute_url',
@@ -178,6 +199,7 @@ class OpinionClusterSerializer(DynamicFieldsMixin,
         queryset=Opinion.objects.all(),
         style={'base_template': 'input.html'},
     )
+    citations = CitationSerializer(many=True)
 
     class Meta:
         model = OpinionCluster
