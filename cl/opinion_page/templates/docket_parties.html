@@ -20,6 +20,8 @@
         {% for party_type in party_dict.party_type_objects %}
             <div class="row v-offset-above-2">
                 {% with party=party_type.party %}
+
+                {# party names #}
                 <div class="col-xs-5">
                     <h4 class="bottom">{{ party.name|safe }}
                         {% if perms.people_db.change_party %}
@@ -36,6 +38,8 @@
                 <div class="col-xs-3">
                     <p class="alt text-uppercase right representation">Represented&nbsp;by</p>
                 </div>
+
+                {# Attorneys #}
                 <div class="col-xs-4">
                     {% for a in attorney_list %}
                         <div class="v-offset-below-1">
@@ -79,7 +83,11 @@
                         {% for role in a.list %}
                             {% if role.role != role.UNKNOWN %}
                             <p class="bottom"><em>
-                                {{  role.get_role_display }}&nbsp;{% if role.date_action %}({{ role.date_action }}){% endif %}<br>
+                              {% if role.role_raw %}
+                                {{ role.role_raw }}&nbsp;{% if role.date_action %}({{ role.date_action }}){% endif %}
+                              {% else %}
+                                {{  role.get_role_display }}&nbsp;{% if role.date_action %}({{ role.date_action }}){% endif %}
+                              {% endif %}<br>
                             </em></p>
                             {% endif %}
                         {% endfor %}
@@ -89,6 +97,65 @@
                 {% endif %}
                 <div class="clearfix"></div>
                 {% endwith %}
+
+                {# Criminal Data as sub-row #}
+                {% if party_type.highest_offense_level_opening or party_type.highest_offense_level_terminated or party_type.criminal_counts.all or party_type.complaints.all %}
+                  <div class="col-xs-12">
+                    <div class="table-responsive">
+                      <table class="table table-bordered table-condensed bottom">
+                        <thead>
+                          <tr>
+                            <th></th>
+                            <th>Description</th>
+                            <th>Disposition</th>
+                          </tr>
+                        </thead>
+                        {% for count in party_type.criminal_counts.all %}
+                          <tr>
+                            <td><strong>{{ count.get_status_display }}&nbsp;Count</strong></td>
+                            <td>{{ count.name }}</td>
+                            <td>{{ count.disposition|default:"None" }}</td>
+                          </tr>
+                        {% empty %}
+                          <tr>
+                            <td><strong>Pending&nbsp;Count</strong></td>
+                            <td>None</td>
+                            <td>None</td>
+                          </tr>
+                          <tr>
+                            <td><strong>Terminated&nbsp;Count</strong></td>
+                            <td>None</td>
+                            <td>None</td>
+                          </tr>
+                        {% endfor %}
+                        {% for complaint in party_type.criminal_complaints.all %}
+                          <tr>
+                            <td><strong>Complaint</strong></td>
+                            <td>{{ complaint.name }}</td>
+                            <td>{{ complaint.disposition|default:"None" }}</td>
+                          </tr>
+                        {% empty %}
+                          <tr>
+                            <td><strong>Complaint</strong></td>
+                            <td>None</td>
+                            <td>None</td>
+                          </tr>
+                        {% endfor %}
+                      </table>
+                    </div>
+                  </div>
+                  <div class="col-xs-12">
+                    <p class="bottom">
+                      <span class="meta-data-header">Highest Offense Level (Opening):</span>
+                      <span class="meta-data-value">{{ party_type.highest_offense_level_opening|default:"None" }}</span>
+                    </p>
+                    <p class="bottom">
+                      <span class="meta-data-header">Highest Offense Level (Terminated):</span>
+                      <span
+                        class="meta-data-value">{{ party_type.highest_offense_level_terminated|default:"None" }}</span>
+                    </p>
+                  </div>
+                {% endif %}
             </div>
         {% endfor %}
     {% endfor %}

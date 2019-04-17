@@ -4,7 +4,7 @@ from cl.opinion_page.sitemap import opinion_sitemap_maker, recap_sitemap_maker
 from cl.opinion_page.views import (
     block_item, cluster_visualizations, view_opinion, citation_redirector,
     redirect_docket_recap, view_authorities, view_docket, view_parties,
-    view_recap_document,
+    view_recap_document, docket_idb_data,
 )
 
 urlpatterns = [
@@ -41,6 +41,11 @@ urlpatterns = [
         name="docket_parties",
     ),
     url(
+        r'^docket/(?P<docket_id>\d*)/idb/(?P<slug>[^/]*)/$',
+        docket_idb_data,
+        name='docket_idb_data',
+    ),
+    url(
         r'^docket/(?P<docket_id>\d*)/(?P<doc_num>\d*)/(?P<slug>[^/]*)/$',
         view_recap_document,
         name='view_recap_document',
@@ -54,10 +59,21 @@ urlpatterns = [
         name='view_recap_attachment',
     ),
     url(
-        r'^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,4})/(?P<page>\d{1,8})/)?$',
+        r'^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,4})/(?P<page>.*)/)?$',
         citation_redirector,
         name="citation_redirector",
     ),
+    url(
+        r'^c/(?P<reporter>.*)/(?P<volume>\d{1,4})/$',
+        citation_redirector,
+        name="citation_redirector",
+    ),
+    url(
+        r'^c/(?P<reporter>.*)/$',
+        citation_redirector,
+        name="citation_redirector",
+    ),
+
 
     # Sitemap
     url(

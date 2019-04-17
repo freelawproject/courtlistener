@@ -20,6 +20,7 @@ urlpatterns = [
     url('', include('cl.api.urls')),
     url('', include('cl.donate.urls')),
     url('', include('cl.visualizations.urls')),
+    url('', include('cl.stats.urls')),
 
     # Sitemaps
     url(r'^sitemap\.xml$', index_sitemap_maker),
@@ -48,6 +49,6 @@ urlpatterns = [
 
     # Catch-alls that could conflict with other regexps -- place them last
     #   Serve a static file
-    url(r'^(?P<file_path>(?:pdf|wpd|txt|doc|html|mp3|recap)/.+)$',
+    url(r'^(?P<file_path>(?:pdf|wpd|txt|doc|docx|html|mp3|recap)/.+)$',
         serve_static_file),
 ]

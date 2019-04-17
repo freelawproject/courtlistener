@@ -1,24 +1,39 @@
 # coding=utf-8
+import json
 import logging
+import re
+from datetime import timedelta
 
-import lxml
 import requests
 from dateutil import parser
+from django.db import transaction, IntegrityError
+from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 
+from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery import app
+from cl.lib.crypto import sha1
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.recap.tasks import find_docket_object, add_recap_source, \
-    update_docket_metadata, add_docket_entries
-from cl.recap_rss.models import RssFeedStatus
+from cl.recap.tasks import find_docket_object, update_docket_metadata, \
+    add_docket_entries
+from cl.recap_rss.models import RssFeedStatus, RssItemCache
 
 logger = logging.getLogger(__name__)
 
 
-def get_last_build_date(xml_string):
-    """Get the last build date for an RSS feed"""
-    doc = lxml.etree.fromstring(xml_string)
-    last_build_date_str = doc.xpath('//lastBuildDate/text()')[0]
+def get_last_build_date(s):
+    """Get the last build date for an RSS feed
+
+    In this case we considered using lxml & xpath, which was 1000× faster than
+    feedparser, but it turns out that using regex is *another* 1000× faster, so
+    we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
+    """
+    # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
+    date_re = r'<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>'
+    m = re.search(date_re, s)
+    if m is None:
+        return None
+    last_build_date_str = m.group(2)
     return parser.parse(last_build_date_str, fuzzy=False)
 
 
@@ -26,6 +41,18 @@ def mark_status(status_obj, status_value):
     """Update the status_obj object with a status_value"""
     status_obj.status = status_value
     status_obj.save()
+
+
+def abort_or_retry(task, feed_status, exc):
+    """Abort a task chain if there are no more retries. Else, retry it."""
+    if task.request.retries == task.max_retries:
+        # Abort and cut off the chain. No more retries.
+        mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
+        task.request.callbacks = None
+        return
+
+    mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
+    raise task.retry(exc=exc, countdown=5)
 
 
 @app.task(bind=True, max_retries=5)
@@ -67,15 +94,27 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     except requests.RequestException as exc:
         logger.warning("Network error trying to get RSS feed at %s" %
                        rss_feed.url)
-        if self.request.retries == self.max_retries:
-            # Abort. Unable to get the thing.
-            mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
-            self.request.callbacks = None
-            return
-        mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
-        raise self.retry(exc=exc, countdown=5)
+        abort_or_retry(self, feed_status, exc)
+        return
+    else:
+        if not rss_feed.response.content:
+            try:
+                raise Exception("Empty RSS document returned by PACER: %s" %
+                                feed_status.court_id)
+            except Exception as exc:
+                logger.warning(str(exc))
+                abort_or_retry(self, feed_status, exc)
+                return
 
     current_build_date = get_last_build_date(rss_feed.response.content)
+    if not current_build_date:
+        try:
+            raise Exception("No last build date in RSS document returned by "
+                            "PACER: %s" % feed_status.court_id)
+        except Exception as exc:
+            logger.warning(str(exc))
+            abort_or_retry(self, feed_status, exc)
+            return
 
     # Only check for early abortion during partial crawls.
     if not feed_status.is_sweep:
@@ -96,11 +135,38 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     return rss_feed
 
 
+def hash_item(item):
+    """Hash an RSS item. Item should be a dict at this stage"""
+    # Stringify, normalizing dates to strings.
+    item_j = json.dumps(item, sort_keys=True, default=str)
+    item_hash = sha1(item_j)
+    return item_hash
+
+
+def is_cached(item_hash):
+    """Check if a hash is in the RSS Item Cache"""
+    return RssItemCache.objects.filter(hash=item_hash).exists()
+
+
+def cache_hash(item_hash):
+    """Add a new hash to the RSS Item Cache
+
+    :param item_hash: A SHA1 hash you wish to cache.
+    :returns True if successful, False if not.
+    """
+    try:
+        RssItemCache.objects.create(hash=item_hash)
+    except IntegrityError:
+        # Happens during race conditions or when you try to cache something
+        # that's already in there.
+        return False
+    else:
+        return True
+
+
 @app.task
 def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
     """Merge the rss feed contents into CourtListener
-
-    If it's not a sweep, abort after ten preexisting items are encountered.
 
     :param rss_feed: A PacerRssFeed object that has already queried the feed.
     :param court_pk: The CourtListener court ID.
@@ -108,41 +174,51 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
     :returns all_rds_created: A list of all the RDs created during the
     processing.
     """
+    start_time = now()
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     rss_feed.parse()
     logger.info("%s: Got %s results to merge." % (feed_status.court_id,
                                                   len(rss_feed.data)))
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
-    preexisting_rd_count = 0
+    d_pks_to_alert = []
     for docket in rss_feed.data:
-        d, count = find_docket_object(court_pk, docket['pacer_case_id'],
-                                      docket['docket_number'])
-        if count > 1:
-            logger.info("Found %s dockets during lookup. Choosing oldest." %
-                        count)
-            d = d.earliest('date_created')
+        item_hash = hash_item(docket)
+        if is_cached(item_hash):
+            continue
 
-        add_recap_source(d)
-        update_docket_metadata(d, docket)
-        if not d.pacer_case_id:
-            d.pacer_case_id = docket['pacer_case_id']
-        d.save()
-        rds_created, _ = add_docket_entries(d, docket['docket_entries'])
-        rd_pks = [rd.pk for rd in rds_created]
-        if len(rd_pks) == 0:
-            # We've gotten this RSS item already.
-            preexisting_rd_count += 1
-            if preexisting_rd_count == 10 and not feed_status.is_sweep:
-                logger.info("%s: After merging %s items, got 10 results we've "
-                            "already seen. Not doing a sweep, therefore "
-                            "aborting." % (len(all_rds_created),
-                                           feed_status.court_id))
-                break
+        with transaction.atomic():
+            cached_ok = cache_hash(item_hash)
+            if not cached_ok:
+                # The item is already in the cache, ergo it's getting processed
+                # in another thread/process and we had a race condition.
+                continue
+            d, docket_count = find_docket_object(
+                court_pk, docket['pacer_case_id'], docket['docket_number'])
+            if docket_count > 1:
+                logger.info("Found %s dockets during lookup. Choosing "
+                            "oldest." % docket_count)
+                d = d.earliest('date_created')
 
-        all_rds_created.extend(rd_pks)
+            d.add_recap_source()
+            update_docket_metadata(d, docket)
+            if not d.pacer_case_id:
+                d.pacer_case_id = docket['pacer_case_id']
+            d.save()
+            rds_created, content_updated = add_docket_entries(
+                d, docket['docket_entries'])
 
-    return all_rds_created
+        if content_updated and docket_count > 0:
+            newly_enqueued = enqueue_docket_alert(d.pk)
+            if newly_enqueued:
+                d_pks_to_alert.append((d.pk, start_time))
+
+        all_rds_created.extend([rd.pk for rd in rds_created])
+
+    logger.info("%s: Sending %s new RECAP documents to Solr for indexing and "
+                "sending %s dockets for alerts.", feed_status.court_id,
+                len(all_rds_created), len(d_pks_to_alert))
+    return {'d_pks_to_alert': d_pks_to_alert, 'rds_for_solr': all_rds_created}
 
 
 @app.task
@@ -151,3 +227,22 @@ def mark_status_successful(feed_status_pk):
     logger.info("Marking %s as a success." % feed_status.court_id)
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)
 
+
+@app.task
+def trim_rss_cache(days=2):
+    """Remove any entries in the RSS cache older than `days` days.
+
+    :returns The number removed.
+    """
+    logger.info("Trimming RSS item cache.")
+    result = RssItemCache.objects.filter(
+        date_created__lt=now() - timedelta(days=days)
+    ).delete()
+    if result is None:
+        return 0
+
+    # Deletions return a tuple of the total count and the individual item count
+    # if there is a cascade. We just want the total.
+    num_deleted = result[0]
+    logger.info("Trimmed %s items from the RSS cache." % num_deleted)
+    return num_deleted

@@ -3,13 +3,12 @@ from django.views.generic import RedirectView
 
 from cl.simple_pages.sitemap import sitemap_maker
 from cl.simple_pages.views import (
-    about, advanced_search, browser_warning, contact, contact_thanks,
-    contribute, coverage_graph, faq, feeds, humans, latest_terms,
-    markdown_help, old_terms, podcasts, robots, tools_page,
-    validate_for_bing, validate_for_google, validate_for_google2,
+    about, advanced_search, alert_help, browser_warning, contact,
+    contact_thanks, contribute, coverage_graph, delete_help, donation_help,
+    faq, feeds, humans, latest_terms, markdown_help, old_terms, podcasts,
+    robots, validate_for_bing, validate_for_google, validate_for_google2,
     validate_for_wot,
 )
-
 
 urlpatterns = [
     # Footer stuff
@@ -21,24 +20,22 @@ urlpatterns = [
     url(r'^contribute/$', contribute, name='contribute'),
     url(r'^contact/$', contact, name="contact"),
     url(r'^contact/thanks/$', contact_thanks, name='contact_thanks'),
-    url(r'^help/markdown/$', markdown_help, name="markdown_help"),
 
-    # Advanced search page
-    url(
-        r'^search/advanced-techniques/$',
-        advanced_search,
-        name='advanced_search'
-    ),
+    # Help pages
+    url(r'^help/markdown/$', markdown_help, name="markdown_help"),
+    url(r'^help/alerts/$', alert_help, name="alert_help"),
+    url(r'^help/donations/$', donation_help, name="donation_help"),
+    url(r'^help/delete-account/$', delete_help, name="delete_help"),
+    url(r'^help/search-operators/$', advanced_search, name="advanced_search"),
+
+    # Added 2018-10-23
+    url(r'^search/advanced-techniques/$',
+        RedirectView.as_view(pattern_name='advanced_search', permanent=True)),
 
     url(r'^terms/v/(\d{1,2})/$', old_terms, name='old_terms'),
     url(r'^terms/$', latest_terms, name='terms'),
 
     # Randoms
-    url(
-        r'^tools/$',
-        tools_page,
-        name='tools',
-    ),
     url(
         r'^bad-browser/$',
         browser_warning,

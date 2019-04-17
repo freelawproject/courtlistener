@@ -77,7 +77,6 @@
       "federal_cite_three": "",
       "date_filed": "2015-08-15",
       "procedural_history": "some rando history",
-      "citation_id": null,
       "source": "C",
       "state_cite_one": "33 state 1",
       "panel": [2],
@@ -120,7 +119,6 @@
       "federal_cite_three": "9 F. 1",
       "date_filed": "1795-06-09",
       "procedural_history": "some rando history",
-      "citation_id": null,
       "source": "C",
       "state_cite_one": "33 state 1",
       "panel": [],
@@ -163,7 +161,6 @@
       "federal_cite_three": "",
       "date_filed": "2015-08-15",
       "procedural_history": "some rando history",
-      "citation_id": null,
       "source": "C",
       "state_cite_one": "33 state 1",
       "panel": [],
@@ -190,6 +187,63 @@
     },
     "model": "search.opinioncluster",
     "pk": 3
+  },
+
+
+  {
+    "fields": {
+      "volume": 33,
+      "reporter": "state",
+      "page": "1",
+      "type": 1,
+      "cluster": 1
+    },
+    "model": "search.citation",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "volume": 22,
+      "reporter": "AL",
+      "page": "339",
+      "type": 8,
+      "cluster": 2
+    },
+    "model": "search.citation",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "volume": 33,
+      "reporter": "state",
+      "page": "1",
+      "type": 1,
+      "cluster": 2
+    },
+    "model": "search.citation",
+    "pk": 3
+  },
+  {
+    "fields": {
+      "volume": 1,
+      "reporter": "Yeates",
+      "page": "1",
+      "type": 5,
+      "cluster": 2
+    },
+    "model": "search.citation",
+    "pk": 4
+  },
+  {
+    "fields": {
+      "volume": 56,
+      "reporter": "F.2d",
+      "page": "9",
+      "type": 1,
+      "cluster": 2
+    },
+    "model": "search.citation",
+    "pk": 5
   },
 
 

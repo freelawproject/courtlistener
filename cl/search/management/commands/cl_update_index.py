@@ -5,9 +5,9 @@ from django.conf import settings
 from six.moves import input
 
 from cl.audio.models import Audio
-from cl.lib.command_utils import VerboseCommand
 from cl.lib.argparse_types import valid_date_time, valid_obj_type
 from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.command_utils import VerboseCommand
 from cl.lib.db_tools import queryset_generator
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timer import print_timing
@@ -15,9 +15,10 @@ from cl.people_db.models import Person
 from cl.search.models import Opinion, RECAPDocument, Docket
 from cl.search.tasks import (delete_items, add_or_update_audio_files,
                              add_or_update_opinions, add_or_update_items,
-                             add_or_update_people, add_or_update_recap_document)
+                             add_or_update_people,
+                             add_or_update_recap_document)
 
-VALID_OBJ_TYPES = ('opinions', 'audio', 'people', 'recap', 'recap-dockets')
+VALID_OBJ_TYPES = ('opinions', 'audio', 'person', 'recap', 'recap-dockets')
 
 
 def proceed_with_deletion(out, count, noinput):
@@ -58,6 +59,7 @@ class Command(VerboseCommand):
         self.verbosity = None
         self.options = []
         self.type = None
+        self.type_str = None
         self.noinput = None
 
     def add_arguments(self, parser):
@@ -85,6 +87,15 @@ class Command(VerboseCommand):
             '--queue',
             default='batch3',
             help="The celery queue where the tasks should be processed.",
+        )
+        parser.add_argument(
+            '--min-wait',
+            default=0,
+            type=int,
+            help="The amount of time to wait between enqueueing tasks. The "
+                 "default is to keep Celery totally swamped, with no delays "
+                 "but if you prefer to do things a little more slowly, set "
+                 "this value to some number of seconds.",
         )
 
         actions_group = parser.add_mutually_exclusive_group()
@@ -166,7 +177,7 @@ class Command(VerboseCommand):
         if not self.options['optimize_everything']:
             self.solr_url = options['solr_url']
             self.si = ExtraSolrInterface(self.solr_url, mode='rw')
-            self.type = options['type']
+            self.type, self.type_str = options['type']
 
         if options['update']:
             if self.verbosity >= 1:
@@ -210,14 +221,15 @@ class Command(VerboseCommand):
                               'index.\n')
             sys.exit(1)
 
-    def process_queryset(self, items, count, chunksize=50,):
+    def process_queryset(self, items, count, chunksize=5,):
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
         """
         queue = self.options['queue']
         start_at = self.options['start_at']
         # Set low throttle. Higher values risk crashing Redis.
-        throttle = CeleryThrottle(min_items=30, queue_name=queue)
+        throttle = CeleryThrottle(min_wait=self.options['min_wait'],
+                                  queue_name=queue)
         processed_count = 0
         chunk = []
         for item in items:
@@ -228,7 +240,7 @@ class Command(VerboseCommand):
             chunk.append(item)
             if processed_count % chunksize == 0 or last_item:
                 throttle.maybe_wait()
-                add_or_update_items.apply_async(args=(chunk, self.solr_url),
+                add_or_update_items.apply_async(args=(chunk, self.type_str),
                                                 queue=queue)
                 chunk = []
                 sys.stdout.write("\rProcessed {}/{} ({:.0%})".format(
@@ -242,10 +254,10 @@ class Command(VerboseCommand):
     @print_timing
     def delete(self, items):
         """
-        Given an item, creates a Celery task to delete it.
+        Given a list of items, delete them.
         """
         self.stdout.write("Deleting items(s): %s\n" % items)
-        delete_items.delay(items, self.solr_url)
+        delete_items.delay(items, self.type_str)
 
     def delete_all(self):
         """
@@ -366,10 +378,7 @@ class Command(VerboseCommand):
 
     @print_timing
     def optimize(self):
-        """Runs the Solr optimize command.
-
-        This wraps Sunburnt, which wraps Solr, which wraps Lucene!
-        """
+        """Runs the Solr optimize command."""
         self.stdout.write('Optimizing the index...')
         self.si.optimize()
         self.stdout.write('done.\n')

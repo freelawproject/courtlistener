@@ -9,9 +9,10 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.status import HTTP_201_CREATED, HTTP_200_OK
 
-from cl.donate.models import Donation
-from cl.donate.utils import send_thank_you_email
+from cl.donate.models import Donation, PAYMENT_TYPES
+from cl.donate.utils import send_thank_you_email, PaymentFailureException
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ def get_paypal_access_token():
         ),
         data={'grant_type': 'client_credentials'}
     )
-    if r.status_code == 200:
+    if r.status_code == HTTP_200_OK:
         logger.info("Got paypal token successfully.")
     else:
         logger.critical("Problem getting paypal token status_code was: %s, "
@@ -68,7 +69,7 @@ def process_paypal_callback(request):
         },
         data=json.dumps({'payer_id': request.GET['PayerID']}),
     )
-    if r.status_code == 200:
+    if r.status_code == HTTP_200_OK:
         d.clearing_date = now()
         # Technically, this should be d.status = 2 (Completed, awaiting
         # processing) and we should await a webhook to tell us that the
@@ -77,78 +78,77 @@ def process_paypal_callback(request):
         # completed (2), it'll get processed (4).
         d.status = Donation.PROCESSED
         d.save()
-        send_thank_you_email(d)
+        send_thank_you_email(d, payment_type=PAYMENT_TYPES.DONATION)
     else:
         logger.critical("Unable to execute PayPal transaction. Status code %s "
                         "with data: %s" % (r.status_code, r.content))
         d.status = Donation.UNKNOWN_ERROR
         d.save()
     # Finally, show them the thank you page
-    return HttpResponseRedirect(reverse('paypal_complete'))
+    return HttpResponseRedirect(reverse('donate_complete'))
 
 
 def process_paypal_payment(cd_donation_form):
     # https://developer.paypal.com/webapps/developer/docs/integration/web/accept-paypal-payment/
     access_token = get_paypal_access_token()
-    if access_token:
-        # We use it to set up a payment
-        data = {
-            'intent': 'sale',
-            'redirect_urls': {
-                'return_url': settings.PAYPAL_CALLBACK,
-                'cancel_url': settings.PAYPAL_CANCELLATION,
-            },
-            'payer': {'payment_method': 'paypal'},
-            'transactions': [
-                {
-                    'amount': {
-                        'total': cd_donation_form['amount'],
-                        'currency': 'USD',
-                    },
-                    'description': 'Donation to Free Law Project',
-                }
-            ]
-        }
-        r = requests.post(
-            '%s/v1/payments/payment' % settings.PAYPAL_ENDPOINT,
-            headers={
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer %s' % access_token
-            },
-            data=json.dumps(data)
-        )
+    if not access_token:
+        raise PaymentFailureException('NO_ACCESS_TOKEN')
 
-        if r.status_code == 201:  # "Created"
-            r_content_as_dict = json.loads(r.content)
-            # Get the redirect value from the 'links' attribute. Links look like:
-            #   [{u'href': u'https://api.sandbox.paypal.com/v1/payments/payment/PAY-8BC403022U6413151KIQPC2I',
-            #     u'method': u'GET',
-            #     u'rel': u'self'},
-            #    {u'href': u'https://www.sandbox.paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=EC-6VV58324J9479725S',
-            #     u'method': u'REDIRECT',
-            #     u'rel': u'approval_url'},
-            #    {u'href': u'https://api.sandbox.paypal.com/v1/payments/payment/PAY-8BC403022U6413151KIQPC2I/execute',
-            #     u'method': u'POST',
-            #     u'rel': u'execute'}
-            #   ]
-            redirect = [link for link in r_content_as_dict['links'] if
-                        link['rel'].lower() == 'approval_url'][0]['href']
-            parsed_redirect = urlparse(redirect)
-            token = parse_qs(parsed_redirect.query)['token'][0]
-            response = {
-                'result': r_content_as_dict['state'],
-                'status_code': r.status_code,
-                'message': None,
-                'redirect': redirect,
-                'payment_id': r_content_as_dict.get('id'),
-                'transaction_id': token
+    return_url = 'https://www.courtlistener.com%s' % reverse('paypal_callback')
+    cancel_url = 'https://www.courtlistener.com%s' % reverse('paypal_cancel')
+    data = {
+        'intent': 'sale',
+        'redirect_urls': {
+            'return_url': return_url,
+            'cancel_url': cancel_url,
+        },
+        'payer': {'payment_method': 'paypal'},
+        'transactions': [
+            {
+                'amount': {
+                    'total': cd_donation_form['amount'],
+                    'currency': 'USD',
+                },
+                'description': 'Donation to Free Law Project',
             }
-            logger.info("Created payment in paypal with response: %s" % response)
-            return response
-        else:
-            return {'result': 'UNABLE_TO_MAKE_PAYMENT'}
+        ]
+    }
+    r = requests.post(
+        '%s/v1/payments/payment' % settings.PAYPAL_ENDPOINT,
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer %s' % access_token
+        },
+        data=json.dumps(data)
+    )
+
+    if r.status_code == HTTP_201_CREATED:
+        r_content_as_dict = json.loads(r.content)
+        # Get the redirect value from the 'links' attribute. Links look like:
+        #   [{u'href': u'https://api.sandbox.paypal.com/v1/payments/payment/PAY-8BC403022U6413151KIQPC2I',
+        #     u'method': u'GET',
+        #     u'rel': u'self'},
+        #    {u'href': u'https://www.sandbox.paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=EC-6VV58324J9479725S',
+        #     u'method': u'REDIRECT',
+        #     u'rel': u'approval_url'},
+        #    {u'href': u'https://api.sandbox.paypal.com/v1/payments/payment/PAY-8BC403022U6413151KIQPC2I/execute',
+        #     u'method': u'POST',
+        #     u'rel': u'execute'}
+        #   ]
+        redirect = [link for link in r_content_as_dict['links'] if
+                    link['rel'].lower() == 'approval_url'][0]['href']
+        parsed_redirect = urlparse(redirect)
+        token = parse_qs(parsed_redirect.query)['token'][0]
+        response = {
+            'status': Donation.AWAITING_PAYMENT,
+            'payment_id': r_content_as_dict.get('id'),
+            'transaction_id': token,
+            'redirect': redirect,
+        }
+        logger.info("Created payment in paypal with response: %s", response)
+        return response
     else:
-        return {'result': 'NO_ACCESS_TOKEN', }
+        raise PaymentFailureException("UNABLE_TO_MAKE_PAYMENT")
 
 
 def donate_paypal_cancel(request):

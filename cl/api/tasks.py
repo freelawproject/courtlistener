@@ -4,7 +4,6 @@ import shutil
 import tarfile
 from os.path import join
 
-from django.conf import settings
 from django.test import RequestFactory
 from rest_framework.renderers import JSONRenderer
 from rest_framework.versioning import URLPathVersioning
@@ -20,24 +19,26 @@ from cl.lib.utils import deepgetattr, mkdir_p
 @print_timing
 def make_bulk_data_and_swap_it_in(courts, bulk_dir, kwargs):
     """We can't wrap the handle() function, but we can wrap this one."""
+    # Create a directory where we'll put temporary files
+    tmp_bulk_dir = join(bulk_dir, 'tmp')
 
     print(' - Creating bulk %s files...' % kwargs['obj_type_str'])
-    num_written = write_json_to_disk(courts, bulk_dir=bulk_dir, **kwargs)
+    num_written = write_json_to_disk(courts, bulk_dir=tmp_bulk_dir, **kwargs)
 
     if num_written > 0:
         print('   - Tarring and compressing all %s files...' %
               kwargs['obj_type_str'])
-        targz_json_files(courts, bulk_dir, kwargs['obj_type_str'],
+        targz_json_files(courts, tmp_bulk_dir, kwargs['obj_type_str'],
                          kwargs['court_attr'])
 
         print('   - Swapping in the new %s archives...' %
               kwargs['obj_type_str'])
-        swap_archives(kwargs['obj_type_str'], bulk_dir)
+        swap_archives(kwargs['obj_type_str'], bulk_dir, tmp_bulk_dir)
 
 
-def swap_archives(obj_type_str, bulk_dir):
+def swap_archives(obj_type_str, bulk_dir, tmp_bulk_dir):
     """Swap out new archives, clobbering the old, if present"""
-    tmp_gz_dir = join(bulk_dir, 'tmp', obj_type_str)
+    tmp_gz_dir = join(tmp_bulk_dir, obj_type_str)
     final_gz_dir = join(bulk_dir, obj_type_str)
     mkdir_p(final_gz_dir)
     for f in glob.glob(join(tmp_gz_dir, '*.tar*')):
@@ -58,7 +59,7 @@ def swap_archives(obj_type_str, bulk_dir):
 def targz_json_files(courts, bulk_dir, obj_type_str, court_attr):
     """Create gz-compressed archives using the JSON on disk."""
 
-    root_path = join(bulk_dir, 'tmp', obj_type_str)
+    root_path = join(bulk_dir, obj_type_str)
     if court_attr is not None:
         for court in courts:
             tar_path = join(root_path, '%s.tar.gz' % court.pk)
@@ -85,7 +86,7 @@ def targz_json_files(courts, bulk_dir, obj_type_str, court_attr):
 
 
 def write_json_to_disk(courts, obj_type_str, obj_class, court_attr,
-                       serializer, bulk_dir=join(settings.BULK_DATA_DIR, 'tmp')):
+                       serializer, bulk_dir):
     """Write all items to disk as json files inside directories named by
     jurisdiction.
 
@@ -151,6 +152,7 @@ def write_json_to_disk(courts, obj_type_str, obj_class, court_attr,
         renderer = JSONRenderer()
         r = RequestFactory().request()
         r.META['SERVER_NAME'] = 'www.courtlistener.com'  # Else, it's testserver
+        r.META['SERVER_PORT'] = '443'  # Else, it's 80
         r.META['wsgi.url_scheme'] = 'https'  # Else, it's http.
         r.version = 'v3'
         r.versioning_scheme = URLPathVersioning()

@@ -8,7 +8,6 @@ except ImportError:
 import datetime
 
 from lxml.builder import E
-from lxml.etree import tostring
 try:
     import mx.DateTime
     HAS_MX_DATETIME = True

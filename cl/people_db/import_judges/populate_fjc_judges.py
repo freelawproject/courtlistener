@@ -6,19 +6,12 @@ from datetime import date
 import pandas as pd
 from localflavor.us.us_states import STATES_NORMALIZED
 
-from cl.corpus_importer.court_regexes import fd_pairs, fb_pairs
+from cl.corpus_importer.court_regexes import match_court_string
 from cl.people_db.import_judges.judge_utils import get_school, process_date, \
     get_races, get_party, get_suffix, get_aba, get_degree_level, \
     process_date_string
 from cl.people_db.models import Person, Position, Education, Race, \
     PoliticalAffiliation, ABARating, GRANULARITY_DAY, GRANULARITY_YEAR
-
-
-def get_fed_court_object(raw_court):
-    for regex, value in fd_pairs:
-        if re.search(regex, raw_court):
-            return value
-    return None
 
 
 def transform_employ(string):
@@ -156,9 +149,10 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
 
         if pd.isnull(item['Court Name' + pos_str]):
             continue
-        courtid = get_fed_court_object(item['Court Name' + pos_str])
+        courtid = match_court_string(item['Court Name' + pos_str],
+                                     federal_district=True)
         if courtid is None:
-            raise
+            raise Exception
 
         date_nominated = process_date_string(
             item['Nomination Date Senate Executive Journal' + pos_str])
@@ -344,19 +338,12 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                 aba.save()
 
 
-def get_bankruptcy_court(raw_court):
-    for regex, value in fb_pairs:
-        if re.search(regex, raw_court):
-            return value
-    return None
-
-
 def update_bankruptcy_and_magistrate(testing=False):
-    # update bankrupcty positions
+    # update bankruptcy positions
     positions = Position.object.filter(job_title__icontains='Bankruptcy')
     for position in positions:
         location = position.location
-        bcourt = get_bankruptcy_court(location)
+        bcourt = match_court_string(location, bankruptcy=True)
         if bcourt is None:
             continue
         position.court_id = bcourt
@@ -367,7 +354,7 @@ def update_bankruptcy_and_magistrate(testing=False):
         positions = Position.object.filter(job_title__icontains='Magistrate')
         for position in positions:
             location = position.location
-            mcourt = get_fed_court_object(location)
+            mcourt = match_court_string(location, federal_district=True)
             position.court_id = mcourt
             position.position_type = 'm-jud'
             if not testing:

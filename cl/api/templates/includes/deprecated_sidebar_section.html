@@ -1,17 +1,49 @@
 <div class="sidebar-section">
-    <h3><span>API Change Log</span></h3>
+  <h3><span>API Change Log</span></h3>
+  <ul>
+    <li>
+      <p><strong>v3.7</strong> &mdash; This version adds data from the Federal Judicial Center's Integrated Database. This data is now included in a new endpoint and as a new <code>idb_data</code> key in the Docket object. For an understanding of these fields, see the endpoint documentation.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.6</strong> &mdash; This version deprecated the numerous <code>federal_cite_one</code>, <code>neutral_cite</code>, <code>lexis_cite</code>, and other citation fields, replacing them with a nested field called <code>citations</code>. The old fields will continue receiving updates until February 1, 2019, and will be removed on May 1, 2019.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.5</strong> &mdash; This version adds the <code>mdl_status</code> field to the docket endpoint.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.4</strong> &mdash; This version adds the <code>file_size</code> field to the RECAP document endpoint. This field contains the size (in bytes) of any document that we have.
+      </p>
+    </li>
 
-    <ul>
-        <li><strong>v3.2</strong> &ndash; This version added the <code>id</code> field to many of the endpoints.</li>
-        <li><strong>v3.1</strong> &ndash; This version added experimental Swagger and Core API implementations.</li>
-        <li><strong>v3.0</strong> &ndash; Upgraded and overhauled the API to use the Django REST Framework.</li>
-        <li><strong>v2</strong> &ndash; <a
-                href="{% url "rest_docs" version="v2" %}">For original documentation, see: {% url "rest_docs" version="v2" %}</a>
-        </li>
-        <li><strong>v1</strong> &ndash; <a
-                href="{% url "rest_docs" version="v1" %}">For original
-            documentation, see: {% url "rest_docs" version="v1" %}</a>
-        </li>
-
-    </ul>
+    <li>
+      <p><strong>v3.3</strong> &ndash; This version added a variety of appellate fields to the docket object including a new related item called the <code>OriginalCourtInformation</code>. See <a href="#og-court-info-endpoint">documentation of that new endpoint</a> for details.
+      </p>
+      <p>The new fields added to the docket include <code>appeal_from</code>, <code>appeal_from_str</code>, <code>originating_court_information</code>, <code>panel</code>, <code>panel_str</code>, <code>appellate_fee_status</code>, and <code>appellate_case_type_information</code>.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.2</strong> &ndash; This version added the <code>id</code> field to many of the endpoints.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.1</strong> &ndash; This version added experimental Swagger and Core API implementations.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.0</strong> &ndash; Upgraded and overhauled the API to use the Django REST Framework.
+      </p>
+    </li>
+    <li>
+      <p><strong>v2</strong> &ndash; <a
+      href="{% url "rest_docs" version="v2" %}">For original documentation, see: {% url "rest_docs" version="v2" %}</a>
+      </p>
+    </li>
+    <li>
+      <p><strong>v1</strong> &ndash; <a href="{% url "rest_docs" version="v1" %}">For original documentation, see: {% url "rest_docs" version="v1" %}</a>
+      </p>
+    </li>
+  </ul>
 </div>

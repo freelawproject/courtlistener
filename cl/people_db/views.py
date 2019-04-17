@@ -1,9 +1,12 @@
 import os
 from django.conf import settings
+from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils.text import slugify
 
+from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib import magic
 from cl.lib.bot_detector import is_bot
 from cl.lib.sunburnt import SolrInterface
@@ -22,6 +25,21 @@ def make_title_str(person):
     return title
 
 
+def make_img_path(person):
+    """Make the path for a person's img tag."""
+
+    img_path = None
+    if person.has_photo:
+        p = slugify(('%s-%s' % (person.name_last, person.name_first)).lower())
+        if person.date_dob:
+            img_path = static('judge_pics/%s-%s.jpeg'
+                   % (p, granular_date(person, 'date_dob', iso=True, default='')))
+        else:
+            img_path = static('judge_pics/%s.jpeg' % p)
+
+    return img_path
+
+
 def view_person(request, pk, slug):
     person = get_object_or_404(Person, pk=pk)
 
@@ -33,6 +51,8 @@ def view_person(request, pk, slug):
 
     # Make the title string.
     title = "Judge %s" % make_title_str(person)
+
+    img_path = make_img_path(person)
 
     # Regroup the positions by whether they're judgeships or other. This allows
     # us to use the {% ifchanged %} template tags to have two groups in the
@@ -76,6 +96,7 @@ def view_person(request, pk, slug):
     return render(request, 'view_person.html', {
         'person': person,
         'title': title,
+        'img_path': img_path,
         'aba_ratings': person.aba_ratings.all().order_by('-year_rated'),
         'political_affiliations': (person.political_affiliations.all()
                                    .order_by('-date_start')),

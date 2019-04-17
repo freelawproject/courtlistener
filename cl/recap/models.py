@@ -1,4 +1,5 @@
 import os
+
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -9,22 +10,27 @@ from cl.lib.storage import UUIDFileSystemStorage
 from cl.recap.constants import NOS_CODES, DATASET_SOURCES, NOO_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 
-DOCKET = 1
-ATTACHMENT_PAGE = 2
-PDF = 3
-DOCKET_HISTORY_REPORT = 4
-APPELLATE_DOCKET = 5
-APPELLATE_ATTACHMENT_PAGE = 6
-IA_XML_FILE = 7
-UPLOAD_TYPES = (
-    (DOCKET, 'HTML Docket'),
-    (ATTACHMENT_PAGE, 'HTML attachment page'),
-    (PDF, 'PDF'),
-    (DOCKET_HISTORY_REPORT, 'Docket history report'),
-    (APPELLATE_DOCKET, 'Appellate HTML docket'),
-    (APPELLATE_ATTACHMENT_PAGE, 'Appellate HTML attachment page'),
-    (IA_XML_FILE, 'Internet Archive XML docket'),
-)
+
+class UPLOAD_TYPE:
+    DOCKET = 1
+    ATTACHMENT_PAGE = 2
+    PDF = 3
+    DOCKET_HISTORY_REPORT = 4
+    APPELLATE_DOCKET = 5
+    APPELLATE_ATTACHMENT_PAGE = 6
+    IA_XML_FILE = 7
+    CASE_REPORT_PAGE = 8
+
+    NAMES = (
+        (DOCKET, 'HTML Docket'),
+        (ATTACHMENT_PAGE, 'HTML attachment page'),
+        (PDF, 'PDF'),
+        (DOCKET_HISTORY_REPORT, 'Docket history report'),
+        (APPELLATE_DOCKET, 'Appellate HTML docket'),
+        (APPELLATE_ATTACHMENT_PAGE, 'Appellate HTML attachment page'),
+        (IA_XML_FILE, 'Internet Archive XML docket'),
+        (CASE_REPORT_PAGE, 'Case report (iquery.pl) page'),
+    )
 
 
 def make_path(root, filename):
@@ -50,9 +56,9 @@ class PacerHtmlFiles(models.Model):
     """This is a simple object for holding original HTML content from PACER
 
     We use this object to make sure that for every item we receive from users,
-    we can go back and re-parse it one day if we have to. This becomes essential
-    as we do more and more data work where we're purchasing content. If we don't
-    keep an original copy, a bug could be devastating.
+    we can go back and re-parse it one day if we have to. This becomes
+    essential as we do more and more data work where we're purchasing content.
+    If we don't keep an original copy, a bug could be devastating.
     """
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -72,11 +78,19 @@ class PacerHtmlFiles(models.Model):
     )
     upload_type = models.SmallIntegerField(
         help_text="The type of object that is uploaded",
-        choices=UPLOAD_TYPES,
+        choices=UPLOAD_TYPE.NAMES,
     )
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
+
+    @property
+    def file_contents(self):
+        with open(self.filepath.path, 'r') as f:
+            return f.read().decode('utf-8')
+
+    def print_file_contents(self):
+        print(self.file_contents)
 
 
 class ProcessingQueue(models.Model):
@@ -144,24 +158,24 @@ class ProcessingQueue(models.Model):
         max_length=1000,
     )
     status = models.SmallIntegerField(
-        help_text="The current status of this upload. Possible values are: %s" %
-                  ', '.join(['(%s): %s' % (t[0], t[1]) for t in
-                             PROCESSING_STATUSES]),
+        help_text="The current status of this upload. Possible values "
+                  "are: %s" % ', '.join(['(%s): %s' % (t[0], t[1]) for t in
+                                         PROCESSING_STATUSES]),
         default=AWAITING_PROCESSING,
         choices=PROCESSING_STATUSES,
         db_index=True,
     )
     upload_type = models.SmallIntegerField(
         help_text="The type of object that is uploaded",
-        choices=UPLOAD_TYPES,
+        choices=UPLOAD_TYPE.NAMES,
     )
     error_message = models.TextField(
         help_text="Any errors that occurred while processing an item",
         blank=True,
     )
     debug = models.BooleanField(
-        help_text="Are you debugging? Debugging uploads will be validated, but "
-                  "not saved to the database.",
+        help_text="Are you debugging? Debugging uploads will be validated, "
+                  "but not saved to the database.",
         default=False,
     )
 
@@ -185,14 +199,16 @@ class ProcessingQueue(models.Model):
     )
 
     def __unicode__(self):
-        if self.upload_type in [DOCKET, DOCKET_HISTORY_REPORT]:
+        if self.upload_type in [
+                UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
+                UPLOAD_TYPE.APPELLATE_DOCKET]:
             return u'ProcessingQueue %s: %s case #%s (%s)' % (
                 self.pk,
                 self.court_id,
                 self.pacer_case_id,
                 self.get_upload_type_display(),
             )
-        elif self.upload_type == PDF:
+        elif self.upload_type == UPLOAD_TYPE.PDF:
             return u'ProcessingQueue: %s: %s.%s.%s.%s (%s)' % (
                 self.pk,
                 self.court_id,
@@ -201,7 +217,7 @@ class ProcessingQueue(models.Model):
                 self.attachment_number or 0,
                 self.get_upload_type_display(),
             )
-        elif self.upload_type == ATTACHMENT_PAGE:
+        elif self.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
             return u'ProcessingQueue: %s (%s)' % (
                 self.pk,
                 self.get_upload_type_display(),
@@ -217,9 +233,13 @@ class ProcessingQueue(models.Model):
             ("has_recap_upload_access", 'Can upload documents to RECAP.'),
         )
 
-    def print_file_contents(self):
+    @property
+    def file_contents(self):
         with open(self.filepath_local.path, 'r') as f:
-            print(f.read().decode('utf-8'))
+            return f.read().decode('utf-8')
+
+    def print_file_contents(self):
+        print(self.file_contents)
 
 
 class FjcIntegratedDatabase(models.Model):
@@ -245,8 +265,8 @@ class FjcIntegratedDatabase(models.Model):
     MULTI_DIST_ORIG = 13
     ORIGINS = (
         (ORIG, "Original Proceeding"),
-        (REMOVED, "Removed  (began in the state court, removed to the district "
-                  "court)"),
+        (REMOVED, "Removed  (began in the state court, removed to the "
+                  "district court)"),
         (REMANDED, "Remanded for further action (removal from court of "
                    "appeals)"),
         (REINSTATED, "Reinstated/reopened (previously opened and closed, "
@@ -264,7 +284,7 @@ class FjcIntegratedDatabase(models.Model):
         (FIFTH_REOPEN, "Fifth reopen"),
         (SIXTH_REOPEN, "Sixth reopen"),
         (MULTI_DIST_ORIG, "Multi district litigation originating in the "
-                          "district (valid beginning July 1, 2016) "),
+                          "district (valid beginning July 1, 2016)"),
     )
     GOV_PLAIN = 1
     GOV_DEF = 2
@@ -420,16 +440,6 @@ class FjcIntegratedDatabase(models.Model):
                   "track of where a row came from originally.",
         choices=DATASET_SOURCES,
     )
-    case_name = models.TextField(
-        help_text="The standard name of the case",
-        blank=True,
-    )
-    pacer_case_id = models.CharField(
-        help_text="The cased ID provided by PACER.",
-        max_length=100,
-        blank=True,
-        db_index=True,
-    )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -458,8 +468,8 @@ class FjcIntegratedDatabase(models.Model):
     office = models.CharField(
         help_text="The code that designates the office within the district "
                   "where the case is filed. Must conform with format "
-                  "established in Volume XI, Guide to Judiciary Policies and " 
-                  "Procedures, Appendix A.",
+                  "established in Volume XI, Guide to Judiciary Policies and "
+                  "Procedures, Appendix A. See: https://free.law/idb-facts/",
         max_length=3,
         blank=True,
     )
@@ -472,8 +482,8 @@ class FjcIntegratedDatabase(models.Model):
         max_length=7,
     )
     origin = models.SmallIntegerField(
-        help_text="A single digit code describing the manner in which the case "
-                  "was filed in the district.",
+        help_text="A single digit code describing the manner in which the "
+                  "case was filed in the district.",
         choices=ORIGINS,
         blank=True,
         null=True,
@@ -546,9 +556,9 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
     )
     arbitration_at_filing = models.CharField(
-        help_text="This field is used only by the courts  participating in the "
-                  "Formal Arbitration Program.  It is not used for any other "
-                  "purpose.",
+        help_text="This field is used only by the courts  participating in "
+                  "the Formal Arbitration Program.  It is not used for any "
+                  "other purpose.",
         max_length=1,
         choices=ARBITRATION_CHOICES,
         blank=True,
@@ -564,11 +574,15 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
     )
     plaintiff = models.TextField(
-        help_text="First listed plaintiff",
+        help_text="First listed plaintiff. This field appears to be cut off "
+                  "at 30 characters",
+        db_index=True,
         blank=True,
     )
     defendant = models.TextField(
-        help_text="First listed defendant",
+        help_text="First listed defendant. This field appears to be cut off "
+                  "at 30 characters.",
+        db_index=True,
         blank=True,
     )
     date_transfer = models.DateField(
@@ -583,7 +597,7 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
     )
     transfer_docket_number = models.TextField(
-        help_text="The docket number of the case int he losing district",
+        help_text="The docket number of the case in the losing district",
         blank=True,
     )
     transfer_origin = models.TextField(
@@ -597,8 +611,8 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
     )
     termination_class_action_status = models.SmallIntegerField(
-        help_text="A code that indicates a case involving allegations of class "
-                  "action.",
+        help_text="A code that indicates a case involving allegations of "
+                  "class action.",
         choices=CLASS_ACTION_STATUSES,
         null=True,
         blank=True,
@@ -643,8 +657,8 @@ class FjcIntegratedDatabase(models.Model):
     )
     year_of_tape = models.IntegerField(
         help_text="Statistical year label on data files obtained from the "
-                  "Administrative Office of the United States Courts.  2099 on "
-                  "pending case records.",
+                  "Administrative Office of the United States Courts.  2099 "
+                  "on pending case records.",
         blank=True,
         null=True,
     )
@@ -664,3 +678,12 @@ class FjcIntegratedDatabase(models.Model):
         null=True,
         blank=True,
     )
+
+    def __unicode__(self):
+        return u'%s: %s v. %s' % (self.pk, self.plaintiff, self.defendant)
+
+    class Meta:
+        verbose_name_plural = 'FJC Integrated Database Entries'
+        index_together = (
+            ('district', 'docket_number'),
+        )

@@ -3,9 +3,33 @@ from django.template import Context
 from django.test import TestCase, RequestFactory
 
 from cl.custom_filters.templatetags.extras import get_full_host, granular_date
-from cl.custom_filters.templatetags.text_filters import naturalduration
+from cl.custom_filters.templatetags.text_filters import naturalduration, \
+    oxford_join
 from cl.people_db.models import GRANULARITY_DAY, GRANULARITY_MONTH, \
     GRANULARITY_YEAR
+
+
+class TestTextFilters(TestCase):
+
+    def test_oxford_zero_items(self):
+        self.assertEqual(oxford_join([]), '')
+
+    def test_oxford_one_item(self):
+        self.assertEqual(oxford_join(['a']), 'a')
+
+    def test_oxford_two_items(self):
+        self.assertEqual(oxford_join(['a', 'b']), 'a and b')
+
+    def test_oxford_three_items(self):
+        self.assertEqual(oxford_join(['a', 'b', 'c']), 'a, b, and c')
+
+    def test_oxford_separator(self):
+        self.assertEqual(oxford_join(['a', 'b', 'c'], separator=';'),
+                         'a; b; and c')
+
+    def test_oxford_conjunction(self):
+        self.assertEqual(oxford_join(['a', 'b', 'c'], conjunction='or'),
+                         'a, b, or c')
 
 
 class TestNaturalDuration(TestCase):

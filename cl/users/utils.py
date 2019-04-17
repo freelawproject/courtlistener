@@ -1,3 +1,4 @@
+# coding=utf-8
 import hashlib
 
 from django.conf import settings
@@ -74,6 +75,17 @@ emails = {
         'from': settings.DEFAULT_FROM_EMAIL,
         'to': [a[1] for a in settings.ADMINS]
     },
+    'take_out_requested': {
+        'subject': "User wants their data. Need to send it to them.",
+        'body': "A user has requested their data in accordance with GDPR. "
+                "This means that if they're a EU citizen, you have to provide "
+                "them with their data. Their username and email are:\n\n"
+                " - %s\n"
+                " - %s\n\n"
+                "Good luck getting this taken care of.",
+        'from': settings.DEFAULT_FROM_EMAIL,
+        'to': [a[1] for a in settings.ADMINS],
+    },
     'email_changed_successfully': {
         'subject': 'Email changed successfully on CourtListener',
         'body': "Hello %s,\n\n"
@@ -90,12 +102,18 @@ emails = {
     },
     'confirm_your_new_account': {
         'subject': 'Confirm your account on CourtListener.com',
-        'body': "Hello, %s, and thanks for signing up for an account!\n\n"
+        'body': "Hello, %s, and thanks for signing up for an account on "
+                "CourtListener.com.\n\n"
                 "To send you emails, we need you to activate your account with "
                 "CourtListener. To activate your account, click this link "
                 "within five days:\n\n"
-                "https://www.courtlistener.com/email/confirm/%s\n\n"
-                "Thanks for using our site,\n\n"
+                "    https://www.courtlistener.com/email/confirm/%s\n\n"
+                "We're always adding features and listening to your requests. "
+                "To join the conversation:\n\n"
+                " - Sign up for the Free Law Project newsletter: https://free.law/newsletter/\n"
+                " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject or https://twitter.com/courtlistener\n"
+                " - Check our blog for the latest news and updates: https://free.law/\n\n"
+                "Thanks for using CourtListener and joining our community,\n\n"
                 "The CourtListener Team\n\n"
                 "-------------------\n"
                 "For questions or comments, please see our contact page, "
@@ -117,6 +135,37 @@ emails = {
                 "For questions or comments, please visit our contact page, "
                 "https://www.courtlistener.com/contact/\n"
                 "We're always happy to hear from you.",
+        'from': settings.DEFAULT_FROM_EMAIL,
+    },
+    # Used both when people want to confirm an email address and when they
+    # want to reset their password, with one small tweak in the wording.
+    'no_account_found': {
+        'subject': 'Password reset and username information on '
+                   'CourtListener.com',
+        'body': u'Hello,\n\n'
+                u''
+                u'Somebody — probably you — has asked that we send %s '
+                u'instructions to this address. If this was you, '
+                u'we regret to inform you that we do not have an account with '
+                u'this email address. This sometimes happens when people '
+                u'have have typos in their email address when they sign up.\n\n'
+                u''
+                u'If you think that may have happened to you, the solution is '
+                u'to simply create a new account using your email address:\n\n'
+                u''
+                u' - https://www.courtlistener.com%s\n\n'
+                u''
+                u'That usually will fix the problem.\n\n'
+                u''
+                u'If this was not you, you can ignore this email.\n\n'
+                u''
+                u'Thanks for using our site,\n\n'
+                u''
+                u'The CourtListener Team\n\n'
+                u'-------\n'
+                u'For questions or comments, please visit our contact page, '
+                u'https://www.courtlistener.com/contact/\n'
+                u'We\'re always happy to hear from you.',
         'from': settings.DEFAULT_FROM_EMAIL,
     },
     'email_not_confirmed': {

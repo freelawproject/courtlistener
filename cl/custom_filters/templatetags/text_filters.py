@@ -2,10 +2,52 @@ import re
 
 from django.template import Library
 from django.template.defaultfilters import stringfilter
+from django.utils.encoding import force_text
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 
 register = Library()
+
+
+@register.filter(is_safe=True, needs_autoescape=True)
+def oxford_join(items, conjunction="and", separator=',', autoescape=True):
+    """Join together items in a human-readable list
+
+    Also works for django querysets due to not using negative indexing.
+
+    :param items: The list to be joined together.
+    :param conjunction: The word to join the items together with (typically
+    'and', but can be swapped for another word like 'but', or 'or'.
+    :param separator: The separator between the items. Typically a comma.
+    :returns s: A string with the items in the list joined together.
+    """
+    items = map(force_text, items)
+    if autoescape:
+        items = map(conditional_escape, items)
+
+    num_items = len(items)
+    if num_items == 0:
+        s = ''
+    elif num_items == 1:
+        s = items[0]
+    elif num_items == 2:
+        s = '%s %s %s' % (items[0], conjunction, items[1])
+    elif num_items > 2:
+        # Don't use negative indexing here, even though they'd make this
+        # easier. Instead use enumeration to figure out when we're close to the
+        # end of the list.
+        for i, item in enumerate(items):
+            if i == 0:
+                # First item
+                s = item
+            elif i == (num_items - 1):
+                # Last item.
+                s += '%s %s %s' % (separator, conjunction, item)
+            else:
+                # Items in the middle
+                s += '%s ' % separator + item
+
+    return mark_safe(s)
 
 
 @register.filter(needs_autoescape=True)

@@ -1,5 +1,4 @@
 import argparse
-import csv
 import os
 
 from dateutil import parser
@@ -9,6 +8,8 @@ from cl.audio.models import Audio
 from cl.people_db.models import Person
 from cl.search.models import Opinion, RECAPDocument, Docket
 
+
+# Note: for files see argparse.FileType!
 
 def valid_date(s):
     try:
@@ -27,12 +28,6 @@ def valid_date_time(s):
     except ValueError:
         raise argparse.ArgumentTypeError(
             "Unable to parse date/time, %s" % s)
-
-
-def csv_list(s):
-    for row in csv.reader([s]):
-        # Just return the first row, parsed into a list.
-        return row
 
 
 def readable_dir(prospective_dir):
@@ -54,13 +49,14 @@ def valid_obj_type(s):
                                          "options are %s" % (s, VALID_OBJ_TYPES))
 
     if s == 'opinions':
-        return Opinion
+        return Opinion, s
     elif s == 'audio':
-        return Audio
-    elif s == 'people':
-        return Person
+        return Audio, s
+    elif s == 'person':
+        return Person, s
     elif s == 'recap':
-        return RECAPDocument
+        return RECAPDocument, s
     elif s == 'recap-dockets':
-        return Docket
+        # Normalize here to match values in settings.SOLR_URLS
+        return Docket, 'recap'
 

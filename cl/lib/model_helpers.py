@@ -1,10 +1,39 @@
 import contextlib
 import os
+import re
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
 
+from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
+
+
+def make_docket_number_core(docket_number):
+    """Make a core docket number from an existing docket number.
+
+    Converts docket numbers like:
+
+        2:12-cv-01032
+        12-cv-01032
+
+    Into:
+
+        1201032
+
+    :param docket_number: A docket number to condense
+    :return empty string if no change possible, or the condensed version if it
+    worked. Note that all values returned are strings. We cannot return an int
+    because that'd strip leading zeroes, which we need.
+    """
+    if docket_number is None:
+        return ''
+
+    m = re.search(r'(?:\d:)?(\d\d)-..-(\d+)', docket_number)
+    if m:
+        return m.group(1) + "{:05d}".format(int(m.group(2)))
+    else:
+        return ''
 
 
 def make_recap_path(instance, filename):
@@ -16,19 +45,29 @@ def make_recap_path(instance, filename):
     return "recap/%s" % get_valid_filename(filename)
 
 
-def make_recap_pdf_path(instance, filename):
-    """Make a path for storing the a PACER document in RECAP.
+def base_recap_path(instance, filename, base_dir):
+    """Make a filepath, accepting an extra parameter for the base directory
 
     Mirrors technique used by original RECAP server to upload PDFs to IA.
     """
     return os.path.join(
-        "recap",
+        base_dir,
         get_bucket_name(
             instance.docket_entry.docket.court_id,
             instance.docket_entry.docket.pacer_case_id,
         ),
         filename,
     )
+
+
+def make_recap_pdf_path(instance, filename):
+    """Make a path for storing the a PACER document in RECAP."""
+    return base_recap_path(instance, filename, 'recap')
+
+
+def make_recap_thumb_path(instance, filename):
+    """Make a path for storing the thumbnails for a PACER document in RECAP."""
+    return base_recap_path(instance, filename, 'recap-thumbnails')
 
 
 def make_upload_path(instance, filename):
@@ -248,6 +287,20 @@ def flatten_choices(self):
         else:
             flat.append((choice, value))
     return flat
+
+
+def choices_to_csv(obj, field_name):
+    """Produce a CSV of possible choices for a field on an object.
+
+    :param obj: The object type you want to inspect
+    :param field_name: The field on the object you want to get the choices for
+    :return s: A comma-separated list of possible values for the field
+    """
+    field = obj._meta.get_field(field_name)
+    flat_choices = flatten_choices(field)
+    # Get the second value in the choices tuple
+    choice_values = [t for s, t in flat_choices]
+    return oxford_join(choice_values, conjunction='or', separator=";")
 
 
 def disable_auto_now_fields(*models):

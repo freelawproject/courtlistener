@@ -1,16 +1,16 @@
 # coding=utf-8
 import json
 import os
-
-import mock
 from datetime import date
 
+import mock
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.urlresolvers import reverse
 from django.test import TestCase
+from juriscraper.pacer import PacerRssFeed
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -20,14 +20,16 @@ from rest_framework.status import (
 from rest_framework.test import APIClient
 
 from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
-    Attorney, Role, PartyType
-from cl.recap.models import ProcessingQueue, DOCKET, ATTACHMENT_PAGE, PDF, \
-    APPELLATE_DOCKET
-from cl.recap.tasks import process_recap_pdf, add_attorney, \
-    process_recap_docket, process_recap_attachment, add_parties_and_attorneys, \
-    update_case_names
-from cl.search.models import Docket, RECAPDocument, DocketEntry
+    Attorney, Role, PartyType, CriminalCount, CriminalComplaint
 from cl.recap.management.commands.import_idb import Command
+from cl.recap.models import ProcessingQueue, UPLOAD_TYPE
+from cl.recap.tasks import process_recap_pdf, add_attorney, \
+    process_recap_docket, process_recap_attachment, \
+    add_parties_and_attorneys, update_case_names, \
+    process_recap_appellate_docket, find_docket_object, add_docket_entries, \
+    update_docket_metadata, normalize_long_description
+from cl.search.models import Docket, RECAPDocument, DocketEntry, \
+    OriginatingCourtInformation
 
 
 @mock.patch('cl.recap.views.process_recap_upload')
@@ -47,7 +49,7 @@ class RecapUploadsTest(TestCase):
             'pacer_doc_id': 24,
             'document_number': 1,
             'filepath_local': f,
-            'upload_type': PDF,
+            'upload_type': UPLOAD_TYPE.PDF,
         }
 
     def test_uploading_a_pdf(self, mock):
@@ -68,7 +70,7 @@ class RecapUploadsTest(TestCase):
         docket due to the mock.
         """
         self.data.update({
-            'upload_type': DOCKET,
+            'upload_type': UPLOAD_TYPE.DOCKET,
             'document_number': '',
         })
         del self.data['pacer_doc_id']
@@ -84,7 +86,7 @@ class RecapUploadsTest(TestCase):
     def test_uploading_an_attachment_page(self, mock):
         """Can we upload an attachment page and have it be saved correctly?"""
         self.data.update({
-            'upload_type': ATTACHMENT_PAGE,
+            'upload_type': UPLOAD_TYPE.ATTACHMENT_PAGE,
             'document_number': '',
         })
         r = self.client.post(self.path, self.data)
@@ -102,7 +104,7 @@ class RecapUploadsTest(TestCase):
         For example, if you're uploading a Docket, you shouldn't be providing a
         document number.
         """
-        self.data['upload_type'] = DOCKET
+        self.data['upload_type'] = UPLOAD_TYPE.DOCKET
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
@@ -111,7 +113,7 @@ class RecapUploadsTest(TestCase):
         fail?
         """
         self.data.update({
-            'upload_type': APPELLATE_DOCKET,
+            'upload_type': UPLOAD_TYPE.APPELLATE_DOCKET,
         })
         del self.data['pacer_doc_id']
         del self.data['document_number']
@@ -123,7 +125,7 @@ class RecapUploadsTest(TestCase):
         fail?
         """
         self.data.update({
-            'upload_type': DOCKET,
+            'upload_type': UPLOAD_TYPE.DOCKET,
             'court': 'scotus',
         })
         del self.data['pacer_doc_id']
@@ -137,7 +139,7 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
     def test_no_numbers_in_docket_uploads_work(self, mock):
-        self.data['upload_type'] = DOCKET
+        self.data['upload_type'] = UPLOAD_TYPE.DOCKET
         del self.data['pacer_doc_id']
         del self.data['document_number']
         r = self.client.post(self.path, self.data)
@@ -207,7 +209,7 @@ class ProcessingQueueApiFilterTest(TestCase):
             'document_number': '1',
             'filepath_local': f,
             'status': ProcessingQueue.AWAITING_PROCESSING,
-            'upload_type': PDF,
+            'upload_type': UPLOAD_TYPE.PDF,
         }
 
     def test_filters(self):
@@ -215,7 +217,7 @@ class ProcessingQueueApiFilterTest(TestCase):
         # Create two PQ objects with different values.
         ProcessingQueue.objects.create(**self.params)
         self.params['status'] = ProcessingQueue.PROCESSING_FAILED
-        self.params['upload_type'] = ATTACHMENT_PAGE
+        self.params['upload_type'] = UPLOAD_TYPE.ATTACHMENT_PAGE
         ProcessingQueue.objects.create(**self.params)
 
         # Then try filtering.
@@ -233,7 +235,7 @@ class ProcessingQueueApiFilterTest(TestCase):
 
         total_pdfs = 1
         r = self.client.get(self.path, {
-            'upload_type': PDF,
+            'upload_type': UPLOAD_TYPE.PDF,
         })
         j = json.loads(r.content)
         self.assertEqual(j['count'], total_pdfs)
@@ -280,10 +282,10 @@ class DebugRecapUploadtest(TestCase):
             pacer_doc_id='asdf',
             document_number='1',
             filepath_local=self.pdf,
-            upload_type=PDF,
+            upload_type=UPLOAD_TYPE.PDF,
             debug=True,
         )
-        _ = process_recap_pdf(pq.pk)
+        process_recap_pdf(pq.pk)
         self.assertEqual(RECAPDocument.objects.count(), 0)
         mock.assert_not_called()
 
@@ -295,7 +297,7 @@ class DebugRecapUploadtest(TestCase):
             uploader=self.user,
             pacer_case_id='asdf',
             filepath_local=self.docket,
-            upload_type=DOCKET,
+            upload_type=UPLOAD_TYPE.DOCKET,
             debug=True,
         )
         process_recap_docket(pq.pk)
@@ -309,7 +311,7 @@ class DebugRecapUploadtest(TestCase):
         d = Docket.objects.create(source=0, court_id='scotus',
                                   pacer_case_id='asdf')
         de = DocketEntry.objects.create(docket=d, entry_number=1)
-        rd = RECAPDocument.objects.create(
+        RECAPDocument.objects.create(
             docket_entry=de,
             document_number='1',
             pacer_doc_id='04505578698',
@@ -318,7 +320,7 @@ class DebugRecapUploadtest(TestCase):
         pq = ProcessingQueue.objects.create(
             court_id='scotus',
             uploader=self.user,
-            upload_type=ATTACHMENT_PAGE,
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
             filepath_local=self.att,
             debug=True,
         )
@@ -344,11 +346,12 @@ class RecapPdfTaskTest(TestCase):
             pacer_doc_id='asdf',
             document_number='1',
             filepath_local=f,
-            upload_type=PDF,
+            upload_type=UPLOAD_TYPE.PDF,
         )
         self.docket = Docket.objects.create(source=0, court_id='scotus',
                                             pacer_case_id='asdf')
-        self.de = DocketEntry.objects.create(docket=self.docket, entry_number=1)
+        self.de = DocketEntry.objects.create(docket=self.docket,
+                                             entry_number=1)
         self.rd = RECAPDocument.objects.create(
             docket_entry=self.de,
             document_type=1,
@@ -386,7 +389,8 @@ class RecapPdfTaskTest(TestCase):
         # Did we update pq appropriately?
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, self.pq.PROCESSING_SUCCESSFUL)
-        self.assertEqual(self.pq.error_message, 'Successful upload! Nice work.')
+        self.assertEqual(self.pq.error_message,
+                         'Successful upload! Nice work.')
         self.assertFalse(self.pq.filepath_local)
         self.assertEqual(self.pq.docket_id, self.docket.pk)
         self.assertEqual(self.pq.docket_entry_id, self.de.pk)
@@ -425,7 +429,8 @@ class RecapPdfTaskTest(TestCase):
 
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, self.pq.PROCESSING_SUCCESSFUL)
-        self.assertEqual(self.pq.error_message, "Successful upload! Nice work.")
+        self.assertEqual(self.pq.error_message,
+                         "Successful upload! Nice work.")
         self.assertFalse(self.pq.filepath_local)
 
     def test_nothing_already_exists(self):
@@ -463,8 +468,7 @@ class RecapAddAttorneyTest(TestCase):
             "name": self.atty_name,
             "roles": [
                 {'role': Role.ATTORNEY_LEAD, 'date_action': None},
-                {'role': Role.ATTORNEY_TO_BE_NOTICED, 'date_action': None},
-            ]
+                {'role': Role.ATTORNEY_TO_BE_NOTICED, 'date_action': None}]
         }
         self.d = Docket.objects.create(source=0, court_id='scotus',
                                        pacer_case_id='asdf',
@@ -587,13 +591,14 @@ class TerminatedEntitiesTest(TestCase):
 
     There are four possibilities we need to handle properly:
 
-     1. The scraped data has terminated entities (easy: update all existing and
-        delete anything that's not touched).
-     2. The scraped data lacks terminated entities and the current data lacks
-        them too (easy: update as above).
-     3. The scraped data lacks terminated entities and the current data has them
-        (hard: update whatever is in common, keep terminated entities,
-        disassociate the rest).
+     1. The scraped data has terminated entities (easy: update all
+        existing and delete anything that's not touched).
+     2. The scraped data lacks terminated entities and the current
+        data lacks them too (easy: update as above).
+     3. The scraped data lacks terminated entities and the current
+        data has them (hard: update whatever is in common, keep
+        terminated entities, disassociate the rest).
+
     """
     def setUp(self):
         # Docket: self.d has...
@@ -620,10 +625,12 @@ class TerminatedEntitiesTest(TestCase):
                                  name="special intervenor")
         self.extraneous_a = Attorney.objects.create(name="Matthew Lesko")
         Role.objects.create(docket=self.d, party=self.extraneous_p,
-                            attorney=self.extraneous_a, role=Role.ATTORNEY_LEAD)
+                            attorney=self.extraneous_a,
+                            role=Role.ATTORNEY_LEAD)
 
         # Extraneous attorney on a valid party. Should always be disassociated.
-        self.extraneous_a2 = Attorney.objects.create(name="Mathew Lesko")  # Typo
+        # Typo:
+        self.extraneous_a2 = Attorney.objects.create(name="Mathew Lesko")
         Role.objects.create(docket=self.d, party=self.p,
                             attorney=self.extraneous_a2,
                             role=Role.ATTORNEY_TO_BE_NOTICED)
@@ -655,8 +662,8 @@ class TerminatedEntitiesTest(TestCase):
         entities?
         """
         add_parties_and_attorneys(self.d, self.new_party_data)
-        # Docket should have two parties, Powell and McCarthy. This implies that
-        # extraneous_p has been removed.
+        # Docket should have two parties, Powell and McCarthy. This
+        # implies that extraneous_p has been removed.
         self.assertEqual(self.d.parties.count(), 2)
 
         # Powell has an attorney. The rest are extraneous or don't have attys.
@@ -670,8 +677,8 @@ class TerminatedEntitiesTest(TestCase):
         self.new_mccarthy_data['date_terminated'] = None
         add_parties_and_attorneys(self.d, self.new_party_data)
 
-        # Docket should have two parties, Powell and McCarthy. This implies that
-        # extraneous_p has been removed.
+        # Docket should have two parties, Powell and McCarthy. This
+        # implies that extraneous_p has been removed.
         self.assertEqual(self.d.parties.count(), 2)
 
         # Powell has an attorney. The rest are extraneous or don't have attys.
@@ -688,7 +695,8 @@ class TerminatedEntitiesTest(TestCase):
         # Add terminated attorney that's not in the new data.
         term_a = Attorney.objects.create(name="Robert Mueller")
         Role.objects.create(docket=self.d, attorney=term_a, party=self.p,
-                            role=Role.TERMINATED, date_action=date(2018, 3, 16))
+                            role=Role.TERMINATED,
+                            date_action=date(2018, 3, 16))
 
         # Add a terminated party that's not in the new data.
         term_p = Party.objects.create(name='Zainab Ahmad')
@@ -711,12 +719,191 @@ class TerminatedEntitiesTest(TestCase):
         self.assertEqual(role_count, 2)
 
 
+class RecapMinuteEntriesTest(TestCase):
+    """Can we ingest minute and numberless entries properly?"""
+
+    @staticmethod
+    def make_path(filename):
+        return os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                            'test_assets', filename)
+
+    def make_pq(self, filename='azd.html', upload_type=UPLOAD_TYPE.DOCKET):
+        """Make a simple pq object for processing"""
+        path = self.make_path(filename)
+        with open(path, 'r') as f:
+            f = SimpleUploadedFile(filename, f.read())
+        return ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=self.user,
+            pacer_case_id='asdf',
+            filepath_local=f,
+            upload_type=upload_type,
+        )
+
+    def setUp(self):
+        self.user = User.objects.get(username='recap')
+
+    def tearDown(self):
+        pqs = ProcessingQueue.objects.all()
+        for pq in pqs:
+            pq.filepath_local.delete()
+            pq.delete()
+        Docket.objects.all().delete()
+
+    def test_all_entries_ingested_without_duplicates(self):
+        """Are all of the docket entries ingested?"""
+        expected_entry_count = 23
+
+        pq = self.make_pq()
+        returned_data = process_recap_docket(pq.pk)
+        d1 = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d1.docket_entries.count(), expected_entry_count)
+
+        pq = self.make_pq()
+        returned_data = process_recap_docket(pq.pk)
+        d2 = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d1.pk, d2.pk)
+        self.assertEqual(d2.docket_entries.count(), expected_entry_count)
+
+    def test_multiple_numberless_entries_multiple_times(self):
+        """Do we get the right number of entries when we add multiple
+        numberless entries multiple times?
+        """
+        expected_entry_count = 25
+        pq = self.make_pq('azd_multiple_unnumbered.html')
+        returned_data = process_recap_docket(pq.pk)
+        d1 = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d1.docket_entries.count(), expected_entry_count)
+
+        pq = self.make_pq('azd_multiple_unnumbered.html')
+        returned_data = process_recap_docket(pq.pk)
+        d2 = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d1.pk, d2.pk)
+        self.assertEqual(d2.docket_entries.count(), expected_entry_count)
+
+    def test_appellate_cases_ok(self):
+        """Do appellate cases get ordered/handled properly?"""
+        expected_entry_count = 16
+        pq = self.make_pq('ca1.html',
+                          upload_type=UPLOAD_TYPE.APPELLATE_DOCKET)
+        returned_data = process_recap_appellate_docket(pq.pk)
+        d1 = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d1.docket_entries.count(), expected_entry_count)
+
+    def test_rss_feed_ingestion(self):
+        """Can we ingest RSS feeds without creating duplicates?"""
+        court_id = 'scotus'
+        rss_feed = PacerRssFeed(court_id)
+        rss_feed.is_bankruptcy = True  # Needed because we say SCOTUS above.
+        with open(self.make_path('rss_sample_unnumbered_mdb.xml')) as f:
+            text = f.read().decode('utf-8')
+        rss_feed._parse_text(text)
+        docket = rss_feed.data[0]
+        d, docket_count = find_docket_object(
+            court_id, docket['pacer_case_id'], docket['docket_number'])
+        update_docket_metadata(d, docket)
+        d.save()
+        self.assertTrue(docket_count == 0)
+
+        expected_count = 1
+        add_docket_entries(d, docket['docket_entries'])
+        self.assertEqual(d.docket_entries.count(), expected_count)
+        add_docket_entries(d, docket['docket_entries'])
+        self.assertEqual(d.docket_entries.count(), expected_count)
+
+    def test_dhr_merges_separate_docket_entries(self):
+        """Does the docket history report merge separate minute entries if
+        one entry has a short description, and the other has a long
+        description?
+        """
+        # Create two unnumbered docket entries, one with a short description
+        # and one with a long description. Then see what happens when you try
+        # to add a DHR result (it should merge them).
+        short_desc = 'Entry one short description'
+        long_desc = 'Entry one long desc'
+        date_filed = date(2014, 11, 16)
+        d = Docket.objects.create(source=0, court_id='scotus')
+        de1 = DocketEntry.objects.create(
+            docket=d, entry_number=None, description=long_desc,
+            date_filed=date_filed)
+        RECAPDocument.objects.create(
+            docket_entry=de1,
+            document_number='',
+            description='',
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        de2 = DocketEntry.objects.create(
+            docket=d, entry_number=None, description='', date_filed=date_filed)
+        RECAPDocument.objects.create(
+            docket_entry=de2,
+            document_number='',
+            description=short_desc,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        # Add a docket entry that spans the two above. Same date, same short
+        # and long description. This should trigger a merge.
+        add_docket_entries(d, [{
+            "date_filed": date_filed,
+            "description": long_desc,
+            "document_number": None,
+            "pacer_doc_id": None,
+            "pacer_seq_no": None,
+            "short_description": short_desc,
+        }])
+        expected_item_count = 1
+        self.assertEqual(d.docket_entries.count(), expected_item_count)
+
+
+class DescriptionCleanupTest(TestCase):
+
+    def test_has_entered_date_at_end(self):
+        desc = 'test (Entered: 01/01/2000)'
+        docket_entry = {'description': desc}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'], 'test')
+
+    def test_has_entered_date_in_middle(self):
+        desc = 'test (Entered: 01/01/2000) test'
+        docket_entry = {'description': desc}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'], desc)
+
+    def test_has_entered_date_in_middle_and_end(self):
+        desc = 'test (Entered: 01/01/2000) and stuff (Entered: 01/01/2000)'
+        docket_entry = {'description': desc}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'],
+                         'test (Entered: 01/01/2000) and stuff')
+
+    def test_has_no_entered_date(self):
+        desc = 'test stuff'
+        docket_entry = {'description': 'test stuff'}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'], desc)
+
+    def test_no_description(self):
+        docket_entry = {}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry, {})
+
+    def test_removing_brackets(self):
+        docket_entry = {'description': 'test [10] stuff'}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'], 'test 10 stuff')
+
+    def test_only_remove_brackets_on_numbers(self):
+        desc = 'test [asdf 10] stuff'
+        docket_entry = {'description': desc}
+        normalize_long_description(docket_entry)
+        self.assertEqual(docket_entry['description'], desc)
+
+
 class RecapDocketTaskTest(TestCase):
     def setUp(self):
         self.user = User.objects.get(username='recap')
         self.filename = 'cand.html'
-        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets',
-                            self.filename)
+        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                            'test_assets', self.filename)
         with open(path, 'r') as f:
             f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
@@ -724,7 +911,7 @@ class RecapDocketTaskTest(TestCase):
             uploader=self.user,
             pacer_case_id='asdf',
             filepath_local=f,
-            upload_type=DOCKET,
+            upload_type=UPLOAD_TYPE.DOCKET,
         )
 
     def tearDown(self):
@@ -796,7 +983,7 @@ class RecapDocketTaskTest(TestCase):
                 'file.pdf',
                 b"file content more content",
             ),
-            upload_type=PDF,
+            upload_type=UPLOAD_TYPE.PDF,
             status=ProcessingQueue.PROCESSING_FAILED,
         )
         process_recap_docket(self.pq.pk)
@@ -804,12 +991,91 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(pq.status, pq.PROCESSING_SUCCESSFUL)
 
 
+class RecapDocketAppellateTaskTest(TestCase):
+    fixtures = ['hawaii_court.json']
+
+    def setUp(self):
+        self.user = User.objects.get(username='recap')
+        self.filename = 'ca9.html'
+        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                            'test_assets', self.filename)
+        with open(path, 'r') as f:
+            f = SimpleUploadedFile(self.filename, f.read())
+        self.pq = ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=self.user,
+            pacer_case_id='asdf',
+            filepath_local=f,
+            upload_type=UPLOAD_TYPE.APPELLATE_DOCKET,
+        )
+
+    def tearDown(self):
+        self.pq.filepath_local.delete()
+        self.pq.delete()
+        Docket.objects.all().delete()
+        OriginatingCourtInformation.objects.all().delete()
+
+    def test_parsing_appellate_docket(self):
+        """Can we parse an HTML docket we have never seen before?"""
+        returned_data = process_recap_appellate_docket(self.pq.pk)
+        d = Docket.objects.get(pk=returned_data['docket_pk'])
+        self.assertEqual(d.source, Docket.RECAP)
+        self.assertTrue(d.case_name)
+        self.assertEqual(d.appeal_from_id, 'hid')
+        self.assertIn('Hawaii', d.appeal_from_str)
+
+        # Test the originating court information
+        og_info = d.originating_court_information
+        self.assertTrue(og_info)
+        self.assertIn('Gloria', og_info.court_reporter)
+        self.assertEqual(og_info.date_judgment, date(2017, 3, 29))
+        self.assertEqual(og_info.docket_number, u'1:17-cv-00050')
+
+
+class RecapCriminalDataUploadTaskTest(TestCase):
+    """Can we handle it properly when criminal data is uploaded as part of
+    a docket?
+    """
+    def setUp(self):
+        self.user = User.objects.get(username='recap')
+        self.filename = 'cand_criminal.html'
+        path = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                            'test_assets', self.filename)
+        with open(path, 'r') as f:
+            f = SimpleUploadedFile(self.filename, f.read())
+        self.pq = ProcessingQueue.objects.create(
+            court_id='scotus',
+            uploader=self.user,
+            pacer_case_id='asdf',
+            filepath_local=f,
+            upload_type=UPLOAD_TYPE.DOCKET,
+        )
+
+    def tearDown(self):
+        self.pq.filepath_local.delete()
+        self.pq.delete()
+        Docket.objects.all().delete()
+
+    def test_criminal_data_gets_created(self):
+        """Does the criminal data appear in the DB properly when we process
+        the docket?
+        """
+        process_recap_docket(self.pq.pk)
+        expected_criminal_count_count = 1
+        self.assertEqual(expected_criminal_count_count,
+                         CriminalCount.objects.count())
+        expected_criminal_complaint_count = 1
+        self.assertEqual(expected_criminal_complaint_count,
+                         CriminalComplaint.objects.count())
+
+
 @mock.patch('cl.recap.tasks.add_or_update_recap_document')
 class RecapAttachmentPageTaskTest(TestCase):
     def setUp(self):
         user = User.objects.get(username='recap')
         self.filename = 'cand.html'
-        test_dir = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap', 'test_assets')
+        test_dir = os.path.join(settings.INSTALL_ROOT, 'cl', 'recap',
+                                'test_assets')
         self.att_filename = 'dcd_04505578698.html'
         att_path = os.path.join(test_dir, self.att_filename)
         with open(att_path, 'r') as f:
@@ -817,7 +1083,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         d = Docket.objects.create(source=0, court_id='scotus',
                                   pacer_case_id='asdf')
         de = DocketEntry.objects.create(docket=d, entry_number=1)
-        rd = RECAPDocument.objects.create(
+        RECAPDocument.objects.create(
             docket_entry=de,
             document_number='1',
             pacer_doc_id='04505578698',
@@ -826,7 +1092,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         self.pq = ProcessingQueue.objects.create(
             court_id='scotus',
             uploader=user,
-            upload_type=ATTACHMENT_PAGE,
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
             filepath_local=self.att,
         )
 
@@ -836,7 +1102,8 @@ class RecapAttachmentPageTaskTest(TestCase):
         ).delete()
 
     def test_attachments_get_created(self, mock):
-        """Do attachments get created if we have a RECAPDocument to match on?"""
+        """Do attachments get created if we have a RECAPDocument to match
+        on?"""
         process_recap_attachment(self.pq.pk)
         num_attachments_to_create = 3
         self.assertEqual(
@@ -889,16 +1156,26 @@ class IdbImportTest(TestCase):
     cmd = Command()
 
     def test_csv_parsing(self):
+        # https://www.ietf.org/rfc/rfc4180.txt
         qa = (
-            ('asdf\tasdf', {'1': 'asdf', '2': 'asdf'}),
-            ('asdf\t"toyrus"\tasdf', {'1': 'asdf', '2': '"toyrus"',
-                                      '3': 'asdf'}),
-            ('asdf\t"\ttoyrus"\tasdf', {'1': 'asdf', '2': 'toyrus',
-                                        '3': 'asdf'}),
+            # Satisfies RFC 4180 rules 1 & 2 (simple values)
+            ('asdf\tasdf',
+             {'1': 'asdf', '2': 'asdf'}),
+            # RFC 4180 rule 5 (quotes around value)
+            ('asdf\t"toyrus"\tasdf',
+             {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
+            # RFC 4180 rule 6 (tab in the value)
+            ('asdf\t"\ttoyrus"\tasdf',
+             {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
+            # More tabs in the value.
             ('asdf\t"\tto\tyrus"\tasdf',
              {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
+            # MOAR tabs in the value.
             ('asdf\t"\tto\tyrus\t"\tasdf',
              {'1': 'asdf', '2': 'toyrus', '3': 'asdf'}),
+            # RFC 4180 rule 7 (double quotes in the value)
+            ('asdf\t"M/V ""Pheonix"""\tasdf',
+             {'1': 'asdf', '2': 'M/V "Pheonix"', '3': 'asdf'})
         )
         for qa in qa:
             print("Testing CSV parser on: %s" % qa[0])
@@ -906,4 +1183,3 @@ class IdbImportTest(TestCase):
                 self.cmd.make_csv_row_dict(qa[0], ['1', '2', '3']),
                 qa[1],
             )
-

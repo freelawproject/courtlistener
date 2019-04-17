@@ -2,9 +2,8 @@
 from __future__ import print_function
 
 import datetime
-import re
-
 import os
+import re
 import tempfile
 
 from django.core.files.base import ContentFile
@@ -14,16 +13,37 @@ from django.test import override_settings
 from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
 
 from cl.lib.db_tools import queryset_generator
+from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
-from cl.lib.model_helpers import make_upload_path
-from cl.lib.pacer import normalize_attorney_role, normalize_attorney_contact,\
-    normalize_us_state, make_address_lookup_key
+from cl.lib.model_helpers import make_upload_path, make_docket_number_core
+from cl.lib.pacer import normalize_attorney_role, normalize_attorney_contact, \
+    normalize_us_state, make_address_lookup_key, get_blocked_status
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import UUIDFileSystemStorage
-from cl.lib.string_utils import trunc
+from cl.lib.string_utils import trunc, anonymize
 from cl.people_db.models import Role
 from cl.scrapers.models import UrlHash
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
+
+
+class TestPacerUtils(TestCase):
+    fixtures = ['court_data.json']
+
+    def test_auto_blocking_small_bankr_docket(self):
+        """Do we properly set small bankruptcy dockets to private?"""
+        d = Docket()
+        d.court = Court.objects.get(pk='akb')
+        blocked, date_blocked = get_blocked_status(d)
+        self.assertTrue(blocked, msg="Bankruptcy dockets with few entries "
+                                     "should be blocked.")
+        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        self.assertFalse(blocked, msg="Bankruptcy dockets with many entries "
+                                      "should not be blocked")
+        # This should stay blocked even though it's a big bankruptcy docket.
+        d.blocked = True
+        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        self.assertTrue(blocked, msg="Bankruptcy dockets that start blocked "
+                                     "should stay blocked.")
 
 
 class TestDBTools(TestCase):
@@ -122,6 +142,38 @@ class TestStringUtils(TestCase):
                     (test_dict, result, test_dict['length'])
             )
 
+    def test_anonymize(self):
+        """Can we properly anonymize SSNs, EINs, and A-Numbers?"""
+        # Simple cases. Anonymize them.
+        self.assertEqual(anonymize('111-11-1111'), ('XXX-XX-XXXX', True))
+        self.assertEqual(anonymize('11-1111111'), ('XX-XXXXXXX', True))
+        self.assertEqual(anonymize('A11111111'), ('AXXXXXXXX', True))
+        self.assertEqual(anonymize('A111111111'), ('AXXXXXXXX', True))
+
+        # Starting or ending with letters isn't an SSN
+        self.assertEqual(anonymize('A111-11-1111'), ('A111-11-1111', False))
+        self.assertEqual(anonymize('111-11-1111A'), ('111-11-1111A', False))
+
+        # Matches in a sentence
+        self.assertEqual(
+            anonymize('Term 111-11-1111 Term'),
+            ('Term XXX-XX-XXXX Term', True),
+        )
+        self.assertEqual(
+            anonymize('Term 11-1111111 Term'),
+            ('Term XX-XXXXXXX Term', True),
+        )
+        self.assertEqual(
+            anonymize('Term A11111111 Term'),
+            ('Term AXXXXXXXX Term', True),
+        )
+
+        # Multiple matches
+        self.assertEqual(
+            anonymize("Term 111-11-1111 Term 111-11-1111 Term"),
+            ('Term XXX-XX-XXXX Term XXX-XX-XXXX Term', True),
+        )
+
 
 class TestMakeFQ(TestCase):
     def test_make_fq(self):
@@ -165,6 +217,26 @@ class TestModelHelpers(TestCase):
         self.opinion.file_with_date = datetime.date(2015, 12, 14)
         path = make_upload_path(self.opinion, 'hotline_bling.mp3')
         self.assertEqual(expected, path)
+
+    def test_making_docket_number_core(self):
+        expected = '1201032'
+        self.assertEqual(make_docket_number_core('2:12-cv-01032-JKG-MJL'),
+                         expected)
+        self.assertEqual(make_docket_number_core('12-cv-01032-JKG-MJL'),
+                         expected)
+        self.assertEqual(make_docket_number_core('2:12-cv-01032'),
+                         expected)
+        self.assertEqual(make_docket_number_core('12-cv-01032'),
+                         expected)
+
+        # Do we automatically zero-pad short docket numbers?
+        self.assertEqual(make_docket_number_core('12-cv-1032'),
+                         expected)
+        # Do we skip appellate courts?
+        self.assertEqual(make_docket_number_core('12-01032'), '')
+        # docket_number fields can be null. If so, the core value should be
+        # an empty string.
+        self.assertEqual(make_docket_number_core(None), '')
 
 
 class UUIDFileSystemStorageTest(SimpleTestCase):
@@ -250,41 +322,65 @@ class TestPACERPartyParsing(TestCase):
         """Can we normalize the attorney roles into a small number of roles?"""
         pairs = [{
             'q': '(Inactive)',
-            'a': {'role': Role.INACTIVE, 'date_action': None},
+            'a': {'role': Role.INACTIVE,
+                  'date_action': None,
+                  'role_raw': '(Inactive)'},
         }, {
             'q': 'ATTORNEY IN SEALED GROUP',
-            'a': {'role': Role.ATTORNEY_IN_SEALED_GROUP, 'date_action': None},
+            'a': {'role': Role.ATTORNEY_IN_SEALED_GROUP,
+                  'date_action': None,
+                  'role_raw': 'ATTORNEY IN SEALED GROUP'},
         }, {
             'q': 'ATTORNEY TO BE NOTICED',
-            'a': {'role': Role.ATTORNEY_TO_BE_NOTICED, 'date_action': None},
+            'a': {'role': Role.ATTORNEY_TO_BE_NOTICED,
+                  'date_action': None,
+                  'role_raw': 'ATTORNEY TO BE NOTICED'},
         }, {
             'q': 'Bar Status: ACTIVE',
-            'a': {'role': None, 'date_action': None},
+            'a': {'role': None,
+                  'date_action': None,
+                  'role_raw': 'Bar Status: ACTIVE'},
         }, {
             'q': 'DISBARRED 02/19/2010',
             'a': {'role': Role.DISBARRED,
-                  'date_action': datetime.date(2010, 2, 19)},
+                  'date_action': datetime.date(2010, 2, 19),
+                  'role_raw': 'DISBARRED 02/19/2010'},
         }, {
             'q': 'Designation: ADR Pro Bono Limited Scope Counsel',
-            'a': {'role': None, 'date_action': None},
+            'a': {'role': None,
+                  'date_action': None,
+                  'role_raw': 'Designation: ADR Pro Bono Limited Scope '
+                              'Counsel'},
         }, {
             'q': 'LEAD ATTORNEY',
-            'a': {'role': Role.ATTORNEY_LEAD, 'date_action': None},
+            'a': {'role': Role.ATTORNEY_LEAD,
+                  'date_action': None,
+                  'role_raw': 'LEAD ATTORNEY'},
         }, {
             'q': 'PRO HAC VICE',
-            'a': {'role': Role.PRO_HAC_VICE, 'date_action': None},
+            'a': {'role': Role.PRO_HAC_VICE,
+                  'date_action': None,
+                  'role_raw': 'PRO HAC VICE'},
         }, {
             'q': 'SELF- TERMINATED: 01/14/2013',
             'a': {'role': Role.SELF_TERMINATED,
-                  'date_action': datetime.date(2013, 1, 14)},
+                  'date_action': datetime.date(2013, 1, 14),
+                  'role_raw': 'SELF- TERMINATED: 01/14/2013'},
         }, {
             'q': 'SUSPENDED 01/22/2016',
             'a': {'role': Role.SUSPENDED,
-                  'date_action': datetime.date(2016, 1, 22)},
+                  'date_action': datetime.date(2016, 1, 22),
+                  'role_raw': 'SUSPENDED 01/22/2016'},
         }, {
             'q': 'TERMINATED: 01/01/2007',
             'a': {'role': Role.TERMINATED,
-                  'date_action': datetime.date(2007, 1, 1)},
+                  'date_action': datetime.date(2007, 1, 1),
+                  'role_raw': 'TERMINATED: 01/01/2007'},
+        }, {
+            'q': 'Blagger jabber',
+            'a': {'role': None,
+                  'date_action': None,
+                  'role_raw': 'Blagger jabber'},
         }]
         for pair in pairs:
             print("Normalizing PACER role of '%s' to '%s'..." %
@@ -292,8 +388,6 @@ class TestPACERPartyParsing(TestCase):
             result = normalize_attorney_role(pair['q'])
             self.assertEqual(result, pair['a'])
             print('✓')
-        with self.assertRaises(ValueError):
-            normalize_attorney_role('this is an unknown role')
 
     def test_state_normalization(self):
         pairs = [{
@@ -590,3 +684,30 @@ class TestPACERPartyParsing(TestCase):
             }),
             'officeoflissnerstrooklevin',
         )
+
+
+class TestFilesizeConversions(TestCase):
+
+    def test_filesize_conversions(self):
+        """Can we convert human filesizes to bytes?"""
+        qa_pairs = [
+            ('58 kb', 59392),
+            ('117 kb', 119808),
+            ('117kb', 119808),
+            ('1 byte', 1),
+            ('117 bytes', 117),
+            ('117  bytes', 117),
+            ('  117 bytes  ', 117),
+            ('117b', 117),
+            ('117bytes', 117),
+            ('1 kilobyte', 1024),
+            ('117 kilobytes', 119808),
+            ('0.7 mb', 734003),
+            ('1mb', 1048576),
+            ('5.2 mb', 5452595),
+        ]
+        for qa in qa_pairs:
+            print("Converting '%s' to bytes..." % qa[0], end='')
+            self.assertEqual(convert_size_to_bytes(qa[0]), qa[1])
+            print('✓')
+

@@ -1,8 +1,9 @@
 import json
+import logging
+import os
 from collections import OrderedDict, defaultdict
 from datetime import date
 
-import os
 import redis
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
@@ -10,8 +11,11 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.mail import send_mail
+from django.utils.decorators import method_decorator
 from django.utils.encoding import force_text
 from django.utils.timezone import now
+from django.views.decorators.cache import cache_page
+from django.views.decorators.vary import vary_on_headers
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.pagination import PageNumberPagination
@@ -32,6 +36,8 @@ INTEGER_LOOKUPS = ['exact', 'gte', 'gt', 'lte', 'lt', 'range']
 BASIC_TEXT_LOOKUPS = ['exact', 'iexact', 'startswith', 'istartswith',
                       'endswith', 'iendswith']
 ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ['contains', 'icontains']
+
+logger = logging.getLogger(__name__)
 
 
 class HyperlinkedModelSerializerWithId(serializers.HyperlinkedModelSerializer):
@@ -128,10 +134,14 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         return actions
 
 
+SEND_API_WELCOME_EMAIL_COUNT = 5
+
+
 class LoggingMixin(object):
     """Log requests to Redis
 
-    This draws inspiration from the code that can be found at: https://github.com/aschn/drf-tracking/blob/master/rest_framework_tracking/mixins.py
+    This draws inspiration from the code that can be found at:
+      https://github.com/aschn/drf-tracking/blob/master/rest_framework_tracking/mixins.py
 
     The big distinctions, however, are that this code uses Redis for greater
     speed, and that it logs significantly less information.
@@ -147,9 +157,39 @@ class LoggingMixin(object):
     def initial(self, request, *args, **kwargs):
         super(LoggingMixin, self).initial(request, *args, **kwargs)
 
+        # For logging the timing in self.finalize_response
+        self.requested_at = now()
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super(LoggingMixin, self).finalize_response(
+            request, response, *args, **kwargs)
+
+        if not response.exception:
+            # Don't log things like 401, 403, etc.,
+            # noinspection PyBroadException
+            try:
+                results = self._log_request(request)
+                self._handle_events(results, request.user)
+            except Exception as e:
+                logger.exception("Unable to log API response timing info: %s",
+                                 e.message)
+        return response
+
+    def _get_response_ms(self):
+        """
+        Get the duration of the request response cycle in milliseconds.
+        In case of negative duration 0 is returned.
+        """
+        response_timedelta = now() - self.requested_at
+        response_ms = int(response_timedelta.total_seconds() * 1000)
+
+        return max(response_ms, 0)
+
+    def _log_request(self, request):
         d = date.today().isoformat()
         user = request.user
         endpoint = request.resolver_match.url_name
+        response_ms = self._get_response_ms()
 
         r = redis.StrictRedis(
             host=settings.REDIS_HOST,
@@ -161,6 +201,8 @@ class LoggingMixin(object):
         # Global and daily tallies for all URLs.
         pipe.incr('api:v3.count')
         pipe.incr('api:v3.d:%s.count' % d)
+        pipe.incr('api:v3.timing', response_ms)
+        pipe.incr('api:v3.d:%s.timing' % d, response_ms)
 
         # Use a sorted set to store the user stats, with the score representing
         # the number of queries the user made total or on a given day.
@@ -172,9 +214,19 @@ class LoggingMixin(object):
         pipe.zincrby('api:v3.endpoint.counts', endpoint)
         pipe.zincrby('api:v3.endpoint.d:%s.counts' % d, endpoint)
 
+        # We create a per-day key in redis for timings. Inside the key we have
+        # members for every endpoint, with score of the total time. So to get
+        # the average for an endpoint you need to get the number of requests
+        # and the total time for the endpoint and divide.
+        timing_key = 'api:v3.endpoint.d:%s.timings' % d
+        pipe.zincrby(timing_key, endpoint, response_ms)
+
         results = pipe.execute()
+        return results
+
+    def _handle_events(self, results, user):
         total_count = results[0]
-        user_count = results[2]
+        user_count = results[4]
 
         if total_count in MILESTONES_FLAT:
             Event.objects.create(description="API has logged %s total requests."
@@ -186,7 +238,7 @@ class LoggingMixin(object):
                                 (user.username, intcomma(ordinal(user_count))),
                     user=user,
                 )
-            if user_count == 5:
+            if user_count == SEND_API_WELCOME_EMAIL_COUNT:
                 email = emails['new_api_user']
                 send_mail(
                     email['subject'],
@@ -194,6 +246,16 @@ class LoggingMixin(object):
                     email['from'],
                     [user.email],
                 )
+
+
+class CacheListMixin(object):
+    """Cache listed results"""
+
+    @method_decorator(cache_page(60))
+    # Ensure that permissions are maintained and not cached!
+    @method_decorator(vary_on_headers('Cookie', 'Authorization'))
+    def list(self, *args, **kwargs):
+        return super(CacheListMixin, self).list(*args, **kwargs)
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):
@@ -282,8 +344,7 @@ class BulkJsonHistory(object):
 
     def __init__(self, obj_type_str, bulk_dir):
         self.obj_type_str = obj_type_str
-        self.path = os.path.join(bulk_dir, 'tmp', obj_type_str,
-                                 'info.json')
+        self.path = os.path.join(bulk_dir, obj_type_str, 'info.json')
         self.json = self.load_json_file()
         super(BulkJsonHistory, self).__init__()
 
@@ -416,6 +477,29 @@ def invert_user_logs(start, end):
             out[user.username] = v
 
     return out
+
+
+def get_avg_ms_for_endpoint(endpoint, d):
+    """
+
+    :param endpoint: The endpoint to get the average timing for. Typically
+    something like 'docket-list' or 'docket-detail'
+    :param d: The date to get the timing for (a date object)
+    :return: The average number of ms that endpoint used to serve requests on
+    that day.
+    """
+    d_str = d.isoformat()
+    r = redis.StrictRedis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        db=settings.REDIS_DATABASES['STATS'],
+    )
+    pipe = r.pipeline()
+    pipe.zscore('api:v3.endpoint.d:%s.timings' % d_str, endpoint)
+    pipe.zscore('api:v3.endpoint.d:%s.counts' % d_str, endpoint)
+    results = pipe.execute()
+
+    return results[0] / results[1]
 
 
 emails = {

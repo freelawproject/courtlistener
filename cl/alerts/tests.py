@@ -1,9 +1,13 @@
 from django.contrib.auth.models import User
+from django.core import mail
 from django.core.urlresolvers import reverse
 from django.test import Client, TestCase
+from django.utils.timezone import now
 from timeout_decorator import timeout_decorator
 
-from cl.alerts.models import Alert
+from cl.alerts.models import Alert, DocketAlert
+from cl.alerts.tasks import send_docket_alert
+from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
 
@@ -18,6 +22,10 @@ class AlertTest(TestCase):
             'name': 'dummy alert',
             'rate': 'dly',
         }
+        self.alert = Alert.objects.create(user_id=1001, **self.alert_params)
+
+    def tearDown(self):
+        Alert.objects.all().delete()
 
     def test_create_alert(self):
         """Can we create an alert by sending a post?"""
@@ -38,6 +46,70 @@ class AlertTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn('error creating your alert', r.content)
         self.client.logout()
+
+    def test_new_alert_gets_secret_key(self):
+        """When you create a new alert, does it get a secret key?"""
+        self.assertTrue(self.alert.secret_key)
+
+    def test_are_alerts_disabled_when_the_link_is_visited(self):
+        self.assertEqual(self.alert.rate, self.alert_params['rate'])
+        self.client.get(reverse('disable_alert', args=[self.alert.secret_key]))
+        self.alert.refresh_from_db()
+        self.assertEqual(self.alert.rate, 'off')
+
+    def test_are_alerts_enabled_when_the_link_is_visited(self):
+        self.assertEqual(self.alert.rate, self.alert_params['rate'])
+        self.alert.rate = 'off'
+        new_rate = 'wly'
+        path = reverse('enable_alert', args=[self.alert.secret_key])
+        self.client.get('%s?rate=%s' % (path, new_rate))
+        self.alert.refresh_from_db()
+        self.assertEqual(self.alert.rate, new_rate)
+
+
+class DocketAlertTest(TestCase):
+    """Do docket alerts work properly?"""
+    fixtures = ['test_court.json', 'authtest_data.json']
+
+    def setUp(self):
+        self.before = now()
+        # Create a new docket
+        self.docket = Docket.objects.create(
+            source=Docket.RECAP, court_id='scotus', pacer_case_id='asdf',
+            docket_number='12-cv-02354', case_name="Vargas v. Wilkins",
+        )
+
+        # Add an alert for it
+        DocketAlert.objects.create(docket=self.docket, user_id=1001)
+
+        # Add a new docket entry to it
+        de = DocketEntry.objects.create(docket=self.docket, entry_number=1)
+        RECAPDocument.objects.create(
+            docket_entry=de, document_type=RECAPDocument.PACER_DOCUMENT,
+            document_number=1, pacer_doc_id='232322332', is_available=False,
+        )
+        self.after = now()
+
+    def tearDown(self):
+        Docket.objects.all().delete()
+        DocketAlert.objects.all().delete()
+        DocketEntry.objects.all().delete()
+        # Clear the outbox
+        mail.outbox = []
+
+    def test_triggering_docket_alert(self):
+        """Does the alert trigger when it should?"""
+        send_docket_alert(self.docket.pk, self.before)
+
+        # Does the alert go out? It should.
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_nothing_happens_for_timers_after_de_creation(self):
+        """Do we avoid sending alerts for timers after the de was created?"""
+        send_docket_alert(self.docket.pk, self.after)
+
+        # Do zero emails go out? None should.
+        self.assertEqual(len(mail.outbox), 0)
 
 
 class AlertSeleniumTest(BaseSeleniumTest):

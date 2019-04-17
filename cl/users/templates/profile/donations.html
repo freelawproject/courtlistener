@@ -4,68 +4,123 @@
 {% block title %}Donations – CourtListener.com{% endblock %}
 
 {% block nav-donations %}active{% endblock %}
+{% block footer-scripts %}
+  <script type="text/javascript"
+          src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+  <script defer type="text/javascript"
+          src="{{ STATIC_URL }}js/toggle_settings.js"></script>
+{% endblock %}
 
 {% block content %}
-    <div class="col-xs-12">
-        {% if user.donations.all and user.profile.email_confirmed %}
-            <div class="table-responsive">
-                <table class="table settings-table">
-                    <thead>
-                        <tr>
-                            <th>Amount</th>
-                            <th>Date</th>
-                            <th>Payment Method</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for donation in user.donations.all %}
-                        <tr>
-                            <td>${{ donation.amount|intcomma }}</td>
-                            <td>{{ donation.date_created|date:"n/j/Y" }}</td>
-                            <td>{{ donation.get_payment_provider_display }}</td>
-                            <td>{{ donation.get_status_display }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div>
-                <div class="col-xs-12 col-sm-9 col-md-10">
-                    <h2>Thank You for Your Support</h2>
-                    <p>Your support <em>truly</em> makes a difference. If you
-                        would like to change a donation or if you have any
-                        questions, please get in touch with us at <a
-                                href="mailto:donate@free.law">donate@free.law</a>.
-                        We'd be happy to hear from you.</p>
-                </div>
-                <div class="col-xs-12 col-sm-3 col-md-2 well">
-                    <h4>Total Donations</h4>
-                    <p class="bold">This Year: ${{ user.profile.total_donated_last_year|intcomma }}</p>
-                    <p class="bold">All Time: ${{ user.profile.total_donated|intcomma }}</p>
-                </div>
-            </div>
-        {% else %}
-            <div class="row">
-                <div class="col-sm-12">
-                    <h3>Make a Donation to Support Free Law Project</h3>
-                    <p>CourtListener is a part of the <a
-                            href="https://free.law">Free Law
-                        Project</a> and is supported in part by people like
-                        you. We run a very lean budget and your donations go
-                        towards paying our full time developers, server costs
-                        and fund raising efforts.</p>
-                    <p>To learn more or support our cause, visit <a
-                            href="{% url "donate" %}?referrer=profile">our donations
-                        page</a>.</p>
-                    {% if not user.profile.email_confirmed %}
-                        <p class="gray">If you have already donated, you may
-                            need to confirm your email address to see your past
-                            donations.
-                        </p>
-                    {% endif %}
-                </div>
-            </div>
-        {% endif %}
-    </div>
+  <div class="col-xs-12">
+    {% if user.donations.all and user.profile.email_confirmed %}
+      <h2>Processed Donations <small>Includes one-time and monthly contributions</small></h2>
+      <div class="table-responsive">
+        <table class="table settings-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Payment Method</th>
+              <th>Status</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for donation in user.donations.all %}
+            <tr>
+              <td>{{ donation.date_created|date:"n/j/Y" }}</td>
+              <td>{{ donation.get_payment_provider_display }}</td>
+              <td>{{ donation.get_status_display }}</td>
+              <td>${{ donation.amount|intcomma }}</td>
+            </tr>
+            {% endfor %}
+            <tr>
+              <td colspan="3" class="right bold">Total Last 365 Days:</td>
+              <td>${{ user.profile.total_donated_last_year|intcomma }}</td>
+            </tr>
+            <tr>
+              <td colspan="3" class="right bold">Total Donations:</td>
+              <td>${{ user.profile.total_donated|intcomma }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+    {% if user.monthly_donations.all and user.profile.email_confirmed %}
+      <h2 class="v-offset-above-3">Monthly Donation Schedule</h2>
+      <div class="table-responsive">
+        <table class="table settings-table">
+          <thead>
+          <tr>
+            <th>Monthly Contribution</th>
+            <th>Billing Date</th>
+            <th colspan="2">Created</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for donation in user.monthly_donations.all %}
+            <tr>
+              <td>${{ donation.monthly_donation_amount|intcomma }}</td>
+              <td>{{ donation.monthly_donation_day|ordinal }} of each month </td>
+              <td>{{ donation.date_created|date:"n/j/Y" }}</td>
+              <td class="right">
+                <a href="{% url "toggle_monthly_donation" %}"
+                   class="btn btn-xs {% if donation.enabled %}btn-danger{% else %}btn-success{% endif %} toggle-monthly-donation"
+                   data-id="{{ donation.pk }}"
+                   data-enable-message="Re-Enable Contributions"
+                   data-disable-message="Pause Contributions">
+                  <i class="fa {% if donation.enabled %}fa-pause{% else %}fa-play{% endif %}"
+                     data-enable-icon-class="fa-play"
+                     data-disable-icon-class="fa-pause"></i> <span class="alert_btn_txt">
+                  {% if donation.enabled %}
+                    Pause Contributions
+                  {% else %}
+                    Curerntly Disabled &mdash; Re-Enable Contributions?
+                  {% endif %}</span>
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <h3 class="caps gray">
+          Questions about monthly donations? <a href="{% url "donation_help" %}"
+             class="btn btn-default btn-lg">Read the FAQs</a>
+        </h3>
+      </div>
+    {% endif %}
+
+    {% if user.donations.all and user.profile.email_confirmed %}
+      <hr class="v-offset-above-3">
+      <div class="row">
+        <div class="hidden-xs col-sm-1 col-md-3"></div>
+        <div class="col-xs-12 col-sm-10 col-md-6 text-center">
+          <h2>Thank You for Your Support <i class="fa fa-heart red"></i></h2>
+          <p>Your support and contributions make a huge difference. If you would like to change a donation or if you have any questions, please get in touch with us at <a href="mailto:donate@free.law">donate@free.law</a>. We'd be happy to hear from you.
+          </p>
+        </div>
+        <div class="hidden-xs col-sm-1 col-md-3"></div>
+      </div>
+    {% endif %}
+
+    {% if not user.donations.all and not user.monthly_donations.all %}
+      <div class="row">
+        <div class="hidden-xs col-sm-1 col-md-3"></div>
+        <div class="col-xs-12 col-sm-10 col-md-6 text-center">
+          <h1>Donate to Support Free Law Project</h1>
+          <h3 class="caps gray">We need your support!</h3>
+          <p class="v-offset-above-2">CourtListener and RECAP are initiatives of <a href="https://free.law">Free Law Project</a> and are supported by user donations. Our biggest expenses are our full time developers and our server&nbsp;costs.
+          </p>
+          <p class="v-offset-above-2"><a href="{% url "donate" %}?referrer=profile"
+                class="btn btn-lg btn-danger">Donate Now</a>
+          </p>
+          {% if not user.profile.email_confirmed %}
+            <p class="gray small">(If you have already donated, you may need to confirm your email address to see your past donations.)
+            </p>
+          {% endif %}
+        </div>
+        <div class="hidden-xs col-sm-1 col-md-3"></div>
+      </div>
+    {% endif %}
+  </div>
 {% endblock %}

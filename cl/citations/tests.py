@@ -127,6 +127,14 @@ class CiteTest(TestCase):
              [Citation(volume=2006, reporter='Ohio', page=2095,
                        canonical_reporter=u'Ohio', lookup_index=0,
                        reporter_index=1, reporter_found='Ohio')]),
+            ('2017 IL App (4th) 160407WC',
+             [Citation(volume=2017, reporter='IL App (4th)', page='160407WC',
+                       canonical_reporter=u'IL App (4th)', lookup_index=0,
+                       reporter_index=1, reporter_found='IL App (4th)')]),
+            ('2017 IL App (1st) 143684-B',
+             [Citation(volume=2017, reporter='IL App (1st)', page='143684-B',
+                       canonical_reporter=u'IL App (1st)', lookup_index=0,
+                       reporter_index=1, reporter_found='IL App (1st)')])
         )
         for q, a in test_pairs:
             print "Testing citation extraction for %s..." % q,

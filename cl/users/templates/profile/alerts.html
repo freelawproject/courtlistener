@@ -1,89 +1,184 @@
 {% extends "profile/nav.html" %}
+{% load text_filters %}
 
 {% block title %}Alerts – CourtListener.com{% endblock %}
 
 {% block nav-alerts %}active{% endblock %}
+{% block footer-scripts %}
+  <script type="text/javascript"
+          src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+  <script defer type="text/javascript"
+          src="{{ STATIC_URL }}js/toggle_settings.js"></script>
+{% endblock %}
+
 
 {% block content %}
-    {% if alerts %}
-        <div class="col-xs-12">
-            <div class="table-responsive">
-                <table class="table settings-table">
-                    <thead>
-                        <tr>
-                            <th>Query&nbsp;name</th>
-                            <th>Frequency</th>
-                            <th>Last&nbsp;hit</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for alert in alerts %}
-                        <tr>
-                            <td>
-                                <p class="bottom">
-                                    {% if alert.type == 'o' %}
-                                        <i class="fa-file-text-o fa gray"
-                                           title="Opinion Alert"></i>
-                                    {% elif alert.type == 'oa' %}
-                                        <i class="fa-volume-up fa gray"
-                                           title="Oral Argument Alert"></i>
-                                    {% endif %}
-                                    <a href="/?{{ alert.query }}">{{ alert.name }}</a>
-                                </p>
-                            </td>
-                            <td>{{ alert.get_rate_display }}</td>
-                            <td>{{ alert.date_last_hit|date:"D, n/j/Y"|default:"Never" }}</td>
-                            <td class="right">
-                                {% if alert.type == 'o' %}
-                                    <a href="/feed/search/?{{ alert.query }}"
-                                       title="Atom feed for this alert"
-                                       class="btn btn-primary btn-xs">
-                                        <i class="fa fa-rss"></i>&nbsp;Subscribe
-                                    </a>
-                                {% elif alert.type == 'oa' %}
-                                    <a href="/podcast/search/?{{ alert.query }}"
-                                       title="Podcast for this alert"
-                                       class="btn btn-primary btn-xs">
-                                        <i class="fa fa-rss"></i>&nbsp;Subscribe
-                                    </a>
-                                {% endif %}
-                                {% if user.profile.total_donated_last_year < MIN_DONATION.rt_alerts and alert.rate == 'rt' %}
-                                    <p class="bottom inline"
-                                       title="Donate at least $10 each year for Real Time alerts">
-                                        <a class="btn btn-primary btn-xs disabled">
-                                            <i class="fa fa-pencil"></i>&nbsp;Edit</a>
-                                    </p>
-                                {% else %}
-                                    <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
-                                       class="btn btn-primary btn-xs">
-                                        <i class="fa fa-pencil"></i>&nbsp;Edit</a>
-                                {% endif %}
-                                <a href="/alert/delete/confirm/{{ alert.pk }}"
-                                   class="btn btn-danger btn-xs">
-                                    <i class="fa fa-trash-o"></i>&nbsp;Delete</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    {% else %}
-        <div class="col-sm-3"></div>
-        <div class="col-xs-12 col-sm-6">
-            <h3>You have not made any alerts.</h3>
-            <p>CourtListener Alerts let you create search queries that will send you emails every time there's a opinion or oral argument that matches your query.
-            </p>
-            <p>Search for anything within the <a
-                    href="{% url "coverage" %}#scraped-jurisdictions">supported jurisdictions</a>, and you will get an email daily, weekly, monthly or even in real time as courts post new opinions and oral arguments.
-            </p>
-            <p class="v-offset-above-2">
-                <a href="/?type=o" class="btn btn-primary btn-lg">Make New Opinion Alert</a>
-                <a href="/?type=oa" class="btn btn-primary btn-lg">Make New Oral Argument Alert</a>
-            </p>
-        </div>
-        <div class="col-sm-3"></div>
+{% if not search_alerts and not docket_alerts %}
+  {# No alerts yet. Tell the user about them. #}
+  <div class="hidden-xs col-sm-1 col-md-3"></div>
+  <div class="col-xs-12 col-sm-10 col-md-6 text-center">
+    <h1>CourtListener Alerts</h1>
+    <h3 class="caps gray">You have not made any alerts</h3>
+    <p>CourtListener provides two types of alerts, Search Alerts that let you follow cases and topics of interest to you, and RECAP Docket Alerts, which let you follow PACER dockets of interest.
+    </p>
+    <p>
+      <a href="{% url "alert_help" %}" class="btn btn-lg btn-primary">Learn More</a>
+  </div>
+  <div class="hidden-xs col-sm-1 col-md-3"></div>
+{% else %}
+  {# We have either search or docket alerts. #}
+  {% if search_alerts %}
+    <div class="col-xs-12">
+      <h2>Search Alerts for Opinions and Oral Arguments</h2>
+    </div>
+    <div class="col-xs-12">
+      <div class="table-responsive">
+        <table class="table settings-table">
+          <thead>
+          <tr>
+            <th>Alert&nbsp;Type</th>
+            <th>Alert&nbsp;Name<br>and Query</th>
+            <th>Frequency</th>
+            <th colspan="2">Last&nbsp;Hit</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for alert in search_alerts %}
+            <tr>
+              <td>
+                <p class="bottom">
+                  {% if alert.type == 'o' %}
+                    Opinion
+                  {% elif alert.type == 'oa' %}
+                    Oral Argument
+                  {% elif alert.type == 'r' %}
+                    RECAP
+                  {% endif %}
+                </p>
+              </td>
+              <td>
+                <p class="bottom">
+                  <a href="/?{{ alert.query }}">{{ alert.name }}</a>
+                </p>
+              </td>
+              <td>{{ alert.get_rate_display }}</td>
+              <td>{{ alert.date_last_hit|date:"D, n/j/Y"|default:"Never" }}</td>
+              <td class="right">
+                {% if alert.type == 'o' or alert.type == 'r' %}
+                  <a href="{% url "search_feed" "search" %}?{{ alert.query }}"
+                     title="Atom feed for this alert"
+                     class="btn btn-primary btn-xs">
+                    <i class="fa fa-rss"></i>&nbsp;Subscribe
+                  </a>
+                {% elif alert.type == 'oa' %}
+                  <a
+                    href="{% url "search_podcast" "search" %}?{{ alert.query }}"
+                    title="Podcast for this alert"
+                    class="btn btn-primary btn-xs">
+                    <i class="fa fa-podcast"></i>&nbsp;Podcast
+                  </a>
+                {% endif %}
+                {% if user.profile.total_donated_last_year < MIN_DONATION.rt_alerts and alert.rate == 'rt' %}
+                  <p class="bottom inline"
+                     title="Donate at least $10 each year for Real Time alerts">
+                    <a class="btn btn-primary btn-xs disabled">
+                      <i class="fa fa-pencil"></i>&nbsp;Edit</a>
+                  </p>
+                {% else %}
+                  <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
+                     class="btn btn-primary btn-xs">
+                    <i class="fa fa-pencil"></i>&nbsp;Edit</a>
+                {% endif %}
+                <a href="/alert/delete/confirm/{{ alert.pk }}"
+                   class="btn btn-danger btn-xs">
+                  <i class="fa fa-trash-o"></i>&nbsp;Delete</a>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% if not docket_alerts %}
+      <div class="col-xs-12">
+        <hr class="v-offset-above-3">
+        <h3 class="gray caps">You have not made any RECAP Docket Alerts <a
+          href="{% url "alert_help" %}"
+          class="btn btn-default btn-lg">Learn More About RECAP Alerts</a></h3>
+      </div>
     {% endif %}
+  {% endif %}
 
+  {% if search_alerts and docket_alerts %}
+    <div class="col-xs-12">
+      <hr class="v-offset-above-3 v-offset-below-3">
+    </div>
+  {% endif %}
+
+  {% if docket_alerts %}
+    <div class="col-xs-12">
+      <h2>RECAP Docket Alerts for PACER Cases</h2>
+      {% if user.profile.unlimited_docket_alerts %}
+        <h3 class="gray caps">Your account has unlimited docket alerts</h3>
+      {% endif %}
+    </div>
+    <div class="col-xs-12">
+      <div class="table-responsive">
+        <table class="table settings-table">
+          <thead>
+          <tr>
+            <th>Case Name</th>
+            <th>Court</th>
+            <th colspan="2">Last&nbsp;Hit</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for alert in docket_alerts %}
+            <tr>
+              <td>
+                <p class="bottom">
+                  <a href="{{ alert.docket.get_absolute_url }}">
+                    {{ alert.docket|best_case_name|safe|v_wrapper }}
+                    {% if docket.docket_number %}
+                      ({{ docket.docket_number }})
+                    {% endif %}
+                  </a>
+                </p>
+              </td>
+              <td>
+                <p class="bottom">
+                  {{ alert.docket.court.short_name }}
+                </p>
+              </td>
+              <td>{{ alert.date_last_hit|default:"Never" }}</td>
+              <td class="right">
+                <a href="{% url "toggle_docket_alert" %}"
+                   class="btn btn-danger btn-xs toggle-docket-alert"
+                   data-id="{{ alert.docket.pk }}"
+                   data-enable-message="Re-Enable Alert"
+                   data-disable-message="Disable Alert"
+                   >
+                  <i class="fa fa-bell-slash-o"
+                     data-enable-icon-class="fa-bell"
+                     data-disable-icon-class="fa-bell-slash-o"></i> <span class="alert_btn_txt">Disable Alert</span>
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p><a
+        href="{% url "alert_help" %}"
+        class="btn btn-default">Learn More About RECAP Alerts</a></p>
+    </div>
+    {% if not search_alerts %}
+      <div class="col-xs-12">
+        <h3 class="gray caps">You have not made any Search Alerts
+          <a href="{% url "alert_help" %}"
+             class="btn btn-default btn-lg">Learn More About Search Alerts</a></h3>
+      </div>
+    {% endif %}
+  {% endif %}
+{% endif %}
 {% endblock %}

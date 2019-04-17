@@ -1,7 +1,9 @@
 /var/log/redis/*.log {
-    rotate 36500
+    rotate 84
+    maxage 84
     daily
     dateext
+    missingok
     notifempty
     noolddir
     sharedscripts

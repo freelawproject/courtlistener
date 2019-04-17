@@ -1,0 +1,16 @@
+---
+
+# Add program configs to the include file
+- hosts: ia-uploader
+  vars:
+    supervisor_conf: "/etc/supervisord.conf"
+    program_dir: "/etc/supervisor"
+  tasks:
+  - include_vars: ../defaults.yml
+
+  - name: Add supervisor configuration for the RECAP uploader
+    become: yes
+    become_user: root
+    template:
+      src="../../scripts/supervisor/ia_recap_uploader.ini"
+      dest="{{ program_dir}}/ia_recap_uploader.ini"

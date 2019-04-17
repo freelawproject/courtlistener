@@ -1,4 +1,6 @@
 # coding=utf-8
+from __future__ import print_function
+
 import datetime
 import os
 
@@ -92,7 +94,7 @@ class SimplePagesTest(TestCase):
 
     def check_for_title(self, content):
         """Make sure a page has a valid HTML title"""
-        print "Checking for HTML title tag....",
+        print("Checking for HTML title tag....", end='')
         html_tree = fromstring(content)
         title = html_tree.xpath('//title/text()')
         self.assertGreater(
@@ -106,7 +108,7 @@ class SimplePagesTest(TestCase):
             msg="The text in this title tag is empty.",
         )
 
-        print "✓"
+        print("✓")
 
     def test_simple_pages(self):
         """Do all the simple pages load properly?"""
@@ -118,19 +120,20 @@ class SimplePagesTest(TestCase):
             {'viewname': 'contribute'},
             {'viewname': 'contact'},
             {'viewname': 'contact_thanks'},
+            {'viewname': 'alert_help'},
+            {'viewname': 'delete_help'},
             {'viewname': 'markdown_help'},
             {'viewname': 'advanced_search'},
             {'viewname': 'old_terms', 'args': ['1']},
             {'viewname': 'old_terms', 'args': ['2']},
             {'viewname': 'terms'},
-            {'viewname': 'tools'},
             {'viewname': 'bad_browser'},
             {'viewname': 'robots'},
             {'viewname': 'humans'},
         ]
         for reverse_param in reverse_params:
             path = reverse(**reverse_param)
-            print "Testing basic load of: {path}...".format(path=path),
+            print("Testing basic load of: {path}...".format(path=path), end='')
             r = self.client.get(path)
             self.assertEqual(
                 r.status_code,
@@ -143,7 +146,7 @@ class SimplePagesTest(TestCase):
                         code=r.status_code,
                     )
             )
-            print '✓'
+            print('✓')
             is_html = ('text/html' in r['content-type'])
             if r['content-type'] and is_html:
                 self.check_for_title(r.content)

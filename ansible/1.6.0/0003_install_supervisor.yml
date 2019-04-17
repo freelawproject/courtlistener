@@ -1,0 +1,70 @@
+---
+
+# Install and configure supervisor
+- hosts: all
+  vars:
+    supervisor_conf: "/etc/supervisord.conf"
+    program_dir: "/etc/supervisor"
+  tasks:
+  - include_vars: ../defaults.yml
+
+  - name: install supervisor using pip
+    become: yes
+    become_user: root
+    pip:
+      name=supervisor
+  - name: configure supervisor
+    become: yes
+    become_user: root
+    template:
+      src="templates/supervisor/supervisord.conf"
+      dest={{ supervisor_conf }}
+      mode=0600
+  - name: Ensure {{program_dir}} exists
+    become: yes
+    become_user: root
+    file: path={{program_dir}} state=directory
+
+  # Install supervisor for init-based systems if applicable
+  - name: install supervisor's init file
+    when: ansible_service_mgr == "upstart"
+    become: yes
+    become_user: root
+    template:
+      src="templates/supervisor/supervisor.init"
+      dest="/etc/init.d/supervisor"
+      mode=0755
+  - name: start supervisor's init service
+    when: ansible_service_mgr == "upstart"
+    become: yes
+    become_user: root
+    service: name=supervisor state=started enabled=yes
+
+  # Install supervisor for systemd-based systems if applicable
+  - name: install supervisor's systemd service
+    become: yes
+    become_user: root
+    when: ansible_service_mgr == "systemd"
+    template:
+      src="templates/supervisor/supervisor.service"
+      dest=/etc/systemd/system/supervisor.service
+  - name: start supervisor's systemd service
+    become: yes
+    become_user: root
+    when: ansible_service_mgr == "systemd"
+    service: name=supervisor.service state=started enabled=yes
+
+  # Add program configs to the include file
+- hosts: rss-scraper
+  vars:
+    supervisor_conf: "/etc/supervisord.conf"
+    program_dir: "/etc/supervisor"
+  tasks:
+  - include_vars: ../defaults.yml
+
+  - name: Add supervisor configuration for the PACER RSS scraper
+    become: yes
+    become_user: root
+    template:
+      src="../../scripts/supervisor/pacer_rss_scraper.ini"
+      dest="{{ program_dir}}/pacer_rss_scraper.ini"

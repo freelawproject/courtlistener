@@ -1,4 +1,5 @@
 import os
+
 from django.conf import settings
 from juriscraper.pacer.http import PacerSession
 
@@ -38,7 +39,7 @@ def get_pacer_doc_ids(options):
             logger.info("Sent %s tasks to celery so far. Latest pk: %s" %
                         (completed, row_pk))
         get_pacer_doc_id_with_show_case_doc_url.apply_async(
-            args=(row_pk, session),
+            args=(row_pk, session.cookies),
             queue=q,
         )
         completed += 1

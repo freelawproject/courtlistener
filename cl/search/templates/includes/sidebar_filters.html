@@ -49,13 +49,13 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="form-group{% if search_form.filed_after.errors %} has-error{% endif %}">
                                 {{ search_form.filed_after.label_tag }}
                                 {{ search_form.filed_after }}
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="form-group{% if search_form.filed_before.errors %} has-error{% endif %}">
                                 {{ search_form.filed_before.label_tag }}
                                 {{ search_form.filed_before }}
                             </div>
@@ -78,13 +78,13 @@
                     </div>
                     <div class="row">
                         <div class="col-xs-6">
-                            <div class="form-group">
+                            <div class="form-group{% if search_form.cited_gt.errors %} has-error{% endif %}">
                                 {{ search_form.cited_gt.label_tag }}
                                 {{ search_form.cited_gt }}
                             </div>
                         </div>
                         <div class="col-xs-6">
-                            <div class="form-group">
+                            <div class="form-group{% if search_form.cited_lt.errors %} has-error{% endif %}">
                                 {{ search_form.cited_lt.label_tag }}
                                 {{ search_form.cited_lt }}
                             </div>
@@ -122,13 +122,13 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="form-group{% if search_form.filed_after.errors %} has-error{% endif %}">
                                 {{ search_form.filed_after.label_tag }}
                                 {{ search_form.filed_after }}
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="form-group{% if search_form.filed_before.errors %} has-error{% endif %}">
                                 {{ search_form.filed_before.label_tag }}
                                 {{ search_form.filed_before }}
                             </div>
@@ -179,13 +179,13 @@
 
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="form-group{% if search_form.argued_after.errors %} has-error{% endif %}">
                                 {{ search_form.argued_after.label_tag }}
                                 {{ search_form.argued_after }}
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="form-group{% if search_form.argued_before.errors %} has-error{% endif %}">
                                 {{ search_form.argued_before.label_tag }}
                                 {{ search_form.argued_before }}
                             </div>
@@ -204,13 +204,13 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="form-group{% if search_form.born_after.errors %} has-error{% endif %}">
                                 {{ search_form.born_after.label_tag }}
                                 {{ search_form.born_after }}
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="form-group{% if search_form.born_before.errors %} has-error{% endif %}">
                                 {{ search_form.born_before.label_tag }}
                                 {{ search_form.born_before }}
                             </div>

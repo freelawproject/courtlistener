@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Help with Alerts – CourtListener.com{% endblock %}
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+{% block sidebar %}{% endblock %}
+
+
+{% block content %}
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+  <div class="col-xs-12 col-sm-8 col-md-6">
+    <h1>Help with Alerts on CourtListener</h1>
+    <p>CourtListener was created in 2009 as an alert and awareness tool for people that were interested in keeping up with new cases or topics in the federal circuit courts.
+    </p>
+    <p>We currently have two kinds of alerts: Search Alerts and RECAP Alerts for PACER. Read on to learn more or skip ahead to the section that interests you:
+    </p>
+    <ul>
+      <li>
+        <a href="#recap-alerts">RECAP Alerts for PACER</a>
+        <ul>
+          <li><a href="#limitations-on-recap-alerts">Limitations on RECAP Alerts</a></li>
+          <li><a href="#creating-a-recap-alert">Creating a RECAP Alert</a></li>
+          <li><a href="#disabling-a-recap-alert">Disabling a RECAP Alert</a></li>
+          <li><a href="#coverage-gaps">Coverage Gaps</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#search-alerts">Search Alerts</a>
+        <ul>
+          <li><a href="#creating-alerts">Creating Alerts</a></li>
+          <li><a href="#enabling-real-time-alerts">Enabling Real Time Alerts</a></li>
+          <li><a href="#editing-or-deleting-an-alert">Editing or Deleting an Alert</a></li>
+          <li><a href="#disabling-an-alert">Disabling an Alert</a></li>
+          <li><a href="#citation-alerts">Citation Alerts</a></li>
+        </ul>
+      </li>
+      <li><a href="#coming-soon">Coming Soon</a></li>
+    </ul>
+    <p>We hope that if you find our alerts useful, you will donate to <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP, to support their ongoing maintenance.
+    </p>
+    <p><a href="{% url "donate" %}?referrer=alerts-help"
+          class="btn btn-danger btn-lg"><i class="fa fa-heart-o"></i> Donate Now</a></p>
+    <hr>
+
+    <h2 id="recap-alerts">RECAP Alerts for PACER</h2>
+    <p>RECAP Alerts are a way of keeping up with cases in the PACER federal court filing system. These alerts monitor tens of thousands of cases across the country for new docket entries and send an email whenever new entries are acquired. In the last 24 hours, {{ d_update_count|intcomma }} dockets and {{ de_update_count|intcomma }} docket entries were updated.
+    </p>
+    <p>The sources for these alerts are as described in detail on our <a href="{% url "coverage" %}">coverage page</a> and include:
+    </p>
+    <ul>
+      <li>The RECAP extensions</li>
+      <li>PACER judicial opinion scraper</li>
+      <li>Client work that we do at Free Law Project</li>
+      <li>PACER RSS feeds</li>
+    </ul>
+    <p>For active cases, this means that alerts will come any time from about a minute after the content is posted to PACER (for a case of national importance), to an hour or two, for a case of lesser importance in a jurisdiction that does not regularly provide public updates via their RSS feed.
+    </p>
+    <p>For closed cases, we get new content and can send alerts when we do client work on those cases or when a <a href="https://free.law/recap/">RECAP extension</a> user shares a docket with us.
+    </p>
+
+    <h3>Limitations on RECAP Alerts</h3>
+    <p>As a non-profit, we try to provide our services to as many people as possible. We currently allow <span class="bold">{{ MAX_FREE_DOCKET_ALERTS }}</span> docket alerts for free, and give a bonus of <span class="bold">{{ DOCKET_ALERT_RECAP_BONUS }}</span> alerts to anybody with the RECAP Extension installed.
+    </p>
+    <p>Monthly donors can create as many alerts as they need, though we may set up some reasonable limits in the future, based on usage.
+    </p>
+    <p>Corporate rates are also available for large organizations needing to provide alerts to many users.
+    </p>
+    <p>We also can sometimes provide need-based exceptions to these rules. If you might need an exception, <a href="{% url "contact" %}">please let us know</a>. This feature is intended for individual users. If you think you may need to use alerts for a commercial endeavor, please <a href="{% url "contact" %}">get in touch</a>.
+    </p>
+    <p>
+      <a href="https://free.law/recap/"
+         class="btn btn-default">Install RECAP</a>
+      <a href="{% url "donate" %}?referrer=more-docket-alerts"
+         class="btn btn-default"><i class="fa fa-heart-o"></i> Become a Monthly Donor</a>
+    </p>
+
+    <h3>Creating a RECAP Alert</h3>
+    <p>To create a RECAP Alert, simply find the docket you are interested in following, and look for the button on the top that says, "<i class="fa fa-bell gray"></i> Get Alerts":
+    </p>
+    <p>
+      <img src="{{ STATIC_PREFIX }}png/docket-alert-button.png"
+           alt="screenshot of the enable button"
+           class="img-responsive img-rounded shadow center-block"
+           height="31"
+           width="94">
+    </p>
+    <p>That's all there is to it. You'll begin getting alerts as soon as the docket has a new docket entry.
+    </p>
+    <p>Here's an example of what an email might look like:</p>
+
+    <p class="v-offset-above-2">
+      <a href="{{ STATIC_PREFIX }}png/alert-example.png">
+        <img src="{{ STATIC_PREFIX }}png/alert-example.png"
+             width="835"
+             height="519"
+             class="img-responsive img-rounded center-block shadow"
+        >
+      </a>
+    </p>
+    <p class="v-offset-below-2 gray alt small">
+      (Click for full size version.)
+    </p>
+
+    <h3>Disabling a RECAP Alert</h3>
+    <p>To disable an a RECAP Alert, simply pull up the docket you no longer are interested in, and press the button that says, "<i class="fa fa-bell-slash-o"></i> Disable Alerts":
+    </p>
+    <p>
+      <img src="{{ STATIC_PREFIX }}png/docket-alert-disable-button.png"
+           alt="screenshot of the disable button"
+           class="img-responsive img-rounded shadow center-block"
+           height="31"
+           width="119">
+    </p>
+
+    <h3>Coverage Gaps</h3>
+    <p>Unfortunately, the sources for RECAP alerts do <strong>not</strong> provide complete coverage of everything being filed in PACER. There are two important gaps to note. First, although we collect more than 100,000 new docket entry descriptions every day from the RSS feeds, some courts do not provide such feeds and others only provide partial feeds.
+    </p>
+    <p>In addition to the federal Circuit Courts, the following courts do not provide RSS feeds of their latest filings:
+    </p>
+    <ul>
+      {% for court in no_feeds %}
+        <li>{{ court }}</li>
+      {% endfor %}
+    </ul>
+    <p>If you rely on one of these courts, we encourage you to contact the court to request a full and complete PACER RSS feed.
+    </p>
+    <hr>
+
+
+    <h2 id="search-alerts">Search Alerts</h2>
+    <p>Search alerts are triggered by our search engine and are thus a powerful way to get fine-tuned alerts on cases or topics that you are following.
+    </p>
+    <h3>Creating Alerts</h3>
+    <p>Creating a search alert is usually straightforward. Simply do a search in CourtListener's Opinion or Oral Argument sections and then complete the "Create Alert" form on the left of your search results.
+    </p>
+    <p>You can use the current set of results as an example of what the alert will look like. For example, if you have many results for your query, you may get a lot of results in your alert. If there are too few, your alert may rarely trigger.
+    </p>
+    <p>Once the alert is created, whenever there are new results for your query, we will send you an email with those results.
+    </p>
+    <p>
+      <img src="{{ STATIC_PREFIX }}png/create-alert-form.png"
+           alt="screenshot of the create alert form"
+           class="img-responsive img-rounded shadow center-block"
+           height="316"
+           width="284">
+    </p>
+    <p>Complete the form as follows:</p>
+    <ul>
+      <li><strong>Alert name:</strong> Use this to set the name of the alert so that you can recall its purpose at a later time.
+      </li>
+      <li><strong>How often:</strong> Here you can set how often you wish to receive an alert for this search.
+      </li>
+    </ul>
+
+    <p>The available rates are "Real Time", "Daily", "Weekly", "Monthly", or "Off". Real Time alerts are usually delivered within about an hour of when something is published by the court. Daily, weekly, and monthly alerts come at the end of the day, week, and month.
+    </p>
+    <p>Alerts that are Off will not be run. This can be useful for temporarily disabling an alert.
+    </p>
+
+    <h3>Enabling Real Time Alerts</h3>
+    <p>Real Time alerts are only available for supporters of Free Law Project that have donated at least ten dollars over the past year. If you see a message like the one below, you will <a href="{% url "donate" %}?referrer=alerts-help">need to donate</a> to enable Real Time alerts:
+    </p>
+    <p>
+      <img src="{{ STATIC_PREFIX }}/png/real-time-donation-required.png"
+           alt="screenshot of the please donate for real time notification"
+           class="img-responsive img-rounded shadow center-block"
+           height="274"
+           width="278">
+    </p>
+
+    <h3>Editing or Deleting an Alert</h3>
+    <p>Existing alerts can be edited or deleted from <a href="{% url "profile_alerts" %}">your user profile</a>. By clicking the <a class="btn btn-xs btn-primary"><i class="fa fa-pencil"></i>Edit</a> button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
+    </p>
+    <p>From your profile page, you can also easily delete an alert.</p>
+
+    <h3>Disabling an Alert</h3>
+    <p>If you wish to temporarily disable an alert, you can edit it and set the rate to "Off". Every alert email also has a one-click link for disabling the alert that triggered it.
+    </p>
+
+    <h3>Supported Jurisdictions</h3>
+    <p>Alerts are available for many jurisdictions across the country, and we are frequently expanding them to support even more courts. To see which courts are currently supported, check <a href="{% url "coverage" %}#scraped-jurisdictions">our coverage page</a> where we list the jurisdictions that we regularly scrape for oral arguments or opinions.
+    </p>
+    <p>If there is a jurisdiction that is not currently listed, please <a href="{% url "contact" %}">let us know you are interested in it</a>, and we will do our best to add it to our list.
+    </p>
+
+    <h3>Citation Alerts</h3>
+    <p>Citation alerts are a way to keep up with citations to a case of interest so that whenever that case is cited, you get an email. To create a citation alert, start at webpage for the case that interests you, for example, <a href="/opinion/108713/roe-v-wade/"><em>Roe v. Wade</em></a>.
+    </p>
+    <p>On that page, in the sidebar on the left, the cases that cite it are listed, and there is a button to "View All Citing Opinions":
+    </p>
+    <p>
+      <img src="{{ STATIC_PREFIX }}/png/citing-opinions.png"
+           alt="screenshot of the citing opinions sidebar"
+           class="img-responsive img-rounded shadow center-block"
+           width="241"
+           height="253">
+    </p>
+
+    <p>Clicking that button will perform a search in CourtListener that <a href="/?q=cites%3A(108713)">shows the opinions that cite <em>Roe v. Wade</em></a>. To create a citation alert, simply save these search results as an alert, as you normally would.
+    </p>
+    <p>For more on citation alerts, <a href="https://free.law/2016/01/30/citation-searching-on-courtlistener/">see our blog post announcing this feature</a>.
+    </p>
+    <hr>
+
+    <h2>Coming Soon</h2>
+    <p>We do not currently support search alerts for the RECAP Archive, but we plan to do so soon.
+    </p>
+    <p>We are also working on automating alerts for use by other software systems via POST requests and callbacks. If interested, please let us know to be an early tester.
+    </p>
+    <p>Please stay tuned!</p>
+  </div>
+{% endblock %}

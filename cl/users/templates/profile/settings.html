@@ -163,8 +163,9 @@
                 {% endif %}
             </div>
             <input type="hidden" value="{{user.username}}" name="user" id="id_user">
-            <button type="submit" class="btn btn-primary float-right">Save Changes</button>
-            <a href="/profile/delete">Delete My Account&hellip;</a>
+            <button type="submit" class="btn btn-primary btn-lg float-right">Save Changes</button>
+            <a href="{% url "delete_account" %}"><i class="fa fa-trash-o gray"></i>&nbsp;Delete my account&hellip;</a><br>
+            <a href="{% url "take_out" %}"><i class="fa fa-download gray"></i>&nbsp;Export my data&hellip;</a>
         </form>
     </div>
     <div class="col-sm-3"></div>

@@ -3,10 +3,11 @@ from urllib import urlencode
 from urlparse import parse_qs
 
 from django.conf import settings
+from django.http import QueryDict
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
-from cl.recommendations.search import handle_related_query
+from cl.search.forms import SearchForm
 from cl.search.models import Court
 
 boosts = {
@@ -74,18 +75,6 @@ def make_get_string(request, nuke_fields=None):
     if len(get_string) > 0:
         get_string += '&'
     return get_string
-
-
-def get_string_to_dict(get_string):
-    """Reverses the work that the make_get_string function performs, building a
-    dict from the get_string.
-
-    Used by alerts.
-    """
-    get_dict = {}
-    for k, v in parse_qs(get_string).items():
-        get_dict[k] = v[0]
-    return get_dict
 
 
 def get_query_citation(cd):
@@ -208,7 +197,6 @@ def merge_form_with_courts(courts, search_form):
     court_tabs = {
         'federal': [],
         'district': [],
-        'bankruptcy': [],
         'state': [],
         'special': [],
     }
@@ -240,11 +228,14 @@ def merge_form_with_courts(courts, search_form):
         elif court.jurisdiction in [Court.FEDERAL_SPECIAL, Court.COMMITTEE,
                                     Court.INTERNATIONAL]:
             court_tabs['special'].append(court)
-    state_bundles.append(state_bundle)  # append the final state bundle after the loop ends. Hack?
+
+    # append the final state bundle after the loop ends. Hack?
+    state_bundles.append(state_bundle)
 
     # Put the bankruptcy bundles in the courts dict
-    court_tabs['bankruptcy'].append(bap_bundle)
-    court_tabs['bankruptcy'].append(b_bundle)
+    if bap_bundle:
+        court_tabs['bankruptcy_panel'] = [bap_bundle]
+    court_tabs['bankruptcy'] = [b_bundle]
 
     # Divide the state bundles into the correct partitions
     court_tabs['state'].append(state_bundles[:17])
@@ -573,6 +564,16 @@ def add_filter_queries(main_params, cd):
             main_params['fq'] = main_fq
 
 
+def map_to_docket_entry_sorting(sort_string):
+    """Convert a RECAP sorting param to a docket entry sorting parameter."""
+    if sort_string == 'dateFiled asc':
+        return 'entry_date_filed asc'
+    elif sort_string == 'dateFiled desc':
+        return 'entry_date_filed desc'
+    else:
+        return sort_string
+
+
 def add_grouping(main_params, cd, group):
     """Add any grouping parameters."""
     if cd['type'] == 'o':
@@ -587,12 +588,16 @@ def add_grouping(main_params, cd, group):
 
     elif cd['type'] == 'r' and group is True:
         docket_query = re.match('docket_id:\d+', cd['q'])
+        if docket_query:
+            group_sort = map_to_docket_entry_sorting(main_params['sort'])
+        else:
+            group_sort = 'score desc'
         group_params = {
             'group': 'true',
             'group.ngroups': 'true',
             'group.limit': 5 if not docket_query else 500,
             'group.field': 'docket_id',
-            'group.sort': 'score desc',
+            'group.sort': group_sort,
         }
         main_params.update(group_params)
 
@@ -652,10 +657,35 @@ def build_main_query(cd, highlight='all', order_by='', facet=True, group=True):
     add_highlighting(main_params, cd, highlight)
     add_filter_queries(main_params, cd)
     add_grouping(main_params, cd, group)
-    handle_related_query(main_params)
 
     print_params(main_params)
     return main_params
+
+
+def build_main_query_from_query_string(query_string, updates=None, kwargs=None):
+    """Build a main query dict from a query string
+
+    :param query_string: A GET string to build from.
+    :param updates: A dict that can be added to the normal finished query
+    string to override any of its defaults.
+    :param kwargs: Kwargs to send to the build_main_query function
+    :return: A dict that can be sent to Solr for querying
+    """
+    qd = QueryDict(query_string)
+    search_form = SearchForm(qd)
+
+    if not search_form.is_valid():
+        return None
+
+    cd = search_form.cleaned_data
+    if kwargs is None:
+        main_query = build_main_query(cd)
+    else:
+        main_query = build_main_query(cd, **kwargs)
+    if updates is not None:
+        main_query.update(updates)
+
+    return main_query
 
 
 def build_coverage_query(court, q):
@@ -674,8 +704,12 @@ def build_coverage_query(court, q):
     return params
 
 
-def build_court_count_query():
-    """Build a query that returns the count of cases for all courts"""
+def build_court_count_query(group=False):
+    """Build a query that returns the count of cases for all courts
+
+    :param group: Should the results be grouped? Note that grouped facets have
+    bad performance.
+    """
     params = {
         'q': '*',
         'facet': 'true',
@@ -684,4 +718,12 @@ def build_court_count_query():
         'rows': 0,
         'caller': 'build_court_count_query',
     }
+    if group:
+        params.update({
+            'group': 'true',
+            'group.ngroups': 'true',
+            'group.field': 'docket_id',
+            'group.limit': '0',
+            'group.facet': 'true',
+        })
     return params
