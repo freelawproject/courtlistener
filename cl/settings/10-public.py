@@ -156,6 +156,11 @@ SOLR_TEST_URLS = {
     'person': SOLR_PEOPLE_TEST_URL,
     'recap': SOLR_RECAP_TEST_URL,
 }
+SOLR_EXAMPLE_CORE_PATH = os.path.join(os.sep, 'usr', 'local', 'solr',
+                                      'example', 'solr', 'collection1')
+SOLR_TEMP_CORE_PATH_LOCAL = os.path.join(os.sep, 'tmp', 'solr')
+SOLR_TEMP_CORE_PATH_REMOTE = os.path.join(os.sep, 'tmp', 'solr')
+
 
 #########
 # Redis #
