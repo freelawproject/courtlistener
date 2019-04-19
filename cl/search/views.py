@@ -20,6 +20,7 @@ from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
+from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     make_stats_variable, merge_form_with_courts, make_get_string, \
@@ -196,6 +197,7 @@ def get_homepage_stats():
 
 
 @never_cache
+@ratelimit_if_not_whitelisted
 def show_results(request):
     """
     This view can vary significantly, depending on how it is called:
