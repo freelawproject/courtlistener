@@ -61,7 +61,7 @@ def core_docket_data(request, pk):
         favorite_form = FavoriteForm(instance=fave)
 
     has_alert = False
-    if request.user.is_authenticated():
+    if request.user.is_authenticated:
         has_alert = DocketAlert.objects.filter(docket=docket,
                                                user=request.user).exists()
 

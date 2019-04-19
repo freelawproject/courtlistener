@@ -275,7 +275,7 @@ def register(request):
     elif '//' in redirect_to and re.match(r'[^\?]*//', redirect_to):
         redirect_to = settings.LOGIN_REDIRECT_URL
 
-    if request.user.is_anonymous():
+    if request.user.is_anonymous:
         if request.method == 'POST':
             try:
                 stub_account = User.objects.filter(
