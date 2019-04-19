@@ -1417,7 +1417,7 @@ class Court(models.Model):
     )
     full_name = models.CharField(
         help_text='the full name of the court',
-        max_length='200',
+        max_length=200,
         blank=False,
     )
     url = models.URLField(
