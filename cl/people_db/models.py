@@ -1,7 +1,7 @@
 # coding=utf-8
 from datetime import datetime, time
 
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db import models
 from django.template import loader
 from django.utils.text import slugify

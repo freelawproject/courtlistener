@@ -3,7 +3,7 @@ Unit tests for Visualizations
 """
 from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from cl.visualizations.forms import VizForm
 from cl.visualizations.models import SCOTUSMap, JSONVersion
 from cl.visualizations import utils, views

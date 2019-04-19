@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.core.mail import send_mail
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.utils.timezone import now
 
 from cl.donate.models import MonthlyDonation, Donation, PAYMENT_TYPES

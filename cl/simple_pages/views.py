@@ -8,7 +8,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import EmailMessage
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db.models import Count, Sum
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect, Http404

@@ -9,7 +9,7 @@ import redis
 from django.conf import settings
 from django.contrib.auth.models import User, Permission
 from django.core import mail
-from django.core.urlresolvers import reverse, ResolverMatch
+from django.urls import reverse, ResolverMatch
 from django.http import HttpRequest, JsonResponse
 from django.test import Client, override_settings, RequestFactory, TestCase, \
     TransactionTestCase
