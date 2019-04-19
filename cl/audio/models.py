@@ -1,6 +1,6 @@
 import json
 
-from django.core.urlresolvers import reverse, NoReverseMatch
+from django.urls import reverse, NoReverseMatch
 from django.db import models
 from django.template import loader
 

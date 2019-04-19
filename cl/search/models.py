@@ -5,7 +5,7 @@ import re
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
-from django.core.urlresolvers import reverse, NoReverseMatch
+from django.urls import reverse, NoReverseMatch
 from django.db import models
 from django.db.models import Prefetch, Q
 from django.template import loader

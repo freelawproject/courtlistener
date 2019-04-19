@@ -3,7 +3,7 @@ import logging
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import User
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.http import HttpResponseRedirect, HttpResponseNotAllowed, \
     HttpResponse
 from django.shortcuts import render

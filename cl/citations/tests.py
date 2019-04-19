@@ -2,7 +2,7 @@
 from datetime import date
 
 from django.core.management import call_command
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import TestCase, SimpleTestCase
 from lxml import etree
 from reporters_db import REPORTERS

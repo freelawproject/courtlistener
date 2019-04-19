@@ -1,6 +1,6 @@
 import time
 
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import Client, TestCase
 from timeout_decorator import timeout_decorator
 
