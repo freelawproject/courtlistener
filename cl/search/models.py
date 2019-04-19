@@ -108,8 +108,9 @@ class OriginatingCourtInformation(models.Model):
     )
     assigned_to = models.ForeignKey(
         'people_db.Person',
-        related_name='original_court_info',
         help_text="The judge the case was assigned to.",
+        related_name='original_court_info',
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
@@ -121,6 +122,7 @@ class OriginatingCourtInformation(models.Model):
         'people_db.Person',
         related_name='+',
         help_text="The judge that issued the final order in the case.",
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
@@ -234,6 +236,7 @@ class Docket(models.Model):
     court = models.ForeignKey(
         'Court',
         help_text="The court where the docket was filed",
+        on_delete=models.CASCADE,
         db_index=True,
         related_name='dockets',
     )
@@ -245,6 +248,7 @@ class Docket(models.Model):
                   "populated historically or due to our inability to "
                   "normalize the value in appeal_from_str.",
         related_name='+',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -261,6 +265,7 @@ class Docket(models.Model):
         OriginatingCourtInformation,
         help_text="Lower court information for appellate dockets",
         related_name="docket",
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -269,6 +274,7 @@ class Docket(models.Model):
         help_text="Data from the FJC Integrated Database associated with this "
                   "case.",
         related_name="docket",
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -289,6 +295,7 @@ class Docket(models.Model):
         'people_db.Person',
         related_name='assigning',
         help_text="The judge the case was assigned to.",
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
@@ -300,6 +307,7 @@ class Docket(models.Model):
         'people_db.Person',
         related_name='referring',
         help_text="The judge to whom the 'assigned_to' judge is delegated.",
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
@@ -785,6 +793,7 @@ class DocketEntry(models.Model):
                   "object. Specifies which docket the docket entry "
                   "belongs to.",
         related_name="docket_entries",
+        on_delete=models.CASCADE,
     )
     tags = models.ManyToManyField(
         'search.Tag',
@@ -894,6 +903,7 @@ class RECAPDocument(models.Model):
                   "Multiple documents can belong to a DocketEntry. "
                   "(Attachments and Documents together)",
         related_name="recap_documents",
+        on_delete=models.CASCADE,
     )
     tags = models.ManyToManyField(
         'search.Tag',
@@ -1498,6 +1508,7 @@ class OpinionCluster(models.Model):
         Docket,
         help_text="The docket that the opinion cluster is a part of",
         related_name="clusters",
+        on_delete=models.CASCADE,
     )
     panel = models.ManyToManyField(
         'people_db.Person',
@@ -1854,6 +1865,7 @@ class Citation(models.Model):
         OpinionCluster,
         help_text="The cluster that the citation applies to",
         related_name="citations",
+        on_delete=models.CASCADE,
     )
     volume = models.SmallIntegerField(
         help_text="The volume of the reporter",
@@ -1951,6 +1963,7 @@ class Opinion(models.Model):
         OpinionCluster,
         help_text="The cluster that the opinion is a part of",
         related_name="sub_opinions",
+        on_delete=models.CASCADE,
     )
     opinions_cited = models.ManyToManyField(
         'self',
@@ -1965,6 +1978,7 @@ class Opinion(models.Model):
         'people_db.Person',
         help_text="The primary author of this opinion as a normalized field",
         related_name='opinions_written',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -2185,10 +2199,12 @@ class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
         Opinion,
         related_name='cited_opinions',
+        on_delete=models.CASCADE,
     )
     cited_opinion = models.ForeignKey(
         Opinion,
         related_name='citing_opinions',
+        on_delete=models.CASCADE,
     )
     #  depth = models.IntegerField(
     #      help_text='The number of times the cited opinion was cited '
@@ -2278,10 +2294,12 @@ class Tag(models.Model):
 #     upper_court = models.ForeignKey(
 #         Court,
 #         related_name='lower_courts_reviewed',
+#         on_delete=models.CASCADE,
 #     )
 #     lower_court = models.ForeignKey(
 #         Court,
 #         related_name='reviewed_by',
+#         on_delete=models.CASCADE,
 #     )
 #     date_start = models.DateTimeField(
 #         help_text="The date this appellate review relationship began",

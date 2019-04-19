@@ -35,6 +35,7 @@ class Event(models.Model):
         User,
         help_text="A user associated with the event.",
         related_name="events",
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )

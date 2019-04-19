@@ -23,6 +23,7 @@ class Alert(models.Model):
         User,
         help_text="The user that created the item",
         related_name="alerts",
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -88,11 +89,13 @@ class DocketAlert(models.Model):
         Docket,
         help_text="The docket that we are subscribed to.",
         related_name='alerts',
+        on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
         User,
         help_text="The user that is subscribed to the docket.",
         related_name="docket_alerts",
+        on_delete=models.CASCADE,
     )
     secret_key = models.CharField(
         verbose_name="A key to be used in links to access the alert without "
