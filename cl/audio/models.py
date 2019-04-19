@@ -31,6 +31,7 @@ class Audio(models.Model):
         Docket,
         help_text="The docket that the oral argument is a part of",
         related_name="audio_files",
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )

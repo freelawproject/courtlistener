@@ -21,16 +21,19 @@ class SCOTUSMap(models.Model):
         User,
         help_text="The user that owns the visualization",
         related_name="scotus_maps",
+        on_delete=models.CASCADE,
     )
     cluster_start = models.ForeignKey(
         OpinionCluster,
         help_text="The starting cluster for the visualization",
         related_name='visualizations_starting_here',
+        on_delete=models.CASCADE,
     )
     cluster_end = models.ForeignKey(
         OpinionCluster,
         help_text="The ending cluster for the visualization",
         related_name='visualizations_ending_here',
+        on_delete=models.CASCADE,
     )
     clusters = models.ManyToManyField(
         OpinionCluster,
@@ -365,6 +368,7 @@ class Referer(models.Model):
         help_text="The visualization that was embedded and which generated a "
                   "referer",
         related_name='referers',
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -408,6 +412,7 @@ class JSONVersion(models.Model):
         SCOTUSMap,
         help_text='The visualization that the json is affiliated with.',
         related_name="json_versions",
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",

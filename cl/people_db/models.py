@@ -72,6 +72,7 @@ class Person(models.Model):
         help_text="Any nicknames or other aliases that a person has. For "
                   "example, William Jefferson Clinton has an alias to Bill",
         related_name="aliases",
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -356,6 +357,7 @@ class School(models.Model):
     is_alias_of = models.ForeignKey(
         'self',
         help_text="Any alternate names that a school may have",
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -553,6 +555,7 @@ class Position(models.Model):
         Person,
         help_text="The person that held the position.",
         related_name='positions',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -561,6 +564,7 @@ class Position(models.Model):
         help_text="If this was a judicial position, this is the jurisdiction "
                   "where it was held.",
         related_name='court_positions',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -568,6 +572,7 @@ class Position(models.Model):
         School,
         help_text="If this was an academic job, this is the school where the "
                   "person worked.",
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -595,6 +600,7 @@ class Position(models.Model):
                   "allows you to know the position a person held when an "
                   "appointment was made.",
         related_name='appointed_positions',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -602,12 +608,14 @@ class Position(models.Model):
         Person,
         help_text="If this is a clerkship, the supervising judge.",
         related_name='supervised_positions',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
     predecessor = models.ForeignKey(
         Person,
         help_text="The person that previously held this position",
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -889,6 +897,7 @@ class RetentionEvent(models.Model):
         Position,
         help_text="The position that was retained by this event.",
         related_name='retention_events',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -986,6 +995,7 @@ class Education(models.Model):
         Person,
         help_text="The person that completed this education",
         related_name='educations',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -993,6 +1003,7 @@ class Education(models.Model):
         School,
         help_text="The school where this education was compeleted",
         related_name='educations',
+        on_delete=models.CASCADE,
     )
     degree_level = models.CharField(
         help_text="Normalized degree level, e.g. BA, JD.",
@@ -1077,6 +1088,7 @@ class PoliticalAffiliation(models.Model):
         Person,
         help_text="The person with the political affiliation",
         related_name='political_affiliations',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -1127,6 +1139,7 @@ class Source(models.Model):
     person = models.ForeignKey(
         Person,
         related_name='sources',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -1169,6 +1182,7 @@ class ABARating(models.Model):
         Person,
         help_text="The person rated by the American Bar Association",
         related_name='aba_ratings',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -1211,6 +1225,7 @@ class FinancialDisclosure(models.Model):
         Person,
         help_text="The person that the document is associated with.",
         related_name='financial_disclosures',
+        on_delete=models.CASCADE,
     )
     year = models.SmallIntegerField(
         help_text="The year that the disclosure corresponds with",
@@ -1259,10 +1274,12 @@ class PartyType(models.Model):
     docket = models.ForeignKey(
         'search.Docket',
         related_name="party_types",
+        on_delete=models.CASCADE,
     )
     party = models.ForeignKey(
         'Party',
         related_name="party_types",
+        on_delete=models.CASCADE,
     )
     name = models.CharField(
         help_text="The name of the type (Defendant, Plaintiff, etc.)",
@@ -1317,6 +1334,7 @@ class CriminalCount(models.Model):
         PartyType,
         help_text="The docket and party the counts are associated with.",
         related_name="criminal_counts",
+        on_delete=models.CASCADE,
     )
     name = models.TextField(
         help_text="The name of the count, such as '21:952 and 960 - "
@@ -1351,6 +1369,7 @@ class CriminalComplaint(models.Model):
         PartyType,
         help_text="The docket and party the complaints are associated with.",
         related_name="criminal_complaints",
+        on_delete=models.CASCADE,
     )
     name = models.TextField(
         help_text="The name of the criminal complaint, for example, '8:1326 "
@@ -1425,15 +1444,18 @@ class Role(models.Model):
     party = models.ForeignKey(
         Party,
         related_name="roles",
+        on_delete=models.CASCADE,
     )
     attorney = models.ForeignKey(
         "Attorney",
         related_name="roles",
+        on_delete=models.CASCADE,
     )
     docket = models.ForeignKey(
         "search.Docket",
         help_text="The attorney represented the party on this docket in this "
                   "role.",
+        on_delete=models.CASCADE,
     )
     role = models.SmallIntegerField(
         help_text="The name of the attorney's role. Used primarily in "
@@ -1521,15 +1543,18 @@ class AttorneyOrganizationAssociation(models.Model):
     attorney = models.ForeignKey(
         Attorney,
         related_name="attorney_organization_associations",
+        on_delete=models.CASCADE,
     )
     attorney_organization = models.ForeignKey(
         "AttorneyOrganization",
         related_name="attorney_organization_associations",
+        on_delete=models.CASCADE,
     )
     docket = models.ForeignKey(
         "search.Docket",
         help_text="The docket that the attorney worked on while at this "
                   "organization.",
+        on_delete=models.CASCADE,
     )
 
     class Meta:

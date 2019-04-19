@@ -35,6 +35,7 @@ class RssFeedStatus(models.Model):
         Court,
         help_text="The court where the upload was from",
         related_name='rss_feed_statuses',
+        on_delete=models.CASCADE,
     )
     date_last_build = models.DateTimeField(
         help_text="The dateLastBuilt field from the feed when it was visited.",
