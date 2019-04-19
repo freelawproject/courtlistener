@@ -231,7 +231,7 @@ class LoggingMixin(object):
         if total_count in MILESTONES_FLAT:
             Event.objects.create(description="API has logged %s total requests."
                                              % total_count)
-        if user.is_authenticated():
+        if user.is_authenticated:
             if user_count in self.milestones:
                 Event.objects.create(
                     description="User '%s' has placed their %s API request." %

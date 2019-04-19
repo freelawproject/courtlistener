@@ -297,7 +297,7 @@ def show_results(request):
             # User placed a search or is trying to edit an alert
             if request.GET.get('edit_alert'):
                 # They're editing an alert
-                if request.user.is_anonymous():
+                if request.user.is_anonymous:
                     return HttpResponseRedirect(
                         "{path}?next={next}{encoded_params}".format(
                             path=reverse('sign-in'),
