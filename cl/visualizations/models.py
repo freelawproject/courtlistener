@@ -382,7 +382,7 @@ class Referer(models.Model):
     )
     url = models.URLField(
         help_text="The URL where this item was embedded.",
-        max_length="3000",
+        max_length=3000,
         db_index=True,
     )
     page_title = models.CharField(

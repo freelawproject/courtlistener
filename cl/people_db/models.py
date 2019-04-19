@@ -1283,7 +1283,7 @@ class PartyType(models.Model):
     )
     name = models.CharField(
         help_text="The name of the type (Defendant, Plaintiff, etc.)",
-        max_length="100",  # 2× the max in first 100,000 sampled.
+        max_length=100,  # 2× the max in first 100,000 sampled.
         db_index=True,
     )
     date_terminated = models.DateField(
