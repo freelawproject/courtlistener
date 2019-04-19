@@ -414,6 +414,8 @@ class CitationCommandTest(IndexedSolrTestCase):
 
 
 class ParallelCitationTest(SimpleTestCase):
+    allow_database_queries = True
+
     def test_identifying_parallel_citations(self):
         """Given a string, can we identify parallel citations"""
         tests = (
