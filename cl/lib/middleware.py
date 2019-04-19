@@ -2,10 +2,11 @@ from django.conf import settings
 from django.core.exceptions import MiddlewareNotUsed
 from django.shortcuts import render
 from django.utils.cache import add_never_cache_headers
+from django.utils.deprecation import MiddlewareMixin
 from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE
 
 
-class MaintenanceModeMiddleware(object):
+class MaintenanceModeMiddleware(MiddlewareMixin):
     """ Provides maintenance mode if requested in settings.
 
     This cribs heavily from:
@@ -27,8 +28,8 @@ class MaintenanceModeMiddleware(object):
     We also eschew using the code from Github to reduce our reliance on third-
     party code.
     """
-    def __init__(self):
-        super(MaintenanceModeMiddleware, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(MaintenanceModeMiddleware, self).__init__(*args, **kwargs)
         if not settings.MAINTENANCE_MODE_ENABLED:
             raise MiddlewareNotUsed
 
