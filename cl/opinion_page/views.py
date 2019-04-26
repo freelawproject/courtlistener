@@ -2,6 +2,7 @@ from collections import defaultdict, OrderedDict
 from itertools import groupby
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
@@ -293,9 +294,17 @@ def view_opinion(request, pk, _):
         }
         citing_clusters = conn.raw_query(**q).execute()
 
-        # Get recommendations with MoreLikeThis query
-        mlt_query = conn.query(id=pk).mlt('text').field_limit(fields=['id', 'caseName', 'absolute_url'])
-        recommendations = mlt_query.execute().more_like_this.docs
+        # Get recommendations with MoreLikeThis query (cached)
+        mlt_cache_key = 'opinion-mlt%s' % pk
+        recommendations = cache.get(mlt_cache_key)
+
+        if recommendations is None:
+            mlt_query = conn.query(id=pk)\
+                .mlt('text', count=5)\
+                .field_limit(fields=['id', 'caseName', 'absolute_url'])
+            recommendations = mlt_query.execute().more_like_this.docs
+
+            cache.set(mlt_cache_key, recommendations, 60 * 60 * 24)
     else:
         citing_clusters = None
         recommendations = None

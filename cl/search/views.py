@@ -21,10 +21,10 @@ from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
-from cl.lib.scorched_utils import ExtraSolrInterface, MoreLikeThisHighlightsSolrInterface, MoreLikeThisHighlightsSolrSearch
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     make_stats_variable, merge_form_with_courts, make_get_string, \
-    regroup_snippets
+    regroup_snippets, get_mlt_query
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
 from cl.stats.models import Stat
@@ -41,57 +41,7 @@ def check_pagination_depth(page_number):
         return True
     return False
 
-
-def get_mlt_query(cd, facet, solr_url, seed_pk, filter_query):
-    """
-    By default Solr MoreLikeThis queries do not support highlighting. Thus, we use a special search interface
-    and build the Solr query manually.
-
-    :param cd: Cleaned search form data
-    :param facet: Set to True to enable facets
-    :param solr_url: URL from Solr endpoint, e.g. settings.SOLR_OPINION_URL
-    :param seed_pk: ID of the document for that related documents should be returned
-    :param filter_query:
-    :return: Executed SolrSearch
-    """
-    si = MoreLikeThisHighlightsSolrInterface(solr_url, mode='r')
-
-    print('Related for #{}, filter query: {}'.format(seed_pk, filter_query))
-
-    # Reset query for query builder
-    cd['q'] = ''
-
-    # Build main query as always
-    q = build_main_query(cd, facet=facet)
-
-    # Option A: strip field queries, e.g. foo:bar would produce an invalid filter_query
-    # Option B: parse original query + validate all field names (not in use)
-    cleaned_fq = re.sub('[^-!"()0-9a-zA-Z]+', ' ', filter_query.strip())
-
-    q.update({
-        'caller': 'mlt_query',
-        'q': 'id:' + seed_pk,
-        'mlt': 'true',  # Python boolean does not work here
-        'mlt.fl': 'text',
-
-        # Retrieve fields as highlight replacement
-        'fl': q['fl'] + ',' + (','.join(MoreLikeThisHighlightsSolrSearch.highlight_fields)),
-
-        # Original query as filter query
-        'fq': q['fq'] + [cleaned_fq],
-
-        # unset fields not used for MLT
-        'boost': '',
-        'pf': '',
-        'ps': '',
-        'qf': '',
-    })
-
-    return si.query().add_extra(**q)
-
-
 def do_search(request, rows=20, order_by=None, type=None, facet=True):
-
     query_citation = None
     error = False
     paged_results = None
@@ -108,13 +58,17 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
         search_form = _clean_form(request, cd, courts)
 
         if cd['type'] == 'o':
-            # This is a `related:` prefix query?
-            related_prefix_match = re.search(r'^related:opinion(?P<pk>[0-9]+)(?P<fq>.*)', cd['q'])
+            # This is a `related:<pk>` prefix query?
+            related_prefix_match = re.search(r'(^|\s)(?P<pfx>related:(?P<pk>[0-9]+))($|\s)', cd['q'])
             if related_prefix_match:
-                results = get_mlt_query(cd, facet, settings.SOLR_OPINION_URL,
-                                        related_prefix_match.group('pk'),
-                                        related_prefix_match.group('fq'))
-
+                results = get_mlt_query(
+                    cd,
+                    facet,
+                    settings.SOLR_OPINION_URL,
+                    settings.SOLR_OPINION_HL_FIELDS,
+                    related_prefix_match.group('pk'),
+                    cd['q'].replace(related_prefix_match.group('pfx'), '')
+                )
             else:
                 # Default search interface
                 si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')

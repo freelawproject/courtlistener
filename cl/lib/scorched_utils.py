@@ -84,19 +84,6 @@ class MoreLikeThisHighlightsSolrSearch(ExtraSolrSearch):
     # Limit length of text field
     text_max_length = 500
 
-    # highlight fields (from search_utils)
-    highlight_fields = [
-        'caseName',
-        'citation',
-        'court_citation_string',
-        'docketNumber',
-        'judge',
-        'lexisCite',
-        'neutralCite',
-        'suitNature',
-        'text'
-    ]
-
     def execute(self, constructor=None):
         """
         Execute MLT-query.
@@ -111,7 +98,7 @@ class MoreLikeThisHighlightsSolrSearch(ExtraSolrSearch):
             doc['solr_highlights'] = {}
 
             # Copy each highlight field
-            for field_name in self.highlight_fields:
+            for field_name in self.interface.hl_fields:
                 if field_name in doc:
                     if field_name == 'text':  # max text length
                         doc[field_name] = doc[field_name][:self.text_max_length]
@@ -128,8 +115,10 @@ class MoreLikeThisHighlightsSolrInterface(ExtraSolrInterface):
     """
     A search interface especially for MoreLikeThis queries (with highlights)
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, hl_fields, *args, **kwargs):
         super(MoreLikeThisHighlightsSolrInterface, self).__init__(*args, **kwargs)
+
+        self.hl_fields = hl_fields
 
     def query(self, *args, **kwargs):
         """
