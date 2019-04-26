@@ -1,0 +1,18 @@
+{% load text_filters %}
+
+<ul>
+    {% for opinion in opinions %}
+        <li>
+            <a href="{{ opinion.absolute_url }}?{{ request.META.QUERY_STRING }}">
+                {% with opinion.title as title  %}
+                  {{ opinion.caseName|default:title|default_if_none:"N/A"|safe|truncatewords:10|v_wrapper }}
+                {% endwith %}
+            </a>
+        </li>
+    {% endfor %}
+</ul>
+<p>
+    <a href="{{ full_list_url }}" class="btn btn-default">
+        View Full List
+    </a>
+</p>

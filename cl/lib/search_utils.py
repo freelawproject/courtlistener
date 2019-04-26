@@ -7,6 +7,7 @@ from django.http import QueryDict
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
+from cl.lib.scorched_utils import MoreLikeThisHighlightsSolrInterface, MoreLikeThisHighlightsSolrSearch
 from cl.search.forms import SearchForm
 from cl.search.models import Court
 
@@ -432,27 +433,23 @@ def add_highlighting(main_params, cd, highlight):
         fl = ['absolute_url', 'citeCount', 'court_id', 'dateFiled',
               'download_url', 'id',  'local_path', 'sibling_ids', 'source',
               'status']
-        hlfl = ['caseName', 'citation', 'court_citation_string', 'docketNumber',
-                'judge', 'lexisCite', 'neutralCite', 'suitNature', 'text']
+        hlfl = settings.SOLR_OPINION_HL_FIELDS
     elif cd['type'] == 'r':
         fl = ['absolute_url', 'assigned_to_id', 'attachment_number', 'attorney',
               'court_id', 'dateArgued', 'dateFiled', 'dateTerminated',
               'docket_absolute_url', 'docket_id', 'document_number', 'id',
               'is_available', 'page_count', 'party', 'referred_to_id']
-        hlfl = ['assignedTo', 'caseName', 'cause', 'court_citation_string',
-                'docketNumber', 'juryDemand', 'referredTo', 'short_description',
-                'suitNature', 'text']
+        hlfl = settings.SOLR_RECAP_HL_FIELDS
     elif cd['type'] == 'oa':
         fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
               'download_url', 'docket_id', 'dateArgued', 'duration']
-        hlfl = ['text', 'caseName', 'judge', 'docketNumber',
-                'court_citation_string']
+        hlfl = settings.SOLR_AUDIO_HL_FIELDS
     elif cd['type'] == 'p':
         fl = ['id', 'absolute_url', 'dob', 'date_granularity_dob', 'dod',
               'date_granularity_dod', 'political_affiliation',
               'aba_rating', 'school', 'appointer', 'supervisor', 'predecessor',
               'selection_method', 'court']
-        hlfl = ['name', 'dob_city', 'dob_state', 'name_reverse']
+        hlfl = settings.SOLR_PEOPLE_HL_FIELDS
 
     main_params.update({
         'fl': ','.join(fl),
@@ -727,3 +724,47 @@ def build_court_count_query(group=False):
             'group.facet': 'true',
         })
     return params
+
+
+def get_mlt_query(cd, facet, solr_url, hl_fields, seed_pk, filter_query):
+    """
+    By default Solr MoreLikeThis queries do not support highlighting. Thus, we use a special search interface
+    and build the Solr query manually.
+
+    :param cd: Cleaned search form data
+    :param facet: Set to True to enable facets
+    :param solr_url: URL from Solr endpoint, e.g. settings.SOLR_OPINION_URL
+    :param hl_fields: List of fields for highlighting, e.g. settings.SOLR_OPINION_HL_FIELDS
+    :param seed_pk: ID of the document for that related documents should be returned
+    :param filter_query:
+    :return: Executed SolrSearch
+    """
+    si = MoreLikeThisHighlightsSolrInterface(hl_fields, solr_url, mode='r')
+
+    # Reset query for query builder
+    cd['q'] = ''
+
+    # Build main query as always
+    q = build_main_query(cd, facet=facet)
+    cleaned_fq = filter_query.strip()
+
+    q.update({
+        'caller': 'mlt_query',
+        'q': 'id:' + seed_pk,
+        'mlt': 'true',  # Python boolean does not work here
+        'mlt.fl': 'text',
+
+        # Retrieve fields as highlight replacement
+        'fl': q['fl'] + ',' + (','.join(hl_fields)),
+
+        # Original query as filter query
+        'fq': q['fq'] + [cleaned_fq],
+
+        # unset fields not used for MLT
+        'boost': '',
+        'pf': '',
+        'ps': '',
+        'qf': '',
+    })
+
+    return si.query().add_extra(**q)

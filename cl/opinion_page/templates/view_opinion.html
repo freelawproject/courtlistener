@@ -126,48 +126,31 @@
             </div>
         {% endif %}
 
-        {# Visualizations #}
-        {% if cluster.top_visualizations %}
-            <div id="visualizations" class="sidebar-section">
-                <h3><span>Visualizations</span></h3>
-                <ul>
-                    {% for viz in cluster.top_visualizations|slice:":5" %}
-                        <li>
-                            <a href="{{ viz.get_absolute_url }}">
-                                {{ viz.title|truncatewords:10 }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-                <p>
-                    <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
-                       class="btn btn-default">
-                        View Full List
-                    </a>
-                </p>
-            </div>
-        {% endif %}
-
         {# Recommendations #}
         {% if recommendations %}
             <div id="recommendations" class="sidebar-section">
                 <h3><span>Related Opinions</span></h3>
+
                 <p class="bottom">The following opinions cover similar topics:</p>
-                <ul>
-                    {% for rec in recommendations %}
-                        <li>
-                            <a href="{{ rec.absolute_url }}?{{ request.META.QUERY_STRING }}">
-                                {{ rec.caseName|safe|truncatewords:10|v_wrapper }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-                <p>
-                    <a href="{% url 'show_results' %}?q=related:opinion{{ cluster.pk }}"
-                       class="btn btn-default">
-                        View Full List
-                    </a>
-                </p>
+
+                {% url 'show_results' as show_results_url %}
+                {% with pk_str=cluster.pk|stringformat:"s" %}
+                    {% with opinions=recommendations full_list_url=show_results_url|add:"?q=related:"|add:pk_str %}
+                      {% include 'includes/opinions_sidebar.html' %}
+                    {% endwith %}
+                {% endwith %}
+            </div>
+        {% endif %}
+
+        {# Visualizations #}
+        {% if cluster.top_visualizations %}
+            <div id="visualizations" class="sidebar-section">
+                <h3><span>Visualizations</span></h3>
+                {% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug as cluster_visualizations_url %}
+
+                {% with opinions=cluster.top_visualizations|slice:":5" full_list_url=cluster_visualizations_url|add:"?q"|add:request.META.QUERY_STRING %}
+                    {% include 'includes/opinions_sidebar.html' %}
+                {% endwith %}
             </div>
         {% endif %}
 
