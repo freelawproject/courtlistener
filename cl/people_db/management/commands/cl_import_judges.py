@@ -15,7 +15,7 @@ from cl.people_db.import_judges.populate_presidents import make_president
 from cl.people_db.import_judges.populate_state_judges import make_state_judge
 from cl.people_db.models import Person, Position
 from cl.search.models import Court
-from cl.search.tasks import add_or_update_people
+from cl.search.tasks import add_items_to_solr
 
 
 class Command(VerboseCommand):
@@ -213,7 +213,7 @@ class Command(VerboseCommand):
                     add_positions_from_row(item, p, self.debug,
                                            fix_nums=[posnum])
                     if not self.debug:
-                        add_or_update_people.delay([p.pk])
+                        add_items_to_solr.delay([p.pk], 'people_db.Person')
                     continue
                 elif position_count == 1:
                     # Good case. Press on!
@@ -235,7 +235,7 @@ class Command(VerboseCommand):
 
                     if not self.debug:
                         position.save()
-                        add_or_update_people.delay([p.pk])
+                        add_items_to_solr.delay([p.pk], 'people_db.Person')
 
     VALID_ACTIONS = {
         'import-all': import_all,

@@ -24,7 +24,7 @@ from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import Court, Docket, Opinion, OpinionCluster, \
     RECAPDocument, DocketEntry, Citation, sort_cites
-from cl.search.tasks import add_or_update_recap_document
+from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
@@ -276,8 +276,7 @@ class IndexingTest(EmptySolrTestCase):
         # Do the absolute URLs differ when pulled from the DB?
         self.assertNotEqual(rd1.get_absolute_url(), rd2.get_absolute_url())
 
-        add_or_update_recap_document([rd1.pk, rd2.pk], coalesce_docket=True,
-                                     force_commit=True)
+        add_docket_to_solr_by_rds([rd1.pk, rd2.pk], force_commit=True)
 
         # Do the absolute URLs differ when pulled from Solr?
         r1 = self.si_recap.get(rd1.pk)

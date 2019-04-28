@@ -16,7 +16,7 @@ from selenium.webdriver.support.expected_conditions import staleness_of
 from cl.audio.models import Audio
 from cl.lib.solr_core_admin import create_temp_solr_core, delete_solr_core
 from cl.search.models import Opinion
-from cl.search.tasks import add_or_update_opinions, add_or_update_audio_files
+from cl.search.tasks import add_items_to_solr
 
 SELENIUM_TIMEOUT = 120
 if 'SELENIUM_TIMEOUT' in os.environ:
@@ -149,9 +149,9 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         # objects, we'll avoid using the cl_update_index command and do
         # this the hard way using tasks
         opinion_keys = Opinion.objects.values_list('pk', flat=True)
-        add_or_update_opinions(opinion_keys, force_commit=True)
+        add_items_to_solr(opinion_keys, 'search.Opinion', force_commit=True)
         audio_keys = Audio.objects.values_list('pk', flat=True)
-        add_or_update_audio_files(audio_keys, force_commit=True)
+        add_items_to_solr(audio_keys, 'audio.Audio', force_commit=True)
 
     @staticmethod
     def _teardown_test_solr():

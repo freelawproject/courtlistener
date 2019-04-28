@@ -15,7 +15,7 @@ from cl.lib.search_utils import build_main_query_from_query_string
 from cl.recap.tasks import process_recap_attachment
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
-from cl.search.tasks import add_or_update_recap_document
+from cl.search.tasks import add_items_to_solr
 
 PACER_USERNAME = os.environ['PACER_USERNAME']
 PACER_PASSWORD = os.environ['PACER_PASSWORD']
@@ -132,7 +132,7 @@ def get_documents(options):
             get_pacer_doc_by_rd.s(rd.pk, session.cookies,
                                   tag=TAG_PHASE_2).set(queue=q),
             extract_recap_pdf.si(rd.pk).set(queue=q),
-            add_or_update_recap_document.si([rd.pk]).set(queue=q),
+            add_items_to_solr.si([rd.pk], 'search.RECAPDocument').set(queue=q),
         ).apply_async()
         i += 1
 

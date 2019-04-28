@@ -1162,9 +1162,9 @@ class RECAPDocument(models.Model):
             from cl.scrapers.tasks import extract_recap_pdf
             tasks.append(extract_recap_pdf.si(self.pk))
         if index:
-            from cl.search.tasks import add_or_update_recap_document
-            tasks.append(add_or_update_recap_document.si([self.pk],
-                                                         force_commit=False))
+            from cl.search.tasks import add_items_to_solr
+            tasks.append(add_items_to_solr.si([self.pk],
+                                              'search.RECAPDocument'))
         if len(tasks) > 0:
             chain(*tasks)()
 
@@ -1823,8 +1823,9 @@ class OpinionCluster(models.Model):
         self.slug = slugify(trunc(best_case_name(self), 75))
         super(OpinionCluster, self).save(*args, **kwargs)
         if index:
-            from cl.search.tasks import add_or_update_cluster
-            add_or_update_cluster.delay(self.pk, force_commit)
+            from cl.search.tasks import add_items_to_solr
+            add_items_to_solr.delay([self.pk], 'search.OpinionCluster',
+                                    force_commit)
 
     def delete(self, *args, **kwargs):
         """
@@ -2098,8 +2099,8 @@ class Opinion(models.Model):
     def save(self, index=True, force_commit=False, *args, **kwargs):
         super(Opinion, self).save(*args, **kwargs)
         if index:
-            from cl.search.tasks import add_or_update_opinions
-            add_or_update_opinions.delay([self.pk], force_commit)
+            from cl.search.tasks import add_items_to_solr
+            add_items_to_solr.delay([self.pk], 'search.Opinion', force_commit)
 
     def as_search_dict(self):
         """Create a dict that can be ingested by Solr."""

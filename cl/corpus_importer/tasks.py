@@ -58,7 +58,7 @@ from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
-from cl.search.tasks import add_or_update_recap_document
+from cl.search.tasks import add_items_to_solr
 
 logger = logging.getLogger(__name__)
 
@@ -1267,7 +1267,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
 
     # Skip OCR for now. It'll happen in a second step.
     extract_recap_pdf(rd.pk, skip_ocr=True)
-    add_or_update_recap_document([rd.pk])
+    add_items_to_solr([rd.pk], 'search.RECAPDocument')
 
 
 @app.task(bind=True, max_retries=15, interval_start=5,
