@@ -35,8 +35,7 @@ from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE, \
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import Docket, DocketEntry, RECAPDocument, \
     OriginatingCourtInformation, Court, Tag
-from cl.search.tasks import add_or_update_recap_docket, \
-    add_or_update_recap_document
+from cl.search.tasks import add_or_update_recap_docket, add_items_to_solr
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -240,7 +239,7 @@ def process_recap_pdf(self, pk):
 
     if not existing_document and not pq.debug:
         extract_recap_pdf(rd.pk)
-        add_or_update_recap_document([rd.pk], force_commit=False)
+        add_items_to_solr([rd.pk], 'search.RECAPDocument')
 
     mark_pq_successful(pq, d_id=rd.docket_entry.docket_id,
                        de_id=rd.docket_entry_id, rd_id=rd.pk)
@@ -1314,7 +1313,7 @@ def process_recap_attachment(self, pk, tag_names=None):
                         tag.tag_object(rd)
 
                 # Do *not* do this async — that can cause race conditions.
-                add_or_update_recap_document([rd.pk], force_commit=False)
+                add_items_to_solr([rd.pk], 'search.RECAPDocument')
 
     mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
     process_orphan_documents(rds_created, pq.court_id,

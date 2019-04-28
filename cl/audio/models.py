@@ -187,8 +187,8 @@ class Audio(models.Model):
         """
         super(Audio, self).save(*args, **kwargs)
         if index:
-            from cl.search.tasks import add_or_update_audio_files
-            add_or_update_audio_files([self.pk], force_commit)
+            from cl.search.tasks import add_items_to_solr
+            add_items_to_solr([self.pk], 'audio.Audio', force_commit)
 
     def delete(self, *args, **kwargs):
         """
