@@ -136,7 +136,6 @@ class PositionFilter(FilterSet):
 
 
 class PersonFilter(FilterSet):
-    # filter_overrides = default_filter_overrides
     educations = filters.RelatedFilter(EducationFilter)
     political_affiliations = filters.RelatedFilter(PoliticalAffiliationFilter)
     sources = filters.RelatedFilter(SourceFilter)
