@@ -16,6 +16,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='event',
             name='user',
-            field=models.ForeignKey(related_name='events', blank=True, to=settings.AUTH_USER_MODEL, help_text=b'A user associated with the event.', null=True),
+            field=models.ForeignKey(related_name='events', blank=True, to=settings.AUTH_USER_MODEL, help_text=b'A user associated with the event.', null=True,
+                                    on_delete=models.CASCADE),
         ),
     ]

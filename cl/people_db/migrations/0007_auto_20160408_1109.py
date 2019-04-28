@@ -19,7 +19,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='person',
             name='is_alias_of',
-            field=models.ForeignKey(related_name='aliases', blank=True, to='people_db.Person', null=True),
+            field=models.ForeignKey(related_name='aliases', blank=True, to='people_db.Person', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='position',

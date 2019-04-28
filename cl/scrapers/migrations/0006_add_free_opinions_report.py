@@ -20,7 +20,8 @@ class Migration(migrations.Migration):
                 ('date_completed', models.DateTimeField(help_text=b'The moment when the scrape of the RECAP content ended.', null=True, db_index=True, blank=True)),
                 ('date_queried', models.DateField(help_text=b'The date that was queried.', db_index=True)),
                 ('status', models.SmallIntegerField(help_text=b'The status of the scrape.', choices=[(1, b'Scrape completed successfully'), (2, b'Scrape currently in progress'), (3, b'Scrape failed')])),
-                ('court', models.ForeignKey(help_text=b'The court where items were being downloaded from.', to='search.Court')),
+                ('court', models.ForeignKey(help_text=b'The court where items were being downloaded from.', to='search.Court',
+                                            on_delete=models.CASCADE)),
             ],
         ),
     ]

@@ -17,11 +17,13 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='favorite',
             name='cluster_id',
-            field=models.ForeignKey(verbose_name=b'the opinion cluster that is favorited', blank=True, to='search.OpinionCluster', null=True),
+            field=models.ForeignKey(verbose_name=b'the opinion cluster that is favorited', blank=True, to='search.OpinionCluster', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='favorite',
             name='user',
-            field=models.ForeignKey(related_name='favorites', to=settings.AUTH_USER_MODEL, help_text=b'The user that owns the favorite'),
+            field=models.ForeignKey(related_name='favorites', to=settings.AUTH_USER_MODEL, help_text=b'The user that owns the favorite',
+                                    on_delete=models.CASCADE),
         ),
     ]
