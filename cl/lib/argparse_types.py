@@ -4,10 +4,6 @@ import os
 from dateutil import parser
 from django.utils.timezone import is_naive, make_aware, utc
 
-from cl.audio.models import Audio
-from cl.people_db.models import Person
-from cl.search.models import Opinion, RECAPDocument, Docket
-
 
 # Note: for files see argparse.FileType!
 
@@ -39,24 +35,4 @@ def readable_dir(prospective_dir):
     else:
         raise argparse.ArgumentTypeError(
             "readable_dir:{0} is not a readable dir".format(prospective_dir))
-
-
-def valid_obj_type(s):
-    from cl.search.management.commands.cl_update_index import VALID_OBJ_TYPES
-    s = s.lower()
-    if s not in VALID_OBJ_TYPES:
-        raise argparse.ArgumentTypeError("Unable to parse type, %s. Valid "
-                                         "options are %s" % (s, VALID_OBJ_TYPES))
-
-    if s == 'opinions':
-        return Opinion, s
-    elif s == 'audio':
-        return Audio, s
-    elif s == 'person':
-        return Person, s
-    elif s == 'recap':
-        return RECAPDocument, s
-    elif s == 'recap-dockets':
-        # Normalize here to match values in settings.SOLR_URLS
-        return Docket, 'recap'
 
