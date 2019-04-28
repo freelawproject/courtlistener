@@ -1837,6 +1837,101 @@ class OpinionCluster(models.Model):
         from cl.search.tasks import delete_items
         delete_items.delay([id_cache], 'opinions')
 
+    def as_search_list(self):
+        # IDs
+        out = {}
+
+        # Court
+        court = {
+            'court_id': self.docket.court_pk,
+            'court': self.docket.court.full_name,
+            'court_citation_string': self.docket.court.citation_string,
+            'court_exact': self.docket.court_id,
+        }
+        out.update(court)
+
+        # Docket
+        docket = {
+            'docket_id': self.docket_id,
+            'docketNumber': self.docket.docket_number
+        }
+        if self.docket.date_argued is not None:
+            docket['dateArgued'] = midnight_pst(self.docket.date_argued)
+        if self.docket.date_reargued is not None:
+            docket['dateReargued'] = midnight_pst(self.docket.date_reargued)
+        if self.docket.date_reargument_denied is not None:
+            docket['dateReargumentDenied'] = midnight_pst(
+                self.docket.date_reargument_denied)
+        out.update(docket)
+
+        # Cluster
+        out.update({
+            'cluster_id': self.pk,
+            'caseName': best_case_name(self),
+            'caseNameShort': self.case_name_short,
+            'panel_ids': [judge.pk for judge in self.panel.all()],
+            'non_participating_judge_ids': [
+                judge.pk for judge in self.non_participating_judges.all()],
+            'judge': self.judges,
+            'citation': [str(cite) for cite in self.citations.all()],
+            'scdb_id': self.scdb_id,
+            'source': self.source,
+            'attorney': self.attorneys,
+            'suitNature': self.nature_of_suit,
+            'citeCount': self.citation_count,
+            'status': self.get_precedential_status_display(),
+            'status_exact': self.get_precedential_status_display(),
+            'sibling_ids': [sibling.pk for sibling in
+                            self.sub_opinions.all()],
+        })
+        try:
+            out['lexisCite'] = str(self.citations.filter(
+                type=Citation.LEXIS)[0])
+        except IndexError:
+            pass
+        try:
+            out['neutralCite'] = str(self.citations.filter(
+                type=Citation.NEUTRAL)[0])
+        except IndexError:
+            pass
+
+        if self.date_filed is not None:
+            out['dateFiled'] = midnight_pst(self.date_filed)
+        try:
+            out['absolute_url'] = self.get_absolute_url()
+        except NoReverseMatch:
+            raise InvalidDocumentError(
+                "Unable to save to index due to missing absolute_url "
+                "(court_id: %s, item.pk: %s). Might the court have in_use set "
+                "to False?" % (self.docket.court_id, self.pk)
+            )
+
+        # Opinion
+        search_list = []
+        text_template = loader.get_template('indexes/opinion_text.txt')
+        for opinion in self.sub_opinions.all():
+            # Always make a copy to get a fresh version above metadata. Failure
+            # to do this pushes metadata from previous iterations to objects
+            # where it doesn't belong.
+            out_copy = out.copy()
+            out_copy.update({
+                'id': opinion.pk,
+                'cites': [o.pk for o in opinion.opinions_cited.all()],
+                'author_id': getattr(opinion.author, 'pk', None),
+                'joined_by_ids': [j.pk for j in opinion.joined_by.all()],
+                'type': opinion.type,
+                'download_url': opinion.download_url or None,
+                'local_path': unicode(opinion.local_path),
+                'text': text_template.render({
+                    'item': opinion,
+                    'citation_string': self.citation_string,
+                }).translate(null_map)
+            })
+
+            search_list.append(normalize_search_dicts(out_copy))
+
+        return search_list
+
 
 class Citation(models.Model):
     """A simple class to hold citations."""
