@@ -16,7 +16,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='donation',
             name='donor',
-            field=models.ForeignKey(related_name='donations', default=1, to=settings.AUTH_USER_MODEL, help_text=b'The user that made the donation'),
+            field=models.ForeignKey(related_name='donations', default=1, to=settings.AUTH_USER_MODEL, help_text=b'The user that made the donation',
+                                    on_delete=models.CASCADE),
             preserve_default=False,
         ),
     ]

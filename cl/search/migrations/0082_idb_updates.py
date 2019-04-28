@@ -20,7 +20,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='docket',
             name='idb_data',
-            field=models.OneToOneField(related_name='docket', null=True, blank=True, to='recap.FjcIntegratedDatabase', help_text=b'Data from the FJC Integrated Database associated with this case.'),
+            field=models.OneToOneField(related_name='docket', null=True, blank=True, to='recap.FjcIntegratedDatabase', help_text=b'Data from the FJC Integrated Database associated with this case.',
+                                       on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='docket',

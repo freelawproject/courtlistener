@@ -42,7 +42,8 @@ class Migration(migrations.Migration):
                 ('key_expires', models.DateTimeField(null=True, verbose_name=b"The time and date when the user's activation_key expires", blank=True)),
                 ('email_confirmed', models.BooleanField(default=False, verbose_name=b'The user has confirmed their email address')),
                 ('barmembership', models.ManyToManyField(to='users.BarMembership', verbose_name=b'the bar memberships held by the user', blank=True)),
-                ('user', models.OneToOneField(related_name='profile', verbose_name=b'the user this model extends', to=settings.AUTH_USER_MODEL)),
+                ('user', models.OneToOneField(related_name='profile', verbose_name=b'the user this model extends', to=settings.AUTH_USER_MODEL,
+                                              on_delete=models.CASCADE)),
             ],
             options={
                 'verbose_name': 'user profile',

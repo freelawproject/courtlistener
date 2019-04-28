@@ -15,12 +15,14 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='favorite',
             name='docket_id',
-            field=models.ForeignKey(verbose_name=b'the docket that is favorited', blank=True, to='search.Docket', null=True),
+            field=models.ForeignKey(verbose_name=b'the docket that is favorited', blank=True, to='search.Docket', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='favorite',
             name='recap_doc_id',
-            field=models.ForeignKey(verbose_name=b'the RECAP document that is favorited', blank=True, to='search.RECAPDocument', null=True),
+            field=models.ForeignKey(verbose_name=b'the RECAP document that is favorited', blank=True, to='search.RECAPDocument', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterUniqueTogether(
             name='favorite',

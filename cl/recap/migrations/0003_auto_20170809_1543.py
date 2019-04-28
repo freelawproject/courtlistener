@@ -15,16 +15,19 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='processingqueue',
             name='docket',
-            field=models.ForeignKey(to='search.Docket', help_text=b'The docket that was created or updated by this request.', null=True),
+            field=models.ForeignKey(to='search.Docket', help_text=b'The docket that was created or updated by this request.', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='processingqueue',
             name='docket_entry',
-            field=models.ForeignKey(to='search.DocketEntry', help_text=b'The docket entry that was created or updated by this request, if applicable. Only applies to PDFs uploads.', null=True),
+            field=models.ForeignKey(to='search.DocketEntry', help_text=b'The docket entry that was created or updated by this request, if applicable. Only applies to PDFs uploads.', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='processingqueue',
             name='recap_document',
-            field=models.ForeignKey(to='search.RECAPDocument', help_text=b'The document that was created or updated by this request, if applicable. Only applies to PDFs uploads.', null=True),
+            field=models.ForeignKey(to='search.RECAPDocument', help_text=b'The document that was created or updated by this request, if applicable. Only applies to PDFs uploads.', null=True,
+                                    on_delete=models.CASCADE),
         ),
     ]

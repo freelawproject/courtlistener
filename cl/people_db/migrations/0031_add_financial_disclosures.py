@@ -21,7 +21,8 @@ class Migration(migrations.Migration):
                 ('thumbnail', models.FileField(help_text=b'A thumbnail of the first page of the disclosure form', storage=cl.lib.storage.IncrementingFileSystemStorage(), null=True, upload_to=b'financial-disclosures/thumbnails/', blank=True)),
                 ('thumbnail_status', models.SmallIntegerField(default=0, help_text=b'The status of the thumbnail generation', choices=[(0, b'Thumbnail needed'), (1, b'Thumbnail completed successfully'), (2, b'Unable to generate thumbnail')])),
                 ('page_count', models.SmallIntegerField(help_text=b'The number of pages in the disclosure report')),
-                ('person', models.ForeignKey(related_name='financial_disclosures', to='people_db.Person', help_text=b'The person that the document is associated with.')),
+                ('person', models.ForeignKey(related_name='financial_disclosures', to='people_db.Person', help_text=b'The person that the document is associated with.',
+                                             on_delete=models.CASCADE)),
             ],
             options={
                 'ordering': ('-year',),
