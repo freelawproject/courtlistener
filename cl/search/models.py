@@ -710,11 +710,13 @@ class Docket(models.Model):
         # Do RECAPDocument and Docket Entries in a nested loop
         for de in self.docket_entries.all():
             # Docket Entry
-            out['description'] = de.description
+            de_out = {
+                'description': de.description,
+            }
             if de.entry_number is not None:
-                out['entry_number'] = de.entry_number
+                de_out['entry_number'] = de.entry_number
             if de.date_filed is not None:
-                out['entry_date_filed'] = midnight_pst(de.date_filed)
+                de_out['entry_date_filed'] = midnight_pst(de.date_filed)
             rds = de.recap_documents.all()
 
             if len(rds) == 0:
@@ -725,17 +727,17 @@ class Docket(models.Model):
 
             for rd in rds:
                 # IDs
-                out.update({
+                rd_out = {
                     'id': rd.pk,
                     'docket_entry_id': de.pk,
                     'docket_id': self.pk,
                     'court_id': self.court.pk,
                     'assigned_to_id': getattr(self.assigned_to, 'pk', None),
                     'referred_to_id': getattr(self.referred_to, 'pk', None),
-                })
+                }
 
                 # RECAPDocument
-                out.update({
+                rd_out.update({
                     'short_description': rd.description,
                     'document_type': rd.get_document_type_display(),
                     'document_number': rd.document_number or None,
@@ -744,9 +746,9 @@ class Docket(models.Model):
                     'page_count': rd.page_count,
                 })
                 if hasattr(rd.filepath_local, 'path'):
-                    out['filepath_local'] = rd.filepath_local.path
+                    rd_out['filepath_local'] = rd.filepath_local.path
                 try:
-                    out['absolute_url'] = rd.get_absolute_url()
+                    rd_out['absolute_url'] = rd.get_absolute_url()
                 except NoReverseMatch:
                     raise InvalidDocumentError(
                         "Unable to save to index due to missing absolute_url: "
@@ -754,10 +756,15 @@ class Docket(models.Model):
                     )
 
                 text_template = loader.get_template('indexes/dockets_text.txt')
-                out['text'] = text_template.render({'item': rd}).translate(
+                rd_out['text'] = text_template.render({'item': rd}).translate(
                     null_map)
 
-                search_list.append(normalize_search_dicts(out))
+                # Ensure that loops to bleed into each other
+                out_copy = out.copy()
+                out_copy.update(rd_out)
+                out_copy.update(rd_out)
+
+                search_list.append(normalize_search_dicts(out_copy))
 
         return search_list
 
