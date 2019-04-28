@@ -16,7 +16,6 @@ class AlertTest(TestCase):
 
     def setUp(self):
         # Set up some handy variables
-        self.client = Client()
         self.alert_params = {
             'query': 'q=asdf',
             'name': 'dummy alert',
@@ -29,7 +28,7 @@ class AlertTest(TestCase):
 
     def test_create_alert(self):
         """Can we create an alert by sending a post?"""
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(username='pandora', password='password'))
         r = self.client.post(reverse('show_results'), self.alert_params, follow=True)
         self.assertEqual(r.redirect_chain[0][1], 302)
         self.assertIn('successfully', r.content)
