@@ -133,10 +133,12 @@ SOLR_AUDIO_URL = '%s/solr/audio' % SOLR_HOST
 SOLR_PEOPLE_URL = '%s/solr/person' % SOLR_HOST
 SOLR_RECAP_URL = '%s/solr/recap' % SOLR_RECAP_HOST
 SOLR_URLS = {
-    'opinions': SOLR_OPINION_URL,
-    'audio': SOLR_AUDIO_URL,
-    'person': SOLR_PEOPLE_URL,
-    'recap': SOLR_RECAP_URL,
+    'audio.Audio': SOLR_AUDIO_URL,
+    'people_db.Person': SOLR_PEOPLE_URL,
+    'search.Docket': SOLR_RECAP_URL,
+    'search.RECAPDocument': SOLR_RECAP_URL,
+    'search.Opinion': SOLR_OPINION_URL,
+    'search.OpinionCluster': SOLR_OPINION_URL,
 }
 
 SOLR_OPINION_TEST_CORE_NAME = 'opinion_test'
