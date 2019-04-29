@@ -435,11 +435,11 @@ class IAUploaderTest(TestCase):
         It's very easy to use the DRF in a way that generates a LOT of queries.
         Let's avoid that.
         """
-        with self.assertNumQueries(11):
+        with self.assertNumQueries(10):
             generate_ia_json(1)
 
-        with self.assertNumQueries(5):
+        with self.assertNumQueries(4):
             generate_ia_json(2)
 
-        with self.assertNumQueries(5):
+        with self.assertNumQueries(4):
             generate_ia_json(3)
