@@ -121,7 +121,7 @@ def generate_ia_json(d_pk, database='default'):
             )
         ),
     )
-    prefetch_related_objects([d], [
+    prefetch_related_objects([d], *[
         'parties__party_types__criminal_complaints',
         'parties__party_types__criminal_counts',
         attorney_prefetch
