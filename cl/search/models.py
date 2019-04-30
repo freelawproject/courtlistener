@@ -1183,7 +1183,7 @@ class RECAPDocument(models.Model):
         id_cache = self.pk
         super(RECAPDocument, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], 'recap')
+        delete_items.delay([id_cache], 'search.RECAPDocument')
 
     def get_docket_metadata(self):
         """The metadata for the item that comes from the Docket."""
@@ -1842,7 +1842,7 @@ class OpinionCluster(models.Model):
         id_cache = self.pk
         super(OpinionCluster, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], 'opinions')
+        delete_items.delay([id_cache], 'search.Opinion')
 
     def as_search_list(self):
         # IDs

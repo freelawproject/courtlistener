@@ -23,7 +23,7 @@ from seal_rookery import seals_data, seals_root
 from cl.audio.models import Audio
 from cl.audio.utils import get_audio_binary
 from cl.celery import app
-from cl.citations.tasks import update_document_by_id
+from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.recap_utils import needs_ocr
@@ -279,8 +279,8 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
         return opinion
 
     # Identify and link citations within the document content
-    update_document_by_id.apply_async(
-        (opinion.pk,),
+    find_citations_for_opinion_by_pks.apply_async(
+        ([opinion.pk],),
         countdown=citation_countdown
     )
 

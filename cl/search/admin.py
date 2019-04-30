@@ -51,7 +51,7 @@ class OpinionAdmin(admin.ModelAdmin):
     def delete_model(self, request, obj):
         obj.delete()
         from cl.search.tasks import delete_items
-        delete_items.delay([obj.pk], 'opinions')
+        delete_items.delay([obj.pk], 'search.Opinion')
 
 
 @admin.register(Citation)
