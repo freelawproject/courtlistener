@@ -91,9 +91,9 @@ class IndexedSolrTestCase(SolrTestCase):
     def setUp(self):
         super(IndexedSolrTestCase, self).setUp()
         cores = {
-            'audio': self.core_name_audio,
-            'opinions': self.core_name_opinion,
-            'person': self.core_name_people,
+            'audio.Audio': self.core_name_audio,
+            'search.Opinion': self.core_name_opinion,
+            'people_db.Person': self.core_name_people,
         }
         for obj_type, core_name in cores.items():
             args = [

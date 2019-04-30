@@ -149,7 +149,7 @@ class PersonAdmin(admin.ModelAdmin, CSSAdminMixin):
     def delete_model(self, request, obj):
         obj.delete()
         from cl.search.tasks import delete_items
-        delete_items.delay([obj.pk], 'person')
+        delete_items.delay([obj.pk], 'people_db.Person')
 
 
 @admin.register(Race)

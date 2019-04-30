@@ -197,7 +197,7 @@ class Audio(models.Model):
         id_cache = self.pk
         super(Audio, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], 'audio')
+        delete_items.delay([id_cache], 'audio.Audio')
 
     def as_search_dict(self):
         """Create a dict that can be ingested by Solr"""

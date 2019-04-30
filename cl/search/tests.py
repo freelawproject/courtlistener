@@ -36,7 +36,7 @@ class SetupException(Exception):
 
 class UpdateIndexCommandTest(SolrTestCase):
     args = [
-        '--type', 'opinions',
+        '--type', 'search.Opinion',
         '--noinput',
     ]
 
@@ -575,7 +575,7 @@ class GroupedSearchTest(EmptySolrTestCase):
         # Set up some handy variables
         super(GroupedSearchTest, self).setUp()
         args = [
-            '--type', 'opinions',
+            '--type', 'search.Opinion',
             '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
             '--update',
             '--everything',
