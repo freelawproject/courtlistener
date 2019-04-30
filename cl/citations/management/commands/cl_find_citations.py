@@ -2,12 +2,11 @@
 import time
 import sys
 
-from cl.citations.tasks import update_document
+from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.lib import sunburnt
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
-from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.db_tools import queryset_generator
+from cl.lib.command_utils import VerboseCommand
 from cl.search.models import Opinion
 from django.conf import settings
 from django.core.management import call_command
@@ -109,8 +108,10 @@ class Command(VerboseCommand):
         self.count = query.count()
         self.average_per_s = 0
         self.timings = []
-        docs = queryset_generator(query, chunksize=10000)
-        self.update_documents(docs)
+        count = query.count()
+        opinion_pks = query.values_list('pk', flat=True).iterator()
+        self.update_documents(opinion_pks, count)
+        self.add_to_solr()
 
     def log_progress(self, processed_count, last_pk):
         if processed_count % 1000 == 1:
@@ -130,25 +131,35 @@ class Command(VerboseCommand):
         ))
         sys.stdout.flush()
 
-    def update_documents(self, documents):
+    def update_documents(self, opinion_pks, count):
         sys.stdout.write('Graph size is {0:d} nodes.\n'.format(self.count))
         sys.stdout.flush()
-        processed_count = 0
+
+        index_during_subtask = False
         if self.index == 'concurrently':
             index_during_subtask = True
-        else:
-            index_during_subtask = False
-        throttle = CeleryThrottle(min_items=500)
-        for doc in documents:
-            throttle.maybe_wait()
-            update_document.delay(doc, index_during_subtask)
-            processed_count += 1
-            self.log_progress(processed_count, doc.pk)
 
+        chunk = []
+        chunk_size = 100
+        processed_count = 0
+        throttle = CeleryThrottle(min_items=500)
+        for opinion_pk in opinion_pks:
+            processed_count += 1
+            last_item = (count == processed_count)
+            chunk.append(opinion_pk)
+            if processed_count % chunk_size == 0 or last_item:
+                throttle.maybe_wait()
+                find_citations_for_opinion_by_pks.delay(
+                    chunk, index_during_subtask)
+                chunk = []
+
+            self.log_progress(processed_count, opinion_pk)
+
+    def add_to_solr(self):
         if self.index == 'all_at_end':
             call_command(
                 'cl_update_index',
-                '--type', 'opinions',
+                '--type', 'search.Opinion',
                 '--solr-url', settings.SOLR_OPINION_URL,
                 '--noinput',
                 '--update',
