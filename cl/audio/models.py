@@ -183,7 +183,8 @@ class Audio(models.Model):
         bulk files and with Solr indexing.
 
         :param index: Should the item be added to the Solr index?
-        :param commit: Should a commit be performed after adding it?
+        :param force_commit: Should a commit be performed in solr after
+        indexing it?
         """
         super(Audio, self).save(*args, **kwargs)
         if index:
