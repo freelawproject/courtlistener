@@ -4,6 +4,8 @@ from rest_framework_filters import FilterSet
 from cl.api.utils import (
     INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS, ALL_TEXT_LOOKUPS
 )
+from cl.audio.models import Audio
+from cl.people_db.models import Person, Party
 from cl.search.models import (
     Citation, Court, Docket, DocketEntry, Opinion, OpinionsCited,
     OpinionCluster, RECAPDocument, SOURCES, Tag,
@@ -11,7 +13,10 @@ from cl.search.models import (
 
 
 class CourtFilter(FilterSet):
-    dockets = filters.RelatedFilter('cl.search.filters.DocketFilter')
+    dockets = filters.RelatedFilter(
+        'cl.search.filters.DocketFilter',
+        queryset=Docket.objects.all(),
+    )
     jurisdiction = filters.MultipleChoiceFilter(choices=Court.JURISDICTIONS)
 
     class Meta:
@@ -38,14 +43,35 @@ class TagFilter(FilterSet):
 
 
 class DocketFilter(FilterSet):
-    court = filters.RelatedFilter(CourtFilter)
-    clusters = filters.RelatedFilter("cl.search.filters.OpinionClusterFilter")
-    docket_entries = filters.RelatedFilter("cl.search.filters.DocketEntryFilter")
-    audio_files = filters.RelatedFilter('cl.audio.filters.AudioFilter')
-    assigned_to = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
-    referred_to = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
-    parties = filters.RelatedFilter('cl.people_db.filters.PartyFilter')
-    tags = filters.RelatedFilter(TagFilter)
+    court = filters.RelatedFilter(CourtFilter, queryset=Court.objects.all())
+    clusters = filters.RelatedFilter(
+        "cl.search.filters.OpinionClusterFilter",
+        queryset=OpinionCluster.objects.all(),
+    )
+    docket_entries = filters.RelatedFilter(
+        "cl.search.filters.DocketEntryFilter",
+        queryset=DocketEntry.objects.all(),
+    )
+    audio_files = filters.RelatedFilter(
+        'cl.audio.filters.AudioFilter',
+        queryset=Audio.objects.all(),
+    )
+    assigned_to = filters.RelatedFilter(
+        'cl.people_db.filters.PersonFilter',
+        queryset=Person.objects.all(),
+    )
+    referred_to = filters.RelatedFilter(
+        'cl.people_db.filters.PersonFilter',
+        queryset=Person.objects.all(),
+    )
+    parties = filters.RelatedFilter(
+        'cl.people_db.filters.PartyFilter',
+        queryset=Party.objects.all(),
+    )
+    tags = filters.RelatedFilter(
+        TagFilter,
+        queryset=Tag.objects.all(),
+    )
 
     class Meta:
         model = Docket
@@ -73,9 +99,18 @@ class DocketFilter(FilterSet):
 class OpinionFilter(FilterSet):
     # Cannot to reference to opinions_cited here, due to it being a self join,
     # which is not supported (possibly for good reasons?)
-    cluster = filters.RelatedFilter('cl.search.filters.OpinionClusterFilter')
-    author = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
-    joined_by = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    cluster = filters.RelatedFilter(
+        'cl.search.filters.OpinionClusterFilter',
+        queryset=OpinionCluster.objects.all()
+    )
+    author = filters.RelatedFilter(
+        'cl.people_db.filters.PersonFilter',
+        queryset=Person.objects.all(),
+    )
+    joined_by = filters.RelatedFilter(
+        'cl.people_db.filters.PersonFilter',
+        queryset=Person.objects.all(),
+    )
     type = filters.MultipleChoiceFilter(choices=Opinion.OPINION_TYPES)
 
     class Meta:
@@ -102,14 +137,27 @@ class CitationFilter(FilterSet):
 
 
 class OpinionClusterFilter(FilterSet):
-    docket = filters.RelatedFilter(DocketFilter)
-    panel = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    docket = filters.RelatedFilter(
+        DocketFilter,
+        queryset=Docket.objects.all(),
+    )
+    panel = filters.RelatedFilter(
+        'cl.people_db.filters.PersonFilter',
+        queryset=Person.objects.all(),
+    )
     non_participating_judges = filters.RelatedFilter(
         'cl.people_db.filters.PersonFilter',
+        queryset=Person.objects.all(),
     )
-    sub_opinions = filters.RelatedFilter(OpinionFilter)
+    sub_opinions = filters.RelatedFilter(
+        OpinionFilter,
+        queryset=Opinion.objects.all(),
+    )
     source = filters.MultipleChoiceFilter(choices=SOURCES)
-    citations = filters.RelatedFilter(CitationFilter)
+    citations = filters.RelatedFilter(
+        CitationFilter,
+        queryset=Citation.objects.all(),
+    )
 
     class Meta:
         model = OpinionCluster
@@ -142,8 +190,14 @@ class OpinionClusterFilter(FilterSet):
 
 
 class OpinionsCitedFilter(FilterSet):
-    citing_opinion = filters.RelatedFilter(OpinionFilter)
-    cited_opinion = filters.RelatedFilter(OpinionFilter)
+    citing_opinion = filters.RelatedFilter(
+        OpinionFilter,
+        queryset=Opinion.objects.all(),
+    )
+    cited_opinion = filters.RelatedFilter(
+        OpinionFilter,
+        queryset=Opinion.objects.all(),
+    )
 
     class Meta:
         model = OpinionsCited
@@ -153,11 +207,18 @@ class OpinionsCitedFilter(FilterSet):
 
 
 class DocketEntryFilter(FilterSet):
-    docket = filters.RelatedFilter(DocketFilter)
-    recap_documents = filters.RelatedFilter(
-        'cl.search.filters.RECAPDocumentFilter'
+    docket = filters.RelatedFilter(
+        DocketFilter,
+        queryset=Docket.objects.all(),
     )
-    tags = filters.RelatedFilter(TagFilter)
+    recap_documents = filters.RelatedFilter(
+        'cl.search.filters.RECAPDocumentFilter',
+        queryset=RECAPDocument.objects.all(),
+    )
+    tags = filters.RelatedFilter(
+        TagFilter,
+        queryset=Tag.objects.all(),
+    )
 
     class Meta:
         model = DocketEntry
@@ -171,8 +232,14 @@ class DocketEntryFilter(FilterSet):
 
 
 class RECAPDocumentFilter(FilterSet):
-    docket_entry = filters.RelatedFilter(DocketEntryFilter)
-    tags = filters.RelatedFilter(TagFilter)
+    docket_entry = filters.RelatedFilter(
+        DocketEntryFilter,
+        queryset=DocketEntry.objects.all(),
+    )
+    tags = filters.RelatedFilter(
+        TagFilter,
+        queryset=Tag.objects.all(),
+    )
 
     class Meta:
         model = RECAPDocument
