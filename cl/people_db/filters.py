@@ -192,9 +192,11 @@ class PersonFilter(FilterSet):
 
     race = filters.MultipleChoiceFilter(
         choices=Race.RACES,
-        action=lambda queryset, value:
-        queryset.filter(race__race__in=value)
+        method='filter_race',
     )
+
+    def filter_race(self, queryset, name, value):
+        return queryset.filter(race__race__in=value)
 
     class Meta:
         model = Person
@@ -222,12 +224,12 @@ class PersonFilter(FilterSet):
 class PartyFilter(FilterSet):
     docket = filters.RelatedFilter(
         'cl.search.filters.DocketFilter',
-        name='dockets',
+        field_name='dockets',
         queryset=Docket.objects.all(),
     )
     attorney = filters.RelatedFilter(
         'cl.people_db.filters.AttorneyFilter',
-        name='attorneys',
+        field_name='attorneys',
         queryset=Attorney.objects.all(),
     )
 
@@ -244,12 +246,12 @@ class PartyFilter(FilterSet):
 class AttorneyFilter(FilterSet):
     docket = filters.RelatedFilter(
         'cl.search.filters.DocketFilter',
-        name='roles__docket',
+        field_name='roles__docket',
         queryset=Docket.objects.all(),
     )
     parties_represented = filters.RelatedFilter(
         PartyFilter,
-        name='parties',
+        field_name='roles__party',
         queryset=Party.objects.all(),
     )
 
