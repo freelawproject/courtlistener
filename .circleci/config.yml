@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: freelawproject/courtlistener-testing:0.1.3
+      - image: freelawproject/courtlistener-testing:0.2.0
 
     steps:
     - checkout

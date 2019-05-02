@@ -161,10 +161,10 @@ If you add new dependencies, remember to update the testing container with the f
    Also remove `-SNAPSHOT`.
 5. `make push --file .circleci/Makefile` 
 6. Use new Docker image in CircleCI tests by updating the [tag in config.yml][circleci-test-container-tag].
-6. **Increment `version.txt` and
+7. Wait for the build to finish, **then** increment `version.txt` and
    append `-SNAPSHOT` to the version string to prepare for the next SNAPSHOT
-   release. This is to prevent someone from accidentially overwriting a stable
-   release.**
+   release. This is to prevent someone from accidentally overwriting a stable
+   release.
 
 
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux
