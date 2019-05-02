@@ -622,7 +622,8 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
 
 class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json',
-                'test_objects_audio.json', 'authtest_data.json']
+                'test_objects_audio.json', 'authtest_data.json',
+                'user_with_recap_api_access.json']
 
     def setUp(self):
         self.assertTrue(self.client.login(
