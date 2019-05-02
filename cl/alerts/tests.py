@@ -40,7 +40,8 @@ class AlertTest(TestCase):
         bad_alert_params = self.alert_params.copy()
         # Break the form
         bad_alert_params.pop('query', None)
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(
+            username='pandora', password='password'))
         r = self.client.post('/', bad_alert_params, follow=True)
         self.assertEqual(r.status_code, 200)
         self.assertIn('error creating your alert', r.content)

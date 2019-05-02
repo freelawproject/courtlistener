@@ -135,7 +135,8 @@ class ApiQueryCountTests(TransactionTestCase):
         ps = Permission.objects.filter(codename='has_recap_api_access')
         u.user_permissions.add(*ps)
 
-        self.client.login(username='recap-user', password='password')
+        self.assertTrue(self.client.login(
+            username='recap-user', password='password'))
 
     def test_audio_api_query_counts(self):
         with self.assertNumQueries(4):
@@ -291,7 +292,8 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
     fixtures = ['judge_judy.json', 'authtest_data.json']
 
     def setUp(self):
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(
+            username='pandora', password='password'))
         self.q = dict()
 
     def test_judge_filtering_by_first_name(self):
@@ -483,7 +485,8 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         ps = Permission.objects.filter(codename='has_recap_api_access')
         u.user_permissions.add(*ps)
 
-        self.client.login(username='recap-user', password='password')
+        self.assertTrue(self.client.login(
+            username='recap-user', password='password'))
         self.q = dict()
 
     def test_docket_entry_to_docket_filters(self):
@@ -622,7 +625,8 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
                 'test_objects_audio.json', 'authtest_data.json']
 
     def setUp(self):
-        self.client.login(username='recap-user', password='password')
+        self.assertTrue(self.client.login(
+            username='recap-user', password='password'))
         self.q = dict()
 
     def test_cluster_filters(self):
@@ -768,7 +772,8 @@ class DRFFieldSelectionTest(TestCase):
         path = reverse('person-list', kwargs={'version': 'v3'})
         fields_to_return = ['educations', 'date_modified', 'slug']
         q = {'fields': ','.join(fields_to_return)}
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(
+            username='pandora', password='password'))
         r = self.client.get(path, q)
         self.assertEqual(len(r.data['results'][0].keys()),
                          len(fields_to_return))
@@ -799,7 +804,8 @@ class DRFRecapPermissionTest(TestCase):
 
     def test_has_access(self):
         """Does the RECAP user have access to all of the RECAP endpoints?"""
-        self.client.login(username='recap-user', password='password')
+        self.assertTrue(self.client.login(
+            username='recap-user', password='password'))
         for path in self.paths:
             print("Access allowed to recap user at: %s... " % path, end='')
             r = self.client.get(path)
@@ -808,7 +814,8 @@ class DRFRecapPermissionTest(TestCase):
 
     def test_lacks_access(self):
         """Does a normal user lack access to the RECPAP endpoints?"""
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(
+            username='pandora', password='password'))
         for path in self.paths:
             print("Access denied to non-recap user at: %s... " % path, end='')
             r = self.client.get(path)

@@ -306,7 +306,8 @@ class TestMaintenanceMiddleware(TestCase):
 
     def test_staff_can_get_through(self):
         """ Can staff get through when the middleware is enabled? """
-        self.client.login(username='admin', password='password')
+        self.assertTrue(self.client.login(
+            username='admin', password='password'))
         r = self.client.get(reverse('show_results'))
         self.assertEqual(
             r.status_code,

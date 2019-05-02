@@ -34,7 +34,8 @@ class ContactTest(TestCase):
         behavior when called multiple times. This test makes sure that that
         behavior does not regress.
         """
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(
+            username='pandora', password='password'))
         self.client.get(reverse('contact'))
         self.client.logout()
 
@@ -46,7 +47,8 @@ class ContactTest(TestCase):
 
     def test_contact_logged_in(self):
         """Can we use the contact form to send a message when logged in?"""
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(
+            username='pandora', password='password'))
         response = self.client.post(reverse('contact'), self.test_msg)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)

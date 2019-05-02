@@ -122,7 +122,8 @@ class TestViews(TestCase):
 
     def test_new_visualization_view_provides_form(self):
         """ Test a GET to the Visualization view provides a VizForm """
-        self.client.login(username='user', password='password')
+        self.assertTrue(self.client.login(
+            username='user', password='password'))
         response = self.client.get(reverse(self.view))
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.context['form'], VizForm)
@@ -131,7 +132,8 @@ class TestViews(TestCase):
         """ Test a valid POST creates a new ScotusMap object """
         SCOTUSMap.objects.all().delete()
 
-        self.client.login(username='user', password='password')
+        self.assertTrue(self.client.login(
+            username='user', password='password'))
         data = {
             'cluster_start': 2674862,
             'cluster_end': 111014,
@@ -148,7 +150,8 @@ class TestViews(TestCase):
 
     def test_published_visualizations_show_in_gallery(self):
         """ Test that a user can see published visualizations from others """
-        self.client.login(username='user', password='password')
+        self.assertTrue(self.client.login(
+            username='user', password='password'))
         response = self.client.get(reverse('viz_gallery'))
         html = response.content.decode('utf-8')
         html = ' '.join(html.split())
@@ -163,12 +166,14 @@ class TestViews(TestCase):
             'view_visualization', kwargs={'pk': viz.pk, 'slug': viz.slug}
         )
 
-        self.client.login(username='admin', password='password')
+        self.assertTrue(self.client.login(
+            username='admin', password='password'))
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'My Private Visualization', response.content)
 
-        self.client.login(username='user', password='password')
+        self.assertTrue(self.client.login(
+            username='user', password='password'))
         response = self.client.get(url)
         self.assertNotEqual(response.status_code, 200)
         self.assertNotIn(b'My Private Visualization', response.context)
@@ -182,7 +187,8 @@ class TestViews(TestCase):
         old_view_count = viz.view_count
         old_date_modified = viz.date_modified
 
-        self.client.login(username='user', password='password')
+        self.assertTrue(self.client.login(
+            username='user', password='password'))
         response = self.client.get(viz.get_absolute_url())
 
         viz.refresh_from_db(fields=['view_count', 'date_modified'])
