@@ -9,6 +9,7 @@ import redis
 from django.conf import settings
 from django.contrib.auth.models import User, Permission
 from django.core import mail
+from django.core.management import call_command
 from django.urls import reverse, ResolverMatch
 from django.http import HttpRequest, JsonResponse
 from django.test import Client, override_settings, RequestFactory, TestCase, \
@@ -16,7 +17,6 @@ from django.test import Client, override_settings, RequestFactory, TestCase, \
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 
-from cl.api.management.commands.cl_make_bulk_data import Command
 from cl.api.utils import BulkJsonHistory, SEND_API_WELCOME_EMAIL_COUNT
 from cl.api.views import coverage_data
 from cl.audio.api_views import AudioViewSet
@@ -901,7 +901,7 @@ class BulkDataTest(TestCase):
     @override_settings(BULK_DATA_DIR=tmp_data_dir)
     def test_make_all_bulk_files(self):
         """Can we successfully generate all bulk files?"""
-        Command().execute()
+        call_command('cl_make_bulk_data')
 
     def test_database_has_objects_for_bulk_export(self):
         self.assertTrue(Opinion.objects.count() > 0, 'Opinions exist')
