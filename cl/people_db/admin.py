@@ -144,7 +144,7 @@ class PersonAdmin(admin.ModelAdmin, CSSAdminMixin):
     def save_model(self, request, obj, form, change):
         obj.save()
         from cl.search.tasks import add_items_to_solr
-        add_items_to_solr.delay([obj.person_id], 'people_db.Person')
+        add_items_to_solr.delay([obj.pk], 'people_db.Person')
 
     def delete_model(self, request, obj):
         obj.delete()
