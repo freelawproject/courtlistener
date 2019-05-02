@@ -13,7 +13,7 @@ from cl.search.models import RECAPDocument
 
 class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     permission_classes = (RECAPUploaders,)
-    queryset = ProcessingQueue.objects.all()
+    queryset = ProcessingQueue.objects.all().order_by('-id')
     serializer_class = ProcessingQueueSerializer
     filter_class = ProcessingQueueFilter
     ordering_fields = (
@@ -27,7 +27,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
-    queryset = RECAPDocument.objects.using('replica').filter(
+    queryset = RECAPDocument.objects.filter(
         is_available=True,
     ).only(
         'pk',
@@ -39,7 +39,7 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         # 'docket_entry_id',
         # 'docket_entry__docket_id',
         # 'docket_entry__docket__slug',
-    ).order_by()
+    ).order_by('-id')
     serializer_class = PacerDocIdLookUpSerializer
     filter_class = RECAPDocumentFilter
     pagination_class = BigPagination
@@ -53,7 +53,7 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
 
 
 class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
-    queryset = FjcIntegratedDatabase.objects.using('replica').all()
+    queryset = FjcIntegratedDatabase.objects.all().order_by('-id')
     serializer_class = FjcIntegratedDatabaseSerializer
     filter_class = FjcIntegratedDatabaseFilter
     ordering_fields = (
