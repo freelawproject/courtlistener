@@ -1,12 +1,10 @@
 import hashlib
-import random
 import signal
 import sys
 import time
 import traceback
 from datetime import date
 
-from celery.task.sets import subtask
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.utils.encoding import force_bytes
@@ -20,7 +18,7 @@ from cl.lib.import_lib import get_candidate_judges
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import ErrorLog
-from cl.scrapers.tasks import extract_doc_content, extract_by_ocr
+from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     get_extension, get_binary_content, signal_handler
 )
@@ -272,9 +270,8 @@ class Command(VerboseCommand):
                         index=False
                     )
                     extract_doc_content.delay(
-                        opinion.pk,
-                        callback=subtask(extract_by_ocr),
-                        citation_countdown=random.randint(0, 3600)
+                        opinion.pk, do_ocr=True,
+                        citation_jitter=True,
                     )
 
                     logger.info("Successfully added doc {pk}: {name}".format(
