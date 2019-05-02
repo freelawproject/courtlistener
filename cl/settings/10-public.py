@@ -67,8 +67,8 @@ ROOT_URLCONF = 'cl.urls'
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.admindocs',
-    'django.contrib.auth',
     'django.contrib.contenttypes',
+    'django.contrib.auth',
     'django.contrib.humanize',
     'django.contrib.messages',
     'django.contrib.sessions',
@@ -177,19 +177,19 @@ REDIS_DATABASES = {
 ##########
 if DEVELOPMENT:
     # In a development machine, these setting make sense
-    CELERY_ALWAYS_EAGER = True  # Do all tasks immediately, no async.
-    CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
-    CELERYD_CONCURRENCY = 2
+    CELERY_TASK_ALWAYS_EAGER = True  # Do all tasks immediately, no async.
+    CELERY_TASK_EAGER_PROPAGATES = True
+    CELERY_WORKER_CONCURRENCY = 2
 else:
     # Celery settings for production sites
-    BROKER_URL = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
+    CELERY_BROKER_URL = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
                                        REDIS_DATABASES['CELERY'])
     CELERY_RESULT_BACKEND = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
                                                   REDIS_DATABASES['CELERY'])
-    CELERYD_CONCURRENCY = 20
-    BROKER_POOL_LIMIT = 30
-    CELERY_TASK_RESULT_EXPIRES = 60 * 60
-    BROKER_TRANSPORT_OPTIONS = {
+    CELERY_WORKER_CONCURRENCY = 20
+    CELERY_BROKER_POOL_LIMIT = 30
+    CELERY_RESULT_EXPIRES = 60 * 60
+    CELERY_BROKER_TRANSPORT_OPTIONS = {
         # This is the length of time a task will wait to be acknowledged by a
         # worker. This value *must* be greater than the largest ETA/countdown
         # that a task may be assigned with, or else it will be run over and over
@@ -199,7 +199,7 @@ else:
 
 # Rate limits aren't ever used, so disable them across the board for better
 # performance
-CELERY_DISABLE_RATE_LIMITS = True
+CELERY_WORKER_DISABLE_RATE_LIMITS = True
 CELERY_SEND_TASK_ERROR_EMAILS = True
 
 
@@ -327,6 +327,7 @@ REST_FRAMEWORK = {
 
     # Filtering
     'DEFAULT_FILTER_BACKENDS': (
+        # This is a tweaked version of DjangoFilterBackend
         'cl.api.utils.DisabledHTMLFilterBackend',
         'rest_framework.filters.OrderingFilter',
     ),
