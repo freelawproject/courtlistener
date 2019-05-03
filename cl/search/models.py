@@ -1850,7 +1850,7 @@ class OpinionCluster(models.Model):
 
         # Court
         court = {
-            'court_id': self.docket.court_pk,
+            'court_id': self.docket.court.pk,
             'court': self.docket.court.full_name,
             'court_citation_string': self.docket.court.citation_string,
             'court_exact': self.docket.court_id,
