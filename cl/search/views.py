@@ -116,6 +116,7 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
     courts, court_count_human, court_count = merge_form_with_courts(courts,
                                                                     search_form)
     search_summary_str = search_form.as_text(court_count, court_count_human)
+    facet_fields = make_stats_variable(search_form, paged_results)
     return {
         'results': paged_results,
         'search_form': search_form,
@@ -124,7 +125,7 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
         'court_count_human': court_count_human,
         'court_count': court_count,
         'query_citation': query_citation,
-        'facet_fields': make_stats_variable(search_form, paged_results),
+        'facet_fields': facet_fields,
         'error': error,
     }
 
