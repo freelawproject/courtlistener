@@ -201,6 +201,9 @@ else:
 # performance
 CELERY_WORKER_DISABLE_RATE_LIMITS = True
 CELERY_SEND_TASK_ERROR_EMAILS = True
+# We could pass around JSON, but it's *much* easier to pass around Python
+# objects that support things like dates. Let's do that, shall we?
+CELERY_RESULT_SERIALIZER = 'pickle'
 
 
 ####################
