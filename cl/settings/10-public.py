@@ -205,6 +205,7 @@ CELERY_SEND_TASK_ERROR_EMAILS = True
 # objects that support things like dates. Let's do that, shall we?
 CELERY_RESULT_SERIALIZER = 'pickle'
 CELERY_TASK_SERIALIZER = 'pickle'
+CELERY_ACCEPT_CONTENT = {'json', 'pickle'}
 
 
 ####################
