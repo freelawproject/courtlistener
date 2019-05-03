@@ -294,6 +294,10 @@ REST_FRAMEWORK = {
         'leo': '100/hour',
         'miffy': '100/hour',
         'safetynet': '100/hour',
+        # From fokal.ai, using multiple accounts to dodge limitations
+        'manu.jose': '10/hour',
+        'shishir': '10/hour',
+        'shishir.kumar': '10/hour',
 
         # Throttling up.
         'YFIN': '430000/day',
