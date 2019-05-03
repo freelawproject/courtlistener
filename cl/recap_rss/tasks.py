@@ -123,7 +123,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             logger.info("%s: Feed has not changed since %s. Aborting." % (
                 feed_status.court_id, date_last_built))
             # Abort. Nothing has changed here.
-            self.request.callbacks = None
+            self.request.chain = None
             mark_status(feed_status, RssFeedStatus.UNCHANGED)
             return
 
