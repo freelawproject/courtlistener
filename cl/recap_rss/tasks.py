@@ -48,7 +48,7 @@ def abort_or_retry(task, feed_status, exc):
     if task.request.retries == task.max_retries:
         # Abort and cut off the chain. No more retries.
         mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
-        task.request.callbacks = None
+        task.request.chain = None
         return
 
     mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
