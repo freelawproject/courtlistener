@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.mail import send_mail
+from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_text
 from django.utils.timezone import now
@@ -188,7 +189,7 @@ class LoggingMixin(object):
     def _log_request(self, request):
         d = date.today().isoformat()
         user = request.user
-        endpoint = request.resolver_match.url_name
+        endpoint = resolve(request.path_info).url_name
         response_ms = self._get_response_ms()
 
         r = redis.StrictRedis(
