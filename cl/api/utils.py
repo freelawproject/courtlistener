@@ -207,8 +207,9 @@ class LoggingMixin(object):
 
         # Use a sorted set to store the user stats, with the score representing
         # the number of queries the user made total or on a given day.
-        pipe.zincrby('api:v3.user.counts', 1, user.pk)
-        pipe.zincrby('api:v3.user.d:%s.counts' % d, 1, user.pk)
+        user_pk = user.pk or 'AnonymousUser'
+        pipe.zincrby('api:v3.user.counts', 1, user_pk)
+        pipe.zincrby('api:v3.user.d:%s.counts' % d, 1, user_pk)
 
         # Use a sorted set to store all the endpoints with score representing
         # the number of queries the endpoint received total or on a given day.
