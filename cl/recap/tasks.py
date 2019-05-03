@@ -1136,7 +1136,7 @@ def process_recap_docket(self, pk):
         pq.upload_type = UPLOAD_TYPE.DOCKET_HISTORY_REPORT
         pq.save()
         process_recap_docket_history_report(pk)
-        self.request.callbacks = None
+        self.request.chain = None
         return None
 
     report._parse_text(text)
@@ -1147,7 +1147,7 @@ def process_recap_docket(self, pk):
         # Not really a docket. Some sort of invalid document (see Juriscraper).
         msg = "Not a valid docket upload."
         mark_pq_status(pq, msg, pq.INVALID_CONTENT)
-        self.request.callbacks = None
+        self.request.chain = None
         return None
 
     # Merge the contents of the docket into CL.
@@ -1165,7 +1165,7 @@ def process_recap_docket(self, pk):
 
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
-        self.request.callbacks = None
+        self.request.chain = None
         return {'docket_pk': d.pk, 'content_updated': False}
 
     d.save()
@@ -1218,7 +1218,7 @@ def process_recap_attachment(self, pk, tag_names=None):
         # Bad attachment page.
         msg = "Not a valid attachment page upload."
         mark_pq_status(pq, msg, pq.INVALID_CONTENT)
-        self.request.callbacks = None
+        self.request.chain = None
         return None
 
     if pq.pacer_case_id in ['undefined', 'null']:
@@ -1347,7 +1347,7 @@ def process_recap_docket_history_report(self, pk):
         # Bad docket history page.
         msg = "Not a valid docket history page upload."
         mark_pq_status(pq, msg, pq.INVALID_CONTENT)
-        self.request.callbacks = None
+        self.request.chain = None
         return None
 
     # Merge the contents of the docket into CL.
@@ -1363,7 +1363,7 @@ def process_recap_docket_history_report(self, pk):
 
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
-        self.request.callbacks = None
+        self.request.chain = None
         return {'docket_pk': d.pk, 'content_updated': False}
 
     try:
@@ -1374,7 +1374,7 @@ def process_recap_docket_history_report(self, pk):
         error_message = "Unable to save docket due to IntegrityError."
         if self.request.retries == self.max_retries:
             mark_pq_status(pq, error_message, pq.PROCESSING_FAILED)
-            self.request.callbacks = None
+            self.request.chain = None
             return None
         else:
             mark_pq_status(pq, error_message, pq.QUEUED_FOR_RETRY)
@@ -1440,7 +1440,7 @@ def process_recap_appellate_docket(self, pk):
         # Not really a docket. Some sort of invalid document (see Juriscraper).
         msg = "Not a valid docket upload."
         mark_pq_status(pq, msg, pq.INVALID_CONTENT)
-        self.request.callbacks = None
+        self.request.chain = None
         return None
 
     # Merge the contents of the docket into CL.
@@ -1459,7 +1459,7 @@ def process_recap_appellate_docket(self, pk):
 
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
-        self.request.callbacks = None
+        self.request.chain = None
         return {'docket_pk': d.pk, 'content_updated': False}
 
     if og_info is not None:
