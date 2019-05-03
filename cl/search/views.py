@@ -291,7 +291,8 @@ def show_results(request):
             render_dict.update({'search_form': SearchForm(request.GET)})
 
             # Get a bunch of stats.
-            render_dict.update(get_homepage_stats())
+            stats = get_homepage_stats()
+            render_dict.update(stats)
 
             six_hours = 60 * 60 * 6
             cache.set(homepage_cache_key, render_dict, six_hours)
