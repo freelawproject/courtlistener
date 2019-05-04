@@ -8,12 +8,15 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.urls import reverse
 from django.db.models import Sum, Count
 from django.shortcuts import HttpResponseRedirect, render, get_object_or_404
 from django.utils.timezone import utc, make_aware
 from django.views.decorators.cache import never_cache
+from requests import RequestException
+from scorched.exc import SolrError
 
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
@@ -38,8 +41,64 @@ def check_pagination_depth(page_number):
     """Check if the pagination is too deep (indicating a crawler)"""
     max_search_pagination_depth = 100
     if page_number > max_search_pagination_depth:
-        return True
-    return False
+        logger.warning("Query depth of %s denied access (probably a "
+                       "crawler)", page_number)
+        raise PermissionDenied
+
+
+def get_solr_result_objects(cd, facet):
+    """Note that this doesn't run the query yet. Not until the
+    pagination is run.
+    """
+    search_type = cd['type']
+    if search_type == 'o':
+        si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        results = si.query().add_extra(**build_main_query(cd, facet=facet))
+    elif search_type == 'r':
+        si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
+        results = si.query().add_extra(**build_main_query(cd, facet=facet))
+    elif search_type == 'oa':
+        si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
+        results = si.query().add_extra(**build_main_query(cd, facet=facet))
+    elif search_type == 'p':
+        si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
+        results = si.query().add_extra(**build_main_query(cd, facet=facet))
+    else:
+        raise NotImplementedError("Unknown search type: %s" % search_type)
+
+    return results
+
+
+def paginate_cached_solr_results(request, cd, results, rows, cache_key):
+    # Run the query and set up pagination
+    if cache_key is not None:
+        paged_results = cache.get(cache_key)
+        if paged_results is not None:
+            return paged_results
+
+    page = int(request.GET.get('page', 1))
+    check_pagination_depth(page)
+
+    if cd['type'] == 'r':
+        rows = 10
+
+    paginator = Paginator(results, rows)
+    try:
+        paged_results = paginator.page(page)
+    except PageNotAnInteger:
+        paged_results = paginator.page(1)
+    except EmptyPage:
+        # Page is out of range (e.g. 9999), deliver last page.
+        paged_results = paginator.page(paginator.num_pages)
+
+    # Post processing of the results
+    regroup_snippets(paged_results)
+
+    if cache_key is not None:
+        six_hours = 60 * 60 * 6
+        cache.set(cache_key, paged_results, six_hours)
+
+    return paged_results
 
 
 def do_search(request, rows=20, order_by=None, type=None, facet=True,
@@ -59,19 +118,6 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True,
     :return A big dict of variables for use in the search results, homepage, or
     other location.
     """
-
-    if cache_key is not None:
-        cache_result = cache.get(cache_key)
-        if cache_result is not None:
-            # Facet fields cannot be pickled, thus cannot be cached, thus must
-            # be calculated after we grab from the cache.
-            facet_fields = make_stats_variable(
-                cache_result['search_form'],
-                cache_result['results'],
-            )
-            cache_result.update({'facet_fields': facet_fields})
-            return cache_result
-
     query_citation = None
     error = False
     paged_results = None
@@ -85,59 +131,30 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True,
             cd['order_by'] = order_by
         if type is not None:
             cd['type'] = type
-        search_form = _clean_form(request, cd, courts)
 
+        # Do the query, hitting the cache if desired
+        # noinspection PyBroadException
+        try:
+            results = get_solr_result_objects(cd, facet)
+            paged_results = paginate_cached_solr_results(request, cd, results,
+                                                         rows, cache_key)
+        except (NotImplementedError, RequestException, SolrError) as e:
+            error = True
+            logger.warning("Error loading search page with "
+                           "request: %s" % request.GET)
+            logger.warning("Error was: %s" % e)
+            if settings.DEBUG is True:
+                traceback.print_exc()
+
+        # A couple special variables for particular search types
+        search_form = _clean_form(request, cd, courts)
         if cd['type'] == 'o':
-            si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
-            results = si.query().add_extra(**build_main_query(cd, facet=facet))
             query_citation = get_query_citation(cd)
         elif cd['type'] == 'r':
-            si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-            results = si.query().add_extra(**build_main_query(cd, facet=facet))
-            courts = courts.filter(
-                pacer_court_id__isnull=False,
-                end_date__isnull=True,
-            ).exclude(
-                jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL,
-            )
-        elif cd['type'] == 'oa':
-            si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
-            results = si.query().add_extra(**build_main_query(cd, facet=facet))
-        elif cd['type'] == 'p':
-            si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
-            results = si.query().add_extra(**build_main_query(cd, facet=facet))
-
-        # Run the query and set up pagination
-        page = int(request.GET.get('page', 1))
-        too_deep = check_pagination_depth(page)
-        if too_deep:
-            logger.warning("Query depth of %s denied access (probably a "
-                           "crawler)", page)
-            error = True
-        else:
-            try:
-                if cd['type'] == 'r':
-                    rows = 10
-                paginator = Paginator(results, rows)
-                try:
-                    paged_results = paginator.page(page)
-                except PageNotAnInteger:
-                    paged_results = paginator.page(1)
-                except EmptyPage:
-                    # Page is out of range (e.g. 9999), deliver last page.
-                    paged_results = paginator.page(paginator.num_pages)
-            except Exception as e:
-                # Catches any Solr errors, and aborts.
-                logger.warning("Error loading pagination on search page with "
-                               "request: %s" % request.GET)
-                logger.warning("Error was: %s" % e)
-                if settings.DEBUG is True:
-                    traceback.print_exc()
-                error = True
-
-        # Post processing of the results
-        regroup_snippets(paged_results)
-
+            panels = Court.FEDERAL_BANKRUPTCY_PANEL
+            courts = (courts.filter(pacer_court_id__isnull=False,
+                                    end_date__isnull=True)
+                            .exclude(jurisdiction=panels))
     else:
         error = True
 
@@ -145,8 +162,9 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True,
         courts, search_form)
     search_summary_str = search_form.as_text(court_count, court_count_human)
 
-    cache_result = {
+    return {
         'results': paged_results,
+        'facet_fields': make_stats_variable(search_form, paged_results),
         'search_form': search_form,
         'search_summary_str': search_summary_str,
         'courts': courts,
@@ -155,14 +173,6 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True,
         'query_citation': query_citation,
         'error': error,
     }
-    if cache_key is not None:
-        six_hours = 60 * 60 * 6
-        cache.set(cache_key, cache_result, six_hours)
-
-    # Note that facet fields cannot be cached
-    facet_fields = make_stats_variable(search_form, paged_results)
-    cache_result.update({'facet_fields': facet_fields})
-    return cache_result
 
 
 def get_homepage_stats():
