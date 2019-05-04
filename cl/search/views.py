@@ -42,7 +42,35 @@ def check_pagination_depth(page_number):
     return False
 
 
-def do_search(request, rows=20, order_by=None, type=None, facet=True):
+def do_search(request, rows=20, order_by=None, type=None, facet=True,
+              cache_key=None):
+    """Do all the difficult solr work.
+
+    :param request: The request made by the user
+    :param rows: The number of solr results to request
+    :param order_by: An opportunity to override the ordering of the search
+    results
+    :param type: An opportunity to override the type
+    :param facet: Whether to complete faceting in the query
+    :param cache_key: A cache key with which to save the results. Note that it
+    does not do anything clever with the actual query, so if you use this, your
+    cache key should *already* have factored in the query. If None, no caching
+    is set or used. Results are saved for six hours.
+    :return A big dict of variables for use in the search results, homepage, or
+    other location.
+    """
+
+    if cache_key is not None:
+        cache_result = cache.get(cache_key)
+        if cache_result is not None:
+            # Facet fields cannot be pickled, thus cannot be cached, thus must
+            # be calculated after we grab from the cache.
+            facet_fields = make_stats_variable(
+                cache_result['search_form'],
+                cache_result['results'],
+            )
+            cache_result.update({'facet_fields': facet_fields})
+            return cache_result
 
     query_citation = None
     error = False
@@ -113,11 +141,11 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
     else:
         error = True
 
-    courts, court_count_human, court_count = merge_form_with_courts(courts,
-                                                                    search_form)
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts, search_form)
     search_summary_str = search_form.as_text(court_count, court_count_human)
-    facet_fields = make_stats_variable(search_form, paged_results)
-    return {
+
+    cache_result = {
         'results': paged_results,
         'search_form': search_form,
         'search_summary_str': search_summary_str,
@@ -125,9 +153,16 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
         'court_count_human': court_count_human,
         'court_count': court_count,
         'query_citation': query_citation,
-        'facet_fields': facet_fields,
         'error': error,
     }
+    if cache_key is not None:
+        six_hours = 60 * 60 * 6
+        cache.set(cache_key, cache_result, six_hours)
+
+    # Note that facet fields cannot be cached
+    facet_fields = make_stats_variable(search_form, paged_results)
+    cache_result.update({'facet_fields': facet_fields})
+    return cache_result
 
 
 def get_homepage_stats():
@@ -273,20 +308,16 @@ def show_results(request):
             request.GET = request.GET.copy()  # Makes it mutable
             request.GET['filed_before'] = date.today()
 
-            homepage_cache_key = 'homepage-data'
-            homepage_dict = cache.get(homepage_cache_key)
-            if homepage_dict is not None:
-                return render(request, 'homepage.html', homepage_dict)
-
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
-            render_dict.update(do_search(request, rows=5,
-                                         order_by='dateFiled desc',
-                                         facet=False))
+            render_dict.update(do_search(
+                request, rows=5, order_by='dateFiled desc', facet=False,
+                cache_key='homepage-data-o'))
             # Get the results from the oral arguments as well
-            oa_dict = do_search(request, rows=5, order_by='dateArgued desc',
-                                type='oa', facet=False)
-            render_dict.update({'results_oa': oa_dict['results']})
+            render_dict.update({'results_oa': do_search(
+                request, rows=5, order_by='dateArgued desc', type='oa',
+                facet=False, cache_key='homepage-data-oa')['results']})
+
             # But give it a fresh form for the advanced search section
             render_dict.update({'search_form': SearchForm(request.GET)})
 
@@ -294,8 +325,6 @@ def show_results(request):
             stats = get_homepage_stats()
             render_dict.update(stats)
 
-            six_hours = 60 * 60 * 6
-            cache.set(homepage_cache_key, render_dict, six_hours)
             return render(request, 'homepage.html', render_dict)
         else:
             # User placed a search or is trying to edit an alert
@@ -346,13 +375,9 @@ def advanced(request):
     if request.path == reverse('advanced_o'):
         obj_type = 'o'
         # Needed b/c of facet values.
-        o_cache_key = 'opinion-homepage-results'
-        o_results = cache.get(o_cache_key)
-        if o_results is None:
-            o_results = do_search(request, rows=1, type=obj_type, facet=True)
-            six_hours = 60 * 60 * 6
-            cache.set(o_cache_key, o_results, six_hours)
 
+        o_results = do_search(request, rows=1, type=obj_type, facet=True,
+                              cache_key='opinion-homepage-results')
         render_dict.update(o_results)
         render_dict['search_form'] = SearchForm({'type': obj_type})
         return render(request, 'advanced.html', render_dict)
