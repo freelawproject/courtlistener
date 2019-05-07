@@ -1,0 +1,60 @@
+version: "3.7"
+services:
+    celery_prefork:
+        image: freelawproject/task-server:latest
+        deploy:
+            resources:
+                limits:
+                    cpus: "${CELERY_PREFORK_CONCURRENCY}"
+                    memory: "1GB"
+            restart_policy:
+                condition: on-failure
+        volumes:
+            - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
+            - "${POSTGRES_SOCK:-/dev/null}:/var/run/postgres"
+        logging:
+            driver: journald
+        networks:
+            - cl_net_overlay
+        command: >
+            celery
+              --app=cl worker
+              --loglevel=info
+              --events
+              --pool=prefork
+              --concurrency=${CELERY_PREFORK_CONCURRENCY:?CELERY_PREFORK_CONCURRENCY not defined}
+              --queues=celery
+              --hostname=prefork@%h
+              --prefetch-multiplier=1
+
+    celery_gevent:
+        image: freelawproject/task-server:latest
+        deploy:
+            resources:
+                limits:
+                    cpus: "${CELERY_GEVENT_CPU_LIMIT:-20}"
+                    memory: "1GB"
+            restart_policy:
+                condition: on-failure
+        volumes:
+            - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
+            - "${POSTGRES_SOCK:-/dev/null}:/var/run/postgres"
+        logging:
+            driver: journald
+        networks:
+            - cl_net_overlay
+        command: >
+            celery
+              --app=cl worker
+              --loglevel=info
+              --events
+              --pool=gevent
+              --concurrency=${CELERY_GEVENT_CONCURRENCY:?CELERY_GEVENT_CONCURRENCY not definied}
+              --queues=io_bound
+              --hostname=gevent@%h
+
+networks:
+    cl_net_overlay:
+        driver: overlay
+        external: true
+
