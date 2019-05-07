@@ -12,6 +12,7 @@ services:
         volumes:
             - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
             - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
+            - "${DJANGO_MEDIA_ROOT:-/sata}:/sata"
         logging:
             driver: journald
         networks:
@@ -39,6 +40,7 @@ services:
         volumes:
             - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
             - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
+            - "${DJANGO_MEDIA_ROOT:-/sata}:/sata"
         logging:
             driver: journald
         networks:
