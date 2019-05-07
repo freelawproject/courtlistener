@@ -133,9 +133,11 @@ Then set up the network:
         
 With that done, you'll run something like:
     
-    sudo CELERY_PREFORK_CONCURRENCY=10 \
+    sudo \
+    CELERY_PREFORK_CONCURRENCY=10 \
     CELERY_GEVENT_CONCURRENCY=512 \
     CL_CODE_DIR=/home/username/projects/courtlistener \
+    DJANGO_MEDIA_ROOT=/sata \
     POSTGRESQL_SOCK=/var/run/postgresql \
     docker stack deploy --compose-file docker-compose.yml task-server
 
@@ -153,6 +155,10 @@ Some explanation of variables:
    CPUs available to the gevent worker. Default is 20 CPUs.
    
  - `CL_CODE_DIR` — Where the image can find the CourtListener code. 
+ 
+ - `DJANGO_MEDIA_ROOT` — Where you want to store your local media files, like 
+   PDFs, MP3s, etc. This is important in prod because it allows you to use a 
+   different drive for this than the one where everything else resides.
  
  - `POSTGRESQL_SOCK` — An optional setting for using the unix socket to connect
    to PostgreSQL. By default this is set to `/dev/null`, but you might want to
