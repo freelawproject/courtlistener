@@ -1,0 +1,14 @@
+# Set the hostname or IP of the Redis host. Note that this value is understood
+# in the context of the docker container. E.g. "localhost" is the localhost of
+# the docker image, not of the host of the docker image, where this file lives.
+REDIS_HOST = 'redis'
+
+# Use unix socket connections to the default DB
+DATABASES['default']['HOST'] = ''
+
+# These settings are needed in prod to store files on the network drives.
+# Dev machines are unlikely to need to tinker with these.
+MEDIA_ROOT = '/sata/'
+BULK_DATA_DIR = '/sata/bulk-data/'
+
+
