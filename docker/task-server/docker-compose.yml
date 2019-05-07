@@ -11,7 +11,7 @@ services:
                 condition: on-failure
         volumes:
             - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
-            - "${POSTGRES_SOCK:-/dev/null}:/var/run/postgresql"
+            - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
         logging:
             driver: journald
         networks:
@@ -38,7 +38,7 @@ services:
                 condition: on-failure
         volumes:
             - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
-            - "${POSTGRES_SOCK:-/dev/null}:/var/run/postgresql"
+            - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
         logging:
             driver: journald
         networks:
