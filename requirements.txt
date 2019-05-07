@@ -36,6 +36,7 @@ enum34==1.1.2
 eyeD3==0.7.11
 feedparser==5.2.1
 geonamescache==0.20
+gevent
 google-cloud-storage==1.6.0
 google-api-python-client==1.6.4
 hiredis==0.2.0
