@@ -177,15 +177,9 @@ REDIS_DATABASES = {
 ##########
 if DEVELOPMENT:
     # In a development machine, these setting make sense
-    CELERY_TASK_ALWAYS_EAGER = True  # Do all tasks immediately, no async.
-    CELERY_TASK_EAGER_PROPAGATES = True
     CELERY_WORKER_CONCURRENCY = 2
 else:
     # Celery settings for production sites
-    CELERY_BROKER_URL = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
-                                       REDIS_DATABASES['CELERY'])
-    CELERY_RESULT_BACKEND = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
-                                                  REDIS_DATABASES['CELERY'])
     CELERY_WORKER_CONCURRENCY = 20
     CELERY_BROKER_POOL_LIMIT = 30
     CELERY_RESULT_EXPIRES = 60 * 60
@@ -197,10 +191,14 @@ else:
         'visibility_timeout': 21600,  # six hours
     }
 
+CELERY_BROKER_URL = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
+                                          REDIS_DATABASES['CELERY'])
+CELERY_RESULT_BACKEND = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
+                                              REDIS_DATABASES['CELERY'])
+
 # Rate limits aren't ever used, so disable them across the board for better
 # performance
 CELERY_WORKER_DISABLE_RATE_LIMITS = True
-CELERY_SEND_TASK_ERROR_EMAILS = True
 # We could pass around JSON, but it's *much* easier to pass around Python
 # objects that support things like dates. Let's do that, shall we?
 CELERY_RESULT_SERIALIZER = 'pickle'
