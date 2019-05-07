@@ -133,11 +133,11 @@ Then set up the network:
         
 With that done, you'll run something like:
     
-    CELERY_PREFORK_CONCURRENCY=10 \
+    sudo CELERY_PREFORK_CONCURRENCY=10 \
     CELERY_GEVENT_CONCURRENCY=512 \
     CL_CODE_DIR=/home/username/projects/courtlistener \
     POSTGRESQL_SOCK=/var/run/postgresql \
-    sudo docker stack deploy --compose-file docker-compose.yaml task-server
+    docker stack deploy --compose-file docker-compose.yml task-server
 
 Some explanation of variables:
 
