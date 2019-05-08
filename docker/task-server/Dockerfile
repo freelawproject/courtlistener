@@ -27,8 +27,8 @@ ENV \
 ENV \
     PYTHONPATH="${PYTHONPATH}:${CELERY_TASKS_DIR}"
 
-RUN addgroup --gid 1025 ${CELERY_USER} && \
-    adduser --disabled-password --system --ingroup ${CELERY_USER} ${CELERY_USER} && \
+RUN addgroup --gid 3502 web-assets && \
+    adduser --disabled-password --system --ingroup web-assets ${CELERY_USER} && \
     mkdir /var/log/courtlistener && \
     chmod 777 /var/log/courtlistener
 
