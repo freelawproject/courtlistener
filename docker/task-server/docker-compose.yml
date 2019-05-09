@@ -6,7 +6,7 @@ services:
             resources:
                 limits:
                     cpus: "${CELERY_PREFORK_CONCURRENCY}"
-                    memory: "1GB"
+                    memory: "${CELERY_PREFORK_MEMORY:-1}GB"
             restart_policy:
                 condition: on-failure
         volumes:
@@ -34,7 +34,7 @@ services:
             resources:
                 limits:
                     cpus: "${CELERY_GEVENT_CPU_LIMIT:-20}"
-                    memory: "1GB"
+                    memory: "${CELERY_GEVENT_MEMORY:-1}GB"
             restart_policy:
                 condition: on-failure
         volumes:
