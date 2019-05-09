@@ -23,7 +23,8 @@ RUN echo "deb http://deb.debian.org/debian stretch-backports main" > \
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install git+https://github.com/freelawproject/judge-pics@master
+    pip install git+https://github.com/freelawproject/judge-pics@master && \
+    update-seals -f
 
 
 ## Needs to be two commands so second one can use variables from first.
