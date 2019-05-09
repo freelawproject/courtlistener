@@ -23,16 +23,14 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 ## Needs to be two commands so second one can use variables from first.
 ENV \
     CELERY_TASKS_DIR=/opt/celery \
-    CELERY_USER=celery
+    CELERY_USER_ID=33
 ENV \
     PYTHONPATH="${PYTHONPATH}:${CELERY_TASKS_DIR}"
 
-RUN addgroup --gid 3502 web-assets && \
-    adduser --disabled-password --system --ingroup web-assets ${CELERY_USER} && \
-    mkdir /var/log/courtlistener && \
+RUN mkdir /var/log/courtlistener && \
     chmod 777 /var/log/courtlistener
 
-USER ${CELERY_USER}
+USER ${CELERY_USER_ID}
 
 CMD celery \
     --app=cl worker \

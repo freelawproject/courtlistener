@@ -193,23 +193,7 @@ Or to go to `celery`, the default queue, do:
 ## Setting up the filesystem
 
 Docker seems to make this difficult, permissions-wise. If you look in the 
-Dockerfile, you'll see that we run celery in a group with ID of `3502`. The 
-number is arbitrary — it was just the number the server assigned when we 
-created the group.
-
-So the trick, now that we know that celery is being run by a user in this 
-group, is to set up the filesystem to expect that user. We do this using the 
-same basic instructions we use for the Solr indexes (though it's a bigger pain
-in this case b/c there are so many more files):
-
-    # Put the files in the right group and make it sticky
-    chown -R :3502 /data/myvolume
-    find /data/myvolume -type d -exec chmod g+s {} \;
-
-Change the permissions of the directory to allow the celery group the access it 
-needs to directories and files respectively:
-   
-    find /data/myvolume -type d -exec chmod 775 {} \;
-    find /data/myvolume -type f -exec chmod 664 {} \;
-    
-[This approach adapted from the link here](https://medium.com/@nielssj/docker-volumes-and-file-system-permissions-772c1aee23ca). 
+Dockerfile, you'll see that we run celery with a user ID of 33. This is the 
+ID of the www-data user on the server. (It also corresponds to the www-data 
+user in the container, but I'm not sure I want to count on that.) We need to 
+use this user to access and create the files on the server.
