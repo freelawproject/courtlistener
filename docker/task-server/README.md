@@ -135,7 +135,9 @@ With that done, you'll run something like:
     
     sudo \
     CELERY_PREFORK_CONCURRENCY=10 \
+    CELERY_PREFORK_MEMORY=5 \
     CELERY_GEVENT_CONCURRENCY=512 \
+    CELERY_GEVENT_MEMORY=10 \
     CL_CODE_DIR=/home/username/projects/courtlistener \
     DJANGO_MEDIA_ROOT=/sata \
     POSTGRESQL_SOCK=/var/run/postgresql \
@@ -150,6 +152,9 @@ Some explanation of variables:
    
  - `CELERY_GEVENT_CONCURRENCY` — Same, but for the `gevent` worker that we 
    start (which is optimized for IO-bound tasks).
+   
+ - `CELERY_{PREFORK,GEVENT}_MEMORY` — The amount of memory (in GB) to give to
+   the prefork and gevent workers. Defaults are 1GB each.
    
  - `CELERY_GEVENT_CPU_LIMIT` — An optional variable for setting the number of 
    CPUs available to the gevent worker. Default is 20 CPUs.
