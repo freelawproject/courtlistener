@@ -37,7 +37,7 @@ def get_dockets(options):
     f = options['file']
     reader = csv.DictReader(f)
     q = options['queue']
-    throttle = CeleryThrottle(queue_name=q, min_items=500)
+    throttle = CeleryThrottle(queue_name=q)
     pacer_session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
     pacer_session.login()
     for i, row in enumerate(reader):
