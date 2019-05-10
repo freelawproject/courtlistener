@@ -18,6 +18,19 @@ PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 TAG = 'ILNB-KESSLER'
 
 
+def make_docket_number(year, docket_number):
+    """The docket number field kind of sucks for lookup. Combine it with the
+    year to make a better version.
+
+    :param year: The four digit year field from the "filecy" field.
+    :param docket_number: The 5-6 digit docket number from the "docket" field.
+    :return a string like 20-bk-39238
+    """
+    docket_serial = docket_number[-5:]
+    two_digit_year = year[-2:]
+    return '%s-bk-%s' % (two_digit_year, docket_serial)
+
+
 def get_dockets(options):
     """Download the dockets described in the CSV
     """
@@ -43,8 +56,7 @@ def get_dockets(options):
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
-                # Makes a value like 2000-257, which works fine.
-                docket_number='%s-%s' % (row['filecy'], row['docket']),
+                docket_number=make_docket_number(row['filecy'], row['docket']),
                 court_id='ilnb',
                 cookies=pacer_session.cookies,
                 office_number=row['office'],
