@@ -38,7 +38,7 @@ def get_dockets(options):
                                          password=PACER_PASSWORD)
             pacer_session.login()
             logger.info("Sent %s tasks to celery so far." % i)
-        logger.info("Doing row %s: %s", i)
+        logger.info("Doing row %s", i)
         throttle.maybe_wait()
         chain(
             get_pacer_case_id_and_title.s(
