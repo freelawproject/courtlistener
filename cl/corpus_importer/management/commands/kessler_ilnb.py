@@ -15,7 +15,7 @@ from cl.search.tasks import add_or_update_recap_docket
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
-TAG = 'ILNB'
+TAG = 'ILNB-KESSLER'
 
 
 def get_dockets(options):
@@ -38,7 +38,7 @@ def get_dockets(options):
                                          password=PACER_PASSWORD)
             pacer_session.login()
             logger.info("Sent %s tasks to celery so far." % i)
-        logger.info("Doing row %s: %s", i, row)
+        logger.info("Doing row %s: %s", i)
         throttle.maybe_wait()
         chain(
             get_pacer_case_id_and_title.s(
