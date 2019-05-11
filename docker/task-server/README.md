@@ -56,6 +56,15 @@ earlier settings file. Your IDE will likely complain that `SOME_VAR` doesn't
 exist in `02-my-overrides.py`, but ignore your IDE. If you want to read the 
 code behind all this, look in `settings.py`.
 
+Note that in production, you may need to set:
+
+    DATABASES['default']['CONN_MAX_AGE'] = 0
+
+That will address bug [celery bug #4878][bug], which crashes workers in Celery 
+4.3 (though they're working on a fix).
+
+[bug]: https://github.com/celery/celery/issues/4878#issuecomment-491529776
+
 
 ## DockerFile purpose and usage
 
@@ -112,9 +121,15 @@ For example, our production settings are something like:
 
     REDIS_HOST = '256.64.24.1'
     DATABASES['default']['HOST'] = ''
+    DATABASES['default']['CONN_MAX_AGE'] = 0
     
 This just sets the IP of the Redis host (it's remote), and sets the host of the
 DB to use the unix socket (it's on the machine hosting docker).
+
+Note that due to bug [celery bug #4878][bug], there's a solid chance that if 
+you have `CONN_MAX_AGE` set to anything other than zero, Celery will crash.
+
+[bug]: https://github.com/celery/celery/issues/4878#issuecomment-491529776
 
 
 ## Using the docker-compose.yaml file
