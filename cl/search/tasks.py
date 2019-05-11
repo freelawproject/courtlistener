@@ -53,7 +53,7 @@ def add_items_to_solr(item_pks, app_label, force_commit=False):
             items.update(date_last_index=now())
 
 
-@app.task
+@app.task(ignore_resutls=True)
 def add_or_update_recap_docket(data, force_commit=False,
                                update_threshold=60*60):
     """Add an entire docket to Solr or update it if it's already there.
