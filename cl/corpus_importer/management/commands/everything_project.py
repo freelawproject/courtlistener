@@ -56,6 +56,14 @@ def price_sample(options, de_upper_bound):
                 doc_num_end=de_upper_bound)
 
 
+def get_content_by_year(options, year):
+    items = get_fjc_rows()
+    d = '%s-01-01' % year
+    items = items.filter(date_filed__gte=d)
+    tags = [TAG]
+    get_dockets(options, items, tags)
+
+
 def get_everything_full(options):
     items = get_fjc_rows()
     tags = [TAG]
@@ -174,3 +182,5 @@ class Command(VerboseCommand):
             price_sample(options, '40')
         elif options['task'] == 'price_sample_50':
             price_sample(options, '50')
+        elif options['task'] == '2018_only':
+            get_content_by_year(options, 2018)
