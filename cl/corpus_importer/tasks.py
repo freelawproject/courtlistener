@@ -614,7 +614,7 @@ def make_fjc_idb_lookup_params(item):
 
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
-          interval_step=10 * 60)
+          interval_step=10 * 60, ignore_results=True)
 def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
                                 cookies, case_name=None, office_number=None,
                                 docket_number_letters=None, extra_data=None):
