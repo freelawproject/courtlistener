@@ -28,6 +28,34 @@ services:
               --hostname=prefork@%h
               --prefetch-multiplier=1
 
+    celery_prefork_bulk:
+        image: freelawproject/task-server:latest
+        deploy:
+            resources:
+                limits:
+                    cpus: "${CELERY_PREFORK_BULK_CONCURRENCY}"
+                    memory: "${CELERY_PREFORK_BULK_MEMORY:-1}GB"
+            restart_policy:
+                condition: on-failure
+        volumes:
+            - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
+            - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
+            - "${DJANGO_MEDIA_ROOT:-/sata}:/sata"
+        logging:
+            driver: journald
+        networks:
+            - cl_net_overlay
+        command: >
+            celery
+              --app=cl worker
+              --loglevel=info
+              --events
+              --pool=prefork
+              --concurrency=${CELERY_PREFORK_BULK_CONCURRENCY:?CELERY_PREFORK_BULK_CONCURRENCY not defined}
+              --queues=batch1,batch2
+              --hostname=prefork@%h
+              --prefetch-multiplier=5
+
     celery_gevent:
         image: freelawproject/task-server:latest
         deploy:
