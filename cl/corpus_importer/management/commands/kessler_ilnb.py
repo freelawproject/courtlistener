@@ -7,15 +7,18 @@ from django.conf import settings
 from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import get_pacer_case_id_and_title, \
-    get_docket_by_pacer_case_id
+    get_docket_by_pacer_case_id, get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.tasks import add_or_update_recap_docket
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.search.models import RECAPDocument
+from cl.search.tasks import add_or_update_recap_docket, add_items_to_solr
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 TAG = 'ILNB-KESSLER'
+TAG_PETITIONS = 'ILNB-KESSLER-PETITIONS'
 
 
 def make_docket_number(year, docket_number):
@@ -76,6 +79,43 @@ def get_dockets(options):
         ).apply_async()
 
 
+def get_petitions(options):
+    """Just get document number one for every docket that's tagged in this
+    collection.
+    """
+    rds = RECAPDocument.objects.filter(
+        tags__name=TAG,
+        document_number='1',
+        document_type=RECAPDocument.PACER_DOCUMENT,
+    ).values_list('pk', flat=True).iterator()
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q)
+    pacer_session = PacerSession(username=PACER_USERNAME,
+                                 password=PACER_PASSWORD)
+    pacer_session.login()
+    for i, rd_pk in enumerate(rds):
+        if i < options['offset']:
+            i += 1
+            continue
+        if i >= options['limit'] > 0:
+            break
+
+        if i % 1000 == 0:
+            pacer_session = PacerSession(username=PACER_USERNAME,
+                                         password=PACER_PASSWORD)
+            pacer_session.login()
+            logger.info("Sent %s tasks to celery so far." % i)
+        logger.info("Doing row %s", i)
+        throttle.maybe_wait()
+
+        chain(
+            get_pacer_doc_by_rd.s(
+                rd_pk, pacer_session.cookies, tag=TAG_PETITIONS).set(queue=q),
+            extract_recap_pdf.si(rd_pk).set(queue=q),
+            add_items_to_solr.si([rd_pk], 'search.RECAPDocument').set(queue=q),
+        ).apply_async()
+
+
 class Command(VerboseCommand):
     help = "Look up dockets from a spreadsheet for a client and download them."
 
@@ -106,9 +146,18 @@ class Command(VerboseCommand):
                  "download?",
             required=True,
         )
+        parser.add_argument(
+            '--task',
+            type=str,
+            required=True,
+            help="What task are we doing at this point?",
+        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         logger.info("Using PACER username: %s" % PACER_USERNAME)
-        get_dockets(options)
+        if options['task'] == 'all_dockets':
+            get_dockets(options)
+        elif options['task'] == 'all_petitions':
+            get_petitions(options)
 
