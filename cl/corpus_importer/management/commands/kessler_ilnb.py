@@ -87,7 +87,9 @@ def get_petitions(options):
         tags__name=TAG,
         document_number='1',
         document_type=RECAPDocument.PACER_DOCUMENT,
-    ).values_list('pk', flat=True).iterator()
+    ).exclude(
+        pacer_doc_id='',
+    ).order_by('pk').values_list('pk', flat=True).iterator()
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
     pacer_session = PacerSession(username=PACER_USERNAME,
