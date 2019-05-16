@@ -144,7 +144,6 @@ class Command(VerboseCommand):
             type=argparse.FileType('r'),
             help="Where is the CSV that has the information about what to "
                  "download?",
-            required=True,
         )
         parser.add_argument(
             '--task',
