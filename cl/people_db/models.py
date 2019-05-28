@@ -1169,6 +1169,14 @@ class Source(models.Model):
         blank=True,
     )
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(Source, self).save(*args, **kwargs)
+
+    def clean_fields(self, *args, **kwargs):
+        validate_is_not_alias(self, ['person'])
+        super(Source, self).clean_fields(*args, **kwargs)
+        
 
 class ABARating(models.Model):
     ABA_RATINGS = (
