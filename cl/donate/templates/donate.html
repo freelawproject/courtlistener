@@ -111,7 +111,7 @@
        data-toggle="buttons">
     {% for radio in donation_form.frequency %}
       <label for="{{ radio.id_for_label }}"
-             class="btn btn-default {% if radio.choice_value == radio.value %} active{% endif %}">
+             class="btn btn-default {% if radio.data.value == donation_form.frequency.value %} active{% endif %}">
         {{ radio.tag }} {{ radio.choice_label }}
       </label>
     {% endfor %}
@@ -173,7 +173,7 @@
   {% endif %}
   <div id="payment-provider-radio" class="btn-group btn-group-justified" data-toggle="buttons">
     {% for radio in donation_form.payment_provider %}
-      <label for="{{ radio.id_for_label }}" class="btn btn-default {% if radio.choice_value == radio.value %} active{% endif %}">
+      <label for="{{ radio.id_for_label }}" class="btn btn-default {% if radio.data.value == donation_form.payment_provider.value %} active{% endif %}">
         {{ radio.tag }} {{ radio.choice_label }}
       </label>
     {% endfor %}
