@@ -743,6 +743,8 @@ PACER_TO_CL_IDS = {
     --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
     <p>The ID fields in that query are the CourtListener court abbreviation and the document ID numbers as found in PACER. Several document ID numbers can be provided, separated by commas. A maximum of 300 items will be returned per page.
     </p>
+    <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Take care:</strong> The fourth digit of a PACER document ID can be a zero or one. We always normalize it to zero and you will need to do so as well in your queries. For more on these IDs, see the <a href="https://github.com/freelawproject/juriscraper">Juriscraper Project</a>.
+    </p>
     <p>To query whether a case is in the RECAP Archive, use the <code>Docket</code> endpoint described above.
     </p>
 
