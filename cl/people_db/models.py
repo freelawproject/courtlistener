@@ -1064,7 +1064,7 @@ class PoliticalAffiliation(models.Model):
         ('o', 'Other'),
     )
     POLITICAL_PARTIES = (
-        ('d', 'Democrat'),
+        ('d', 'Democratic'),
         ('r', 'Republican'),
         ('i', 'Independent'),
         ('g', 'Green'),
@@ -1172,11 +1172,7 @@ class Source(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super(Source, self).save(*args, **kwargs)
-
-    def clean_fields(self, *args, **kwargs):
-        validate_is_not_alias(self, ['person'])
-        super(Source, self).clean_fields(*args, **kwargs)
-        
+    
 
 class ABARating(models.Model):
     ABA_RATINGS = (
