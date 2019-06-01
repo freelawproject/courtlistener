@@ -187,7 +187,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             position_type='jud',
             date_start=date_start,
             date_termination=date_termination,
-            court_id=courtid
+            court_id=courtid,
         )
         if len(dupe_search) > 0:
             print('Duplicate position:', dupe_search)
@@ -224,7 +224,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                     person__name_middle__iexact=mid,
                     position_type='pres',
                     date_start__lte=date_nominated,
-                    date_termination__gte=date_nominated
+                    date_termination__gte=date_nominated,
                 )
             if len(appoint_search) == 0:
                 print(names, appoint_search)
@@ -252,7 +252,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                     'Impeachment & Conviction': 'bad_judge',
                     'Recess Appointment-Not Confirmed': 'recess_not_confirmed',
                     'Resignation': 'resign',
-                    'Retirement': 'retire_vol'
+                    'Retirement': 'retire_vol',
                     }
         term_reason = item['Termination' + pos_str]
         if pd.isnull(term_reason):
@@ -281,7 +281,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             votes_no=votes_no,
             vote_type='s',
             how_selected='a_pres',
-            termination_reason=term_reason
+            termination_reason=term_reason,
         )
 
         if not testing and save_this_position:
@@ -317,7 +317,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                     political_party=party,
                     date_start=date_nominated,
                     date_granularity_start=GRANULARITY_DAY,
-                    source='a'
+                    source='a',
                 )
                 if not testing and save_this_position:
                     politics.save()
@@ -327,7 +327,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             aba = ABARating(
                 person=person,
                 rating=rating,
-                year_rated=nom_year
+                year_rated=nom_year,
             )
             if not testing and save_this_position:
                 aba.save()
@@ -336,7 +336,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
         sources = Source(
             person=person,
             url='https://www.fjc.gov/sites/default/files/history/judges.csv',
-            date_accessed=str(date.today())
+            date_accessed=str(date.today()),
         )
         if not testing:
             sources.save()
@@ -374,7 +374,7 @@ def make_federal_judge(item, testing=False):
 
     date_dob, date_granularity_dob = process_date(item['Birth Year'],
                                                   item['Birth Month'],
-                                                  item['Birth Day'])
+                                                  item['Birth Day'],)
 
     dob_city = item['Birth City']
     dob_state = item['Birth State']
@@ -401,7 +401,7 @@ def make_federal_judge(item, testing=False):
     else:
         date_dod, date_granularity_dod = process_date(item['Death Year'],
                                                       item['Death Month'],
-                                                      item['Death Day'])
+                                                      item['Death Day'],)
 
         dod_city = item['Death City']
         dod_state = item['Death State']
@@ -429,7 +429,7 @@ def make_federal_judge(item, testing=False):
                 date_dod=date_dod,
                 date_granularity_dod=date_granularity_dod,
                 dod_city=dod_city,
-                dod_state=dod_state
+                dod_state=dod_state,
         )
 
     if not testing:
@@ -474,7 +474,7 @@ def make_federal_judge(item, testing=False):
                         school=school,
                         degree_detail=degtype,
                         degree_level=deg_level,
-                        degree_year=degyear
+                        degree_year=degyear,
                 )
                 if not testing:
                     degree.save()
@@ -538,6 +538,18 @@ def make_federal_judge(item, testing=False):
              # test for schools and courts
         else:
             city, state, org = '', '', ''
+
+        position = Position(
+                person=person,
+                job_title=job_title,
+                date_start=date_start,
+                date_granularity_start=date_start_granularity,
+                date_termination=date_end,
+                date_granularity_termination=date_end_granularity,
+                location_city=city,
+                location_state=state,
+                organization_name=org,
+        )
 
         if not testing:
             try:
