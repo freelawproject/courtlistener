@@ -374,7 +374,7 @@ def make_federal_judge(item, testing=False):
 
     date_dob, date_granularity_dob = process_date(item['Birth Year'],
                                                   item['Birth Month'],
-                                                  item['Birth Day'],)
+                                                  item['Birth Day'])
 
     dob_city = item['Birth City']
     dob_state = item['Birth State']
@@ -401,7 +401,7 @@ def make_federal_judge(item, testing=False):
     else:
         date_dod, date_granularity_dod = process_date(item['Death Year'],
                                                       item['Death Month'],
-                                                      item['Death Day'],)
+                                                      item['Death Day'])
 
         dod_city = item['Death City']
         dod_state = item['Death State']
