@@ -58,8 +58,9 @@ def price_sample(options, de_upper_bound):
 
 def get_content_by_year(options, year):
     items = get_fjc_rows()
-    d = '%s-01-01' % year
-    items = items.filter(date_filed__gte=d)
+    start = '%s-01-01' % year
+    end = '%s-12-31' % year
+    items = items.filter(date_filed__gte=start, date_filed__lte=end)
     tags = [TAG]
     get_dockets(options, items, tags)
 
@@ -135,11 +136,6 @@ def get_dockets(options, items, tags, sample_size=0, doc_num_end=''):
 class Command(VerboseCommand):
     help = "Purchase dockets from PACER"
 
-    allowed_tasks = [
-        'everything',
-        'everything_sample',
-    ]
-
     def add_arguments(self, parser):
         parser.add_argument(
             '--queue',
@@ -184,3 +180,8 @@ class Command(VerboseCommand):
             price_sample(options, '50')
         elif options['task'] == '2018_only':
             get_content_by_year(options, 2018)
+        elif options['task'] == '2017_only':
+            get_content_by_year(options, 2017)
+        elif options['task'] == '2016_only':
+            get_content_by_year(options, 2016)
+
