@@ -115,6 +115,9 @@ def get_and_save_free_document_reports(options):
     for pacer_court_id in pacer_court_ids:
         while True:
             next_start_d, next_end_d = get_next_date_range(pacer_court_id)
+            logger.info("Attempting to get latest document references at for "
+                        "%s between %s and %s", pacer_court_id, next_start_d,
+                        next_end_d)
             pacer_log = mark_court_in_progress(pacer_court_id, next_end_d)
             result = chain(
                 get_and_save_free_document_report.si(
