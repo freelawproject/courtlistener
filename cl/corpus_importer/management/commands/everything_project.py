@@ -184,4 +184,6 @@ class Command(VerboseCommand):
             get_content_by_year(options, 2017)
         elif options['task'] == '2016_only':
             get_content_by_year(options, 2016)
+        else:
+            print("Unknown task: %s" % options['task'])
 
