@@ -120,8 +120,8 @@ def get_and_save_free_document_reports(options):
             status = get_and_save_free_document_report(
                 pacer_court_id, next_start_d, next_end_d,
                 pacer_session.cookies)
-            result = mark_court_done_on_date.s(status, pacer_court_id,
-                                               next_end_d)
+            result = mark_court_done_on_date(status, pacer_court_id,
+                                             next_end_d)
 
             if result == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
                 if next_end_d >= today.date():
