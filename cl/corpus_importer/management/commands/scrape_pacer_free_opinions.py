@@ -3,7 +3,6 @@ import os
 from datetime import timedelta
 
 from celery.canvas import chain
-from celery.exceptions import TimeoutError
 from django.conf import settings
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -111,33 +110,18 @@ def get_and_save_free_document_reports(options):
     pacer_session.login()
 
     today = now()
-    max_delay = 60
     for pacer_court_id in pacer_court_ids:
         while True:
             next_start_d, next_end_d = get_next_date_range(pacer_court_id)
             logger.info("Attempting to get latest document references at for "
                         "%s between %s and %s", pacer_court_id, next_start_d,
                         next_end_d)
-            pacer_log = mark_court_in_progress(pacer_court_id, next_end_d)
-            result = chain(
-                get_and_save_free_document_report.si(
-                    pacer_court_id,
-                    next_start_d,
-                    next_end_d,
-                    pacer_session.cookies,
-                ),
-                mark_court_done_on_date.s(pacer_court_id, next_end_d),
-            )()
-            try:
-                result.get(timeout=max_delay)
-            except TimeoutError:
-                logger.info("Court %s failed to complete in %ss. Marking as "
-                            "failed and pressing on. Tried to do: %s to %s",
-                            pacer_court_id, max_delay, next_start_d,
-                            next_end_d)
-                pacer_log.status = PACERFreeDocumentLog.SCRAPE_FAILED
-                pacer_log.save()
-                break
+            mark_court_in_progress(pacer_court_id, next_end_d)
+            status = get_and_save_free_document_report(
+                pacer_court_id, next_start_d, next_end_d,
+                pacer_session.cookies)
+            result = mark_court_done_on_date.s(status, pacer_court_id,
+                                               next_end_d)
 
             if result == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
                 if next_end_d >= today.date():
