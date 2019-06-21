@@ -7,6 +7,7 @@ from django.conf import settings
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer.http import PacerSession
+from requests import RequestException
 
 from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
@@ -113,15 +114,24 @@ def get_and_save_free_document_reports(options):
     for pacer_court_id in pacer_court_ids:
         while True:
             next_start_d, next_end_d = get_next_date_range(pacer_court_id)
-            logger.info("Attempting to get latest document references at for "
+            logger.info("Attempting to get latest document references for "
                         "%s between %s and %s", pacer_court_id, next_start_d,
                         next_end_d)
             mark_court_in_progress(pacer_court_id, next_end_d)
-            status = get_and_save_free_document_report(
-                pacer_court_id, next_start_d, next_end_d,
-                pacer_session.cookies)
-            result = mark_court_done_on_date(status, pacer_court_id,
-                                             next_end_d)
+            try:
+                status = get_and_save_free_document_report(
+                    pacer_court_id, next_start_d, next_end_d,
+                    pacer_session.cookies)
+            except RequestException:
+                logger.error("Failed to get document references for %s "
+                               "between %s and %s", pacer_court_id,
+                               next_start_d, next_end_d)
+                mark_court_done_on_date(PACERFreeDocumentLog.SCRAPE_FAILED,
+                                        pacer_court_id, next_end_d)
+                break
+            else:
+                result = mark_court_done_on_date(status, pacer_court_id,
+                                                 next_end_d)
 
             if result == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
                 if next_end_d >= today.date():
