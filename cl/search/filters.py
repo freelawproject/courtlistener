@@ -88,6 +88,7 @@ class DocketFilter(FilterSet):
             'date_terminated': DATE_LOOKUPS,
             'date_last_filing': DATE_LOOKUPS,
             'docket_number': ['exact', 'startswith'],
+            'docket_number_core': ['exact', 'startswith'],
             'nature_of_suit': ALL_TEXT_LOOKUPS,
             'pacer_case_id': ['exact'],
             'source': ['exact', 'in'],
