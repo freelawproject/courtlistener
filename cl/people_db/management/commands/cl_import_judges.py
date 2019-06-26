@@ -78,13 +78,13 @@ class Command(VerboseCommand):
         if infile is None:
             self.ensure_input_file()
             infile = self.options['input_file']
-        textfields = ['firstname', 'midname', 'lastname', 'gender',
-                      'Place of Birth (City)', 'Place of Birth (State)',
-                      'Place of Death (City)', 'Place of Death (State)']
-        df = pd.read_excel(infile, 0)
+        textfields = ['First Name', 'Middle Name', 'Last Name', 'Gender',
+                      'Birth City', 'Birth State',
+                      'Death City', 'Death State']
+        df = pd.read_csv(infile)
         for x in textfields:
             df[x] = df[x].replace(np.nan, '', regex=True)
-        df['Employment text field'].replace(to_replace=r';\sno', value=r', no',
+        df['Professional Career'].replace(to_replace=r';\sno', value=r', no',
                                             inplace=True, regex=True)
         for i, row in df.iterrows():
             make_federal_judge(dict(row), testing=self.debug)
