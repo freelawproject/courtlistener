@@ -377,10 +377,6 @@ def make_federal_judge(item, testing=False):
     Returns a Judge object.
     """
 
-    # Delete this before pushing to github.
-    Person.objects.filter(cl_id=item['cl_id']).delete()
-    # Delete this before pushing to github.
-
     date_dob, date_granularity_dob = process_date(item['Birth Year'],
                                                   item['Birth Month'],
                                                   item['Birth Day'])
