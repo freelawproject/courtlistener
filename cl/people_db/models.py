@@ -1064,7 +1064,7 @@ class PoliticalAffiliation(models.Model):
         ('o', 'Other'),
     )
     POLITICAL_PARTIES = (
-        ('d', 'Democrat'),
+        ('d', 'Democratic'),
         ('r', 'Republican'),
         ('i', 'Independent'),
         ('g', 'Green'),
@@ -1169,7 +1169,7 @@ class Source(models.Model):
         blank=True,
     )
 
-
+    
 class ABARating(models.Model):
     ABA_RATINGS = (
         ('ewq', 'Exceptionally Well Qualified'),
