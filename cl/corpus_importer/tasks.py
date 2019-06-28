@@ -855,6 +855,12 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
         if count > 1:
             d = d.earliest('date_created')
 
+        # Ensure that we set the case ID. This is needed on dockets that have
+        # matching docket numbers, but that never got PACER data before. This
+        # was previously rare, but since we added the FJC data to the dockets
+        # table, this is now quite common.
+        d.pacer_case_id = pacer_case_id
+
     d.add_recap_source()
     update_docket_metadata(d, docket_data)
     d.save()
