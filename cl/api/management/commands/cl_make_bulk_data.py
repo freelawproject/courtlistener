@@ -109,7 +109,7 @@ class Command(VerboseCommand):
         self.make_citation_data(tmp_destination)
         logger.info("   - Swapping in the new citation archives...")
 
-        mkdir_p(join(settings.BULK_DATA_DIR, obj_type_str))
+        mkdir_p(final_destination)
         shutil.move(
             join(tmp_destination, 'all.csv.gz'),
             join(final_destination, 'all.csv.gz'),
