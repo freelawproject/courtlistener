@@ -11,17 +11,18 @@ from cl.people_db.import_judges.judge_utils import get_school, process_date, \
     get_races, get_party, get_suffix, get_aba, get_degree_level, \
     process_date_string
 from cl.people_db.models import Person, Position, Education, Race, \
-    PoliticalAffiliation, ABARating, GRANULARITY_DAY, GRANULARITY_YEAR
+    PoliticalAffiliation, ABARating, GRANULARITY_DAY, GRANULARITY_YEAR, \
+    Source
 
 
 def transform_employ(string):
     if pd.isnull(string):
         return [None], [None], [None], [None]
     string_list = re.split('<BR>|;|<br>', string)
-    #  separate dates from the rest
+    #  Separate dates from the rest.
     employ_list = [[a] if a is None or a.startswith('Nominated') else re.split("\,+\s+(?=\d)+|\,+\s+(?=\-)", a, 1) for a in string_list]
 
-    #  extract position and location
+    #  Extract position and location.
     for j in range(len(employ_list)):
         if len(employ_list[j]) > 1:
             A = employ_list[j][0].split(',')
@@ -38,7 +39,7 @@ def transform_employ(string):
         else:
             employ_list[j].insert(1, None)
             employ_list[j].insert(2, None)
-    #  extract start dates and end dates from dates
+    #  Extract start dates and end dates from dates.
     j = 0
     while j < len(employ_list):
         if employ_list[j][-1] is None:  # in case there are
@@ -142,10 +143,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
         # Save the position if we're running all positions or specifically
         # fixing this one.
         save_this_position = (fix_nums is None or posnum in fix_nums)
-        if posnum > 1:
-            pos_str = ' (%s)' % posnum
-        else:
-            pos_str = ''
+        pos_str = ' (%s)' % posnum
 
         if pd.isnull(item['Court Name' + pos_str]):
             continue
@@ -155,16 +153,16 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             raise Exception
 
         date_nominated = process_date_string(
-            item['Nomination Date Senate Executive Journal' + pos_str])
+            item['Nomination Date' + pos_str])
         date_recess_appointment = process_date_string(
-            item['Recess Appointment date' + pos_str])
+            item['Recess Appointment Date' + pos_str])
         date_referred_to_judicial_committee = process_date_string(
-            item['Referral date (referral to Judicial Committee)' + pos_str])
+            item['Committee Referral Date' + pos_str])
         date_judicial_committee_action = process_date_string(
-            item['Committee action date' + pos_str])
-        date_hearing = process_date_string(item['Hearings' + pos_str])
+            item['Committee Action Date' + pos_str])
+        date_hearing = process_date_string(item['Hearing Date' + pos_str])
         date_confirmation = process_date_string(
-            item['Senate Vote Date (Confirmation Date)' + pos_str])
+            item['Confirmation Date' + pos_str])
 
         # assign start date
         date_start = process_date_string(item['Commission Date' + pos_str])
@@ -174,7 +172,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             # if still no start date, skip
             continue
         date_termination = process_date_string(
-            item['Date of Termination' + pos_str])
+            item['Termination Date' + pos_str])
         date_retirement = process_date_string(
             item['Retirement from Active Service' + pos_str])
 
@@ -196,10 +194,10 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             continue
 
         # assign appointing president
-        if not pd.isnull(item['Renominating President name' + pos_str]):
-            appointstr = item['Renominating President name' + pos_str]
+        if not pd.isnull(item['Reappointing President' + pos_str]):
+            appointstr = item['Reappointing President' + pos_str]
         else:
-            appointstr = item['President name' + pos_str]
+            appointstr = item['Appointing President' + pos_str]
         appointer = None
         if appointstr not in ['Assignment', 'Reassignment']:
             names = appointstr.split()
@@ -226,7 +224,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                     person__name_middle__iexact=mid,
                     position_type='pres',
                     date_start__lte=date_nominated,
-                    date_termination__gte=date_nominated
+                    date_termination__gte=date_nominated,
                 )
             if len(appoint_search) == 0:
                 print(names, appoint_search)
@@ -235,14 +233,14 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             if len(appoint_search) == 1:
                 appointer = appoint_search[0]
 
-        # senate votes data
-        votes = item['Senate vote Ayes/Nays' + pos_str]
+        # Senate votes data.
+        votes = item['Ayes/Nays' + pos_str]
         if not pd.isnull(votes):
             votes_yes, votes_no = votes.split('/')
         else:
             votes_yes = None
             votes_no = None
-        if item['Senate voice vote' + pos_str] == "Yes":
+        if item['Senate Vote Type' + pos_str] == "Yes":
             voice_vote = True
         else:
             voice_vote = False
@@ -254,19 +252,18 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                     'Impeachment & Conviction': 'bad_judge',
                     'Recess Appointment-Not Confirmed': 'recess_not_confirmed',
                     'Resignation': 'resign',
-                    'Retirement': 'retire_vol'
+                    'Retirement': 'retire_vol',
                     }
-        term_reason = item['Termination specific reason' + pos_str]
+        term_reason = item['Termination' + pos_str]
         if pd.isnull(term_reason):
             term_reason = ''
         else:
             term_reason = termdict[term_reason]
-
+            
         position = Position(
             person=person,
             court_id=courtid,
             position_type='jud',
-
             date_nominated=date_nominated,
             date_recess_appointment=date_recess_appointment,
             date_referred_to_judicial_committee=date_referred_to_judicial_committee,
@@ -278,24 +275,22 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             date_termination=date_termination,
             date_granularity_termination=date_granularity_termination,
             date_retirement=date_retirement,
-
             appointer=appointer,
-
             voice_vote=voice_vote,
             votes_yes=votes_yes,
             votes_no=votes_no,
             vote_type='s',
             how_selected='a_pres',
-            termination_reason=term_reason
+            termination_reason=term_reason,
         )
 
         if not testing and save_this_position:
             position.save()
 
         # set party
-        p = item['Party Affiliation of President' + pos_str]
+        p = item['Party of Appointing President' + pos_str]
         if not pd.isnull(p) and p not in ['Assignment', 'Reassignment']:
-            party = get_party(item['Party Affiliation of President' + pos_str])
+            party = get_party(item['Party of Appointing President' + pos_str])
             if prev_politics is None:
                 if pd.isnull(date_nominated):
                     politicsgran = ''
@@ -322,7 +317,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                     political_party=party,
                     date_start=date_nominated,
                     date_granularity_start=GRANULARITY_DAY,
-                    source='a'
+                    source='a',
                 )
                 if not testing and save_this_position:
                     politics.save()
@@ -332,14 +327,25 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             aba = ABARating(
                 person=person,
                 rating=rating,
-                year_rated=nom_year
+                year_rated=nom_year,
             )
             if not testing and save_this_position:
                 aba.save()
 
+        # Add URL and date accessed.
+        sources = Source(
+            person=person,
+            url='https://www.fjc.gov/sites/default/files/history/judges.csv',
+            date_accessed=str(date.today()),
+        )
+        if not testing:
+            sources.save()
+
 
 def update_bankruptcy_and_magistrate(testing=False):
-    # update bankruptcy positions
+    
+    # Update bankruptcy positions.
+    
     positions = Position.object.filter(job_title__icontains='Bankruptcy')
     for position in positions:
         location = position.location
@@ -366,57 +372,56 @@ def make_federal_judge(item, testing=False):
     Returns a Judge object.
     """
 
-    date_dob, date_granularity_dob = process_date(item['Birth year'],
-                                                  item['Birth month'],
-                                                  item['Birth day'])
+    date_dob, date_granularity_dob = process_date(item['Birth Year'],
+                                                  item['Birth Month'],
+                                                  item['Birth Day'])
 
-    dob_city = item['Place of Birth (City)']
-    dob_state = item['Place of Birth (State)']
+    dob_city = item['Birth City']
+    dob_state = item['Birth State']
     # if foreign-born, leave blank for now.
     if len(dob_state) > 2:
         dob_state = ''
-    name = "%s: %s %s %s" % (item['cl_id'], item['firstname'], item['lastname'],
+    name = "%s: %s %s %s" % (item['cl_id'], item['First Name'], item['Last Name'],
                              str(date_dob))
-    fjc_check = Person.objects.filter(fjc_id=item['Judge Identification Number'])
+    fjc_check = Person.objects.filter(fjc_id=item['jid'])
     if len(fjc_check) > 0:
         print ('Warning: %s exists' % name)
         return
 
-    pres_check = Person.objects.filter(name_first=item['firstname'],
-                                  name_last=item['lastname'], date_dob=date_dob)
+    pres_check = Person.objects.filter(name_first=item['First Name'],
+                                  name_last=item['Last Name'], date_dob=date_dob)
 
     if not testing:
         print ("Now processing: %s" % name)
     if len(pres_check) > 0:
         print ('%s is a president.' % name)
         person = pres_check[0]
-        person.fjc_id = item['Judge Identification Number']
+        person.fjc_id = item['jid']
 
     else:
-        date_dod, date_granularity_dod = process_date(item['Death year'],
-                                                      item['Death month'],
-                                                      item['Death day'])
+        date_dod, date_granularity_dod = process_date(item['Death Year'],
+                                                      item['Death Month'],
+                                                      item['Death Day'])
 
-        dod_city = item['Place of Death (City)']
-        dod_state = item['Place of Death (State)']
+        dod_city = item['Death City']
+        dod_state = item['Death State']
         # if foreign-dead, leave blank for now.
         if len(dod_state) > 2:
             dod_state = ''
 
-        if not pd.isnull(item['midname']):
-            if len(item['midname']) == 1:
-                item['midname'] += '.'
+        if not pd.isnull(item['Middle Name']):
+            if len(item['Middle Name']) == 1:
+                item['Middle Name'] += '.'
 
-        # instantiate Judge object
+        # Instantiate Judge object.
         person = Person(
-                name_first=item['firstname'],
-                name_middle=item['midname'],
-                name_last=item['lastname'],
-                name_suffix=get_suffix(item['suffname']),
-                gender=item['gender'],
-                fjc_id=item['Judge Identification Number'],
+                name_first=item['First Name'],
+                name_middle=item['Middle Name'],
+                name_last=item['Last Name'],
+                name_suffix=get_suffix(item['Suffix']),
+                gender=item['Gender'],
+                fjc_id=item['jid'],
                 cl_id=item['cl_id'],
-
                 date_dob=date_dob,
                 date_granularity_dob=date_granularity_dob,
                 dob_city=dob_city,
@@ -424,13 +429,13 @@ def make_federal_judge(item, testing=False):
                 date_dod=date_dod,
                 date_granularity_dod=date_granularity_dod,
                 dod_city=dod_city,
-                dod_state=dod_state
+                dod_state=dod_state,
         )
 
     if not testing:
         person.save()
 
-    listraces = get_races(item['race'])
+    listraces = get_races(item['Race or Ethnicity'])
     races = [Race.objects.get(race=r) for r in listraces]
     for r in races:
         if not testing:
@@ -445,7 +450,9 @@ def make_federal_judge(item, testing=False):
         else:
             school_str = ''
 
-        schoolname = item['Name of School' + school_str]
+        school_str = ' (%s)' % schoolnum
+
+        schoolname = item['School' + school_str]
         if pd.isnull(schoolname):
             continue
 
@@ -455,7 +462,7 @@ def make_federal_judge(item, testing=False):
             degs = [x.strip() for x in item['Degree' + school_str].split(';')]
         for degtype in degs:
             deg_level = get_degree_level(degtype)
-            degyear = item['Degree year' + school_str]
+            degyear = item['Degree Year' + school_str]
             try:
                 int(degyear)
             except:
@@ -467,18 +474,24 @@ def make_federal_judge(item, testing=False):
                         school=school,
                         degree_detail=degtype,
                         degree_level=deg_level,
-                        degree_year=degyear
+                        degree_year=degyear,
                 )
                 if not testing:
                     degree.save()
 
+
     # Non-judicial positions
-    titles, locations, startyears, endyears = transform_employ(item['Employment text field'])
-    titles2, locations2, startyears2, endyears2 = transform_bankruptcy(item['Bankruptcy and Magistrate service'])
-    titles = titles + titles2
-    locations = locations + locations2
-    startyears = startyears + startyears2
-    endyears = endyears + endyears2
+    titles, locations, startyears, endyears = transform_employ(item['Professional Career'])
+    # There is no field in the FJC data with variables commented out below 
+    # (i.e. "Bankruptcy and Magistrate service").  This is commented out  
+    # for reference as pulling out bankruptcy and magistrate service does 
+    # need to be implemented.
+
+    # titles2, locations2, startyears2, endyears2 = transform_bankruptcy(item['Bankruptcy and Magistrate service'])
+    # titles = titles + titles2
+    # locations = locations + locations2
+    # startyears = startyears + startyears2
+    # endyears = endyears + endyears2
 
     for i in range(len(titles)):
         job_title = titles[i]
@@ -489,11 +502,8 @@ def make_federal_judge(item, testing=False):
         end_year = endyears[i]
 
         job_title = job_title.strip()
+
         if pd.isnull(start_year) or start_year == '':
-            #print
-            #print(name)
-            #print(job_title,location,start_year,end_year)
-            #print('No start date.')
             continue
         else:
             try:
@@ -532,16 +542,15 @@ def make_federal_judge(item, testing=False):
         position = Position(
                 person=person,
                 job_title=job_title,
-
                 date_start=date_start,
                 date_granularity_start=date_start_granularity,
                 date_termination=date_end,
                 date_granularity_termination=date_end_granularity,
-
                 location_city=city,
                 location_state=state,
-                organization_name=org
+                organization_name=org,
         )
+
         if not testing:
             try:
                 position.save()
