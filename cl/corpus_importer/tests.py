@@ -294,8 +294,16 @@ class CourtMatchingTest(unittest.TestCase):
                 'q': 'U. S. Court of Appeals for the Ninth Circuit',
                 'a': 'ca9',
             },
-            {
+                        {
                 'q': 'U.S. Court of Appeals for the Ninth Circuit',
+                'a': 'ca9',
+            },
+                        {
+                'q': 'U. S. Circuit Court for the Ninth Circuit',
+                'a': 'ca9',
+            },
+            {
+                'q': 'U.S. Circuit Court for the Ninth Circuit',
                 'a': 'ca9',
             },
         )
