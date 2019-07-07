@@ -285,6 +285,25 @@ class CourtMatchingTest(unittest.TestCase):
                 got,
             )
 
+    def test_get_appellate_court_object_from_string(self):
+        """Can we get the correct federal appellate courts?"""
+
+        pairs = (
+            {
+                # FJC data appears to have a space between U and S.
+                'q': 'U. S. Court of Appeals for the Ninth Circuit',
+                'a': 'ca9',
+            },
+            {
+                'q': 'U.S. Court of Appeals for the Ninth Circuit',
+                'a': 'ca9',
+            },
+        )
+        for test in pairs:
+            print("Testing: %s, expecting: %s" % (test['q'], test['a']))
+            got = match_court_string(test['q'], federal_appeals=True)
+            self.assertEqual(test['a'], got)
+
 
 @pytest.mark.django_db
 class PacerDocketParserTest(TestCase):
