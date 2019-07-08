@@ -2,51 +2,49 @@
 
 CourtListener is built upon a few key pieces of technology that needs to come together in order to function. Whether you're contributing platform code, web design, etc. it helps to know the easiest ways to run and test the project.
 
-There are a few development options depending on your level of experience or comfort with a complex Django web application.
-
-1. Configure your own Ubuntu Linux environment to support running CourtListener per the [wiki instructions][wiki]
-2. Use [Vagrant](https://vagrantup.com) and [VirtualBox](https://virtualbox.org) to virtualize a CourtListener-ready Linux environment.
-
-# Using Vagrant and VirtualBox
-
-The recommended approach is to use the Vagrant box provided by the [FreeLawMachine][flm] project. It provides a standardized ready-to-run virtual machine, provisioned by Vagrant, pre-configured to provide:
-
-* Ubuntu 14.04.5 64-bit
-* PostgreSQL
-* Apache Solr
-* Redis, Celery, and other dependencies for OCR, etc.
-* Python 2.7 virtual environment pre-installed with CourtListener requirements
-* CourtListener github project precloned to `/var/www/courtlistener` (within the VM)
-
-Install both [Vagrant](https://vagrantup.com) and [VirtualBox](https://virtualbox.org) and check the [FreeLawMachine README][flm-readme] before continuing.
-
-Then, just choose one of the following boxes, grab the provided Vagrantfile, save it to a location to use for your project, and run `vagrant up`!
+The best way to get started is to configure your own Ubuntu Linux environment to support running CourtListener per the [wiki instructions][wiki].
 
 
-## Headless FreeLawBox
-[Vagrantfile](https://github.com/freelawproject/freelawmachine/blob/master/Vagrantfile)
+# Workflow
 
-Preconfigured for:
-* 2 CPU cores
-* 2.5 GB of RAM
-* 20 GB of disk space
+For the most part, we use [Github flow][flow] to get our work done. Our 
+[BDFL][bdfl] and primary developer is @mlissner. For better and/or for worse, 
+he doesn't care too much about git, provided things get done smoothly and his 
+life is fairly easy. What that means generally, is:
 
-This version works great for command-line access via `vagrant ssh`, using your own local IDE (emacs, Atom, PyCharm, etc.) and fully supports premium PyCharm features for seamless integration. It automatically activates the provided _courtlistener_ Python virtual environment upon login.
+1. Commits should represent a unit of work. In other words, if you're working 
+on a big feature, each commit should be a descrete step along the path of 
+getting that feature ready to land. Bad or experimental work shouldn't be in a
+commit that you submit as part of a PR, if you can avoid it. 
 
-_Note: if using a tool like PyCharm that supports a remote Python interpreter, set it to: `/home/vagrant/.virtualenvs/courtlistener/bin/python` and make sure you set the working directory to `/var/www/courtlistener`. You may also need to prevent the tool from adding the project to the PYTHONPATH, which is not needed due to the virtual environment._
+1. Your commit messages should use [the format defined by the Angular.js 
+project][format]. This is pretty easy if you use [this plugin][format-plugin] 
+for Intellij/PyCharm/et al.
 
-## Desktop/GUI-based FreeLawBox
-[Vagrantfile][vagrantfile-desktop]
+1. If you want to change whitespace, do it in its own commit. We encourage
+code cleanup and whitespare/reformatting is part of that, BUT never combine it
+with other code changes. That makes PR's that are impossible to read and risky
+to merge.
 
-Preconfigured for:
-* 2 CPU cores
-* 4 GB of RAM
-* 20 GB of disk space
-* XFCE4-based desktop environment
+1. KEEP YOUR PR's SMALL. A good PR should land a specific thing of some sort. 
+It doesn't have to be done — it doesn't even have to work! — but it should be 
+clean and it should be your best effort at clean *progress*. PRs are both a way
+of getting your work into the system and a way to *communicate* your work. The
+latter is more important. 10 small, clean PRs are about 10× better than a 
+monolithic one that is fully functional. 
 
-This version will automatically log you into an XFCE4 desktop as the _vagrant_ user. When you open a terminal (or ssh into the machine via `vagrant ssh`) it will automatically activate the _courtlistener_ Python virtual environment.
+    Say you are developing a system that relies on regexes to do something. Why
+    not submit the regexes (and their tests!) in one PR and the thing that uses
+    those regexes in another? That'd be much easier to review than trying to 
+    see the whole thing at once. 
 
-# Running Django Tests
+[flow]: https://guides.github.com/introduction/flow/
+[bdfl]: https://en.wikipedia.org/wiki/Benevolent_dictator_for_life
+[format]: https://github.com/angular/angular.js/blob/master/DEVELOPERS.md#-git-commit-guidelines
+[format-plugin]: https://plugins.jetbrains.com/plugin/9861-git-commit-template/
+
+
+# Testing
 
 Any time you're contributing to or hacking on code base, whether adding features or fixing issues, you should validate your changes don't break the core functionality of CourtListener by executing the test suite. This is also a great way to validate your development environment is properly configured. (You should probably consider adding your own tests as well!)
 
