@@ -8,7 +8,7 @@ The best way to get started is to configure your own Ubuntu Linux environment to
 # Workflow
 
 For the most part, we use [Github flow][flow] to get our work done. Our 
-[BDFL][bdfl] and primary developer is @mlissner. For better and/or for worse, 
+[BDFL][bdfl] and primary developer is [@mlissner][me]. For better and/or for worse, 
 he doesn't care too much about git, provided things get done smoothly and his 
 life is fairly easy. What that means generally, is:
 
@@ -21,12 +21,16 @@ commit that you submit as part of a PR, if you can avoid it.
 project][format]. This is pretty easy if you use [this plugin][format-plugin] 
 for Intellij/PyCharm/et al.
 
-1. If you want to change whitespace, do it in its own commit. We encourage
-code cleanup and whitespare/reformatting is part of that, BUT never combine it
-with other code changes. That makes PR's that are impossible to read and risky
-to merge.
+1. If you want to change whitespace, do it in its own commit and ideally in its
+own PR. We encourage code cleanup and whitespare/reformatting is part of that, 
+BUT the more isolated it is from other changes, the better. When whitespace is
+combined with other code changes, the PR's become impossible to read and risky
+to merge. 
 
-1. KEEP YOUR PR's SMALL. A good PR should land a specific thing of some sort. 
+    A suggestion: If this stuff bugs you, do a round of whitespace/formatting 
+    cleanup before you start on each file and/or once you're done.  
+
+1. *KEEP YOUR PR's SMALL*. A good PR should land a specific thing of some sort. 
 It doesn't have to be done — it doesn't even have to work! — but it should be 
 clean and it should be your best effort at clean *progress*. PRs are both a way
 of getting your work into the system and a way to *communicate* your work. The
@@ -37,7 +41,14 @@ monolithic one that is fully functional.
     not submit the regexes (and their tests!) in one PR and the thing that uses
     those regexes in another? That'd be much easier to review than trying to 
     see the whole thing at once. 
+    
+These guidelines are a little sloppy compared with many projects. Those 
+projects have greater quality needs, are popular enough to demand a high 
+bar, and can envision coding techniques as a part of their overall goal. We 
+don't have to lead the industry with our approach, we just need to get good 
+work done. That's the goal here. 
 
+[me]: https://github.com/mlissner
 [flow]: https://guides.github.com/introduction/flow/
 [bdfl]: https://en.wikipedia.org/wiki/Benevolent_dictator_for_life
 [format]: https://github.com/angular/angular.js/blob/master/DEVELOPERS.md#-git-commit-guidelines
