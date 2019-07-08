@@ -10,22 +10,15 @@ This repository is organized in the following way:
  - cleaning_scripts: cleanup scripts that are used from time to time to fix data issues or errors.
  - OCR: code and files related to our Tesseract OCR configuration.
  - scripts: logrotate, systemd, etc, and init scripts for our various configurations and daemons.
- - Solr: Anything related to the solr configuration.
 
 
 ## Getting Started
 
-You have two options for installing the CourtListener project. The easiest and recommended way is to use Vagrant:
-  
- - https://free.law/2016/03/01/its-easier-than-ever-to-contribute-to-courtlistener-and-free-law-project/
-
-Vagrant provides a self-contained, controlled environment preconfigured to run CourtListener locally in development mode. For more details, check out the blob post above or the [DEVELOPING.md](DEVELOPING.md) file for more details on how to get started.
-
-The other, harder way to get set up is to follow the instructions on our wiki:
+The best way to get started right now is to follow the instructions on our wiki:
 
  - https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux
 
-We endeavor to keep these up to date, since for now they are the ground truth in terms of how to set up a new server.
+We endeavor to keep these up to date, since for now they are the ground truth in terms of how to set up a new server, but consider this an apology that you're almost destined to run into some kind of issue. (Update the wiki when you do!)
 
 
 ## Getting Involved
@@ -39,6 +32,7 @@ If you want to get involved send us an email with your contact info or take a lo
  - small fixes here and there (these are usually flagged with the [help-wanted label][hw])
 
 But in general, we're looking for all kinds of help! Get in touch if you think you have skills we could use or if you have skills you want to learn by improving CourtListener.
+
 
 ### Contributing code
 
