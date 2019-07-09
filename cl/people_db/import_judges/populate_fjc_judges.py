@@ -9,7 +9,7 @@ from localflavor.us.us_states import STATES_NORMALIZED
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.people_db.import_judges.judge_utils import get_school, process_date, \
     get_races, get_party, get_suffix, get_aba, get_degree_level, \
-    process_date_string
+    get_gender, process_date_string
 from cl.people_db.models import Person, Position, Education, Race, \
     PoliticalAffiliation, ABARating, GRANULARITY_DAY, GRANULARITY_YEAR, \
     Source
@@ -147,8 +147,14 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
 
         if pd.isnull(item['Court Name' + pos_str]):
             continue
-        courtid = match_court_string(item['Court Name' + pos_str],
-                                     federal_district=True)
+
+        if re.search('appeal', item['Court Name' + pos_str], re.I):
+            courtid = match_court_string(item['Court Name' + pos_str],
+                                         federal_appeals=True)
+        elif re.search('district', item['Court Name' + pos_str], re.I):
+            courtid = match_court_string(item['Court Name' + pos_str],
+                                         federal_district=True)
+
         if courtid is None:
             raise Exception
 
@@ -173,8 +179,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             continue
         date_termination = process_date_string(
             item['Termination Date' + pos_str])
-        date_retirement = process_date_string(
-            item['Retirement from Active Service' + pos_str])
+        termination = item['Termination' + pos_str]
 
         if date_termination is None:
             date_granularity_termination = ''
@@ -187,6 +192,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             position_type='jud',
             date_start=date_start,
             date_termination=date_termination,
+            termination_reason=termination,
             court_id=courtid,
         )
         if len(dupe_search) > 0:
@@ -274,7 +280,6 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             date_granularity_start=GRANULARITY_DAY,
             date_termination=date_termination,
             date_granularity_termination=date_granularity_termination,
-            date_retirement=date_retirement,
             appointer=appointer,
             voice_vote=voice_vote,
             votes_yes=votes_yes,
@@ -413,13 +418,16 @@ def make_federal_judge(item, testing=False):
             if len(item['Middle Name']) == 1:
                 item['Middle Name'] += '.'
 
+        if not pd.isnull(item['Gender']):
+            gender = get_gender(item['Gender'])
+
         # Instantiate Judge object.
         person = Person(
                 name_first=item['First Name'],
                 name_middle=item['Middle Name'],
                 name_last=item['Last Name'],
                 name_suffix=get_suffix(item['Suffix']),
-                gender=item['Gender'],
+                gender=gender,
                 fjc_id=item['jid'],
                 cl_id=item['cl_id'],
                 date_dob=date_dob,
@@ -445,14 +453,9 @@ def make_federal_judge(item, testing=False):
 
     # add education items (up to 5 of them)
     for schoolnum in range(1, 6):
-        if schoolnum > 1:
-            school_str = ' (%s)' % schoolnum
-        else:
-            school_str = ''
-
         school_str = ' (%s)' % schoolnum
-
         schoolname = item['School' + school_str]
+
         if pd.isnull(schoolname):
             continue
 
@@ -485,7 +488,7 @@ def make_federal_judge(item, testing=False):
     # There is no field in the FJC data with variables commented out below 
     # (i.e. "Bankruptcy and Magistrate service").  This is commented out  
     # for reference as pulling out bankruptcy and magistrate service does 
-    # need to be implemented.
+    # need to be implemented (yet).
 
     # titles2, locations2, startyears2, endyears2 = transform_bankruptcy(item['Bankruptcy and Magistrate service'])
     # titles = titles + titles2
@@ -538,6 +541,7 @@ def make_federal_judge(item, testing=False):
              # test for schools and courts
         else:
             city, state, org = '', '', ''
+
 
         position = Position(
                 person=person,
