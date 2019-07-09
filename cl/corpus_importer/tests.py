@@ -289,12 +289,12 @@ class CourtMatchingTest(unittest.TestCase):
         """Can we get the correct federal appellate courts?"""
 
         pairs = (
-            {
-                # FJC data appears to have a space between U and S.
+            {            
                 'q': 'U. S. Court of Appeals for the Ninth Circuit',
                 'a': 'ca9',
             },
             {
+                # FJC data does not appear to have a space between U. and S.
                 'q': 'U.S. Court of Appeals for the Ninth Circuit',
                 'a': 'ca9',
             },
