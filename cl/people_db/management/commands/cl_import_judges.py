@@ -82,6 +82,7 @@ class Command(VerboseCommand):
                       'Birth City', 'Birth State',
                       'Death City', 'Death State']
         df = pd.read_csv(infile)
+        df = df.replace(r'^\s+$', np.nan, regex=True) 
         for x in textfields:
             df[x] = df[x].replace(np.nan, '', regex=True)
         df['Professional Career'].replace(to_replace=r';\sno', value=r', no',
