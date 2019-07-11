@@ -80,6 +80,10 @@ class Command(VerboseCommand, CommandUtils):
                 break
 
             throttle.maybe_wait()
+            # TODO: See conversation in #courtlistener channel from 2019-07-11,
+            # In which it appears we matched a criminal case with a civil one.
+            # The code below doesn't protect against that, but it should (and I
+            # think it does in the `do_second_pass` code, below.
             ds = Docket.objects.filter(
                 docket_number_core=idb_row.docket_number,
                 court=idb_row.district,
