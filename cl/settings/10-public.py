@@ -384,11 +384,11 @@ MARKDOWN_DEUX_STYLES = {
 }
 
 
-#########
-# PIWIK #
-#########
-PIWIK_URL = 'https://piwik.courtlistener.com/piwik.php'
-PIWIK_SITE_ID = '1'
+##########
+# MATOMO #
+##########
+MATOMO_URL = 'http://192.168.0.243/piwik.php'
+MATOMO_SITE_ID = '1'
 
 
 ########
