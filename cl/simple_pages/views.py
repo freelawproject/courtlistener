@@ -22,7 +22,7 @@ from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
 from cl.lib import magic
 from cl.lib.bot_detector import is_og_bot
-from cl.lib.decorators import track_in_piwik
+from cl.lib.decorators import track_in_matomo
 from cl.opinion_page.views import view_recap_document
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
@@ -319,7 +319,7 @@ def ratelimited(request, exception):
                   status=HTTP_429_TOO_MANY_REQUESTS)
 
 
-@track_in_piwik
+@track_in_matomo
 def serve_static_file(request, file_path=''):
     """Sends a static file to a user.
 
