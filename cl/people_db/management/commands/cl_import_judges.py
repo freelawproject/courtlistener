@@ -39,6 +39,20 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            '--offset',
+            type=int,
+            default=0,
+            help="The number of items to skip before beginning. Default is to "
+                 "skip none.",
+        )
+        parser.add_argument(
+            '--limit',
+            type=int,
+            default=0,
+            help="After doing this number, stop. This number is not additive "
+                 "with the offset parameter. Default is to do all of them.",
+        )
+        parser.add_argument(
             '--debug',
             action='store_true',
             default=False,
@@ -88,7 +102,11 @@ class Command(VerboseCommand):
         df['Professional Career'].replace(to_replace=r';\sno', value=r', no',
                                             inplace=True, regex=True)
         for i, row in df.iterrows():
-            make_federal_judge(dict(row), testing=self.debug)
+            if i < self.options['offset']:
+                make_federal_judge(dict(row), testing=self.debug)
+                continue              
+            if i >= self.options['limit'] > 0:
+                break
 
     def import_state_judges(self, infile=None):
         if infile is None:
