@@ -103,11 +103,10 @@ class Command(VerboseCommand):
                                             inplace=True, regex=True)
         for i, row in df.iterrows():
             if i < self.options['offset']:
-                continue              
-            if i >= self.options['offset']:
-                make_federal_judge(dict(row), testing=self.debug)
+                continue
             if i >= self.options['limit'] > 0:
                 break
+            make_federal_judge(dict(row), testing=self.debug)
 
     def import_state_judges(self, infile=None):
         if infile is None:
