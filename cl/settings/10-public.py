@@ -293,7 +293,6 @@ REST_FRAMEWORK = {
     },
     'OVERRIDE_THROTTLE_RATES': {
         # Throttling down.
-        'spierre91': '100/hour',  # Ignored repeated emails
         'shreyngd': '100/hour',
         'leo': '100/hour',
         'miffy': '100/hour',
