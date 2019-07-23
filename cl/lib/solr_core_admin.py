@@ -18,7 +18,7 @@ def create_temp_solr_core(core_name, schema_path, delete_if_present=True,
     core_path_local = os.path.join(settings.SOLR_TEMP_CORE_PATH_LOCAL, core_name)
 
     # Path on Solr machine
-    core_path_remote = os.path.join(settings.SOLR_TEMP_CORE_PATH_REMOTE, core_name)
+    core_path_docker = os.path.join(settings.SOLR_TEMP_CORE_PATH_DOCKER, core_name)
 
     if delete_if_present and os.path.exists(core_path_local):
         print(u"Core at %s already exists! Deleting it." % core_path_local)
@@ -47,7 +47,7 @@ def create_temp_solr_core(core_name, schema_path, delete_if_present=True,
         'wt': 'json',
         'action': 'CREATE',
         'name': core_name,
-        'instanceDir': core_path_remote,
+        'instanceDir': core_path_docker,
         # This is supposedly optional, but didn't work without it:
         'dataDir': 'data',
     }
