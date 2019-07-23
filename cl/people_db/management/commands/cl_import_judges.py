@@ -15,7 +15,7 @@ from cl.people_db.import_judges.populate_presidents import make_president
 from cl.people_db.import_judges.populate_state_judges import make_state_judge
 from cl.people_db.models import Person, Position
 from cl.search.models import Court
-from cl.search.tasks import add_or_update_people
+from cl.search.tasks import add_items_to_solr
 
 
 class Command(VerboseCommand):
@@ -38,6 +38,20 @@ class Command(VerboseCommand):
             )
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            '--offset',
+            type=int,
+            default=0,
+            help="The number of items to skip before beginning. Default is to "
+                 "skip none.",
+        )
+        parser.add_argument(
+            '--limit',
+            type=int,
+            default=0,
+            help="After doing this number, stop. This number is not additive "
+                 "with the offset parameter. Default is to do all of them.",
+        )
         parser.add_argument(
             '--debug',
             action='store_true',
@@ -78,15 +92,20 @@ class Command(VerboseCommand):
         if infile is None:
             self.ensure_input_file()
             infile = self.options['input_file']
-        textfields = ['firstname', 'midname', 'lastname', 'gender',
-                      'Place of Birth (City)', 'Place of Birth (State)',
-                      'Place of Death (City)', 'Place of Death (State)']
-        df = pd.read_excel(infile, 0)
+        textfields = ['First Name', 'Middle Name', 'Last Name', 'Gender',
+                      'Birth City', 'Birth State',
+                      'Death City', 'Death State']
+        df = pd.read_csv(infile)
+        df = df.replace(r'^\s+$', np.nan, regex=True) 
         for x in textfields:
             df[x] = df[x].replace(np.nan, '', regex=True)
-        df['Employment text field'].replace(to_replace=r';\sno', value=r', no',
+        df['Professional Career'].replace(to_replace=r';\sno', value=r', no',
                                             inplace=True, regex=True)
         for i, row in df.iterrows():
+            if i < self.options['offset']:
+                continue
+            if i >= self.options['limit'] > 0:
+                break
             make_federal_judge(dict(row), testing=self.debug)
 
     def import_state_judges(self, infile=None):
@@ -213,7 +232,7 @@ class Command(VerboseCommand):
                     add_positions_from_row(item, p, self.debug,
                                            fix_nums=[posnum])
                     if not self.debug:
-                        add_or_update_people.delay([p.pk])
+                        add_items_to_solr.delay([p.pk], 'people_db.Person')
                     continue
                 elif position_count == 1:
                     # Good case. Press on!
@@ -235,7 +254,7 @@ class Command(VerboseCommand):
 
                     if not self.debug:
                         position.save()
-                        add_or_update_people.delay([p.pk])
+                        add_items_to_solr.delay([p.pk], 'people_db.Person')
 
     VALID_ACTIONS = {
         'import-all': import_all,

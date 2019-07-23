@@ -25,7 +25,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='originatingcourtinformation',
             name='ordering_judge',
-            field=models.ForeignKey(related_name='+', blank=True, to='people_db.Person', help_text=b'The judge that issued the final order in the case.', null=True),
+            field=models.ForeignKey(related_name='+', blank=True, to='people_db.Person', help_text=b'The judge that issued the final order in the case.', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='originatingcourtinformation',

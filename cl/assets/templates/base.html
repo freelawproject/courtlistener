@@ -472,26 +472,27 @@
 {% block footer-scripts %}{% endblock %}
 
 {% if not user.is_superuser  %}
-  <!-- Piwik -->
+  <!-- matomo -->
   <script type="text/javascript">
-      var _paq = _paq || [];
-      _paq.push(['trackPageView']);
-      _paq.push(['enableLinkTracking']);
-      (function () {
-          var u = "//www.courtlistener.com/piwik/";
-          _paq.push(['setTrackerUrl', u + 'piwik.php']);
-          _paq.push(['setSiteId', 1]);
-          var d = document, g = d.createElement('script'), s = d.getElementsByTagName('script')[0];
-          g.type = 'text/javascript';
-          g.async = true;
-          g.defer = true;
-          g.src = u + 'piwik.js';
-          s.parentNode.insertBefore(g, s);
-      })();
+    var _paq = window._paq || [];
+    _paq.push(['trackPageView']);
+    _paq.push(['enableLinkTracking']);
+    (function () {
+      var u = "//matomo.courtlistener.com/";
+      _paq.push(['setTrackerUrl', u + 'matomo.php']);
+      _paq.push(['setSiteId', '1']);
+      var d = document, g = d.createElement('script'),
+        s = d.getElementsByTagName('script')[0];
+      g.type = 'text/javascript';
+      g.async = true;
+      g.defer = true;
+      g.src = u + 'matomo.js';
+      s.parentNode.insertBefore(g, s);
+    })();
   </script>
-  <noscript><p><img src="//www.courtlistener.com/piwik/piwik.php?idsite=1"
+  <noscript><p><img src="//matomo.courtlistener.com/piwik.php?idsite=1&rec=1"
                     style="border:0;" alt=""/></p></noscript>
-  <!-- End Piwik Code -->
+  <!-- End Matomo Code -->
 {% endif %}
 <!--[if lt IE 10 ]>
 <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>

@@ -106,7 +106,7 @@ class MockConnection(object):
     def request(self, uri, method='GET', body=None, headers=None):
 
         u = urlparse.urlparse(uri)
-        params = cgi.parse_qs(u.query)
+        params = urlparse.parse_qs(u.query)
 
         self.tracking_dict.update(url=uri,
                                   params=params,

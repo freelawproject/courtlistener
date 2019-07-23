@@ -52,8 +52,10 @@ class Migration(migrations.Migration):
                 ('judgment', models.SmallIntegerField(blank=True, help_text=b'Which party the cases was disposed in favor of.', null=True, choices=[(1, b'Plaintiff'), (2, b'Defendant'), (3, b'Both plaintiff and defendant'), (4, b'Unknown')])),
                 ('pro_se', models.SmallIntegerField(blank=True, help_text=b'Which parties filed pro se? (See codebook for more details.)', null=True, choices=[(0, b'No pro se plaintiffs or defendants'), (1, b'Pro se plaintiffs, but no pro se defendants'), (2, b'Pro se defendants, but no pro se plaintiffs'), (3, b'Both pro se plaintiffs & defendants')])),
                 ('year_of_tape', models.IntegerField(help_text=b'Statistical year label on data files obtained from the Administrative Office of the United States Courts.  2099 on pending case records.', null=True, blank=True)),
-                ('circuit', models.ForeignKey(related_name='+', blank=True, to='search.Court', help_text=b'Circuit in which the case was filed.', null=True)),
-                ('district', models.ForeignKey(related_name='idb_cases', blank=True, to='search.Court', help_text=b'District court in which the case was filed.', null=True)),
+                ('circuit', models.ForeignKey(related_name='+', blank=True, to='search.Court', help_text=b'Circuit in which the case was filed.', null=True,
+                                              on_delete=models.CASCADE)),
+                ('district', models.ForeignKey(related_name='idb_cases', blank=True, to='search.Court', help_text=b'District court in which the case was filed.', null=True,
+                                               on_delete=models.CASCADE)),
             ],
         ),
     ]

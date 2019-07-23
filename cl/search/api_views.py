@@ -1,6 +1,5 @@
 from rest_framework import status, pagination, viewsets, permissions, response
 
-from cl.api.routers import get_api_read_db
 from cl.api.utils import LoggingMixin, RECAPUsersReadOnly, CacheListMixin
 from cl.search import api_utils
 from cl.search.api_serializers import (
@@ -22,10 +21,7 @@ from cl.search.models import (
 
 class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
     serializer_class = OriginalCourtInformationSerializer
-
-    def get_queryset(self):
-        return OriginatingCourtInformation.objects.using(
-            get_api_read_db()).all()
+    queryset = OriginatingCourtInformation.objects.all().order_by('-id')
 
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -37,20 +33,18 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
         'date_cert_denied', 'date_filed', 'date_terminated',
         'date_last_filing',
     )
-
-    def get_queryset(self):
-        return Docket.objects.using(get_api_read_db()).select_related(
-            'court',
-            'assigned_to',
-            'referred_to',
-            'originating_court_information',
-            'idb_data',
-        ).prefetch_related(
-            'panel',
-            'clusters',
-            'audio_files',
-            'tags',
-        )
+    queryset = Docket.objects.select_related(
+        'court',
+        'assigned_to',
+        'referred_to',
+        'originating_court_information',
+        'idb_data',
+    ).prefetch_related(
+        'panel',
+        'clusters',
+        'audio_files',
+        'tags',
+    ).order_by('-id')
 
 
 class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -59,14 +53,13 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
     filter_class = DocketEntryFilter
     ordering_fields = ('date_created', 'date_modified', 'date_filed')
 
-    def get_queryset(self):
-        return DocketEntry.objects.using(get_api_read_db()).select_related(
-            'docket',  # For links back to dockets
-        ).prefetch_related(
-            'recap_documents',        # Sub items
-            'recap_documents__tags',  # Sub-sub items
-            'tags',                   # Tags on docket entries
-        ).order_by()
+    queryset =  DocketEntry.objects.select_related(
+        'docket',  # For links back to dockets
+    ).prefetch_related(
+        'recap_documents',        # Sub items
+        'recap_documents__tags',  # Sub-sub items
+        'tags',                   # Tags on docket entries
+    ).order_by('-id')
 
 
 class RECAPDocumentViewSet(LoggingMixin, CacheListMixin,
@@ -75,14 +68,12 @@ class RECAPDocumentViewSet(LoggingMixin, CacheListMixin,
     serializer_class = RECAPDocumentSerializer
     filter_class = RECAPDocumentFilter
     ordering_fields = ('date_created', 'date_modified', 'date_upload')
-
-    def get_queryset(self):
-        return RECAPDocument.objects.using(get_api_read_db()).select_related(
-            'docket_entry',
-            'docket_entry__docket',
-        ).prefetch_related(
-            'tags',
-        ).order_by()
+    queryset = RECAPDocument.objects.select_related(
+        'docket_entry',
+        'docket_entry__docket',
+    ).prefetch_related(
+        'tags',
+    ).order_by('-id')
 
 
 class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -91,10 +82,8 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = (
         'date_modified', 'position', 'start_date', 'end_date',
     )
-
-    def get_queryset(self):
-        return Court.objects.using(get_api_read_db()).exclude(
-            jurisdiction=Court.TESTING_COURT)
+    queryset = Court.objects.exclude(
+        jurisdiction=Court.TESTING_COURT).order_by('position')
 
 
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -104,16 +93,12 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
         'date_created', 'date_modified', 'date_filed', 'citation_count',
         'date_blocked',
     )
-
-    def get_queryset(self):
-        return OpinionCluster.objects.using(
-            get_api_read_db(),
-        ).prefetch_related(
-            'sub_opinions',
-            'panel',
-            'non_participating_judges',
-            'citations',
-        )
+    queryset = OpinionCluster.objects.prefetch_related(
+        'sub_opinions',
+        'panel',
+        'non_participating_judges',
+        'citations',
+    ).order_by('-id')
 
 
 class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -122,31 +107,25 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = (
         'id', 'date_created', 'date_modified',
     )
-
-    def get_queryset(self):
-        return Opinion.objects.using(get_api_read_db()).select_related(
-            'cluster',
-            'author',
-        ).prefetch_related(
-            'opinions_cited',
-            'joined_by',
-        )
+    queryset = Opinion.objects.select_related(
+        'cluster',
+        'author',
+    ).prefetch_related(
+        'opinions_cited',
+        'joined_by',
+    ).order_by('-id')
 
 
 class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionsCitedSerializer
     filter_class = OpinionsCitedFilter
-
-    def get_queryset(self):
-        return OpinionsCited.objects.using(get_api_read_db()).all()
+    queryset = OpinionsCited.objects.all().order_by('-id')
 
 
 class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = TagSerializer
-
-    def get_queryset(self):
-        return Tag.objects.using(get_api_read_db()).all()
+    queryset = Tag.objects.all().order_by('-id')
 
 
 class SearchViewSet(LoggingMixin, viewsets.ViewSet):

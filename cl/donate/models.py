@@ -36,7 +36,7 @@ class PROVIDERS(object):
         (PAYPAL, 'PayPal'),
         (CREDIT_CARD, 'Credit Card'),
         (CHECK, 'Check'),
-        (BITCOIN, 'Bitcoin'),
+        (BITCOIN, 'Crypto<span class="hidden-xs">currency</span>'),
     )
 
 
@@ -67,6 +67,7 @@ class Donation(models.Model):
         User,
         help_text="The user that made the donation",
         related_name="donations",
+        on_delete=models.CASCADE,
     )
     date_modified = models.DateTimeField(
         auto_now=True,
@@ -135,6 +136,7 @@ class MonthlyDonation(models.Model):
         User,
         help_text="The user that made the donation",
         related_name="monthly_donations",
+        on_delete=models.CASCADE,
     )
     date_modified = models.DateTimeField(
         auto_now=True,

@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import TestCase, override_settings
 from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND, \
     HTTP_302_FOUND, HTTP_300_MULTIPLE_CHOICES

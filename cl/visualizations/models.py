@@ -4,7 +4,7 @@ import json
 import networkx
 
 from django.contrib.auth.models import User
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db import models
 from django.utils.text import slugify
 from django.utils.timezone import now
@@ -21,16 +21,19 @@ class SCOTUSMap(models.Model):
         User,
         help_text="The user that owns the visualization",
         related_name="scotus_maps",
+        on_delete=models.CASCADE,
     )
     cluster_start = models.ForeignKey(
         OpinionCluster,
         help_text="The starting cluster for the visualization",
         related_name='visualizations_starting_here',
+        on_delete=models.CASCADE,
     )
     cluster_end = models.ForeignKey(
         OpinionCluster,
         help_text="The ending cluster for the visualization",
         related_name='visualizations_ending_here',
+        on_delete=models.CASCADE,
     )
     clusters = models.ManyToManyField(
         OpinionCluster,
@@ -365,6 +368,7 @@ class Referer(models.Model):
         help_text="The visualization that was embedded and which generated a "
                   "referer",
         related_name='referers',
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -378,7 +382,7 @@ class Referer(models.Model):
     )
     url = models.URLField(
         help_text="The URL where this item was embedded.",
-        max_length="3000",
+        max_length=3000,
         db_index=True,
     )
     page_title = models.CharField(
@@ -408,6 +412,7 @@ class JSONVersion(models.Model):
         SCOTUSMap,
         help_text='The visualization that the json is affiliated with.',
         related_name="json_versions",
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",

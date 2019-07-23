@@ -18,7 +18,8 @@ class Migration(migrations.Migration):
                 ('log_time', models.DateTimeField(auto_now_add=True, verbose_name=b'the exact date and time of the error')),
                 ('log_level', models.CharField(verbose_name=b'the loglevel of the error encountered', max_length=15, editable=False)),
                 ('message', models.TextField(verbose_name=b'the message produced in the log', editable=False, blank=True)),
-                ('court', models.ForeignKey(verbose_name=b'the court where the error occurred', to='search.Court')),
+                ('court', models.ForeignKey(verbose_name=b'the court where the error occurred', to='search.Court',
+                                            on_delete=models.CASCADE)),
             ],
         ),
         migrations.CreateModel(

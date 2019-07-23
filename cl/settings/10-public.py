@@ -50,10 +50,8 @@ TEMPLATES = [{
     },
 }]
 
-
-MIDDLEWARE_CLASSES = [
+MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -69,8 +67,8 @@ ROOT_URLCONF = 'cl.urls'
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.admindocs',
-    'django.contrib.auth',
     'django.contrib.contenttypes',
+    'django.contrib.auth',
     'django.contrib.humanize',
     'django.contrib.messages',
     'django.contrib.sessions',
@@ -135,10 +133,12 @@ SOLR_AUDIO_URL = '%s/solr/audio' % SOLR_HOST
 SOLR_PEOPLE_URL = '%s/solr/person' % SOLR_HOST
 SOLR_RECAP_URL = '%s/solr/recap' % SOLR_RECAP_HOST
 SOLR_URLS = {
-    'opinions': SOLR_OPINION_URL,
-    'audio': SOLR_AUDIO_URL,
-    'person': SOLR_PEOPLE_URL,
-    'recap': SOLR_RECAP_URL,
+    'audio.Audio': SOLR_AUDIO_URL,
+    'people_db.Person': SOLR_PEOPLE_URL,
+    'search.Docket': SOLR_RECAP_URL,
+    'search.RECAPDocument': SOLR_RECAP_URL,
+    'search.Opinion': SOLR_OPINION_URL,
+    'search.OpinionCluster': SOLR_OPINION_URL,
 }
 
 SOLR_OPINION_TEST_CORE_NAME = 'opinion_test'
@@ -151,10 +151,13 @@ SOLR_AUDIO_TEST_URL = '%s/solr/audio_test' % SOLR_HOST
 SOLR_PEOPLE_TEST_URL = '%s/solr/person_test' % SOLR_HOST
 SOLR_RECAP_TEST_URL = '%s/solr/recap_test' % SOLR_RECAP_HOST
 SOLR_TEST_URLS = {
-    'opinions': SOLR_OPINION_TEST_URL,
-    'audio': SOLR_AUDIO_TEST_URL,
-    'person': SOLR_PEOPLE_TEST_URL,
-    'recap': SOLR_RECAP_TEST_URL,
+    'audio.Audio': SOLR_AUDIO_TEST_URL,
+    'people_db.Person': SOLR_PEOPLE_TEST_URL,
+    'search.Docket': SOLR_RECAP_TEST_URL,
+    'search.RECAPDocument': SOLR_RECAP_TEST_URL,
+    'search.Opinion': SOLR_OPINION_TEST_URL,
+    'search.OpinionCluster': SOLR_OPINION_TEST_URL,
+
 }
 SOLR_EXAMPLE_CORE_PATH = os.path.join(os.sep, 'usr', 'local', 'solr',
                                       'example', 'solr', 'collection1')
@@ -179,19 +182,13 @@ REDIS_DATABASES = {
 ##########
 if DEVELOPMENT:
     # In a development machine, these setting make sense
-    CELERY_ALWAYS_EAGER = True  # Do all tasks immediately, no async.
-    CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
-    CELERYD_CONCURRENCY = 2
+    CELERY_WORKER_CONCURRENCY = 2
 else:
     # Celery settings for production sites
-    BROKER_URL = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
-                                       REDIS_DATABASES['CELERY'])
-    CELERY_RESULT_BACKEND = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
-                                                  REDIS_DATABASES['CELERY'])
-    CELERYD_CONCURRENCY = 20
-    BROKER_POOL_LIMIT = 30
-    CELERY_TASK_RESULT_EXPIRES = 60 * 60
-    BROKER_TRANSPORT_OPTIONS = {
+    CELERY_WORKER_CONCURRENCY = 20
+    CELERY_BROKER_POOL_LIMIT = 30
+    CELERY_RESULT_EXPIRES = 60 * 60
+    CELERY_BROKER_TRANSPORT_OPTIONS = {
         # This is the length of time a task will wait to be acknowledged by a
         # worker. This value *must* be greater than the largest ETA/countdown
         # that a task may be assigned with, or else it will be run over and over
@@ -199,10 +196,19 @@ else:
         'visibility_timeout': 21600,  # six hours
     }
 
+CELERY_BROKER_URL = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
+                                          REDIS_DATABASES['CELERY'])
+CELERY_RESULT_BACKEND = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
+                                              REDIS_DATABASES['CELERY'])
+
 # Rate limits aren't ever used, so disable them across the board for better
 # performance
-CELERY_DISABLE_RATE_LIMITS = True
-CELERY_SEND_TASK_ERROR_EMAILS = True
+CELERY_WORKER_DISABLE_RATE_LIMITS = True
+# We could pass around JSON, but it's *much* easier to pass around Python
+# objects that support things like dates. Let's do that, shall we?
+CELERY_RESULT_SERIALIZER = 'pickle'
+CELERY_TASK_SERIALIZER = 'pickle'
+CELERY_ACCEPT_CONTENT = {'json', 'pickle'}
 
 
 ####################
@@ -296,6 +302,10 @@ REST_FRAMEWORK = {
         'leo': '100/hour',
         'miffy': '100/hour',
         'safetynet': '100/hour',
+        # From fokal.ai, using multiple accounts to dodge limitations
+        'manu.jose': '10/hour',
+        'shishir': '10/hour',
+        'shishir.kumar': '10/hour',
 
         # Throttling up.
         'YFIN': '430000/day',
@@ -329,6 +339,7 @@ REST_FRAMEWORK = {
 
     # Filtering
     'DEFAULT_FILTER_BACKENDS': (
+        # This is a tweaked version of DjangoFilterBackend
         'cl.api.utils.DisabledHTMLFilterBackend',
         'rest_framework.filters.OrderingFilter',
     ),
@@ -348,7 +359,7 @@ if DEVELOPMENT:
 # CORS
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_URLS_REGEX = r'^/api/.*$'
-CORS_ALLOW_METHODS = ('GET', 'OPTIONS', )
+CORS_ALLOW_METHODS = ('GET', 'HEAD', 'OPTIONS', )
 CORS_ALLOW_CREDENTIALS = True
 
 ############
@@ -377,11 +388,11 @@ MARKDOWN_DEUX_STYLES = {
 }
 
 
-#########
-# PIWIK #
-#########
-PIWIK_URL = 'https://piwik.courtlistener.com/piwik.php'
-PIWIK_SITE_ID = '1'
+##########
+# MATOMO #
+##########
+MATOMO_URL = 'http://192.168.0.243/piwik.php'
+MATOMO_SITE_ID = '1'
 
 
 ########
@@ -430,6 +441,10 @@ LOGGING = {
         'simple': {
             'format': '%(levelname)s %(message)s'
         },
+        'django.server': {
+            '()': 'django.utils.log.ServerFormatter',
+            'format': '[%(server_time)s] %(message)s',
+        }
     },
     'filters': {
         'require_debug_false': {
@@ -439,7 +454,7 @@ LOGGING = {
     'handlers': {
         'null': {
             'level': 'DEBUG',
-            'class': 'django.utils.log.NullHandler',
+            'class': 'logging.NullHandler',
         },
         'console': {
             'level': 'DEBUG',
@@ -458,10 +473,15 @@ LOGGING = {
             'filters': ['require_debug_false'],
             'class': 'django.utils.log.AdminEmailHandler',
             'include_html': True,
-        }
+        },
+        'django.server': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'django.server',
+        },
     },
     'loggers': {
-        'django.request': {
+        'django': {
             'handlers': ['mail_admins'],
             'level': 'ERROR',
             'propagate': True,
@@ -472,6 +492,11 @@ LOGGING = {
         # server. The most relevant bad client is the googlebot.
         'django.security.DisallowedHost': {
             'handlers': ['null'],
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['django.server'],
+            'level': 'INFO',
             'propagate': False,
         },
         # This is the one that's used practically everywhere in the code.

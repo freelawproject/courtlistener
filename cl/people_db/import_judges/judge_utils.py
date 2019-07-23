@@ -31,12 +31,12 @@ def process_date(year,month,day):
 
 
 def process_date_string(date_input):
+    """Return date as YYYY-MM-DD"""
     if pd.isnull(date_input):
         return None
-
-    date_object = datetime.strptime(date_input, '%m/%d/%Y')
-
+    date_object = datetime.strptime(date_input, '%Y-%m-%d')
     return date_object
+    
 
 C = Counter() # for fixing school names.
 def get_school(schoolname, testing=False):
@@ -142,6 +142,7 @@ def get_degree_level(degstr):
 
 def get_party(partystr):
     partydict =  dict([(v,k) for (k,v) in [('d', 'Democrat'),
+        ('d', 'Democratic'),
         ('r', 'Republican'),
         ('i', 'Independent'),
         ('g', 'Green'),
@@ -156,7 +157,9 @@ def get_appointer(appointstr):
 
 def get_suffix(suffstr):
     suffdict = {'Jr': 'jr',
+                'Jr.': 'jr',
                 'Sr': 'sr',
+                'Sr.': 'sr',
                 'I': '1',
                 'II': '2',
                 'III': '3',
@@ -213,4 +216,11 @@ def get_select(state,year):
     return 'P'
 
 
+def get_gender(gender_str):
+    gender_dict = {'Female': 'f',
+                   'Male': 'm', 
+                   'Other': 'o',
+                   }
+    gender = gender_dict[gender_str] 
+    return gender
 

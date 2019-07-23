@@ -24,7 +24,8 @@ class Migration(migrations.Migration):
                 ('monthly_donation_amount', models.DecimalField(max_digits=10, decimal_places=2)),
                 ('monthly_donation_day', models.SmallIntegerField(help_text=b'The day of the month that the monthly donation should be processed.')),
                 ('stripe_customer_id', models.CharField(help_text=b'The ID of the Stripe customer object that we use to charge credit card users each month.', max_length=200)),
-                ('donor', models.ForeignKey(related_name='monthly_donations', to=settings.AUTH_USER_MODEL, help_text=b'The user that made the donation')),
+                ('donor', models.ForeignKey(related_name='monthly_donations', to=settings.AUTH_USER_MODEL, help_text=b'The user that made the donation',
+                                            on_delete=models.CASCADE)),
             ],
         ),
         migrations.AlterField(

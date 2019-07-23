@@ -3,7 +3,7 @@ import logging
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import User
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.http import HttpResponseRedirect, HttpResponseNotAllowed, \
     HttpResponse
 from django.shortcuts import render
@@ -107,7 +107,7 @@ def make_payment_page_context(request):
     if request.method == 'POST':
         donation_form = DonationForm(request.POST)
 
-        if request.user.is_anonymous():
+        if request.user.is_anonymous:
             # Either this is a new account, a stubbed one, or a user that's
             # simply not logged into their account
             try:
@@ -199,7 +199,7 @@ def process_donation_forms(request, template_name, stripe_redirect_url,
             logger.info("Payment routed with response: %s", response)
 
         if response['status'] == Donation.AWAITING_PAYMENT:
-            if request.user.is_anonymous() and not context['stub_account']:
+            if request.user.is_anonymous and not context['stub_account']:
                 # Create a stub account with an unusable password
                 user, profile = create_stub_account(cd_user_form,
                                                     cd_profile_form)

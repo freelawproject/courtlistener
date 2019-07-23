@@ -8,7 +8,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import RequestFactory
@@ -24,7 +24,7 @@ from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import Court, Docket, Opinion, OpinionCluster, \
     RECAPDocument, DocketEntry, Citation, sort_cites
-from cl.search.tasks import add_or_update_recap_document
+from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
@@ -36,7 +36,7 @@ class SetupException(Exception):
 
 class UpdateIndexCommandTest(SolrTestCase):
     args = [
-        '--type', 'opinions',
+        '--type', 'search.Opinion',
         '--noinput',
     ]
 
@@ -276,8 +276,7 @@ class IndexingTest(EmptySolrTestCase):
         # Do the absolute URLs differ when pulled from the DB?
         self.assertNotEqual(rd1.get_absolute_url(), rd2.get_absolute_url())
 
-        add_or_update_recap_document([rd1.pk, rd2.pk], coalesce_docket=True,
-                                     force_commit=True)
+        add_docket_to_solr_by_rds([rd1.pk, rd2.pk], force_commit=True)
 
         # Do the absolute URLs differ when pulled from Solr?
         r1 = self.si_recap.get(rd1.pk)
@@ -576,7 +575,7 @@ class GroupedSearchTest(EmptySolrTestCase):
         # Set up some handy variables
         super(GroupedSearchTest, self).setUp()
         args = [
-            '--type', 'opinions',
+            '--type', 'search.Opinion',
             '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
             '--update',
             '--everything',

@@ -4,54 +4,35 @@ import socket
 from datetime import timedelta
 
 import scorched
+from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
 
-from cl.audio.models import Audio
 from cl.celery import app
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.lib.sunburnt import SolrError
-from cl.people_db.models import Person
-from cl.search.models import Opinion, OpinionCluster, RECAPDocument, Docket
+from cl.search.models import OpinionCluster, RECAPDocument, Docket
 
 
 @app.task
-def add_or_update_items(items, solr_object_type):
-    """Adds an item to a solr index.
+def add_items_to_solr(item_pks, app_label, force_commit=False):
+    """Add a list of items to Solr
 
-    This function is for use with the update_index command. It's slightly
-    different than the commands below because it expects a Django object,
-    rather than a primary key. This rejects the standard Celery advice about
-    not passing objects around, but thread safety shouldn't be an issue since
-    this is only used by the update_index command, and we want to get the
-    objects in the task, not in its caller.
-
-    :param items: A list of items or a single item to add or update in Solr
-    :param solr_object_type: The solr object type being updated so that the URL
-    can be pulled from the settings file. This is essential since different
-    celery workers may connect to solr on different machines.
-    :return None
+    :param item_pks: An iterable list of item PKs that you wish to add to Solr.
+    :param app_label: The type of item that you are adding.
+    :param force_commit: Whether to send a commit to Solr after your addition.
+    This is generally not advised and is mostly used for testing.
     """
-    if hasattr(items, "items") or not hasattr(items, "__iter__"):
-        # If it's a dict or a single item make it a list
-        items = [items]
-    search_item_list = []
+    search_dicts = []
+    model = apps.get_model(app_label)
+    items = model.objects.filter(pk__in=item_pks).order_by()
     for item in items:
-        si = scorched.SolrInterface(settings.SOLR_URLS[solr_object_type],
-                                    mode='w')
         try:
-            if type(item) == Opinion:
-                search_item_list.append(item.as_search_dict())
-            elif type(item) == RECAPDocument:
-                search_item_list.append(item.as_search_dict())
-            elif type(item) == Docket:
-                # Slightly different here b/c dockets return a list of search
-                # dicts.
-                search_item_list.extend(item.as_search_list())
-            elif type(item) == Audio:
-                search_item_list.append(item.as_search_dict())
-            elif type(item) == Person:
-                search_item_list.append(item.as_search_dict())
+            if model in [OpinionCluster, Docket]:
+                # Dockets make a list of items; extend, don't append
+                search_dicts.extend(item.as_search_list())
+            else:
+                search_dicts.append(item.as_search_dict())
         except AttributeError as e:
             print("AttributeError trying to add: %s\n  %s" % (item, e))
         except ValueError as e:
@@ -59,17 +40,20 @@ def add_or_update_items(items, solr_object_type):
         except InvalidDocumentError:
             print("Unable to parse: %s" % item)
 
+    si = scorched.SolrInterface(settings.SOLR_URLS[app_label], mode='w')
     try:
-        si.add(search_item_list)
-    except socket.error as exc:
-        add_or_update_items.retry(exc=exc, countdown=120)
+        si.add(search_dicts)
+        if force_commit:
+            si.commit()
+    except (socket.error, SolrError) as exc:
+        add_items_to_solr.retry(exc=exc, countdown=30)
     else:
-        if type(item) == Docket:
-            item.date_last_index = now()
-            item.save()
+        # Mark dockets as updated if needed
+        if model == Docket:
+            items.update(date_last_index=now())
 
 
-@app.task
+@app.task(ignore_resutls=True)
 def add_or_update_recap_docket(data, force_commit=False,
                                update_threshold=60*60):
     """Add an entire docket to Solr or update it if it's already there.
@@ -119,66 +103,25 @@ def add_or_update_recap_docket(data, force_commit=False,
 
 
 @app.task
-def add_or_update_opinions(item_pks, force_commit=False):
-    si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
-    try:
-        si.add([item.as_search_dict() for item in
-                Opinion.objects.filter(pk__in=item_pks)])
-        if force_commit:
-            si.commit()
-    except SolrError as exc:
-        add_or_update_opinions.retry(exc=exc, countdown=30)
+def add_docket_to_solr_by_rds(item_pks, force_commit=False):
+    """Add RECAPDocuments from a single Docket to Solr.
 
-
-@app.task
-def add_or_update_audio_files(item_pks, force_commit=False):
-    si = scorched.SolrInterface(settings.SOLR_AUDIO_URL, mode='w')
-    try:
-        si.add([item.as_search_dict() for item in
-                Audio.objects.filter(pk__in=item_pks)])
-        if force_commit:
-            si.commit()
-    except SolrError as exc:
-        add_or_update_audio_files.retry(exc=exc, countdown=30)
-
-
-@app.task
-def add_or_update_people(item_pks, force_commit=False):
-    si = scorched.SolrInterface(settings.SOLR_PEOPLE_URL, mode='w')
-    try:
-        si.add([item.as_search_dict() for item in
-                Person.objects.filter(pk__in=item_pks)])
-        if force_commit:
-            si.commit()
-    except SolrError as exc:
-        add_or_update_people.retry(exc=exc, countdown=30)
-
-
-@app.task
-def add_or_update_recap_document(item_pks, coalesce_docket=False,
-                                 force_commit=False):
-    """Add or update recap documents in Solr.
+    This is a performance enhancement that can be used when adding many RECAP
+    Documents from a single docket to Solr. Instead of pulling the same docket
+    metadata for these items over and over (adding potentially thousands of
+    queries on a large docket), just pull the metadata once and cache it for
+    every document that's added.
 
     :param item_pks: RECAPDocument pks to add or update in Solr.
-    :param coalesce_docket: If True, assume that the PKs all correspond to
-    RECAPDocument objects on the same docket. Instead of processing each
-    RECAPDocument individually, pull out repeated metadata so that it is
-    only queried from the database once instead of once/RECAPDocument. This can
-    provide significant performance improvements since some dockets have
-    thousands of entries, each of which would otherwise need to make the same
-    queries to the DB.
-    :param force_commit: Should we send a commit message at the end of our
-    updates?
+    :param force_commit: Whether to send a commit to Solr (this is usually not
+    needed).
     :return: None
     """
     si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode='w')
     rds = RECAPDocument.objects.filter(pk__in=item_pks).order_by()
-    if coalesce_docket:
-        try:
-            metadata = rds[0].get_docket_metadata()
-        except IndexError:
-            metadata = None
-    else:
+    try:
+        metadata = rds[0].get_docket_metadata()
+    except IndexError:
         metadata = None
 
     try:
@@ -186,27 +129,15 @@ def add_or_update_recap_document(item_pks, coalesce_docket=False,
         if force_commit:
             si.commit()
     except SolrError as exc:
-        add_or_update_recap_document.retry(exc=exc, countdown=30)
+        add_docket_to_solr_by_rds.retry(exc=exc, countdown=30)
 
 
 @app.task
-def delete_items(items, solr_obj_type, force_commit=False):
-    si = scorched.SolrInterface(settings.SOLR_URLS[solr_obj_type], mode='w')
+def delete_items(items, app_label, force_commit=False):
+    si = scorched.SolrInterface(settings.SOLR_URLS[app_label], mode='w')
     try:
         si.delete_by_ids(list(items))
         if force_commit:
             si.commit()
     except SolrError as exc:
         delete_items.retry(exc=exc, countdown=30)
-
-
-@app.task
-def add_or_update_cluster(pk, force_commit=False):
-    si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
-    try:
-        si.add([item.as_search_dict() for item in
-                OpinionCluster.objects.get(pk=pk).sub_opinions.all()])
-        if force_commit:
-            si.commit()
-    except SolrError as exc:
-        add_or_update_cluster.retry(exc=exc, countdown=30)

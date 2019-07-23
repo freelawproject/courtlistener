@@ -7,7 +7,7 @@ import re
 import tempfile
 
 from django.core.files.base import ContentFile
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import TestCase, SimpleTestCase
 from django.test import override_settings
 from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
@@ -241,6 +241,7 @@ class TestModelHelpers(TestCase):
 
 class UUIDFileSystemStorageTest(SimpleTestCase):
     # Borrows from https://github.com/django/django/blob/9cbf48693dcd8df6cb22c183dcc94e7ce62b2921/tests/file_storage/tests.py#L89
+    allow_database_queries = True
 
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -305,7 +306,8 @@ class TestMaintenanceMiddleware(TestCase):
 
     def test_staff_can_get_through(self):
         """ Can staff get through when the middleware is enabled? """
-        self.client.login(username='admin', password='password')
+        self.assertTrue(self.client.login(
+            username='admin', password='password'))
         r = self.client.get(reverse('show_results'))
         self.assertEqual(
             r.status_code,

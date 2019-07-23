@@ -1,6 +1,6 @@
 import time
 
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import Client, TestCase
 from timeout_decorator import timeout_decorator
 
@@ -28,7 +28,8 @@ class FavoriteTest(TestCase):
 
     def test_create_fave(self):
         """Can we create a fave by sending a post?"""
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(
+            username='pandora', password='password'))
         for params in [self.fave_cluster_params, self.fave_audio_params]:
             r = self.client.post(
                 reverse('save_or_update_favorite'),

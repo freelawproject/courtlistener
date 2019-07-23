@@ -111,7 +111,7 @@
        data-toggle="buttons">
     {% for radio in donation_form.frequency %}
       <label for="{{ radio.id_for_label }}"
-             class="btn btn-default {% if radio.choice_value == radio.value %} active{% endif %}">
+             class="btn btn-default {% if radio.data.value == donation_form.frequency.value %} active{% endif %}">
         {{ radio.tag }} {{ radio.choice_label }}
       </label>
     {% endfor %}
@@ -163,7 +163,7 @@
 
 {% block donation_how %}
 <div id="how-donate">
-  <h3>How Would You Like to Donate?</h3>
+  <h3>How Would You Like to&nbsp;Donate?</h3>
   {% if donation_form.payment_provider.errors %}
     <p class="help-block">
       {% for error in donation_form.payment_provider.errors %}
@@ -173,8 +173,8 @@
   {% endif %}
   <div id="payment-provider-radio" class="btn-group btn-group-justified" data-toggle="buttons">
     {% for radio in donation_form.payment_provider %}
-      <label for="{{ radio.id_for_label }}" class="btn btn-default {% if radio.choice_value == radio.value %} active{% endif %}">
-        {{ radio.tag }} {{ radio.choice_label }}
+      <label for="{{ radio.id_for_label }}" class="btn btn-default {% if radio.data.value == donation_form.payment_provider.value %} active{% endif %}">
+        {{ radio.tag }} {{ radio.choice_label|safe }}
       </label>
     {% endfor %}
   </div>
@@ -242,14 +242,30 @@
 
 {% block bitcoin_info %}
 <div id="bitcoin-info">
-  <p>Bitcoin is an experimental, cryptographically secure,
-      semi-anonymous method of transferring value between parties.</p>
-  <p class="v-offset-below-2">To donate to Free Law Project using Bitcoin, please use the address or QR code below.</p>
+  <p class="v-offset-below-2">To donate to Free Law Project using <strong>Bitcoin</strong>, please use the address or QR code below.</p>
   <img src="{{ STATIC_PREFIX }}png/bitcoin-qr-code.png"
        width="200"
        height="200"
-       class="img-responsive img-rounded center-block">
-  <p class="text-center"><a href="bitcoin:18zToeKZZyqMP39WiNpCd6V6c1Fc1MbR27">18zToeKZZyqMP39WiNpCd6V6c1Fc1MbR27</a></p>
+       class="img-responsive center-block"
+       alt="QR code for Bitcoin">
+  <p class="text-center"><a href="bitcoin:19FBmVguf86kaxEM7air6EDrtq5bJSo8qs">19FBmVguf86kaxEM7air6EDrtq5bJSo8qs</a></p>
+
+  <p class="v-offset-below-2">To donate to Free Law Project using <strong>Bitcoin Cash</strong>, please use the address or QR code below.</p>
+  <img src="{{ STATIC_PREFIX }}png/bitcoin-cash-qr-code.png"
+       width="200"
+       height="200"
+       class="img-responsive center-block"
+       alt="QR code for Bitcoin Cash">
+  <p class="text-center"><a href="bitcoincash:qz29895afcv6g3ycktsz8645vzldanqvpq3zyvdeyc">qz29895afcv6g3ycktsz8645vzldanqvpq3zyvdeyc</a></p>
+  <p class="text-center"><a href="bitcoincash:1EXH9DCtHcVZV4QcKBYpq1MAZfT7fUA2Jn">Legacy address: 1EXH9DCtHcVZV4QcKBYpq1MAZfT7fUA2Jn</a></p>
+
+  <p class="v-offset-below-2">To donate to Free Law Project using <strong>Ethereum</strong>, please use the QR code below.</p>
+  <img src="{{ STATIC_PREFIX }}png/ethereum-qr-code.png"
+       width="200"
+       height="200"
+       class="img-responsive center-block"
+       alt="QR code for Ethereum">
+
   <p class="text-center v-offset-above-2 lead">Thank you for your donation.</p>
 </div>
 {% endblock %}

@@ -18,8 +18,7 @@ from cl.recap.constants import CV_2017
 from cl.recap.models import FjcIntegratedDatabase
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, Docket, RECAPDocument
-from cl.search.tasks import add_or_update_recap_docket, \
-    add_or_update_recap_document
+from cl.search.tasks import add_or_update_recap_docket, add_items_to_solr
 
 # Case insensitive dict for abbreviation lookups.
 CASE_NAME_IABBREVIATIONS = CaseInsensitiveDict(CASE_NAME_ABBREVIATIONS)
@@ -372,10 +371,11 @@ def download_documents(options):
                 else:
                     # Otherwise, do the normal download thing.
                     chain(
-                        get_pacer_doc_by_rd.s(rd.pk, session.cookies,
-                                              tag=TAG_NAME).set(queue=q),
+                        get_pacer_doc_by_rd.s(
+                            rd.pk, session.cookies, tag=TAG_NAME).set(queue=q),
                         extract_recap_pdf.si(rd.pk).set(queue=q),
-                        add_or_update_recap_document.si([rd.pk]).set(queue=q),
+                        add_items_to_solr.si(
+                            [rd.pk], 'search.RECAPDocument').set(queue=q),
                     ).apply_async()
     f.close()
 
