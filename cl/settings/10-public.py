@@ -424,6 +424,7 @@ MARKDOWN_DEUX_STYLES = {
 # MATOMO #
 ##########
 MATOMO_URL = 'http://192.168.0.243/piwik.php'
+MATOMO_BASE_URL = '//192.168.0.243/'
 MATOMO_SITE_ID = '1'
 
 
