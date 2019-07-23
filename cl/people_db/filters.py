@@ -9,7 +9,7 @@ from cl.people_db.models import Person, Position, RetentionEvent, \
     Education, School, PoliticalAffiliation, Source, ABARating, \
     Race, Party, Attorney
 from cl.search.filters import CourtFilter
-from cl.search.models import Docket
+from cl.search.models import Docket, Court, OpinionCluster, Opinion
 
 
 class SourceFilter(FilterSet):
@@ -51,7 +51,10 @@ class PoliticalAffiliationFilter(FilterSet):
 
 
 class SchoolFilter(FilterSet):
-    educations = filters.RelatedFilter('cl.people_db.filters.EducationFilter')
+    educations = filters.RelatedFilter(
+        'cl.people_db.filters.EducationFilter',
+        queryset=Education.objects.all(),
+    )
 
     class Meta:
         model = School
@@ -65,8 +68,14 @@ class SchoolFilter(FilterSet):
 
 
 class EducationFilter(FilterSet):
-    school = filters.RelatedFilter(SchoolFilter)
-    person = filters.RelatedFilter('cl.people_db.filters.PersonFilter')
+    school = filters.RelatedFilter(
+        SchoolFilter,
+        queryset=School.objects.all(),
+    )
+    person = filters.RelatedFilter(
+        'cl.people_db.filters.PersonFilter',
+        queryset=Person.objects.all(),
+    )
 
     class Meta:
         model = Education
@@ -99,8 +108,14 @@ class RetentionEventFilter(FilterSet):
 
 
 class PositionFilter(FilterSet):
-    court = filters.RelatedFilter(CourtFilter)
-    retention_events = filters.RelatedFilter(RetentionEventFilter)
+    court = filters.RelatedFilter(
+        CourtFilter,
+        queryset=Court.objects.all()
+    )
+    retention_events = filters.RelatedFilter(
+        RetentionEventFilter,
+        queryset=RetentionEvent.objects.all(),
+    )
 
     class Meta:
         model = Position
@@ -136,34 +151,52 @@ class PositionFilter(FilterSet):
 
 
 class PersonFilter(FilterSet):
-    # filter_overrides = default_filter_overrides
-    educations = filters.RelatedFilter(EducationFilter)
-    political_affiliations = filters.RelatedFilter(PoliticalAffiliationFilter)
-    sources = filters.RelatedFilter(SourceFilter)
-    aba_ratings = filters.RelatedFilter(ABARatingFilter)
-    positions = filters.RelatedFilter(PositionFilter)
+    educations = filters.RelatedFilter(
+        EducationFilter,
+        queryset=Education.objects.all(),
+    )
+    political_affiliations = filters.RelatedFilter(
+        PoliticalAffiliationFilter,
+        queryset=PoliticalAffiliation.objects.all(),
+    )
+    sources = filters.RelatedFilter(
+        SourceFilter,
+        queryset=Source.objects.all(),
+    )
+    aba_ratings = filters.RelatedFilter(
+        ABARatingFilter,
+        queryset=ABARating.objects.all(),
+    )
+    positions = filters.RelatedFilter(
+        PositionFilter,
+        queryset=Position.objects.all(),
+    )
     opinion_clusters_participating_judges = filters.RelatedFilter(
         'cl.search.filters.OpinionClusterFilter',
         'opinion_clusters_participating_judges',
+        queryset=OpinionCluster.objects.all(),
     )
     opinion_clusters_non_participating_judges = filters.RelatedFilter(
         'cl.search.filters.OpinionClusterFilter',
         'opinion_clusters_non_participating_judges',
+        queryset=OpinionCluster.objects.all(),
     )
     opinions_written = filters.RelatedFilter(
         'cl.search.filters.OpinionFilter',
-        name='opinions_written',
+        queryset=Opinion.objects.all(),
     )
     opinions_joined = filters.RelatedFilter(
         'cl.search.filters.OpinionFilter',
-        name='opinions_joined',
+        queryset=Opinion.objects.all(),
     )
 
     race = filters.MultipleChoiceFilter(
         choices=Race.RACES,
-        action=lambda queryset, value:
-        queryset.filter(race__race__in=value)
+        method='filter_race',
     )
+
+    def filter_race(self, queryset, name, value):
+        return queryset.filter(race__race__in=value)
 
     class Meta:
         model = Person
@@ -191,12 +224,12 @@ class PersonFilter(FilterSet):
 class PartyFilter(FilterSet):
     docket = filters.RelatedFilter(
         'cl.search.filters.DocketFilter',
-        name='dockets',
+        field_name='dockets',
         queryset=Docket.objects.all(),
     )
     attorney = filters.RelatedFilter(
         'cl.people_db.filters.AttorneyFilter',
-        name='attorneys',
+        field_name='attorneys',
         queryset=Attorney.objects.all(),
     )
 
@@ -213,12 +246,12 @@ class PartyFilter(FilterSet):
 class AttorneyFilter(FilterSet):
     docket = filters.RelatedFilter(
         'cl.search.filters.DocketFilter',
-        name='roles__docket',
+        field_name='roles__docket',
         queryset=Docket.objects.all(),
     )
     parties_represented = filters.RelatedFilter(
         PartyFilter,
-        name='parties',
+        field_name='roles__party',
         queryset=Party.objects.all(),
     )
 

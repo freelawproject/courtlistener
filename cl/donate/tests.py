@@ -7,7 +7,7 @@ import stripe
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import Client, TestCase
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
@@ -322,7 +322,7 @@ class DonationIntegrationTest(TestCase):
                          content_type='application/json')
 
     def test_one_time_paypal_logged_in_donation(self):
-        self.client.login(**self.credentials)
+        self.assertTrue(self.client.login(**self.credentials))
         self.do_post_and_assert(reverse('donate'))
 
     def test_one_time_paypal_logged_out_donation_existing_account(self):
@@ -337,7 +337,7 @@ class DonationIntegrationTest(TestCase):
 
     def test_one_time_stripe_logged_in_donation(self):
         self.set_stripe_params()
-        self.client.login(**self.credentials)
+        self.assertTrue(self.client.login(**self.credentials))
         self.do_post_and_assert(reverse('donate'))
 
     def test_one_time_stripe_logged_out_donation_existing_account(self):
@@ -354,7 +354,7 @@ class DonationIntegrationTest(TestCase):
     def test_monthly_stripe_logged_in_donation(self):
         self.set_monthly_params()
         self.set_stripe_params()
-        self.client.login(**self.credentials)
+        self.assertTrue(self.client.login(**self.credentials))
         self.do_post_and_assert(reverse('donate'))
         self.check_monthly_donation_created()
 
@@ -375,7 +375,7 @@ class DonationIntegrationTest(TestCase):
 
     def test_one_time_stripe_logged_in_payment(self):
         self.set_stripe_params()
-        self.client.login(**self.credentials)
+        self.assertTrue(self.client.login(**self.credentials))
         self.do_post_and_assert(reverse('cc_payment'))
 
     def test_one_time_stripe_logged_out_payment_existing_account(self):

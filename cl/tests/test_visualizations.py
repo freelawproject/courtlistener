@@ -35,7 +35,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
         self.attempt_sign_in('user', 'password')
 
         # She selects "New Visualization" from the new Visualization menu
-        menu = self.browser.find_element_by_link_text('Visualizations ')
+        menu = self.browser.find_element_by_partial_link_text('Visualizations')
         menu.click()
         menu_item = self.browser.find_element_by_link_text('New Network')
         menu_item.click()

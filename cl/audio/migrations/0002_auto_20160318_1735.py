@@ -16,7 +16,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='audio',
             name='docket',
-            field=models.ForeignKey(related_name='audio_files', blank=True, to='search.Docket', help_text=b'The docket that the oral argument is a part of', null=True),
+            field=models.ForeignKey(related_name='audio_files', blank=True, to='search.Docket', help_text=b'The docket that the oral argument is a part of', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='audio',

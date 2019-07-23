@@ -45,13 +45,13 @@ class OpinionAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         obj.save()
-        from cl.search.tasks import add_or_update_opinions
-        add_or_update_opinions.delay([obj.pk])
+        from cl.search.tasks import add_items_to_solr
+        add_items_to_solr.delay([obj.pk], 'search.Opinion')
 
     def delete_model(self, request, obj):
         obj.delete()
         from cl.search.tasks import delete_items
-        delete_items.delay([obj.pk], 'opinions')
+        delete_items.delay([obj.pk], 'search.Opinion')
 
 
 @admin.register(Citation)
@@ -101,8 +101,8 @@ class OpinionClusterAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         obj.save()
-        from cl.search.tasks import add_or_update_cluster
-        add_or_update_cluster.delay(obj.pk)
+        from cl.search.tasks import add_items_to_solr
+        add_items_to_solr.delay([obj.pk], 'search.OpinionCluster')
 
 
 @admin.register(Court)
@@ -208,5 +208,5 @@ class OpinionsCitedAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         obj.save()
-        from cl.search.tasks import add_or_update_opinions
-        add_or_update_opinions.delay([obj.citing_opinion_id])
+        from cl.search.tasks import add_items_to_solr
+        add_items_to_solr.delay([obj.citing_opinion_id], 'search.Opinion')

@@ -9,14 +9,14 @@ import redis
 from django.conf import settings
 from django.contrib.auth.models import User, Permission
 from django.core import mail
-from django.core.urlresolvers import reverse, ResolverMatch
+from django.core.management import call_command
+from django.urls import reverse, ResolverMatch
 from django.http import HttpRequest, JsonResponse
 from django.test import Client, override_settings, RequestFactory, TestCase, \
     TransactionTestCase
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 
-from cl.api.management.commands.cl_make_bulk_data import Command
 from cl.api.utils import BulkJsonHistory, SEND_API_WELCOME_EMAIL_COUNT
 from cl.api.views import coverage_data
 from cl.audio.api_views import AudioViewSet
@@ -135,7 +135,8 @@ class ApiQueryCountTests(TransactionTestCase):
         ps = Permission.objects.filter(codename='has_recap_api_access')
         u.user_permissions.add(*ps)
 
-        self.client.login(username='recap-user', password='password')
+        self.assertTrue(self.client.login(
+            username='recap-user', password='password'))
 
     def test_audio_api_query_counts(self):
         with self.assertNumQueries(4):
@@ -291,7 +292,8 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
     fixtures = ['judge_judy.json', 'authtest_data.json']
 
     def setUp(self):
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(
+            username='pandora', password='password'))
         self.q = dict()
 
     def test_judge_filtering_by_first_name(self):
@@ -483,7 +485,8 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         ps = Permission.objects.filter(codename='has_recap_api_access')
         u.user_permissions.add(*ps)
 
-        self.client.login(username='recap-user', password='password')
+        self.assertTrue(self.client.login(
+            username='recap-user', password='password'))
         self.q = dict()
 
     def test_docket_entry_to_docket_filters(self):
@@ -619,10 +622,12 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
 
 class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json',
-                'test_objects_audio.json', 'authtest_data.json']
+                'test_objects_audio.json', 'authtest_data.json',
+                'user_with_recap_api_access.json']
 
     def setUp(self):
-        self.client.login(username='recap-user', password='password')
+        self.assertTrue(self.client.login(
+            username='recap-user', password='password'))
         self.q = dict()
 
     def test_cluster_filters(self):
@@ -768,7 +773,8 @@ class DRFFieldSelectionTest(TestCase):
         path = reverse('person-list', kwargs={'version': 'v3'})
         fields_to_return = ['educations', 'date_modified', 'slug']
         q = {'fields': ','.join(fields_to_return)}
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(
+            username='pandora', password='password'))
         r = self.client.get(path, q)
         self.assertEqual(len(r.data['results'][0].keys()),
                          len(fields_to_return))
@@ -799,7 +805,8 @@ class DRFRecapPermissionTest(TestCase):
 
     def test_has_access(self):
         """Does the RECAP user have access to all of the RECAP endpoints?"""
-        self.client.login(username='recap-user', password='password')
+        self.assertTrue(self.client.login(
+            username='recap-user', password='password'))
         for path in self.paths:
             print("Access allowed to recap user at: %s... " % path, end='')
             r = self.client.get(path)
@@ -808,7 +815,8 @@ class DRFRecapPermissionTest(TestCase):
 
     def test_lacks_access(self):
         """Does a normal user lack access to the RECPAP endpoints?"""
-        self.client.login(username='pandora', password='password')
+        self.assertTrue(self.client.login(
+            username='pandora', password='password'))
         for path in self.paths:
             print("Access denied to non-recap user at: %s... " % path, end='')
             r = self.client.get(path)
@@ -901,7 +909,7 @@ class BulkDataTest(TestCase):
     @override_settings(BULK_DATA_DIR=tmp_data_dir)
     def test_make_all_bulk_files(self):
         """Can we successfully generate all bulk files?"""
-        Command().execute()
+        call_command('cl_make_bulk_data')
 
     def test_database_has_objects_for_bulk_export(self):
         self.assertTrue(Opinion.objects.count() > 0, 'Opinions exist')

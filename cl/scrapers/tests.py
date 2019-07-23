@@ -2,7 +2,6 @@
 import os
 from datetime import timedelta
 
-from celery.task.sets import subtask
 from django.conf import settings
 from django.test import TestCase, override_settings
 from django.utils.timezone import now
@@ -15,7 +14,7 @@ from cl.scrapers.management.commands import (
 )
 from cl.scrapers.models import UrlHash, ErrorLog
 from cl.scrapers.tasks import (
-    extract_from_txt, extract_doc_content, extract_by_ocr, process_audio_file
+    extract_from_txt, extract_doc_content, process_audio_file
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
@@ -75,7 +74,8 @@ class IngestionTest(IndexedSolrTestCase):
         opinions = Opinion.objects.all()
         for op, test_string in zip(opinions, test_strings):
             ext = get_extension(op.local_path.file.read())
-            op = extract_doc_content(op.pk, callback=subtask(extract_by_ocr))
+            extract_doc_content(op.pk, do_ocr=True)
+            op.refresh_from_db()
             if ext in ['.html', '.wpd']:
                 self.assertIn(test_string, op.html.lower())
             else:
@@ -316,9 +316,6 @@ class DupcheckerWithFixturesTest(TestCase):
                 )
 
 
-@override_settings(
-    MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
-)
 class AudioFileTaskTest(TestCase):
 
     fixtures = ['judge_judy.json', 'test_objects_search.json',

@@ -1,0 +1,9 @@
+# Ignore everything...
+*
+
+# Except a few things...
+!requirements.txt
+!cl
+
+# But no matter what, ignore these things.
+*/assets/media*

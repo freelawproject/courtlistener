@@ -32,11 +32,13 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docketentry',
             name='docket',
-            field=models.ForeignKey(related_name='docket_entries', to='search.Docket', help_text=b'Foreign key as a relation to the corresponding Docket object. Specifies which docket the docket entry belongs to.'),
+            field=models.ForeignKey(related_name='docket_entries', to='search.Docket', help_text=b'Foreign key as a relation to the corresponding Docket object. Specifies which docket the docket entry belongs to.',
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='recapdocument',
             name='docket_entry',
-            field=models.ForeignKey(related_name='recap_documents', to='search.DocketEntry', help_text=b'Foreign Key to the DocketEntry object to which it belongs. Multiple documents can belong to a DocketEntry. (Attachments and Documents together)'),
+            field=models.ForeignKey(related_name='recap_documents', to='search.DocketEntry', help_text=b'Foreign Key to the DocketEntry object to which it belongs. Multiple documents can belong to a DocketEntry. (Attachments and Documents together)',
+                                    on_delete=models.CASCADE),
         ),
     ]

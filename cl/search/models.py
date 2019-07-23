@@ -5,7 +5,7 @@ import re
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
-from django.core.urlresolvers import reverse, NoReverseMatch
+from django.urls import reverse, NoReverseMatch
 from django.db import models
 from django.db.models import Prefetch, Q
 from django.template import loader
@@ -108,8 +108,9 @@ class OriginatingCourtInformation(models.Model):
     )
     assigned_to = models.ForeignKey(
         'people_db.Person',
-        related_name='original_court_info',
         help_text="The judge the case was assigned to.",
+        related_name='original_court_info',
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
@@ -121,6 +122,7 @@ class OriginatingCourtInformation(models.Model):
         'people_db.Person',
         related_name='+',
         help_text="The judge that issued the final order in the case.",
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
@@ -234,6 +236,7 @@ class Docket(models.Model):
     court = models.ForeignKey(
         'Court',
         help_text="The court where the docket was filed",
+        on_delete=models.CASCADE,
         db_index=True,
         related_name='dockets',
     )
@@ -245,6 +248,7 @@ class Docket(models.Model):
                   "populated historically or due to our inability to "
                   "normalize the value in appeal_from_str.",
         related_name='+',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -261,6 +265,7 @@ class Docket(models.Model):
         OriginatingCourtInformation,
         help_text="Lower court information for appellate dockets",
         related_name="docket",
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -269,6 +274,7 @@ class Docket(models.Model):
         help_text="Data from the FJC Integrated Database associated with this "
                   "case.",
         related_name="docket",
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -289,6 +295,7 @@ class Docket(models.Model):
         'people_db.Person',
         related_name='assigning',
         help_text="The judge the case was assigned to.",
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
@@ -300,6 +307,7 @@ class Docket(models.Model):
         'people_db.Person',
         related_name='referring',
         help_text="The judge to whom the 'assigned_to' judge is delegated.",
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
@@ -702,11 +710,13 @@ class Docket(models.Model):
         # Do RECAPDocument and Docket Entries in a nested loop
         for de in self.docket_entries.all():
             # Docket Entry
-            out['description'] = de.description
+            de_out = {
+                'description': de.description,
+            }
             if de.entry_number is not None:
-                out['entry_number'] = de.entry_number
+                de_out['entry_number'] = de.entry_number
             if de.date_filed is not None:
-                out['entry_date_filed'] = midnight_pst(de.date_filed)
+                de_out['entry_date_filed'] = midnight_pst(de.date_filed)
             rds = de.recap_documents.all()
 
             if len(rds) == 0:
@@ -717,17 +727,17 @@ class Docket(models.Model):
 
             for rd in rds:
                 # IDs
-                out.update({
+                rd_out = {
                     'id': rd.pk,
                     'docket_entry_id': de.pk,
                     'docket_id': self.pk,
                     'court_id': self.court.pk,
                     'assigned_to_id': getattr(self.assigned_to, 'pk', None),
                     'referred_to_id': getattr(self.referred_to, 'pk', None),
-                })
+                }
 
                 # RECAPDocument
-                out.update({
+                rd_out.update({
                     'short_description': rd.description,
                     'document_type': rd.get_document_type_display(),
                     'document_number': rd.document_number or None,
@@ -736,9 +746,9 @@ class Docket(models.Model):
                     'page_count': rd.page_count,
                 })
                 if hasattr(rd.filepath_local, 'path'):
-                    out['filepath_local'] = rd.filepath_local.path
+                    rd_out['filepath_local'] = rd.filepath_local.path
                 try:
-                    out['absolute_url'] = rd.get_absolute_url()
+                    rd_out['absolute_url'] = rd.get_absolute_url()
                 except NoReverseMatch:
                     raise InvalidDocumentError(
                         "Unable to save to index due to missing absolute_url: "
@@ -746,10 +756,15 @@ class Docket(models.Model):
                     )
 
                 text_template = loader.get_template('indexes/dockets_text.txt')
-                out['text'] = text_template.render({'item': rd}).translate(
+                rd_out['text'] = text_template.render({'item': rd}).translate(
                     null_map)
 
-                search_list.append(normalize_search_dicts(out))
+                # Ensure that loops to bleed into each other
+                out_copy = out.copy()
+                out_copy.update(rd_out)
+                out_copy.update(rd_out)
+
+                search_list.append(normalize_search_dicts(out_copy))
 
         return search_list
 
@@ -785,6 +800,7 @@ class DocketEntry(models.Model):
                   "object. Specifies which docket the docket entry "
                   "belongs to.",
         related_name="docket_entries",
+        on_delete=models.CASCADE,
     )
     tags = models.ManyToManyField(
         'search.Tag',
@@ -894,6 +910,7 @@ class RECAPDocument(models.Model):
                   "Multiple documents can belong to a DocketEntry. "
                   "(Attachments and Documents together)",
         related_name="recap_documents",
+        on_delete=models.CASCADE,
     )
     tags = models.ManyToManyField(
         'search.Tag',
@@ -1152,9 +1169,9 @@ class RECAPDocument(models.Model):
             from cl.scrapers.tasks import extract_recap_pdf
             tasks.append(extract_recap_pdf.si(self.pk))
         if index:
-            from cl.search.tasks import add_or_update_recap_document
-            tasks.append(add_or_update_recap_document.si([self.pk],
-                                                         force_commit=False))
+            from cl.search.tasks import add_items_to_solr
+            tasks.append(add_items_to_solr.si([self.pk],
+                                              'search.RECAPDocument'))
         if len(tasks) > 0:
             chain(*tasks)()
 
@@ -1166,7 +1183,7 @@ class RECAPDocument(models.Model):
         id_cache = self.pk
         super(RECAPDocument, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], 'recap')
+        delete_items.delay([id_cache], 'search.RECAPDocument')
 
     def get_docket_metadata(self):
         """The metadata for the item that comes from the Docket."""
@@ -1407,7 +1424,7 @@ class Court(models.Model):
     )
     full_name = models.CharField(
         help_text='the full name of the court',
-        max_length='200',
+        max_length=200,
         blank=False,
     )
     url = models.URLField(
@@ -1498,6 +1515,7 @@ class OpinionCluster(models.Model):
         Docket,
         help_text="The docket that the opinion cluster is a part of",
         related_name="clusters",
+        on_delete=models.CASCADE,
     )
     panel = models.ManyToManyField(
         'people_db.Person',
@@ -1812,8 +1830,9 @@ class OpinionCluster(models.Model):
         self.slug = slugify(trunc(best_case_name(self), 75))
         super(OpinionCluster, self).save(*args, **kwargs)
         if index:
-            from cl.search.tasks import add_or_update_cluster
-            add_or_update_cluster.delay(self.pk, force_commit)
+            from cl.search.tasks import add_items_to_solr
+            add_items_to_solr.delay([self.pk], 'search.OpinionCluster',
+                                    force_commit)
 
     def delete(self, *args, **kwargs):
         """
@@ -1823,7 +1842,102 @@ class OpinionCluster(models.Model):
         id_cache = self.pk
         super(OpinionCluster, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], 'opinions')
+        delete_items.delay([id_cache], 'search.Opinion')
+
+    def as_search_list(self):
+        # IDs
+        out = {}
+
+        # Court
+        court = {
+            'court_id': self.docket.court.pk,
+            'court': self.docket.court.full_name,
+            'court_citation_string': self.docket.court.citation_string,
+            'court_exact': self.docket.court_id,
+        }
+        out.update(court)
+
+        # Docket
+        docket = {
+            'docket_id': self.docket_id,
+            'docketNumber': self.docket.docket_number
+        }
+        if self.docket.date_argued is not None:
+            docket['dateArgued'] = midnight_pst(self.docket.date_argued)
+        if self.docket.date_reargued is not None:
+            docket['dateReargued'] = midnight_pst(self.docket.date_reargued)
+        if self.docket.date_reargument_denied is not None:
+            docket['dateReargumentDenied'] = midnight_pst(
+                self.docket.date_reargument_denied)
+        out.update(docket)
+
+        # Cluster
+        out.update({
+            'cluster_id': self.pk,
+            'caseName': best_case_name(self),
+            'caseNameShort': self.case_name_short,
+            'panel_ids': [judge.pk for judge in self.panel.all()],
+            'non_participating_judge_ids': [
+                judge.pk for judge in self.non_participating_judges.all()],
+            'judge': self.judges,
+            'citation': [str(cite) for cite in self.citations.all()],
+            'scdb_id': self.scdb_id,
+            'source': self.source,
+            'attorney': self.attorneys,
+            'suitNature': self.nature_of_suit,
+            'citeCount': self.citation_count,
+            'status': self.get_precedential_status_display(),
+            'status_exact': self.get_precedential_status_display(),
+            'sibling_ids': [sibling.pk for sibling in
+                            self.sub_opinions.all()],
+        })
+        try:
+            out['lexisCite'] = str(self.citations.filter(
+                type=Citation.LEXIS)[0])
+        except IndexError:
+            pass
+        try:
+            out['neutralCite'] = str(self.citations.filter(
+                type=Citation.NEUTRAL)[0])
+        except IndexError:
+            pass
+
+        if self.date_filed is not None:
+            out['dateFiled'] = midnight_pst(self.date_filed)
+        try:
+            out['absolute_url'] = self.get_absolute_url()
+        except NoReverseMatch:
+            raise InvalidDocumentError(
+                "Unable to save to index due to missing absolute_url "
+                "(court_id: %s, item.pk: %s). Might the court have in_use set "
+                "to False?" % (self.docket.court_id, self.pk)
+            )
+
+        # Opinion
+        search_list = []
+        text_template = loader.get_template('indexes/opinion_text.txt')
+        for opinion in self.sub_opinions.all():
+            # Always make a copy to get a fresh version above metadata. Failure
+            # to do this pushes metadata from previous iterations to objects
+            # where it doesn't belong.
+            out_copy = out.copy()
+            out_copy.update({
+                'id': opinion.pk,
+                'cites': [o.pk for o in opinion.opinions_cited.all()],
+                'author_id': getattr(opinion.author, 'pk', None),
+                'joined_by_ids': [j.pk for j in opinion.joined_by.all()],
+                'type': opinion.type,
+                'download_url': opinion.download_url or None,
+                'local_path': unicode(opinion.local_path),
+                'text': text_template.render({
+                    'item': opinion,
+                    'citation_string': self.citation_string,
+                }).translate(null_map)
+            })
+
+            search_list.append(normalize_search_dicts(out_copy))
+
+        return search_list
 
 
 class Citation(models.Model):
@@ -1854,6 +1968,7 @@ class Citation(models.Model):
         OpinionCluster,
         help_text="The cluster that the citation applies to",
         related_name="citations",
+        on_delete=models.CASCADE,
     )
     volume = models.SmallIntegerField(
         help_text="The volume of the reporter",
@@ -1951,6 +2066,7 @@ class Opinion(models.Model):
         OpinionCluster,
         help_text="The cluster that the opinion is a part of",
         related_name="sub_opinions",
+        on_delete=models.CASCADE,
     )
     opinions_cited = models.ManyToManyField(
         'self',
@@ -1965,6 +2081,7 @@ class Opinion(models.Model):
         'people_db.Person',
         help_text="The primary author of this opinion as a normalized field",
         related_name='opinions_written',
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -2084,8 +2201,8 @@ class Opinion(models.Model):
     def save(self, index=True, force_commit=False, *args, **kwargs):
         super(Opinion, self).save(*args, **kwargs)
         if index:
-            from cl.search.tasks import add_or_update_opinions
-            add_or_update_opinions.delay([self.pk], force_commit)
+            from cl.search.tasks import add_items_to_solr
+            add_items_to_solr.delay([self.pk], 'search.Opinion', force_commit)
 
     def as_search_dict(self):
         """Create a dict that can be ingested by Solr."""
@@ -2185,10 +2302,12 @@ class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
         Opinion,
         related_name='cited_opinions',
+        on_delete=models.CASCADE,
     )
     cited_opinion = models.ForeignKey(
         Opinion,
         related_name='citing_opinions',
+        on_delete=models.CASCADE,
     )
     #  depth = models.IntegerField(
     #      help_text='The number of times the cited opinion was cited '
@@ -2278,10 +2397,12 @@ class Tag(models.Model):
 #     upper_court = models.ForeignKey(
 #         Court,
 #         related_name='lower_courts_reviewed',
+#         on_delete=models.CASCADE,
 #     )
 #     lower_court = models.ForeignKey(
 #         Court,
 #         related_name='reviewed_by',
+#         on_delete=models.CASCADE,
 #     )
 #     date_start = models.DateTimeField(
 #         help_text="The date this appellate review relationship began",

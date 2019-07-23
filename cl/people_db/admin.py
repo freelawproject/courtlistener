@@ -36,13 +36,13 @@ class PositionAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         obj.save()
-        from cl.search.tasks import add_or_update_people
-        add_or_update_people.delay([obj.person_id])
+        from cl.search.tasks import add_items_to_solr
+        add_items_to_solr.delay([obj.person_id], 'people_db.Person')
 
     def delete_model(self, request, obj):
         obj.delete()
-        from cl.search.tasks import add_or_update_people
-        add_or_update_people.delay([obj.person_id])
+        from cl.search.tasks import add_items_to_solr
+        add_items_to_solr.delay([obj.person_id], 'people_db.Person')
 
 
 class PositionInline(admin.StackedInline):
@@ -143,13 +143,13 @@ class PersonAdmin(admin.ModelAdmin, CSSAdminMixin):
 
     def save_model(self, request, obj, form, change):
         obj.save()
-        from cl.search.tasks import add_or_update_people
-        add_or_update_people.delay([obj.pk])
+        from cl.search.tasks import add_items_to_solr
+        add_items_to_solr.delay([obj.pk], 'people_db.Person')
 
     def delete_model(self, request, obj):
         obj.delete()
         from cl.search.tasks import delete_items
-        delete_items.delay([obj.pk], 'person')
+        delete_items.delay([obj.pk], 'people_db.Person')
 
 
 @admin.register(Race)

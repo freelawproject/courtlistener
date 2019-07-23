@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 import os
+import random
 import subprocess
 import traceback
 import uuid
@@ -23,7 +24,7 @@ from seal_rookery import seals_data, seals_root
 from cl.audio.models import Audio
 from cl.audio.utils import get_audio_binary
 from cl.celery import app
-from cl.citations.tasks import update_document_by_id
+from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.recap_utils import needs_ocr
@@ -102,7 +103,7 @@ def make_pdftotext_process(path):
     )
 
 
-def extract_from_pdf(doc, path, callback=None):
+def extract_from_pdf(path, opinion, do_ocr=False):
     """ Extract text from pdfs.
 
     Here, we use pdftotext. If that fails, try to use tesseract under the
@@ -112,22 +113,17 @@ def extract_from_pdf(doc, path, callback=None):
     """
     process = make_pdftotext_process(path)
     content, err = process.communicate()
-    if content.strip() == '' and callback:
-        # probably an image PDF. Send it to OCR. N.B.: Do NOT use a subtask here
-        # unless you are very careful. In the worst case, doing so can cause a
-        # total celery deadlock, since this task will create another task, but
-        # there might not be a worker to consume it, guaranteeing that this
-        # task never finishes!
-        success, content = callback(path)
+    if content.strip() == '' and do_ocr:
+        success, content = extract_by_ocr(path)
         if success:
-            doc.extracted_by_ocr = True
+            opinion.extracted_by_ocr = True
         elif content == '' or not success:
             content = 'Unable to extract document content.'
     elif 'e' not in content:
         # It's a corrupt PDF from ca9. Fix it.
         content = fix_mojibake(unicode(content, 'utf-8', errors='ignore'))
 
-    return doc, content, err
+    return content, err
 
 
 def extract_from_txt(path):
@@ -155,7 +151,7 @@ def extract_from_txt(path):
     return content, err
 
 
-def extract_from_wpd(opinion, path):
+def extract_from_wpd(path, opinion):
     """Extract text from a Word Perfect file
 
     Yes, courts still use these, so we extract their text using wpd2html. Once
@@ -171,7 +167,7 @@ def extract_from_wpd(opinion, path):
     if 'not for publication' in content.lower():
         opinion.precedential_status = "Unpublished"
 
-    return opinion, content, err
+    return content, err
 
 
 def convert_file_to_txt(path):
@@ -214,13 +210,19 @@ def get_page_count(path, extension):
 
 
 @app.task
-def extract_doc_content(pk, callback=None, citation_countdown=0):
+def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     """
-    Given a document, we extract it, sniffing its extension, then store its
+    Given an opinion PK, we extract it, sniffing its extension, then store its
     contents in the database.  Finally, we asynchronously find citations in
     the document content and match them to other documents.
 
-    TODO: this implementation cannot be distributed due to using local paths.
+    This implementation uses local paths.
+
+    :param pk: The opinion primary key to work on
+    :param do_ocr: Whether the PDF converting function should use OCR
+    :param citation_jitter: Whether to apply jitter before running the citation
+    parsing code. This can be useful do spread these tasks out when doing a
+    larger scrape.
     """
     opinion = Opinion.objects.get(pk=pk)
 
@@ -234,15 +236,15 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
     elif extension == 'html':
         content, err = extract_from_html(path)
     elif extension == 'pdf':
-        opinion, content, err = extract_from_pdf(opinion, path, callback)
+        content, err = extract_from_pdf(path, opinion, do_ocr)
     elif extension == 'txt':
         content, err = extract_from_txt(path)
     elif extension == 'wpd':
-        opinion, content, err = extract_from_wpd(opinion, path)
+        content, err = extract_from_wpd(path, opinion)
     else:
         print ('*****Unable to extract content due to unknown extension: %s '
                'on opinion: %s****' % (extension, opinion))
-        return 2
+        return
 
     # Do page count, if possible
     opinion.page_count = get_page_count(path, extension)
@@ -259,11 +261,12 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
     if err:
         print ("****Error extracting text from %s: %s****" %
                (extension, opinion))
-        return opinion
+        return
 
     # Save item, and index Solr if needed.
+    # noinspection PyBroadException
     try:
-        if citation_countdown == 0:
+        if not citation_jitter:
             # No waiting around. Save to the database now, but don't bother
             # with the index yet because citations are being done imminently.
             opinion.cluster.save(index=False)
@@ -276,15 +279,13 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
     except Exception:
         print("****Error saving text to the db for: %s****\n%s" %
               (opinion, traceback.format_exc()))
-        return opinion
+        return
 
     # Identify and link citations within the document content
-    update_document_by_id.apply_async(
-        (opinion.pk,),
-        countdown=citation_countdown
+    find_citations_for_opinion_by_pks.apply_async(
+        ([opinion.pk],),
+        countdown=random.randint(0, 3600)
     )
-
-    return opinion
 
 
 @app.task

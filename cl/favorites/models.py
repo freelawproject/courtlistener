@@ -11,28 +11,33 @@ class Favorite(models.Model):
         User,
         help_text="The user that owns the favorite",
         related_name="favorites",
+        on_delete=models.CASCADE,
     )
     cluster_id = models.ForeignKey(
         OpinionCluster,
         verbose_name='the opinion cluster that is favorited',
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     audio_id = models.ForeignKey(
         Audio,
         verbose_name='the audio file that is favorited',
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     docket_id = models.ForeignKey(
         Docket,
         verbose_name="the docket that is favorited",
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     recap_doc_id = models.ForeignKey(
         RECAPDocument,
         verbose_name="the RECAP document that is favorited",
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )

@@ -19,11 +19,13 @@ def _process_field_attributes(field, attr, process):
     field.as_widget = bound_method(as_widget, field, field.__class__)
     return field
 
+
 @register.filter('attr')
 def set_attr(field, attr):
     def process(widget, attrs, attribute, value):
         attrs[attribute] = value
     return _process_field_attributes(field, attr, process)
+
 
 @register.filter
 def append_attr(field, attr):
@@ -36,9 +38,11 @@ def append_attr(field, attr):
             attrs[attribute] = value
     return _process_field_attributes(field, attr, process)
 
+
 @register.filter
 def add_class(field, css_class):
     return append_attr(field, 'class:'+ css_class)
+
 
 @register.filter
 def add_error_class(field, css_class):
@@ -46,9 +50,11 @@ def add_error_class(field, css_class):
         return add_class(field, css_class)
     return field
 
+
 @register.filter
 def set_data(field, data):
     return set_attr(field, 'data-' + data)
+
 
 @register.filter
 def behave(field, names):

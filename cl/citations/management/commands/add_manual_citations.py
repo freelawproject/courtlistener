@@ -2,7 +2,7 @@ import pandas as pd
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import OpinionsCited, Opinion
-from cl.search.tasks import add_or_update_opinions
+from cl.search.tasks import add_items_to_solr
 
 
 def load_csv(csv_location):
@@ -47,7 +47,7 @@ def process_citations(data, debug):
 
     logger.info("\nUpdating Solr...")
     if not debug:
-        add_or_update_opinions(updated_ids)
+        add_items_to_solr(updated_ids, 'search.Opinion')
     logger.info("Done.")
 
 

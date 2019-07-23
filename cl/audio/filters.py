@@ -4,11 +4,11 @@ from rest_framework_filters import FilterSet
 from cl.api.utils import DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.audio.models import Audio
 from cl.search.filters import DocketFilter
-from cl.search.models import SOURCES
+from cl.search.models import SOURCES, Docket
 
 
 class AudioFilter(FilterSet):
-    docket = filters.RelatedFilter(DocketFilter)
+    docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
     source = filters.MultipleChoiceFilter(choices=SOURCES)
 
     class Meta:

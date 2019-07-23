@@ -8,7 +8,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import EmailMessage
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db.models import Count, Sum
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect, Http404
@@ -22,7 +22,7 @@ from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
 from cl.lib import magic
 from cl.lib.bot_detector import is_og_bot
-from cl.lib.decorators import track_in_piwik
+from cl.lib.decorators import track_in_matomo
 from cl.opinion_page.views import view_recap_document
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
@@ -319,7 +319,7 @@ def ratelimited(request, exception):
                   status=HTTP_429_TOO_MANY_REQUESTS)
 
 
-@track_in_piwik
+@track_in_matomo
 def serve_static_file(request, file_path=''):
     """Sends a static file to a user.
 

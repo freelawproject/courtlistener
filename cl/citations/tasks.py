@@ -82,73 +82,73 @@ def create_cited_html(opinion, citations):
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-def update_document(self, opinion, index=True):
-    """Get the citations for an item and save it and add it to the index if
-    requested."""
-    citations = get_document_citations(opinion)
+def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
+    """Find citations for search.Opinion objects.
 
-    # List used so we can do one simple update to the citing opinion.
-    opinions_cited = set()
-    for citation in citations:
-        try:
-            matches = match_citations.match_citation(
-                citation,
-                citing_doc=opinion
-            )
-        except ResponseNotReady as e:
-            # Threading problem in httplib, which is used in the Solr query.
-            raise self.retry(exc=e, countdown=2)
+    :param opinion_pks: An iterable of search.Opinion PKs
+    :param index: Whether to add the item to Solr
+    :return: None
+    """
+    opinions = Opinion.objects.filter(pk__in=opinion_pks)
+    for opinion in opinions:
+        citations = get_document_citations(opinion)
 
-        # TODO: Figure out what to do if there's more than one
-        if len(matches) == 1:
-            match_id = matches[0]['id']
+        # List used so we can do one simple update to the citing opinion.
+        opinions_cited = set()
+        for citation in citations:
             try:
-                matched_opinion = Opinion.objects.get(pk=match_id)
+                matches = match_citations.match_citation(
+                    citation, citing_doc=opinion)
+            except ResponseNotReady as e:
+                # Threading problem in httplib, which is used in the Solr query.
+                raise self.retry(exc=e, countdown=2)
 
-                # Increase citation count for matched cluster if it hasn't
-                # already been cited by this opinion.
-                if matched_opinion not in opinion.opinions_cited.all():
-                    matched_opinion.cluster.citation_count += 1
-                    matched_opinion.cluster.save(index=index)
+            # TODO: Figure out what to do if there's more than one
+            if len(matches) == 1:
+                match_id = matches[0]['id']
+                try:
+                    matched_opinion = Opinion.objects.get(pk=match_id)
 
-                # Add citation match to the citing opinion's list of cases it
-                # cites. opinions_cited is a set so duplicates aren't an issue
-                opinions_cited.add(matched_opinion.pk)
+                    # Increase citation count for matched cluster if it hasn't
+                    # already been cited by this opinion.
+                    if matched_opinion not in opinion.opinions_cited.all():
+                        matched_opinion.cluster.citation_count += 1
+                        matched_opinion.cluster.save(index=index)
 
-                # URL field will be used for generating inline citation html
-                citation.match_url = matched_opinion.cluster.get_absolute_url()
-                citation.match_id = matched_opinion.pk
-            except Opinion.DoesNotExist:
-                # No Opinions returned. Press on.
-                continue
-            except Opinion.MultipleObjectsReturned:
-                # Multiple Opinions returned. Press on.
-                continue
-        else:
-            # No match found for citation
-            #create_stub([citation])
-            pass
+                    # Add citation match to the citing opinion's list of cases
+                    # it cites. opinions_cited is a set so duplicates aren't an
+                    # issue
+                    opinions_cited.add(matched_opinion.pk)
 
-    # Only update things if we found citations
-    if citations:
-        opinion.html_with_citations = create_cited_html(opinion, citations)
+                    # URL field will be used for generating inline citation
+                    # html
+                    citation.match_url = matched_opinion.cluster.get_absolute_url()
+                    citation.match_id = matched_opinion.pk
+                except Opinion.DoesNotExist:
+                    # No Opinions returned. Press on.
+                    continue
+                except Opinion.MultipleObjectsReturned:
+                    # Multiple Opinions returned. Press on.
+                    continue
+            else:
+                # No match found for citation
+                # create_stub([citation])
+                pass
 
-        # Nuke existing citations
-        OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
+        # Only update things if we found citations
+        if citations:
+            opinion.html_with_citations = create_cited_html(opinion, citations)
 
-        # Create the new ones.
-        OpinionsCited.objects.bulk_create([
-            OpinionsCited(citing_opinion_id=opinion.pk,
-                          cited_opinion_id=pk) for
-            pk in opinions_cited
-        ])
+            # Nuke existing citations
+            OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
 
-    # Update Solr if requested. In some cases we do it at the end for
-    # performance reasons.
-    opinion.save(index=index)
+            # Create the new ones.
+            OpinionsCited.objects.bulk_create([
+                OpinionsCited(citing_opinion_id=opinion.pk,
+                              cited_opinion_id=pk) for
+                pk in opinions_cited
+            ])
 
-
-@app.task(ignore_result=True)
-def update_document_by_id(opinion_id, index=True):
-    op = Opinion.objects.get(pk=opinion_id)
-    update_document(op, index=index)
+        # Update Solr if requested. In some cases we do it at the end for
+        # performance reasons.
+        opinion.save(index=index)

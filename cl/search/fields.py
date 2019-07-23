@@ -10,7 +10,7 @@ from django.utils import six
 from django.utils.encoding import force_text
 from django.forms import DateField, ChoiceField
 
-INPUT_FORMATS = (
+INPUT_FORMATS = [
     '%Y%m%d',    # '20061025'
     '%Y-%m-%d',  # '2006-10-25'
     '%Y-%m',     # '2006-10'
@@ -25,7 +25,7 @@ INPUT_FORMATS = (
     '%m/%y',     # '10/06'
     '%Y/%m/%d',  # '2006/10/26'
     '%Y/%m',     # '2006/10'
-)
+]
 
 
 class FloorDateField(DateField):

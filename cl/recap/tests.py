@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import TestCase
 from juriscraper.pacer import PacerRssFeed
 from rest_framework.status import (
@@ -305,7 +305,7 @@ class DebugRecapUploadtest(TestCase):
         self.assertEqual(DocketEntry.objects.count(), 0)
         self.assertEqual(RECAPDocument.objects.count(), 0)
 
-    @mock.patch('cl.recap.tasks.add_or_update_recap_document')
+    @mock.patch('cl.recap.tasks.add_items_to_solr')
     def test_debug_does_not_create_recap_documents(self, mock):
         """If debug is passed, do we avoid creating recap documents?"""
         d = Docket.objects.create(source=0, court_id='scotus',
@@ -1069,7 +1069,7 @@ class RecapCriminalDataUploadTaskTest(TestCase):
                          CriminalComplaint.objects.count())
 
 
-@mock.patch('cl.recap.tasks.add_or_update_recap_document')
+@mock.patch('cl.recap.tasks.add_items_to_solr')
 class RecapAttachmentPageTaskTest(TestCase):
     def setUp(self):
         user = User.objects.get(username='recap')

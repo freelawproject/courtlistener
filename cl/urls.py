@@ -6,8 +6,7 @@ from cl.simple_pages.views import serve_static_file
 
 urlpatterns = [
     # Admin docs and site
-    url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
-    url(r'^admin/', include(admin.site.urls)),
+    url(r'^admin/', admin.site.urls),
 
     url('', include('cl.audio.urls')),
     url('', include('cl.opinion_page.urls')),
