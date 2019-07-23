@@ -296,18 +296,18 @@ def view_opinion(request, pk, _):
 
         # Get recommendations with MoreLikeThis query (cached)
         mlt_cache_key = 'opinion-mlt%s' % pk
-        recommendations = cache.get(mlt_cache_key)
+        related_items = cache.get(mlt_cache_key)
 
-        if recommendations is None:
+        if related_items is None:
             mlt_query = conn.query(id=pk)\
                 .mlt('text', count=5)\
                 .field_limit(fields=['id', 'caseName', 'absolute_url'])
-            recommendations = mlt_query.execute().more_like_this.docs
+            related_items = mlt_query.execute().more_like_this.docs
 
-            cache.set(mlt_cache_key, recommendations, 60 * 60 * 24)
+            cache.set(mlt_cache_key, related_items, 60 * 60 * 24)
     else:
         citing_clusters = None
-        recommendations = None
+        related_items = []
 
     return render(request, 'view_opinion.html', {
         'title': title,
@@ -318,7 +318,9 @@ def view_opinion(request, pk, _):
         'private': cluster.blocked,
         'citing_clusters': citing_clusters,
         'top_authorities': cluster.authorities[:5],
-        'recommendations': recommendations,
+        'related_algorithm': 'mlt',
+        'related_items': related_items,
+        'related_item_ids': [item['id'] for item in related_items],
     })
 
 
