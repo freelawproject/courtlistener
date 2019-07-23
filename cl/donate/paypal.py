@@ -4,7 +4,7 @@ from urlparse import urlparse, parse_qs
 import requests
 import simplejson as json  # This is needed to handle Decimal objects.
 from django.conf import settings
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.utils.timezone import now

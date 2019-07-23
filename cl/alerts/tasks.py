@@ -29,7 +29,8 @@ def enqueue_docket_alert(d_pk):
                           port=settings.REDIS_PORT,
                           db=settings.REDIS_DATABASES['ALERTS'])
     key = make_alert_key(d_pk)
-    currently_enqueued = bool(r.getset(key, True))
+    # Set to True if not already set. Redis doesn't do bools anymore, so use 1.
+    currently_enqueued = bool(r.getset(key, 1))
     if currently_enqueued:
         # We've got a task going for this alert.
         return False

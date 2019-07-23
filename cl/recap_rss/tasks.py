@@ -48,7 +48,7 @@ def abort_or_retry(task, feed_status, exc):
     if task.request.retries == task.max_retries:
         # Abort and cut off the chain. No more retries.
         mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
-        task.request.callbacks = None
+        task.request.chain = None
         return
 
     mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
@@ -123,7 +123,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             logger.info("%s: Feed has not changed since %s. Aborting." % (
                 feed_status.court_id, date_last_built))
             # Abort. Nothing has changed here.
-            self.request.callbacks = None
+            self.request.chain = None
             mark_status(feed_status, RssFeedStatus.UNCHANGED)
             return
 
@@ -132,7 +132,11 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     feed_status.date_last_build = current_build_date
     feed_status.save()
 
-    return rss_feed
+    rss_feed.parse()
+    logger.info("%s: Got %s results to merge." % (feed_status.court_id,
+                                                  len(rss_feed.data)))
+
+    return rss_feed.data
 
 
 def hash_item(item):
@@ -165,10 +169,11 @@ def cache_hash(item_hash):
 
 
 @app.task
-def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
+def merge_rss_feed_contents(feed_data, court_pk, feed_status_pk):
     """Merge the rss feed contents into CourtListener
 
-    :param rss_feed: A PacerRssFeed object that has already queried the feed.
+    :param feed_data: The data parameter of a PacerRssFeed object that has
+    already queried the feed and been parsed.
     :param court_pk: The CourtListener court ID.
     :param feed_status_pk: The CL ID for the RSS status object.
     :returns all_rds_created: A list of all the RDs created during the
@@ -176,13 +181,11 @@ def merge_rss_feed_contents(rss_feed, court_pk, feed_status_pk):
     """
     start_time = now()
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
-    rss_feed.parse()
-    logger.info("%s: Got %s results to merge." % (feed_status.court_id,
-                                                  len(rss_feed.data)))
+
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
     d_pks_to_alert = []
-    for docket in rss_feed.data:
+    for docket in feed_data:
         item_hash = hash_item(docket)
         if is_cached(item_hash):
             continue

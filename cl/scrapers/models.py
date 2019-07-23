@@ -33,7 +33,8 @@ class ErrorLog(models.Model):
     """
     court = models.ForeignKey(
         Court,
-        verbose_name='the court where the error occurred'
+        verbose_name='the court where the error occurred',
+        on_delete=models.CASCADE,
     )
     log_time = models.DateTimeField(
         'the exact date and time of the error',
@@ -68,7 +69,8 @@ class PACERFreeDocumentLog(models.Model):
     )
     court = models.ForeignKey(
         Court,
-        help_text="The court where items were being downloaded from."
+        help_text="The court where items were being downloaded from.",
+        on_delete=models.CASCADE,
     )
     date_started = models.DateTimeField(
         help_text="The moment when the scrape of the RECAP content began.",

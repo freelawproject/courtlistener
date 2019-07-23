@@ -7,6 +7,7 @@ from django.conf import settings
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer.http import PacerSession
+from requests import RequestException
 
 from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
@@ -20,7 +21,7 @@ from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, RECAPDocument
-from cl.search.tasks import add_or_update_recap_document
+from cl.search.tasks import add_items_to_solr, add_docket_to_solr_by_rds
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
@@ -62,16 +63,26 @@ def get_next_date_range(court_id, span=7):
 
 
 def mark_court_in_progress(court_id, d):
-    PACERFreeDocumentLog.objects.create(
+    log = PACERFreeDocumentLog.objects.create(
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
         date_queried=d,
         court_id=map_pacer_to_cl_id(court_id),
     )
+    return log
 
 
 def get_and_save_free_document_reports(options):
     """Query the Free Doc Reports on PACER and get a list of all the free
-    documents. Do not download those items, as that step is done later.
+    documents. Do not download those items, as that step is done later. For now
+    just get the list.
+
+    Note that this uses synchronous celery chains. A previous version was more
+    complex and did not use synchronous chains. Unfortunately in Celery 4.2.0,
+    or more accurately in redis-py 3.x.x, doing it that way failed nearly every
+    time.
+
+    This is a simpler version, though a slower one, but it should get the job
+    done.
     """
     # Kill any *old* logs that report they're in progress. (They've failed.)
     three_hrs_ago = now() - timedelta(hours=3)
@@ -93,69 +104,58 @@ def get_and_save_free_document_reports(options):
         'pk',
         flat=True,
     )
-    pacer_court_ids = {
-        map_cl_to_pacer_id(v): {'until': now(), 'count': 1, 'result': None} for
-        v in cl_court_ids
-    }
+    pacer_court_ids = [map_cl_to_pacer_id(v) for v in cl_court_ids]
+
     pacer_session = PacerSession(username=PACER_USERNAME,
                                  password=PACER_PASSWORD)
     pacer_session.login()
 
-    # Iterate over every court, X days at a time. As courts are completed,
-    # remove them from the list of courts to process until none are left
     today = now()
-    max_delay_count = 20
-    while len(pacer_court_ids) > 0:
-        court_ids_copy = pacer_court_ids.copy()  # Make a copy of the list.
-        for pacer_court_id, delay in court_ids_copy.items():
-            if now() < delay['until']:
-                # Do other courts until the delay is up. Do not print/log
-                # anything since at the end there will only be one court left.
-                continue
-
+    for pacer_court_id in pacer_court_ids:
+        while True:
             next_start_d, next_end_d = get_next_date_range(pacer_court_id)
-            if delay['result'] is not None:
-                if delay['result'].ready():
-                    result = delay['result'].get()
-                    if result == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
-                        if next_end_d >= today.date():
-                            logger.info("Finished '%s'. Marking it complete." %
-                                        pacer_court_id)
-                            pacer_court_ids.pop(pacer_court_id, None)
-                            continue
+            logger.info("Attempting to get latest document references for "
+                        "%s between %s and %s", pacer_court_id, next_start_d,
+                        next_end_d)
+            mark_court_in_progress(pacer_court_id, next_end_d)
+            try:
+                status = get_and_save_free_document_report(
+                    pacer_court_id, next_start_d, next_end_d,
+                    pacer_session.cookies)
+            except RequestException:
+                logger.error("Failed to get document references for %s "
+                             "between %s and %s due to network error.",
+                             pacer_court_id, next_start_d, next_end_d)
+                mark_court_done_on_date(PACERFreeDocumentLog.SCRAPE_FAILED,
+                                        pacer_court_id, next_end_d)
+                continue
+            except IndexError:
+                logger.error("Failed to get document references for %s "
+                             "between %s and %s due to PACER 6.3 bug.",
+                             pacer_court_id, next_start_d, next_end_d)
+                mark_court_done_on_date(PACERFreeDocumentLog.SCRAPE_FAILED,
+                                        pacer_court_id, next_end_d)
+                continue
+            else:
+                result = mark_court_done_on_date(status, pacer_court_id,
+                                                 next_end_d)
 
-                    elif result == PACERFreeDocumentLog.SCRAPE_FAILED:
-                        logger.error("Encountered critical error on %s "
-                                     "(network error?). Marking as failed and "
-                                     "pressing on." % pacer_court_id)
-                        pacer_court_ids.pop(pacer_court_id, None)
-                        continue
+            if result == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
+                if next_end_d >= today.date():
+                    logger.info("Got all document references for '%s'.",
+                                pacer_court_id)
+                    # Break from while loop, onwards to next court
+                    break
                 else:
-                    if delay['count'] > max_delay_count:
-                        logger.error("Something went wrong and we weren't "
-                                     "able to finish %s. We ran out of time." %
-                                     pacer_court_id)
-                        pacer_court_ids.pop(pacer_court_id, None)
-                        continue
-                    next_delay = min(delay['count'] * 5, 30)  # backoff w/cap
-                    logger.info("Court %s still in progress. Delaying at "
-                                "least %ss." % (pacer_court_id, next_delay))
-                    delay_until = now() + timedelta(seconds=next_delay)
-                    pacer_court_ids[pacer_court_id]['until'] = delay_until
-                    pacer_court_ids[pacer_court_id]['count'] += 1
+                    # More dates to do; let it continue
                     continue
 
-            mark_court_in_progress(pacer_court_id, next_end_d)
-            pacer_court_ids[pacer_court_id]['count'] = 1  # Reset
-            delay['result'] = chain(
-                get_and_save_free_document_report.si(
-                    pacer_court_id,
-                    next_start_d,
-                    next_end_d,
-                    pacer_session.cookies,
-                ),
-                mark_court_done_on_date.s(pacer_court_id, next_end_d),
-            ).apply_async()
+            elif result == PACERFreeDocumentLog.SCRAPE_FAILED:
+                logger.error("Encountered critical error on %s "
+                             "(network error?). Marking as failed and "
+                             "pressing on." % pacer_court_id)
+                # Break from while loop, onwards to next court
+                break
 
 
 def get_pdfs(options):
@@ -193,7 +193,7 @@ def get_pdfs(options):
             delete_pacer_row.s(row.pk).set(queue=q),
         )
         if index:
-            c |= add_or_update_recap_document.s().set(queue=q)
+            c |= add_items_to_solr.s('search.RECAPDocument').set(queue=q)
         c.apply_async()
         completed += 1
         if completed % 1000 == 0:
@@ -216,8 +216,7 @@ def do_ocr(options):
         else:
             chain(
                 extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q),
-                add_or_update_recap_document.s(
-                    coalesce_docket=True).set(queue=q),
+                add_docket_to_solr_by_rds.s().set(queue=q),
             ).apply_async()
         if i % 1000 == 0:
             logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))

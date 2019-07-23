@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db.models import F, Prefetch
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponse, HttpResponseNotAllowed
@@ -61,7 +61,7 @@ def core_docket_data(request, pk):
         favorite_form = FavoriteForm(instance=fave)
 
     has_alert = False
-    if request.user.is_authenticated():
+    if request.user.is_authenticated:
         has_alert = DocketAlert.objects.filter(docket=docket,
                                                user=request.user).exists()
 

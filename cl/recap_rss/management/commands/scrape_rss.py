@@ -12,7 +12,7 @@ from cl.recap_rss.models import RssFeedStatus
 from cl.recap_rss.tasks import check_if_feed_changed, merge_rss_feed_contents, \
     mark_status_successful, trim_rss_cache
 from cl.search.models import Court
-from cl.search.tasks import add_or_update_recap_document
+from cl.search.tasks import add_items_to_solr
 
 
 class Command(VerboseCommand):
@@ -144,7 +144,7 @@ class Command(VerboseCommand):
                     # docket information from the RSS feeds. RSS feeds also
                     # have information about hundreds or thousands of
                     # dockets. Updating them all would be very bad.
-                    add_or_update_recap_document.s(),
+                    add_items_to_solr.s('search.RECAPDocument'),
                     mark_status_successful.si(new_status.pk),
                 ).apply_async()
 

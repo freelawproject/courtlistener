@@ -33,6 +33,7 @@ class UserProfile(models.Model):
         User,
         related_name='profile',
         verbose_name='the user this model extends',
+        on_delete=models.CASCADE,
         unique=True,
     )
     barmembership = models.ManyToManyField(

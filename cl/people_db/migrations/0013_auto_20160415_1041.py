@@ -14,6 +14,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='position',
             name='appointer',
-            field=models.ForeignKey(related_name='appointed_positions', blank=True, to='people_db.Position', help_text=b'If this is an appointed position, the person-position responsible for the appointing.', null=True),
+            field=models.ForeignKey(related_name='appointed_positions', blank=True, to='people_db.Position', help_text=b'If this is an appointed position, the person-position responsible for the appointing.', null=True,
+                                    on_delete=models.CASCADE),
         ),
     ]

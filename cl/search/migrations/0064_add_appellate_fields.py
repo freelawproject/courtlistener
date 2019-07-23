@@ -26,13 +26,15 @@ class Migration(migrations.Migration):
                 ('date_judgement_oed', models.DateField(help_text=b'The date the judgement was entered on the docket at the lower court.', null=True, blank=True)),
                 ('date_filed_noa', models.DateField(help_text=b'The date the notice of appeal was filed for the case.', null=True, blank=True)),
                 ('date_received_coa', models.DateField(help_text=b'The date the case was received at the court of appeals.', null=True, blank=True)),
-                ('assigned_to', models.ForeignKey(related_name='original_court_info', blank=True, to='people_db.Person', help_text=b'The judge the case was assigned to.', null=True)),
+                ('assigned_to', models.ForeignKey(related_name='original_court_info', blank=True, to='people_db.Person', help_text=b'The judge the case was assigned to.', null=True,
+                                                  on_delete=models.CASCADE)),
             ],
         ),
         migrations.AddField(
             model_name='docket',
             name='appeal_from',
-            field=models.ForeignKey(related_name='+', blank=True, to='search.Court', help_text=b'In appellate cases, this is the lower court or administrative body where this case was originally heard. This field is frequently blank due to it not being populated historically or due to our inability to normalize the value in appeal_from_str.', null=True),
+            field=models.ForeignKey(related_name='+', blank=True, to='search.Court', help_text=b'In appellate cases, this is the lower court or administrative body where this case was originally heard. This field is frequently blank due to it not being populated historically or due to our inability to normalize the value in appeal_from_str.', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='docket',
@@ -72,6 +74,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='docket',
             name='originating_court',
-            field=models.OneToOneField(related_name='docket', null=True, blank=True, to='search.OriginatingCourtInformation', help_text=b'Lower court information for appellate dockets'),
+            field=models.OneToOneField(related_name='docket', null=True, blank=True, to='search.OriginatingCourtInformation', help_text=b'Lower court information for appellate dockets',
+                                       on_delete=models.CASCADE),
         ),
     ]

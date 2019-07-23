@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db.models import Count
 from django.http import HttpResponseRedirect, QueryDict, HttpResponse
 from django.shortcuts import render
@@ -275,7 +275,7 @@ def register(request):
     elif '//' in redirect_to and re.match(r'[^\?]*//', redirect_to):
         redirect_to = settings.LOGIN_REDIRECT_URL
 
-    if request.user.is_anonymous():
+    if request.user.is_anonymous:
         if request.method == 'POST':
             try:
                 stub_account = User.objects.filter(

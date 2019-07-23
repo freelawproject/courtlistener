@@ -231,19 +231,19 @@ fd_pairs = (
 ca_pairs = (
     (re.compile(u'Supreme Court of the United States', re.I), 'scotus'),
 
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Second Circuit', re.I), 'ca2'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Third Circuit', re.I), 'ca3'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Fourth Circuit', re.I), 'ca4'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Fifth Circuit', re.I), 'ca5'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Sixth Circuit', re.I), 'ca6'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Seventh Circuit', re.I), 'ca7'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Eighth Circuit', re.I), 'ca8'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Ninth Circuit', re.I), 'ca9'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Tenth Circuit', re.I), 'ca10'),
-    (re.compile(u'(^|\s)U\. S\. ((Circuit Courts?)|(Court of Appeals)) for the Eleventh Circuit', re.I), 'ca11'),
-    (re.compile(u'(^|\s)U\. S\. Court of Appeals for the District of Columbia Circuit', re.I), 'cadc'),
-    (re.compile(u'(^|\s)U\. S\. Court of Appeals for the Federal Circuit', re.I), 'cafc'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Second Circuit', re.I), 'ca2'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Third Circuit', re.I), 'ca3'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Fourth Circuit', re.I), 'ca4'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Fifth Circuit', re.I), 'ca5'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Sixth Circuit', re.I), 'ca6'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Seventh Circuit', re.I), 'ca7'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Eighth Circuit', re.I), 'ca8'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Ninth Circuit', re.I), 'ca9'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Tenth Circuit', re.I), 'ca10'),
+    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Eleventh Circuit', re.I), 'ca11'),
+    (re.compile(u'(^|\s)U\. ?S\. Court of Appeals for the District of Columbia Circuit', re.I), 'cadc'),
+    (re.compile(u'(^|\s)U\. ?S\. Court of Appeals for the Federal Circuit', re.I), 'cafc'),
 )
 
 # noinspection PyPep8

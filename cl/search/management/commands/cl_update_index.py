@@ -1,24 +1,21 @@
 import ast
 import sys
 
+from django.apps import apps
 from django.conf import settings
 from six.moves import input
 
-from cl.audio.models import Audio
-from cl.lib.argparse_types import valid_date_time, valid_obj_type
+from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
-from cl.lib.db_tools import queryset_generator
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timer import print_timing
 from cl.people_db.models import Person
-from cl.search.models import Opinion, RECAPDocument, Docket
-from cl.search.tasks import (delete_items, add_or_update_audio_files,
-                             add_or_update_opinions, add_or_update_items,
-                             add_or_update_people,
-                             add_or_update_recap_document)
+from cl.search.models import Docket
+from cl.search.tasks import delete_items, add_items_to_solr
 
-VALID_OBJ_TYPES = ('opinions', 'audio', 'person', 'recap', 'recap-dockets')
+VALID_OBJ_TYPES = ('audio.Audio', 'people_db.Person', 'search.Opinion',
+                   'search.RECAPDocument', 'search.Docket')
 
 
 def proceed_with_deletion(out, count, noinput):
@@ -59,16 +56,17 @@ class Command(VerboseCommand):
         self.verbosity = None
         self.options = []
         self.type = None
-        self.type_str = None
         self.noinput = None
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--type',
-            type=valid_obj_type,
+            type=str,
+            choices=VALID_OBJ_TYPES,
             help='Because the Solr indexes are loosely bound to the database, '
                  'commands require that the correct model is provided in this '
-                 'argument. Current choices are %s' % ', '.join(VALID_OBJ_TYPES)
+                 'argument. Current choices are %s' %
+                 ', '.join(VALID_OBJ_TYPES)
         )
         parser.add_argument(
             '--solr-url',
@@ -85,7 +83,7 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             '--queue',
-            default='batch3',
+            default='celery',
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(
@@ -177,7 +175,7 @@ class Command(VerboseCommand):
         if not self.options['optimize_everything']:
             self.solr_url = options['solr_url']
             self.si = ExtraSolrInterface(self.solr_url, mode='rw')
-            self.type, self.type_str = options['type']
+            self.type = options['type']
 
         if options['update']:
             if self.verbosity >= 1:
@@ -221,10 +219,16 @@ class Command(VerboseCommand):
                               'index.\n')
             sys.exit(1)
 
-    def process_queryset(self, items, count, chunksize=5,):
+    def process_queryset(self, iterable, count):
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
+
+        :param iterable: An iterable of items to add to Solr.
+        :param count: The number of items that will be processed.
         """
+        # The count to send in a single Celery task
+        chunk_size = 100
+
         queue = self.options['queue']
         start_at = self.options['start_at']
         # Set low throttle. Higher values risk crashing Redis.
@@ -232,16 +236,16 @@ class Command(VerboseCommand):
                                   queue_name=queue)
         processed_count = 0
         chunk = []
-        for item in items:
+        for item in iterable:
             processed_count += 1
             if processed_count < start_at:
                 continue
             last_item = (count == processed_count)
             chunk.append(item)
-            if processed_count % chunksize == 0 or last_item:
+            if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
-                add_or_update_items.apply_async(args=(chunk, self.type_str),
-                                                queue=queue)
+                add_items_to_solr.apply_async(args=(chunk, self.type),
+                                              queue=queue)
                 chunk = []
                 sys.stdout.write("\rProcessed {}/{} ({:.0%})".format(
                     processed_count,
@@ -257,7 +261,7 @@ class Command(VerboseCommand):
         Given a list of items, delete them.
         """
         self.stdout.write("Deleting items(s): %s\n" % items)
-        delete_items.delay(items, self.type_str)
+        delete_items.delay(items, self.type)
 
     def delete_all(self):
         """
@@ -282,12 +286,9 @@ class Command(VerboseCommand):
 
         Relies on the items still being in the database.
         """
-        qs = self.type.objects.filter(
-            date_created__gt=dt
-        ).values_list(
-            'pk',
-            flat=True,
-        )
+        model = apps.get_model(self.type)
+        qs = model.objects.filter(
+            date_created__gt=dt).order_by().values_list('pk', flat=True)
         count = qs.count()
         if proceed_with_deletion(self.stdout, count, self.noinput):
             self.stdout.write("Deleting all item(s) newer than %s\n" % dt)
@@ -314,15 +315,7 @@ class Command(VerboseCommand):
         in the index.
         """
         self.stdout.write("Adding or updating item(s): %s\n" % list(items))
-        # Use Celery to add or update the item asynchronously
-        if self.type == Opinion:
-            add_or_update_opinions.delay(items)
-        elif self.type == Audio:
-            add_or_update_audio_files.delay(items)
-        elif self.type == Person:
-            add_or_update_people.delay(items)
-        elif self.type == RECAPDocument:
-            add_or_update_recap_document.delay(items)
+        add_items_to_solr(items, self.type)
 
     @print_timing
     def add_or_update_by_datetime(self, dt):
@@ -330,10 +323,12 @@ class Command(VerboseCommand):
         Given a datetime, adds or updates all items newer than that time.
         """
         self.stdout.write("Adding or updating items(s) newer than %s\n" % dt)
-        qs = self.type.objects.filter(date_created__gte=dt)
-        items = queryset_generator(qs, chunksize=5000)
+        model = apps.get_model(self.type)
+        qs = model.objects.filter(
+            date_created__gte=dt).order_by().values_list('pk', flat=True)
         count = qs.count()
-        self.process_queryset(items, count)
+        qs = qs.iterator()
+        self.process_queryset(qs, count)
 
     @print_timing
     def add_or_update_all(self):
@@ -341,39 +336,26 @@ class Command(VerboseCommand):
         Iterates over the entire corpus, adding it to the index. Can be run on
         an empty index or an existing one.
 
-        If run on an existing index, existing items will be updated.
+        If run on an existing index, existing items will be updated, but no
+        items will be deleted.
         """
         self.stdout.write("Adding or updating all items...\n")
-        if self.type == Person:
-            q = self.type.objects.filter(
-                is_alias_of=None
-            ).prefetch_related(
-                'positions',
-                'positions__predecessor',
-                'positions__supervisor',
-                'positions__appointer',
-                'positions__court',
-                'political_affiliations',
-                'aba_ratings',
-                'educations__school',
-                'aliases',
-                'race',
-            )
+        model = apps.get_model(self.type)
+        if model == Person:
+            q = model.objects.filter(
+                is_alias_of=None).prefetch_related('positions')
             # Filter out non-judges -- they don't get searched.
-            q = [item for item in q if item.is_judge]
+            q = [item.pk for item in q if item.is_judge]
             count = len(q)
-        elif self.type == RECAPDocument:
-            q = self.type.objects.all()
+        elif model == Docket:
+            q = Docket.objects.filter(
+                source__in=Docket.RECAP_SOURCES).values_list('pk', flat=True)
             count = q.count()
-            q = queryset_generator(q, chunksize=5000)
-        elif self.type == Docket:
-            q = Docket.objects.filter(source__in=Docket.RECAP_SOURCES)
-            count = q.count()
-            q = queryset_generator(q, chunksize=5000)
+            q = q.iterator()
         else:
-            q = self.type.objects.all()
+            q = model.objects.values_list('pk', flat=True)
             count = q.count()
-            q = queryset_generator(q, chunksize=5000)
+            q = q.iterator()
         self.process_queryset(q, count)
 
     @print_timing
@@ -386,7 +368,7 @@ class Command(VerboseCommand):
     @print_timing
     def optimize_everything(self):
         """Run the optimize command on all indexes."""
-        urls = settings.SOLR_URLS.values()
+        urls = set(settings.SOLR_URLS.values())
         self.stdout.write("Found %s indexes. Optimizing...\n" % len(urls))
         for url in urls:
             self.stdout.write(" - {url}\n".format(url=url))

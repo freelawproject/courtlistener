@@ -2,7 +2,7 @@
 from datetime import date
 
 from django.core.management import call_command
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import TestCase, SimpleTestCase
 from lxml import etree
 from reporters_db import REPORTERS
@@ -13,7 +13,7 @@ from cl.citations.management.commands.cl_add_parallel_citations import \
     identify_parallel_citations, make_edge_list
 from cl.citations.match_citations import match_citation
 from cl.citations.reporter_tokenizer import tokenize
-from cl.citations.tasks import update_document, create_cited_html
+from cl.citations.tasks import find_citations_for_opinion_by_pks, create_cited_html
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 
@@ -296,8 +296,8 @@ class MatchingTest(IndexedSolrTestCase):
         """
         remove_citations_from_imported_fixtures()
 
-        citing = Opinion.objects.get(pk=3)
-        update_document(citing)  # Updates d1's citation count in a Celery task
+        # Updates d1's citation count in a Celery task
+        find_citations_for_opinion_by_pks.delay([3])
 
         cited = Opinion.objects.get(pk=2)
         expected_count = 1
@@ -414,6 +414,8 @@ class CitationCommandTest(IndexedSolrTestCase):
 
 
 class ParallelCitationTest(SimpleTestCase):
+    allow_database_queries = True
+
     def test_identifying_parallel_citations(self):
         """Given a string, can we identify parallel citations"""
         tests = (

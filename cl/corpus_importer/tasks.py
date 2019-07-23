@@ -58,7 +58,7 @@ from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
-from cl.search.tasks import add_or_update_recap_document
+from cl.search.tasks import add_items_to_solr
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ def generate_ia_json(d_pk, database='default'):
             )
         ),
     )
-    prefetch_related_objects([d], [
+    prefetch_related_objects([d], *[
         'parties__party_types__criminal_complaints',
         'parties__party_types__criminal_counts',
         attorney_prefetch
@@ -290,7 +290,7 @@ def process_free_opinion_result(self, row_pk, cnt):
                 logger.error(msg)
                 result.error_msg = msg
                 result.save()
-                self.request.callbacks = None
+                self.request.chain = None
                 return
             docket.blocked, docket.date_blocked = get_blocked_status(docket)
             mark_ia_upload_needed(docket)
@@ -356,7 +356,7 @@ def process_free_opinion_result(self, row_pk, cnt):
         logger.error(msg)
         result.error_msg = msg
         result.save()
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     if not rd_created and rd.is_available:
@@ -365,7 +365,7 @@ def process_free_opinion_result(self, row_pk, cnt):
         rd.is_free_on_pacer = True
         rd.save()
         result.delete()
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     return {'result': result, 'rd_pk': rd.pk,
@@ -614,7 +614,7 @@ def make_fjc_idb_lookup_params(item):
 
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
-          interval_step=10 * 60)
+          interval_step=10 * 60, ignore_results=True)
 def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
                                 cookies, case_name=None, office_number=None,
                                 docket_number_letters=None, extra_data=None):
@@ -663,7 +663,7 @@ def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
                        "query. Trying again if retries not exceeded: %s.%s",
                        court_id, docket_number)
         if self.request.retries == self.max_retries:
-            self.request.callbacks = None
+            self.request.chain = None
             return None
         raise self.retry(exc=exc)
 
@@ -697,7 +697,7 @@ def do_case_query_by_pacer_case_id(self, data, court_id, cookies,
     if data is None:
         logger.info("Empty data argument. Terminating "
                     "chains and exiting.")
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     pacer_case_id = data.get('pacer_case_id')
@@ -720,7 +720,7 @@ def do_case_query_by_pacer_case_id(self, data, court_id, cookies,
 
     if not docket_data:
         logger.info("No valid docket data for %s.%s", court_id, pacer_case_id)
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     # Merge the contents into CL.
@@ -771,7 +771,7 @@ def filter_docket_by_tags(self, data, tags, court_id):
     """
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     ds = Docket.objects.filter(
@@ -785,7 +785,7 @@ def filter_docket_by_tags(self, data, tags, court_id):
         logger.info("Found %s dockets that were already tagged for "
                     "pacer_case_id '%s', court_id '%s'. Aborting chain",
                     count, data['pacer_case_id'], court_id)
-        self.request.callbacks = None
+        self.request.chain = None
         return None
     return data
 
@@ -814,7 +814,7 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     s = PacerSession(cookies=cookies)
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     pacer_case_id = data.get('pacer_case_id')
@@ -845,7 +845,7 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
 
     if not docket_data:
         logger.info("No valid docket data for %s.%s", court_id, pacer_case_id)
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     # Merge the contents into CL.
@@ -854,6 +854,12 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
                                       docket_data['docket_number'])
         if count > 1:
             d = d.earliest('date_created')
+
+        # Ensure that we set the case ID. This is needed on dockets that have
+        # matching docket numbers, but that never got PACER data before. This
+        # was previously rare, but since we added the FJC data to the dockets
+        # table, this is now quite common.
+        d.pacer_case_id = pacer_case_id
 
     d.add_recap_source()
     update_docket_metadata(d, docket_data)
@@ -911,7 +917,7 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
     except requests.RequestException as e:
         logger.warning("Problem getting docket %s", logging_id)
         if self.request.retries == self.max_retries:
-            self.request.callbacks = None
+            self.request.chain = None
             return None
         raise self.retry(exc=e)
 
@@ -920,7 +926,7 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
 
     if docket_data == {}:
         logger.info("Unable to find docket: %s", logging_id)
-        self.request.callbacks = None
+        self.request.chain = None
         return None
 
     try:
@@ -988,7 +994,7 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if not rd.pacer_doc_id:
         # Some docket entries are just text/don't have a pacer_doc_id.
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     s = PacerSession(cookies=cookies)
@@ -1005,7 +1011,7 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
         else:
             msg = "Ran into unknown HTTPError. %s. Aborting."
             logger.error(msg, exc.response.status_code)
-            self.request.callbacks = None
+            self.request.chain = None
             return
     except requests.RequestException as exc:
         logger.warning("Unable to get attachment page for %s", rd)
@@ -1070,19 +1076,19 @@ def download_pacer_pdf_by_rd(self, rd_pk, pacer_case_id, pacer_doc_id,
             logger.warning("Ran into HTTPError while getting PDF: %s. "
                            "Retrying.", exc.response.status_code)
             if self.request.retries == self.max_retries:
-                self.request.callbacks = None
+                self.request.chain = None
                 return
             raise self.retry(exc)
         else:
             logger.error("Ran into unknown HTTPError while getting PDF: %s. "
                          "Aborting.", exc.response.status_code)
-            self.request.callbacks = None
+            self.request.chain = None
             return
     except requests.RequestException as exc:
         logger.warning("Unable to get PDF for %s in %s", pacer_doc_id,
                        pacer_case_id)
         if self.request.retries == self.max_retries:
-            self.request.callbacks = None
+            self.request.chain = None
             return
         raise self.retry(exc=exc)
     return r
@@ -1108,7 +1114,7 @@ def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
         msg = "Unable to get PDF for RECAP Document '%s' " \
               "at '%s' with doc id '%s'" % (rd_pk, court_id, pacer_doc_id)
         logger.error(msg)
-        self.request.callbacks = None
+        self.request.chain = None
         return False, msg
 
     file_name = get_document_filename(court_id, pacer_case_id, document_number,
@@ -1165,7 +1171,7 @@ def get_pacer_doc_by_rd(self, rd_pk, cookies, tag=None):
 
     if rd.is_available:
         add_tags(rd, tag)
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
@@ -1177,7 +1183,7 @@ def get_pacer_doc_by_rd(self, rd_pk, cookies, tag=None):
         rd.document_number, rd.attachment_number)
 
     if success is False:
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     add_tags(rd, tag)
@@ -1223,12 +1229,12 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
         else:
             msg = "Aborting. Did not find civil cover sheet for %s." % rd
             logger.error(msg)
-            self.request.callbacks = None
+            self.request.chain = None
             return
 
     if not att_found.get('pacer_doc_id'):
         logger.warn("No pacer_doc_id for document (is it sealed?)")
-        self.request.callbacks = None
+        self.request.chain = None
         return
 
     # Try to find the attachment already in the collection
@@ -1267,7 +1273,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
 
     # Skip OCR for now. It'll happen in a second step.
     extract_recap_pdf(rd.pk, skip_ocr=True)
-    add_or_update_recap_document([rd.pk])
+    add_items_to_solr([rd.pk], 'search.RECAPDocument')
 
 
 @app.task(bind=True, max_retries=15, interval_start=5,

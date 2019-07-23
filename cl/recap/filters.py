@@ -1,6 +1,6 @@
 from rest_framework_filters import FilterSet
 
-from cl.api.utils import DATETIME_LOOKUPS, BASIC_TEXT_LOOKUPS
+from cl.api.utils import DATETIME_LOOKUPS, BASIC_TEXT_LOOKUPS, DATE_LOOKUPS
 from cl.recap.models import ProcessingQueue, FjcIntegratedDatabase
 
 
@@ -25,7 +25,7 @@ class FjcIntegratedDatabaseFilter(FilterSet):
             'circuit': ['exact'],
             'district': ['exact'],
             'origin': ['exact', 'in'],
-            'date_filed': DATETIME_LOOKUPS,
+            'date_filed': DATE_LOOKUPS,
             'jurisdiction': ['exact', 'in'],
             'title': BASIC_TEXT_LOOKUPS,
             'section': BASIC_TEXT_LOOKUPS,

@@ -122,11 +122,13 @@ class ProcessingQueue(models.Model):
         Court,
         help_text="The court where the upload was from",
         related_name='recap_processing_queue',
+        on_delete=models.CASCADE,
     )
     uploader = models.ForeignKey(
         User,
         help_text="The user that uploaded the item to RECAP.",
         related_name='recap_processing_queue',
+        on_delete=models.CASCADE,
     )
     pacer_case_id = models.CharField(
         help_text="The cased ID provided by PACER.",
@@ -184,18 +186,21 @@ class ProcessingQueue(models.Model):
         Docket,
         help_text="The docket that was created or updated by this request.",
         null=True,
+        on_delete=models.CASCADE,
     )
     docket_entry = models.ForeignKey(
         DocketEntry,
         help_text="The docket entry that was created or updated by this "
                   "request, if applicable. Only applies to PDFs uploads.",
         null=True,
+        on_delete=models.CASCADE,
     )
     recap_document = models.ForeignKey(
         RECAPDocument,
         help_text="The document that was created or updated by this request, "
                   "if applicable. Only applies to PDFs uploads.",
         null=True,
+        on_delete=models.CASCADE,
     )
 
     def __unicode__(self):
@@ -454,6 +459,7 @@ class FjcIntegratedDatabase(models.Model):
         Court,
         help_text='Circuit in which the case was filed.',
         related_name='+',
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
@@ -461,6 +467,7 @@ class FjcIntegratedDatabase(models.Model):
         Court,
         help_text='District court in which the case was filed.',
         related_name="idb_cases",
+        on_delete=models.CASCADE,
         db_index=True,
         null=True,
         blank=True,

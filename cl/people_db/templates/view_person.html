@@ -119,7 +119,24 @@
                     {% endif %}
                 </h2>
                 <span class="small gray top">
-                    CourtListener ID: {{ person.cl_id }}{% if person.fjc_id %}, FJC ID: <a href="http://www.fjc.gov/servlet/nGetInfo?jid={{ person.fjc_id }}">{{ person.fjc_id }}</a>{% endif %}
+                    CourtListener ID: {{ person.cl_id }}
+                    {% if person.fjc_id %},  FJC ID:
+                        {% filter lower %}
+                        {% if person.name_middle %}
+                            {% if person.name_suffix %}
+                                <a href="http://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}-{{ person.name_middle }}-{{ person.name_suffix|cut:"." }}">{{ person.fjc_id }}</a>
+                            {% else %}
+                                <a href="http://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}-{{ person.name_middle }}">{{ person.fjc_id }}</a>
+                            {% endif %}
+                        {% else %}
+                            {% if person.name_suffix %}
+                                <a href="http://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}-{{ person.name_suffix|cut:"." }}">{{ person.fjc_id }}</a>
+                            {% else %}
+                                <a href="http://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}">{{ person.fjc_id }}</a>
+                            {% endif %}                  
+                        {% endif %}
+                        {% endfilter %} 
+                    {% endif %}
                 </span>
 
                 <div class="row v-offset-below-3">

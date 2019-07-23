@@ -19,7 +19,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='opinion',
             name='author',
-            field=models.ForeignKey(related_name='opinions_written', blank=True, to='people_db.Person', help_text=b'The primary author of this opinion as a normalized field', null=True),
+            field=models.ForeignKey(related_name='opinions_written', blank=True, to='people_db.Person', help_text=b'The primary author of this opinion as a normalized field', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='opinioncluster',

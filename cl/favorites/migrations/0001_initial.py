@@ -20,7 +20,8 @@ class Migration(migrations.Migration):
                 ('date_modified', models.DateTimeField(db_index=True, auto_now=True, null=True)),
                 ('name', models.CharField(max_length=100, verbose_name=b'a name for the alert')),
                 ('notes', models.TextField(blank=True, max_length=500, verbose_name=b'notes about the favorite', validators=[django.core.validators.MaxLengthValidator(500)])),
-                ('audio_id', models.ForeignKey(verbose_name=b'the audio file that is favorited', blank=True, to='audio.Audio', null=True)),
+                ('audio_id', models.ForeignKey(verbose_name=b'the audio file that is favorited', blank=True, to='audio.Audio', null=True,
+                                               on_delete=models.CASCADE)),
             ],
         ),
     ]

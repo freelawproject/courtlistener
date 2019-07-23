@@ -1,5 +1,7 @@
 from django.conf.urls import url
 
+from cl.search.views import advanced, show_results
+
 from cl.search.feeds import (
     JurisdictionFeed, AllJurisdictionsFeed, SearchFeed
 )
@@ -7,29 +9,19 @@ from cl.search.feeds import (
 urlpatterns = [
     # Search pages
     url(
-        r'^$',
-        'cl.search.views.show_results',
-        name='show_results',
+        r'^$', show_results, name='show_results',
     ),
     url(
-        r'^opinion/$',
-        'cl.search.views.advanced',
-        name='advanced_o',
+        r'^opinion/$', advanced, name='advanced_o',
     ),
     url(
-        r'^audio/$',
-        'cl.search.views.advanced',
-        name='advanced_oa',
+        r'^audio/$', advanced, name='advanced_oa',
     ),
     url(
-        r'^person/$',
-        'cl.search.views.advanced',
-        name='advanced_p',
+        r'^person/$', advanced, name='advanced_p',
     ),
     url(
-        r'^recap/$',
-        'cl.search.views.advanced',
-        name='advanced_r',
+        r'^recap/$', advanced, name='advanced_r',
     ),
 
     # Feeds & Podcasts

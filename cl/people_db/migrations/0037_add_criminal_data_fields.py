@@ -41,11 +41,13 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='criminalcount',
             name='party_type',
-            field=models.ForeignKey(related_name='criminal_counts', to='people_db.PartyType', help_text=b'The docket and party the counts are associated with.'),
+            field=models.ForeignKey(related_name='criminal_counts', to='people_db.PartyType', help_text=b'The docket and party the counts are associated with.',
+                                    on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='criminalcomplaint',
             name='party_type',
-            field=models.ForeignKey(related_name='criminal_complaints', to='people_db.PartyType', help_text=b'The docket and party the complaints are associated with.'),
+            field=models.ForeignKey(related_name='criminal_complaints', to='people_db.PartyType', help_text=b'The docket and party the complaints are associated with.',
+                                    on_delete=models.CASCADE),
         ),
     ]

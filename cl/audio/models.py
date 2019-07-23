@@ -1,6 +1,6 @@
 import json
 
-from django.core.urlresolvers import reverse, NoReverseMatch
+from django.urls import reverse, NoReverseMatch
 from django.db import models
 from django.template import loader
 
@@ -31,6 +31,7 @@ class Audio(models.Model):
         Docket,
         help_text="The docket that the oral argument is a part of",
         related_name="audio_files",
+        on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
@@ -182,12 +183,13 @@ class Audio(models.Model):
         bulk files and with Solr indexing.
 
         :param index: Should the item be added to the Solr index?
-        :param commit: Should a commit be performed after adding it?
+        :param force_commit: Should a commit be performed in solr after
+        indexing it?
         """
         super(Audio, self).save(*args, **kwargs)
         if index:
-            from cl.search.tasks import add_or_update_audio_files
-            add_or_update_audio_files([self.pk], force_commit)
+            from cl.search.tasks import add_items_to_solr
+            add_items_to_solr([self.pk], 'audio.Audio', force_commit)
 
     def delete(self, *args, **kwargs):
         """
@@ -196,7 +198,7 @@ class Audio(models.Model):
         id_cache = self.pk
         super(Audio, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], 'audio')
+        delete_items.delay([id_cache], 'audio.Audio')
 
     def as_search_dict(self):
         """Create a dict that can be ingested by Solr"""

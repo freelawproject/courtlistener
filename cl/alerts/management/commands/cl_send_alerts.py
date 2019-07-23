@@ -1,5 +1,6 @@
 import datetime
 import traceback
+import warnings
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -142,8 +143,14 @@ class Command(VerboseCommand):
                 main_params['fq'].append('id:(%s)' % ' OR '.join(
                     [str(i) for i in self.valid_ids[query_type]]
                 ))
-            results = self.connections[query_type].query().add_extra(
-                **main_params).execute()
+
+            # Ignore warnings from this bit of code. Otherwise, it complains
+            # about the query URL being too long and having to POST it instead
+            # of being able to GET it.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                results = self.connections[query_type].query().add_extra(
+                    **main_params).execute()
             regroup_snippets(results)
 
         logger.info("There were %s results." % len(results))

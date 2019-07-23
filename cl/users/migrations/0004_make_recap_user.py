@@ -23,10 +23,12 @@ def make_recap_user(apps, schema_editor):
         email_confirmed=True,
     )
 
-    # http://stackoverflow.com/a/31735043/64911 (this breaks in Django 1.10)
-    apps.models_module = True
-    create_permissions(apps, verbosity=0)
-    apps.models_module = None
+    # https://stackoverflow.com/a/41564061/64911
+    for app_config in apps.get_app_configs():
+        app_config.models_module = True
+        create_permissions(app_config, verbosity=0)
+        app_config.models_module = None
+
     p = Permission.objects.get(codename='has_recap_upload_access')
     recap_user.user_permissions.add(p)
     Token.objects.get_or_create(user_id=recap_user.id)
