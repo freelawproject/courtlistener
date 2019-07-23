@@ -1,32 +1,33 @@
-amqp==1.4.9
 ansible
 anyjson==0.3.3
 argparse==1.2.1
 astroid==1.3.6
 beautifulsoup4==4.4.1
-billiard==3.3.0.21
 cchardet==2.1.1
-celery==3.1.19
+# Before upgrading, note: https://github.com/celery/celery/issues/4878
+celery~=4.3.0
 certifi
 chardet==3.0.4
 coreapi==2.3.0
 coreschema==0.0.4
-cryptography
+# Unfortunately, higher versions emit an insane Python 2.7 error EVERYWHERE.
+# Once we have py3, we can upgrade: https://stackoverflow.com/q/51778764/64911
+cryptography==2.2.2
 datadiff==1.1.5
 defusedxml==0.5.0
 disposable-email-domains
-Django~=1.8.0
-django-cors-headers==1.1.0
+Django~=1.11.0
+django-cors-headers~=2.5
 django-debug-toolbar==1.3.2
 django-extensions==1.6.1
-django-filter==0.15.3
+django-filter==1.1
 django-localflavor==1.1
 django-mathfilters
 django-markdown-deux
-django-ratelimit
-django-redis-cache==1.6.5
+django-ratelimit~=2.0.0
+django-redis-cache~=2.0.0
 djangorestframework==3.6.2
-djangorestframework-filters==0.9.1
+djangorestframework-filters~=0.11.0
 django-rest-swagger==2.1.2
 djangorestframework-xml==1.3.0
 docutils==0.12
@@ -35,6 +36,7 @@ enum34==1.1.2
 eyeD3==0.7.11
 feedparser==5.2.1
 geonamescache==0.20
+gevent<1.3
 google-cloud-storage==1.6.0
 google-api-python-client==1.6.4
 hiredis==0.2.0
@@ -43,7 +45,6 @@ ipaddress==1.0.16
 ipython==3.2.0
 itypes==1.1.0
 juriscraper
-kombu==3.0.35
 logilab-common==0.63.2
 lxml==3.5.0
 Markdown~=2.6
@@ -66,8 +67,8 @@ PyPDF2==1.26.0
 python-dateutil==2.5.0
 python-igraph
 python-mimeparse==0.1.4
-pytz==2015.7
-redis==2.10.5
+pytz
+redis~=3.2.0
 requests==2.20.0
 reporters-db
 scorched==0.11.0

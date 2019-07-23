@@ -168,7 +168,6 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         )
         blocked_argument.click()
 
-
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertIn(BLOCKED_MSG, sidebar.text)

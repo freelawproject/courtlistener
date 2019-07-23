@@ -1,4 +1,4 @@
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 
 from cl.lib.test_helpers import IndexedSolrTestCase, SitemapTest
 from lxml import etree

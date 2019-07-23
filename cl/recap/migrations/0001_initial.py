@@ -29,8 +29,10 @@ class Migration(migrations.Migration):
                 ('status', models.SmallIntegerField(help_text=b'The current status of this upload.', choices=[(1, b'Awaiting processing in queue.'), (2, b'Item processed successfully.'), (3, b'Item encountered an error while processing.'), (4, b'Item is currently being processed.'), (5, b'Item failed processing, but will be retried.')])),
                 ('upload_type', models.SmallIntegerField(help_text=b'The type of object that is uploaded', choices=[(1, b'HTML Docket'), (2, b'HTML attachment page'), (3, b'PDF')])),
                 ('error_message', models.TextField(help_text=b'Any errors that occurred while processing an item', blank=True)),
-                ('court', models.ForeignKey(related_name='recap_processing_queue', to='search.Court', help_text=b'The court where the upload was from')),
-                ('uploader', models.ForeignKey(related_name='recap_processing_queue', to=settings.AUTH_USER_MODEL, help_text=b'The user that uploaded the item to RECAP.')),
+                ('court', models.ForeignKey(related_name='recap_processing_queue', to='search.Court', help_text=b'The court where the upload was from',
+                                            on_delete=models.CASCADE)),
+                ('uploader', models.ForeignKey(related_name='recap_processing_queue', to=settings.AUTH_USER_MODEL, help_text=b'The user that uploaded the item to RECAP.',
+                                               on_delete=models.CASCADE)),
             ],
             options={
                 'permissions': (('has_recap_upload_access', 'Can upload documents to RECAP.'),),

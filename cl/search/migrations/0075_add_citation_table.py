@@ -19,7 +19,8 @@ class Migration(migrations.Migration):
                 ('reporter', models.TextField(help_text=b'The abbreviation for the reporter', db_index=True)),
                 ('page', models.SmallIntegerField(help_text=b'The page of the citation in the reporter')),
                 ('type', models.SmallIntegerField(help_text=b'The type of citation that this is.', choices=[(1, b'A federal reporter citation'), (2, b'A citation in a state-based reporter'), (3, b'A citation in a regional reporter'), (4, b'A citation in a specialty reporter'), (5, b'A citation in an early SCOTUS reporter, like Wheat.'), (6, b'A citation in the Lexis system'), (7, b'A citation in the WestLaw system'), (8, b'A vendor neutral citation')])),
-                ('cluster', models.ForeignKey(related_name='citations', to='search.OpinionCluster', help_text=b'The cluster that the citation applies to')),
+                ('cluster', models.ForeignKey(related_name='citations', to='search.OpinionCluster', help_text=b'The cluster that the citation applies to',
+                                              on_delete=models.CASCADE)),
             ],
         ),
         migrations.AlterIndexTogether(

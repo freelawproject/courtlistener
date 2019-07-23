@@ -8,18 +8,22 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.db.models import Sum, Count
 from django.shortcuts import HttpResponseRedirect, render, get_object_or_404
 from django.utils.timezone import utc, make_aware
 from django.views.decorators.cache import never_cache
+from requests import RequestException
+from scorched.exc import SolrError
 
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
+from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     make_stats_variable, merge_form_with_courts, make_get_string, \
@@ -37,12 +41,83 @@ def check_pagination_depth(page_number):
     """Check if the pagination is too deep (indicating a crawler)"""
     max_search_pagination_depth = 100
     if page_number > max_search_pagination_depth:
-        return True
-    return False
+        logger.warning("Query depth of %s denied access (probably a "
+                       "crawler)", page_number)
+        raise PermissionDenied
 
 
-def do_search(request, rows=20, order_by=None, type=None, facet=True):
+def get_solr_result_objects(cd, facet):
+    """Note that this doesn't run the query yet. Not until the
+    pagination is run.
+    """
+    search_type = cd['type']
+    if search_type == 'o':
+        si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        results = si.query().add_extra(**build_main_query(cd, facet=facet))
+    elif search_type == 'r':
+        si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
+        results = si.query().add_extra(**build_main_query(cd, facet=facet))
+    elif search_type == 'oa':
+        si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
+        results = si.query().add_extra(**build_main_query(cd, facet=facet))
+    elif search_type == 'p':
+        si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
+        results = si.query().add_extra(**build_main_query(cd, facet=facet))
+    else:
+        raise NotImplementedError("Unknown search type: %s" % search_type)
 
+    return results
+
+
+def paginate_cached_solr_results(request, cd, results, rows, cache_key):
+    # Run the query and set up pagination
+    if cache_key is not None:
+        paged_results = cache.get(cache_key)
+        if paged_results is not None:
+            return paged_results
+
+    page = int(request.GET.get('page', 1))
+    check_pagination_depth(page)
+
+    if cd['type'] == 'r':
+        rows = 10
+
+    paginator = Paginator(results, rows)
+    try:
+        paged_results = paginator.page(page)
+    except PageNotAnInteger:
+        paged_results = paginator.page(1)
+    except EmptyPage:
+        # Page is out of range (e.g. 9999), deliver last page.
+        paged_results = paginator.page(paginator.num_pages)
+
+    # Post processing of the results
+    regroup_snippets(paged_results)
+
+    if cache_key is not None:
+        six_hours = 60 * 60 * 6
+        cache.set(cache_key, paged_results, six_hours)
+
+    return paged_results
+
+
+def do_search(request, rows=20, order_by=None, type=None, facet=True,
+              cache_key=None):
+    """Do all the difficult solr work.
+
+    :param request: The request made by the user
+    :param rows: The number of solr results to request
+    :param order_by: An opportunity to override the ordering of the search
+    results
+    :param type: An opportunity to override the type
+    :param facet: Whether to complete faceting in the query
+    :param cache_key: A cache key with which to save the results. Note that it
+    does not do anything clever with the actual query, so if you use this, your
+    cache key should *already* have factored in the query. If None, no caching
+    is set or used. Results are saved for six hours.
+    :return A big dict of variables for use in the search results, homepage, or
+    other location.
+    """
     query_citation = None
     error = False
     paged_results = None
@@ -56,74 +131,46 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True):
             cd['order_by'] = order_by
         if type is not None:
             cd['type'] = type
-        search_form = _clean_form(request, cd, courts)
 
+        # Do the query, hitting the cache if desired
+        # noinspection PyBroadException
+        try:
+            results = get_solr_result_objects(cd, facet)
+            paged_results = paginate_cached_solr_results(request, cd, results,
+                                                         rows, cache_key)
+        except (NotImplementedError, RequestException, SolrError) as e:
+            error = True
+            logger.warning("Error loading search page with "
+                           "request: %s" % request.GET)
+            logger.warning("Error was: %s" % e)
+            if settings.DEBUG is True:
+                traceback.print_exc()
+
+        # A couple special variables for particular search types
+        search_form = _clean_form(request, cd, courts)
         if cd['type'] == 'o':
-            si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
-            results = si.query().add_extra(**build_main_query(cd, facet=facet))
             query_citation = get_query_citation(cd)
         elif cd['type'] == 'r':
-            si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-            results = si.query().add_extra(**build_main_query(cd, facet=facet))
-            courts = courts.filter(
-                pacer_court_id__isnull=False,
-                end_date__isnull=True,
-            ).exclude(
-                jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL,
-            )
-        elif cd['type'] == 'oa':
-            si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r')
-            results = si.query().add_extra(**build_main_query(cd, facet=facet))
-        elif cd['type'] == 'p':
-            si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
-            results = si.query().add_extra(**build_main_query(cd, facet=facet))
-
-        # Run the query and set up pagination
-        page = int(request.GET.get('page', 1))
-        too_deep = check_pagination_depth(page)
-        if too_deep:
-            logger.warning("Query depth of %s denied access (probably a "
-                           "crawler)", page)
-            error = True
-        else:
-            try:
-                if cd['type'] == 'r':
-                    rows = 10
-                paginator = Paginator(results, rows)
-                try:
-                    paged_results = paginator.page(page)
-                except PageNotAnInteger:
-                    paged_results = paginator.page(1)
-                except EmptyPage:
-                    # Page is out of range (e.g. 9999), deliver last page.
-                    paged_results = paginator.page(paginator.num_pages)
-            except Exception as e:
-                # Catches any Solr errors, and aborts.
-                logger.warning("Error loading pagination on search page with "
-                               "request: %s" % request.GET)
-                logger.warning("Error was: %s" % e)
-                if settings.DEBUG is True:
-                    traceback.print_exc()
-                error = True
-
-        # Post processing of the results
-        regroup_snippets(paged_results)
-
+            panels = Court.FEDERAL_BANKRUPTCY_PANEL
+            courts = (courts.filter(pacer_court_id__isnull=False,
+                                    end_date__isnull=True)
+                            .exclude(jurisdiction=panels))
     else:
         error = True
 
-    courts, court_count_human, court_count = merge_form_with_courts(courts,
-                                                                    search_form)
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts, search_form)
     search_summary_str = search_form.as_text(court_count, court_count_human)
+
     return {
         'results': paged_results,
+        'facet_fields': make_stats_variable(search_form, paged_results),
         'search_form': search_form,
         'search_summary_str': search_summary_str,
         'courts': courts,
         'court_count_human': court_count_human,
         'court_count': court_count,
         'query_citation': query_citation,
-        'facet_fields': make_stats_variable(search_form, paged_results),
         'error': error,
     }
 
@@ -196,6 +243,7 @@ def get_homepage_stats():
 
 
 @never_cache
+@ratelimit_if_not_whitelisted
 def show_results(request):
     """
     This view can vary significantly, depending on how it is called:
@@ -270,34 +318,29 @@ def show_results(request):
             request.GET = request.GET.copy()  # Makes it mutable
             request.GET['filed_before'] = date.today()
 
-            homepage_cache_key = 'homepage-data'
-            homepage_dict = cache.get(homepage_cache_key)
-            if homepage_dict is not None:
-                return render(request, 'homepage.html', homepage_dict)
-
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
-            render_dict.update(do_search(request, rows=5,
-                                         order_by='dateFiled desc',
-                                         facet=False))
+            render_dict.update(do_search(
+                request, rows=5, order_by='dateFiled desc', facet=False,
+                cache_key='homepage-data-o'))
             # Get the results from the oral arguments as well
-            oa_dict = do_search(request, rows=5, order_by='dateArgued desc',
-                                type='oa', facet=False)
-            render_dict.update({'results_oa': oa_dict['results']})
+            render_dict.update({'results_oa': do_search(
+                request, rows=5, order_by='dateArgued desc', type='oa',
+                facet=False, cache_key='homepage-data-oa')['results']})
+
             # But give it a fresh form for the advanced search section
             render_dict.update({'search_form': SearchForm(request.GET)})
 
             # Get a bunch of stats.
-            render_dict.update(get_homepage_stats())
+            stats = get_homepage_stats()
+            render_dict.update(stats)
 
-            six_hours = 60 * 60 * 6
-            cache.set(homepage_cache_key, render_dict, six_hours)
             return render(request, 'homepage.html', render_dict)
         else:
             # User placed a search or is trying to edit an alert
             if request.GET.get('edit_alert'):
                 # They're editing an alert
-                if request.user.is_anonymous():
+                if request.user.is_anonymous:
                     return HttpResponseRedirect(
                         "{path}?next={next}{encoded_params}".format(
                             path=reverse('sign-in'),
@@ -342,13 +385,9 @@ def advanced(request):
     if request.path == reverse('advanced_o'):
         obj_type = 'o'
         # Needed b/c of facet values.
-        o_cache_key = 'opinion-homepage-results'
-        o_results = cache.get(o_cache_key)
-        if o_results is None:
-            o_results = do_search(request, rows=1, type=obj_type, facet=True)
-            six_hours = 60 * 60 * 6
-            cache.set(o_cache_key, o_results, six_hours)
 
+        o_results = do_search(request, rows=1, type=obj_type, facet=True,
+                              cache_key='opinion-homepage-results')
         render_dict.update(o_results)
         render_dict['search_form'] = SearchForm({'type': obj_type})
         return render(request, 'advanced.html', render_dict)

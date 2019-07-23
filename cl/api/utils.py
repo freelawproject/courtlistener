@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.mail import send_mail
+from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_text
 from django.utils.timezone import now
@@ -188,7 +189,7 @@ class LoggingMixin(object):
     def _log_request(self, request):
         d = date.today().isoformat()
         user = request.user
-        endpoint = request.resolver_match.url_name
+        endpoint = resolve(request.path_info).url_name
         response_ms = self._get_response_ms()
 
         r = redis.StrictRedis(
@@ -206,20 +207,21 @@ class LoggingMixin(object):
 
         # Use a sorted set to store the user stats, with the score representing
         # the number of queries the user made total or on a given day.
-        pipe.zincrby('api:v3.user.counts', user.pk)
-        pipe.zincrby('api:v3.user.d:%s.counts' % d, user.pk)
+        user_pk = user.pk or 'AnonymousUser'
+        pipe.zincrby('api:v3.user.counts', 1, user_pk)
+        pipe.zincrby('api:v3.user.d:%s.counts' % d, 1, user_pk)
 
         # Use a sorted set to store all the endpoints with score representing
         # the number of queries the endpoint received total or on a given day.
-        pipe.zincrby('api:v3.endpoint.counts', endpoint)
-        pipe.zincrby('api:v3.endpoint.d:%s.counts' % d, endpoint)
+        pipe.zincrby('api:v3.endpoint.counts', 1, endpoint)
+        pipe.zincrby('api:v3.endpoint.d:%s.counts' % d, 1, endpoint)
 
         # We create a per-day key in redis for timings. Inside the key we have
         # members for every endpoint, with score of the total time. So to get
         # the average for an endpoint you need to get the number of requests
         # and the total time for the endpoint and divide.
         timing_key = 'api:v3.endpoint.d:%s.timings' % d
-        pipe.zincrby(timing_key, endpoint, response_ms)
+        pipe.zincrby(timing_key, response_ms, endpoint)
 
         results = pipe.execute()
         return results
@@ -231,7 +233,7 @@ class LoggingMixin(object):
         if total_count in MILESTONES_FLAT:
             Event.objects.create(description="API has logged %s total requests."
                                              % total_count)
-        if user.is_authenticated():
+        if user.is_authenticated:
             if user_count in self.milestones:
                 Event.objects.create(
                     description="User '%s' has placed their %s API request." %

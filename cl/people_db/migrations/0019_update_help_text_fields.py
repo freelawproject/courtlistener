@@ -15,7 +15,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='abarating',
             name='person',
-            field=models.ForeignKey(related_name='aba_ratings', blank=True, to='people_db.Person', help_text=b'The person rated by the American Bar Association', null=True),
+            field=models.ForeignKey(related_name='aba_ratings', blank=True, to='people_db.Person', help_text=b'The person rated by the American Bar Association', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='abarating',
@@ -25,12 +26,14 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='education',
             name='person',
-            field=models.ForeignKey(related_name='educations', blank=True, to='people_db.Person', help_text=b'The person that completed this education', null=True),
+            field=models.ForeignKey(related_name='educations', blank=True, to='people_db.Person', help_text=b'The person that completed this education', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='education',
             name='school',
-            field=models.ForeignKey(related_name='educations', to='people_db.School', help_text=b'The school where this education was compeleted'),
+            field=models.ForeignKey(related_name='educations', to='people_db.School', help_text=b'The school where this education was compeleted',
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='person',
@@ -70,7 +73,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='person',
             name='is_alias_of',
-            field=models.ForeignKey(related_name='aliases', blank=True, to='people_db.Person', help_text=b'Any nicknames or other aliases that a person has. For example, William Jefferson Clinton has an alias to Bill', null=True),
+            field=models.ForeignKey(related_name='aliases', blank=True, to='people_db.Person', help_text=b'Any nicknames or other aliases that a person has. For example, William Jefferson Clinton has an alias to Bill', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='person',
@@ -120,7 +124,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='politicalaffiliation',
             name='person',
-            field=models.ForeignKey(related_name='political_affiliations', blank=True, to='people_db.Person', help_text=b'The person with the political affiliation', null=True),
+            field=models.ForeignKey(related_name='political_affiliations', blank=True, to='people_db.Person', help_text=b'The person with the political affiliation', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='politicalaffiliation',
@@ -135,12 +140,14 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='position',
             name='appointer',
-            field=models.ForeignKey(related_name='appointed_positions', blank=True, to='people_db.Position', help_text=b'If this is an appointed position, the person-position responsible for the appointment. This field references other positions instead of referencing people because that allows you to know the position a person held when an appointment was made.', null=True),
+            field=models.ForeignKey(related_name='appointed_positions', blank=True, to='people_db.Position', help_text=b'If this is an appointed position, the person-position responsible for the appointment. This field references other positions instead of referencing people because that allows you to know the position a person held when an appointment was made.', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='position',
             name='court',
-            field=models.ForeignKey(related_name='court_positions', blank=True, to='search.Court', help_text=b'If this was a judicial position, this is the jurisdiction where it was held.', null=True),
+            field=models.ForeignKey(related_name='court_positions', blank=True, to='search.Court', help_text=b'If this was a judicial position, this is the jurisdiction where it was held.', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='position',
@@ -170,7 +177,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='position',
             name='person',
-            field=models.ForeignKey(related_name='positions', blank=True, to='people_db.Person', help_text=b'The person that held the position.', null=True),
+            field=models.ForeignKey(related_name='positions', blank=True, to='people_db.Person', help_text=b'The person that held the position.', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='position',
@@ -180,12 +188,14 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='position',
             name='predecessor',
-            field=models.ForeignKey(blank=True, to='people_db.Person', help_text=b'The person that previously held this position', null=True),
+            field=models.ForeignKey(blank=True, to='people_db.Person', help_text=b'The person that previously held this position', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='position',
             name='school',
-            field=models.ForeignKey(blank=True, to='people_db.School', help_text=b'If this was an academic job, this is the school where the person worked.', null=True),
+            field=models.ForeignKey(blank=True, to='people_db.School', help_text=b'If this was an academic job, this is the school where the person worked.', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='position',
@@ -230,7 +240,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='retentionevent',
             name='position',
-            field=models.ForeignKey(related_name='retention_events', blank=True, to='people_db.Position', help_text=b'The position that was retained by this event.', null=True),
+            field=models.ForeignKey(related_name='retention_events', blank=True, to='people_db.Position', help_text=b'The position that was retained by this event.', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='retentionevent',
@@ -270,7 +281,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='school',
             name='is_alias_of',
-            field=models.ForeignKey(blank=True, to='people_db.School', help_text=b'Any alternate names that a school may have', null=True),
+            field=models.ForeignKey(blank=True, to='people_db.School', help_text=b'Any alternate names that a school may have', null=True,
+                                    on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='school',

@@ -224,7 +224,7 @@ class Command(VerboseCommand):
         if options['update_solr']:
             call_command(
                 'cl_update_index',
-                '--type', 'opinions',
+                '--type', 'search.Opinion',
                 '--solr-url', settings.SOLR_OPINION_URL,
                 '--noinput',
                 '--update',

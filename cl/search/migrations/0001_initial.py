@@ -53,7 +53,8 @@ class Migration(migrations.Migration):
                 ('docket_number', models.CharField(help_text=b'The docket numbers of a case, can be consolidated and quite long', max_length=5000, null=True, blank=True)),
                 ('date_blocked', models.DateField(help_text=b'The date that this opinion was blocked from indexing by search engines', null=True, db_index=True, blank=True)),
                 ('blocked', models.BooleanField(default=False, help_text=b'Whether a document should be blocked from indexing by search engines', db_index=True)),
-                ('court', models.ForeignKey(related_name='dockets', to='search.Court', help_text=b'The court where the docket was filed')),
+                ('court', models.ForeignKey(related_name='dockets', to='search.Court', help_text=b'The court where the docket was filed',
+                                            on_delete=models.CASCADE)),
             ],
         ),
         migrations.CreateModel(
@@ -72,7 +73,8 @@ class Migration(migrations.Migration):
                 ('html_columbia', models.TextField(help_text=b'HTML of Columbia archive', null=True, blank=True)),
                 ('html_with_citations', models.TextField(help_text=b'HTML of the document with citation links and other post-processed markup added', blank=True)),
                 ('extracted_by_ocr', models.BooleanField(default=False, help_text=b'Whether OCR was used to get this document content', db_index=True)),
-                ('author', models.ForeignKey(related_name='opinions_written', blank=True, to='people_db.Person', help_text=b'The primary author of this opinion', null=True)),
+                ('author', models.ForeignKey(related_name='opinions_written', blank=True, to='people_db.Person', help_text=b'The primary author of this opinion', null=True,
+                                             on_delete=models.CASCADE)),
             ],
         ),
         migrations.CreateModel(
@@ -115,7 +117,8 @@ class Migration(migrations.Migration):
                 ('precedential_status', models.CharField(blank=True, help_text=b'The precedential status of document, one of: Published, Unpublished, Errata, Memorandum Decision, Per Curiam Opinion, Separate, Signed Opinion, In-chambers, Relating-to, Unknown', max_length=50, db_index=True, choices=[(b'Published', b'Precedential'), (b'Unpublished', b'Non-Precedential'), (b'Errata', b'Errata'), (b'Memorandum Decision', b'Memorandum Decision'), (b'Per Curiam Opinion', b'Per Curiam Opinion'), (b'Separate', b'Separate Opinion'), (b'Signed Opinion', b'Signed Opinion'), (b'In-chambers', b'In-chambers'), (b'Relating-to', b'Relating-to orders'), (b'Unknown', b'Unknown Status')])),
                 ('date_blocked', models.DateField(help_text=b'The date that this opinion was blocked from indexing by search engines', null=True, db_index=True, blank=True)),
                 ('blocked', models.BooleanField(default=False, help_text=b'Whether a document should be blocked from indexing by search engines', db_index=True)),
-                ('docket', models.ForeignKey(related_name='clusters', to='search.Docket', help_text=b'The docket that the opinion cluster is a part of')),
+                ('docket', models.ForeignKey(related_name='clusters', to='search.Docket', help_text=b'The docket that the opinion cluster is a part of',
+                                             on_delete=models.CASCADE)),
                 ('non_participating_judges', models.ManyToManyField(help_text=b'The judges that heard the case, but did not participate in the opinion', related_name='opinion_clusters_non_participating_judges', to='people_db.Person', blank=True)),
                 ('panel', models.ManyToManyField(help_text=b'The judges that heard the oral arguments', related_name='opinion_clusters_participating_judges', to='people_db.Person', blank=True)),
             ],
@@ -124,8 +127,10 @@ class Migration(migrations.Migration):
             name='OpinionsCited',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('cited_opinion', models.ForeignKey(related_name='citing_opinions', to='search.Opinion')),
-                ('citing_opinion', models.ForeignKey(related_name='cited_opinions', to='search.Opinion')),
+                ('cited_opinion', models.ForeignKey(related_name='citing_opinions', to='search.Opinion',
+                                                    on_delete=models.CASCADE)),
+                ('citing_opinion', models.ForeignKey(related_name='cited_opinions', to='search.Opinion',
+                                                     on_delete=models.CASCADE)),
             ],
             options={
                 'verbose_name_plural': 'Opinions cited',
@@ -134,7 +139,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='opinion',
             name='cluster',
-            field=models.ForeignKey(related_name='sub_opinions', to='search.OpinionCluster', help_text=b'The cluster that the opinion is a part of'),
+            field=models.ForeignKey(related_name='sub_opinions', to='search.OpinionCluster', help_text=b'The cluster that the opinion is a part of',
+                                    on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='opinion',

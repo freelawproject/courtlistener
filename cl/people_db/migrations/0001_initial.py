@@ -101,7 +101,8 @@ class Migration(migrations.Migration):
                 ('votes_no', models.PositiveSmallIntegerField(null=True, blank=True)),
                 ('how_selected', models.CharField(blank=True, max_length=20, choices=[(b'e_part', b'Partisan Election'), (b'e_non_part', b'Non-Partisan Election'), (b'a_pres', b'Appointment (President)'), (b'a_gov', b'Appointment (Governor)'), (b'a_legis', b'Appointment (Legislature)')])),
                 ('termination_reason', models.CharField(blank=True, max_length=25, choices=[(b'ded', b'Death'), (b'retire_vol', b'Voluntary Retirement'), (b'retire_mand', b'Mandatory Retirement'), (b'resign', b'Resigned'), (b'other_pos', b'Appointed to Other Judgeship'), (b'lost', b'Lost Election'), (b'abolished', b'Court Abolished'), (b'bad_judge', b'Impeached and Convicted'), (b'recess_not_confirmed', b'Recess Appointment Not Confirmed')])),
-                ('appointer', models.ForeignKey(related_name='appointed_positions', blank=True, to='people_db.Person', help_text=b'If this is an appointed position, the person responsible for the appointing.', null=True)),
+                ('appointer', models.ForeignKey(related_name='appointed_positions', blank=True, to='people_db.Person', help_text=b'If this is an appointed position, the person responsible for the appointing.', null=True,
+                                                on_delete=models.CASCADE)),
             ],
         ),
         migrations.CreateModel(
@@ -123,7 +124,8 @@ class Migration(migrations.Migration):
                 ('votes_no', models.PositiveSmallIntegerField(null=True, blank=True)),
                 ('unopposed', models.NullBooleanField()),
                 ('won', models.NullBooleanField()),
-                ('position', models.ForeignKey(related_name='retention_events', blank=True, to='people_db.Position', null=True)),
+                ('position', models.ForeignKey(related_name='retention_events', blank=True, to='people_db.Position', null=True,
+                                               on_delete=models.CASCADE)),
             ],
         ),
         migrations.CreateModel(
@@ -134,7 +136,8 @@ class Migration(migrations.Migration):
                 ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified', auto_now=True, db_index=True)),
                 ('name', models.CharField(max_length=120, db_index=True)),
                 ('ein', models.IntegerField(help_text=b'The EIN assigned by the IRS', null=True, db_index=True, blank=True)),
-                ('is_alias_of', models.ForeignKey(blank=True, to='people_db.School', null=True)),
+                ('is_alias_of', models.ForeignKey(blank=True, to='people_db.School', null=True,
+                                                  on_delete=models.CASCADE)),
             ],
         ),
         migrations.CreateModel(
@@ -146,7 +149,8 @@ class Migration(migrations.Migration):
                 ('url', models.URLField(help_text=b'The URL where this data was gathered.', max_length=2000, blank=True)),
                 ('date_accessed', models.DateField(help_text=b'The date the data was gathered.', null=True, blank=True)),
                 ('notes', models.TextField(help_text=b"Any additional notes about the data's provenance, in Markdown format.", blank=True)),
-                ('person', models.ForeignKey(related_name='sources', blank=True, to='people_db.Person', null=True)),
+                ('person', models.ForeignKey(related_name='sources', blank=True, to='people_db.Person', null=True,
+                                             on_delete=models.CASCADE)),
             ],
         ),
     ]

@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import LiveServerTestCase, Client, TestCase
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
@@ -126,7 +126,8 @@ class DisposableEmailTest(TestCase):
 
     def test_can_i_change_to_bad_email_address(self):
         """Is an error thrown if we try to change to a bad email address?"""
-        self.client.login(username="pandora", password="password")
+        self.assertTrue(self.client.login(
+            username="pandora", password="password"))
         r = self.client.post(reverse('view_settings'), {
             'email': self.bad_email,
         }, follow=True)
