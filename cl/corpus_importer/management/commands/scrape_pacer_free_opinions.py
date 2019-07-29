@@ -128,14 +128,14 @@ def get_and_save_free_document_reports(options):
                              pacer_court_id, next_start_d, next_end_d)
                 mark_court_done_on_date(PACERFreeDocumentLog.SCRAPE_FAILED,
                                         pacer_court_id, next_end_d)
-                continue
+                break
             except IndexError:
                 logger.error("Failed to get document references for %s "
                              "between %s and %s due to PACER 6.3 bug.",
                              pacer_court_id, next_start_d, next_end_d)
                 mark_court_done_on_date(PACERFreeDocumentLog.SCRAPE_FAILED,
                                         pacer_court_id, next_end_d)
-                continue
+                break
             else:
                 result = mark_court_done_on_date(status, pacer_court_id,
                                                  next_end_d)
