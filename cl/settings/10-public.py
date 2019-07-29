@@ -159,6 +159,11 @@ SOLR_TEST_URLS = {
     'search.OpinionCluster': SOLR_OPINION_TEST_URL,
 
 }
+SOLR_EXAMPLE_CORE_PATH = os.path.join(os.sep, 'usr', 'local', 'solr',
+                                      'example', 'solr', 'collection1')
+SOLR_TEMP_CORE_PATH_LOCAL = os.path.join(os.sep, 'tmp', 'solr')
+SOLR_TEMP_CORE_PATH_DOCKER = os.path.join(os.sep, 'tmp', 'solr')
+
 
 #########
 # Redis #
