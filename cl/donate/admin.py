@@ -44,10 +44,12 @@ class MonthlyDonationAdmin(admin.ModelAdmin):
         'enabled',
         'monthly_donation_amount',
         'failure_count',
+        'monthly_donation_day',
     )
     list_filter = (
         'enabled',
         'failure_count',
+        'monthly_donation_day',
     )
     raw_id_fields = (
         'donor',
