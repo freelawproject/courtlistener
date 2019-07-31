@@ -298,6 +298,9 @@ REST_FRAMEWORK = {
     },
     'OVERRIDE_THROTTLE_RATES': {
         # Throttling down.
+        # Doing a background check service, we told them we didn't want to work
+        # with them.
+        'elios': '10/hour',
         'shreyngd': '100/hour',
         'leo': '100/hour',
         'miffy': '100/hour',
