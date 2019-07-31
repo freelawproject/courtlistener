@@ -10,31 +10,40 @@ from django.conf import settings
 from cl.lib.sunburnt import SolrError
 
 
-def create_temp_solr_core(core_name, schema_path, delete_if_present=True,
+def create_temp_solr_core(core_name, core_source_path, schema_path,
+                          delete_if_present=True,
                           url=settings.SOLR_HOST):
-    """ Create a new core by copying collection1 and updating it """
-    core_path = os.path.join(os.sep, 'tmp', 'solr', core_name)
-    if delete_if_present and os.path.exists(core_path):
-        print(u"Core at %s already exists! Deleting it." % core_path)
+    """ Create a new core by copying core from `core_source_path` and updating it """
+
+    # Path on testing machine
+    core_path_local = os.path.join(settings.SOLR_TEMP_CORE_PATH_LOCAL, core_name)
+
+    # Path on Solr machine
+    core_path_docker = os.path.join(settings.SOLR_TEMP_CORE_PATH_DOCKER, core_name)
+
+    if delete_if_present and os.path.exists(core_path_local):
+        print(u"Core at %s already exists! Deleting it." % core_path_local)
         delete_solr_core(core_name)
 
-    # Copy collection1 directory to core_name directory
+    # Copy core from source directory to core_name directory
     shutil.copytree(
-        os.path.join(os.sep, 'usr', 'local', 'solr', 'example', 'solr', 'collection1'),
-        core_path,
+        core_source_path,
+        core_path_local,
         symlinks=True,
     )
 
     # Delete the properties file. It'll get created by the GET request.
-    os.unlink(os.path.join(core_path, 'core.properties'))
+    if os.path.exists(os.path.join(core_path_local, 'core.properties')):
+        os.unlink(os.path.join(core_path_local, 'core.properties'))
 
-    # Update the symlinks for the schema.xml file (the other symlinks, like
-    # those for the synonyms and protwords files will already be copied).
-    schema_destination = os.path.join(core_path, 'conf', 'schema.xml')
-    os.unlink(schema_destination)
-    os.symlink(
-        schema_path,
-        schema_destination,
+    # Copy the schema.xml file (syslinks won't work with Docker).
+    schema_destination = os.path.join(core_path_local, 'conf', 'schema.xml')
+    if os.path.exists(schema_destination):
+        os.unlink(schema_destination)
+
+    shutil.copyfile(
+        os.path.abspath(schema_path),
+        schema_destination
     )
 
     # Inform Solr of the core.
@@ -42,7 +51,7 @@ def create_temp_solr_core(core_name, schema_path, delete_if_present=True,
         'wt': 'json',
         'action': 'CREATE',
         'name': core_name,
-        'instanceDir': core_path,
+        'instanceDir': core_path_docker,
         # This is supposedly optional, but didn't work without it:
         'dataDir': 'data',
     }

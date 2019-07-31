@@ -159,6 +159,18 @@ SOLR_TEST_URLS = {
     'search.OpinionCluster': SOLR_OPINION_TEST_URL,
 
 }
+
+SOLR_EXAMPLE_CORE_PATH_OPINION = os.path.join(os.sep, 'usr', 'local', 'solr',
+                                      'example', 'solr', 'collection1')
+SOLR_EXAMPLE_CORE_PATH_PERSON = os.path.join(os.sep, 'usr', 'local', 'solr',
+                                      'example', 'solr', 'person')
+SOLR_EXAMPLE_CORE_PATH_AUDIO = os.path.join(os.sep, 'usr', 'local', 'solr',
+                                      'example', 'solr', 'audio')
+SOLR_EXAMPLE_CORE_PATH_RECAP = os.path.join(os.sep, 'usr', 'local', 'solr',
+                                      'example', 'solr', 'recap')
+SOLR_TEMP_CORE_PATH_LOCAL = os.path.join(os.sep, 'tmp', 'solr')
+SOLR_TEMP_CORE_PATH_DOCKER = os.path.join(os.sep, 'tmp', 'solr')
+
 SOLR_OPINION_HL_FIELDS = [
     'caseName',
     'citation',
@@ -547,3 +559,10 @@ if DEVELOPMENT:
         'level': 'DEBUG',
         'propagate': False,
     }
+
+###################
+# Related content #
+###################
+
+RELATED_COUNT = 5
+RELATED_USE_CACHE = True

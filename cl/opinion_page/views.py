@@ -1,5 +1,6 @@
 from collections import defaultdict, OrderedDict
 from itertools import groupby
+from urllib import urlencode
 
 from django.conf import settings
 from django.core.cache import cache
@@ -294,13 +295,14 @@ def view_opinion(request, pk, _):
         }
         citing_clusters = conn.raw_query(**q).execute()
 
-        # Get recommendations with MoreLikeThis query (cached)
+        # Get recommendations with MoreLikeThis query (use cache if enabled)
         mlt_cache_key = 'opinion-mlt%s' % pk
-        related_items = cache.get(mlt_cache_key)
+        related_items = cache.get(mlt_cache_key) if settings.RELATED_USE_CACHE else None
 
         if related_items is None:
+            # Cache is empty
             mlt_query = conn.query(id=pk)\
-                .mlt('text', count=5)\
+                .mlt('text', count=settings.RELATED_COUNT)\
                 .field_limit(fields=['id', 'caseName', 'absolute_url'])
             related_items = mlt_query.execute().more_like_this.docs
 
@@ -321,6 +323,15 @@ def view_opinion(request, pk, _):
         'related_algorithm': 'mlt',
         'related_items': related_items,
         'related_item_ids': [item['id'] for item in related_items],
+        'related_search_params': '&' + urlencode({
+            'stat_Precedential': 'on',
+            'stat_Non-Precedential': 'on',
+            'stat_Errata': 'on',
+            'stat_Separate Opinion': 'on',
+            'stat_In-chambers': 'on',
+            'stat_Relating-to orders': 'on',
+            'stat_Unknown Status': 'on',
+        })
     })
 
 
