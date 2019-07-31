@@ -149,6 +149,11 @@ class RECAPDocumentInline(admin.StackedInline):
         'date_modified',
     )
 
+    # Essential so that we remove sealed content from Solr when updating it via
+    # admin interface.
+    def save_model(self, request, obj, form, change):
+        obj.save(index=True)
+
 
 @admin.register(DocketEntry)
 class DocketEntryAdmin(admin.ModelAdmin):
