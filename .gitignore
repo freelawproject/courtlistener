@@ -8,7 +8,7 @@
 # Downloaded and generated assets
 cl/assets/media/doc/
 cl/assets/media/bulk-data/
-cl/assets/media/financial-disclosures/thumbnails/
+cl/assets/media/financial-disclosures/
 cl/assets/media/html/
 cl/assets/media/mp3/
 cl/assets/media/pdf/
@@ -22,14 +22,6 @@ cl/assets/media/wma/
 cl/assets/media/wpd/
 cl/assets/media/xml/
 cl/assets/static/
-
-# Solr
-Solr/data/
-Solr/data_audio/
-Solr/data_opinion_test/
-Solr/data_audio_test/
-Solr/data_recap/
-Solr/data_person/
 
 # IntelliJ IDEA files
 .idea
