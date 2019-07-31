@@ -137,11 +137,13 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         root = settings.INSTALL_ROOT
         create_temp_solr_core(
             settings.SOLR_OPINION_TEST_CORE_NAME,
-            os.path.join(root, 'Solr', 'conf', 'schema.xml'),
+            settings.SOLR_EXAMPLE_CORE_PATH_OPINION,
+            os.path.join(settings.SOLR_EXAMPLE_CORE_PATH_OPINION, 'conf', 'schema.xml'),
         )
         create_temp_solr_core(
             settings.SOLR_AUDIO_TEST_CORE_NAME,
-            os.path.join(root, 'Solr', 'conf', 'audio_schema.xml'),
+            settings.SOLR_EXAMPLE_CORE_PATH_AUDIO,
+            os.path.join(settings.SOLR_EXAMPLE_CORE_PATH_AUDIO, 'conf', 'schema.xml'),
         )
 
     @staticmethod

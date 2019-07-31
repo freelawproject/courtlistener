@@ -142,7 +142,7 @@
                 {% with pk_str=cluster.pk|stringformat:"s" %}
                   {% with event_category='clickRelated' %}
                     {% with event_action='clickRelated_'|add:related_algorithm|add:'_seed'|add:pk_str %}
-                      {% with opinions=related_items full_list_url=show_results_url|add:"?q=related:"|add:pk_str %}
+                      {% with opinions=related_items full_list_url=show_results_url|add:"?q=related:"|add:pk_str|add:related_search_params %}
                         {% include 'includes/opinions_sidebar.html' %}
                       {% endwith %}
                   {% endwith %}

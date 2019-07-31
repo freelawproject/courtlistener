@@ -35,19 +35,23 @@ class EmptySolrTestCase(TestCase):
         root = settings.INSTALL_ROOT
         create_temp_solr_core(
             self.core_name_opinion,
-            os.path.join(root, 'Solr', 'conf', 'schema.xml'),
+            settings.SOLR_EXAMPLE_CORE_PATH_OPINION,
+            os.path.join(settings.SOLR_EXAMPLE_CORE_PATH_OPINION, 'conf', 'schema.xml'),
         )
         create_temp_solr_core(
             self.core_name_audio,
-            os.path.join(root, 'Solr', 'conf', 'audio_schema.xml'),
+            settings.SOLR_EXAMPLE_CORE_PATH_AUDIO,
+            os.path.join(settings.SOLR_EXAMPLE_CORE_PATH_AUDIO, 'conf', 'schema.xml'),
         )
         create_temp_solr_core(
             self.core_name_people,
-            os.path.join(root, 'Solr', 'conf', 'person_schema.xml'),
+            settings.SOLR_EXAMPLE_CORE_PATH_PERSON,
+            os.path.join(settings.SOLR_EXAMPLE_CORE_PATH_PERSON, 'conf', 'schema.xml'),
         )
         create_temp_solr_core(
             self.core_name_recap,
-            os.path.join(root, 'Solr', 'conf', 'recap_schema.xml')
+            settings.SOLR_EXAMPLE_CORE_PATH_RECAP,
+            os.path.join(settings.SOLR_EXAMPLE_CORE_PATH_RECAP, 'conf', 'schema.xml')
         )
         self.si_opinion = sunburnt.SolrInterface(
             settings.SOLR_OPINION_URL, mode='rw')
