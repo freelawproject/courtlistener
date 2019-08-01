@@ -884,16 +884,7 @@ class DocketEntry(models.Model):
         )
 
 
-class RECAPDocument(models.Model):
-    """
-        The model for Docket Documents and Attachments.
-    """
-    PACER_DOCUMENT = 1
-    ATTACHMENT = 2
-    DOCUMENT_TYPES = (
-        (PACER_DOCUMENT, "PACER Document"),
-        (ATTACHMENT, "Attachment"),
-    )
+class AbstractPacerDocument(models.Model):
     OCR_COMPLETE = 1
     OCR_UNNECESSARY = 2
     OCR_FAILED = 3
@@ -903,20 +894,6 @@ class RECAPDocument(models.Model):
         (OCR_UNNECESSARY, "OCR Not Necessary"),
         (OCR_FAILED, "OCR Failed"),
         (OCR_NEEDED, "OCR Needed"),
-    )
-    docket_entry = models.ForeignKey(
-        DocketEntry,
-        help_text="Foreign Key to the DocketEntry object to which it belongs. "
-                  "Multiple documents can belong to a DocketEntry. "
-                  "(Attachments and Documents together)",
-        related_name="recap_documents",
-        on_delete=models.CASCADE,
-    )
-    tags = models.ManyToManyField(
-        'search.Tag',
-        help_text="The tags associated with the document.",
-        related_name="recap_documents",
-        blank=True,
     )
     date_created = models.DateTimeField(
         help_text="The date the file was imported to Local Storage.",
@@ -933,11 +910,6 @@ class RECAPDocument(models.Model):
                   "RECAP. This information is provided by RECAP.",
         blank=True,
         null=True,
-    )
-    document_type = models.IntegerField(
-        help_text="Whether this is a regular document or an attachment.",
-        db_index=True,
-        choices=DOCUMENT_TYPES,
     )
     document_number = models.CharField(
         help_text="If the file is a document, the number is the "
@@ -1009,11 +981,6 @@ class RECAPDocument(models.Model):
         choices=THUMBNAIL_STATUSES.NAMES,
         default=THUMBNAIL_STATUSES.NEEDED,
     )
-    description = models.TextField(
-        help_text="The short description of the docket entry that appears on "
-                  "the attachments page.",
-        blank=True,
-    )
     plain_text = models.TextField(
         help_text="Plain text of the document after extraction using "
                   "pdftotext, wpd2txt, etc.",
@@ -1032,6 +999,45 @@ class RECAPDocument(models.Model):
     is_sealed = models.NullBooleanField(
         help_text="Is this item sealed or otherwise unavailable on PACER?",
         db_index=True,
+    )
+
+    class Meta:
+        abstract = True
+
+
+class RECAPDocument(AbstractPacerDocument):
+    """
+        The model for Docket Documents and Attachments.
+    """
+    PACER_DOCUMENT = 1
+    ATTACHMENT = 2
+    DOCUMENT_TYPES = (
+        (PACER_DOCUMENT, "PACER Document"),
+        (ATTACHMENT, "Attachment"),
+    )
+    docket_entry = models.ForeignKey(
+        DocketEntry,
+        help_text="Foreign Key to the DocketEntry object to which it belongs. "
+                  "Multiple documents can belong to a DocketEntry. "
+                  "(Attachments and Documents together)",
+        related_name="recap_documents",
+        on_delete=models.CASCADE,
+    )
+    tags = models.ManyToManyField(
+        'search.Tag',
+        help_text="The tags associated with the document.",
+        related_name="recap_documents",
+        blank=True,
+    )
+    document_type = models.IntegerField(
+        help_text="Whether this is a regular document or an attachment.",
+        db_index=True,
+        choices=DOCUMENT_TYPES,
+    )
+    description = models.TextField(
+        help_text="The short description of the docket entry that appears on "
+                  "the attachments page.",
+        blank=True,
     )
 
     class Meta:
