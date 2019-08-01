@@ -1318,6 +1318,216 @@ class RECAPDocument(AbstractPacerDocument):
         return normalize_search_dicts(out)
 
 
+class BankruptcyInformation(models.Model):
+    docket = models.OneToOneField(
+        Docket,
+        help_text="The docket that the bankruptcy info is associated with.",
+        on_delete=models.CASCADE,
+    )
+    date_created = models.DateTimeField(
+        help_text="The date time this item was created.",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="Timestamp of last update.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_converted = models.DateTimeField(
+        help_text="The date when the bankruptcy was converted from one "
+                  "chapter to another.",
+        blank=True,
+        null=True,
+    )
+    date_last_to_file_claims = models.DateTimeField(
+        help_text="The last date for filing claims.",
+        blank=True,
+        null=True,
+    )
+    date_last_to_file_govt = models.DateTimeField(
+        help_text="The last date for the government to file claims.",
+        blank=True,
+        null=True,
+    )
+    date_debtor_dismissed = models.DateTimeField(
+        help_text="The date the debtor was dismissed.",
+        blank=True,
+        null=True,
+    )
+    chapter = models.CharField(
+        help_text="The chapter the bankruptcy is currently filed under.",
+        max_length=10,
+        blank=True,
+    )
+    trustee_str = models.TextField(
+        help_text="The name of the trustee handling the case.",
+        blank=True,
+    )
+
+
+class Claim(models.Model):
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket that the claim is associated with.",
+        related_name="claims",
+        on_delete=models.CASCADE,
+    )
+    tags = models.ManyToManyField(
+        'search.Tag',
+        help_text="The tags associated with the document.",
+        related_name="claims",
+        blank=True,
+    )
+    date_created = models.DateTimeField(
+        help_text="The date time this item was created.",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="Timestamp of last update.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_claim_modified = models.DateTimeField(
+        help_text="Date the claim was last modified to our knowledge.",
+        blank=True,
+        null=True,
+    )
+    date_original_entered = models.DateTimeField(
+        help_text="Date the claim was originally entered.",
+        blank=True,
+        null=True,
+    )
+    date_original_filed = models.DateTimeField(
+        help_text="Date the claim was originally filed.",
+        blank=True,
+        null=True,
+    )
+    date_last_amendment_entered = models.DateTimeField(
+        help_text="Date the last amendment was entered.",
+        blank=True,
+        null=True,
+    )
+    date_last_amendment_filed = models.DateTimeField(
+        help_text="Date the last amendment was filed.",
+        blank=True,
+        null=True,
+    )
+    claim_number = models.CharField(
+        help_text="The number of the claim.",
+        max_length=10,
+        blank=True,
+    )
+    creditor_details = models.TextField(
+        help_text="The details of the creditor from the claims register; "
+                  "typically their address.",
+        blank=True,
+    )
+    creditor_id = models.CharField(
+        help_text="The ID of the creditor from the claims register; "
+                  "typically a seven digit number",
+        max_length=50,
+        blank=True,
+    )
+    status = models.CharField(
+        help_text="The status of the claim.",
+        max_length=1000,
+        blank=True,
+    )
+    entered_by = models.CharField(
+        help_text="The person that entered the claim.",
+        max_length=1000,
+        blank=True,
+    )
+    filed_by = models.CharField(
+        help_text="The person that filed the claim.",
+        max_length=1000,
+        blank=True,
+    )
+    amount_claimed = models.CharField(
+        help_text="The amount claimed, usually in dollars.",
+        max_length=100,
+        blank=True,
+    )
+    unsecured_claimed = models.CharField(
+        help_text="The unsecured claimed, usually in dollars.",
+        max_length=100,
+        blank=True,
+    )
+    secured_claimed = models.CharField(
+        help_text="The secured claimed, usually in dollars.",
+        max_length=100,
+        blank=True,
+    )
+    priority_claimed = models.CharField(
+        help_text="The priority claimed, usually in dollars.",
+        max_length=100,
+        blank=True,
+    )
+    description = models.TextField(
+        help_text="The description of the claim that appears on the claim "
+                  "register.",
+        blank=True,
+    )
+    remarks = models.TextField(
+        help_text="The remarks of the claim that appear on the claim "
+                  "register.",
+        blank=True,
+    )
+
+
+class ClaimHistory(AbstractPacerDocument):
+    DOCKET_ENTRY = 1
+    CLAIM_ENTRY = 2
+    CLAIM_TYPES = (
+        (DOCKET_ENTRY, "A docket entry referenced from the claim register."),
+        (CLAIM_ENTRY, "A document only referenced from the claim register"),
+    )
+    claim = models.ForeignKey(
+        Claim,
+        help_text="The claim that the history row is associated with.",
+        related_name="claims",
+        on_delete=models.CASCADE,
+    )
+    date_filed = models.DateField(
+        help_text="The created date of the claim.",
+        null=True,
+        blank=True,
+    )
+    claim_document_type = models.IntegerField(
+        help_text="The type of document that is used in the history row for "
+                  "the claim. One of: %s" %
+                  ', '.join(['%s (%s)' % (t[0], t[1]) for t in CLAIM_TYPES]),
+        choices=CLAIM_TYPES,
+    )
+    description = models.TextField(
+        help_text="The text content of the docket entry that appears in the "
+                  "docket or claims registry page.",
+        blank=True,
+    )
+    # Items should either have a claim_doc_id or a pacer_doc_id, depending on
+    # their claim_document_type value.
+    claim_doc_id = models.CharField(
+        help_text="The ID of a claims registry document.",
+        max_length=32,  # Same as in RECAP
+        blank=True,
+    )
+    pacer_dm_id = models.IntegerField(
+        help_text="The dm_id value pulled out of links and possibly other "
+                  "pages in PACER. Collected but not currently used.",
+        null=True,
+        blank=True,
+    )
+    pacer_case_id = models.CharField(
+        help_text="The cased ID provided by PACER. Noted in this case on a "
+                  "per-document-level, since we've learned that some "
+                  "documents from other cases can appear in curious places.",
+        max_length=100,
+        blank=True,
+    )
+
+
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
