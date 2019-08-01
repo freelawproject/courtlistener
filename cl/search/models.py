@@ -442,6 +442,7 @@ class Docket(models.Model):
         blank=True,
         db_index=True,
     )
+    # Nullable for unique constraint requirements.
     pacer_case_id = fields.CharNullField(
         help_text="The cased ID provided by PACER.",
         max_length=100,
