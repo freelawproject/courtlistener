@@ -566,3 +566,4 @@ if DEVELOPMENT:
 
 RELATED_COUNT = 5
 RELATED_USE_CACHE = True
+RELATED_USER_GROUPS = ['recommender_system_tester']
