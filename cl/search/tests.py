@@ -287,6 +287,9 @@ class IndexingTest(EmptySolrTestCase):
         )
 
 
+@override_settings(
+    RELATED_USE_CACHE=False,
+)
 class SearchTest(IndexedSolrTestCase):
     @staticmethod
     def get_article_count(r):
@@ -566,6 +569,53 @@ class SearchTest(IndexedSolrTestCase):
             'attachment_number': '1',
         })
         self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_more_like_this_opinion(self):
+        """Does the MoreLikeThis query return the correct number and order of
+        articles."""
+        seed_pk = 1
+        expected_article_count = 3
+        expected_first_pk = 2  # Howard v. Honda
+        expected_second_pk = 3  # case name cluster 3
+
+        r = self.client.get(reverse('show_results'), {
+            'type': 'o',
+            'q': 'related:%i' % seed_pk,
+
+            # disable all status filters (otherwise results do not match detail page)
+            'stat_Precedential': 'on',
+            'stat_Non-Precedential': 'on',
+            'stat_Errata': 'on',
+            'stat_Separate Opinion': 'on',
+            'stat_In-chambers': 'on',
+            'stat_Relating-to orders': 'on',
+            'stat_Unknown Status': 'on',
+        })
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+        self.assertEqual(expected_article_count, self.get_article_count(r))
+        self.assertTrue(
+            r.content.index('/opinion/%i/' % expected_first_pk)
+            < r.content.index('/opinion/%i/' % expected_second_pk),
+            msg="'Howard v. Honda' should come AFTER 'case name cluster 3'."
+        )
+
+    def test_more_like_this_opinion_detail(self):
+        """MoreLikeThis query on opinion detail page (cache must be disabled)"""
+        seed_pk = 1
+        expected_first_pk = 2  # Howard v. Honda
+        expected_second_pk = 3  # case name cluster 3
+
+        r = self.client.get('/opinion/%i/asdf/' % seed_pk)
+        self.assertEqual(r.status_code, 200)
+
+        # Test for click tracking order
+        self.assertTrue(
+            r.content.index("'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk))
+            <
+            r.content.index("'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_second_pk)),
+            msg="Related opinions are in wrong order."
+        )
 
 
 class GroupedSearchTest(EmptySolrTestCase):
