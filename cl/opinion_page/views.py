@@ -295,18 +295,26 @@ def view_opinion(request, pk, _):
         }
         citing_clusters = conn.raw_query(**q).execute()
 
-        # Get recommendations with MoreLikeThis query (use cache if enabled)
-        mlt_cache_key = 'opinion-mlt%s' % pk
-        related_items = cache.get(mlt_cache_key) if settings.RELATED_USE_CACHE else None
+        # Related opinions with Solr-MoreLikeThis query
+        # (Beta test: feature is only available for specific user groups)
+        if request.user.is_authenticated and (request.user.is_superuser or request.user.is_staff
+            or (hasattr(settings, 'RELATED_USER_GROUPS') and
+                request.user.groups.filter(name__in=settings.RELATED_USER_GROUPS).exists())):
 
-        if related_items is None:
-            # Cache is empty
-            mlt_query = conn.query(id=pk)\
-                .mlt('text', count=settings.RELATED_COUNT)\
-                .field_limit(fields=['id', 'caseName', 'absolute_url'])
-            related_items = mlt_query.execute().more_like_this.docs
+            # Use cache if enabled
+            mlt_cache_key = 'opinion-mlt%s' % pk
+            related_items = cache.get(mlt_cache_key) if settings.RELATED_USE_CACHE else None
 
-            cache.set(mlt_cache_key, related_items, 60 * 60 * 24)
+            if related_items is None:
+                # Cache is empty
+                mlt_query = conn.query(id=pk) \
+                    .mlt('text', count=settings.RELATED_COUNT) \
+                    .field_limit(fields=['id', 'caseName', 'absolute_url'])
+                related_items = mlt_query.execute().more_like_this.docs
+
+                cache.set(mlt_cache_key, related_items, 60 * 60 * 24)
+        else:
+            related_items = []
     else:
         citing_clusters = None
         related_items = []

@@ -26,7 +26,9 @@
 {% endblock %}
 
 {% block matomo-scripts %}
+  {% if related_items %}
   _paq.push(['trackEvent', 'viewRelated', 'viewRelated_{{ related_algorithm }}_seed_{{ cluster.pk }}', '{{ related_item_ids|join:"," }}']);
+  {% endif %}
 {% endblock %}
 
 {% block sidebar %}
