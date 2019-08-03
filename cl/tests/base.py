@@ -4,6 +4,7 @@ Base class(es) for functional testing CourtListener using Selenium and PhantomJS
 import os
 from contextlib import contextmanager
 
+import scorched
 from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test.utils import override_settings
@@ -14,7 +15,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.expected_conditions import staleness_of
 
 from cl.audio.models import Audio
-from cl.lib.solr_core_admin import create_temp_solr_core, delete_solr_core
 from cl.search.models import Opinion
 from cl.search.tasks import add_items_to_solr
 
@@ -67,7 +67,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
 
     def setUp(self):
         self.reset_browser()
-        self._initialize_test_solr()
         self._update_index()
 
     def reset_browser(self):
@@ -132,19 +131,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         return count
 
     @staticmethod
-    def _initialize_test_solr():
-        """ Try to initialize a pair of Solr cores for testing purposes """
-        root = settings.INSTALL_ROOT
-        create_temp_solr_core(
-            settings.SOLR_OPINION_TEST_CORE_NAME,
-            os.path.join(root, 'Solr', 'conf', 'schema.xml'),
-        )
-        create_temp_solr_core(
-            settings.SOLR_AUDIO_TEST_CORE_NAME,
-            os.path.join(root, 'Solr', 'conf', 'audio_schema.xml'),
-        )
-
-    @staticmethod
     def _update_index():
         # For now, until some model/api issues are worked out for Audio
         # objects, we'll avoid using the cl_update_index command and do
@@ -156,6 +142,10 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
 
     @staticmethod
     def _teardown_test_solr():
-        """ Try to clean up and remove the test Solr cores """
-        delete_solr_core(settings.SOLR_OPINION_TEST_CORE_NAME)
-        delete_solr_core(settings.SOLR_AUDIO_TEST_CORE_NAME)
+        """Empty out the test cores that we use"""
+        conns = [settings.SOLR_OPINION_TEST_URL,
+                 settings.SOLR_AUDIO_TEST_URL]
+        for conn in conns:
+            si = scorched.SolrInterface(conn, mode='rw')
+            si.delete_all()
+            si.commit()
