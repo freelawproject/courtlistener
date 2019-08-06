@@ -2,7 +2,7 @@ ansible
 anyjson==0.3.3
 argparse==1.2.1
 astroid==1.3.6
-beautifulsoup4==4.4.1
+beautifulsoup4==4.8.0
 cchardet==2.1.1
 # Before upgrading, note: https://github.com/celery/celery/issues/4878
 celery~=4.3.0
