@@ -1,35 +1,19 @@
-import argparse
-import os, json, sys
-#
-from celery.canvas import chain
+import os, sys, argparse, json
+from datetime import datetime as dt
+
 from django.conf import settings
-from django.utils.timezone import now
+from django.core.serializers import serialize as sz
 from django.utils import timezone
+from django.contrib.contenttypes.models import ContentType
+
+
 from juriscraper.lasc.http import LASCSession
 from juriscraper.lasc.fetch import LASCSearch
 
-from cl.lasc.models import LASC, DocumentImages, RegisterOfActions, \
-                        Parties, DocumentsFiled, \
-                        PastProceedings, FutureProceedings, \
-                        CrossReferences, CaseHistory, TentativeRulings
-
-from datetime import datetime as dt
-
-from requests import RequestException
-#
-# from cl.corpus_importer.tasks import (
-#     mark_court_done_on_date,
-#     get_and_save_free_document_report,
-#     process_free_opinion_result, get_and_process_pdf, delete_pacer_row,
-# )
-from cl.lib.celery_utils import CeleryThrottle
+from cl.lasc import tasks
+from cl.lasc.models import LASC
+from cl.lib.models import JSONFile
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.db_tools import queryset_generator
-# from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
-# from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-# from cl.scrapers.tasks import extract_recap_pdf
-# from cl.search.models import Court, RECAPDocument
-# from cl.search.tasks import add_items_to_solr, add_docket_to_solr_by_rds
 
 
 LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
@@ -73,8 +57,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             '--case',
             default='19STCV25157;SS;CV',
-            help="The celery queue where the tasks should be processed.",
+            help="T.",
         )
+        parser.add_argument(
+            '--dir',
+            default='/Users/Palin/Desktop/Probate/',
+            help="",
+        )
+
 
 
     def handle(self, *args, **options):
@@ -82,9 +72,18 @@ class Command(VerboseCommand):
         options['action'](options)
 
 
-
     def get_cases_for_last_week(options):
-        """This code collects the last weeks worth of new cases and add them to the database."""
+        """
+        This code collects the last weeks worth of new cases and add them to the database.
+
+        :return:
+        """
+
+        if "--date" in sys.argv:
+            date1 = options['date1']
+            date2 = options['date2']
+            # query._get_cases_around_dates()
+
         logger.info("Getting last weeks data.")
 
         lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
@@ -93,265 +92,167 @@ class Command(VerboseCommand):
         query = LASCSearch(lasc_session)
         query._get_case_list_for_last_seven_days()
         logger.info("Got data")
+        query._parse_date_data()
 
-        cases = json.loads(query.date_case_list)['ResultList']
+        datum = query.normalized_date_data
         logger.info("Saving Data to DB")
 
-        for case in cases:
-            num_results = LASC.objects.filter(InternalCaseID=case['InternalCaseID']).count()
+        for case in datum:
+            case_id = case['case_id']
+            case_object = LASC.objects.filter(case_id=case_id)
+            if not case_object.exists():
 
-            if num_results == 0:
-                if case['DispTypeCode'] == None:
-                    case['DispTypeCode'] = ""
-                if case['JudgeCode'] == None:
-                    case['JudgeCode'] = ""
+                dc = {}
+                dc['date_added'] = dt.now(tz=timezone.utc)
+                dc['full_data_model'] = False
+                dc['case_id'] = case_id
 
-                cd = LASC.objects.create(**{key: value for key, value in case.iteritems()})
+                print case_id
+
+                cd = LASC.objects.create(**{key: value for key, value in dc.iteritems()})
                 cd.save()
-            else:
-                print "Exists"
+
+                logger.info("Finished Adding.")
+
+
 
         logger.info("Finished Saving.")
 
 
-    def fill_data(options):
+    def add_case(options):
+        """
+
+        :return:
+        """
 
         if "--case" in sys.argv:
-            InternalCaseID = options['case']
-            q = LASC.objects.filter(InternalCaseID=InternalCaseID)
+            case_id = options['case']
+            lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+            lasc_session.login()
+            tasks.add_case(lasc_session, case_id)
 
-        else:
-            q = LASC.objects.all()
-            InternalCaseID = q[0].InternalCaseID
 
-        print InternalCaseID,
+    def check_out_of_date_case(options):
+        """
+        # Add options later... for tagged types... clients -- etc
 
+        :return:
+        """
         lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
         lasc_session.login()
 
-        query = LASCSearch(lasc_session)
-        query._get_json_from_internal_case_id(InternalCaseID)
-
-        datum =  json.loads(query.case_data)['ResultList']
-
-        rOfA = datum[0]['NonCriminalCaseInformation']['RegisterOfActions'][0]
-        rOfA['LASC'] = q[0]
-        ra = RegisterOfActions.objects.create(**{key: value for key, value in rOfA.iteritems()})
-
-        print ra.Description
+        fmds = LASC.objects.filter(full_data_model=True).order_by('date_checked') #oldest to newest
+        print fmds.count()
+        for f in fmds:
+            print f.date_checked
+            tasks.check_case(lasc_session, f.case_id)
 
 
-    def add_new_case(options):
+
+
+    def fill_in_case(options):
+        """
+        If no case is passed - the tool searches for cases that have yet to be indexed and added to the system.
+        :return:
+        """
 
         if "--case" in sys.argv:
-            icID = options['case']
-            q = LASC.objects.filter(InternalCaseID=icID)
+            case_id = options['case']
+            case_search = LASC.objects.filter(case_id=case_id)
+            if case_search.count() == 0:
 
-            if not q.exists():
-                print "Case doesnt exist"
+                logger.info("New Case")
+
+                lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+                lasc_session.login()
+                tasks.add_case(lasc_session, case_id)
+            else:
+
+                logger.info("%s cases to update" % case_search.count())
+
+                lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+                lasc_session.login()
+                query = LASCSearch(lasc_session)
+
+                if tasks.check_hash(query, case_id, case_search[0].case_hash):
+
+                    case = {'date_checked' : dt.now(tz=timezone.utc)}
+                    LASC.objects.filter(case_id=case_id).update(**{key: value for key, value in case.iteritems()})
+                    logger.info("Case has not Changed, Updating date_checked Value")
+
+                else:
+
+                    logger.info("Changes Detected, Need to update")
+                    tasks.update_case(query, case_id)
+
+
+
+        else:
+
+            fmds = LASC.objects.filter(full_data_model=False)
+
+            if fmds.count() == 0:
+                logger.info("%s cases to update" % fmds.count())
 
             else:
-                print "case already exists"
-                q.delete()
-                return ''
 
-        lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-        lasc_session.login()
-        query = LASCSearch(lasc_session)
-        query._get_json_from_internal_case_id(icID)
+                logger.info("Updating %s cases." % fmds.count())
 
-
-        datum = json.loads(query.case_data)['ResultList'][0]['NonCriminalCaseInformation']
-
-        case = datum['CaseInformation']
-        rOfA = datum['RegisterOfActions']
-        dI = datum['DocumentImages']
-        p = datum['Parties']
-        dF = datum['DocumentsFiled']
-        pP = datum['PastProceedings']
-        fP = datum['FutureProceedings']
-        cR = datum['CrossReferences']
-        cH = datum['CaseHistory']
-        tT = datum['TentativeRulings']
-
-        case['InternalCaseID'] = icID
-        case['date_added'] = dt.now(tz=timezone.utc)
-        case['date_updated'] = dt.now(tz=timezone.utc)
-
-        cd = LASC.objects.create(**{key: value for key, value in case.iteritems()})
-        cd.save()
-
-        while rOfA:
-            r = rOfA.pop()
-            r["LASC"] = cd
-            RegisterOfActions.objects.create(**{key: value for key, value in r.iteritems()}).save()
-
-        while dI:
-            r = dI.pop()
-            r["LASC"] = cd
-            DocumentImages.objects.create(**{key: value for key, value in r.iteritems()}).save()
-
-        while p:
-            r = p.pop()
-            r["LASC"] = cd
-            Parties.objects.create(**{key: value for key, value in r.iteritems()}).save()
-
-        while dF:
-            r = dF.pop()
-            r["LASC"] = cd
-            DocumentsFiled.objects.create(**{key: value for key, value in r.iteritems()}).save()
-
-        while pP:
-            r = pP.pop()
-            r["LASC"] = cd
-            PastProceedings.objects.create(**{key: value for key, value in r.iteritems()}).save()
-
-        while fP:
-            r = fP.pop()
-            r["LASC"] = cd
-            FutureProceedings.objects.create(**{key: value for key, value in r.iteritems()}).save()
-
-        while cR:
-            r = cR.pop()
-            r["LASC"] = cd
-            CrossReferences.objects.create(**{key: value for key, value in r.iteritems()}).save()
-
-        while cH:
-            r = cH.pop()
-            r["LASC"] = cd
-            CaseHistory.objects.create(**{key: value for key, value in r.iteritems()}).save()
-
-        while tT:
-            r = tT.pop()
-            r["LASC"] = cd
-            TentativeRulings.objects.create(**{key: value for key, value in r.iteritems()}).save()
-
-        logger.info("Saving Data to DB")
+                lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+                lasc_session.login()
+                for case in fmds:
+                    tasks.add_case(lasc_session, case.case_id)
 
 
-
-    def update_case(options):
-
-        lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-        lasc_session.login()
-
-        query = LASCSearch(lasc_session)
-        intID = options['case']
-        query._get_json_from_internal_case_id(intID)
-
-        datum =  json.loads(query.case_data)['ResultList']
-
-        # lasc_object = LASC.objects.filter(InternalCaseID="19STCV25152;SS;CV")
-        # lasc_object = LASC.objects.filter(InternalCaseID="19STCV25155;SS;CV")
-        lasc_object = LASC.objects.filter(InternalCaseID=intID)
-
-
-        roa_count = len(datum[0]['NonCriminalCaseInformation']['RegisterOfActions'])  #found register of actions
-        roa_db_count = len(RegisterOfActions.objects.filter(LASC_id=lasc_object[0].id))  #saved register of actions
-
-        docI_count = len(datum[0]['NonCriminalCaseInformation']['DocumentImages'])  #found register of actions
-        docI_db_count = len(DocumentImages.objects.filter(LASC_id=lasc_object[0].id))  #saved register of actions
-
-        parties_count = len(datum[0]['NonCriminalCaseInformation']['Parties'])  #found register of actions
-        parties_db_count = len(Parties.objects.filter(LASC_id=lasc_object[0].id))  #saved register of actions
-
-        print docI_count, docI_db_count
-
-        if roa_count > roa_db_count:
-            for r in datum[0]['NonCriminalCaseInformation']['RegisterOfActions']:
-
-                results = RegisterOfActions.objects.filter(LASC_id=lasc_object[0].id)\
-                    .filter(Description=r['Description'])\
-                    .filter(RegisterOfActionDateString=r['RegisterOfActionDateString'])
-
-                if results.count() == 0:
-                    r['LASC'] = lasc_object[0]
-                    ra = RegisterOfActions.objects.create(**{key: value for key, value in r.iteritems()})
-                    ra.save()
-                else:
-                    print results.count(),
-                    print "Already have", r['Description']
-        else:
-            print "same roa's"
-
-        if docI_count > docI_db_count:
-            for r in datum[0]['NonCriminalCaseInformation']['DocumentImages']:
-
-                results = DocumentImages.objects.filter(LASC_id=lasc_object[0].id)\
-                    .filter(docId=r['docId'])
-
-
-                if results.count() == 0:
-                    r['LASC'] = lasc_object[0]
-                    ra = DocumentImages.objects.create(**{key: value for key, value in r.iteritems()})
-                    ra.save()
-                else:
-                    print results.count(),
-                    print "Already have", r['docId']
-
-        else:
-            print "same doc Images's"
-
-        if parties_count > parties_db_count:
-            for r in datum[0]['NonCriminalCaseInformation']['Parties']:
-                print "adding ", r['EntityNumber']
-                results = Parties.objects.filter(LASC_id=lasc_object[0].id)\
-                    .filter(EntityNumber=r['EntityNumber'])
-
-
-                if results.count() == 0:
-                    r['LASC'] = lasc_object[0]
-                    ra = Parties.objects.create(**{key: value for key, value in r.iteritems()})
-                    ra.save()
-                else:
-                    print results.count(),
-                    print "Already have", r['EntityNumber']
-
-        else:
-            print "same parties information"
-
-
-
-
-
-
-
-    def get_pdfs(options):
-        """Get PDFs for the results of the Free Document Report queries.
-
-        At this stage, we have rows in the PACERFreeDocumentRow table, each of
-        which represents a PDF we need to download and merge into our normal
-        tables: Docket, DocketEntry, and RECAPDocument.
-
-        In this function, we iterate over the entire table of results, merge it
-        into our normal tables, and then download and extract the PDF.
-
-        :return: None
-        """
-        pass
 
     def test(options):
+        if "--case" in sys.argv:
+            case_id = options['case']
+            """
+            code to access filepath of atleast the first object ... maybe all the filepaths
+            """
 
-        # for case in LASC.objects.all():
-        #     print case.InternalCaseID
+            l = LASC.objects.get(case_id=case_id)
+            o_id = JSONFile(content_object=l).object_id
+            print o_id
+            x = JSONFile.objects.get(object_id=o_id)
+            print x.filepath
 
-        for order in LASC.objects.filter(InternalCaseID="19STCV25152;SS;CV"):
-            types = order.registers.values('Description')
-            for type in types:
-                print type
-        # pass
 
-    #
-    # def do_ocr(options):
-    #     pass
-    #
+            """
+            Code to access the case_id from the file path of the document.
+            """
+            # docs = JSONFile.objects.all()
+            # # print docs.last()
+            # print docs[1].content_object.case_id
+
+    def import_wormhole(options):
+
+        if "--dir" in sys.argv:
+            dir = options['dir']
+            dir = dir + "*.json"
+            tasks.import_wormhole_corpus(dir)
+
 
     VALID_ACTIONS = {
-        'get-lastweek': get_cases_for_last_week,
-        'fill-data': fill_data,
-        'update-case': update_case,
-        'add-new-case': add_new_case,
-        'test': test
+        'lastweek': get_cases_for_last_week,  #gets ~1k recent filings
+        'add-case': add_case, #adds case by case id
+        'out-of-date': check_out_of_date_case,
+        'fill-in': fill_in_case,  #fills in cases that are partial
+        'test': test,  # fills in cases that are partial
+        'wormhole': import_wormhole,  # fills in cases that are partial
     }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
