@@ -82,7 +82,7 @@ class IndexedSolrTestCase(SolrTestCase):
         for obj_type, core_name in cores.items():
             args = [
                 '--type', obj_type,
-                '--solr-url', 'http://127.0.0.1:8983/solr/%s' % core_name,
+                '--solr-url', '%s/solr/%s' % (settings.SOLR_HOST, core_name),
                 '--update',
                 '--everything',
                 '--do-commit',

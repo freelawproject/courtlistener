@@ -54,7 +54,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         args = list(self.args)  # Make a copy of the list.
         args.extend([
             '--solr-url',
-            'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '%s/solr/%s' % (settings.SOLR_HOST, self.core_name_opinion),
             '--update',
             '--everything',
             '--do-commit',
@@ -90,7 +90,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         args = list(self.args)  # Make a copy of the list.
         args.extend([
             '--solr-url',
-            'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '%s/solr/%s' % (settings.SOLR_HOST, self.core_name_opinion),
             '--delete',
             '--everything',
             '--do-commit',
@@ -113,7 +113,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         args = list(self.args)  # Make a copy of the list.
         args.extend([
             '--solr-url',
-            'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '%s/solr/%s' % (settings.SOLR_HOST, self.core_name_opinion),
             '--update',
             '--items', '1', '2', '3',
             '--do-commit',
@@ -576,7 +576,8 @@ class GroupedSearchTest(EmptySolrTestCase):
         super(GroupedSearchTest, self).setUp()
         args = [
             '--type', 'search.Opinion',
-            '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '--solr-url', '%s/solr/%s' % (settings.SOLR_HOST,
+                                          self.core_name_opinion),
             '--update',
             '--everything',
             '--do-commit',
