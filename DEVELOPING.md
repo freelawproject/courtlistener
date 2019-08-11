@@ -2,10 +2,114 @@
 
 CourtListener is built upon a few key pieces of technology that needs to come together in order to function. Whether you're contributing platform code, web design, etc. it helps to know the easiest ways to run and test the project.
 
-The best way to get started is to configure your own Ubuntu Linux environment to support running CourtListener per the [wiki instructions][wiki].
+Historically, we have used [wiki instructions][wiki] to get set up, but these days most things can be accomplished using docker.
+
+But before we can get into that, we must address...
+
+## Legal Matters
+
+Not surprisingly, we have a lot of legal, and particularly IP lawyers around here. As a result, we endeavor to be a model for other open source projects in how we handle IP contributions and concerns. 
+
+We do this in a couple of ways. First, we use a liberal copy-left license for CourtListener, the GNU GPL Affero license. Read the details in the license itself, but the high level is that it's a copy-left license for server code that isn't normally distributed to end users (like an app would be, say).
+
+The other thing we do is require a contributor license agreement from any non-employees or non-contractors that contribute code to the project. You can find a form for this purpose in the root of our project. If you have any questions about it, please don't hesitate to ask.
+
+On with the show.
+
+# Set up
+
+The major components of CourtListener are:
+
+ - Postgresql - For database storage. We used to use MySQL long ago, but it caused endless weird and surprising problems. Postgresql is great.
+ 
+ - Redis - For in-memory fast storage, caching, task queueing, some stats logging, etc. Everybody loves Redis for a reason. It's great.
+ 
+ - Celery - For running asynchronous tasks. We've been using this a long time. It causes a lot of annoyance and sometimes will have unsolvable bugs, but as of 2019 it's better than any of the competition that we've tried. 
+ 
+ - Tesseract - For OCR. It's getting good lately, which is nice since we do hundreds of thousands of pages.
+ 
+ - Solr - For making things searchable. It's *decent*. Our version is currently very old, but it hangs in there. We've also tried Sphinx a while back. We chose it early on literally because it had a smaller binary than Solr, and so seemed less intimidating (it was early times).
+ 
+ - Python - And it's associated virtual envs
 
 
-# Workflow
+## Pulling Everything Together
+
+We use a docker compose file to make development easier. Don't use it for production! It's not secure enough and it uses bad practices for data storage. But if you're a dev, it should work nicely. To use it, you need do a few things:
+
+ - Create the overlay network it relies on:
+ 
+        docker network create -d overlay --attachable cl_net_overlay
+
+ - Set the `CL_SOLR_CODE_DIR` environment variable. This should get set to something like `/mlissner/home/code/courtlistener-solr-server`. This is a path to the [`courtlistener-solr-server` repository's code][cl-solr]. Before this works, you'll need to do some funky chmod and chown work in that directory. If you need help with this, see the readme in that code base. It explains things.
+
+ - Make sure that you in your CourtListener settings, you've set up the following:
+ 
+     - `cl_redis` as the `REDIS_HOST` variable.
+     - `http://cl_solr:8983` as the `SOLR_HOST` variable.
+     - The `default` database should not have host or port parameters (it uses unix sockets), and it should have a `USER` of `postgres` and a password of `postgres`. 
+
+    See below if you need an explanation of how settings work in CourtListener.
+
+The final command you'll run is:
+    
+    CL_SOLR_CODE_DIR='/code/courtlistener-solr-server' \
+         docker-compose up
+
+(Make sure you're in the right directory when you do this.)
+
+If that goes smoothly, it'll launch Solr, Postgresql, Redis, Celery (with access to Tesseract), and Django. Whew! 
+
+You then need to do a few first time set ups:
+
+1. Set up the DB. The first time you run this, it'll create the database for you, but you'll need to migrate it. To do so, you need to have the context of the CourtListener virtualenv and computer. You just launched those when you ran the docker compose file. To reach inside the correct docker image and migrate the models, run:
+
+        docker exec -it cl_django python /opt/courtlistener/manage.py migrate
+    
+    That will run the command in the right place in the right way.
+
+1. Whenever you create a new Django db, you need to create a super user. Do so with:
+
+        docker exec -it cl_django python /opt/courtlistener/manage.py createsuperuser
+ 
+So that should be it! You should now be able to access the following URLs:
+
+ - <http://127.0.0.1:8000> - Your dev homepage
+ - <http://127.0.0.1:8000/admin> - The Django admin page (try the super user)
+ - <http://127.0.0.1:8983> - Solr admin page
+
+Whew!
+ 
+[cl-solr]: https://github.com/freelawproject/courtlistener-solr-server
+
+
+# How Settings Work in CourtListener
+
+The files in the `cl/settings` directory contain all of the settings for CourtListener. They are read in alphabetical order, with each subsequent file potentially overriding the previous one.
+
+Thus, `10-public.py` contains default settings for CourtListener and Celery. To override it, simply create a file in `cl/settings` called `11-private.py`. Since `11` comes after `10` *alphabetically*, it'll override anything in `10-*`. 
+
+Files ending in `-public.py` are meant to be distributed in the code base. Those ending in `-private.py` are meant to stay on your machine. In theory, our `.gitignore` file will ignore them. 
+
+You can find an example file to use for `11-private.py` in `cl/settings`.
+
+Files that are read later (with higher numbered file names) have access to the 
+context of files that are read earlier. For example, if `01-some-name.py` 
+contains:
+ 
+    SOME_VAR = {'some-key': 'some-value'}
+    
+You could create a file called `02-my-overrides.py` that contained:
+
+    SOME_VAR['some-key'] = 'some-other-value'
+    
+That is, you can assume that `SOME_VAR` exists because it was declared in an 
+earlier settings file. Your IDE will likely complain that `SOME_VAR` doesn't 
+exist in `02-my-overrides.py`, but ignore your IDE. If you want to read the 
+code behind all this, look in `settings.py` (in the root directory).
+
+
+# Workflow for Contributions
 
 For the most part, we use [Github flow][flow] to get our work done. Our 
 [BDFL][bdfl] and primary developer is [@mlissner][me]. For better and/or for worse, 
@@ -62,14 +166,15 @@ Any time you're contributing to or hacking on code base, whether adding features
 In general, the easiest way to run the test suite is via Django's `test` command. An example from within the FreeLawBox images:
 
 ```bash
->(courtlistener)vagrant@freelawbox64:/var/www/courtlistener$ ./manage.py test --noinput cl
+docker exec -it cl_django python /opt/courtlistener/manage.py test --noinput cl
 ```
 
 The `--noinput` flag tells Django to destroy any old test databases without prompting for confirmation (typically this is what you want).
 
 The `cl` parameter is the name of the Python package to search for tests. It's not required, but a good habit to learn as you can more specifically specify tests by provided more details, such as `cl.search` to execute only tests in the search module.
 
-For more details, Django provides a lot of documentation on [testing in Django][django-testing]. Make sure to read the docs related to the current release used in CourtListener. (As of 27-01-2017, that's v1.8.7.)
+For more details, Django provides a lot of documentation on [testing in Django][django-testing]. Make sure to read the docs related to the current release used in CourtListener.
+
 
 ## About the Types of Tests
 
@@ -157,6 +262,7 @@ A webhook triggers [CircleCI][circleci-cl-builds] to run `.circleci/config.yml`.
 `config.yml` makes CircleCI run tests inside a Docker container. The custom
 Docker image used to run tests is built from `.circleci/Dockerfile` and pushed
 to [Docker Hub][hub-cl-testing].
+
 
 ### Updating the testing container
 
