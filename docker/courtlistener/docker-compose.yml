@@ -1,0 +1,72 @@
+# Run using `docker-compose up`
+version: "3.7"
+networks:
+    cl_net_overlay:
+        driver: overlay
+services:
+    # Redis for caching
+    cl_redis:
+        container_name: cl_redis
+        image: redis
+        ports:
+            - "6379:6379"
+        networks:
+            - cl_net_overlay
+
+    # Database
+    cl_postgresql:
+        container_name: cl_postgres
+        ports:
+            - "5432:5432"
+        image: postgres
+        environment:
+            POSTGRES_USER: "postgres"
+            POSTGRES_PASSWORD: "postgres"
+        volumes:
+            - /var/run/postgresql:/var/run/postgresql
+            - ./initdb.d:/docker-entrypoint-initdb.d
+        networks:
+            - cl_net_overlay
+
+    # Search engine
+    cl_solr:
+        container_name: cl_solr
+        image: freelawproject/solr:latest
+        ports:
+            - "8983:8983"
+        # needs chmod 777
+        volumes:
+            - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/data:/var/opt/solr/indices
+            - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/solr/cores/:/etc/opt/solr:ro
+        networks:
+            - cl_net_overlay
+
+    # Task Server
+    cl_celery:
+        container_name: cl_celery
+        image: freelawproject/task-server:latest
+        depends_on:
+            - cl_postgresql
+            - cl_redis
+        volumes:
+            - ../../../courtlistener:/opt/celery:ro
+            - /var/run/postgresql:/var/run/postgresql
+            - ../../cl/assets/media:/sata
+        networks:
+            - cl_net_overlay
+
+    django:
+        container_name: cl_django
+        image: freelawproject/courtlistener-django:latest
+        depends_on:
+            - cl_postgresql
+            - cl_redis
+            - cl_celery
+            - cl_solr
+        ports:
+            - "8000:8000"
+        volumes:
+            - ../../../courtlistener:/opt/courtlistener
+            - /var/run/postgresql:/var/run/postgresql
+        networks:
+            - cl_net_overlay
