@@ -22,18 +22,16 @@ DATABASES = {
         'NAME': 'courtlistener',
         'USER': 'django',
         'PASSWORD': 'your-password',
-        'HOST': '',
-        'PORT': '',
         'CONN_MAX_AGE': 600,
     },
 }
 API_READ_DATABASES = ['replica']
 
 
-SOLR_HOST = 'http://127.0.0.1:8983'
+SOLR_HOST = 'http://cl_solr:8983'
 SOLR_RECAP_HOST = SOLR_HOST
 
-REDIS_HOST = 'localhost'
+REDIS_HOST = 'cl_redis'
 REDIS_PORT = 6379
 
 # Make these unique, and don't share it with anybody.
