@@ -87,7 +87,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         if self.screenshot:
             filename = type(self).__name__ + '.png'
             print('\nSaving screenshot: %s' % (filename,))
-            self.browser.save_screenshot(type(self).__name__ + '.png')
+            self.browser.save_screenshot('/tmp/' + filename)
         self.browser.quit()
         self._teardown_test_solr()
 
