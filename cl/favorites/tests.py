@@ -69,7 +69,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # Dora needs to do some research, so she fires up CL and performs
         # an initial query on her subject: Lissner
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         search_box = self.browser.find_element_by_id('id_q')
         search_box.send_keys('lissner\n')
 
@@ -123,7 +123,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         Favorite.objects.all().delete()
 
         # Dora goes to CL, logs in, and does a search on her topic of interest
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('pandora', 'password')
 
         search_box = self.browser.find_element_by_id('id_q')
@@ -175,7 +175,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # When she returns, she signs back into CL and wants to pull up
         # that favorite again, so she goes to Favorites under the Profile menu
-        self.get_url_and_wait(self.server_url)
+        self.get_url_and_wait(self.live_server_url)
         self.attempt_sign_in('pandora', 'password')
 
         # TODO: Refactor. Same code used in
@@ -225,7 +225,7 @@ class UserFavoritesTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_user_can_change_favorites(self):
         # Dora already has some favorites and she logs in and pulls them up
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('pandora', 'password')
 
         profile_dropdown = self.browser. \
