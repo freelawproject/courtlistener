@@ -74,9 +74,9 @@ services:
 
     cl-selenium:
         container_name: cl-selenium
-        image: selenium/standalone-chrome
+        image: selenium/standalone-chrome-debug
         ports:
             - 4444:4444  # Selenium
-            - 5900:5900    # VNC server
+            - 5900:5900  # VNC server
         networks:
             - cl_net_overlay
