@@ -37,11 +37,6 @@ class BasicAPIPageTest(TestCase):
     def setUp(self):
         self.client = Client()
 
-        # Need pagerank file for test_pagerank_file()
-        from cl.search.management.commands.cl_calculate_pagerank import Command
-        command = Command()
-        command.do_pagerank(chown=False)
-
     def test_api_index(self):
         r = self.client.get(reverse('api_index'))
         self.assertEqual(r.status_code, 200)
@@ -59,6 +54,10 @@ class BasicAPIPageTest(TestCase):
         self.assertEqual(r.status_code, 200)
 
     def test_pagerank_file(self):
+        # Need pagerank file for test_pagerank_file()
+        from cl.search.management.commands.cl_calculate_pagerank import Command
+        command = Command()
+        command.do_pagerank(chown=False)
         r = self.client.get(reverse('pagerank_file'))
         self.assertEqual(r.status_code, 200)
 
