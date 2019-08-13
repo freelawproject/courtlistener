@@ -43,11 +43,11 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     host = '0.0.0.0'
 
     @staticmethod
-    def _create_browser(options=None):
-        if options is None:
-            options = webdriver.ChromeOptions()
+    def _create_browser():
+        options = webdriver.ChromeOptions()
+        if settings.SELENIUM_HEADLESS is True:
             options.add_argument('headless')
-            options.add_argument("silent")
+        options.add_argument("silent")
         options.add_experimental_option('w3c', False)
 
         if settings.DOCKER_SELENIUM_HOST:
@@ -79,9 +79,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             # it's ok we forgive you http://stackoverflow.com/a/610923
             pass
         finally:
-            options = webdriver.ChromeOptions()
-            options.add_argument('headless')
-            self.browser = self._create_browser(options)
+            self.browser = self._create_browser()
 
         self.browser.implicitly_wait(15)
 
