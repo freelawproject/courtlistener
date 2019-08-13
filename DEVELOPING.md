@@ -49,11 +49,11 @@ We use a docker compose file to make development easier. Don't use it for produc
 
  - Make sure that in your CourtListener settings, you've set up the following (these should all be defaults):
  
-     - `cl-redis` as the `REDIS_HOST` variable.
-     - `http://cl-solr:8983` as the `SOLR_HOST` variable.
-     - The `default` database should not have host or port parameters (it uses unix sockets), and it should have a `USER` of `postgres` and a password of `postgres`. 
+     - `REDIS_HOST` should be `cl-redis`.
+     - `SOLR_HOST` should be `http://cl-solr:8983`. 
      - `DOCKER_SELENIUM_HOST` should be `http://cl-selenium:4444/wd/hub`
      - `DOCKER_DJANGO_HOST` should be `cl-django`
+     - The `default` database should not have host or port parameters (it uses unix sockets), and it should have a `USER` of `postgres` and a password of `postgres`.
 
     See below if you need an explanation of how settings work in CourtListener.
 
@@ -64,7 +64,7 @@ The final command you'll run is:
 
 (Make sure you're in the right directory when you do this.)
 
-If that goes smoothly, it'll launch Solr, Postgresql, Redis, Celery (with access to Tesseract), Django, and a Selenium test server. Whew! 
+If that goes smoothly, it'll launch Solr, PostgreSQL, Redis, Celery (with access to Tesseract), Django, and a Selenium test server. Whew! 
 
 You then need to do a few first time set ups:
 
@@ -82,11 +82,9 @@ So that should be it! You should now be able to access the following URLs:
 
  - <http://127.0.0.1:8000> - Your dev homepage
  - <http://127.0.0.1:8000/admin> - The Django admin page (try the super user)
- - <http://127.0.0.1:8983> - Solr admin page
- - <http://127.0.0.1:5900> - A VNC server to the selenium machine (in theory)
+ - <http://127.0.0.1:8983/solr> - Solr admin page
+ - 127.0.0.1:5900 - A VNC server to the selenium machine (it doesn't serve http though)
 
-Whew!
- 
 [cl-solr]: https://github.com/freelawproject/courtlistener-solr-server
 
 
@@ -217,7 +215,17 @@ There are some helper methods provided via `BaseSeleniumTest` as well:
 * `assert_text_not_in_body(text)` - similar to previous, but tests that text is NOT in the body, failing if it's found.
 * `extract_result_count_from_serp()` - if on the search result page, will attempt to find and parse the total results found count into a number and return it.
 
-#### Increasing the Test Timeouts
+##### Viewing the Remote Selenium Browser
+
+You can watch the remote selenium browser using VNC. To do so, start a VNC client, and then connect to:
+
+    0.0.0.0:5900
+
+The password is `secret`. Make sure that `SELENIUM_HEADLESS` is set to `False` or else you'll see nothing.
+
+With those things done, run some tests and watch as it goes! 
+
+##### Increasing the Test Timeouts
 
 The Selenium tests are wrapped with a timeout annotation that will fail them if they take too long to run. If you need to increase, or even want to decrease, this value then the easiest step is to set the `SELENIUM_TIMEOUT` environment variable to the given time in seconds.
 
@@ -227,9 +235,9 @@ For example, for a 2 minute timeout, you might do the following on Linux (or wit
 export SELENIUM_TIMEOUT=120
 ```
 
-#### Taking Screenshots on Failure
+##### Taking Screenshots on Failure
 
-While a little flaky at the moment, most Selenium tests will be able to take a screenshot of the browser window on a failure. This should work well when running the FreeLawBox Desktop version (i.e. NOT in headless mode).
+While a little flaky at the moment, most Selenium tests will be able to take a screenshot of the browser window on a failure.
 
 To enable screenshots, simply define a `SELENIUM_DEBUG` environment variable set to anything. It's presence indicates it's enabled.
 
@@ -237,7 +245,13 @@ To enable screenshots, simply define a `SELENIUM_DEBUG` environment variable set
 export SELENIUM_DEBUG=1
 ```
 
-You should find screenshot files available in the project directory. It's recommend you run the test suite with the `--failfast` option so it stops executing the rest of the tests if it encounters a failure. Currently, the screenshot is named after the test class and you may overwrite a screenshot if you continue through more tests in the same class.
+That will create screenshots at the end of every test as part of the `tearDown` method. If you want screenshots at other times, you can always add a line like:
+
+    self.browser.save_screenshot('/tmp/' + filename)
+    
+Screenshots will be saved into the `cl-django` container. To grab them, [you can use][cp] `docker cp`.
+
+[cp]: https://stackoverflow.com/a/22050116/64911
 
 ### CI/CD
 
