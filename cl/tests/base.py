@@ -2,6 +2,7 @@
 Base class(es) for functional testing CourtListener using Selenium and PhantomJS
 """
 import os
+import socket
 from contextlib import contextmanager
 
 import scorched
@@ -32,12 +33,14 @@ if 'SELENIUM_TIMEOUT' in os.environ:
 )
 class BaseSeleniumTest(StaticLiveServerTestCase):
     """Base class for Selenium Tests. Sets up a few attributes:
-        * server_url - either from a sys argument for liveserver or
-            the default from the LiveServerTestCase
-        * browser - instance of Selenium WebDriver
-        * screenshot - boolean for if the test should save a final screenshot
-        Also sets window size to default of 1024x768.
+      * browser - instance of Selenium WebDriver
+      * screenshot - boolean for if the test should save a final screenshot
+      * Also sets window size to default of 1024x768.
+      * Binds the host to 0.0.0.0 to allow external access.
+
+    See this URL for notes: https://marcgibbons.com/post/selenium-in-docker/
     """
+    host = '0.0.0.0'
 
     @staticmethod
     def _create_browser(options=None):
@@ -45,13 +48,11 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             options = webdriver.ChromeOptions()
             options.add_argument('headless')
             options.add_argument("silent")
+        options.add_experimental_option('w3c', False)
 
-        if 'SELENIUM_REMOTE_ADDRESS' in os.environ:
-            address = str(os.environ['SELENIUM_REMOTE_ADDRESS']).strip()
-            if not address.startswith('http'):
-                address = 'http://' + address
+        if settings.DOCKER_SELENIUM_HOST:
             capabilities = options.to_capabilities()
-            return webdriver.Remote(address,
+            return webdriver.Remote(settings.DOCKER_SELENIUM_HOST,
                                     desired_capabilities=capabilities)
         return webdriver.Chrome(chrome_options=options)
 
@@ -63,7 +64,9 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             cls.screenshot = True
         else:
             cls.screenshot = False
-        cls.server_url = cls.live_server_url
+
+        # Set host to externally accessible web server address
+        cls.host = socket.gethostbyname(socket.gethostname())
 
     def setUp(self):
         self.reset_browser()
