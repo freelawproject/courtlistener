@@ -34,6 +34,9 @@ SOLR_RECAP_HOST = SOLR_HOST
 REDIS_HOST = 'cl-redis'
 REDIS_PORT = 6379
 
+DOCKER_SELENIUM_HOST = 'http://cl-selenium:4444/wd/hub'
+DOCKER_DJANGO_HOST = 'cl-django'
+
 # Make these unique, and don't share it with anybody.
 SECRET_KEY = 'your-secret-key'
 
