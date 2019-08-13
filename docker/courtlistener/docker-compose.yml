@@ -5,8 +5,8 @@ networks:
         driver: overlay
 services:
     # Redis for caching
-    cl_redis:
-        container_name: cl_redis
+    cl-redis:
+        container_name: cl-redis
         image: redis
         ports:
             - "6379:6379"
@@ -14,8 +14,8 @@ services:
             - cl_net_overlay
 
     # Database
-    cl_postgresql:
-        container_name: cl_postgres
+    cl-postgresql:
+        container_name: cl-postgres
         ports:
             - "5432:5432"
         image: postgres
@@ -29,8 +29,8 @@ services:
             - cl_net_overlay
 
     # Search engine
-    cl_solr:
-        container_name: cl_solr
+    cl-solr:
+        container_name: cl-solr
         image: freelawproject/solr:latest
         ports:
             - "8983:8983"
@@ -42,12 +42,12 @@ services:
             - cl_net_overlay
 
     # Task Server
-    cl_celery:
-        container_name: cl_celery
+    cl-celery:
+        container_name: cl-celery
         image: freelawproject/task-server:latest
         depends_on:
-            - cl_postgresql
-            - cl_redis
+            - cl-postgresql
+            - cl-redis
         volumes:
             - ../../../courtlistener:/opt/celery:ro
             - /var/run/postgresql:/var/run/postgresql
@@ -56,17 +56,27 @@ services:
             - cl_net_overlay
 
     django:
-        container_name: cl_django
+        container_name: cl-django
         image: freelawproject/courtlistener-django:latest
         depends_on:
-            - cl_postgresql
-            - cl_redis
-            - cl_celery
-            - cl_solr
+            - cl-postgresql
+            - cl-redis
+            - cl-celery
+            - cl-solr
+            - cl-selenium
         ports:
             - "8000:8000"
         volumes:
             - ../../../courtlistener:/opt/courtlistener
             - /var/run/postgresql:/var/run/postgresql
+        networks:
+            - cl_net_overlay
+
+    cl-selenium:
+        container_name: cl-selenium
+        image: selenium/standalone-chrome
+        ports:
+            - 4444:4444  # Selenium
+            - 5900:5900    # VNC server
         networks:
             - cl_net_overlay

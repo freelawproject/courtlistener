@@ -884,7 +884,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_toggle_to_oral_args_search_results(self):
         # Dora navigates to the global SERP from the homepage
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self._perform_wildcard_search()
         self.extract_result_count_from_serp()
 
@@ -902,7 +902,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_search_and_facet_docket_numbers(self):
         # Dora goes to CL and performs an initial wildcard Search
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self._perform_wildcard_search()
         initial_count = self.extract_result_count_from_serp()
 
@@ -929,7 +929,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_opinion_search_result_detail_page(self):
         # Dora navitages to CL and does a simple wild card search
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.browser.find_element_by_id('id_q').send_keys('voutila\n')
 
         # Seeing an Opinion immediately on the first page of results, she
@@ -1016,7 +1016,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def test_search_and_add_precedential_results(self):
         # Dora navigates to CL and just hits Search to just start with
         # a global result set
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self._perform_wildcard_search()
         first_count = self.extract_result_count_from_serp()
 
@@ -1061,7 +1061,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def test_basic_homepage_search_and_signin_and_signout(self):
 
         # Dora navigates to the CL website.
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
 
         # At a glance, Dora can see the Latest Opinions, Latest Oral Arguments,
         # the searchbox (obviously important), and a place to sign in

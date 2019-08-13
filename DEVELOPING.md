@@ -64,7 +64,7 @@ You then need to do a few first time set ups:
 
 1. Set up the DB. The first time you run this, it'll create the database for you, but you'll need to migrate it. To do so, you need to have the context of the CourtListener virtualenv and computer. You just launched those when you ran the docker compose file. To reach inside the correct docker image and migrate the models, run:
 
-        docker exec -it cl_django python /opt/courtlistener/manage.py migrate
+        docker exec -it cl-django python /opt/courtlistener/manage.py migrate
     
     That will run the command in the right place in the right way.
 
