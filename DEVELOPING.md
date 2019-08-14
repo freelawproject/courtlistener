@@ -115,7 +115,7 @@ code behind all this, look in `settings.py` (in the root directory). It's
 short.
 
 
-## Workflow for Contributions
+## Guidelines for Contributions
 
 For the most part, we use [Github flow][flow] to get our work done. Our 
 [BDFL][bdfl] and primary developer is [@mlissner][me]. For better and/or for worse, 
@@ -151,7 +151,9 @@ monolithic one that is fully functional.
     not submit the regexes (and their tests!) in one PR and the thing that uses
     those regexes in another? That'd be much easier to review than trying to 
     see the whole thing at once. 
-    
+
+1. Finally, we have both an editorconfig and an eslint configuration. Please use them. 
+
 These guidelines are a little sloppy compared with many projects. Those 
 projects have greater quality needs, are popular enough to demand a high 
 bar, and can envision coding techniques as a part of their overall goal. We 
