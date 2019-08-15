@@ -1,14 +1,10 @@
 import os
-import pwd
-import shutil
 
 import igraph
 from django.conf import settings
 
 from cl.lib.command_utils import VerboseCommand
-from cl.lib.solr_core_admin import get_data_dir, \
-    reload_pagerank_external_file_cache
-from cl.lib.utils import mkdir_p
+from cl.lib.solr_core_admin import get_data_dir
 from cl.search.models import Opinion, OpinionsCited
 
 
@@ -65,32 +61,22 @@ def make_sorted_pr_file(pr_results, result_file_path):
     os.remove(result_file_path + temp_extension)
 
 
-def cp_pr_file_to_bulk_dir(result_file_path, chown):
-    """Copy the pagerank file to the bulk data directory for public analysis.
-    """
-    mkdir_p(settings.BULK_DATA_DIR)  # The dir doesn't always already exist.
-    shutil.copy(result_file_path, settings.BULK_DATA_DIR)
-    if chown:
-        user_info = pwd.getpwnam('www-data')
-        os.chown(
-            settings.BULK_DATA_DIR + 'external_pagerank',
-            user_info.pw_uid,
-            user_info.pw_gid,
-        )
-
-
 class Command(VerboseCommand):
     args = '<args>'
     help = 'Calculate pagerank value for every case'
-    RESULT_FILE_PATH = get_data_dir('collection1') + "external_pagerank"
 
-    def do_pagerank(self, chown=True):
+    @staticmethod
+    def do_pagerank():
         g = make_and_populate_nx_graph()
         pr_results = g.pagerank()
-        make_sorted_pr_file(pr_results, self.RESULT_FILE_PATH)
-        reload_pagerank_external_file_cache()
-        cp_pr_file_to_bulk_dir(self.RESULT_FILE_PATH, chown)
+        return pr_results
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        self.do_pagerank()
+        pr_results = self.do_pagerank()
+        pr_dest_dir = settings.SOLR_PAGERANK_DEST_DIR
+        make_sorted_pr_file(pr_results, pr_dest_dir)
+        normal_dest_dir = get_data_dir('collection1') + "external_pagerank"
+        print("Pagerank file created at %s. Because of distributed servers, "
+              "you may need to copy it to its final destination. Somewhere "
+              "like: %s." % (pr_dest_dir, normal_dest_dir))
