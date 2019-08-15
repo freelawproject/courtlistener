@@ -840,28 +840,20 @@ class PagerankTest(TestCase):
         # calculate pagerank of these 3 document
         comm = Command()
         self.verbosity = 1
-        comm.do_pagerank(chown=False)
-
-        # read in the pagerank file, converting to a dict
-        pr_values_from_file = {}
-        data_path = get_data_dir('collection1') + "external_pagerank"
-        with open(data_path) as f:
-            for line in f:
-                pk, value = line.split('=')
-                pr_values_from_file[pk] = float(value.strip())
+        pr_results = comm.do_pagerank()
 
         # Verify that whether the answer is correct, based on calculations in
         # Gephi
         answers = {
-            '1': 0.369323534954,
-            '2': 0.204581549974,
-            '3': 0.378475867453,
+            1: 0.369323534954,
+            2: 0.204581549974,
+            3: 0.378475867453,
         }
         for key, value in answers.items():
             self.assertTrue(
-                abs(pr_values_from_file[key] - value) < 0.0001,
+                abs(pr_results[key] - value) < 0.0001,
                 msg="The answer for item %s was %s when it should have been "
-                    "%s" % (key, pr_values_from_file[key],
+                    "%s" % (key, pr_results[key],
                             answers[key],)
             )
 
