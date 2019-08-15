@@ -30,6 +30,7 @@ API_READ_DATABASES = ['replica']
 
 SOLR_HOST = 'http://cl-solr:8983'
 SOLR_RECAP_HOST = SOLR_HOST
+SOLR_PAGERANK_DEST_DIR = '/tmp/'
 
 REDIS_HOST = 'cl-redis'
 REDIS_PORT = 6379

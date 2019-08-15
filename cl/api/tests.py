@@ -53,14 +53,6 @@ class BasicAPIPageTest(TestCase):
         r = self.client.get(reverse('bulk_data_index'))
         self.assertEqual(r.status_code, 200)
 
-    def test_pagerank_file(self):
-        # Need pagerank file for test_pagerank_file()
-        from cl.search.management.commands.cl_calculate_pagerank import Command
-        command = Command()
-        command.do_pagerank(chown=False)
-        r = self.client.get(reverse('pagerank_file'))
-        self.assertEqual(r.status_code, 200)
-
     def test_coverage_api(self):
         r = self.client.get(reverse('coverage_data',
                                     kwargs={'version': 2, 'court': 'ca1'}))
