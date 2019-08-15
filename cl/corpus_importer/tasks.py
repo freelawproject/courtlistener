@@ -30,7 +30,7 @@ from juriscraper.lib.exceptions import ParsingException
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
     CaseQuery, DocketReport, FreeOpinionReport, PacerSession, \
-    PossibleCaseNumberApi, ShowCaseDocApi
+    PossibleCaseNumberApi, ShowCaseDocApi, ClaimsRegister
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -51,10 +51,11 @@ from cl.lib.recap_utils import get_document_filename, get_bucket_name, \
     get_docket_filename
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
-from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
-    find_docket_object, add_docket_entries, \
-    process_orphan_documents, update_docket_appellate_metadata, \
-    make_recap_sequence_number
+from cl.recap.tasks import find_docket_object
+from cl.recap.mergers import update_docket_metadata, \
+    update_docket_appellate_metadata, make_recap_sequence_number, \
+    add_docket_entries, add_parties_and_attorneys, process_orphan_documents, \
+    add_claims_to_docket, add_bankruptcy_data_to_docket
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
