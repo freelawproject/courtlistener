@@ -24,8 +24,9 @@ from cl.lib.model_helpers import (
 from cl.lib.search_index_utils import solr_list, null_map, \
     normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
+from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.string_utils import trunc
-from cl.search.models import Court, THUMBNAIL_STATUSES
+from cl.search.models import Court
 
 SUFFIXES = (
     ('jr', 'Jr.'),
@@ -1169,7 +1170,7 @@ class Source(models.Model):
         blank=True,
     )
 
-    
+
 class ABARating(models.Model):
     ABA_RATINGS = (
         ('ewq', 'Exceptionally Well Qualified'),
