@@ -18,6 +18,8 @@ cl/assets/media/txt/
 cl/assets/media/wma/
 cl/assets/media/wpd/
 cl/assets/static/
+cl/assets/media/pdf-data/
+cl/assets/media/json-data/
 
 # Solr
 Solr/data/
