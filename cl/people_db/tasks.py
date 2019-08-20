@@ -3,8 +3,9 @@ import subprocess
 from django.core.files.base import ContentFile
 
 from cl.celery import app
+from cl.lib.models import THUMBNAIL_STATUSES
 from cl.people_db.models import FinancialDisclosure
-from cl.search.models import THUMBNAIL_STATUSES, RECAPDocument
+from cl.search.models import RECAPDocument
 
 
 def make_png_thumbnail_for_instance(pk, InstanceClass, file_attr,

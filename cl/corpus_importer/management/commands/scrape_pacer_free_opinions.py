@@ -124,8 +124,15 @@ def get_and_save_free_document_reports(options):
                     pacer_session.cookies)
             except RequestException:
                 logger.error("Failed to get document references for %s "
-                               "between %s and %s", pacer_court_id,
-                               next_start_d, next_end_d)
+                             "between %s and %s due to network error.",
+                             pacer_court_id, next_start_d, next_end_d)
+                mark_court_done_on_date(PACERFreeDocumentLog.SCRAPE_FAILED,
+                                        pacer_court_id, next_end_d)
+                break
+            except IndexError:
+                logger.error("Failed to get document references for %s "
+                             "between %s and %s due to PACER 6.3 bug.",
+                             pacer_court_id, next_start_d, next_end_d)
                 mark_court_done_on_date(PACERFreeDocumentLog.SCRAPE_FAILED,
                                         pacer_court_id, next_end_d)
                 break

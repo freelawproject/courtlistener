@@ -7,27 +7,24 @@
 
 # Downloaded and generated assets
 cl/assets/media/doc/
+cl/assets/media/dot/
 cl/assets/media/bulk-data/
+cl/assets/media/financial-disclosures/
 cl/assets/media/html/
 cl/assets/media/mp3/
 cl/assets/media/pdf/
 cl/assets/media/recap/
 cl/assets/media/sitemaps/
+cl/assets/media/recap-data/
+cl/assets/media/recap_processing_queue/
 cl/assets/media/recap-thumbnails/
 cl/assets/media/txt/
 cl/assets/media/wma/
 cl/assets/media/wpd/
+cl/assets/media/xml/
 cl/assets/static/
 cl/assets/media/pdf-data/
 cl/assets/media/json-data/
-
-# Solr
-Solr/data/
-Solr/data_audio/
-Solr/data_opinion_test/
-Solr/data_audio_test/
-Solr/data_recap/
-Solr/data_person/
 
 # IntelliJ IDEA files
 .idea

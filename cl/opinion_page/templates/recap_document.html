@@ -125,7 +125,7 @@
               {% if document.ocr_status and document.ocr_status != document.OCR_UNNECESSARY %}
                 <div class="col-sm-12 alert-warning alert">
                   {% if document.ocr_status == document.OCR_COMPLETE %}
-                    <p class="bottom">The text of this document was obtained by analyzing a scanned document provided by the court. As a result it may have typos, and you may prefer <a href="/{{ document.filepath_local }}" class="visitable">reading theoriginal PDF</a>.
+                    <p class="bottom">The text of this document was obtained by analyzing a scanned document provided by the court. As a result it may have typos, and you may prefer <a href="/{{ document.filepath_local }}" class="visitable">reading the original PDF</a>.
                     </p>
                   {% elif document.ocr_status == document.OCR_FAILED %}
                     <p class="bottom">We were unable to extract text from this document. Please <a href="/{{ document.filepath_local }}" class="visitable">download and read the original PDF</a>.

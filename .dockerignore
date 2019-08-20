@@ -3,6 +3,7 @@
 
 # Except a few things...
 !requirements.txt
+!requirements-test.txt
 !cl
 
 # But no matter what, ignore these things.
