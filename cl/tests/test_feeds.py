@@ -45,7 +45,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_can_get_to_feeds_from_homepage(self):
         """Can we get to the feeds/podcasts page from the homepage?"""
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         link = self.browser.find_element_by_link_text('Feeds')
         link.click()
 
@@ -54,7 +54,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         self.assert_text_in_body('Feeds')
 
         # Podcasts
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         link = self.browser.find_element_by_link_text("Podcasts")
         link.click()
 
@@ -71,7 +71,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             in_use=True,
             has_opinion_scraper=True,
         )
-        self.browser.get('%s%s' % (self.server_url, reverse('feeds_info')))
+        self.browser.get('%s%s' % (self.live_server_url, reverse('feeds_info')))
         self.assert_text_in_body('Jurisdiction Feeds for Opinions')
 
         for court in courts:
@@ -79,7 +79,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             print "Testing link to %s..." % court.full_name,
             self.assertEqual(
                 link.get_attribute('href'),
-                '%s/feed/court/%s/' % (self.server_url, court.pk,)
+                '%s/feed/court/%s/' % (self.live_server_url, court.pk,)
             )
             link.click()
             print "clicked...",
@@ -95,7 +95,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         Can the RSS feed for ALL jurisdictions render properly in an RSS reader?
         """
         f = feedparser.parse(
-            '%s%s' % (self.server_url, reverse('all_jurisdictions_feed'))
+            '%s%s' % (self.live_server_url, reverse('all_jurisdictions_feed'))
         )
         self.assertEqual(
             u'CourtListener.com: All Opinions (High Volume)',
@@ -110,7 +110,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
         url = '%s%s' % \
             (
-                self.server_url,
+                self.live_server_url,
                 reverse('jurisdiction_feed', kwargs={'court': 'test'})
             )
         f = feedparser.parse(url)
@@ -127,7 +127,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         to the CourtListener copy of the original PDF?
         """
         f = feedparser.parse(
-            '%s%s' % (self.server_url, reverse('all_jurisdictions_feed'))
+            '%s%s' % (self.live_server_url, reverse('all_jurisdictions_feed'))
         )
         for entry in f.entries:
             if entry.enclosures is not None:
@@ -148,7 +148,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         For Oral Arguments, does the feed provide valid links to MP3 content?
         """
         f = feedparser.parse(
-            '%s%s' % (self.server_url, reverse('all_jurisdictions_podcast'))
+            '%s%s' % (self.live_server_url, reverse('all_jurisdictions_podcast'))
         )
         for entry in f.entries:
             if entry.enclosures is not None:
@@ -168,7 +168,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         Can a user perform a search via CL and use the RSS feed feature?
         """
         # Dora goes to CL and searches for Bonvini
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.browser.find_element_by_id('id_q').send_keys('bonvini\n')
 
         # She's brought to the SERP.

@@ -54,7 +54,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         args = list(self.args)  # Make a copy of the list.
         args.extend([
             '--solr-url',
-            'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '%s/solr/%s' % (settings.SOLR_HOST, self.core_name_opinion),
             '--update',
             '--everything',
             '--do-commit',
@@ -90,7 +90,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         args = list(self.args)  # Make a copy of the list.
         args.extend([
             '--solr-url',
-            'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '%s/solr/%s' % (settings.SOLR_HOST, self.core_name_opinion),
             '--delete',
             '--everything',
             '--do-commit',
@@ -113,7 +113,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         args = list(self.args)  # Make a copy of the list.
         args.extend([
             '--solr-url',
-            'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '%s/solr/%s' % (settings.SOLR_HOST, self.core_name_opinion),
             '--update',
             '--items', '1', '2', '3',
             '--do-commit',
@@ -576,7 +576,8 @@ class GroupedSearchTest(EmptySolrTestCase):
         super(GroupedSearchTest, self).setUp()
         args = [
             '--type', 'search.Opinion',
-            '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '--solr-url', '%s/solr/%s' % (settings.SOLR_HOST,
+                                          self.core_name_opinion),
             '--update',
             '--everything',
             '--do-commit',
@@ -839,28 +840,20 @@ class PagerankTest(TestCase):
         # calculate pagerank of these 3 document
         comm = Command()
         self.verbosity = 1
-        comm.do_pagerank(chown=False)
-
-        # read in the pagerank file, converting to a dict
-        pr_values_from_file = {}
-        data_path = get_data_dir('collection1') + "external_pagerank"
-        with open(data_path) as f:
-            for line in f:
-                pk, value = line.split('=')
-                pr_values_from_file[pk] = float(value.strip())
+        pr_results = comm.do_pagerank()
 
         # Verify that whether the answer is correct, based on calculations in
         # Gephi
         answers = {
-            '1': 0.369323534954,
-            '2': 0.204581549974,
-            '3': 0.378475867453,
+            1: 0.369323534954,
+            2: 0.204581549974,
+            3: 0.378475867453,
         }
         for key, value in answers.items():
             self.assertTrue(
-                abs(pr_values_from_file[key] - value) < 0.0001,
+                abs(pr_results[key] - value) < 0.0001,
                 msg="The answer for item %s was %s when it should have been "
-                    "%s" % (key, pr_values_from_file[key],
+                    "%s" % (key, pr_results[key],
                             answers[key],)
             )
 
@@ -883,7 +876,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_toggle_to_oral_args_search_results(self):
         # Dora navigates to the global SERP from the homepage
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self._perform_wildcard_search()
         self.extract_result_count_from_serp()
 
@@ -901,7 +894,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_search_and_facet_docket_numbers(self):
         # Dora goes to CL and performs an initial wildcard Search
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self._perform_wildcard_search()
         initial_count = self.extract_result_count_from_serp()
 
@@ -928,7 +921,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_opinion_search_result_detail_page(self):
         # Dora navitages to CL and does a simple wild card search
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.browser.find_element_by_id('id_q').send_keys('voutila\n')
 
         # Seeing an Opinion immediately on the first page of results, she
@@ -1015,7 +1008,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def test_search_and_add_precedential_results(self):
         # Dora navigates to CL and just hits Search to just start with
         # a global result set
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self._perform_wildcard_search()
         first_count = self.extract_result_count_from_serp()
 
@@ -1060,7 +1053,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def test_basic_homepage_search_and_signin_and_signout(self):
 
         # Dora navigates to the CL website.
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
 
         # At a glance, Dora can see the Latest Opinions, Latest Oral Arguments,
         # the searchbox (obviously important), and a place to sign in

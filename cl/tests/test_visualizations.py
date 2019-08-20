@@ -31,7 +31,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
     def test_creating_new_visualization(self):
         """ Test if a user can create a new Visualization """
         # Beth Beta-User logs into CL
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('user', 'password')
 
         # She selects "New Visualization" from the new Visualization menu
