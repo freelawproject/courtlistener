@@ -104,7 +104,6 @@ class Command(VerboseCommand):
             if not case_object.exists():
 
                 dc = {}
-                dc['date_added'] = dt.now(tz=timezone.utc)
                 dc['full_data_model'] = False
                 dc['case_id'] = case_id
 
@@ -135,7 +134,7 @@ class Command(VerboseCommand):
 
     def check_out_of_date_case(options):
         """
-        # Add options later... for tagged types... clients -- etc
+        Add options later... for tagged types... clients -- etc
 
         :return:
         """
@@ -206,42 +205,6 @@ class Command(VerboseCommand):
 
 
 
-    def test(options):
-
-
-        if "--case" in sys.argv:
-            case_id = options['case']
-            """
-            code to access filepath of atleast the first object ... maybe all the filepaths
-            """
-
-            try:
-                dock = Docket.objects.get(case_id=case_id)
-                pdfs = DocumentImages.objects.filter(Docket_id=dock.id).filter(downloaded=True)
-                for pdf in pdfs:
-                    print LASCPDF.objects.filter(object_id=pdf.id)[0].filepath
-
-            except:
-
-                print "docket not found"
-
-
-            # try:
-            #     l = Docket.objects.get(case_id=case_id)
-            #     o_id = LASCJSON(content_object=l).object_id
-            #     print o_id
-            #     x = LASCJSON.objects.get(object_id=o_id)
-            #     print x.filepath
-            # except:
-            #     print "docket not found"
-
-
-            """
-            Code to access the case_id from the file path of the document.
-            """
-            # docs = JSONFile.objects.all()
-            # # print docs.last()
-            # print docs[1].content_object.case_id
 
     def import_wormhole(options):
 
@@ -281,7 +244,6 @@ class Command(VerboseCommand):
             lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
             lasc_session.login()
 
-            # tasks.get_pdfs(lasc_session, case_id)
             tasks.get_pdfs(lasc_session, case_id)
 
 
@@ -290,15 +252,14 @@ class Command(VerboseCommand):
 
 
     VALID_ACTIONS = {
-        'lastweek': get_cases_for_last_week,  #gets ~1k recent filings
+        'last-week': get_cases_for_last_week,  #gets ~1k recent filings
         'add-case': add_case, #adds case by case id
         'get-pdf': get_pdf, #adds case by case id
         'get-pdfs': get_pdfs, #adds case by case id
         'out-of-date': check_out_of_date_case,
         'fill-in': fill_in_case,  #fills in cases that are partial
-        'test': test,  # fills in cases that are partial
         'wormhole': import_wormhole,  # fills in cases that are partial
-        'reset-db': reset_db  # clean the database
+        'reset-db': reset_db  # clean the database of the case
     }
 
 
