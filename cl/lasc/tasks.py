@@ -1,23 +1,19 @@
 # coding=utf-8
 
 from datetime import datetime as dt
-import hashlib, types, json
+import hashlib
 
-from cl.lasc.models import Docket, DocumentImages
+from cl.lasc.models import Docket, DocumentImages, CaseInformation
 from cl.lib.command_utils import logger
-from cl.lib.models import LASCJSON, UPLOAD_TYPE, LASCPDF
+from cl.lib.models import LASCJSON, LASCPDF
 
-from django.apps import apps
 from django.core.files.base import ContentFile
-from django.core.serializers import serialize as sz
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 
-# from django.contrib.contenttypes.models import ContentType
 from django.apps import apps
 
 from juriscraper.lasc.fetch import LASCSearch
-from juriscraper.lasc.http import LASCSession
 
 from glob import glob as g
 
@@ -32,8 +28,7 @@ def get_pdf(lasc_session, case_id):
         query = LASCSearch(lasc_session)
         query._get_pdf_from_url(url)
 
-        pdf_document = LASCPDF(content_object=pdf,
-                                    upload_type=UPLOAD_TYPE.PDF)
+        pdf_document = LASCPDF(content_object=pdf)
 
         pdf_document.filepath.save(
             'lasc.pdf',
@@ -59,7 +54,7 @@ def get_pdfs(lasc_session, case_id):
             query._get_pdf_from_url(url)
 
             pdf_document = LASCPDF(content_object=pdf,
-                                        upload_type=UPLOAD_TYPE.PDF)
+                                        )
 
             pdf_document.filepath.save(
                 'lasc.pdf',
@@ -87,7 +82,7 @@ def get_pdfs_async(lasc_session, case_id):
 
         for pdf_data in query.pdfs_data:
             pdf_document = LASCPDF(content_object=lasc_obj,
-                                        upload_type=UPLOAD_TYPE.PDF)
+                                        )
 
             pdf_document.filepath.save(
                 'lasc.pdf',  # We only care about the ext w/UUIDFileSystemStorage
@@ -125,7 +120,7 @@ def add_case(lasc_session, case_id):
 
 
         else:
-            logger.info("Run Code to check for updates... not adding")
+            logger.info("Checking for Updates")
 
             if not check_hash(query, case_id, case_obj[0].case_hash):
                 logger.info("Case Up-To-Date")
@@ -135,7 +130,7 @@ def add_case(lasc_session, case_id):
                 docket.update(**{key: value for key, value in case.iteritems()})
             else:
 
-                logger.info("Case Not - up to date, Sending to update")
+                logger.info("Case Not - up to date, Sending to Update Message")
                 update_case(query, case_id)
 
             logger.info("Finished Updating")
@@ -148,67 +143,44 @@ def add_case(lasc_session, case_id):
 
         case = {}
         case['case_id'] = case_id
-        # case['date_added'], case['date_checked'], case['date_modified'] = \
-        #     dt.now(tz=timezone.utc), dt.now(tz=timezone.utc), dt.now(tz=timezone.utc)
         case['date_checked'] = dt.now(tz=timezone.utc)
         case['full_data_model'] = True
         case["case_hash"] = hashlib.sha1(force_bytes(query.case_data)).hexdigest()
 
         docket = Docket.objects.create(**{key: value for key, value in case.iteritems()})
-
         docket.save()
 
-    models = [x for x in apps.get_app_config('lasc').get_models() if x.__name__ not in ["Docket", "Proceedings"]]
+    models = [x for x in apps.get_app_config('lasc').get_models() if x.__name__ not in ["Docket"]]
     lasc_obj = Docket.objects.filter(case_id=case_id)[0]
-    pmdl = apps.get_model('lasc', 'Proceedings')
-
-    dont_save_list = ["PastProceedings", "FutureProceedings"]
     while models:
         mdl = models.pop()
 
         print mdl.__name__
 
+        while data[mdl.__name__]:
 
-        case_data_array = data[mdl.__name__]
-        if mdl.__name__ == "CaseInformation":
-            case_data_array = [case_data_array]
-            # print case_data_array
+            case_data_row = data[mdl.__name__].pop()
 
-        while case_data_array:
-
-            case_data_row = case_data_array.pop()
             case_data_row["Docket"] = lasc_obj
 
             fields = [field.name for field in mdl._meta.fields]
+
             fields.append("Docket")
 
             jj = {key: value for key, value in case_data_row.iteritems() if key in fields}
 
-            # mdl.objects.create(**{key: value for key, value in case_data_row.iteritems()}).save()
+            mdl.objects.create(**jj).save()
 
-            if mdl.__name__ not in dont_save_list:
-                mdl.objects.create(**jj).save()
-
-
-            if mdl.__name__ == "PastProceedings":
-                jj['past_or_future'] = 1
-                pmdl.objects.create(**jj).save()
-
-            if mdl.__name__ == "FutureProceedings":
-                jj['past_or_future'] = 2
-                pmdl.objects.create(**jj).save()
 
     logger.info("Saving Data to DB")
 
+    json_file = LASCJSON(content_object=lasc_obj)
 
-    json_file = LASCJSON(content_object=lasc_obj,
-                                upload_type=UPLOAD_TYPE.JSON)
 
-    json_file.filepath.save(
-        'lasc.json',  # We only care about the ext w/UUIDFileSystemStorage
+    json_file.filepath_local.save(
+        'lasc.json',
         ContentFile(query.case_data),
     )
-
 
 
 def check_case(lasc_session, case_id):
@@ -234,6 +206,8 @@ def check_hash(query, case_id, case_hash):
     query._get_json_from_internal_case_id(case_id)
     query._parse_case_data()
 
+    # print case_hash
+    # print hashlib.sha1(force_bytes(query.case_data)).hexdigest()
     if case_hash == hashlib.sha1(force_bytes(query.case_data)).hexdigest():
         return True
     else:
@@ -241,9 +215,13 @@ def check_hash(query, case_id, case_hash):
 
 
 
+
 def update_case(query, case_id):
+
     """
     This code should update cases that have detected changes
+    Method currently deletes and replaces the data on the system except for
+    lasc_docket and connections for older json and pdf files.
 
     :param query:
     :param case_id:
@@ -252,59 +230,46 @@ def update_case(query, case_id):
 
     data = query.normalized_case_data
 
-    for d in data:
-
-        if type(data[d]) == types.ListType:
-
-            mdl = apps.get_app_config('lasc').get_model(d)
-            docs = mdl.objects.filter(Docket__case_id=case_id).order_by('pk')
-
-            if len(docs) != len(data[d]): # If this is different new fields
-
-                dx = len(data[d]) - len(docs)
-
-                for row in data[d][0:dx]:
-
-                    row["Docket"] = Docket.objects.filter(case_id=case_id)[0]
-                    mdl.objects.create(**{key: value for key, value in row.iteritems()}).save()
+    models = [x for x in apps.get_app_config('lasc').get_models() if x.__name__ not in ["Docket"]]
+    lasc_obj = Docket.objects.filter(case_id=case_id)[0]
 
 
-        if type(data[d]) == types.DictionaryType:
+    while models:
 
-            mdl = apps.get_app_config('lasc').get_model(d)
-            docs = mdl.objects.filter(Docket__case_id=case_id).order_by('pk')
+        mdl = models.pop()
 
-            sobj = sz('json', [docs[0], ])
-            xx = json.loads(sobj)[0]['fields']
+        mdl.objects.filter(Docket__case_id=case_id).delete()
 
-            for key in data[d]:
 
-                if type(data[d][key]) != type(xx[key]):
-                    checkd = dt.strptime(xx[key], '%Y-%m-%d').date()
-                else:
-                    checkd = xx[key]
+        while data[mdl.__name__]:
 
-                if checkd != data[d][key]:
+            case_data_row = data[mdl.__name__].pop()
 
-                    # print "\n", key, ":", data[d][key], " -----> ", xx[key]
+            case_data_row["Docket"] = lasc_obj
 
-                    mdl.objects.filter(Docket__case_id=case_id).order_by('pk').update(**{key: value for key, value in {key:data[d][key]}.iteritems()})
+            fields = [field.name for field in mdl._meta.fields]
+            fields.append("Docket")
 
-    # Save our new hash and update the date checked moment.
+            jj = {key: value for key, value in case_data_row.iteritems() if key in fields}
 
-    docket = Docket.objects.filter(case_id=case_id)
-    case = {}
-    case['date_checked'] = dt.now(tz=timezone.utc)
-    case['date_modified'] = dt.now(tz=timezone.utc)
-    case["case_hash"] = hashlib.sha1(force_bytes(query.case_data)).hexdigest()
+            mdl.objects.create(**jj).save()
 
-    docket.update(**{key: value for key, value in case.iteritems()})
+
+
+    logger.info("Saving Data to DB")
+
+    json_file = LASCJSON(content_object=lasc_obj)
+
+    json_file.filepath_local.save(
+        'lasc.json',
+        ContentFile(query.case_data),
+    )
+
 
 def remove_case(case_id):
 
-    l = Docket.objects.get(case_id=case_id)
-    l.delete()
-
+    case_obj = Docket.objects.filter(case_id=case_id)
+    case_obj.delete()
 
     pass
 
@@ -373,9 +338,9 @@ def import_wormhole_corpus(dir):
 
 
             json_file = LASCJSON(content_object=lasc_obj,
-                                        upload_type=UPLOAD_TYPE.CASE_JSON)
+                                        upload_type="JSON")
 
-            json_file.filepath.save(
+            json_file.filepath_local.save(
                 'lasc.json',  # We only care about the ext w/UUIDFileSystemStorage
                 ContentFile(l.case_data),
             )
