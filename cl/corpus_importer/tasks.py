@@ -618,7 +618,7 @@ def make_fjc_idb_lookup_params(item):
           interval_step=10 * 60, ignore_results=True)
 def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
                                 cookies, case_name=None, office_number=None,
-                                docket_number_letters=None, extra_data=None):
+                                docket_number_letters=None):
     """Get the pacer_case_id and title values for a district court docket. Use
     heuristics to disambiguate the results.
 
@@ -635,7 +635,8 @@ def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
     :param court_id: The CourtListener court ID for the docket number
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
-    :param case_name: The case name to use for disambiguation
+    :param case_name: The case name to use for disambiguation. Disambiguation
+    is done in Juriscraper using edit distance.
     :param office_number: The number (or letter) where the case took place.
     Typically, this is in the beginning of the docket number before the colon.
     This will be used for disambiguation. If you passed it as part of the
