@@ -4,6 +4,7 @@
 # Except a few things...
 !requirements.txt
 !requirements-test.txt
+!.circleci
 !cl
 
 # But no matter what, ignore these things.
