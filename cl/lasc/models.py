@@ -36,7 +36,7 @@ class Docket(models.Model):
     )
 
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
+        help_text="The last moment when the item was modified",
         auto_now=True,
         db_index=True,
     )
@@ -44,7 +44,7 @@ class Docket(models.Model):
 
     case_hash = models.CharField(
         max_length=128,
-        help_text="SHA1 Hash of the returned JSON"
+        help_text="SHA1 Hash of Case Data"
     )
 
 
@@ -84,25 +84,25 @@ class CaseInformation(models.Model):
     filing_date = models.DateField(
         null=True,
         blank=True,
-        help_text="The date the case was filed as a Date",
+        help_text="The date the case was filed as a date",
     )
 
     filing_date_string = models.TextField(
         null=True,
         blank=True,
-        help_text="The date the case was filed as a String",
+        help_text="The date the case was filed as a string",
     )
 
     disposition_date = models.DateField(
         null=True,
         blank=True,
-        help_text="The date the case was disposed by the court as a Date",
+        help_text="The date the case was disposed by the court as a date",
     )
 
     disposition_date_string = models.TextField(
         null=True,
         blank=True,
-        help_text="The date the case was disposed by the court as a String",
+        help_text="The date the case was disposed by the court as a string",
     )
 
     district = models.CharField(
@@ -151,7 +151,7 @@ class CaseInformation(models.Model):
         null=True,
         blank=True,
         help_text="Case Type Code",
-    ) #may delete
+    )
 
     status = models.TextField(
         null=True,
@@ -215,9 +215,9 @@ class DocumentImages(models.Model):
     Docket = models.ForeignKey(
         Docket,
         on_delete=models.CASCADE,
+        null=True
     )
 
-    # case_number = models.TextField(help_text="Case Number associated with this document")
     page_count = models.IntegerField(
         help_text="Page count for this document",
     )
@@ -225,6 +225,8 @@ class DocumentImages(models.Model):
     document_type = models.TextField(
         null=True,
         blank=True,
+        help_text="Type of Document Code",
+
     )
     document_url = models.TextField(
         help_text="The document URL {MAP Credentials required}",
@@ -239,11 +241,11 @@ class DocumentImages(models.Model):
     )
 
     doc_filing_date = models.DateField(
-        help_text="The date the document was filed in the system as a Date object",
+        help_text="The date the document was filed in the system as a date object",
     )
 
     doc_filing_date_string = models.TextField(
-        help_text="The date the document was filed in the system as a String object",
+        help_text="The date the document was filed in the system as a string object",
     )
 
     image_type_id = models.TextField(
@@ -252,7 +254,7 @@ class DocumentImages(models.Model):
 
     app_id = models.TextField(
         help_text="ID for filing application, if any.",
-    ) #Is this the App that was used to file the document?  California have multiple options?
+    )
 
     doc_id = models.TextField(
         help_text="Internal Document ID",
@@ -361,12 +363,27 @@ class RegisterOfActions(models.Model):
         # "IsDownloadable": false
     """
 
-    Docket = models.ForeignKey(Docket, related_name='registers', on_delete=models.CASCADE)
+    Docket = models.ForeignKey(
+        Docket,
+        on_delete=models.CASCADE,
+        null=True
+    )
 
-    description = models.TextField(help_text="Short description of the document")
-    additional_information = models.TextField(help_text="Additional information stored as HTML")
-    register_of_action_date_string = models.TextField(help_text="Date of Register of Action as a String")
-    register_of_action_date = models.DateTimeField(help_text="Date of Register of Action as a Date Object")
+    description = models.TextField(
+        help_text="Short description of the document",
+    )
+
+    additional_information = models.TextField(
+        help_text="Additional information stored as HTML",
+    )
+
+    register_of_action_date_string = models.TextField(
+        help_text="Date of Register of Action as a string",
+    )
+
+    register_of_action_date = models.DateTimeField(
+        help_text="Date of Register of Action as a Date Object",
+    )
 
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -380,16 +397,6 @@ class RegisterOfActions(models.Model):
         db_index=True,
     )
 
-    # page_count = models.IntegerField()
-    # is_purchaseable = models.BooleanField()
-    # is_emailable = models.BooleanField()
-    # is_viewable = models.BooleanField()
-    # is_in_cart = models.BooleanField()
-    # is_downloadable = models.BooleanField()
-    # is_purchased = models.BooleanField()
-
-    # filenet_id = models.TextField(help_text="")
-    # odyssey_id = models.TextField(help_text="")
 
 
     pass
@@ -397,12 +404,38 @@ class RegisterOfActions(models.Model):
 
 class CrossReferences(models.Model):
 
-    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE)
+    """
+    cross_reference_date_string: "11/08/2001"
+    cross_reference_date : 2001-11-07T23:00:00-08:00
+    cross_reference_case_number: 37-2011-0095551-
+    cross_reference_type_description:  Coordinated Case(s)
+    """
 
-    cross_reference_date_string = models.TextField(help_text="Cross Reference date as a String")        #--->"11/08/2001",
-    cross_reference_date = models.DateTimeField(help_text="Cross reference date as a Date Object")               #"2001-11-07T23:00:00-08:00",
-    cross_reference_case_number = models.TextField(help_text="Cross Reference Case Number")        #"37-2011-0095551-",
-    cross_reference_type_description = models.TextField(help_text="Cross Reference short description")   #"Coordinated Case(s)"
+    Docket = models.ForeignKey(
+        Docket,
+        on_delete=models.CASCADE,
+        null=True
+    )
+
+    cross_reference_date_string = models.TextField(
+        help_text="Cross Reference date as a String",
+        null=True,
+    )
+
+    cross_reference_date = models.DateTimeField(
+        help_text="Cross reference date as a Date Object",
+        null=True,
+    )
+
+    cross_reference_case_number = models.TextField(
+        help_text="Cross Reference Case Number",
+        null=True,
+    )
+
+    cross_reference_type_description = models.TextField(
+        help_text="Cross Reference short description",
+        null=True,
+    )
 
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -437,23 +470,36 @@ class Parties(models.Model):
 
     """
 
-    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE)
+    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE, null=True)
 
-    case_number = models.TextField(help_text="Case Number")
-    district = models.TextField(help_text="Court District")
-    division_code = models.TextField(help_text="Court Division ")
-    attorney_name = models.TextField(help_text="Attorney Name")
-    attorney_firm = models.TextField(help_text="Attorney Firm")
-    entity_number = models.TextField(help_text="Order entity/party joined cases system as String")
-    party_flag = models.TextField(help_text="Court Code representing party")
-    party_type_code = models.TextField(help_text="Court code representing party position")
-    party_description = models.TextField(help_text="Description of the party")
-    name = models.TextField(help_text="Full name of the party")
 
-    # civas_cxc_number = models.TextField(help_text="")
-    # crs_party_code = models.TextField(null=True, blank=True)
-    # date_of_birth = models.TextField(help_text="")
-    # date_of_birth_string = models.TextField(help_text="")
+    attorney_name = models.TextField(
+        help_text="Attorney Name",
+    )
+
+    attorney_firm = models.TextField(
+        help_text="Attorney Firm",
+    )
+
+    entity_number = models.TextField(
+        help_text="Order entity/party joined cases system as String",
+    )
+
+    party_flag = models.TextField(
+        help_text="Court Code representing party",
+    )
+
+    party_type_code = models.TextField(
+        help_text="Court code representing party position",
+    )
+
+    party_description = models.TextField(
+        help_text="Description of the party",
+    )
+
+    name = models.TextField(
+        help_text="Full name of the party",
+    )
 
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -468,111 +514,6 @@ class Parties(models.Model):
     )
 
 
-class PastProceedings(models.Model):
-
-    """
-    # "ProceedingDateString": "05/20/2019",
-    # "CourtAlt": "",
-    # "CaseNumber": "JCCP4674",
-    # "District": "",
-    # "AMPM": "AM",
-    # "Memo": "",
-    # "Address": "",
-    # "ProceedingRoom": "Legacy",
-    # "ProceedingDate": "2019-05-20T00:00:00-07:00",
-    # "Result": "Not Held - Vacated by Court",
-    # "ProceedingTime": "09:00",
-    # "Judge": "",
-    # "CourthouseName": "",
-    # "DivisionCode": "",
-    # "Event": "Jury Trial"
-
-    """
-
-    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE)
-
-    # court_alt = models.TextField(help_text="")
-    # case_number = models.TextField(help_text="Court Case Number")
-    # district = models.TextField(help_text="Court District")
-    am_pm = models.TextField(help_text="Was the proceeding in the AM or PM")
-    memo = models.TextField(help_text="Memo about the past proceeding")
-    address = models.TextField(help_text="Address of the past proceeding")
-
-    proceeding_date_string = models.TextField(help_text="Date of Past Proceeding as a string")
-    proceeding_room = models.TextField(help_text="The court room of the past proceeding")
-    proceeding_date = models.DateTimeField(help_text="Date of the past proceeding as a date object")
-    proceeding_time = models.TextField(help_text="Time of the past proceeding")
-
-    result = models.TextField(help_text="Result of the past proceeding")
-    judge = models.TextField(help_text="Judge in the past proceeding")
-    courthouse_name = models.TextField(help_text="Courthouse name for the past proceeding")
-    division_code = models.TextField(help_text="Courthouse Division {ex. CV = Civil}")
-    event = models.TextField(help_text="Event that occurred {ex. Jury Trial}")
-
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
-
-
-class FutureProceedings(models.Model):
-
-    """
-        # "ProceedingDateString": "04/13/2020",
-        # "CourtAlt": "SS ",
-        # "CaseNumber": "18STCV02953",
-        # "District": "SS ",
-        # "AMPM": "AM",
-        # "Memo": "",
-        # "Address": "SS ",
-        # "ProceedingRoom": "5",
-        # "ProceedingDate": "2020-04-13T00:00:00-07:00",
-        # "Result": "",
-        # "ProceedingTime": "10:00",
-        # "Judge": "",
-        # "CourthouseName": "Spring Street Courthouse",
-        # "DivisionCode": "CV",
-        # "Event": "Final Status Conference"
-
-    """
-    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE)
-
-    # court_alt = models.TextField(help_text="")
-    # case_number = models.TextField(help_text="Court Case Number")
-    # district = models.TextField(h_elp_text="Court District")
-    am_pm = models.TextField(help_text="Was the proceeding in the AM or PM")
-    memo = models.TextField(help_text="Memo about the past proceeding")
-    address = models.TextField(help_text="Address of the past proceeding")
-
-    proceeding_date = models.DateField(help_text="Date of the past proceeding as a date object")
-    proceeding_date_string = models.TextField(help_text="Date of Past Proceeding as a string")
-    proceeding_room = models.TextField(help_text="The court room of the past proceeding")
-    proceeding_time = models.TextField(help_text="Time of the past proceeding in HH:MM string")
-
-    result = models.TextField(help_text="Result of the past proceeding")
-    judge = models.TextField(help_text="Judge in the past proceeding")
-    courthouse_name = models.TextField(help_text="Courthouse name for the past proceeding")
-    division_code = models.TextField(help_text="Courthouse Division {ex. CV = Civil}")
-    event = models.TextField(help_text="Event that occurred {ex. Jury Trial}")
-
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
 
 
 class PastManager(models.Manager):
@@ -597,23 +538,55 @@ class Proceedings(models.Model):
     TIME_CHOICES = ((PAST, "Things in the past"), (FUTURE, "Things in the future"))
 
 
-    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE)
+    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE, null=True)
 
-    am_pm = models.TextField(help_text="Was the proceeding in the AM or PM")
-    memo = models.TextField(help_text="Memo about the past proceeding")
-    address = models.TextField(help_text="Address of the past proceeding")
+    am_pm = models.TextField(
+        help_text="Was the proceeding in the AM or PM",
+    )
 
-    proceeding_date = models.TextField(help_text="Date of the past proceeding as a date object")
-    proceeding_date_string = models.TextField(help_text="Date of Past Proceeding as a string")
-    proceeding_room = models.TextField(help_text="The court room of the past proceeding")
-    proceeding_time = models.TextField(help_text="Time of the past proceeding in HH:MM string")
+    memo = models.TextField(
+        help_text="Memo about the past proceeding",
+    )
 
-    result = models.TextField(help_text="Result of the past proceeding")
-    judge = models.TextField(help_text="Judge in the past proceeding")
-    courthouse_name = models.TextField(help_text="Courthouse name for the past proceeding")
-    division_code = models.TextField(help_text="Courthouse Division {ex. CV = Civil}")
-    event = models.TextField(help_text="Event that occurred {ex. Jury Trial}")
+    address = models.TextField(
+        help_text="Address of the past proceeding",
+    )
 
+    proceeding_date = models.TextField(
+        help_text="Date of the past proceeding as a date object",
+    )
+
+    proceeding_date_string = models.TextField(
+        help_text="Date of Past Proceeding as a string",
+    )
+
+    proceeding_room = models.TextField(
+        help_text="The court room of the past proceeding",
+    )
+
+    proceeding_time = models.TextField(
+        help_text="Time of the past proceeding in HH:MM string",
+    )
+
+    result = models.TextField(
+        help_text="Result of the past proceeding",
+    )
+
+    judge = models.TextField(
+        help_text="Judge in the past proceeding",
+    )
+
+    courthouse_name = models.TextField(
+        help_text="Courthouse name for the past proceeding",
+    )
+
+    division_code = models.TextField(
+        help_text="Courthouse Division {ex. CV = Civil}",
+    )
+
+    event = models.TextField(
+        help_text="Event that occurred {ex. Jury Trial}",
+    )
 
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -629,10 +602,12 @@ class Proceedings(models.Model):
 
 
 
-    past_or_future = models.SmallIntegerField(choices=TIME_CHOICES,
-                                              null=True,
-                                               blank=True,
-                                                    )
+    past_or_future = models.SmallIntegerField(
+        choices=TIME_CHOICES,
+        null=True,
+        blank=True,
+        help_text="Is this event in the Past {1} or Future {2}"
+    )
     past_objects = PastManager()
     future_objects = FutureManager()
 
@@ -658,16 +633,34 @@ class TentativeRulings(models.Model):
     """
 
 
-    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE)
+    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE, null=True)
 
-    case_number = models.TextField(help_text="Case number")
-    location_id = models.TextField(help_text="Internal court code for location")
-    department = models.TextField(help_text="Internal court code for department")
-    ruling = models.TextField(help_text="The court decision in HTML format as long string")
-    creation_date = models.DateTimeField(help_text="Date the ruling was decided as a date object")
-    creation_date_string = models.TextField(help_text="Date the ruling was added to the system as a string")
-    hearing_date = models.DateTimeField(help_text="")
-    hearing_date_string = models.TextField(help_text="")
+    case_number = models.TextField(
+        help_text="Case number")
+
+    location_id = models.TextField(
+        help_text="Internal court code for location")
+
+    department = models.TextField(
+        help_text="Internal court code for department")
+
+    ruling = models.TextField(
+        help_text="The court ruling as HTML")
+
+    creation_date = models.DateTimeField(
+        help_text="Date the ruling was decided as a date object")
+
+    creation_date_string = models.TextField(
+        help_text="Date the ruling was added to the system as a string",
+    )
+
+    hearing_date = models.DateTimeField(
+        help_text="",
+    )
+
+    hearing_date_string = models.TextField(
+        help_text="",
+    )
 
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -693,14 +686,30 @@ class DocumentsFiled(models.Model):
     # "Document": "Answer"]
     """
 
-    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE)
+    Docket = models.ForeignKey(Docket, on_delete=models.CASCADE, null=True)
 
-    case_number = models.CharField(max_length=20, help_text="Case Number associated with the filed document")
-    date_filed = models.DateTimeField(help_text="Date a document was filed as a DateTime object")
-    date_filed_string = models.CharField(max_length=25, help_text="Date a document was filed as a string")
+    # case_number = models.CharField(max_length=20, help_text="Case Number associated with the filed document")
 
-    memo = models.TextField(null=True, blank=True, help_text="Memo describing document filed")
-    party = models.TextField(null=True, blank=True, help_text="Name of the Party responsible for the filed document")
+    date_filed = models.DateTimeField(
+        help_text="Date a document was filed as a DateTime object",
+    )
+
+    date_filed_string = models.CharField(
+        max_length=25,
+        help_text="Date a document was filed as a string",
+    )
+
+    memo = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Memo describing document filed",
+    )
+
+    party = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Filing Party",
+    )
 
     document = models.TextField(
         null=True, blank=True,
@@ -720,8 +729,3 @@ class DocumentsFiled(models.Model):
         db_index=True,
     )
 
-
-class CaseHistory(models.Model):
-    """This will probably be removed"""
-
-    pass
