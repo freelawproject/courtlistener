@@ -4,24 +4,24 @@ import re
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction, OperationalError
-from django.db.models import Q, Prefetch
+from django.db import IntegrityError, OperationalError, transaction
+from django.db.models import Prefetch, Q
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.import_lib import get_candidate_judges
-from cl.lib.pacer import normalize_attorney_contact, get_blocked_status, \
-    map_pacer_to_cl_id, normalize_attorney_role
+from cl.lib.pacer import get_blocked_status, map_pacer_to_cl_id, \
+    normalize_attorney_contact, normalize_attorney_role
 from cl.lib.string_utils import anonymize
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.models import Attorney, AttorneyOrganization, \
-    AttorneyOrganizationAssociation, Role, PartyType, Party, CriminalCount, \
-    CriminalComplaint
+    AttorneyOrganizationAssociation, CriminalComplaint, CriminalCount, Party, \
+    PartyType, Role
 from cl.recap.models import ProcessingQueue, UPLOAD_TYPE
-from cl.search.models import Court, OriginatingCourtInformation, DocketEntry, \
-    RECAPDocument
+from cl.search.models import BankruptcyInformation, Claim, ClaimHistory, Court, \
+    DocketEntry, OriginatingCourtInformation, RECAPDocument, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -804,14 +804,128 @@ def add_parties_and_attorneys(d, parties):
                                      updated_attorneys)
 
 
-def add_bankruptcy_data_to_docket(d, claims_data, tag_names):
+@transaction.atomic
+def add_bankruptcy_data_to_docket(d, claims_data):
     """Add bankruptcy data to the docket from the claims data."""
-    pass
+    try:
+        bankr_data = d.bankruptcy_information
+    except BankruptcyInformation.DoesNotExist:
+        bankr_data = BankruptcyInformation(docket=d)
+
+    bankr_data.date_converted = claims_data.get(
+        'date_converted') or bankr_data.date_converted
+    bankr_data.date_last_to_file_claims = claims_data.get(
+        'date_last_to_file_claims') or bankr_data.date_last_to_file_claims
+    bankr_data.date_last_to_file_govt = claims_data.get(
+        'date_last_to_file_govt') or bankr_data.date_last_to_file_govt
+    bankr_data.date_debtor_dismissed = claims_data.get(
+        'date_debtor_dismissed') or bankr_data.date_debtor_dismissed
+    bankr_data.chapter = claims_data.get(
+        'chapter') or bankr_data.chapter
+    bankr_data.trustee_str = claims_data.get(
+        'trustee_str') or bankr_data.trustee_str
+    bankr_data.save()
 
 
-def add_claims_to_docket(d, claims_data, tag_names):
-    """Add claims data to the docket."""
-    pass
+def add_claim_history_entry(new_history, claim):
+    """Add a document from a claim's history table to the database.
+
+    These documents can reference docket entries or documents that only exist
+    in the claims registry. Whatever the case, we just make an entry in the
+    claims history table. For now we don't try to link the docket entry table
+    with the claims table. It's doable, but adds complexity.
+
+    :param new_history: The history dict returned by juriscraper.
+    :param claim: The claim in the database the history is associated with.
+    :return None
+    """
+    history_type = new_history['type']
+    common_lookup_params = {
+        'claim': claim,
+        'date_filed': new_history['date_filed'],
+        'pacer_case_id': new_history['pacer_case_id'],
+        'document_number': new_history['document_number'],
+    }
+    if history_type == 'docket_entry':
+        db_history, _ = ClaimHistory.objects.get_or_create(
+            claim_document_type=ClaimHistory.DOCKET_ENTRY,
+            pacer_doc_id=new_history.get('pacer_doc_id', ''),
+            **common_lookup_params
+        )
+        db_history.pacer_dm_id = new_history.get(
+            'pacer_dm_id') or db_history.pacer_dm_id
+        db_history.pacer_seq_no = new_history.get(
+            'pacer_seq_no') or db_history.pacer_seq_no
+    else:
+        db_history, _ = ClaimHistory.objects.get_or_create(
+            claim_document_type=ClaimHistory.CLAIM_ENTRY,
+            claim_doc_id=new_history['id'],
+            attachment_number=new_history['attachment_number'],
+            **common_lookup_params
+        )
+
+    db_history.description = new_history.get(
+        'description') or db_history.description
+    db_history.save()
+
+
+@transaction.atomic
+def add_claims_to_docket(d, new_claims, tag_names):
+    """Add claims data to the docket.
+
+    :param d: A docket object to associate claims with.
+    :param new_claims: A list of claims dicts from Juriscraper.
+    :param tag_names: A list of tag names to add to the claims.
+    """
+    for new_claim in new_claims:
+        db_claim, _ = Claim.objects.get_or_create(
+            docket=d,
+            claim_number=new_claim['claim_number']
+        )
+        db_claim.date_claim_modified = new_claim.get(
+            'date_claim_modified') or db_claim.date_claim_modified
+        db_claim.date_original_entered = new_claim.get(
+            'date_original_entered') or db_claim.date_original_entered
+        db_claim.date_original_filed = new_claim.get(
+            'date_original_filed') or db_claim.date_original_filed
+        db_claim.date_last_amendment_entered = new_claim.get(
+            'date_last_amendment_entered') or db_claim.date_last_amendment_entered
+        db_claim.date_last_amendment_filed = new_claim.get(
+            'date_last_amendment_filed') or db_claim.date_last_amendment_filed
+        db_claim.creditor_details = new_claim.get(
+            'creditor_details') or db_claim.creditor_details
+        db_claim.creditor_id = new_claim.get(
+            'creditor_id') or db_claim.creditor_id
+        db_claim.status = new_claim.get(
+            'status') or db_claim.status
+        db_claim.entered_by = new_claim.get(
+            'entered_by') or db_claim.entered_by
+        db_claim.filed_by = new_claim.get(
+            'filed_by') or db_claim.filed_by
+        db_claim.amount_claimed = new_claim.get(
+            'amount_claimed') or db_claim.amount_claimed
+        db_claim.unsecured_claimed = new_claim.get(
+            'unsecured_claimed') or db_claim.unsecured_claimed
+        db_claim.secured_claimed = new_claim.get(
+            'secured_claimed') or db_claim.secured_claimed
+        db_claim.priority_claimed = new_claim.get(
+            'priority_claimed') or db_claim.priority_claimed
+        db_claim.description = new_claim.get(
+            'description') or db_claim.description
+        db_claim.remarks = new_claim.get(
+            'remarks') or db_claim.remarks
+        db_claim.save()
+
+        # Add tags to claim
+        tags = []
+        if tag_names is not None:
+            for tag_name in tag_names:
+                tag, _ = Tag.objects.get_or_create(name=tag_name)
+                tag.tag_object(db_claim)
+                tags.append(tag)
+
+        for new_history in new_claim['history']:
+            add_claim_history_entry(new_history, db_claim)
 
 
 def process_orphan_documents(rds_created, court_id, docket_date):
