@@ -1020,6 +1020,53 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
     return att_report
 
 
+@app.task(bind=True, max_retries=5, interval_start=5 * 60,
+          interval_step=10 * 60, ignore_result=True)
+def get_bankr_claims_registry(self, data, cookies, tag_names=None):
+    """Get the bankruptcy claims registry for a docket
+
+    :param data: A dict of data containing, primarily, a key to 'docket_pk' for
+    the docket for which we want to get the registry. Other keys will be
+    ignored.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
+    :param tag_names: A list of tag names that should be stored with the claims
+    registry information in the DB.
+    """
+    s = PacerSession(cookies=cookies)
+    if data is None or data.get('docket_pk') is None:
+        logger.warning("Empty data argument or parameter. Terminating chains "
+                       "and exiting.")
+        self.request.chain = None
+        return
+
+    d = Docket.objects.get(pk=data['docket_pk'])
+    logging_id = "%s, %s" % (d.pk, d.pacer_case_id)
+    logger.info("Querying claims information for docket: %s", logging_id)
+    report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
+    report.query(d.pacer_case_id)
+    claims_data = report.data
+    logger.info("Querying and parsing complete for %s", logging_id)
+
+    # Save the HTML
+    pacer_file = PacerHtmlFiles(content_object=d,
+                                upload_type=UPLOAD_TYPE.CLAIMS_REGISTER)
+    pacer_file.filepath.save(
+        'random.html',  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(report.response.text),
+    )
+
+    if not claims_data:
+        logger.info("No valid claims data for %s", logging_id)
+        return data
+
+    # Merge the contents into CL
+    add_bankruptcy_data_to_docket(d, claims_data)
+    add_claims_to_docket(d, claims_data['claims'], tag_names)
+    logger.info("Created/updated claims data for %s", logging_id)
+    return data
+
+
 @app.task(bind=True, max_retries=15, interval_start=5,
           interval_step=5, ignore_result=True)
 def make_attachment_pq_object(self, attachment_report, rd_pk, user_pk):
