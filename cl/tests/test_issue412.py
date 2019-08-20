@@ -3,6 +3,7 @@
 Test Issue 412: Add admin-visible notice to various pages showing if they are
 blocked from search engines
 """
+from django.urls import reverse
 from timeout_decorator import timeout_decorator
 
 from cl.search.models import Docket
@@ -26,12 +27,9 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in('admin', 'password')
 
-        # She ends up on the SERP page and clicks the link for an Opinion
-        # she knows is blocked
-        blocked_opinion = self.browser.find_element_by_link_text(
-            'Blocked Opinion (Test 2015)'
-        )
-        blocked_opinion.click()
+        # Then she loads up a blocked case
+        self.browser.get('%s%s' % (self.live_server_url,
+                                   reverse('view_case', args=('11', 'asdf'))))
 
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
@@ -44,12 +42,9 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in('pandora', 'password')
 
-        # She ends up on the SERP page and clicks the link for an Opinion
-        # she knows is blocked
-        blocked_opinion = self.browser.find_element_by_link_text(
-            'Blocked Opinion (Test 2015)'
-        )
-        blocked_opinion.click()
+        # Then she loads up a blocked case
+        self.browser.get('%s%s' % (self.live_server_url,
+                                   reverse('view_case', args=('11', 'asdf'))))
 
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
@@ -62,12 +57,9 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in('admin', 'password')
 
-        # She ends up on the SERP page and clicks the link for an Opinion
-        # she knows is definitely NOT blocked
-        blocked_opinion = self.browser.find_element_by_link_text(
-            'Not Blocked Opinion (Test 2015)'
-        )
-        blocked_opinion.click()
+        # Then she loads up a case that's not blocked
+        self.browser.get('%s%s' % (self.live_server_url,
+                                   reverse('view_case', args=('10', 'asdf'))))
 
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
