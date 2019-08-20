@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     'cl.donate',
     'cl.favorites',
     'cl.people_db',
+    'cl.lasc',
     'cl.lib',
     'cl.opinion_page',
     'cl.recap',
@@ -159,6 +160,11 @@ SOLR_TEST_URLS = {
     'search.OpinionCluster': SOLR_OPINION_TEST_URL,
 
 }
+SOLR_EXAMPLE_CORE_PATH = os.path.join(os.sep, 'usr', 'local', 'solr',
+                                      'example', 'solr', 'collection1')
+SOLR_TEMP_CORE_PATH_LOCAL = os.path.join(os.sep, 'tmp', 'solr')
+SOLR_TEMP_CORE_PATH_DOCKER = os.path.join(os.sep, 'tmp', 'solr')
+
 
 #########
 # Redis #
@@ -178,6 +184,9 @@ REDIS_DATABASES = {
 if DEVELOPMENT:
     # In a development machine, these setting make sense
     CELERY_WORKER_CONCURRENCY = 2
+    # This makes the tasks run outside the async worker and is needed for tests
+    # to pass
+    CELERY_TASK_ALWAYS_EAGER = True
 else:
     # Celery settings for production sites
     CELERY_WORKER_CONCURRENCY = 20
@@ -293,7 +302,9 @@ REST_FRAMEWORK = {
     },
     'OVERRIDE_THROTTLE_RATES': {
         # Throttling down.
-        'spierre91': '100/hour',  # Ignored repeated emails
+        # Doing a background check service, we told them we didn't want to work
+        # with them.
+        'elios': '10/hour',
         'shreyngd': '100/hour',
         'leo': '100/hour',
         'miffy': '100/hour',
@@ -384,11 +395,11 @@ MARKDOWN_DEUX_STYLES = {
 }
 
 
-#########
-# PIWIK #
-#########
-PIWIK_URL = 'https://piwik.courtlistener.com/piwik.php'
-PIWIK_SITE_ID = '1'
+##########
+# MATOMO #
+##########
+MATOMO_URL = 'http://192.168.0.243/piwik.php'
+MATOMO_SITE_ID = '1'
 
 
 ########
