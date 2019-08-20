@@ -1238,6 +1238,7 @@ class BankruptcyInformation(models.Model):
         Docket,
         help_text="The docket that the bankruptcy info is associated with.",
         on_delete=models.CASCADE,
+        related_name='bankruptcy_information',
     )
     date_created = models.DateTimeField(
         help_text="The date time this item was created.",
@@ -1279,6 +1280,12 @@ class BankruptcyInformation(models.Model):
         help_text="The name of the trustee handling the case.",
         blank=True,
     )
+
+    class Meta:
+        verbose_name_plural = "Bankruptcy Information"
+
+    def __unicode__(self):
+        return 'Bankruptcy Info for docket %s' % self.docket_id
 
 
 class Claim(models.Model):
@@ -1333,6 +1340,7 @@ class Claim(models.Model):
         help_text="The number of the claim.",
         max_length=10,
         blank=True,
+        db_index=True,
     )
     creditor_details = models.TextField(
         help_text="The details of the creditor from the claims register; "
@@ -1391,6 +1399,10 @@ class Claim(models.Model):
         blank=True,
     )
 
+    def __unicode__(self):
+        return "Claim #%s on docket %s with pk %s" % \
+               (self.claim_number, self.docket_id, self.pk)
+
 
 class ClaimHistory(AbstractPacerDocument, AbstractPDF):
     DOCKET_ENTRY = 1
@@ -1441,6 +1453,9 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF):
         max_length=100,
         blank=True,
     )
+
+    class Meta:
+        verbose_name_plural = "Claim History Entries"
 
 
 class Court(models.Model):
@@ -2515,6 +2530,9 @@ class Tag(models.Model):
         elif type(thing) == RECAPDocument:
             return self.recap_documents.through.objects.get_or_create(
                     recapdocument_id=thing.pk, tag_id=self.pk)
+        elif type(thing) == Claim:
+            return self.claims.through.objects.get_or_create(
+                claim_id=thing.pk, tag_id=self.pk)
         else:
             raise NotImplementedError("Object type not supported for tagging.")
 

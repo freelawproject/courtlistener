@@ -180,6 +180,7 @@
     {% endif %}
 
     {% with og_info=docket.originating_court_information %}
+    {% with bankr_info=docket.bankruptcy_information %}
     {% if docket.panel_str %}
       <p class="bottom">
         <span class="meta-data-header">Panel:</span>
@@ -324,6 +325,52 @@
       </p>
     {% endif %}
 
+    {% if bankr_info %}
+      <h3 class="v-offset-above-3">Bankruptcy Information</h3>
+      <hr class="top">
+      {% if bankr_info.date_converted %}
+        <p class="bottom">
+          <span class="meta-data-header">Date Converted:</span>
+          <span class="meta-data-value">{{ bankr_info.date_converted|date:"N j, Y" }}</span>
+        </p>
+      {% endif %}
+      {% if bankr_info.date_last_to_file_claims %}
+        <p class="bottom">
+          <span class="meta-data-header">Last Date to File Claims:</span>
+          <span
+              class="meta-data-value">{{ bankr_info.date_last_to_file_claims|date:"N j, Y" }}</span>
+        </p>
+      {% endif %}
+      {% if bankr_info.date_last_to_file_govt %}
+        <p class="bottom">
+          <span class="meta-data-header">Last Date to File Claims (Gov't):</span>
+          <span
+              class="meta-data-value">{{ bankr_info.date_last_to_file_govt|date:"N j, Y" }}</span>
+        </p>
+      {% endif %}
+      {% if bankr_info.date_debtor_dismissed %}
+        <p class="bottom">
+          <span class="meta-data-header">Date Debtor Dismissed:</span>
+          <span
+              class="meta-data-value">{{ bankr_info.date_debtor_dismissed|date:"N j, Y" }}</span>
+        </p>
+      {% endif %}
+      {% if bankr_info.chapter %}
+        <p class="bottom">
+          <span class="meta-data-header">Chapter:</span>
+          <span
+              class="meta-data-value">{{ bankr_info.chapter }}</span>
+        </p>
+      {% endif %}
+      {% if bankr_info.trustee_str %}
+        <p class="bottom">
+          <span class="meta-data-header">Trustee:</span>
+          <span
+              class="meta-data-value">{{ bankr_info.trustee_str }}</span>
+        </p>
+      {% endif %}
+    {% endif %}
+
     {% if og_info %}
       <h3 class="v-offset-above-3">Originating Court Information</h3>
       <hr class="top">
@@ -416,6 +463,7 @@
         <span class="meta-data-value">{{ og_info.date_received_coa }}</span>
       </p>
     {% endif %}
+    {% endwith %}{# No more bankr_info variable #}
     {% endwith %}{# No more og_info variable #}
   </div>
 

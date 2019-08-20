@@ -6,6 +6,7 @@ from django.db import models
 from django.utils.timezone import now
 
 from cl.lib.storage import UUIDFileSystemStorage
+from django.db import models
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.model_helpers import make_pdf_path, make_pdf_thumb_path
 
@@ -41,9 +42,6 @@ def make_path(root, filename):
     )
 
 class AbstractPDF(models.Model):
-
-
-
     """An abstract model to hold PDF-related information"""
     OCR_COMPLETE = 1
     OCR_UNNECESSARY = 2
@@ -88,16 +86,6 @@ class AbstractPDF(models.Model):
         db_index=True,
         blank=True,
     )
-
-    filepath = models.FileField(
-        help_text="The path of the original json file.",
-        upload_to=make_pdf_path,
-        storage=UUIDFileSystemStorage(),
-        max_length=1000,
-        blank=True,
-    )
-
-
     filepath_ia = models.CharField(
         help_text="The URL of the file in IA",
         max_length=1000,
@@ -131,7 +119,6 @@ class AbstractPDF(models.Model):
         null=True,
         blank=True,
     )
-
 
     class Meta:
         abstract = True

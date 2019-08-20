@@ -81,7 +81,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         finally:
             self.browser = self._create_browser()
 
-        self.browser.implicitly_wait(15)
+        self.browser.implicitly_wait(5)
 
     def tearDown(self):
         if self.screenshot:
@@ -116,7 +116,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self.assertIn('Sign In', self.browser.title)
         self.browser.find_element_by_id('username').send_keys(username)
         self.browser.find_element_by_id('password').send_keys(password + '\n')
-        self.assertTrue(self.extract_result_count_from_serp() > 0)
 
     def get_url_and_wait(self, url, timeout=30):
         self.browser.get(url)
