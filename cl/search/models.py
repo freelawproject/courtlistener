@@ -2530,6 +2530,9 @@ class Tag(models.Model):
         elif type(thing) == RECAPDocument:
             return self.recap_documents.through.objects.get_or_create(
                     recapdocument_id=thing.pk, tag_id=self.pk)
+        elif type(thing) == Claim:
+            return self.claims.through.objects.get_or_create(
+                claim_id=thing.pk, tag_id=self.pk)
         else:
             raise NotImplementedError("Object type not supported for tagging.")
 
