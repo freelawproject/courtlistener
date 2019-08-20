@@ -1,9 +1,9 @@
 from django.contrib import admin
 
-from cl.search.models import (
-    Citation, Court, Docket, DocketEntry, Opinion, OpinionCluster,
-    OpinionsCited, OriginatingCourtInformation, RECAPDocument,
-)
+from cl.search.models import BankruptcyInformation, Citation, Claim, \
+    ClaimHistory, Court, Docket, DocketEntry, Opinion, OpinionCluster, \
+    OpinionsCited, OriginatingCourtInformation, RECAPDocument
+
 
 
 @admin.register(Opinion)
@@ -128,6 +128,33 @@ class CourtAdmin(admin.ModelAdmin):
     )
 
 
+class ClaimHistoryInline(admin.StackedInline):
+    model = ClaimHistory
+    extra = 1
+
+
+@admin.register(Claim)
+class ClaimAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'docket',
+    )
+
+    inlines = (
+        ClaimHistoryInline,
+    )
+
+
+class BankruptcyInformationInline(admin.StackedInline):
+    model = BankruptcyInformation
+
+
+@admin.register(BankruptcyInformation)
+class BankruptcyInformationAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'docket',
+    )
+
+
 @admin.register(RECAPDocument)
 class RECAPDocumentAdmin(admin.ModelAdmin):
     raw_id_fields = (
@@ -187,6 +214,7 @@ class DocketAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ['case_name']}
     inlines = (
         DocketEntryInline,
+        BankruptcyInformationInline,
     )
     readonly_fields = (
         'date_created',
