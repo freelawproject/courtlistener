@@ -6,90 +6,71 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="col-sm-9 col-md-6 col-sm-push-3" id="sidebar">
-        <h2>Contact Us</h2>
+  <div class="col-xs-1 col-sm-2 col-md-3"></div>
+  <div class="col-sm-9 col-md-6" id="sidebar">
+      <h1 class="text-center v-offset-below-2">Contact Us</h1>
+      <p><strong>If you are writing seeking legal help</strong>, that is not something we provide. You may wish to contact a qualified attorney, reach out to your local bar association to see if they operate a lawyer referral service, or try <a href="https://www.justia.com/lawyers">Justia's lawyer directory</a>. Additionally, many counties and law schools operate law libraries open to the general public, where you can conduct general legal research.
+      </p>
+      <p><strong>If you want something taken off of our website</strong>, please see our <a href="{% url "terms" %}#removal">removal policy</a> for how to proceed. You <em>must</em> provide a link of the item you need reviewed.
+      </p>
 
-        {% if form.errors %}
-            <div class="alert alert-danger">
-                <p class="bottom">There were errors with your submission.</p>
-            </div>
-        {% endif %}
+      {% if form.errors %}
+          <div class="alert alert-danger">
+              <p class="bottom">There were errors with your submission.</p>
+          </div>
+      {% endif %}
 
-        <form action="" method="post">{% csrf_token %}
-            {% render_honeypot_field "skip_me_if_alive" %}
-            <div class="form-group">
-                <label for="id_name">Name</label>
-                {{ form.name }}
-                {% if form.name.errors %}
-                    <p class="help-block">
-                        {% for error in form.name.errors %}
-                            {{ error|escape }}
-                        {% endfor %}
-                    </p>
-                {% endif %}
-            </div>
+      <form action="" method="post">{% csrf_token %}
+          {% render_honeypot_field "skip_me_if_alive" %}
+          <div class="form-group">
+              <label for="id_name">Name</label>
+              {{ form.name }}
+              {% if form.name.errors %}
+                  <p class="help-block">
+                      {% for error in form.name.errors %}
+                          {{ error|escape }}
+                      {% endfor %}
+                  </p>
+              {% endif %}
+          </div>
 
-            <div class="form-group">
-                <label for="id_email">Email (optional)</label>
-                {{ form.email }}
-                {% if form.email.errors %}
-                    <p class="help-block">
-                        {% for error in form.email.errors %}
-                            {{ error|escape }}
-                        {% endfor %}
-                    </p>
-                {% endif %}
-            </div>
+          <div class="form-group">
+              <label for="id_email">Email</label>
+              {{ form.email }}
+              {% if form.email.errors %}
+                  <p class="help-block">
+                      {% for error in form.email.errors %}
+                          {{ error|escape }}
+                      {% endfor %}
+                  </p>
+              {% endif %}
+          </div>
 
-            {# We use the phone_number field as the subject field to defeat spam #}
-            <div class="form-group">
-                <label for="id_phone_number">Subject</label>
-                {{ form.phone_number }}
-                {% if form.phone_number.errors %}
-                    <p class="help-block">
-                        {% for error in form.phone_number.errors %}
-                            {{ error|escape }}
-                        {% endfor %}
-                    </p>
-                {% endif %}
-            </div>
+          {# We use the phone_number field as the subject field to defeat spam #}
+          <div class="form-group">
+              <label for="id_phone_number">Subject</label>
+              {{ form.phone_number }}
+              {% if form.phone_number.errors %}
+                  <p class="help-block">
+                      {% for error in form.phone_number.errors %}
+                          {{ error|escape }}
+                      {% endfor %}
+                  </p>
+              {% endif %}
+          </div>
 
-            <div class="form-group">
-                <label for="id_message">Message</label>
-                {{ form.message }}
-                {% if form.message.errors %}
-                    <p class="help-block">
-                        {% for error in form.message.errors %}
-                            {{ error|escape }}
-                        {% endfor %}
-                    </p>
-                {% endif %}
-            </div>
-            <button type="submit" class="btn btn-primary btn-lg pull-right">Send Message</button>
-        </form>
-    </div>
-
-
-    <div class="col-sm-3 col-sm-pull-9 col-md-pull-6">
-        <h3 class="bottom">Twitter&nbsp;<i class="fa fa-twitter gray"></i></h3>
-        <p>Follow our accounts on twitter:<br>
-            <a href="https://twitter.com/freelawproject">@freelawproject</a><br>
-            <a href="https://twitter.com/courtlistener">@courtlistener</a><br>
-            <a href="https://twitter.com/recapthelaw">@recapthelaw</a><br>
-        <br>
-
-
-        <h3 class="bottom">Blog</h3>
-        <p>Follow <a href="https://free.law">The Free Law Blog</a>
-            to see our latest announcements and press releases.</p>
-        <br>
-
-
-        <h3 class="bottom">Removal Requests</h3>
-        <p>If you are concerned about your case appearing on this site,
-            please see our <a href="{% url "terms" %}#removal">removal
-                policy</a> for instructions.
-        </p>
-    </div>
-    <div class="col-sm-3"></div>
+          <div class="form-group">
+              <label for="id_message">Message</label>
+              {{ form.message }}
+              {% if form.message.errors %}
+                  <p class="help-block">
+                      {% for error in form.message.errors %}
+                          {{ error|escape }}
+                      {% endfor %}
+                  </p>
+              {% endif %}
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg pull-right">Send Message</button>
+      </form>
+  </div>
 {% endblock %}

@@ -30,7 +30,7 @@ from juriscraper.lib.exceptions import ParsingException
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
     CaseQuery, DocketReport, FreeOpinionReport, PacerSession, \
-    PossibleCaseNumberApi, ShowCaseDocApi
+    PossibleCaseNumberApi, ShowCaseDocApi, ClaimsRegister
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -51,10 +51,11 @@ from cl.lib.recap_utils import get_document_filename, get_bucket_name, \
     get_docket_filename
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
-from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
-    find_docket_object, add_docket_entries, \
-    process_orphan_documents, update_docket_appellate_metadata, \
-    make_recap_sequence_number
+from cl.recap.tasks import find_docket_object
+from cl.recap.mergers import update_docket_metadata, \
+    update_docket_appellate_metadata, make_recap_sequence_number, \
+    add_docket_entries, add_parties_and_attorneys, process_orphan_documents, \
+    add_claims_to_docket, add_bankruptcy_data_to_docket
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
@@ -262,7 +263,7 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
             description=row.description,
             nature_of_suit=row.nature_of_suit,
             cause=row.cause,
-         )
+        )
 
     return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
 
@@ -617,7 +618,7 @@ def make_fjc_idb_lookup_params(item):
           interval_step=10 * 60, ignore_results=True)
 def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
                                 cookies, case_name=None, office_number=None,
-                                docket_number_letters=None, extra_data=None):
+                                docket_number_letters=None):
     """Get the pacer_case_id and title values for a district court docket. Use
     heuristics to disambiguate the results.
 
@@ -634,7 +635,8 @@ def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
     :param court_id: The CourtListener court ID for the docket number
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
-    :param case_name: The case name to use for disambiguation
+    :param case_name: The case name to use for disambiguation. Disambiguation
+    is done in Juriscraper using edit distance.
     :param office_number: The number (or letter) where the case took place.
     Typically, this is in the beginning of the docket number before the colon.
     This will be used for disambiguation. If you passed it as part of the
@@ -910,7 +912,7 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
     s = PacerSession(cookies=cookies)
     report = AppellateDocketReport(court_id, s)
     logging_id = "%s - %s" % (court_id, docket_number)
-    logger.info("Querying docket report %s",  logging_id)
+    logger.info("Querying docket report %s", logging_id)
 
     try:
         report.query(docket_number, **kwargs)
@@ -1017,6 +1019,53 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
         logger.warning("Unable to get attachment page for %s", rd)
         raise self.retry(exc=exc)
     return att_report
+
+
+@app.task(bind=True, max_retries=5, interval_start=5 * 60,
+          interval_step=10 * 60, ignore_result=True)
+def get_bankr_claims_registry(self, data, cookies, tag_names=None):
+    """Get the bankruptcy claims registry for a docket
+
+    :param data: A dict of data containing, primarily, a key to 'docket_pk' for
+    the docket for which we want to get the registry. Other keys will be
+    ignored.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
+    :param tag_names: A list of tag names that should be stored with the claims
+    registry information in the DB.
+    """
+    s = PacerSession(cookies=cookies)
+    if data is None or data.get('docket_pk') is None:
+        logger.warning("Empty data argument or parameter. Terminating chains "
+                       "and exiting.")
+        self.request.chain = None
+        return
+
+    d = Docket.objects.get(pk=data['docket_pk'])
+    logging_id = "docket %s with pacer_case_id %s" % (d.pk, d.pacer_case_id)
+    logger.info("Querying claims information for %s", logging_id)
+    report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
+    report.query(d.pacer_case_id, d.docket_number)
+    claims_data = report.data
+    logger.info("Querying and parsing complete for %s", logging_id)
+
+    # Save the HTML
+    pacer_file = PacerHtmlFiles(content_object=d,
+                                upload_type=UPLOAD_TYPE.CLAIMS_REGISTER)
+    pacer_file.filepath.save(
+        'random.html',  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(report.response.text),
+    )
+
+    if not claims_data:
+        logger.info("No valid claims data for %s", logging_id)
+        return data
+
+    # Merge the contents into CL
+    add_bankruptcy_data_to_docket(d, claims_data)
+    add_claims_to_docket(d, claims_data['claims'], tag_names)
+    logger.info("Created/updated claims data for %s", logging_id)
+    return data
 
 
 @app.task(bind=True, max_retries=15, interval_start=5,

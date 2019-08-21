@@ -91,22 +91,6 @@ def bulk_data_index(request):
     })
 
 
-def serve_pagerank_file(request):
-    """Serves the bulk pagerank file from the bulk data directory."""
-    file_loc = settings.BULK_DATA_DIR + "external_pagerank"
-    file_name = file_loc.split('/')[-1]
-    try:
-        mimetype = magic.from_file(file_loc, mime=True)
-    except IOError:
-        raise Http404('Unable to locate external_pagerank file in %s' % settings.BULK_DATA_DIR)
-    response = HttpResponse()
-    response['X-Sendfile'] = os.path.join(file_loc)
-    response['Content-Disposition'] = 'attachment; filename="%s"' % file_name.encode('utf-8')
-    response['Content-Type'] = mimetype
-    tally_stat('bulk_data.pagerank.served')
-    return response
-
-
 def strip_zero_years(data):
     """Removes zeroes from the ends of the court data
 

@@ -1,24 +1,18 @@
 # CourtListener
 
-CourtListener.com is the main initiative of [Free Law Project][flp].
+Started [in 2009][yours-truly], CourtListener.com is the main initiative of [Free Law Project][flp]. The goal of CourtListener.com is to provide high quality data and services.
+
+## What's Here
 
 This repository is organized in the following way:
 
  - ansible: ansible playbooks and inventories for setting up and updating your machine.
  - apache: configurations for the Apache webserver.
  - cl: the Django code for this project. 99% of everything is in this directory.
+ - docker: Where to find compose files and docker files for various components.
  - cleaning_scripts: cleanup scripts that are used from time to time to fix data issues or errors.
  - OCR: code and files related to our Tesseract OCR configuration.
  - scripts: logrotate, systemd, etc, and init scripts for our various configurations and daemons.
-
-
-## Getting Started
-
-The best way to get started right now is to follow the instructions on our wiki:
-
- - https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux
-
-We endeavor to keep these up to date, since for now they are the ground truth in terms of how to set up a new server, but consider this an apology that you're almost destined to run into some kind of issue. (Update the wiki when you do!)
 
 
 ## Getting Involved
@@ -26,22 +20,16 @@ We endeavor to keep these up to date, since for now they are the ground truth in
 If you want to get involved send us an email with your contact info or take a look through the [issues list][issues]. There are innumerable things we need help with, but we especially are looking for help with:
 
  - legal research in order to fix data errors or other problems (check out the [data-quality label][dq] for some starting points)
+ - fixing bugs and building features (most things are written in Python)
  - machine learning or natural language problems. 
- - signal processing to improve the features we can provide for oral argument recordings.
  - test writing -- we always need more and better tests
- - small fixes here and there (these are usually flagged with the [help-wanted label][hw])
 
-But in general, we're looking for all kinds of help! Get in touch if you think you have skills we could use or if you have skills you want to learn by improving CourtListener.
+In general, we're looking for all kinds of help. Get in touch if you think you have skills we could use or if you have skills you want to learn by improving CourtListener.
 
 
-### Contributing code
+## Contributing code
 
 See the [developer guide][developing].
-
-Finally, before we accept code from new people, we ask that they complete a `contributor_license_agreement.txt`. You can find a form to fill out for this in the root of our project. If you have any questions about that, please don't hesitate to ask. The short version is that this helps us to protect the platform.
-
-To familiarize yourself with the state of the art in the technologies we're using,
- we put together the [related academic literature](https://github.com/freelawproject/related-literature) library.
 
 
 ## Upgrading On the Regular
@@ -94,8 +82,8 @@ https://free.law/contact/
 
 
 [issues]: https://github.com/freelawproject/courtlistener/issues
-[trel]: https://trello.com/b/l0qS4yhd/assistance-needed
 [hw]: https://github.com/freelawproject/courtlistener/labels/help%20wanted
 [dq]: https://github.com/freelawproject/courtlistener/labels/data-quality
 [flp]: https://free.law/
 [developing]: https://github.com/freelawproject/courtlistener/blob/master/DEVELOPING.md
+[yours-truly]: https://github.com/freelawproject/courtlistener/commit/90db0eb433990a7fd5e8cbe5b0fffef5fbf8e4f6

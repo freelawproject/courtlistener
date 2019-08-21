@@ -1,29 +1,28 @@
-import os
-
-
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.utils.timezone import now
-
-from cl.lib.storage import UUIDFileSystemStorage
-
+from cl.lib.storage import IncrementingFileSystemStorage
+from cl.lib.model_helpers import make_pdf_path, make_pdf_thumb_path
 
 
-class UPLOAD_TYPE:
-    CASE_JSON = 1
-    CASE_HTML = 2
-    PDF = 3
-
+class THUMBNAIL_STATUSES(object):
+    NEEDED = 0
+    COMPLETE = 1
+    FAILED = 2
     NAMES = (
-        (CASE_JSON, 'JSON Response'),
-        (CASE_HTML, 'HTML attachment page'),
-        (PDF, 'PDF'),
+        (NEEDED, "Thumbnail needed"),
+        (COMPLETE, "Thumbnail completed successfully"),
+        (FAILED, 'Unable to generate thumbnail'),
     )
+
 
 def make_json_data_path(instance, filename):
     # return make_path('recap-data', filename)
     return make_path('json-data', filename)
+
+
+def make_pdf_path(instance, filename):
+    # return make_path('recap-data', filename)
+    return make_path('pdf-data', filename)
+
 
 def make_path(root, filename):
     d = now()
@@ -35,33 +34,143 @@ def make_path(root, filename):
         filename,
     )
 
-class JSONFile(models.Model):
-    """This is a simple object for holding original JSON content from any court api
 
-    We will use this maintain a copy of all json acquired from LASC which is important
-    in the event we lose our database.
-    """
-
+class AbstractPDF(models.Model):
+    """An abstract model to hold PDF-related information"""
+    OCR_COMPLETE = 1
+    OCR_UNNECESSARY = 2
+    OCR_FAILED = 3
+    OCR_NEEDED = 4
+    OCR_STATUSES = (
+        (OCR_COMPLETE, "OCR Complete"),
+        (OCR_UNNECESSARY, "OCR Not Necessary"),
+        (OCR_FAILED, "OCR Failed"),
+        (OCR_NEEDED, "OCR Needed"),
+    )
     date_created = models.DateTimeField(
-        help_text="The time when this item was created",
+        help_text="The date the file was imported to Local Storage.",
         auto_now_add=True,
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
+        help_text="Timestamp of last update.",
         auto_now=True,
         db_index=True,
     )
-    filepath = models.FileField(
-        help_text="The path of the original json file.",
+    sha1 = models.CharField(
+        help_text="The ID used for a document in RECAP",
+        max_length=40,  # As in RECAP
+        blank=True,
+    )
+    page_count = models.IntegerField(
+        help_text="The number of pages in the document, if known",
+        blank=True,
+        null=True,
+    )
+    file_size = models.IntegerField(
+        help_text="The size of the file in bytes, if known",
+        blank=True,
+        null=True,
+    )
+    filepath_local = models.FileField(
+        help_text="The path of the file in the local storage area.",
+        upload_to=make_pdf_path,
+        storage=IncrementingFileSystemStorage(),
+        max_length=1000,
+        db_index=True,
+        blank=True,
+    )
+    filepath_ia = models.CharField(
+        help_text="The URL of the file in IA",
+        max_length=1000,
+        blank=True,
+    )
+    ia_upload_failure_count = models.SmallIntegerField(
+        help_text="Number of times the upload to the Internet Archive failed.",
+        null=True,
+        blank=True,
+    )
+    thumbnail = models.FileField(
+        help_text="A thumbnail of the first page of the document",
+        upload_to=make_pdf_thumb_path,
+        storage=IncrementingFileSystemStorage(),
+        null=True,
+        blank=True,
+    )
+    thumbnail_status = models.SmallIntegerField(
+        help_text="The status of the thumbnail generation",
+        choices=THUMBNAIL_STATUSES.NAMES,
+        default=THUMBNAIL_STATUSES.NEEDED,
+    )
+    plain_text = models.TextField(
+        help_text="Plain text of the document after extraction using "
+                  "pdftotext, wpd2txt, etc.",
+        blank=True,
+    )
+    ocr_status = models.SmallIntegerField(
+        help_text="The status of OCR processing on this item.",
+        choices=OCR_STATUSES,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        abstract = True
+
+
+class AbstractJSON(models.Model):
+    # date_created = models.DateTimeField(
+    #     help_text="The time when this item was created",)
+
+    date_created = models.DateTimeField(
+        help_text="The date the file was imported to Local Storage.",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="Timestamp of last update.",
+        auto_now=True,
+        db_index=True,
+    )
+
+    filepath_local = models.FileField(
+        help_text="The path of the file in the local storage area.",
         upload_to=make_json_data_path,
         storage=UUIDFileSystemStorage(),
-        max_length=150,
+        max_length=1000,
+        db_index=True,
+        blank=True,
     )
-    upload_type = models.SmallIntegerField(
-        help_text="The type of object that is uploaded",
-        choices=UPLOAD_TYPE.NAMES,
-    )
+
+    class Meta:
+        abstract = True
+
+
+class LASCJSON(AbstractJSON):
+    """This is a simple object for holding original JSON content from any court api
+    We will use this maintain a copy of all json acquired from LASC which is important
+    in the event we lose our database.
+    """
+
+    content_type = models.ForeignKey(ContentType)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    @property
+    def file_contents(self):
+        with open(self.filepath_local.path, 'r') as f:
+            return f.read().decode('utf-8')
+
+    def print_file_contents(self):
+        print(self.file_contents)
+
+
+class LASCPDF(AbstractPDF):
+    """This is a simple object for holding original JSON content from any court api
+    We will use this maintain a copy of all json acquired from LASC which is important
+    in the event we lose our database.
+    """
+
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
@@ -73,4 +182,3 @@ class JSONFile(models.Model):
 
     def print_file_contents(self):
         print(self.file_contents)
-

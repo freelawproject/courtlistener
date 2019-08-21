@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='recapdocument',
             name='thumbnail',
-            field=models.FileField(help_text=b'A thumbnail of the first page of the document', storage=cl.lib.storage.IncrementingFileSystemStorage(), null=True, upload_to=cl.lib.model_helpers.make_recap_thumb_path, blank=True),
+            field=models.FileField(help_text=b'A thumbnail of the first page of the document', storage=cl.lib.storage.IncrementingFileSystemStorage(), null=True, upload_to=cl.lib.model_helpers.make_recap_path, blank=True),
         ),
         migrations.AddField(
             model_name='recapdocument',

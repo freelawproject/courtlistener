@@ -22,19 +22,23 @@ DATABASES = {
         'NAME': 'courtlistener',
         'USER': 'django',
         'PASSWORD': 'your-password',
-        'HOST': '',
-        'PORT': '',
         'CONN_MAX_AGE': 600,
     },
 }
 API_READ_DATABASES = ['replica']
 
 
-SOLR_HOST = 'http://127.0.0.1:8983'
+SOLR_HOST = 'http://cl-solr:8983'
 SOLR_RECAP_HOST = SOLR_HOST
+SOLR_PAGERANK_DEST_DIR = '/tmp/'
 
-REDIS_HOST = 'localhost'
+REDIS_HOST = 'cl-redis'
 REDIS_PORT = 6379
+
+DOCKER_SELENIUM_HOST = 'http://cl-selenium:4444/wd/hub'
+DOCKER_DJANGO_HOST = 'cl-django'
+
+SELENIUM_HEADLESS = False
 
 # Make these unique, and don't share it with anybody.
 SECRET_KEY = 'your-secret-key'

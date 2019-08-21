@@ -9,7 +9,6 @@ class ContactForm(forms.Form):
     )
 
     email = forms.EmailField(
-        required=False,
         widget=forms.TextInput(
             attrs={'class': 'form-control'}
         )

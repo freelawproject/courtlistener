@@ -26,6 +26,9 @@ RUN pip install --no-cache-dir -r requirements.txt && \
     pip install git+https://github.com/freelawproject/judge-pics@master && \
     update-seals -f
 
+COPY requirements-flp.txt ./
+RUN pip install --no-cache-dir -r requirements-flp.txt
+
 
 ## Needs to be two commands so second one can use variables from first.
 ENV \
