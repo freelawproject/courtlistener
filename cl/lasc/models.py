@@ -270,6 +270,19 @@ class DocumentImages(models.Model):
         Docket,
         on_delete=models.CASCADE,
     )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_create = models.DateTimeField(
+        help_text="The date the document was created in the system as a date object",
+    )
     page_count = models.IntegerField(
         help_text="Page count for this document",
     )
@@ -280,9 +293,6 @@ class DocumentImages(models.Model):
     )
     document_url = models.TextField(
         help_text="The document URL {MAP Credentials required}",
-    )
-    create_date = models.TextField(
-        help_text="The date the document was created in the system as a date object",
     )
     create_date_string = models.TextField(
         help_text="The date the document was created in the system as a string",
@@ -353,16 +363,6 @@ class DocumentImages(models.Model):
         blank=True,
         help_text="Document Part",
     )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     pdf_document = GenericRelation(
         to='lasc.LASCPDF',
         help_text="PDF document.",
@@ -394,18 +394,6 @@ class RegisterOfActions(models.Model):
         Docket,
         on_delete=models.CASCADE,
     )
-    description = models.TextField(
-        help_text="Short description of the document",
-    )
-    additional_information = models.TextField(
-        help_text="Additional information stored as HTML",
-    )
-    register_of_action_date_string = models.TextField(
-        help_text="Date of Register of Action as a string",
-    )
-    register_of_action_date = models.DateTimeField(
-        help_text="Date of Register of Action as a Date Object",
-    )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -415,6 +403,18 @@ class RegisterOfActions(models.Model):
         help_text="The last moment when the item was modified.",
         auto_now=True,
         db_index=True,
+    )
+    date_register_of_action = models.DateTimeField(
+        help_text="Date of Register of Action as a Date Object",
+    )
+    description = models.TextField(
+        help_text="Short description of the document",
+    )
+    additional_information = models.TextField(
+        help_text="Additional information stored as HTML",
+    )
+    register_of_action_date_string = models.TextField(
+        help_text="Date of Register of Action as a string",
     )
 
 
@@ -431,22 +431,6 @@ class CrossReferences(models.Model):
         Docket,
         on_delete=models.CASCADE,
     )
-    cross_reference_date_string = models.TextField(
-        help_text="Cross Reference date as a String",
-        null=True,
-    )
-    cross_reference_date = models.DateTimeField(
-        help_text="Cross reference date as a Date Object",
-        null=True,
-    )
-    cross_reference_case_number = models.TextField(
-        help_text="Cross Reference Case Number",
-        null=True,
-    )
-    cross_reference_type_description = models.TextField(
-        help_text="Cross Reference short description",
-        null=True,
-    )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -456,6 +440,22 @@ class CrossReferences(models.Model):
         help_text="The last moment when the item was modified.",
         auto_now=True,
         db_index=True,
+    )
+    date_cross_reference = models.DateTimeField(
+        help_text="Cross reference date",
+        null=True,
+    )
+    cross_reference_date_string = models.TextField(
+        help_text="Cross Reference date as a String",
+        null=True,
+    )
+    cross_reference_case_number = models.TextField(
+        help_text="Cross Reference case number",
+        null=True,
+    )
+    cross_reference_type_description = models.TextField(
+        help_text="Cross Reference short description",
+        null=True,
     )
 
 
@@ -483,6 +483,16 @@ class Parties(models.Model):
         Docket,
         on_delete=models.CASCADE,
     )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
     attorney_name = models.TextField(
         help_text="Attorney Name",
     )
@@ -503,16 +513,6 @@ class Parties(models.Model):
     )
     name = models.TextField(
         help_text="Full name of the party",
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
 
 
@@ -537,6 +537,16 @@ class Proceedings(models.Model):
     Docket = models.ForeignKey(
         Docket,
         on_delete=models.CASCADE,
+    )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
     )
     am_pm = models.TextField(
         help_text="Was the proceeding in the AM or PM",
@@ -574,16 +584,6 @@ class Proceedings(models.Model):
     event = models.TextField(
         help_text="Event that occurred {ex. Jury Trial}",
     )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     past_or_future = models.SmallIntegerField(
         choices=TIME_CHOICES,
         null=True,
@@ -612,8 +612,21 @@ class TentativeRulings(models.Model):
         Docket,
         on_delete=models.CASCADE,
     )
-    case_number = models.TextField(
-        help_text="Case number",
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_creation = models.DateTimeField(
+        help_text="Date the ruling was decided as a date object",
+    )
+    date_hearing = models.DateTimeField(
+        help_text="",
     )
     location_id = models.TextField(
         help_text="Internal court code for location",
@@ -624,27 +637,11 @@ class TentativeRulings(models.Model):
     ruling = models.TextField(
         help_text="The court ruling as HTML",
     )
-    creation_date = models.DateTimeField(
-        help_text="Date the ruling was decided as a date object",
-    )
     creation_date_string = models.TextField(
         help_text="Date the ruling was added to the system as a string",
     )
-    hearing_date = models.DateTimeField(
-        help_text="",
-    )
     hearing_date_string = models.TextField(
         help_text="",
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
 
 
@@ -661,12 +658,21 @@ class DocumentsFiled(models.Model):
         Docket,
         on_delete=models.CASCADE,
     )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
     date_filed = models.DateTimeField(
         help_text="Date a document was filed as a DateTime object",
     )
-    date_filed_string = models.CharField(
+    date_filed_string = models.TextField(
         help_text="Date a document was filed as a string",
-        max_length=25,
     )
     memo = models.TextField(
         help_text="Memo describing document filed",
@@ -683,14 +689,4 @@ class DocumentsFiled(models.Model):
         null=True,
         blank=True,
         default='',
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
