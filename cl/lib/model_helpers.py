@@ -4,6 +4,7 @@ import re
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
+from django.utils.timezone import now
 
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
@@ -84,8 +85,8 @@ def make_pdf_path(instance, filename, thumbs=False):
                         filename)
 
 def make_json_path(instance, filename):
-    # from cl.lasc.models import Docket as LASC
-    # if type(instance) == LASC:
+    # As additional types are needed, this will need to mirror the format of
+    # make_pdf_path, by doing type checking.
     return make_path('json-data', filename)
 
 
