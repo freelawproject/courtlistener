@@ -1,4 +1,4 @@
-# Run with make push --file docket/task-server/Makefile
+# Run with make push --file docker/task-server/Makefile
 DOCKER_REPOSITORY ?= freelawproject/task-server
 
 DOCKER ?= docker
