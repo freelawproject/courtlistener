@@ -60,14 +60,28 @@ def base_recap_path(instance, filename, base_dir):
     )
 
 
-def make_recap_pdf_path(instance, filename):
-    """Make a path for storing the a PACER document in RECAP."""
-    return base_recap_path(instance, filename, 'recap')
+def make_pdf_path(instance, filename, thumbs=False):
+    from cl.search.models import ClaimHistory, RECAPDocument
+    if type(instance) == RECAPDocument:
+        root = 'recap'
+        court_id = instance.docket_entry.docket.court_id
+        pacer_case_id = instance.docket_entry.docket.pacer_case_id
+    elif type(instance) == ClaimHistory:
+        root = 'claim'
+        court_id = instance.claim.docket.court_id
+        pacer_case_id = instance.pacer_case_id
+    else:
+        raise ValueError("Unknown model type in make_pdf_path "
+                         "function: %s" % type(instance))
+
+    if thumbs:
+        root = root + '-thumbnails'
+    return os.path.join(root, get_bucket_name(court_id, pacer_case_id),
+                        filename)
 
 
-def make_recap_thumb_path(instance, filename):
-    """Make a path for storing the thumbnails for a PACER document in RECAP."""
-    return base_recap_path(instance, filename, 'recap-thumbnails')
+def make_pdf_thumb_path(instance, filename):
+    return make_pdf_path(instance, filename, thumbs=True)
 
 
 def make_upload_path(instance, filename):

@@ -8,7 +8,6 @@ from django.test.utils import override_settings
 from lxml import etree
 
 from cl.lib import sunburnt
-from cl.lib.solr_core_admin import delete_solr_core, create_temp_solr_core
 from cl.search.models import Court
 
 
@@ -32,23 +31,7 @@ class EmptySolrTestCase(TestCase):
         self.core_name_audio = settings.SOLR_AUDIO_TEST_CORE_NAME
         self.core_name_people = settings.SOLR_PEOPLE_TEST_CORE_NAME
         self.core_name_recap = settings.SOLR_RECAP_TEST_CORE_NAME
-        root = settings.INSTALL_ROOT
-        create_temp_solr_core(
-            self.core_name_opinion,
-            os.path.join(root, 'Solr', 'conf', 'schema.xml'),
-        )
-        create_temp_solr_core(
-            self.core_name_audio,
-            os.path.join(root, 'Solr', 'conf', 'audio_schema.xml'),
-        )
-        create_temp_solr_core(
-            self.core_name_people,
-            os.path.join(root, 'Solr', 'conf', 'person_schema.xml'),
-        )
-        create_temp_solr_core(
-            self.core_name_recap,
-            os.path.join(root, 'Solr', 'conf', 'recap_schema.xml')
-        )
+
         self.si_opinion = sunburnt.SolrInterface(
             settings.SOLR_OPINION_URL, mode='rw')
         self.si_audio = sunburnt.SolrInterface(
@@ -60,12 +43,13 @@ class EmptySolrTestCase(TestCase):
         # uses scorched, not sunburnt.
         self.si_recap = scorched.SolrInterface(
             settings.SOLR_RECAP_URL, mode='rw')
+        self.all_sis = [self.si_opinion, self.si_audio, self.si_people,
+                        self.si_recap]
 
     def tearDown(self):
-        delete_solr_core(self.core_name_opinion)
-        delete_solr_core(self.core_name_audio)
-        delete_solr_core(self.core_name_people)
-        delete_solr_core(self.core_name_recap)
+        for si in self.all_sis:
+            si.delete_all()
+            si.commit()
 
 
 class SolrTestCase(EmptySolrTestCase):
@@ -98,7 +82,7 @@ class IndexedSolrTestCase(SolrTestCase):
         for obj_type, core_name in cores.items():
             args = [
                 '--type', obj_type,
-                '--solr-url', 'http://127.0.0.1:8983/solr/%s' % core_name,
+                '--solr-url', '%s/solr/%s' % (settings.SOLR_HOST, core_name),
                 '--update',
                 '--everything',
                 '--do-commit',

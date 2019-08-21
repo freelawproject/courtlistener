@@ -29,32 +29,9 @@ Each is described below.
 
 Connecting to everything is done through a combination of command line flags 
 given to `docker run` command and settings stored in the `cl/settings` 
-directory. The files in this directory contain all of the settings for 
-CourtListener. They are read by the Celery worker in alphabetical order, with
-each subsequent file potentially overriding the previous one.
+directory. 
 
-Thus, `10-public.py` contains default settings for CourtListener and Celery. To 
-override it, simply create a file in `cl/settings` called `11-public.py`. In 
-that file you can create any connection settings that you need and they'll 
-override the settings in `10-public.py`, because of the higher number in the 
-file name. 
-
-You can find an example file to use for `11-private.py` in this directory.
-
-Files that are read later (with higher numbered file names) have access to the 
-context of files that are read earlier. For example, if `01-some-name.py` 
-contains:
- 
-    SOME_VAR = {'some-key': 'some-value'}
-    
-You could create a file called `02-my-overrides.py` that contained:
-
-    SOME_VAR['some-key'] = 'some-other-value'
-    
-That is, you can assume that `SOME_VAR` exists because it was declared in an 
-earlier settings file. Your IDE will likely complain that `SOME_VAR` doesn't 
-exist in `02-my-overrides.py`, but ignore your IDE. If you want to read the 
-code behind all this, look in `settings.py`.
+For an explanation of how settings work, see DEVELOPING.md.
 
 Note that in production, you may need to set:
 

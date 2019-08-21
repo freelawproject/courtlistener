@@ -138,13 +138,10 @@ class AlertSeleniumTest(BaseSeleniumTest):
         alert.save()
 
         # Pan tries to edit their alert
-        self.browser.get(
-            '{url}{path}?{q}&edit_alert={pk}'.format(
-                url=self.server_url,
-                path=reverse('show_results'),
-                q=alert.query,
-                pk=alert.pk,
-            ))
+        url = '{url}{path}?{q}&edit_alert={pk}'.format(
+            url=self.live_server_url, path=reverse('show_results'),
+            q=alert.query, pk=alert.pk)
+        self.browser.get(url)
 
         # But winds up at the sign in form
         self.assertIn(reverse('sign-in'), self.browser.current_url)
