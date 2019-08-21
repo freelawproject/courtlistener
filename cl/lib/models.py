@@ -100,12 +100,8 @@ class AbstractPDF(models.Model):
     class Meta:
         abstract = True
 
-class AbstractJSON(models.Model):
 
-
-    # date_created = models.DateTimeField(
-    #     help_text="The time when this item was created",)
-
+class AbstractFile(models.Model):
     date_created = models.DateTimeField(
         help_text="The date the file was imported to Local Storage.",
         auto_now_add=True,
@@ -116,31 +112,12 @@ class AbstractJSON(models.Model):
         auto_now=True,
         db_index=True,
     )
-
-    filepath_local = models.FileField(
-        help_text="The path of the file in the local storage area.",
-        upload_to=make_json_data_path,
-        storage=UUIDFileSystemStorage(),
-        max_length=1000,
-        db_index=True,
-        blank=True,
-    )
-
-    class Meta:
-        abstract = True
-
-
-class LASCJSON(AbstractJSON):
-    """This is a simple object for holding original JSON content from any court api
-
-    We will use this maintain a copy of all json acquired from LASC which is important
-    in the event we lose our database.
-    """
-
-
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
+
+    class Meta:
+        abstract = True
 
     @property
     def file_contents(self):
@@ -151,23 +128,15 @@ class LASCJSON(AbstractJSON):
         print(self.file_contents)
 
 
-class LASCPDF(AbstractPDF):
-    """This is a simple object for holding original JSON content from any court api
+class AbstractJSON(AbstractFile):
+    filepath = models.FileField(
+        help_text="The path of the file in the local storage area.",
+        upload_to=make_json_path,
+        storage=UUIDFileSystemStorage(),
+        max_length=150,
+        blank=True,
+    )
 
-    We will use this maintain a copy of all json acquired from LASC which is important
-    in the event we lose our database.
-    """
-
-
-    content_type = models.ForeignKey(ContentType)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey()
-
-    @property
-    def file_contents(self):
-        with open(self.filepath.path, 'r') as f:
-            return f.read().decode('utf-8')
-
-    def print_file_contents(self):
-        print(self.file_contents)
+    class Meta:
+        abstract = True
 
