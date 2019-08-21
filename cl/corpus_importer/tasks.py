@@ -263,7 +263,7 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
             description=row.description,
             nature_of_suit=row.nature_of_suit,
             cause=row.cause,
-         )
+        )
 
     return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
 
@@ -912,7 +912,7 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
     s = PacerSession(cookies=cookies)
     report = AppellateDocketReport(court_id, s)
     logging_id = "%s - %s" % (court_id, docket_number)
-    logger.info("Querying docket report %s",  logging_id)
+    logger.info("Querying docket report %s", logging_id)
 
     try:
         report.query(docket_number, **kwargs)
@@ -1042,8 +1042,8 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
         return
 
     d = Docket.objects.get(pk=data['docket_pk'])
-    logging_id = "%s, %s" % (d.pk, d.pacer_case_id)
-    logger.info("Querying claims information for docket: %s", logging_id)
+    logging_id = "docket %s with pacer_case_id %s" % (d.pk, d.pacer_case_id)
+    logger.info("Querying claims information for %s", logging_id)
     report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
     report.query(d.pacer_case_id, d.docket_number)
     claims_data = report.data
