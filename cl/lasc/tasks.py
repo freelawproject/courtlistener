@@ -3,9 +3,9 @@
 from datetime import datetime as dt
 import hashlib
 
-from cl.lasc.models import Docket, DocumentImages, CaseInformation
+from cl.lasc.models import Docket, DocumentImages
 from cl.lib.command_utils import logger
-from cl.lib.models import LASCJSON, LASCPDF
+from cl.lasc.models import LASCJSON, LASCPDF
 
 from django.core.files.base import ContentFile
 from django.utils import timezone
