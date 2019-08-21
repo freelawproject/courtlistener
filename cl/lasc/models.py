@@ -1,27 +1,52 @@
 # coding=utf-8
 
 from django.db import models
-from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey, \
+    GenericRelation
+from django.contrib.contenttypes.models import ContentType
+
+from cl.lib.models import AbstractJSON, AbstractPDF
+
+
+class UPLOAD_TYPE:
+    DOCKET = 1
+    NAMES = (
+        (DOCKET, 'JSON Docket'),
+    )
+
+
+class LASCJSON(AbstractJSON):
+    """This is a simple object for holding original JSON content from LASC's
+    API. We will use this maintain a copy of all json acquired from LASC which
+    is important in the event we need to reparse something.
+    """
+    upload_type = models.SmallIntegerField(
+        help_text="The type of object that is uploaded",
+        choices=UPLOAD_TYPE.NAMES,
+    )
+
+
+class LASCPDF(AbstractPDF):
+    """This is a simple object for holding original PDF content from LASC's
+    API. We will use this maintain a copy of all PDFs acquired from LASC. This
+    is important in the event we lose our database.
+    """
+
+    content_type = models.ForeignKey(ContentType)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    @property
+    def file_contents(self):
+        with open(self.filepath_local.path, 'r') as f:
+            return f.read().decode('utf-8')
+
+    def print_file_contents(self):
+        print(self.file_contents)
+
 
 class Docket(models.Model):
-
-    """ ..."""
-
-    case_id = models.CharField(
-        max_length=30,
-        help_text="Internal Case ID = "
-                  "{Combination of Case Number; District; Division Code}",
-    )
-    full_data_model = models.BooleanField(
-        default=False,
-        help_text="Indicates if the case has been scraped beyond "
-                  "Basic Date Search information",
-    )
-    date_checked = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="Datetime case was last checked",
-    )
+    """High-level object to contain all other LASC-related data"""
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -31,6 +56,42 @@ class Docket(models.Model):
         help_text="The last moment when the item was modified",
         auto_now=True,
         db_index=True,
+    )
+    date_checked = models.DateTimeField(
+        help_text="Datetime case was last pulled or checked from LASC",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    date_filed = models.DateField(
+        help_text="The date the case was filed",
+        null=True,
+        blank=True,
+    )
+    date_disposition = models.DateField(
+        help_text="The date the case was disposed by the court",
+        null=True,
+        blank=True,
+    )
+    docket_number = models.CharField(
+        help_text="Docket number for the case. E.g. 19LBCV00507, "
+                  "19STCV28994, or even 30-2017-00900866-CU-AS-CJC.",
+        max_length=300,
+        db_index=True,
+    )
+    district = models.CharField(
+        max_length=10,
+        help_text="District is a 2-3 character code representing court "
+                  "locations; For Example BUR means Burbank",
+    )
+    division_code = models.CharField(
+        max_length=10,
+        help_text="Division. E.g. civil (cv), civil probate (cp), etc.",
+    )
+    full_data_model = models.BooleanField(
+        default=False,
+        help_text="Indicates if the case has been scraped beyond "
+                  "Basic Date Search information",
     )
     case_hash = models.CharField(
         max_length=128,
@@ -43,22 +104,6 @@ class Docket(models.Model):
         null=True,
         blank=True,
     )
-
-
-class CaseInformation(models.Model):
-    Docket = models.ForeignKey(
-        Docket,
-        on_delete=models.CASCADE,
-    )
-    case_id = models.TextField(
-        null=True,
-        blank=True,
-        help_text="Internal Case ID",
-    )
-    case_number = models.CharField(
-        max_length=30,
-        help_text="Court Case Number"
-    )
     disposition_type = models.TextField(
         null=True,
         blank=True
@@ -67,30 +112,17 @@ class CaseInformation(models.Model):
         null=True,
         blank=True
     )
-    filing_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="The date the case was filed as a date",
-    )
+
     filing_date_string = models.TextField(
         null=True,
         blank=True,
         help_text="The date the case was filed as a string",
     )
-    disposition_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="The date the case was disposed by the court as a date",
-    )
+
     disposition_date_string = models.TextField(
         null=True,
         blank=True,
         help_text="The date the case was disposed by the court as a string",
-    )
-    district = models.CharField(
-        max_length=10,
-        help_text="District is a 2-3 character code representing court locations; "
-                  "For Example BUR means Burbank",
     )
     case_type_description = models.TextField(
         help_text="Case Type Description",
@@ -101,10 +133,6 @@ class CaseInformation(models.Model):
     )
     case_title = models.TextField(
         help_text="Case Title",
-    )
-    division_code = models.CharField(
-        max_length=10,
-        help_text="Division",
     )
     judge_code = models.CharField(
         max_length=10,
@@ -141,16 +169,14 @@ class CaseInformation(models.Model):
         blank=True,
         help_text="Court Status Code associated with current status",
     )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
+
+    class Meta:
+        index_together = ('docket_number', 'district', 'division_code')
+
+    @property
+    def case_id(self):
+        return ';'.join([self.docket_number, self.district,
+                         self.division_code])
 
 
 class DocumentImages(models.Model):
@@ -184,7 +210,6 @@ class DocumentImages(models.Model):
     Docket = models.ForeignKey(
         Docket,
         on_delete=models.CASCADE,
-        null=True
     )
     page_count = models.IntegerField(
         help_text="Page count for this document",
@@ -309,7 +334,6 @@ class RegisterOfActions(models.Model):
     Docket = models.ForeignKey(
         Docket,
         on_delete=models.CASCADE,
-        null=True
     )
     description = models.TextField(
         help_text="Short description of the document",
@@ -347,7 +371,6 @@ class CrossReferences(models.Model):
     Docket = models.ForeignKey(
         Docket,
         on_delete=models.CASCADE,
-        null=True
     )
     cross_reference_date_string = models.TextField(
         help_text="Cross Reference date as a String",
@@ -400,10 +423,7 @@ class Parties(models.Model):
     Docket = models.ForeignKey(
         Docket,
         on_delete=models.CASCADE,
-        null=True,
     )
-
-
     attorney_name = models.TextField(
         help_text="Attorney Name",
     )
@@ -458,7 +478,6 @@ class Proceedings(models.Model):
     Docket = models.ForeignKey(
         Docket,
         on_delete=models.CASCADE,
-        null=True,
     )
     am_pm = models.TextField(
         help_text="Was the proceeding in the AM or PM",
@@ -533,7 +552,6 @@ class TentativeRulings(models.Model):
     Docket = models.ForeignKey(
         Docket,
         on_delete=models.CASCADE,
-        null=True,
     )
     case_number = models.TextField(
         help_text="Case number",
@@ -570,6 +588,7 @@ class TentativeRulings(models.Model):
         db_index=True,
     )
 
+
 class DocumentsFiled(models.Model):
     """
     # "CaseNumber": "18STCV02953",
@@ -582,7 +601,6 @@ class DocumentsFiled(models.Model):
     Docket = models.ForeignKey(
         Docket,
         on_delete=models.CASCADE,
-        null=True,
     )
     # case_number = models.CharField(max_length=20, help_text="Case Number associated with the filed document")
 
