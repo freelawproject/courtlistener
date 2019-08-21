@@ -1045,7 +1045,7 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     logging_id = "%s, %s" % (d.pk, d.pacer_case_id)
     logger.info("Querying claims information for docket: %s", logging_id)
     report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
-    report.query(d.pacer_case_id)
+    report.query(d.pacer_case_id, d.docket_number)
     claims_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
 
