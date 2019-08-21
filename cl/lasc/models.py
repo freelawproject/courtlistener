@@ -45,6 +45,64 @@ class LASCPDF(AbstractPDF):
         print(self.file_contents)
 
 
+class QueuedCases(models.Model):
+    """This is a simple table of Cases we have yet to fetch,
+    but have a list of from date searching.
+    """
+
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
+    )
+    internal_case_id = models.CharField(
+        help_text="Internal Case Id",
+        max_length=300,
+        db_index=True,
+        blank=True,
+    )
+
+
+class QueuedPdfs(models.Model):
+    """This is a simple table of PDFs we have yet to download.
+    """
+
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
+    )
+    internal_case_id = models.CharField(
+        help_text="Internal Case Id"
+                  "",
+        max_length=300,
+        db_index=True,
+        blank=True,
+    )
+    document_id = models.CharField(
+        help_text="Internal Document Id",
+        max_length=40,
+        db_index=True,
+        blank=True,
+    )
+
+    @property
+    def document_url(self):
+        return '/'.join(["https://media.lacourt.org/api/AzureApi",
+                        self.internal_case_id,
+                        self.document_id])
+
+
 class Docket(models.Model):
     """High-level object to contain all other LASC-related data"""
     date_created = models.DateTimeField(
@@ -78,61 +136,62 @@ class Docket(models.Model):
                   "19STCV28994, or even 30-2017-00900866-CU-AS-CJC.",
         max_length=300,
         db_index=True,
+        blank=True,
     )
     district = models.CharField(
-        max_length=10,
         help_text="District is a 2-3 character code representing court "
                   "locations; For Example BUR means Burbank",
+        max_length=10,
+        blank=True,
     )
     division_code = models.CharField(
+        help_text="Division. E.g. civil (CV), civil probate (CP), etc.",
         max_length=10,
-        help_text="Division. E.g. civil (cv), civil probate (cp), etc.",
-    )
-    full_data_model = models.BooleanField(
-        default=False,
-        help_text="Indicates if the case has been scraped beyond "
-                  "Basic Date Search information",
+        blank=True,
     )
     case_hash = models.CharField(
+        help_text="SHA1 Hash of Case Data",
         max_length=128,
-        help_text="SHA1 Hash of Case Data"
     )
     json_document = GenericRelation(
-        to='lib.LASCJSON',
+        to='lasc.LASCJSON',
         help_text="JSON files.",
         related_query_name='case_json',
         null=True,
         blank=True,
     )
     disposition_type = models.TextField(
+        help_text="Disposition type",
         null=True,
         blank=True
     )
     disposition_type_code = models.TextField(
+        help_text="Disposition type code",
         null=True,
-        blank=True
+        blank=True,
     )
-
     filing_date_string = models.TextField(
-        null=True,
-        blank=True,
         help_text="The date the case was filed as a string",
-    )
-
-    disposition_date_string = models.TextField(
         null=True,
         blank=True,
+    )
+    disposition_date_string = models.TextField(
         help_text="The date the case was disposed by the court as a string",
+        null=True,
+        blank=True,
     )
     case_type_description = models.TextField(
         help_text="Case Type Description",
+        blank=True,
     )
     case_type_code = models.CharField(
-        max_length=5,
         help_text="Case Type Code",
+        max_length=10,
+        null=True,
     )
     case_title = models.TextField(
         help_text="Case Title",
+        blank=True,
     )
     judge_code = models.CharField(
         max_length=10,
@@ -146,13 +205,13 @@ class Docket(models.Model):
         help_text="The judge that the case was assigned to, as a string",
     )
     courthouse = models.TextField(
-        max_length=50,
         help_text="The courthouse name",
+        blank=True,
     )
     case_type = models.IntegerField(
+        help_text="Case Type Code",
         null=True,
         blank=True,
-        help_text="Case Type Code",
     )
     status = models.TextField(
         null=True,
@@ -305,7 +364,7 @@ class DocumentImages(models.Model):
         db_index=True,
     )
     pdf_document = GenericRelation(
-        to='lib.LASCPDF',
+        to='lasc.LASCPDF',
         help_text="PDF document.",
         related_query_name='case_pdf',
         null=True,
@@ -602,29 +661,28 @@ class DocumentsFiled(models.Model):
         Docket,
         on_delete=models.CASCADE,
     )
-    # case_number = models.CharField(max_length=20, help_text="Case Number associated with the filed document")
-
     date_filed = models.DateTimeField(
         help_text="Date a document was filed as a DateTime object",
     )
     date_filed_string = models.CharField(
-        max_length=25,
         help_text="Date a document was filed as a string",
+        max_length=25,
     )
     memo = models.TextField(
+        help_text="Memo describing document filed",
         null=True,
         blank=True,
-        help_text="Memo describing document filed",
     )
     party = models.TextField(
+        help_text="Filing Party",
         null=True,
         blank=True,
-        help_text="Filing Party",
     )
     document = models.TextField(
-        null=True, blank=True,
+        help_text="Document Type",
+        null=True,
+        blank=True,
         default='',
-        help_text="Document Type"
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
