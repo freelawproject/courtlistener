@@ -84,6 +84,10 @@ MAILCHIMP_API_KEY = ''
 PACER_USERNAME = ''
 PACER_PASSWORD = ''
 
+#LASC MAP
+LASC_USERNAME = ''
+LASC_PASSWORD = ''
+
 here = os.path.dirname(os.path.realpath(__file__))
 GOOGLE_AUTH = {
     'PATH': os.path.join(here, 'google_auth.json'),
