@@ -9,7 +9,6 @@ from django.utils.timezone import now
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
 
-from django.utils.timezone import now
 
 def make_docket_number_core(docket_number):
     """Make a core docket number from an existing docket number.
@@ -36,6 +35,21 @@ def make_docket_number_core(docket_number):
         return m.group(1) + "{:05d}".format(int(m.group(2)))
     else:
         return ''
+
+
+def make_path(root, filename):
+    """Make a simple path for uploaded files.
+
+    Start with the `root` node, and use the current date as the subdirectories.
+    """
+    d = now()
+    return os.path.join(
+        root,
+        '%s' % d.year,
+        '%02d' % d.month,
+        '%02d' % d.day,
+        filename,
+    )
 
 
 def make_recap_path(instance, filename):
