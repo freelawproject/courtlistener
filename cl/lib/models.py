@@ -1,14 +1,10 @@
-import os
-
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.utils.timezone import now
 
-from cl.lib.storage import UUIDFileSystemStorage
-from django.db import models
-from cl.lib.storage import IncrementingFileSystemStorage
-from cl.lib.model_helpers import make_pdf_path, make_pdf_thumb_path
+from cl.lib.storage import IncrementingFileSystemStorage, UUIDFileSystemStorage
+from cl.lib.model_helpers import make_json_path, make_pdf_path, \
+    make_pdf_thumb_path
 
 
 class THUMBNAIL_STATUSES(object):
@@ -21,25 +17,6 @@ class THUMBNAIL_STATUSES(object):
         (FAILED, 'Unable to generate thumbnail'),
     )
 
-
-def make_json_data_path(instance, filename):
-    # return make_path('recap-data', filename)
-    return make_path('json-data', filename)
-
-def make_pdf_path(instance, filename):
-    # return make_path('recap-data', filename)
-    return make_path('pdf-data', filename)
-
-
-def make_path(root, filename):
-    d = now()
-    return os.path.join(
-        root,
-        '%s' % d.year,
-        '%02d' % d.month,
-        '%02d' % d.day,
-        filename,
-    )
 
 class AbstractPDF(models.Model):
     """An abstract model to hold PDF-related information"""
