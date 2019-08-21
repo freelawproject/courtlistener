@@ -23,6 +23,8 @@ cl/assets/media/wma/
 cl/assets/media/wpd/
 cl/assets/media/xml/
 cl/assets/static/
+cl/assets/media/pdf-data/
+cl/assets/media/json-data/
 
 # IntelliJ IDEA files
 .idea

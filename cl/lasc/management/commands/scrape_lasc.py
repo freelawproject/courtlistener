@@ -11,8 +11,8 @@ from juriscraper.lasc.http import LASCSession
 from juriscraper.lasc.fetch import LASCSearch
 
 from cl.lasc import tasks
-from cl.lasc.models import LASC
-from cl.lib.models import JSONFile
+from cl.lasc.models import Docket, Proceedings, DocumentImages
+from cl.lib.models import LASCJSON, LASCPDF
 from cl.lib.command_utils import VerboseCommand, logger
 
 
@@ -59,6 +59,7 @@ class Command(VerboseCommand):
             default='19STCV25157;SS;CV',
             help="T.",
         )
+
         parser.add_argument(
             '--dir',
             default='/Users/Palin/Desktop/Probate/',
@@ -99,17 +100,16 @@ class Command(VerboseCommand):
 
         for case in datum:
             case_id = case['case_id']
-            case_object = LASC.objects.filter(case_id=case_id)
+            case_object = Docket.objects.filter(case_id=case_id)
             if not case_object.exists():
 
                 dc = {}
-                dc['date_added'] = dt.now(tz=timezone.utc)
                 dc['full_data_model'] = False
                 dc['case_id'] = case_id
 
                 print case_id
 
-                cd = LASC.objects.create(**{key: value for key, value in dc.iteritems()})
+                cd = Docket.objects.create(**{key: value for key, value in dc.iteritems()})
                 cd.save()
 
                 logger.info("Finished Adding.")
@@ -134,14 +134,14 @@ class Command(VerboseCommand):
 
     def check_out_of_date_case(options):
         """
-        # Add options later... for tagged types... clients -- etc
+        Add options later... for tagged types... clients -- etc
 
         :return:
         """
         lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
         lasc_session.login()
 
-        fmds = LASC.objects.filter(full_data_model=True).order_by('date_checked') #oldest to newest
+        fmds = Docket.objects.filter(full_data_model=True).order_by('date_checked') #oldest to newest
         print fmds.count()
         for f in fmds:
             print f.date_checked
@@ -158,7 +158,7 @@ class Command(VerboseCommand):
 
         if "--case" in sys.argv:
             case_id = options['case']
-            case_search = LASC.objects.filter(case_id=case_id)
+            case_search = Docket.objects.filter(case_id=case_id)
             if case_search.count() == 0:
 
                 logger.info("New Case")
@@ -177,7 +177,7 @@ class Command(VerboseCommand):
                 if tasks.check_hash(query, case_id, case_search[0].case_hash):
 
                     case = {'date_checked' : dt.now(tz=timezone.utc)}
-                    LASC.objects.filter(case_id=case_id).update(**{key: value for key, value in case.iteritems()})
+                    Docket.objects.filter(case_id=case_id).update(**{key: value for key, value in case.iteritems()})
                     logger.info("Case has not Changed, Updating date_checked Value")
 
                 else:
@@ -189,7 +189,7 @@ class Command(VerboseCommand):
 
         else:
 
-            fmds = LASC.objects.filter(full_data_model=False)
+            fmds = Docket.objects.filter(full_data_model=False)
 
             if fmds.count() == 0:
                 logger.info("%s cases to update" % fmds.count())
@@ -205,26 +205,6 @@ class Command(VerboseCommand):
 
 
 
-    def test(options):
-        if "--case" in sys.argv:
-            case_id = options['case']
-            """
-            code to access filepath of atleast the first object ... maybe all the filepaths
-            """
-
-            l = LASC.objects.get(case_id=case_id)
-            o_id = JSONFile(content_object=l).object_id
-            print o_id
-            x = JSONFile.objects.get(object_id=o_id)
-            print x.filepath
-
-
-            """
-            Code to access the case_id from the file path of the document.
-            """
-            # docs = JSONFile.objects.all()
-            # # print docs.last()
-            # print docs[1].content_object.case_id
 
     def import_wormhole(options):
 
@@ -234,13 +214,52 @@ class Command(VerboseCommand):
             tasks.import_wormhole_corpus(dir)
 
 
+    def reset_db(options):
+        print('reset db')
+
+        if "--case" in sys.argv:
+            case_id = options['case']
+            tasks.remove_case(case_id)
+
+        pass
+
+    def get_pdf(options):
+
+        if "--case" in sys.argv:
+            case_id = options['case']
+
+            lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+            lasc_session.login()
+
+            tasks.get_pdf(lasc_session, case_id)
+
+
+        pass
+
+    def get_pdfs(options):
+
+        if "--case" in sys.argv:
+            case_id = options['case']
+
+            lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+            lasc_session.login()
+
+            tasks.get_pdfs(lasc_session, case_id)
+
+
+        pass
+
+
+
     VALID_ACTIONS = {
-        'lastweek': get_cases_for_last_week,  #gets ~1k recent filings
+        'last-week': get_cases_for_last_week,  #gets ~1k recent filings
         'add-case': add_case, #adds case by case id
+        'get-pdf': get_pdf, #adds case by case id
+        'get-pdfs': get_pdfs, #adds case by case id
         'out-of-date': check_out_of_date_case,
         'fill-in': fill_in_case,  #fills in cases that are partial
-        'test': test,  # fills in cases that are partial
         'wormhole': import_wormhole,  # fills in cases that are partial
+        'reset-db': reset_db  # clean the database of the case
     }
 
 

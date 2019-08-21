@@ -1,3 +1,11 @@
+import os
+
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+from django.db import models
+from django.utils.timezone import now
+
+from cl.lib.storage import UUIDFileSystemStorage
 from django.db import models
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.model_helpers import make_pdf_path, make_pdf_thumb_path
@@ -18,7 +26,6 @@ def make_json_data_path(instance, filename):
     # return make_path('recap-data', filename)
     return make_path('json-data', filename)
 
-
 def make_pdf_path(instance, filename):
     # return make_path('recap-data', filename)
     return make_path('pdf-data', filename)
@@ -33,7 +40,6 @@ def make_path(root, filename):
         '%02d' % d.day,
         filename,
     )
-
 
 class AbstractPDF(models.Model):
     """An abstract model to hold PDF-related information"""
@@ -117,8 +123,9 @@ class AbstractPDF(models.Model):
     class Meta:
         abstract = True
 
-
 class AbstractJSON(models.Model):
+
+
     # date_created = models.DateTimeField(
     #     help_text="The time when this item was created",)
 
@@ -148,9 +155,11 @@ class AbstractJSON(models.Model):
 
 class LASCJSON(AbstractJSON):
     """This is a simple object for holding original JSON content from any court api
+
     We will use this maintain a copy of all json acquired from LASC which is important
     in the event we lose our database.
     """
+
 
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
@@ -167,9 +176,11 @@ class LASCJSON(AbstractJSON):
 
 class LASCPDF(AbstractPDF):
     """This is a simple object for holding original JSON content from any court api
+
     We will use this maintain a copy of all json acquired from LASC which is important
     in the event we lose our database.
     """
+
 
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
@@ -182,3 +193,4 @@ class LASCPDF(AbstractPDF):
 
     def print_file_contents(self):
         print(self.file_contents)
+

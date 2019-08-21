@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     'cl.donate',
     'cl.favorites',
     'cl.people_db',
+    'cl.lasc',
     'cl.lib',
     'cl.opinion_page',
     'cl.recap',

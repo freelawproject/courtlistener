@@ -8,6 +8,7 @@ from django.utils.text import get_valid_filename
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
 
+from django.utils.timezone import now
 
 def make_docket_number_core(docket_number):
     """Make a core docket number from an existing docket number.
@@ -74,10 +75,43 @@ def make_pdf_path(instance, filename, thumbs=False):
         raise ValueError("Unknown model type in make_pdf_path "
                          "function: %s" % type(instance))
 
+def make_path(root, filename):
+    d = now()
+    return os.path.join(
+        root,
+        '%s' % d.year,
+        '%02d' % d.month,
+        '%02d' % d.day,
+        filename,
+    )
+
+def make_pdf_path(instance, filename, thumbs=False):
+    from cl.search.models import ClaimHistory, RECAPDocument
+    from cl.lasc.models import Docket as LASC
+    if type(instance) == RECAPDocument:
+        root = 'recap'
+        court_id = instance.docket_entry.docket.court_id
+        pacer_case_id = instance.docket_entry.docket.pacer_case_id
+    elif type(instance) == ClaimHistory:
+        root = 'claim'
+        court_id = instance.claim.docket.court_id
+        pacer_case_id = instance.pacer_case_id
+    elif type(instance) == LASC:
+        return make_path('pdf-data', filename)
+
+    else:
+        raise ValueError("Unknown model type in make_pdf_path "
+                         "function: %s" % type(instance))
+
     if thumbs:
         root = root + '-thumbnails'
     return os.path.join(root, get_bucket_name(court_id, pacer_case_id),
                         filename)
+
+def make_json_path(instance, filename):
+    # from cl.lasc.models import Docket as LASC
+    # if type(instance) == LASC:
+    return make_path('json-data', filename)
 
 
 def make_pdf_thumb_path(instance, filename):
