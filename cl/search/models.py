@@ -1368,6 +1368,8 @@ class Claim(models.Model):
         max_length=1000,
         blank=True,
     )
+    # An additional field, admin_claimed, should be added here eventually too.
+    # It's ready in Juriscraper, but rarely used and skipped for the moment.
     amount_claimed = models.CharField(
         help_text="The amount claimed, usually in dollars.",
         max_length=100,
