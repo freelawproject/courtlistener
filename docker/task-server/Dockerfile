@@ -21,10 +21,12 @@ RUN echo "deb http://deb.debian.org/debian stretch-backports main" > \
     apt-get update && \
     apt-get install -t stretch-backports -y tesseract-ocr tesseract-ocr-eng
 
-COPY requirements.txt requirements-flp.txt ./
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install git+https://github.com/freelawproject/judge-pics@master && \
     update-seals -f
+
+COPY requirements-flp.txt ./
 RUN pip install --no-cache-dir -r requirements-flp.txt
 
 
