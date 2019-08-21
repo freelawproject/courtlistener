@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Copy over required files.
 COPY .circleci /var/circleci
-COPY requirements.txt requirements-test.txt /tmp/
+COPY requirements.txt requirements-test.txt requirements-flp.txt /tmp/
 
 RUN /var/circleci/configure-postgres.sh && \
     /var/circleci/configure-redis.sh && \

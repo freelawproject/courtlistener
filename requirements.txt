@@ -44,7 +44,6 @@ internetarchive
 ipaddress==1.0.16
 ipython==3.2.0
 itypes==1.1.0
-juriscraper
 logilab-common==0.63.2
 lxml==3.5.0
 Markdown~=2.6
@@ -70,7 +69,6 @@ python-mimeparse==0.1.4
 pytz
 redis~=3.2.0
 requests==2.20.0
-reporters-db
 scorched==0.11.0
 seal_rookery
 selenium==2.53.6

@@ -1,0 +1,5 @@
+# Separated out so they can be a separate layer in docker files. This allows us
+# to avoid rebuilding all the other dependencies when the only thing that
+# really changes frequently is juriscraper.
+juriscraper
+reporters-db
