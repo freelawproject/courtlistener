@@ -63,30 +63,6 @@ def base_recap_path(instance, filename, base_dir):
 
 def make_pdf_path(instance, filename, thumbs=False):
     from cl.search.models import ClaimHistory, RECAPDocument
-    if type(instance) == RECAPDocument:
-        root = 'recap'
-        court_id = instance.docket_entry.docket.court_id
-        pacer_case_id = instance.docket_entry.docket.pacer_case_id
-    elif type(instance) == ClaimHistory:
-        root = 'claim'
-        court_id = instance.claim.docket.court_id
-        pacer_case_id = instance.pacer_case_id
-    else:
-        raise ValueError("Unknown model type in make_pdf_path "
-                         "function: %s" % type(instance))
-
-def make_path(root, filename):
-    d = now()
-    return os.path.join(
-        root,
-        '%s' % d.year,
-        '%02d' % d.month,
-        '%02d' % d.day,
-        filename,
-    )
-
-def make_pdf_path(instance, filename, thumbs=False):
-    from cl.search.models import ClaimHistory, RECAPDocument
     from cl.lasc.models import Docket as LASC
     if type(instance) == RECAPDocument:
         root = 'recap'
@@ -98,7 +74,6 @@ def make_pdf_path(instance, filename, thumbs=False):
         pacer_case_id = instance.pacer_case_id
     elif type(instance) == LASC:
         return make_path('pdf-data', filename)
-
     else:
         raise ValueError("Unknown model type in make_pdf_path "
                          "function: %s" % type(instance))
