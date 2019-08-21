@@ -4,8 +4,9 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.utils.timezone import now
 
+from cl.lib.model_helpers import make_path
+from cl.lib.models import AbstractFile
 from cl.lib.storage import UUIDFileSystemStorage
 from cl.recap.constants import NOS_CODES, DATASET_SOURCES, NOO_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
@@ -32,17 +33,6 @@ class UPLOAD_TYPE:
         (IA_XML_FILE, 'Internet Archive XML docket'),
         (CASE_REPORT_PAGE, 'Case report (iquery.pl) page'),
         (CLAIMS_REGISTER, 'Claims register page'),
-    )
-
-
-def make_path(root, filename):
-    d = now()
-    return os.path.join(
-        root,
-        '%s' % d.year,
-        '%02d' % d.month,
-        '%02d' % d.day,
-        filename,
     )
 
 
