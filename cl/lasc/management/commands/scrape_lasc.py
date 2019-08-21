@@ -11,8 +11,7 @@ from juriscraper.lasc.http import LASCSession
 from juriscraper.lasc.fetch import LASCSearch
 
 from cl.lasc import tasks
-from cl.lasc.models import Docket, Proceedings, DocumentImages
-from cl.lib.models import LASCJSON, LASCPDF
+from cl.lasc.models import Docket, Proceedings, DocumentImages, QueuedCases
 from cl.lib.command_utils import VerboseCommand, logger
 
 
