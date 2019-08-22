@@ -1,9 +1,3 @@
-# QUESTIONS/COMMENTS
-# 5. All text/char fields should be blank-able, but not nullable (if they can
-#    lack a value)
-# 6. Text vs Char fields...which do we want for each field.
-# 7. Date/datetime fields need both or neither null and blank
-
 # coding=utf-8
 import hashlib
 import json
@@ -287,6 +281,7 @@ class DocumentImage(models.Model):
         help_text="PDF document.",
         related_name='document_images',
         null=True,
+        blank=True,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -318,6 +313,7 @@ class DocumentImage(models.Model):
     page_count = models.IntegerField(
         help_text="Page count for this document",
         blank=True,
+        null=True,
     )
     document_type = models.TextField(
         help_text="Type of document. Typically blank; still exploring "
