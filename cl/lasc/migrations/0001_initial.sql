@@ -18,7 +18,7 @@ CREATE TABLE "lasc_documentfiled" ("id" serial NOT NULL PRIMARY KEY, "date_creat
 --
 -- Create model DocumentImage
 --
-CREATE TABLE "lasc_documentimage" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "date_processed" timestamp with time zone NULL, "date_filed" timestamp with time zone NULL, "doc_id" varchar(30) NOT NULL, "page_count" integer NOT NULL, "document_type" text NOT NULL, "document_type_code" varchar(20) NOT NULL, "image_type_id" varchar(20) NOT NULL, "app_id" text NOT NULL, "odyssey_id" text NOT NULL, "is_downloadable" boolean NOT NULL, "security_level" varchar(10) NOT NULL, "description" text NOT NULL, "volume" text NOT NULL, "doc_part" text NOT NULL, "is_available" boolean NOT NULL, "docket_id" integer NOT NULL);
+CREATE TABLE "lasc_documentimage" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "date_processed" timestamp with time zone NULL, "date_filed" timestamp with time zone NULL, "doc_id" varchar(30) NOT NULL, "page_count" integer NULL, "document_type" text NOT NULL, "document_type_code" varchar(20) NOT NULL, "image_type_id" varchar(20) NOT NULL, "app_id" text NOT NULL, "odyssey_id" text NOT NULL, "is_downloadable" boolean NOT NULL, "security_level" varchar(10) NOT NULL, "description" text NOT NULL, "volume" text NOT NULL, "doc_part" text NOT NULL, "is_available" boolean NOT NULL, "docket_id" integer NOT NULL);
 --
 -- Create model LASCJSON
 --
