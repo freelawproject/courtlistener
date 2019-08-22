@@ -14,8 +14,6 @@ from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
 from cl.people_db.models import Role, AttorneyOrganization
-from cl.recap.mergers import add_bankruptcy_data_to_docket, \
-    add_claims_to_docket
 from cl.recap.models import UPLOAD_TYPE
 from cl.search.models import Court, Docket
 
@@ -196,7 +194,8 @@ def process_docket_data(d, filepath, report_type):
     """
     from cl.recap.mergers import add_docket_entries, \
         add_parties_and_attorneys, update_docket_appellate_metadata, \
-        update_docket_metadata
+        update_docket_metadata, add_bankruptcy_data_to_docket, \
+        add_claims_to_docket
     if report_type == UPLOAD_TYPE.DOCKET:
         report = DocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
