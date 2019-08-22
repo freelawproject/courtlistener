@@ -103,12 +103,12 @@ class AbstractPDF(models.Model):
 
 class AbstractFile(models.Model):
     date_created = models.DateTimeField(
-        help_text="The date the file was imported to Local Storage.",
+        help_text="The time when this item was created",
         auto_now_add=True,
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.",
+        help_text="The last moment when the item was modified.",
         auto_now=True,
         db_index=True,
     )
