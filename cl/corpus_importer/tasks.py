@@ -1045,7 +1045,12 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     logging_id = "docket %s with pacer_case_id %s" % (d.pk, d.pacer_case_id)
     logger.info("Querying claims information for %s", logging_id)
     report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
-    report.query(d.pacer_case_id, d.docket_number)
+    try:
+        report.query(d.pacer_case_id, d.docket_number)
+    except HTTPError as exc:
+        logger.warning("Ran into HTTPError '%s' for %s. Retrying.",
+                       exc.response.status_code, logging_id)
+        raise self.retry(exc)
     claims_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
 
