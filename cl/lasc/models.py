@@ -92,7 +92,6 @@ class QueuedCase(models.Model):
         help_text="Internal judge code assigned to the case. First letter of "
                   "judge's last name, and then four digits.",
         max_length=10,
-        null=True,
         blank=True,
     )
     case_type_code = models.CharField(
@@ -100,7 +99,7 @@ class QueuedCase(models.Model):
                   "federal nature of suit code in PACER). E.g. '1601' "
                   "represents 'Fraud (no contract) (General Jurisdiction)'.",
         max_length=10,
-        null=True,
+        blank=True,
     )
 
 
@@ -122,13 +121,11 @@ class QueuedPDF(models.Model):
                   "number, district, and division code.",
         max_length=300,
         db_index=True,
-        blank=True,
     )
     document_id = models.CharField(
         help_text="Internal Document Id",
         max_length=40,
         db_index=True,
-        blank=True,
     )
 
     @property
@@ -178,7 +175,6 @@ class Docket(models.Model):
                   "19STCV28994, or even 30-2017-00900866-CU-AS-CJC.",
         max_length=300,
         db_index=True,
-        blank=True,
     )
     district = models.CharField(
         help_text="District is a 2-3 character code representing court "
@@ -193,12 +189,11 @@ class Docket(models.Model):
     )
     disposition_type = models.TextField(
         help_text="Disposition type",
-        null=True,
         blank=True
     )
-    disposition_type_code = models.TextField(
+    disposition_type_code = models.CharField(
         help_text="Disposition type code",
-        null=True,
+        max_length=10,
         blank=True,
     )
     case_type_str = models.TextField(
@@ -208,7 +203,7 @@ class Docket(models.Model):
     case_type_code = models.CharField(
         help_text="Case type code",
         max_length=10,
-        null=True,
+        blank=True,
     )
     case_name = models.TextField(
         help_text="The name of the case",
@@ -217,12 +212,10 @@ class Docket(models.Model):
     judge_code = models.CharField(
         help_text="Internal judge code assigned to the case",
         max_length=10,
-        null=True,
         blank=True,
     )
     judge_name = models.TextField(
         help_text="The judge that the case was assigned to",
-        null=True,
         blank=True,
     )
     courthouse_name = models.TextField(
@@ -234,14 +227,13 @@ class Docket(models.Model):
         null=True,
         blank=True,
     )
-    status_code = models.TextField(
+    status_code = models.CharField(
         help_text="Court status code associated with current status",
-        null=True,
+        max_length=20,
         blank=True,
     )
     status_str = models.TextField(
         help_text="The status of the case",
-        null=True,
         blank=True,
     )
 
@@ -310,64 +302,70 @@ class DocumentImage(models.Model):
     date_processed = models.DateTimeField(
         help_text="The date the document was created in the lasc system, "
                   "whether by attorney upload, clerk processing, etc.",
+        null=True,
+        blank=True,
     )
-    date_filed = models.DateField(
+    date_filed = models.DateTimeField(
         help_text="The date the document was filed in the system",
+        null=True,
+        blank=True,
     )
-    doc_id = models.TextField(
+    doc_id = models.CharField(
         help_text="Internal document ID in LASC system used for uniquely "
                   "identifying the document",
+        max_length=30,
     )
     page_count = models.IntegerField(
         help_text="Page count for this document",
+        blank=True,
     )
     document_type = models.TextField(
         help_text="Type of document. Typically blank; still exploring "
                   "possible meaning in LASC system.",
-        null=True,
         blank=True,
     )
-    document_type_code = models.TextField(
+    document_type_code = models.CharField(
         help_text="Type of document as a code. We believe this corresponds to "
                   "the document_type field.",
+        max_length=20,
+        blank=True,
     )
-    image_type_id = models.TextField(
+    image_type_id = models.CharField(
         help_text="Image type ID. Still exploring possible meanings in LASC "
                   "system.",
+        max_length=20,
+        blank=True,
     )
     app_id = models.TextField(
         help_text="ID for filing application, if any.",
+        blank=True,
     )
     odyssey_id = models.TextField(
         help_text="Typically null; likely a vendor-provided code. Still "
                   "exploring possible meanings in LASC system.",
-        null=True,
         blank=True,
     )
     is_downloadable = models.BooleanField(
         help_text="Did the user who got the docket have permission to "
                   "download this item?",
     )
-    security_level = models.TextField(
+    security_level = models.CharField(
         help_text="Document security level",
-        null=True,
+        max_length=10,
         blank=True,
     )
     description = models.TextField(
         help_text="Document description",
-        null=True,
         blank=True,
     )
     volume = models.TextField(
         help_text="Document volume. Still exploring possible meanings in LASC "
                   "system.",
-        null=True,
         blank=True,
     )
     doc_part = models.TextField(
         help_text="Document part. Still exploring possible meanings in LASC "
                   "system.",
-        null=True,
         blank=True,
     )
 
@@ -418,17 +416,14 @@ class DocumentFiled(models.Model):
     )
     memo = models.TextField(
         help_text="Memo describing document filed",
-        null=True,
         blank=True,
     )
     document_type = models.TextField(
         help_text="Document type, whether it's an Answer, a Complaint, etc.",
-        null=True,
         blank=True,
     )
     party_str = models.TextField(
         help_text="Filing party for the document",
-        null=True,
         blank=True,
     )
 
@@ -475,9 +470,11 @@ class Action(models.Model):
     )
     description = models.TextField(
         help_text="Short description of the document",
+        blank=True,
     )
     additional_information = models.TextField(
         help_text="Additional information stored as HTML",
+        blank=True,
     )
 
     class Meta:
@@ -517,14 +514,15 @@ class CrossReference(models.Model):
     date_cross_reference = models.DateTimeField(
         help_text="Cross reference date",
         null=True,
+        blank=True,
     )
     cross_reference_docket_number = models.TextField(
         help_text="Cross reference docket number",
-        null=True,
+        blank=True,
     )
     cross_reference_type = models.TextField(
         help_text="A description of the type of cross reference",
-        null=True,
+        blank=True,
     )
 
 
@@ -565,24 +563,31 @@ class Party(models.Model):
     )
     attorney_name = models.TextField(
         help_text="Attorney name",
+        blank=True,
     )
     attorney_firm = models.TextField(
         help_text="Attorney firm",
+        blank=True,
     )
     entity_number = models.TextField(
         help_text="Order entity/party joined cases system",
+        blank=True,
     )
     party_name = models.TextField(
         help_text="Full name of the party",
+        blank=True,
     )
     party_flag = models.TextField(
         help_text="Court code representing party",
+        blank=True,
     )
     party_type_code = models.TextField(
         help_text="Court code representing party position",
+        blank=True,
     )
     party_description = models.TextField(
         help_text="Description of the party",
+        blank=True,
     )
 
     class Meta:
@@ -660,30 +665,39 @@ class Proceeding(models.Model):
     )
     proceeding_time = models.TextField(
         help_text="Time of the past proceeding in HH:MM string",
+        blank=True,
     )
     am_pm = models.TextField(
         help_text="Was the proceeding in the AM or PM",
+        blank=True,
     )
     memo = models.TextField(
         help_text="Memo about the proceeding",
+        blank=True,
     )
     courthouse_name = models.TextField(
         help_text="Courthouse name for the proceeding",
+        blank=True,
     )
     address = models.TextField(
         help_text="Address of the proceeding",
+        blank=True,
     )
     proceeding_room = models.TextField(
         help_text="The court room of the proceeding",
+        blank=True,
     )
     result = models.TextField(
         help_text="Result of the proceeding",
+        blank=True,
     )
     judge_name = models.TextField(
         help_text="Judge in the proceeding",
+        blank=True,
     )
     event = models.TextField(
         help_text='Event that occurred. E.g. "Jury Trial"',
+        blank=True,
     )
 
     past_objects = PastProceedingManager()
@@ -721,14 +735,20 @@ class TentativeRuling(models.Model):
     date_creation = models.DateTimeField(
         help_text="Still exploring possible meanings in LASC "
                   "system.",
+        null=True,
+        blank=True,
     )
     date_hearing = models.DateTimeField(
         help_text="The date of the hearing leading to the ruling.",
+        null=True,
+        blank=True,
     )
     department = models.TextField(
         help_text="Internal court code for department",
+        blank=True,
     )
     ruling = models.TextField(
         help_text="The court ruling as HTML",
+        blank=True,
     )
 
