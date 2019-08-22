@@ -837,10 +837,18 @@ def add_claim_history_entry(new_history, claim):
     claims history table. For now we don't try to link the docket entry table
     with the claims table. It's doable, but adds complexity.
 
+    Further, we also don't handle unnumbered claims. You can see an example of
+    one of these in Juriscraper in the txeb.html example file. Here, we just
+    punt on these.
+
     :param new_history: The history dict returned by juriscraper.
     :param claim: The claim in the database the history is associated with.
     :return None
     """
+    if new_history['document_number'] is None:
+        # Punt on unnumbered claims.
+        return
+
     history_type = new_history['type']
     common_lookup_params = {
         'claim': claim,
