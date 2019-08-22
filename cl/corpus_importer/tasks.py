@@ -839,14 +839,20 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
         first_missing_date = get_first_missing_de_date(d)
         kwargs.setdefault('date_start', first_missing_date)
 
-    logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
-    report.query(pacer_case_id, **kwargs)
+    logging_id = '%s.%s' % (court_id, pacer_case_id)
+    logger.info("Querying docket report %s", logging_id)
+    try:
+        report.query(pacer_case_id, **kwargs)
+    except ConnectionError as exc:
+        logger.warning("Ran into ConnectionError '%s' while getting docket "
+                       "for %s. Retrying.", exc.response.status_code,
+                       logging_id)
+        raise self.retry(exc)
     docket_data = report.data
-    logger.info("Querying and parsing complete for %s.%s" % (court_id,
-                                                             pacer_case_id))
+    logger.info("Querying and parsing complete for %s", logging_id)
 
     if not docket_data:
-        logger.info("No valid docket data for %s.%s", court_id, pacer_case_id)
+        logger.info("No valid docket data for %s", logging_id)
         self.request.chain = None
         return
 
@@ -1048,8 +1054,9 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     try:
         report.query(d.pacer_case_id, d.docket_number)
     except ConnectionError as exc:
-        logger.warning("Ran into ConnectionError '%s' for %s. Retrying.",
-                       exc.response.status_code, logging_id)
+        logger.warning("Ran into ConnectionError '%s' while getting claims "
+                       "report for %s. Retrying.", exc.response.status_code,
+                       logging_id)
         raise self.retry(exc)
     claims_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
