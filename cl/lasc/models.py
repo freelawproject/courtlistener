@@ -1,12 +1,8 @@
 # QUESTIONS/COMMENTS
-# 1. Why do we have dates as strings and as dates? Can't we just not store them as
-#    dates? I nuked all of these.
-# 2. Model names are singular even though that's weird. They're classes.
-# 3. No magic numbers (as in the managers)
-# 4. I added verbose_name and verbose_name_plural meta values
-# 5. Todo: Check all char/text fields and see if they have or should not have
-#    blank=True. Related: If these fields need/have null=True, they usually
-#    need blank=True as well.
+# 5. All text/char fields should be blank-able, but not nullable (if they can
+#    lack a value)
+# 6. Text vs Char fields...which do we want for each field.
+# 7. Date/datetime fields need both or neither null and blank
 
 # coding=utf-8
 import hashlib
@@ -18,7 +14,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey, \
 from django.contrib.contenttypes.models import ContentType
 from django.utils.encoding import force_bytes
 
-from cl.lib.models import AbstractJSON, AbstractPDF, AbstractFile
+from cl.lib.models import AbstractJSON, AbstractPDF
 
 
 class UPLOAD_TYPE:
@@ -28,7 +24,7 @@ class UPLOAD_TYPE:
     )
 
 
-class LASCJSON(AbstractJSON, AbstractFile):
+class LASCJSON(AbstractJSON):
     """Store the original JSON content from LASC's API.
 
     Keep the original data in case we ever need to reparse it.
@@ -233,8 +229,7 @@ class Docket(models.Model):
         help_text="The courthouse name",
         blank=True,
     )
-    # Why isn't this a date field?
-    date_status = models.TextField(
+    date_status = models.DateTimeField(
         help_text="Date status was updated",
         null=True,
         blank=True,
@@ -260,7 +255,9 @@ class Docket(models.Model):
 
 
 class DocumentImage(models.Model):
-    """XXX we need a description here..."""
+    """Represents documents that are filed and scanned into the online system,
+    most of which are available to us.
+    """
 
     """
         # caseNumber
@@ -309,56 +306,47 @@ class DocumentImage(models.Model):
         auto_now=True,
         db_index=True,
     )
+    # Corresponds with create_date in docket JSON
+    date_processed = models.DateTimeField(
+        help_text="The date the document was created in the lasc system, "
+                  "whether by attorney upload, clerk processing, etc.",
+    )
     date_filed = models.DateField(
         help_text="The date the document was filed in the system",
     )
-    # Is this a duplicate of date_created?
-    date_create = models.DateTimeField(
-        help_text="The date the document was created in the system",
+    doc_id = models.TextField(
+        help_text="Internal document ID in LASC system used for uniquely "
+                  "identifying the document",
     )
     page_count = models.IntegerField(
         help_text="Page count for this document",
     )
-    # XXX Could use an example in the help_text here.
     document_type = models.TextField(
-        help_text="Type of document code",
+        help_text="Type of document. Typically blank; still exploring "
+                  "possible meaning in LASC system.",
         null=True,
         blank=True,
     )
-    # XXX Can this be moved to a @property?
-    document_url = models.TextField(
-        help_text="The document URL in MAP",
+    document_type_code = models.TextField(
+        help_text="Type of document as a code. We believe this corresponds to "
+                  "the document_type field.",
     )
-    # Maybe an example here?
     image_type_id = models.TextField(
-        help_text="Image type ID",
+        help_text="Image type ID. Still exploring possible meanings in LASC "
+                  "system.",
     )
     app_id = models.TextField(
         help_text="ID for filing application, if any.",
     )
-    doc_id = models.TextField(
-        help_text="Internal document ID",
-    )
-    # Duplicate of document_type, above?
-    document_type_id = models.TextField(
-        help_text="Document Type ID",
-    )
-    # No help_text?
     odyssey_id = models.TextField(
+        help_text="Typically null; likely a vendor-provided code. Still "
+                  "exploring possible meanings in LASC system.",
         null=True,
         blank=True,
     )
-    # This stores whether the item is available in CL, ie, whether we have it?
-    # If so, the convention is is_available for this field.
     is_downloadable = models.BooleanField(
-        help_text="Is the document downloadable by Courtlistener as a BOOL",
-        # XXX I'm not sure I like this default. Let's discuss.
-        default=True,
-    )
-    # Hm, now I don't know what is_downloadable was for.
-    downloaded = models.BooleanField(
-        help_text="Has the document been downloaded as a BOOL",
-        default=False,
+        help_text="Did the user who got the docket have permission to "
+                  "download this item?",
     )
     security_level = models.TextField(
         help_text="Document security level",
@@ -370,22 +358,37 @@ class DocumentImage(models.Model):
         null=True,
         blank=True,
     )
-    # XXX What's this mean?
     volume = models.TextField(
-        help_text="Document volume",
+        help_text="Document volume. Still exploring possible meanings in LASC "
+                  "system.",
         null=True,
         blank=True,
     )
-    # XXX What's this mean?
     doc_part = models.TextField(
-        help_text="Document Part",
+        help_text="Document part. Still exploring possible meanings in LASC "
+                  "system.",
         null=True,
         blank=True,
     )
+
+    # CourtListener-populated fields, not gathered from the docket JSON or
+    # otherwise from LASC.
+    is_available = models.BooleanField(
+        help_text="Has the document been downloaded",
+    )
+
+    @property
+    def document_map_url(self):
+        """The URL to the document in the Media Access Portal."""
+        base_url = 'https://media.lacourt.org/api/AzureApi/'
+        path_template = 'ViewDocument/%s/%s'
+        return base_url + path_template % (self.docket.case_id, self.doc_id)
 
 
 class DocumentFiled(models.Model):
-    """XXX Need a description here."""
+    """Filings on the docket whether or not they're digitally available to
+    anyone accessing the system.
+    """
 
     """
     # "CaseNumber": "18STCV02953",
@@ -413,22 +416,18 @@ class DocumentFiled(models.Model):
     date_filed = models.DateTimeField(
         help_text="Date a document was filed",
     )
-    # XXX Do they call this the memo publicly? If not, we usually call this the
-    # 'description'.
     memo = models.TextField(
         help_text="Memo describing document filed",
         null=True,
         blank=True,
     )
-    # XXX Any point trying to normalize this to the party table?
-    party = models.TextField(
-        help_text="Filing party for the document",
+    document_type = models.TextField(
+        help_text="Document type, whether it's an Answer, a Complaint, etc.",
         null=True,
         blank=True,
     )
-    # XXX The field name doesn't seem to match the help_text here, maybe?
-    document = models.TextField(
-        help_text="Document type",
+    party_str = models.TextField(
+        help_text="Filing party for the document",
         null=True,
         blank=True,
     )
@@ -437,7 +436,8 @@ class DocumentFiled(models.Model):
         verbose_name_plural = 'Documents Filed'
 
 
-class RegisterOfActions(models.Model):
+class Action(models.Model):
+    """Actions registered on a docket"""
 
     """
         # "IsPurchaseable": false,
@@ -457,7 +457,7 @@ class RegisterOfActions(models.Model):
 
     docket = models.ForeignKey(
         Docket,
-        related_name='registers_of_action',
+        related_name='actions',
         on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
@@ -470,7 +470,7 @@ class RegisterOfActions(models.Model):
         auto_now=True,
         db_index=True,
     )
-    date_register_of_action = models.DateTimeField(
+    date_of_action = models.DateTimeField(
         help_text="Date of the action entry",
     )
     description = models.TextField(
@@ -481,15 +481,17 @@ class RegisterOfActions(models.Model):
     )
 
     class Meta:
-        verbose_name = "Register of Action Entry"
-        verbose_name_plural = "Register of Action Entries"
+        verbose_name = "Action Entry"
+        verbose_name_plural = "Action Entries"
 
 
 class CrossReference(models.Model):
     """Relations between cases.
 
-    Unfortunately, these cannot be normalized b/c XXX
+    Unfortunately, these cannot be normalized b/c they may refer to cases in
+    other jurisdictions, among other issues.
     """
+
     """
     cross_reference_date_string: "11/08/2001"
     cross_reference_date : 2001-11-07T23:00:00-08:00
@@ -570,6 +572,9 @@ class Party(models.Model):
     entity_number = models.TextField(
         help_text="Order entity/party joined cases system",
     )
+    party_name = models.TextField(
+        help_text="Full name of the party",
+    )
     party_flag = models.TextField(
         help_text="Court code representing party",
     )
@@ -578,10 +583,6 @@ class Party(models.Model):
     )
     party_description = models.TextField(
         help_text="Description of the party",
-    )
-    # XXX Isn't this the party_name field?
-    name = models.TextField(
-        help_text="Full name of the party",
     )
 
     class Meta:
@@ -599,8 +600,8 @@ class TIME_CHOICES:
 
 class PastProceedingManager(models.Manager):
     def get_queryset(self):
-        super_queryset = super(PastProceedingManager, self).get_queryset()
-        return super_queryset.filter(past_or_future=TIME_CHOICES.PAST)
+        super_qs = super(PastProceedingManager, self).get_queryset()
+        return super_qs.filter(past_or_future=TIME_CHOICES.PAST)
 
 
 class FutureProceedingManager(models.Manager):
@@ -610,6 +611,25 @@ class FutureProceedingManager(models.Manager):
 
 
 class Proceeding(models.Model):
+
+    """
+    "ProceedingDateString": "08/24/2018",
+    "CourtAlt": "",
+    "CaseNumber": "BZ215634",
+    "District": "",
+    "AMPM": "AM",
+    "Memo": "",
+    "Address": "",
+    "ProceedingRoom": "Department 2F",
+    "ProceedingDate": "2018-08-24T00:00:00-07:00",
+    "Result": "Held - Order Made",
+    "ProceedingTime": " 9:00",
+    "Judge": "Lowry, Stephen M.",
+    "CourthouseName": "",
+    "DivisionCode": "",
+    "Event": "DSU - RFO (Modification Hearing)
+    """
+
     docket = models.ForeignKey(
         Docket,
         related_name='proceedings',
@@ -631,37 +651,36 @@ class Proceeding(models.Model):
         null=True,
         blank=True,
     )
-    date_proceeding = models.TextField(
+    # We keep a date a time, and an AM/PM field for this table because each
+    # provides useful information and unfortunately the upstream data is
+    # provided in this manner. Rather than try to merge them, which may go
+    # poorly, we just keep them in the format we've been given them.
+    date_proceeding = models.DateTimeField(
         help_text="Date of the past proceeding",
-    )
-    # XXX Do we need am/pm, proceeding_time, and date_proceeding? This seems weird?
-    am_pm = models.TextField(
-        help_text="Was the proceeding in the AM or PM",
     )
     proceeding_time = models.TextField(
         help_text="Time of the past proceeding in HH:MM string",
     )
-    # XXX Again, should this be a description field instead?
+    am_pm = models.TextField(
+        help_text="Was the proceeding in the AM or PM",
+    )
     memo = models.TextField(
-        help_text="Memo about the past proceeding",
-    )
-    address = models.TextField(
-        help_text="Address of the past proceeding",  # XXX Here and elsewhere: "Past"?
-    )
-    proceeding_room = models.TextField(
-        help_text="The court room of the past proceeding",
-    )
-    result = models.TextField(
-        help_text="Result of the past proceeding",
-    )
-    judge_name = models.TextField(
-        help_text="Judge in the past proceeding",
+        help_text="Memo about the proceeding",
     )
     courthouse_name = models.TextField(
-        help_text="Courthouse name for the past proceeding",
+        help_text="Courthouse name for the proceeding",
     )
-    division_code = models.TextField(
-        help_text="Courthouse division. E.g. CV = Civil}",
+    address = models.TextField(
+        help_text="Address of the proceeding",
+    )
+    proceeding_room = models.TextField(
+        help_text="The court room of the proceeding",
+    )
+    result = models.TextField(
+        help_text="Result of the proceeding",
+    )
+    judge_name = models.TextField(
+        help_text="Judge in the proceeding",
     )
     event = models.TextField(
         help_text='Event that occurred. E.g. "Jury Trial"',
@@ -700,13 +719,11 @@ class TentativeRuling(models.Model):
         db_index=True,
     )
     date_creation = models.DateTimeField(
-        help_text="Date the ruling was decided",
+        help_text="Still exploring possible meanings in LASC "
+                  "system.",
     )
     date_hearing = models.DateTimeField(
-        help_text="",
-    )
-    location_id = models.TextField(
-        help_text="Internal court code for location",
+        help_text="The date of the hearing leading to the ruling.",
     )
     department = models.TextField(
         help_text="Internal court code for department",
