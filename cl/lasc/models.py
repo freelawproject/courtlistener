@@ -96,6 +96,19 @@ class QueuedCase(models.Model):
         blank=True,
     )
 
+    @property
+    def case_url(self):
+        return '/'.join(["https://media.lacourt.org/api/AzureApi",
+                        self.internal_case_id]
+                        )
+
+
+    def __unicode__(self):
+        return "%s" % (self.internal_case_id)
+
+    class Meta:
+        verbose_name = "Queued Case"
+
 
 class QueuedPDF(models.Model):
     """PDFs we have yet to download."""
@@ -128,6 +141,11 @@ class QueuedPDF(models.Model):
                         self.internal_case_id,
                         self.document_id])
 
+    def __unicode__(self):
+        return "%s" % (self.document_id)
+
+    class Meta:
+        verbose_name = "Queued PDF"
 
 class Docket(models.Model):
     """High-level table to contain all other LASC-related data"""
@@ -238,6 +256,9 @@ class Docket(models.Model):
     def case_id(self):
         return ';'.join([self.docket_number, self.district,
                          self.division_code])
+
+    def __unicode__(self):
+        return "%s" % (self.case_id)
 
 
 class DocumentImage(models.Model):
@@ -378,6 +399,13 @@ class DocumentImage(models.Model):
         path_template = 'ViewDocument/%s/%s'
         return base_url + path_template % (self.docket.case_id, self.doc_id)
 
+    def __unicode__(self):
+        return "Scanned PDF  %s for %s" % (self.doc_id, self.docket.docket_number)
+
+    class Meta:
+        verbose_name = "Document Image"
+        verbose_name_plural = "Document Images"
+
 
 class DocumentFiled(models.Model):
     """Filings on the docket whether or not they're digitally available to
@@ -425,6 +453,9 @@ class DocumentFiled(models.Model):
 
     class Meta:
         verbose_name_plural = 'Documents Filed'
+
+    def __unicode__(self):
+        return "%s for %s" % (self.document_type, self.docket.docket_number)
 
 
 class Action(models.Model):
@@ -477,6 +508,9 @@ class Action(models.Model):
         verbose_name = "Action Entry"
         verbose_name_plural = "Action Entries"
 
+    def __unicode__(self):
+        return "Action for %s" % (self.docket.docket_number)
+
 
 class CrossReference(models.Model):
     """Relations between cases.
@@ -520,6 +554,13 @@ class CrossReference(models.Model):
         help_text="A description of the type of cross reference",
         blank=True,
     )
+
+    def __unicode__(self):
+        return "%s for %s" % (self.cross_reference_type, self.docket.docket_number)
+
+    class Meta:
+        verbose_name = "Cross Reference"
+        verbose_name_plural = "Cross References"
 
 
 class Party(models.Model):
@@ -588,6 +629,9 @@ class Party(models.Model):
 
     class Meta:
         verbose_name_plural = "Parties"
+
+    def __unicode__(self):
+        return "%s for %s" % (self.party_name, self.docket.docket_number)
 
 
 class TIME_CHOICES:
@@ -699,6 +743,9 @@ class Proceeding(models.Model):
     past_objects = PastProceedingManager()
     future_objects = FutureProceedingManager()
 
+    def __unicode__(self):
+        return "%s for %s" % (self.event, self.docket.docket_number)
+
 
 class TentativeRuling(models.Model):
     """
@@ -747,4 +794,10 @@ class TentativeRuling(models.Model):
         help_text="The court ruling as HTML",
         blank=True,
     )
+
+    def __unicode__(self):
+        return "Tentative ruling for %s" % (self.docket.docket_number)
+
+    class Meta:
+        verbose_name = "Tenative Ruling"
 
