@@ -792,8 +792,9 @@ def filter_docket_by_tags(self, data, tags, court_id):
     return data
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60,
-          interval_step=10 * 60, ignore_result=True)
+# Retry 10 times. First one after 1m, then again every 5 minutes.
+@app.task(bind=True, max_retries=10, interval_start=1 * 60,
+          interval_step=5 * 60, ignore_result=True)
 def get_docket_by_pacer_case_id(self, data, court_id, cookies,
                                 tag_names=None, **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
@@ -846,6 +847,11 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     except ConnectionError as exc:
         logger.warning("Ran into ConnectionError while getting docket "
                        "for %s. Retrying.", logging_id)
+        if self.request.retries == self.max_retries:
+            logger.error("Max retries exceeded for %s. Aborting chain.",
+                         logging_id)
+            self.request.chain = None
+            return None
         raise self.retry(exc)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
@@ -1026,8 +1032,9 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
     return att_report
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60,
-          interval_step=10 * 60, ignore_result=True)
+# Retry 10 times. First one after 1m, then again every 5 minutes.
+@app.task(bind=True, max_retries=10, interval_start=1 * 60,
+          interval_step=5 * 60, ignore_result=True)
 def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     """Get the bankruptcy claims registry for a docket
 
@@ -1055,6 +1062,12 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     except ConnectionError as exc:
         logger.warning("Ran into ConnectionError while getting claims "
                        "report for %s. Retrying.", logging_id)
+        if self.request.retries == self.max_retries:
+            self.request.chain = None
+            logger.error("Max retries completed for %s. Unable to get "
+                         "claims data. Aborting task, but allowing next task "
+                         "to run.", logging_id)
+            return data
         raise self.retry(exc)
     claims_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
