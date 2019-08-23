@@ -853,9 +853,12 @@ def add_claim_history_entry(new_history, claim):
     common_lookup_params = {
         'claim': claim,
         'date_filed': new_history['date_filed'],
-        'pacer_case_id': new_history['pacer_case_id'],
+        # Sometimes missing when a docket entry type
+        # doesn't have a link for some reason.
+        'pacer_case_id': new_history.get('pacer_case_id', ''),
         'document_number': new_history['document_number'],
     }
+
     if history_type == 'docket_entry':
         db_history, _ = ClaimHistory.objects.get_or_create(
             claim_document_type=ClaimHistory.DOCKET_ENTRY,
