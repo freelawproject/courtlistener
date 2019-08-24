@@ -17,7 +17,7 @@ TAG = 'RllVuRYPZETjSCTkDp-TCIL'
 TAG_IDB_SAMPLE = 'xJwsPIosbuXPGeFblc-TCIL'
 
 
-def get_data(options, field_map, row_transform, tags):
+def get_data(options, row_transform, tags):
     """Download dockets from their list, then download claims register data
     from those dockets.
     """
@@ -38,13 +38,21 @@ def get_data(options, field_map, row_transform, tags):
         row = row_transform(row)
         throttle.maybe_wait()
         get_docket_and_claims(
-            row[field_map['docket_number']].strip(),
-            row[field_map['court']].strip(),
-            row.get(field_map['case_name'], '').strip(),
+            row['docket_number'],
+            row['court'],
+            row['case_name'],
             session.cookies,
             tags,
             q,
         )
+
+
+def tcil_row_transform(row):
+    """A small helper to tune up the row from the tcil spreadsheet"""
+    row['docket_number'] = row['Docket #'].strip()
+    row['court'] = row['Court'].strip()
+    row['case_name'] = row['Case name'].strip()
+    return row
 
 
 def idb_row_transform(row):
@@ -112,16 +120,12 @@ class Command(VerboseCommand):
         if options['task'] == 'fdd_export':
             get_data(
                 options,
-                {'docket_number': 'Docket #', 'court': 'Court',
-                 'case_name': 'Case name'},
-                None,
+                tcil_row_transform,
                 [TAG],
             )
         elif options['task'] == 'idb_sample':
             get_data(
                 options,
-                {'docket_number': 'docket_number', 'court': 'court',
-                 'case_name': 'case_name'},
                 idb_row_transform,
                 [TAG_IDB_SAMPLE]
             )
