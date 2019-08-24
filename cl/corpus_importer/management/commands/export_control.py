@@ -2,23 +2,22 @@ import argparse
 import csv
 import os
 
-from celery.canvas import chain
 from django.conf import settings
 from juriscraper.pacer import PacerSession
 
-from cl.corpus_importer.tasks import get_pacer_case_id_and_title, \
-    get_docket_by_pacer_case_id, get_bankr_claims_registry
+from cl.corpus_importer.task_canvases import get_docket_and_claims
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.tasks import add_or_update_recap_docket
+from cl.search.models import Court
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 TAG = 'RllVuRYPZETjSCTkDp-TCIL'
+TAG_IDB_SAMPLE = 'xJwsPIosbuXPGeFblc-TCIL'
 
 
-def get_data(options):
+def get_data(options, field_map, row_transform, tags):
     """Download dockets from their list, then download claims register data
     from those dockets.
     """
@@ -36,32 +35,39 @@ def get_data(options):
 
         # All tests pass. Get the docket.
         logger.info("Doing row %s: %s", i, row)
+        row = row_transform(row)
         throttle.maybe_wait()
-        chain(
-            get_pacer_case_id_and_title.s(
-                pass_through=None,
-                docket_number=row['Docket #'].strip(),
-                court_id=row['Court'].strip(),
-                cookies=session.cookies,
-                case_name=row['Case name'].strip(),
-                docket_number_letters='bk',
-            ).set(queue=q),
-            get_docket_by_pacer_case_id.s(
-                court_id=row['Court'].strip(),
-                cookies=session.cookies,
-                tag_names=[TAG],
-                **{
-                    'show_parties_and_counsel': True,
-                    'show_terminated_parties': True,
-                    'show_list_of_member_cases': False,
-                }
-            ).set(queue=q),
-            get_bankr_claims_registry.s(
-                cookies=session.cookies,
-                tag_names=[TAG],
-            ).set(queue=q),
-            add_or_update_recap_docket.s().set(queue=q),
-        ).apply_async()
+        get_docket_and_claims(
+            row[field_map['docket_number']].strip(),
+            row[field_map['court']].strip(),
+            row.get(field_map['case_name'], '').strip(),
+            session.cookies,
+            tags,
+            q,
+        )
+
+
+def idb_row_transform(row):
+    """A small helper function to tune up the row.
+
+    :param row: A dict of the row from the CSV
+    :return row: A transformed version of the row
+    """
+    # Convert the court field from theirs to something bearable
+    row['court'] = Court.objects.get(
+        fjc_court_id=row['DISTRICT'],
+        jurisdiction=Court.FEDERAL_BANKRUPTCY
+    ).pk
+
+    # Set the case name to None. Alas, we don't get it, but we probably don't
+    # need it either.
+    row['case_name'] = None
+
+    # Make a docket number. Combination of the two digit year and a five digit
+    # 0-padded serial number.
+    row['docket_number'] = '%s-%s' % (row['FILECY'][2:4],
+                                      row['DOCKET'].rjust(5, '0'))
+    return row
 
 
 class Command(VerboseCommand):
@@ -81,6 +87,11 @@ class Command(VerboseCommand):
                  "skip none.",
         )
         parser.add_argument(
+            '--task',
+            type=str,
+            help="The task to perform. Either fdd_export, or idb_sample",
+        )
+        parser.add_argument(
             '--limit',
             type=int,
             default=0,
@@ -98,5 +109,22 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         logger.info("Using PACER username: %s" % PACER_USERNAME)
-        get_data(options)
+        if options['task'] == 'fdd_export':
+            get_data(
+                options,
+                {'docket_number': 'Docket #', 'court': 'Court',
+                 'case_name': 'Case name'},
+                None,
+                [TAG],
+            )
+        elif options['task'] == 'idb_sample':
+            get_data(
+                options,
+                {'docket_number': 'docket_number', 'court': 'court',
+                 'case_name': 'case_name'},
+                idb_row_transform,
+                [TAG_IDB_SAMPLE]
+            )
+        else:
+            NotImplementedError("Unknown task: %s" % options['task'])
 
