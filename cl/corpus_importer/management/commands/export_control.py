@@ -34,8 +34,8 @@ def get_data(options, row_transform, tags):
             break
 
         # All tests pass. Get the docket.
-        logger.info("Doing row %s: %s", i, row)
         row = row_transform(row)
+        logger.info("Doing row %s: %s", i, row)
         throttle.maybe_wait()
         get_docket_and_claims(
             row['docket_number'],
@@ -73,8 +73,8 @@ def idb_row_transform(row):
 
     # Make a docket number. Combination of the two digit year and a five digit
     # 0-padded serial number.
-    row['docket_number'] = '%s-%s' % (row['FILECY'][2:4],
-                                      row['DOCKET'].rjust(5, '0'))
+    row['docket_number'] = '%s-%s' % (row['DOCKET'][0:2],
+                                      row['DOCKET'][2:])
     return row
 
 
