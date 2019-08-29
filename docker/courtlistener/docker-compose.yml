@@ -33,6 +33,7 @@ services:
     cl-solr:
         container_name: cl-solr
         image: freelawproject/solr:latest
+        user: ${SOLR_USER_ID:-1024}
         ports:
             - "8983:8983"
         # needs chmod 777
@@ -46,6 +47,7 @@ services:
     cl-celery:
         container_name: cl-celery
         image: freelawproject/task-server:latest
+        user: ${CELERY_USER_ID:-33}
         depends_on:
             - cl-postgresql
             - cl-redis

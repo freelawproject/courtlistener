@@ -45,8 +45,6 @@ We use a docker compose file to make development easier. Don't use it for produc
         
     This is important so that each service in the compose file can have a hostname.
 
- - Set the `CL_SOLR_CODE_DIR` environment variable. This should get set to something like `/mlissner/home/code/courtlistener-solr-server`. This is a path to the [`courtlistener-solr-server` repository's code][cl-solr]. Before this works, you'll need to do some funky chmod and chown work in that directory (I'm sorry). If you need help with this, see the readme in that code base. It explains things.
-
  - Make sure that in your CourtListener settings, you've set up the following (these should all be defaults):
  
      - `REDIS_HOST` should be `cl-redis`.
@@ -59,10 +57,21 @@ We use a docker compose file to make development easier. Don't use it for produc
 
 The final command you'll run is:
     
-    CL_SOLR_CODE_DIR='/code/courtlistener-solr-server' \
+    CL_SOLR_CODE_DIR='/code/courtlistener-solr-server' `# Optional` \
+    CELERY_USER_ID=$UID `# Optional` \
+    SOLR_USER_ID=$UID   `# Optional` \
          docker-compose up
-
+         
 (Make sure you're in the right directory when you do this.)
+
+An explanation of variables:
+
+ - `CL_SOLR_CODE_DIR` is a path to the [`courtlistener-solr-server` repository's code][cl-solr]. This will default to a directory called `courtlistener-solr-server` that is next to the `courtlistener` repository, but if you put the solr repo somewhere else, you might set it to something like `/mlissner/home/code/courtlistener-solr-server`.
+ 
+ - `CELERY_USER_ID` is the Linux user ID that you want to run Celery as. By default, it will run as user 33. This number was effectively picked out of a hat, but if you allow the default, you also have to make sure that any mounted volumes in the Celery service can be accessed by user 33. Unless you take special steps, this won't be the case on most computers. Therefore, the command above tells Celery to run as the same user as the person running the docker compose command. This is no good in production, but it should work nicely for local development.
+ 
+ - `SOLR_USER_ID` is the same thing as `CELERY_USER_ID`, but for Solr. It uses user ID 1024 by default — another anointed value that otherwise has nothing special about it.
+
 
 If that goes smoothly, it'll launch Solr, PostgreSQL, Redis, Celery (with access to Tesseract), Django, and a Selenium test server. Whew! 
 
