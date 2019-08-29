@@ -41,7 +41,7 @@ We use a docker compose file to make development easier. Don't use it for produc
 
  - Create the overlay network it relies on:
  
-        docker network create -d overlay --attachable cl_net_overlay
+        docker network create -d bridge --attachable cl_net_overlay
         
     This is important so that each service in the compose file can have a hostname.
 

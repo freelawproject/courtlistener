@@ -2,7 +2,8 @@
 version: "3.7"
 networks:
     cl_net_overlay:
-        driver: overlay
+        driver: bridge
+        external: true
 services:
     # Redis for caching
     cl-redis:
