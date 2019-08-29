@@ -78,7 +78,7 @@ def base_recap_path(instance, filename, base_dir):
 
 def make_pdf_path(instance, filename, thumbs=False):
     from cl.search.models import ClaimHistory, RECAPDocument
-    from cl.lasc.models import Docket as LASC
+    from cl.lasc.models import LASCPDF
     if type(instance) == RECAPDocument:
         root = 'recap'
         court_id = instance.docket_entry.docket.court_id
@@ -87,8 +87,11 @@ def make_pdf_path(instance, filename, thumbs=False):
         root = 'claim'
         court_id = instance.claim.docket.court_id
         pacer_case_id = instance.pacer_case_id
-    elif type(instance) == LASC:
-        return make_path('pdf-data', filename)
+    elif type(instance) == LASCPDF:
+        root = 'state/ca/lasc/gov.ca.lasc.%s/' % (instance.docket_number)
+        fn = 'gov.ca.lasc.%s.%s.pdf' % (instance.docket_number,
+                                                      instance.document_id)
+        return os.path.join(root, fn)
     else:
         raise ValueError("Unknown model type in make_pdf_path "
                          "function: %s" % type(instance))
