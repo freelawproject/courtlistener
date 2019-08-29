@@ -23,6 +23,7 @@ cl/assets/media/wma/
 cl/assets/media/wpd/
 cl/assets/media/xml/
 cl/assets/static/
+cl/assets/media/state/
 cl/assets/media/pdf-data/
 cl/assets/media/json-data/
 
@@ -33,3 +34,4 @@ cl/assets/media/json-data/
 cl/settings/*private.py
 cl/settings/google_auth.json
 .DS_Store
+
