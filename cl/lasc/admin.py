@@ -11,35 +11,13 @@ class Base(admin.ModelAdmin, CSSAdminMixin):
         'date_created',
         'date_modified',
     )
-
-    dates = (
-        'date_created',
-        'date_modified',
-    )
-
     raw_id_fields = (
         'docket',
     )
 
-    @classmethod
-    def add(self, fields):
-        return fields + (self.dates)
 
-    @classmethod
-    def add_all(self, fields):
-        return ("docket",) + fields + (self.dates)
-
-    class Meta:
-        abstract = True
-
-
-class DocumentFiledInline(admin.TabularInline):
+class DocumentFiledInline(admin.TabularInline, CSSAdminMixin):
     model = DocumentFiled
-
-    formfield_overrides = {
-        models.CharField: {'widget': TextInput(attrs={'size':'20'})},
-        models.TextField: {'widget': Textarea(attrs={'rows':4, 'cols':40})},
-    }
 
 
 @admin.register(Docket)
