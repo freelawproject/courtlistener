@@ -221,18 +221,14 @@ class Command(VerboseCommand):
 
         pass
 
-    def get_pdf(options):
-
-        if "--case" in sys.argv:
-            case_id = options['case']
-
-            lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-            lasc_session.login()
-
-            tasks.get_pdf(lasc_session, case_id)
-
-
-        pass
+    def case_queue(self):
+        """
+        Finds all cases in case queue
+        :return:
+        """
+        lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+        lasc_session.login()
+        tasks.case_queue(sess=lasc_session)
 
     def pdf_queue(self):
         """
