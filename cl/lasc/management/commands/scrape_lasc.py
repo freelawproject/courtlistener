@@ -217,31 +217,11 @@ class Command(VerboseCommand):
         tasks.pdf_queue(sess=lasc_session)
 
 
-        pass
-
-
-
     VALID_ACTIONS = {
         'last-week': get_cases_for_last_week,  #gets ~1k recent filings
         'add-case': add_case, #adds case by case id
-        'get-pdf': get_pdf, #adds case by case id
-        'get-pdfs': get_pdfs, #adds case by case id
-        'out-of-date': check_out_of_date_case,
-        'fill-in': fill_in_case,  #fills in cases that are partial
+        'reset-db': reset_db,  # clean the database of the case
+        'case-queue': case_queue,
+        'pdf-queue': pdf_queue,
         'wormhole': import_wormhole,  # fills in cases that are partial
-        'reset-db': reset_db  # clean the database of the case
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
