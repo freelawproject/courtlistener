@@ -66,7 +66,6 @@ class Command(VerboseCommand):
         )
 
 
-
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         options['action'](options)
@@ -235,15 +234,15 @@ class Command(VerboseCommand):
 
         pass
 
-    def get_pdfs(options):
+    def pdf_queue(self):
+        """
+        Pulls all pdfs in queue
+        :return:
+        """
 
-        if "--case" in sys.argv:
-            case_id = options['case']
-
-            lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-            lasc_session.login()
-
-            tasks.get_pdfs(lasc_session, case_id)
+        lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+        lasc_session.login()
+        tasks.pdf_queue(sess=lasc_session)
 
 
         pass
