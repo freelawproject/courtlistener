@@ -73,7 +73,8 @@ class Command(VerboseCommand):
 
     def get_cases_for_last_week(options):
         """
-        This code collects the last weeks worth of new cases and add them to the database.
+        This code collects the last weeks worth of new cases,
+         and add them to the db.
 
         :return:
         """
@@ -83,38 +84,13 @@ class Command(VerboseCommand):
             date2 = options['date2']
             # query._get_cases_around_dates()
 
-        logger.info("Getting last weeks data.")
+        logger.info("Getting last 7 days worth of cases.")
 
-        lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-        lasc_session.login()
+        sess = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+        sess.login()
 
-        query = LASCSearch(lasc_session)
-        query._get_case_list_for_last_seven_days()
-        logger.info("Got data")
-        query._parse_date_data()
+        tasks.fetch_last_week(sess=sess)
 
-        datum = query.normalized_date_data
-        logger.info("Saving Data to DB")
-
-        for case in datum:
-            case_id = case['case_id']
-            case_object = Docket.objects.filter(case_id=case_id)
-            if not case_object.exists():
-
-                dc = {}
-                dc['full_data_model'] = False
-                dc['case_id'] = case_id
-
-                print case_id
-
-                cd = Docket.objects.create(**{key: value for key, value in dc.iteritems()})
-                cd.save()
-
-                logger.info("Finished Adding.")
-
-
-
-        logger.info("Finished Saving.")
 
 
     def add_case(options):

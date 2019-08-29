@@ -3,7 +3,8 @@
 from datetime import datetime as dt
 import hashlib
 
-from cl.lasc.models import Docket, DocumentImages
+from cl.lasc.models import Docket, QueuedCase, QueuedPDF, \
+                         DocumentImage, UPLOAD_TYPE
 from cl.lib.command_utils import logger
 from cl.lasc.models import LASCJSON, LASCPDF
 
@@ -334,11 +335,30 @@ def import_wormhole_corpus(dir):
                     mdl.objects.create(**{key: value for key, value in case_data_row.iteritems()}).save()
 
 
-            logger.info("Saving Data to DB")
+def fetch_last_week(sess):
+    query = LASCSearch(sess)
+    query._get_case_list_for_last_seven_days()
+    logger.info("Got data")
+    query._parse_date_data()
 
+    datum = query.normalized_date_data
+    logger.info("Saving Data to DB")
+    i = 0
+    for case in datum:
+        internal_case_id = case['case_id']
+        case_object = QueuedCase.objects.filter(internal_case_id=internal_case_id)
+        if not case_object.exists():
+            i += 1
+            dc = {}
+            dc['internal_case_id'] = internal_case_id
+            dc['judge_code'] = case['judge_code']
+            dc['case_type_code'] = case['case_type_code']
+            cd = QueuedCase.objects.create(**{key: value for key, value in dc.iteritems()})
+            cd.save()
 
-            json_file = LASCJSON(content_object=lasc_obj,
-                                        upload_type="JSON")
+            logger.info("Adding %s" % (case['case_number']))
+
+    logger.info("Added %s cases." % (i))
 
             json_file.filepath_local.save(
                 'lasc.json',  # We only care about the ext w/UUIDFileSystemStorage
