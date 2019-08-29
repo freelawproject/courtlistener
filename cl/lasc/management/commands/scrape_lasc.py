@@ -1,17 +1,9 @@
-import os, sys, argparse, json
-from datetime import datetime as dt
+# coding=utf-8
 
+import os, sys, argparse
 from django.conf import settings
-from django.core.serializers import serialize as sz
-from django.utils import timezone
-from django.contrib.contenttypes.models import ContentType
-
-
 from juriscraper.lasc.http import LASCSession
-from juriscraper.lasc.fetch import LASCSearch
-
 from cl.lasc import tasks
-from cl.lasc.models import Docket, Proceedings, DocumentImages, QueuedCases
 from cl.lib.command_utils import VerboseCommand, logger
 
 
@@ -20,7 +12,7 @@ LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
 
 
 class Command(VerboseCommand):
-    help = "Get all the free content from PACER."
+    help = "Get all content from MAP LA Unlimited Civil Cases."
 
     def valid_actions(self, s):
 
@@ -95,7 +87,8 @@ class Command(VerboseCommand):
 
     def add_case(options):
         """
-
+        Adds case to db by internal case id
+        {docket_number}.
         :return:
         """
 
@@ -106,96 +99,32 @@ class Command(VerboseCommand):
             tasks.add_case(lasc_session, case_id)
 
 
-    def check_out_of_date_case(options):
-        """
-        Add options later... for tagged types... clients -- etc
-
-        :return:
-        """
-        lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-        lasc_session.login()
-
-        fmds = Docket.objects.filter(full_data_model=True).order_by('date_checked') #oldest to newest
-        print fmds.count()
-        for f in fmds:
-            print f.date_checked
-            tasks.check_case(lasc_session, f.case_id)
-
-
-
-
-    def fill_in_case(options):
-        """
-        If no case is passed - the tool searches for cases that have yet to be indexed and added to the system.
-        :return:
-        """
-
-        if "--case" in sys.argv:
-            case_id = options['case']
-            case_search = Docket.objects.filter(case_id=case_id)
-            if case_search.count() == 0:
-
-                logger.info("New Case")
-
-                lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-                lasc_session.login()
-                tasks.add_case(lasc_session, case_id)
-            else:
-
-                logger.info("%s cases to update" % case_search.count())
-
-                lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-                lasc_session.login()
-                query = LASCSearch(lasc_session)
-
-                if tasks.check_hash(query, case_id, case_search[0].case_hash):
-
-                    case = {'date_checked' : dt.now(tz=timezone.utc)}
-                    Docket.objects.filter(case_id=case_id).update(**{key: value for key, value in case.iteritems()})
-                    logger.info("Case has not Changed, Updating date_checked Value")
-
-                else:
-
-                    logger.info("Changes Detected, Need to update")
-                    tasks.update_case(query, case_id)
-
-
-
-        else:
-
-            fmds = Docket.objects.filter(full_data_model=False)
-
-            if fmds.count() == 0:
-                logger.info("%s cases to update" % fmds.count())
-
-            else:
-
-                logger.info("Updating %s cases." % fmds.count())
-
-                lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-                lasc_session.login()
-                for case in fmds:
-                    tasks.add_case(lasc_session, case.case_id)
-
-
-
-
     def import_wormhole(options):
+
+        """
+        Wormhole refers to how we shared data.
+        The code needs an directory wildcard to run.  It then glob.globs' the
+        partial directory and generates a list of cases to import.
+
+        :return:
+        """
 
         if "--dir" in sys.argv:
             dir = options['dir']
+
             dir = dir + "*.json"
             tasks.import_wormhole_corpus(dir)
 
-
     def reset_db(options):
-        print('reset db')
+        """
+        Deletes case from db
+        :return:
+        """
 
         if "--case" in sys.argv:
             case_id = options['case']
             tasks.remove_case(case_id)
 
-        pass
 
     def case_queue(self):
         """
