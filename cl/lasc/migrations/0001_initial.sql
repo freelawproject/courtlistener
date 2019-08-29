@@ -26,7 +26,7 @@ CREATE TABLE "lasc_lascjson" ("id" serial NOT NULL PRIMARY KEY, "date_created" t
 --
 -- Create model LASCPDF
 --
-CREATE TABLE "lasc_lascpdf" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "sha1" varchar(40) NOT NULL, "page_count" integer NULL, "file_size" integer NULL, "filepath_local" varchar(1000) NOT NULL, "filepath_ia" varchar(1000) NOT NULL, "ia_upload_failure_count" smallint NULL, "thumbnail" varchar(100) NULL, "thumbnail_status" smallint NOT NULL, "plain_text" text NOT NULL, "ocr_status" smallint NULL, "object_id" integer NOT NULL CHECK ("object_id" >= 0), "content_type_id" integer NOT NULL);
+CREATE TABLE "lasc_lascpdf" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "sha1" varchar(40) NOT NULL, "page_count" integer NULL, "file_size" integer NULL, "filepath_local" varchar(1000) NOT NULL, "filepath_ia" varchar(1000) NOT NULL, "ia_upload_failure_count" smallint NULL, "thumbnail" varchar(100) NULL, "thumbnail_status" smallint NOT NULL, "plain_text" text NOT NULL, "ocr_status" smallint NULL, "object_id" integer NOT NULL CHECK ("object_id" >= 0), "filepath" varchar(150) NOT NULL, "docket_number" varchar(300) NOT NULL, "document_id" varchar(40) NOT NULL, "content_type_id" integer NOT NULL);
 --
 -- Create model Party
 --
@@ -42,7 +42,7 @@ CREATE TABLE "lasc_queuedcase" ("id" serial NOT NULL PRIMARY KEY, "date_created"
 --
 -- Create model QueuedPDF
 --
-CREATE TABLE "lasc_queuedpdf" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "internal_case_id" varchar(300) NOT NULL, "document_id" varchar(40) NOT NULL);
+CREATE TABLE "lasc_queuedpdf" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "internal_case_id" varchar(300) NOT NULL, "document_id" varchar(40) NOT NULL, "docket_id" integer NOT NULL);
 --
 -- Create model TentativeRuling
 --
@@ -85,6 +85,10 @@ CREATE INDEX "lasc_lascpdf_date_created_01f9451f" ON "lasc_lascpdf" ("date_creat
 CREATE INDEX "lasc_lascpdf_date_modified_37f39ca4" ON "lasc_lascpdf" ("date_modified");
 CREATE INDEX "lasc_lascpdf_filepath_local_c10c8db5" ON "lasc_lascpdf" ("filepath_local");
 CREATE INDEX "lasc_lascpdf_filepath_local_c10c8db5_like" ON "lasc_lascpdf" ("filepath_local" varchar_pattern_ops);
+CREATE INDEX "lasc_lascpdf_docket_number_f4f4d567" ON "lasc_lascpdf" ("docket_number");
+CREATE INDEX "lasc_lascpdf_docket_number_f4f4d567_like" ON "lasc_lascpdf" ("docket_number" varchar_pattern_ops);
+CREATE INDEX "lasc_lascpdf_document_id_a222b520" ON "lasc_lascpdf" ("document_id");
+CREATE INDEX "lasc_lascpdf_document_id_a222b520_like" ON "lasc_lascpdf" ("document_id" varchar_pattern_ops);
 CREATE INDEX "lasc_lascpdf_content_type_id_92b2954d" ON "lasc_lascpdf" ("content_type_id");
 ALTER TABLE "lasc_party" ADD CONSTRAINT "lasc_party_docket_id_eefccc6e_fk_lasc_docket_id" FOREIGN KEY ("docket_id") REFERENCES "lasc_docket" ("id") DEFERRABLE INITIALLY DEFERRED;
 CREATE INDEX "lasc_party_date_created_ac942438" ON "lasc_party" ("date_created");
@@ -98,12 +102,14 @@ CREATE INDEX "lasc_queuedcase_date_created_d0bc8b3c" ON "lasc_queuedcase" ("date
 CREATE INDEX "lasc_queuedcase_date_modified_74609387" ON "lasc_queuedcase" ("date_modified");
 CREATE INDEX "lasc_queuedcase_internal_case_id_9e5b0a54" ON "lasc_queuedcase" ("internal_case_id");
 CREATE INDEX "lasc_queuedcase_internal_case_id_9e5b0a54_like" ON "lasc_queuedcase" ("internal_case_id" varchar_pattern_ops);
+ALTER TABLE "lasc_queuedpdf" ADD CONSTRAINT "lasc_queuedpdf_docket_id_5fbbd00a_fk_lasc_docket_id" FOREIGN KEY ("docket_id") REFERENCES "lasc_docket" ("id") DEFERRABLE INITIALLY DEFERRED;
 CREATE INDEX "lasc_queuedpdf_date_created_7ed0bfc0" ON "lasc_queuedpdf" ("date_created");
 CREATE INDEX "lasc_queuedpdf_date_modified_ed856b05" ON "lasc_queuedpdf" ("date_modified");
 CREATE INDEX "lasc_queuedpdf_internal_case_id_ceffd139" ON "lasc_queuedpdf" ("internal_case_id");
 CREATE INDEX "lasc_queuedpdf_internal_case_id_ceffd139_like" ON "lasc_queuedpdf" ("internal_case_id" varchar_pattern_ops);
 CREATE INDEX "lasc_queuedpdf_document_id_5ef0503b" ON "lasc_queuedpdf" ("document_id");
 CREATE INDEX "lasc_queuedpdf_document_id_5ef0503b_like" ON "lasc_queuedpdf" ("document_id" varchar_pattern_ops);
+CREATE INDEX "lasc_queuedpdf_docket_id_5fbbd00a" ON "lasc_queuedpdf" ("docket_id");
 ALTER TABLE "lasc_tentativeruling" ADD CONSTRAINT "lasc_tentativeruling_docket_id_51a63aa6_fk_lasc_docket_id" FOREIGN KEY ("docket_id") REFERENCES "lasc_docket" ("id") DEFERRABLE INITIALLY DEFERRED;
 CREATE INDEX "lasc_tentativeruling_date_created_577564e9" ON "lasc_tentativeruling" ("date_created");
 CREATE INDEX "lasc_tentativeruling_date_modified_11fea074" ON "lasc_tentativeruling" ("date_modified");
