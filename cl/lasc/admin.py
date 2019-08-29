@@ -1,7 +1,7 @@
 from django.contrib import admin
 from cl.lib.admin import CSSAdminMixin
 from cl.lasc.models import Action, CrossReference, Docket, DocumentFiled, \
-    DocumentImage, LASCJSON, LASCPDF, Party, Proceeding, \
+    DocumentImage, Party, Proceeding, \
     QueuedCase, QueuedPDF, TentativeRuling
 
 
@@ -241,41 +241,3 @@ class QueuedCaseAdmin(admin.ModelAdmin):
 
     show_url.short_description = 'URL'
     show_url.allow_tags = True
-
-
-@admin.register(LASCJSON)
-class LASCJSONAdmin(admin.ModelAdmin):
-    fields = (
-        'object_id',
-        'filepath',
-        'upload_type',
-        'sha1',
-        'date_created',
-        'date_modified',
-    )
-    readonly_fields = (
-        'date_created',
-        'date_modified',
-    )
-
-@admin.register(LASCPDF)
-class LASCPDFAdmin(admin.ModelAdmin):
-    fields = (
-        'object_id',
-        'page_count',
-        'file_size',
-        'plain_text',
-        'ocr_status',
-        'filepath_local',
-        'filepath_ia',
-        'ia_upload_failure_count',
-        'thumbnail',
-        'thumbnail_status',
-        'sha1',
-        'date_created',
-        'date_modified',
-    )
-    readonly_fields = (
-        'date_created',
-        'date_modified',
-    )
