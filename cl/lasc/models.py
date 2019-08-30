@@ -54,6 +54,27 @@ class LASCPDF(AbstractPDF):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
 
+    """
+    Do we want to have a different file path generator <----
+    """
+    filepath = models.FileField(
+        help_text="The path of the file in the local storage area.",
+        upload_to=make_pdf_path,
+        max_length=150,
+        blank=True,
+    )
+    docket_number = models.CharField(
+        help_text="Docket number for the case. E.g. 19LBCV00507, "
+                  "19STCV28994, or even 30-2017-00900866-CU-AS-CJC.",
+        max_length=300,
+        db_index=True,
+    )
+    document_id = models.CharField(
+        help_text="Internal Document Id",
+        max_length=40,
+        db_index=True,
+    )
+
     class Meta:
         verbose_name = 'LASC PDF'
 
