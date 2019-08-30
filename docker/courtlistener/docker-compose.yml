@@ -50,9 +50,9 @@ services:
             - cl-postgresql
             - cl-redis
         volumes:
-            - ../../../courtlistener:/opt/celery:ro
+            - ../../cl:/opt/celery/cl:ro
             - /var/run/postgresql:/var/run/postgresql
-            - ../../cl/assets/media:/sata
+            - ../../cl/assets/media:/opt/celery/cl/assets/media
         networks:
             - cl_net_overlay
 
