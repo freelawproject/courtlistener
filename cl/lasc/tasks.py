@@ -18,77 +18,57 @@ from juriscraper.lasc.fetch import LASCSearch
 
 
 
-def get_pdf(lasc_session, case_id):
 
-    docket = Docket.objects.get(case_id=case_id)
-    images = DocumentImages.objects.filter(Docket=docket).filter(downloaded=False).all()
-    if images.count() > 0:
-        pdf = images[0]
-        url = pdf.document_url
+def case_queue(sess):
+    """
 
-        query = LASCSearch(lasc_session)
-        query._get_pdf_from_url(url)
+    :param lasc_session:
+    :return:
+    """
 
-        pdf_document = LASCPDF(content_object=pdf)
-
-        pdf_document.filepath.save(
-            'lasc.pdf',
-            ContentFile(query.pdf_data),
-        )
-        pdf.downloaded = True
-        pdf.save()
-
-    else:
-        logger.info("All PDFs downloaded")
-
-def get_pdfs(lasc_session, case_id):
-
-    docket = Docket.objects.get(case_id=case_id)
-    pdfs = DocumentImages.objects.filter(Docket=docket).filter(downloaded=False).all()
-    if pdfs.count() > 0:
-        for pdf in pdfs:
-            logger.info("Downloading %s" % (pdf.document_url))
-
-            url = pdf.document_url
-
-            query = LASCSearch(lasc_session)
-            query._get_pdf_from_url(url)
-
-            pdf_document = LASCPDF(content_object=pdf,
-                                        )
-
-            pdf_document.filepath.save(
-                'lasc.pdf',
-                ContentFile(query.pdf_data),
-            )
-            pdf.downloaded = True
-            pdf.save()
-    else:
-        logger.info("All PDFs downloaded")
+    queue = QueuedCase.objects.all()
+    if queue.count() > 0:
+        for case in queue:
+            add_case(sess, case.internal_case_id)
 
 
-def get_pdfs_async(lasc_session, case_id):
+def pdf_queue(sess):
+    """
 
-    url_list = []
-    lasc_obj = Docket.objects.filter(case_id=case_id)[0]
-    docket = Docket.objects.get(case_id=case_id)
-    pdfs = DocumentImages.objects.filter(Docket=docket).filter(downloaded=False).all()
-    if pdfs.count() > 0:
-        for pdf in pdfs:
-            url = pdf.document_url
-            url_list.append(url)
+    :param lasc_session:
+    :return:
+    """
 
-        query = LASCSearch(lasc_session)
-        query._get_pdfs_from_urls(url_list)
+    queue = QueuedPDF.objects.all()
+    if queue.count() > 0:
+        for pdf in queue:
 
-        for pdf_data in query.pdfs_data:
-            pdf_document = LASCPDF(content_object=lasc_obj,
-                                        )
+            # Check if we already have the pdf
+            doc = DocumentImage.objects.get(doc_id=pdf.document_id)
+            if doc.is_available == False:
 
-            pdf_document.filepath.save(
-                'lasc.pdf',  # We only care about the ext w/UUIDFileSystemStorage
-                ContentFile(pdf_data),
-            )
+                query = LASCSearch(sess)
+                query._get_pdf_from_url(pdf.document_url)
+
+                pdf_document = LASCPDF(
+                    content_object=pdf,
+                    docket_number=pdf.docket.case_id.split(";")[0],
+                    document_id=pdf.document_id
+
+                )
+
+                pdf_document.filepath.save(
+                    pdf.document_id,
+                    ContentFile(query.pdf_data),
+                )
+
+                doc = DocumentImage.objects.get(doc_id=pdf.document_id)
+                doc.is_available = True
+                doc.save()
+
+                pdf.delete()
+            else:
+                logger.info("Already Have Document")
 
 
 def add_case(lasc_session, case_id):
