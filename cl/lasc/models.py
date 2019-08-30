@@ -132,42 +132,7 @@ class QueuedCase(models.Model):
         verbose_name = "Queued Case"
 
 
-class QueuedPDF(models.Model):
-    """PDFs we have yet to download."""
 
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified",
-        auto_now=True,
-        db_index=True,
-    )
-    internal_case_id = models.CharField(
-        help_text="Internal case ID. Typically a combination of the docket "
-                  "number, district, and division code.",
-        max_length=300,
-        db_index=True,
-    )
-    document_id = models.CharField(
-        help_text="Internal Document Id",
-        max_length=40,
-        db_index=True,
-    )
-
-    @property
-    def document_url(self):
-        return '/'.join(["https://media.lacourt.org/api/AzureApi",
-                        self.internal_case_id,
-                        self.document_id])
-
-    def __unicode__(self):
-        return "%s" % (self.document_id)
-
-    class Meta:
-        verbose_name = "Queued PDF"
 
 class Docket(models.Model):
     """High-level table to contain all other LASC-related data"""
