@@ -770,6 +770,7 @@ class Proceeding(models.Model):
         blank=True,
     )
 
+    objects = models.Manager()
     past_objects = PastProceedingManager()
     future_objects = FutureProceedingManager()
 
