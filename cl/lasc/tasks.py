@@ -178,9 +178,7 @@ def check_hash(query, case_id, case_hash):
         return False
 
 
-
-
-def update_case(query, case_id):
+def update_case(query):
 
     """
     This code should update cases that have detected changes
@@ -192,42 +190,52 @@ def update_case(query, case_id):
     :return:
     """
 
+    docket_number = query.normalized_case_data['Docket']['docket_number']
+    district = query.normalized_case_data['Docket']['district']
+    division_code = query.normalized_case_data['Docket']['division_code']
+
+    case_id = ";".join([docket_number, district, division_code])
+
+    docket = docket_for_case(case_id)[0]
+    docket.__dict__.update(query.normalized_case_data['Docket'])
+    docket.save()
+
+    docket = docket_for_case(case_id)[0]
+
     data = query.normalized_case_data
 
-    models = [x for x in apps.get_app_config('lasc').get_models() if x.__name__ not in ["Docket"]]
-    lasc_obj = Docket.objects.filter(case_id=case_id)[0]
-
+    models = [x for x in apps.get_app_config('lasc').get_models()
+              if x.__name__ not in ["Docket", "QueuedPDF",
+                                    "QueuedCase", "LASCPDF",
+                                    "LASCJSON", "DocumentImage"]]
 
     while models:
-
         mdl = models.pop()
-
-        mdl.objects.filter(Docket__case_id=case_id).delete()
-
+        print mdl.__name__
 
         while data[mdl.__name__]:
-
-            case_data_row = data[mdl.__name__].pop()
-
-            case_data_row["Docket"] = lasc_obj
-
-            fields = [field.name for field in mdl._meta.fields]
-            fields.append("Docket")
-
-            jj = {key: value for key, value in case_data_row.iteritems() if key in fields}
-
+            row = data[mdl.__name__].pop()
+            row['docket'] = docket
+            jj = {key: value for key, value in row.iteritems()}
             mdl.objects.create(**jj).save()
 
 
+    documents = query.normalized_case_data['DocumentImage']
+    for row in documents:
+        r = DocumentImage.objects.filter(doc_id=row['doc_id'])
+        if r.count() == 1:
+            row['is_available'] = r[0].is_available
+            rr = r[0]
+            rr.__dict__.update(**row)
+            rr.save()
+        else:
+            row["docket"] = docket
+            jj = {key: value for key, value in row.iteritems()}
+            DocumentImage.objects.create(**jj).save()
+
 
     logger.info("Saving Data to DB")
-
-    json_file = LASCJSON(content_object=lasc_obj)
-
-    json_file.filepath_local.save(
-        'lasc.json',
-        ContentFile(query.case_data),
-    )
+    save_json(query, content_obj=docket)
 
 
 def remove_case(case_id):
