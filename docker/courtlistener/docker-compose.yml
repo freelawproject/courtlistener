@@ -33,7 +33,6 @@ services:
     cl-solr:
         container_name: cl-solr
         image: freelawproject/solr:latest
-        user: ${SOLR_USER_ID:-1024}
         ports:
             - "8983:8983"
         # needs chmod 777
