@@ -5,7 +5,8 @@ from django.conf import settings
 from juriscraper.lasc.http import LASCSession
 from cl.lasc import tasks
 from cl.lib.command_utils import VerboseCommand, logger
-
+from dateutil.rrule import rrule, WEEKLY
+import datetime
 
 LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
 LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
@@ -26,6 +27,12 @@ class Command(VerboseCommand):
         return self.VALID_ACTIONS[s]
 
     def add_arguments(self, parser):
+        import datetime
+        dt = datetime.datetime.today()
+        minus_seven = datetime.timedelta(days=-7)
+        start = (dt + minus_seven).strftime('%m/%d/%Y')
+        end = (dt).strftime('%m/%d/%Y')
+
         parser.add_argument(
             '--action',
             type=self.valid_actions,
@@ -56,6 +63,18 @@ class Command(VerboseCommand):
             default='/Users/Palin/Desktop/Probate/',
             help="",
         )
+        parser.add_argument(
+            '--start',
+            default=start,
+            help="Start Date",
+        )
+        parser.add_argument(
+            '--end',
+            default=end,
+            help="End Date",
+        )
+
+
 
 
     def handle(self, *args, **options):
@@ -63,25 +82,35 @@ class Command(VerboseCommand):
         options['action'](options)
 
 
-    def get_cases_for_last_week(options):
+    def date_search(options):
         """
         This code collects the last weeks worth of new cases,
          and add them to the db.
 
+         --start mm/dd/yyyy format -- default one week ago
+         --end mm/dd/yyyy format -- default today
+
         :return:
         """
 
-        if "--date" in sys.argv:
-            date1 = options['date1']
-            date2 = options['date2']
-            # query._get_cases_around_dates()
-
         logger.info("Getting last 7 days worth of cases.")
+
+        s = datetime.datetime.strptime(options['start'], '%m/%d/%Y')
+        e = datetime.datetime.strptime(options['end'], '%m/%d/%Y')
+        dt = datetime.datetime.today()
+
+        dates = ["/".join([x.strftime('%m-%d-%Y'),
+                       (x + datetime.timedelta(days=7))
+                      .strftime('%m-%d-%Y')]) for x in list(rrule(freq=WEEKLY,
+                                                                  dtstart=s,
+                                                                  until=e))
+                        if x.strftime('%m-%d-%Y') != dt.strftime('%m-%d-%Y')]
 
         sess = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
         sess.login()
-
-        tasks.fetch_last_week(sess=sess)
+        for daterange in dates:
+            logger.info(daterange)
+            tasks.fetch_last_week(sess=sess, daterange=daterange)
 
 
 
@@ -147,7 +176,7 @@ class Command(VerboseCommand):
 
 
     VALID_ACTIONS = {
-        'last-week': get_cases_for_last_week,  #gets ~1k recent filings
+        'date': date_search,  #gets ~1k recent filings
         'add-case': add_case, #adds case by case id
         'reset-db': reset_db,  # clean the database of the case
         'case-queue': case_queue,

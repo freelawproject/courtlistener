@@ -311,9 +311,9 @@ def import_wormhole_corpus(dir):
             logger.info("Case already In System")
 
 
-def fetch_last_week(sess):
+def fetch_last_week(sess, daterange):
     query = LASCSearch(sess)
-    query._get_case_list_for_last_seven_days()
+    query._get_case_list_for_last_seven_days(daterange)
     logger.info("Got data")
     query._parse_date_data()
 
@@ -331,9 +331,7 @@ def fetch_last_week(sess):
             dc['case_type_code'] = case['case_type_code']
             cd = QueuedCase.objects.create(**{key: value for key, value in dc.iteritems()})
             cd.save()
-
             logger.info("Adding %s" % (case['case_number']))
-
     logger.info("Added %s cases." % (i))
 
 
