@@ -1416,7 +1416,7 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF):
     claim = models.ForeignKey(
         Claim,
         help_text="The claim that the history row is associated with.",
-        related_name="claims",
+        related_name="claim_history_entries",
         on_delete=models.CASCADE,
     )
     date_filed = models.DateField(
