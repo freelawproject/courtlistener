@@ -43,8 +43,10 @@ def do_bulk_export(options):
             break
         logger.info("Doing item %s with pk %s", i, d_pk)
         throttle.maybe_wait()
-        save_ia_docket_to_disk.apply_async(args=(d_pk, BULK_OUTPUT_DIRECTORY),
-                                           queue=q)
+        save_ia_docket_to_disk.apply_async(
+            args=(d_pk, options['output_directory']),
+            queue=q,
+        )
 
 
 
@@ -152,6 +154,13 @@ class Command(VerboseCommand):
             help="Where is the CSV that has the information about what to "
                  "download?",
             required=False,
+        )
+        parser.add_argument(
+            '--output-directory',
+            type=str,
+            help="Where the bulk data will be output to. Note that if Docker "
+                 "is used for Celery, this is a direcotry *inside* docker.",
+            default=BULK_OUTPUT_DIRECTORY,
         )
 
     def handle(self, *args, **options):
