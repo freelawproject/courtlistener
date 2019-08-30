@@ -150,7 +150,7 @@ def save_ia_docket_to_disk(self, d_pk, output_directory):
     :param output_directory: The location to save the docket's JSON
     """
     _, j = generate_ia_json(d_pk)
-    with open(os.path.join([output_directory, '%s.json' % d_pk]), 'w') as f:
+    with open(os.path.join(output_directory, '%s.json' % d_pk), 'w') as f:
         f.write(j)
 
 
