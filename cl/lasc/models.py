@@ -1,4 +1,5 @@
 # coding=utf-8
+
 import hashlib
 import json
 
@@ -9,7 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils.encoding import force_bytes
 
 from cl.lib.models import AbstractJSON, AbstractPDF
-
+from cl.lib.model_helpers import make_pdf_path
 
 class UPLOAD_TYPE:
     DOCKET = 1
@@ -260,6 +261,49 @@ class Docket(models.Model):
     def __unicode__(self):
         return "%s" % (self.case_id)
 
+
+class QueuedPDF(models.Model):
+    """PDFs we have yet to download."""
+
+    docket = models.ForeignKey(
+        Docket,
+        related_name='queued_pdfs',
+        on_delete=models.CASCADE,
+    )
+
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
+    )
+    internal_case_id = models.CharField(
+        help_text="Internal case ID. Typically a combination of the docket "
+                  "number, district, and division code.",
+        max_length=300,
+        db_index=True,
+    )
+    document_id = models.CharField(
+        help_text="Internal Document Id",
+        max_length=40,
+        db_index=True,
+    )
+
+    @property
+    def document_url(self):
+        return '/'.join(["https://media.lacourt.org/api/AzureApi/ViewDocument",
+                        self.internal_case_id,
+                        self.document_id])
+
+    def __unicode__(self):
+        return "%s" % (self.document_id)
+
+    class Meta:
+        verbose_name = "Queued PDF"
 
 class DocumentImage(models.Model):
     """Represents documents that are filed and scanned into the online system,
