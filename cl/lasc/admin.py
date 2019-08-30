@@ -40,8 +40,9 @@ class DocketAdmin(Base):
         'status_str',
         'date_checked',
         'date_filed',
+        'date_created',
+        'date_modified',
     )
-    fields = Base.add(fields)
 
     inlines = [
         DocumentFiledInline,
@@ -51,29 +52,24 @@ class DocketAdmin(Base):
 
     search_fields = (
         'docket_number',
-        'case_name',
-        'judge_code',
-        'courthouse_name',
     )
 
 @admin.register(DocumentFiled)
 class DocumentFiledAdmin(Base):
     fields = (
+        'docket',
         'document_type',
         'memo',
         'party_str',
         'date_filed',
-    )
-    fields = Base.add_all(fields)
-
-    search_fields = (
-        'document_type',
-        'party_str',
+        'date_created',
+        'date_modified',
     )
 
 @admin.register(DocumentImage)
 class DocumentImageAdmin(Base):
     fields = (
+        'docket',
         'doc_id',
         'page_count',
         'document_type',
@@ -88,9 +84,11 @@ class DocumentImageAdmin(Base):
         'doc_part',
         'is_available',
         'document_map_url',
-        'show_url'
+        'show_url',
+        'date_created',
+        'date_modified',
     )
-    fields = Base.add_all(fields)
+
 
     readonly_fields = (
         'document_map_url',
@@ -106,36 +104,32 @@ class DocumentImageAdmin(Base):
     show_url.allow_tags = True
 
 @admin.register(Action)
-class ActionFiledAdmin(Base):
+class ActionFiledAdmin(Base, CSSAdminMixin):
     fields = (
+        'docket',
         'date_of_action',
         'description',
         'additional_information',
-    )
-    fields = Base.add_all(fields)
-
-    search_fields = (
-        'description',
-        'date_of_action',
+        'date_created',
+        'date_modified',
     )
 
 
 @admin.register(CrossReference)
 class CrossReferenceAdmin(Base):
     fields = (
+        'docket',
         'date_cross_reference',
         'cross_reference_type',
         'cross_reference_docket_number',
-    )
-    fields = Base.add_all(fields)
-
-    search_fields = (
-        'cross_reference_docket_number',
+        'date_created',
+        'date_modified',
     )
 
 @admin.register(Proceeding)
 class ProceedingAdmin(Base):
     fields = (
+        'docket',
         'courthouse_name',
         'address',
         'event',
@@ -147,17 +141,14 @@ class ProceedingAdmin(Base):
         'proceeding_time',
         'proceeding_room',
         'past_or_future',
-    )
-    fields = Base.add_all(fields)
-
-    search_fields = (
-        'judge_name',
-        'event',
+        'date_created',
+        'date_modified',
     )
 
 @admin.register(Party)
 class PartyAdmin(Base):
     fields = (
+        'docket',
         'entity_number',
         'party_name',
         'party_flag',
@@ -165,17 +156,22 @@ class PartyAdmin(Base):
         'party_description',
         'attorney_name',
         'attorney_firm',
+        'date_created',
+        'date_modified',
     )
-    fields = Base.add_all(fields)
+
 
 @admin.register(TentativeRuling)
 class TentativeRulingAdmin(Base):
     fields = (
+        'docket'
         'date_hearing',
         'department',
         'ruling',
+        'date_created',
+        'date_modified',
     )
-    fields = Base.add_all(fields)
+
 
 @admin.register(QueuedPDF)
 class QueuedPDFAdmin(admin.ModelAdmin):
