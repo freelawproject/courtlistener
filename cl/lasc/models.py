@@ -42,8 +42,7 @@ class LASCJSON(AbstractJSON):
         # whitespace.
         with open(self.filepath.path, 'r') as f:
             j = json.load(f)
-        j_data = j.dumps(separators=(',', ':'))
-        self.sha1 = hashlib.sha1(force_bytes(j_data)).hexdigest()
+        self.sha1 = hashlib.sha1(force_bytes(j)).hexdigest()
         super(LASCJSON, self).save(*args, **kwargs)
 
 
@@ -830,5 +829,5 @@ class TentativeRuling(models.Model):
         return "Tentative ruling for %s" % (self.docket.docket_number)
 
     class Meta:
-        verbose_name = "Tenative Ruling"
+        verbose_name = "Tentative Ruling"
 
