@@ -23,9 +23,9 @@ services:
         environment:
             POSTGRES_USER: "postgres"
             POSTGRES_PASSWORD: "postgres"
+            POSTGRES_DB: "courtlistener"
         volumes:
             - /var/run/postgresql:/var/run/postgresql
-            - ./initdb.d:/docker-entrypoint-initdb.d
         networks:
             - cl_net_overlay
 
