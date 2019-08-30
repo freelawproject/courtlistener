@@ -79,7 +79,7 @@ You then need to do a few first time set ups:
 
 1. Whenever you create a new Django db, you need to create a super user. Do so with:
 
-        docker exec -it cl_django python /opt/courtlistener/manage.py createsuperuser
+        docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser
  
 So that should be it! You should now be able to access the following URLs:
 
