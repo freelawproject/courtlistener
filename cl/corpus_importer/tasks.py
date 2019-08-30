@@ -58,7 +58,8 @@ from cl.recap.mergers import update_docket_metadata, \
     add_claims_to_docket, add_bankruptcy_data_to_docket
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
-from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
+from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag, \
+    ClaimHistory
 from cl.search.tasks import add_items_to_solr
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ def generate_ia_json(d_pk, database='default'):
     # objects the docket has such as docket entries, parties, etc.
     ds = Docket.objects.filter(pk=d_pk).select_related(
         'originating_court_information',
+        'bankruptcy_information',
         'idb_data',
     ).prefetch_related(
         'panel',
@@ -96,6 +98,10 @@ def generate_ia_json(d_pk, database='default'):
         Prefetch(
             'docket_entries__recap_documents',
             queryset=RECAPDocument.objects.all().defer('plain_text')
+        ),
+        Prefetch(
+            'claims__claim_history_entries',
+            queryset=ClaimHistory.objects.all().defer('plain_text')
         ),
     ).using(database)
     d = ds[0]
