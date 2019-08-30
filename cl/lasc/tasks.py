@@ -239,11 +239,9 @@ def update_case(query):
 
 
 def remove_case(case_id):
+    dock_obj = docket_for_case(case_id)
+    dock_obj.delete()
 
-    case_obj = Docket.objects.filter(case_id=case_id)
-    case_obj.delete()
-
-    pass
 
 def get_filepath_from_case_id(case_id):
 
