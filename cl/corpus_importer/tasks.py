@@ -143,6 +143,18 @@ def generate_ia_json(d_pk, database='default'):
 
 
 @app.task(bind=True, ignore_result=True)
+def save_ia_docket_to_disk(self, d_pk, output_directory):
+    """For each docket given, save it to disk.
+
+    :param d_pk: The PK of the docket to serialize to disk
+    :param output_directory: The location to save the docket's JSON
+    """
+    _, j = generate_ia_json(d_pk)
+    with open(os.path.join([output_directory, '%s.json' % d_pk]), 'w') as f:
+        f.write(j)
+
+
+@app.task(bind=True, ignore_result=True)
 def upload_recap_json(self, pk, database='default'):
     """Make a JSON object for a RECAP docket and upload it to IA"""
     d, json_str = generate_ia_json(pk, database=database)

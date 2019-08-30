@@ -6,15 +6,46 @@ from django.conf import settings
 from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.task_canvases import get_docket_and_claims
+from cl.corpus_importer.tasks import save_ia_docket_to_disk
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import Court
+from cl.search.models import Court, Docket
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
 
 TAG = 'RllVuRYPZETjSCTkDp-TCIL'
 TAG_IDB_SAMPLE = 'xJwsPIosbuXPGeFblc-TCIL'
+
+BULK_OUTPUT_DIRECTORY = '/tmp/fdd-export/'
+
+def do_bulk_export(options):
+    """The final step of this project is to bulk export an outrageous
+    amount of bankruptcy data from our system.
+
+    Limit/offset work differently than in many other functions. Limit is a
+    true hard limit to the number that should get done. A limit of 10 means
+    ten items will be done. Offset corresponds to the docket PK below which you
+    do not want to process. (It does *not* correspond to the number of
+    completed items.)
+    """
+    q = options['queue']
+    offset = options['offset']
+    throttle = CeleryThrottle(queue_name=q)
+    if offset > 0:
+        logger.info("Skipping to dockets with PK greater than %s", offset)
+    d_pks = Docket.objects.filter(
+        court__jurisdiction=Court.FEDERAL_BANKRUPTCY,
+        pk__gt=offset,
+    ).order_by('pk').values_list('pk', flat=True)
+    for i, d_pk in enumerate(d_pks):
+        if i >= options['limit'] > 0:
+            break
+        logger.info("Doing item %s with pk %s", i, d_pk)
+        throttle.maybe_wait()
+        save_ia_docket_to_disk.apply_async(args=(d_pk, BULK_OUTPUT_DIRECTORY),
+                                           queue=q)
+
 
 
 def get_data(options, row_transform, tags):
@@ -106,6 +137,7 @@ class Command(VerboseCommand):
             '--task',
             type=str,
             help="The task to perform. One of %s" % ', '.join(self.tasks),
+            required=True,
         )
         parser.add_argument(
             '--limit',
@@ -119,7 +151,7 @@ class Command(VerboseCommand):
             type=argparse.FileType('r'),
             help="Where is the CSV that has the information about what to "
                  "download?",
-            required=True,
+            required=False,
         )
 
     def handle(self, *args, **options):
