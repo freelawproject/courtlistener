@@ -73,106 +73,87 @@ def pdf_queue(sess):
 
 def add_case(lasc_session, case_id):
     """
-
     :param lasc_session:
     :param case_id:
     :return:
     """
 
-    case_obj = Docket.objects.filter(case_id=case_id)
-
+    docket = docket_for_case(case_id)
 
     query = LASCSearch(lasc_session)
-    query._get_json_from_internal_case_id(case_id)
-    query._parse_case_data()
-    data = query.normalized_case_data
+    query.internal_case_id = case_id
 
-    if case_obj.count() == 1:
-        if case_obj[0].full_data_model == False:
-            print "\nDo full search -- adding to database\n"
+    if docket.count() == 0:
+        is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
 
-            docket = Docket.objects.filter(case_id=case_id)
-            case = {}
-            case['full_data_model'] = True
-            case['date_checked'] = dt.now(tz=timezone.utc)
-            case["case_hash"] = hashlib.sha1(force_bytes(query.case_data)).hexdigest()
+        data = get_normalized_data(query)
 
-            docket.update(**{key: value for key, value in case.iteritems()})
+        if is_queued.count() == 1:
+            data["Docket"]['judge_code'] = is_queued[0].judge_code
+            data["Docket"]['case_type_code'] = is_queued[0].case_type_code
 
 
-        else:
-            logger.info("Checking for Updates")
-
-            if not check_hash(query, case_id, case_obj[0].case_hash):
-                logger.info("Case Up-To-Date")
-                docket = Docket.objects.filter(case_id=case_id)
-                case = {}
-                case['date_checked'] = dt.now(tz=timezone.utc)
-                docket.update(**{key: value for key, value in case.iteritems()})
-            else:
-
-                logger.info("Case Not - up to date, Sending to Update Message")
-                update_case(query, case_id)
-
-            logger.info("Finished Updating")
-
-            return "" #Can end here
-
-
-    else:
-        logger.info("New Case")
-
-        case = {}
-        case['case_id'] = case_id
-        case['date_checked'] = dt.now(tz=timezone.utc)
-        case['full_data_model'] = True
-        case["case_hash"] = hashlib.sha1(force_bytes(query.case_data)).hexdigest()
-
-        docket = Docket.objects.create(**{key: value for key, value in case.iteritems()})
+        docket = Docket.objects.create(**{key: value
+                                          for key, value in
+                                          data["Docket"].iteritems()})
         docket.save()
 
-    models = [x for x in apps.get_app_config('lasc').get_models() if x.__name__ not in ["Docket"]]
-    lasc_obj = Docket.objects.filter(case_id=case_id)[0]
-    while models:
-        mdl = models.pop()
+        docket = docket_for_case(case_id)
+        models = [x for x in apps.get_app_config('lasc').get_models()
+                  if x.__name__ not in ["Docket"]]
 
-        print mdl.__name__
+        while models:
+            mdl = models.pop()
+            while data[mdl.__name__]:
+                case_data_row = data[mdl.__name__].pop()
+                case_data_row["docket"] = docket[0]
+                jj = {key: value for key, value in case_data_row.iteritems()}
+                mdl.objects.create(**jj).save()
 
-        while data[mdl.__name__]:
+        save_json(query, content_obj=docket[0])
 
-            case_data_row = data[mdl.__name__].pop()
+        if is_queued.count() == 1:
+            is_queued[0].delete()
 
-            case_data_row["Docket"] = lasc_obj
+    elif docket.count() == 1:
+        get_normalized_data(query)
 
-            fields = [field.name for field in mdl._meta.fields]
-
-            fields.append("Docket")
-
-            jj = {key: value for key, value in case_data_row.iteritems() if key in fields}
-
-            mdl.objects.create(**jj).save()
-
-
-    logger.info("Saving Data to DB")
-
-    json_file = LASCJSON(content_object=lasc_obj)
-
-
-    json_file.filepath_local.save(
-        'lasc.json',
-        ContentFile(query.case_data),
-    )
+        if latest_sha(case_id=case_id) != makeSha1(query):
+            logger.info("Send to Update")
+            update_case(query)
+        else:
+            logger.info("Case Up To Date")
+    else:
+        logger.info("Issue - More than one case in system")
 
 
-def check_case(lasc_session, case_id):
+def get_normalized_data(query):
+    query._get_json_from_internal_case_id(query.internal_case_id)
+    query._parse_case_data()
+    return query.normalized_case_data
+
+
+def makeSha1(query):
     """
+    Generate SHA1 from case_data
+    :param query:
+    :return:
+    """
+    return hashlib.sha1(force_bytes(json.loads(query.case_data))).hexdigest()
 
-    :param lasc_session:
+
+def latest_sha(case_id):
+    """
+    Get newest sha1 generated on case by case id
     :param case_id:
     :return:
     """
-    print case_id
-    pass
+
+    dn = case_id.split(";")
+    docket = Docket.objects \
+        .get(docket_number=dn[0])
+    o_id = LASCJSON(content_object=docket).object_id
+    return LASCJSON.objects.filter(object_id=o_id).order_by('-pk')[0].sha1
 
 
 def check_hash(query, case_id, case_hash):
@@ -187,10 +168,12 @@ def check_hash(query, case_id, case_hash):
     query._get_json_from_internal_case_id(case_id)
     query._parse_case_data()
 
-    # print case_hash
-    # print hashlib.sha1(force_bytes(query.case_data)).hexdigest()
-    if case_hash == hashlib.sha1(force_bytes(query.case_data)).hexdigest():
-        return True
+    # hashlib.sha1(force_bytes(json.loads(query.case_data))).hexdigest()
+    # if case_hash == hashlib.sha1(force_bytes(query.case_data)).hexdigest():
+
+    if case_hash == hashlib.sha1(force_bytes(json.loads(query.case_data)))\
+                                        .hexdigest():
+            return True
     else:
         return False
 
@@ -345,9 +328,17 @@ def fetch_last_week(sess):
                 ContentFile(l.case_data),
             )
 
+def save_json(query, content_obj):
+    json_file = LASCJSON(content_object=content_obj)
+    json_file.upload_type = UPLOAD_TYPE.DOCKET
+    json_file.filepath.save(
+        'lasc.json',
+        ContentFile(query.case_data),
+    )
 
-        else:
-            print "in the system"
-
-
-
+def docket_for_case(case_id):
+    dn = case_id.split(";")
+    return Docket.objects \
+        .filter(docket_number=dn[0]) \
+        .filter(district=dn[1]) \
+        .filter(division_code=dn[2])
