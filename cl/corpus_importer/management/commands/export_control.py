@@ -130,5 +130,5 @@ class Command(VerboseCommand):
                 [TAG_IDB_SAMPLE]
             )
         else:
-            NotImplementedError("Unknown task: %s" % options['task'])
+            raise NotImplementedError("Unknown task: %s" % options['task'])
 
