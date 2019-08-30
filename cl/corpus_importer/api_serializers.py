@@ -1,11 +1,11 @@
 from rest_framework.serializers import CharField
 from rest_framework.serializers import ModelSerializer
 
-from cl.people_db.models import Party, Role, PartyType, Attorney, \
-    CriminalCount, CriminalComplaint
+from cl.people_db.models import Attorney, CriminalComplaint, CriminalCount, \
+    Party, PartyType, Role
 from cl.recap.models import FjcIntegratedDatabase
-from cl.search.models import RECAPDocument, Docket, DocketEntry, \
-    OriginatingCourtInformation
+from cl.search.models import BankruptcyInformation, Claim, ClaimHistory, \
+    Docket, DocketEntry, OriginatingCourtInformation, RECAPDocument
 
 
 class CriminalCountSerializer(ModelSerializer):
@@ -81,12 +81,31 @@ class FjcIntegratedDatabaseSerializer(ModelSerializer):
         fields = '__all__'
 
 
+class BankruptcyInformationSerializer(ModelSerializer):
+    class Meta:
+        model = BankruptcyInformation
+        fields = '__all__'
+
+class ClaimHistorySerializer(ModelSerializer):
+    class Meta:
+        model = ClaimHistory
+        exclude = ('claim', 'plain_text')
+
+class ClaimSerializer(ModelSerializer):
+    claim_history_entries = ClaimHistorySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Claim
+        exclude = ('docket', 'tags')
+
 class IADocketSerializer(ModelSerializer):
     docket_entries = DocketEntrySerializer(many=True, read_only=True)
     parties = PartySerializer(many=True, read_only=True)
     original_court_info = OriginalCourtInformationSerializer(
         source='originating_court_information',
     )
+    bankruptcy_information = BankruptcyInformationSerializer()
+    claims = ClaimSerializer(many=True, read_only=True)
     idb_data = FjcIntegratedDatabaseSerializer()
     absolute_url = CharField(source='get_absolute_url', read_only=True)
 
