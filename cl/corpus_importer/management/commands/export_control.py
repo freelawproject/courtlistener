@@ -18,8 +18,15 @@ TAG_IDB_SAMPLE = 'xJwsPIosbuXPGeFblc-TCIL'
 
 
 def get_data(options, row_transform, tags):
-    """Download dockets from their list, then download claims register data
+    """Download dockets from a csv, then download claims register data
     from those dockets.
+
+    :param options: The options provided at the command line.
+    :param row_transform: A function that takes the row as an argument and
+    returns a cleaned up version of the row that has the needed attributes.
+    This parameter allows this function to be able to work with almost any
+    CSV.
+    :param tags: Tags you wish to apply to the gathered data.
     """
     f = options['file']
     reader = csv.DictReader(f)
@@ -80,6 +87,7 @@ def idb_row_transform(row):
 
 class Command(VerboseCommand):
     help = "Look up dockets from a spreadsheet for a client and download them."
+    tasks = ('fdd_export', 'idb_sample', 'bulk_export')
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -97,7 +105,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             '--task',
             type=str,
-            help="The task to perform. Either fdd_export, or idb_sample",
+            help="The task to perform. One of %s" % ', '.join(self.tasks),
         )
         parser.add_argument(
             '--limit',
@@ -129,6 +137,10 @@ class Command(VerboseCommand):
                 idb_row_transform,
                 [TAG_IDB_SAMPLE]
             )
+        elif options['task'] == 'bulk_export':
+            do_bulk_export(options)
         else:
-            raise NotImplementedError("Unknown task: %s" % options['task'])
+            raise NotImplementedError(
+                "Unknown task: %s. Valid tasks are: %s" % (
+                    options['task'], ', '.join(self.tasks)))
 
