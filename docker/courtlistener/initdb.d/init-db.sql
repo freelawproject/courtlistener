@@ -1,1 +1,0 @@
-CREATE DATABASE courtlistener TEMPLATE template0 ENCODING 'UTF-8';
