@@ -39,7 +39,7 @@ The major components of CourtListener are:
 
 We use a docker compose file to make development easier. Don't use it for production! It's not secure enough and it uses bad practices for data storage. But if you're a dev, it should work nicely. To use it, you need do a few things:
 
- - Create the overlay network it relies on:
+ - Create the bridge network it relies on:
  
         docker network create -d bridge --attachable cl_net_overlay
         
@@ -55,23 +55,17 @@ We use a docker compose file to make development easier. Don't use it for produc
 
     See below if you need an explanation of how settings work in CourtListener.
 
+ - Update the group permissions of the solr repository so it can be mounted into the solr container and then accessed from within it. This is wonky, but I can't find a way around this. For the commands to run, see the README.md file in the solr repository.
+
 The final command you'll run is:
     
-    CL_SOLR_CODE_DIR='/code/courtlistener-solr-server' `# Optional` \
-    CELERY_USER_ID=$UID `# Optional` \
-    SOLR_USER_ID=$UID   `# Optional` \
-         docker-compose up
+      docker-compose up
          
-(Make sure you're in the right directory when you do this.)
+(Make sure you're in the same directory as the docker-compose.yml file and it should work.)
 
-An explanation of variables:
+There are a few optional variables that you can see if you peek inside the compose file. These give you a few opportunities to tweak things at runtime:
 
- - `CL_SOLR_CODE_DIR` is a path to the [`courtlistener-solr-server` repository's code][cl-solr]. This will default to a directory called `courtlistener-solr-server` that is next to the `courtlistener` repository, but if you put the solr repo somewhere else, you might set it to something like `/mlissner/home/code/courtlistener-solr-server`.
- 
- - `CELERY_USER_ID` is the Linux user ID that you want to run Celery as. By default, it will run as user 33. This number was effectively picked out of a hat, but if you allow the default, you also have to make sure that any mounted volumes in the Celery service can be accessed by user 33. Unless you take special steps, this won't be the case on most computers. Therefore, the command above tells Celery to run as the same user as the person running the docker compose command. This is no good in production, but it should work nicely for local development.
- 
- - `SOLR_USER_ID` is the same thing as `CELERY_USER_ID`, but for Solr. It uses user ID 1024 by default — another anointed value that otherwise has nothing special about it.
-
+ - `CL_SOLR_CODE_DIR` is a path to the [`courtlistener-solr-server` repository's code][cl-solr]. This will default to a directory called `courtlistener-solr-server` that is next to the `courtlistener` repository on your file system, but if you put the solr repo somewhere else, you might set it to something like `/some/weird/location/courtlistener-solr-server`.
 
 If that goes smoothly, it'll launch Solr, PostgreSQL, Redis, Celery (with access to Tesseract), Django, and a Selenium test server. Whew! 
 
