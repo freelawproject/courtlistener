@@ -1,7 +1,8 @@
 # coding=utf-8
 
 from datetime import datetime as dt
-import hashlib
+import hashlib, json
+from glob import glob as g
 
 from cl.lasc.models import Docket, QueuedCase, QueuedPDF, \
                          DocumentImage, UPLOAD_TYPE
@@ -11,12 +12,11 @@ from cl.lasc.models import LASCJSON, LASCPDF
 from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.utils.encoding import force_bytes
-
 from django.apps import apps
 
 from juriscraper.lasc.fetch import LASCSearch
 
-from glob import glob as g
+
 
 def get_pdf(lasc_session, case_id):
 
