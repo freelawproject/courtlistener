@@ -261,47 +261,54 @@ def import_wormhole_corpus(dir):
     :param directory:
     :return:
     """
-
-    l = LASCSearch("")
-
+    query = LASCSearch(None)
     for fp in g(dir):
         with open(fp, 'r') as f:
-            l.case_data = f.read()
-        l._parse_case_data()
-        data = l.normalized_case_data
+            query.case_data = f.read()
 
-        case_id = data['CaseInformation']['case_id']
-        print case_id
-        case_obj = Docket.objects.filter(case_id=case_id)
-        if not case_obj.exists():
+        query._parse_case_data()
+        data = query.normalized_case_data
+        docket_number = query.normalized_case_data['Docket']['docket_number']
+        district = query.normalized_case_data['Docket']['district']
+        division_code = query.normalized_case_data['Docket']['division_code']
 
-            case = {}
-            case['case_id'] = case_id
+        case_id = ";".join([docket_number, district, division_code])
 
-            # case['date_added'], case['date_checked'], case['date_modified'] = \
-            #     dt.now(tz=timezone.utc), dt.now(tz=timezone.utc), dt.now(tz=timezone.utc)
-            case['date_checked'] = dt.now(tz=timezone.utc)
-            case['full_data_model'] = True
-            case["case_hash"] = hashlib.sha1(force_bytes(l.case_data)).hexdigest()
+        dock_obj = docket_for_case(case_id)
 
-            docket = Docket.objects.create(**{key: value for key, value in case.iteritems()})
+        if dock_obj.count() == 0:
+            is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
+
+            if is_queued.count() == 1:
+                data["Docket"]['judge_code'] = is_queued[0].judge_code
+                data["Docket"]['case_type_code'] = is_queued[0].case_type_code
+
+
+            docket = Docket.objects.create(**{key: value
+                                              for key, value in
+                                              data["Docket"].iteritems()})
             docket.save()
 
-            models = [x for x in apps.get_app_config('docket').get_models() if x.__name__ != "Docket"]
-            lasc_obj = Docket.objects.filter(case_id=case_id)[0]
+            dock_obj = docket_for_case(case_id)
+
+            models = [x for x in apps.get_app_config('lasc').get_models()
+                      if x.__name__ not in ["Docket"]]
 
             while models:
                 mdl = models.pop()
+                while data[mdl.__name__]:
+                    row = data[mdl.__name__].pop()
+                    row["docket"] = dock_obj[0]
+                    jj = {key: value for key, value in row.iteritems()}
+                    mdl.objects.create(**jj).save()
 
-                case_data_array = data[mdl.__name__]
-                if mdl.__name__ == "CaseInformation":
-                    case_data_array = [case_data_array]
-                    # print case_data_array
+            save_json(query, dock_obj[0])
 
-                while case_data_array:
-                    case_data_row = case_data_array.pop()
-                    case_data_row["Docket"] = lasc_obj
-                    mdl.objects.create(**{key: value for key, value in case_data_row.iteritems()}).save()
+            if is_queued.count() == 1:
+                is_queued[0].delete()
+
+        elif dock_obj.count() == 1:
+            logger.info("Case already In System")
 
 
 def fetch_last_week(sess):
@@ -329,10 +336,6 @@ def fetch_last_week(sess):
 
     logger.info("Added %s cases." % (i))
 
-            json_file.filepath_local.save(
-                'lasc.json',  # We only care about the ext w/UUIDFileSystemStorage
-                ContentFile(l.case_data),
-            )
 
 def save_json(query, content_obj):
     json_file = LASCJSON(content_object=content_obj)
