@@ -57,6 +57,8 @@ We use a docker compose file to make development easier. Don't use it for produc
 
  - Update the group permissions of the solr repository so it can be mounted into the solr container and then accessed from within it. This is wonky, but I can't find a way around this. For the commands to run, see the README.md file in the solr repository.
 
+Change to docker/courtlistener directory then:
+
 The final command you'll run is:
     
       docker-compose up
