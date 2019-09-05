@@ -45,6 +45,10 @@ We use a docker compose file to make development easier. Don't use it for produc
         
     This is important so that each service in the compose file can have a hostname.
 
+- Initialize the docker swarm:
+       
+       docker swarm init
+
  - Make sure that in your CourtListener settings, you've set up the following (these should all be defaults):
  
      - `REDIS_HOST` should be `cl-redis`.
