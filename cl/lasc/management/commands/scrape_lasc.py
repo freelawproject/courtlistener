@@ -57,7 +57,11 @@ class Command(VerboseCommand):
             default='19STCV25157;SS;CV',
             help="T.",
         )
-
+        parser.add_argument(
+            '--count',
+            default=0,
+            help="Number of cases to collect",
+        )
         parser.add_argument(
             '--dir',
             default='/Users/Palin/Desktop/Probate/',
@@ -155,14 +159,15 @@ class Command(VerboseCommand):
             tasks.remove_case(case_id)
 
 
-    def case_queue(self):
+    def case_queue(options):
         """
         Finds all cases in case queue
         :return:
         """
-        lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-        lasc_session.login()
-        tasks.case_queue(sess=lasc_session)
+        count = int(options['count'])
+        tasks.case_queue(count=count)
+
+
 
     def pdf_queue(self):
         """
