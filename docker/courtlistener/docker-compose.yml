@@ -55,7 +55,7 @@ services:
         networks:
             - cl_net_overlay
 
-    django:
+    cl-django:
         container_name: cl-django
         image: freelawproject/courtlistener-django:latest
         depends_on:
