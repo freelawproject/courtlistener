@@ -2,7 +2,8 @@
 version: "3.7"
 networks:
     cl_net_overlay:
-        driver: overlay
+        driver: bridge
+        external: true
 services:
     # Redis for caching
     cl-redis:
@@ -22,9 +23,9 @@ services:
         environment:
             POSTGRES_USER: "postgres"
             POSTGRES_PASSWORD: "postgres"
+            POSTGRES_DB: "courtlistener"
         volumes:
             - /var/run/postgresql:/var/run/postgresql
-            - ./initdb.d:/docker-entrypoint-initdb.d
         networks:
             - cl_net_overlay
 
@@ -49,9 +50,9 @@ services:
             - cl-postgresql
             - cl-redis
         volumes:
-            - ../../../courtlistener:/opt/celery:ro
+            - ../../cl:/opt/celery/cl:ro
             - /var/run/postgresql:/var/run/postgresql
-            - ../../cl/assets/media:/sata
+            - ../../cl/assets/media:/opt/celery/cl/assets/media
         networks:
             - cl_net_overlay
 

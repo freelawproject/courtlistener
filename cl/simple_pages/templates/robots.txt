@@ -1,6 +1,12 @@
 # If you would like to crawl CourtListener, please contact us. We also have an
 # extensive REST API and provide bulk data.
 
+# Recently blocked dockets, opinions, and audio files. See:
+# https://github.com/freelawproject/courtlistener/issues/1007
+{% include "includes/robots_disallow.html" with items=blocked_dockets %}
+{% include "includes/robots_disallow.html" with items=blocked_opinions %}
+{% include "includes/robots_disallow.html" with items=blocked_afs %}
+
 # Google, AOL, Bing, Yahoo!, DuckDuckGo
 # These support meta robots and x-robots-tag or are otherwise harmless (DDG)
 # Crawl everything except a few explicit blocks

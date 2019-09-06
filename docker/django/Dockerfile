@@ -14,18 +14,11 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         `# Document extraction and OCR tools` \
         antiword docx2txt ghostscript libwpd-tools poppler-utils \
         `# Audio extraction/manipulation tools` \
-        libav-tools \
-        `# Image tweaking tools` \
-        imagemagick \
+         ffmpeg \
+        `# Image & OCR tools` \
+        imagemagick tesseract-ocr tesseract-ocr-eng \
         `# Other dependencies` \
-        libffi-dev libxml2-dev libxslt-dev \
-        python-dev
-
-# Install Tesseract 4
-RUN echo "deb http://deb.debian.org/debian stretch-backports main" > \
-      /etc/apt/sources.list.d/backports.list && \
-    apt-get update && \
-    apt-get install -t stretch-backports -y tesseract-ocr tesseract-ocr-eng
+        libffi-dev libxml2-dev libxslt-dev python-dev
 
 COPY requirements.txt requirements-test.txt ./
 RUN pip install --no-cache-dir -r requirements-test.txt && \
