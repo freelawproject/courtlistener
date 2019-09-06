@@ -1,8 +1,9 @@
 # coding=utf-8
 
 from datetime import datetime as dt
-import hashlib, json
+import hashlib, json, os, redis
 from glob import glob as g
+
 
 from cl.lasc.models import Docket, QueuedCase, QueuedPDF, \
                          DocumentImage, UPLOAD_TYPE
@@ -13,28 +14,40 @@ from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.apps import apps
+from django.conf import settings
 
+from juriscraper.lasc.http import LASCSession
 from juriscraper.lasc.fetch import LASCSearch
 
+from cl.celery import app
+from celery import Celery, Task
+
+LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
+LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
 
 
-
-def case_queue(sess):
+def case_queue(count):
     """
-
     :param lasc_session:
+    :param Number of loops to go thru if we only want pull a certain number.
+            most useful for testing purposes:
     :return:
     """
-
+    i = 0
     queue = QueuedCase.objects.all()
+    if count == 0:
+        count = queue.count()
+
     if queue.count() > 0:
         for case in queue:
-            add_case(sess, case.internal_case_id)
-
+            print case
+            add_case.apply_async(kwargs={"case_id":case.internal_case_id})
+            i += 1
+            if i >= count:
+                break
 
 def pdf_queue(sess):
     """
-
     :param lasc_session:
     :return:
     """
@@ -54,7 +67,6 @@ def pdf_queue(sess):
                     content_object=pdf,
                     docket_number=pdf.docket.case_id.split(";")[0],
                     document_id=pdf.document_id
-
                 )
 
                 pdf_document.filepath.save(
@@ -71,61 +83,99 @@ def pdf_queue(sess):
                 logger.info("Already Have Document")
 
 
-def add_case(lasc_session, case_id):
+class lasc(Task):
+
+    import redis
+    r = redis.StrictRedis(host=settings.REDIS_HOST,
+                          port=settings.REDIS_PORT,
+                          db=settings.REDIS_DATABASES['CACHE'])
+
+    redis_key = 'lasc-cookie'
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        import pickle
+        print('{0!r} failed: {1!r}'.format(task_id, exc))
+        # perhaps we can relogin here
+
+        if "OperationalError" == type(exc).__name__:
+            print "OPERATIONAL ERROR"
+        else:
+            sess = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+            sess.login()
+            lasc.r.getset(lasc.redis_key, str(pickle.dumps(sess.s.cookies)))
+
+
+@app.task(bind=True, base=lasc)
+def add_case(self, case_id):
     """
-    :param lasc_session:
     :param case_id:
     :return:
     """
+    import pickle
 
-    docket = docket_for_case(case_id)
+    if lasc.r.get(lasc.redis_key) == None :
+        sess = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+        sess.login()
+        lasc.r.getset(lasc.redis_key, str(pickle.dumps(sess.s.cookies)))
+    else:
+        sess = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+        sess.cookies = pickle.loads(lasc.r.get(lasc.redis_key))
 
-    query = LASCSearch(lasc_session)
+    logger.info("start")
+
+    query = LASCSearch(sess)
     query.internal_case_id = case_id
 
-    if docket.count() == 0:
-        is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
-
-        data = get_normalized_data(query)
-
-        if is_queued.count() == 1:
-            data["Docket"]['judge_code'] = is_queued[0].judge_code
-            data["Docket"]['case_type_code'] = is_queued[0].case_type_code
-
-
-        docket = Docket.objects.create(**{key: value
-                                          for key, value in
-                                          data["Docket"].iteritems()})
-        docket.save()
-
+    try:
         docket = docket_for_case(case_id)
-        models = [x for x in apps.get_app_config('lasc').get_models()
-                  if x.__name__ not in ["Docket"]]
 
-        while models:
-            mdl = models.pop()
-            while data[mdl.__name__]:
-                case_data_row = data[mdl.__name__].pop()
-                case_data_row["docket"] = docket[0]
-                jj = {key: value for key, value in case_data_row.iteritems()}
-                mdl.objects.create(**jj).save()
+        if docket.count() == 0:
+            is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
 
-        save_json(query, content_obj=docket[0])
+            data = get_normalized_data(query)
 
-        if is_queued.count() == 1:
-            is_queued[0].delete()
+            if is_queued.count() == 1:
+                data["Docket"]['judge_code'] = is_queued[0].judge_code
+                data["Docket"]['case_type_code'] = is_queued[0].case_type_code
 
-    elif docket.count() == 1:
-        get_normalized_data(query)
 
-        if latest_sha(case_id=case_id) != makeSha1(query):
-            logger.info("Send to Update")
-            update_case(query)
+            docket = Docket.objects.create(**{key: value
+                                              for key, value in
+                                              data["Docket"].iteritems()})
+            docket.save()
+
+            docket = docket_for_case(case_id)
+            models = [x for x in apps.get_app_config('lasc').get_models()
+                      if x.__name__ not in ["Docket"]]
+
+            while models:
+                mdl = models.pop()
+                while data[mdl.__name__]:
+                    case_data_row = data[mdl.__name__].pop()
+                    case_data_row["docket"] = docket[0]
+                    jj = {key: value for key, value in case_data_row.iteritems()}
+                    mdl.objects.create(**jj).save()
+
+            save_json(query, content_obj=docket[0])
+
+            if is_queued.count() == 1:
+                is_queued[0].delete()
+            return "Saved New Case"
+        elif docket.count() == 1:
+            get_normalized_data(query)
+
+            if latest_sha(case_id=case_id) != makeSha1(query):
+                logger.info("Send to Update")
+                update_case(query)
+            else:
+                is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
+                if is_queued.count() == 1:
+                    is_queued[0].delete()
+                logger.info("Case Up To Date")
         else:
-            logger.info("Case Up To Date")
-    else:
-        logger.info("Issue - More than one case in system")
-
+            logger.info("Issue - More than one case in system")
+    except Exception as e:
+        print case_id
+        return "None....." + str(e)
 
 def get_normalized_data(query):
     query._get_json_from_internal_case_id(query.internal_case_id)
