@@ -167,8 +167,6 @@ class Command(VerboseCommand):
         count = int(options['count'])
         tasks.case_queue(count=count)
 
-
-
     def pdf_queue(self):
         """
         Pulls all pdfs in queue
@@ -179,6 +177,9 @@ class Command(VerboseCommand):
         lasc_session.login()
         tasks.pdf_queue(sess=lasc_session)
 
+    def test(options, **kwargs):
+        logger.info("testing testing")
+        pass
 
     VALID_ACTIONS = {
         'date': date_search,  #gets ~1k recent filings
@@ -187,4 +188,5 @@ class Command(VerboseCommand):
         'case-queue': case_queue,
         'pdf-queue': pdf_queue,
         'wormhole': import_wormhole,  # fills in cases that are partial
+        'test':test,
     }
