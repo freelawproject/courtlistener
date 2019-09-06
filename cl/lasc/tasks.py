@@ -363,7 +363,9 @@ def import_wormhole_corpus(dir):
 
 def fetch_last_week(sess, daterange):
     query = LASCSearch(sess)
-    query._get_case_list_for_last_seven_days(daterange)
+    # query._get_case_list_for_last_seven_days(daterange)
+    query._get_cases_around_dates(
+        daterange.split("/")[0], daterange.split("/")[1])
     logger.info("Got data")
     query._parse_date_data()
 
@@ -372,14 +374,16 @@ def fetch_last_week(sess, daterange):
     i = 0
     for case in datum:
         internal_case_id = case['case_id']
-        case_object = QueuedCase.objects.filter(internal_case_id=internal_case_id)
+        case_object = QueuedCase.\
+            objects.filter(internal_case_id=internal_case_id)
         if not case_object.exists():
             i += 1
             dc = {}
             dc['internal_case_id'] = internal_case_id
             dc['judge_code'] = case['judge_code']
             dc['case_type_code'] = case['case_type_code']
-            cd = QueuedCase.objects.create(**{key: value for key, value in dc.iteritems()})
+            cd = QueuedCase.objects.\
+                create(**{key: value for key, value in dc.iteritems()})
             cd.save()
             logger.info("Adding %s" % (case['case_number']))
     logger.info("Added %s cases." % (i))
@@ -389,7 +393,7 @@ def save_json(query, content_obj):
     json_file = LASCJSON(content_object=content_obj)
     json_file.upload_type = UPLOAD_TYPE.DOCKET
     json_file.filepath.save(
-        'lasc.json',
+        makeSha1(query)[0:2],
         ContentFile(query.case_data),
     )
 
