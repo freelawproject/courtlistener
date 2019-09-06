@@ -119,7 +119,7 @@ class QueuedCase(models.Model):
 
     @property
     def case_url(self):
-        return '/'.join(["https://media.lacourt.org/api/AzureApi",
+        return '/'.join(["https://media.lacourt.org/api/AzureApi/GetRecentCivilCases",
                         self.internal_case_id]
                         )
 
