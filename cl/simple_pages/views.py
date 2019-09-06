@@ -14,7 +14,7 @@ from django.http import HttpResponse
 from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render, get_object_or_404
 from django.template import loader
-from django.utils.timezone import now
+from django.utils.timezone import now, localdate
 from django.views.decorators.cache import cache_page
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
@@ -276,12 +276,27 @@ def latest_terms(request):
     })
 
 
-@cache_page(60 * 60 * 12)  # 12 hours
+@cache_page(60 * 60 * 6)
 def robots(request):
     """Generate the robots.txt file"""
     response = HttpResponse(content_type='text/plain')
     t = loader.get_template('robots.txt')
-    response.write(t.render({}))
+    # This is sloppy. We take the current moment, in UTC, subtract hours from
+    # it, then use it to query a date field in the DB. We could use fewer hours
+    # here if we had a datetime in the DB instead, but we have to go a little
+    # bigger here to make sure items are on robots.txt long enough.
+    block_threshold = now() - timedelta(hours=36)
+    blocked_dockets = Docket.objects.filter(
+        date_blocked__gt=block_threshold)
+    blocked_opinions = OpinionCluster.objects.filter(
+        date_blocked__gt=block_threshold)
+    blocked_afs = Audio.objects.filter(
+        date_blocked__gt=block_threshold)
+    response.write(t.render({
+        'blocked_dockets': blocked_dockets,
+        'blocked_opinions': blocked_opinions,
+        'blocked_afs': blocked_afs,
+    }))
     return response
 
 

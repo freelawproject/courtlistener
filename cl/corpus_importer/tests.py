@@ -289,7 +289,7 @@ class CourtMatchingTest(unittest.TestCase):
         """Can we get the correct federal appellate courts?"""
 
         pairs = (
-            {            
+            {
                 'q': 'U. S. Court of Appeals for the Ninth Circuit',
                 'a': 'ca9',
             },
@@ -462,11 +462,11 @@ class IAUploaderTest(TestCase):
         It's very easy to use the DRF in a way that generates a LOT of queries.
         Let's avoid that.
         """
-        with self.assertNumQueries(10):
+        with self.assertNumQueries(11):
             generate_ia_json(1)
 
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(5):
             generate_ia_json(2)
 
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(5):
             generate_ia_json(3)
