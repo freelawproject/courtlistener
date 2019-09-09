@@ -109,7 +109,7 @@ you have `CONN_MAX_AGE` set to anything other than zero, Celery will crash.
 [bug]: https://github.com/celery/celery/issues/4878#issuecomment-491529776
 
 
-## Using the docker-compose.yaml file
+## Using the docker-compose.yml file
 
 Running things this way lets you run innumerable Celery workers. It also 
 launches good things like `flower`, which helps with Celery monitoring, for 

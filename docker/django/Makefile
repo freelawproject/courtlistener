@@ -11,7 +11,7 @@ DOCKER_TAG = $(shell cat docker/django/version.txt)
 all: image
 
 image:
-	$(DOCKER) build -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) -t $(DOCKER_REPOSITORY):latest --file docker/task-server/Dockerfile .
+	$(DOCKER) build -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) -t $(DOCKER_REPOSITORY):latest --file docker/django/Dockerfile .
 
 push: image
 	$(DOCKER) push $(DOCKER_REPOSITORY):$(DOCKER_TAG)

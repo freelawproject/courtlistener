@@ -208,6 +208,7 @@ def delete_account(request):
             send_mail(email['subject'], email['body'] % request.user,
                       email['from'], email['to'])
             request.user.alerts.all().delete()
+            request.user.docket_alerts.all().delete()
             request.user.favorites.all().delete()
             request.user.scotus_maps.all().update(deleted=True)
             convert_to_stub_account(request.user)

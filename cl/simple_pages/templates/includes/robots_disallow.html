@@ -1,0 +1,2 @@
+{% load extras %}{% for item in items %}Disallow: {% get_full_host %}{{ item.get_absolute_url }}
+{% endfor %}
