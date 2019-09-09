@@ -58,7 +58,8 @@ from cl.recap.mergers import update_docket_metadata, \
     add_claims_to_docket, add_bankruptcy_data_to_docket
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
-from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
+from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag, \
+    ClaimHistory
 from cl.search.tasks import add_items_to_solr
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ def generate_ia_json(d_pk, database='default'):
     # objects the docket has such as docket entries, parties, etc.
     ds = Docket.objects.filter(pk=d_pk).select_related(
         'originating_court_information',
+        'bankruptcy_information',
         'idb_data',
     ).prefetch_related(
         'panel',
@@ -96,6 +98,10 @@ def generate_ia_json(d_pk, database='default'):
         Prefetch(
             'docket_entries__recap_documents',
             queryset=RECAPDocument.objects.all().defer('plain_text')
+        ),
+        Prefetch(
+            'claims__claim_history_entries',
+            queryset=ClaimHistory.objects.all().defer('plain_text')
         ),
     ).using(database)
     d = ds[0]
@@ -134,6 +140,18 @@ def generate_ia_json(d_pk, database='default'):
         accepted_media_type='application/json; indent=2',
     )
     return d, json_str
+
+
+@app.task(bind=True, ignore_result=True)
+def save_ia_docket_to_disk(self, d_pk, output_directory):
+    """For each docket given, save it to disk.
+
+    :param d_pk: The PK of the docket to serialize to disk
+    :param output_directory: The location to save the docket's JSON
+    """
+    _, j = generate_ia_json(d_pk)
+    with open(os.path.join(output_directory, '%s.json' % d_pk), 'w') as f:
+        f.write(j)
 
 
 @app.task(bind=True, ignore_result=True)
@@ -792,8 +810,9 @@ def filter_docket_by_tags(self, data, tags, court_id):
     return data
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60,
-          interval_step=10 * 60, ignore_result=True)
+# Retry 10 times. First one after 1m, then again every 5 minutes.
+@app.task(bind=True, max_retries=10, interval_start=1 * 60,
+          interval_step=5 * 60, ignore_result=True)
 def get_docket_by_pacer_case_id(self, data, court_id, cookies,
                                 tag_names=None, **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
@@ -839,14 +858,24 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
         first_missing_date = get_first_missing_de_date(d)
         kwargs.setdefault('date_start', first_missing_date)
 
-    logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
-    report.query(pacer_case_id, **kwargs)
+    logging_id = '%s.%s' % (court_id, pacer_case_id)
+    logger.info("Querying docket report %s", logging_id)
+    try:
+        report.query(pacer_case_id, **kwargs)
+    except ConnectionError as exc:
+        logger.warning("Ran into ConnectionError while getting docket "
+                       "for %s. Retrying.", logging_id)
+        if self.request.retries == self.max_retries:
+            logger.error("Max retries exceeded for %s. Aborting chain.",
+                         logging_id)
+            self.request.chain = None
+            return None
+        raise self.retry(exc)
     docket_data = report.data
-    logger.info("Querying and parsing complete for %s.%s" % (court_id,
-                                                             pacer_case_id))
+    logger.info("Querying and parsing complete for %s", logging_id)
 
     if not docket_data:
-        logger.info("No valid docket data for %s.%s", court_id, pacer_case_id)
+        logger.info("No valid docket data for %s", logging_id)
         self.request.chain = None
         return
 
@@ -1021,8 +1050,9 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
     return att_report
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60,
-          interval_step=10 * 60, ignore_result=True)
+# Retry 10 times. First one after 1m, then again every 5 minutes.
+@app.task(bind=True, max_retries=10, interval_start=1 * 60,
+          interval_step=5 * 60, ignore_result=True)
 def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     """Get the bankruptcy claims registry for a docket
 
@@ -1045,7 +1075,18 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     logging_id = "docket %s with pacer_case_id %s" % (d.pk, d.pacer_case_id)
     logger.info("Querying claims information for %s", logging_id)
     report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
-    report.query(d.pacer_case_id, d.docket_number)
+    try:
+        report.query(d.pacer_case_id, d.docket_number)
+    except ConnectionError as exc:
+        logger.warning("Ran into ConnectionError while getting claims "
+                       "report for %s. Retrying.", logging_id)
+        if self.request.retries == self.max_retries:
+            self.request.chain = None
+            logger.error("Max retries completed for %s. Unable to get "
+                         "claims data. Aborting task, but allowing next task "
+                         "to run.", logging_id)
+            return data
+        raise self.retry(exc)
     claims_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
 

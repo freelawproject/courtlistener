@@ -39,13 +39,15 @@ The major components of CourtListener are:
 
 We use a docker compose file to make development easier. Don't use it for production! It's not secure enough and it uses bad practices for data storage. But if you're a dev, it should work nicely. To use it, you need do a few things:
 
- - Create the overlay network it relies on:
+ - Create the bridge network it relies on:
  
-        docker network create -d overlay --attachable cl_net_overlay
+        docker network create -d bridge --attachable cl_net_overlay
         
     This is important so that each service in the compose file can have a hostname.
 
- - Set the `CL_SOLR_CODE_DIR` environment variable. This should get set to something like `/mlissner/home/code/courtlistener-solr-server`. This is a path to the [`courtlistener-solr-server` repository's code][cl-solr]. Before this works, you'll need to do some funky chmod and chown work in that directory (I'm sorry). If you need help with this, see the readme in that code base. It explains things.
+- Initialize the docker swarm:
+       
+       docker swarm init
 
  - Make sure that in your CourtListener settings, you've set up the following (these should all be defaults):
  
@@ -57,12 +59,19 @@ We use a docker compose file to make development easier. Don't use it for produc
 
     See below if you need an explanation of how settings work in CourtListener.
 
+ - Update the group permissions of the solr repository so it can be mounted into the solr container and then accessed from within it. This is wonky, but I can't find a way around this. For the commands to run, see the README.md file in the solr repository.
+
+Change to docker/courtlistener directory then:
+
 The final command you'll run is:
     
-    CL_SOLR_CODE_DIR='/code/courtlistener-solr-server' \
-         docker-compose up
+      docker-compose up
+         
+(Make sure you're in the same directory as the docker-compose.yml file and it should work.)
 
-(Make sure you're in the right directory when you do this.)
+There are a few optional variables that you can see if you peek inside the compose file. These give you a few opportunities to tweak things at runtime:
+
+ - `CL_SOLR_CODE_DIR` is a path to the [`courtlistener-solr-server` repository's code][cl-solr]. This will default to a directory called `courtlistener-solr-server` that is next to the `courtlistener` repository on your file system, but if you put the solr repo somewhere else, you might set it to something like `/some/weird/location/courtlistener-solr-server`.
 
 If that goes smoothly, it'll launch Solr, PostgreSQL, Redis, Celery (with access to Tesseract), Django, and a Selenium test server. Whew! 
 
@@ -76,7 +85,7 @@ You then need to do a few first time set ups:
 
 1. Whenever you create a new Django db, you need to create a super user. Do so with:
 
-        docker exec -it cl_django python /opt/courtlistener/manage.py createsuperuser
+        docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser
  
 So that should be it! You should now be able to access the following URLs:
 
