@@ -12,6 +12,7 @@ from django.utils.encoding import force_bytes
 from cl.lib.models import AbstractJSON, AbstractPDF
 from cl.lib.model_helpers import make_pdf_path
 
+
 class UPLOAD_TYPE:
     DOCKET = 1
     NAMES = (
@@ -120,17 +121,13 @@ class QueuedCase(models.Model):
     @property
     def case_url(self):
         return '/'.join(["https://media.lacourt.org/api/AzureApi",
-                        self.internal_case_id]
-                        )
-
+                        self.internal_case_id])
 
     def __unicode__(self):
-        return "%s" % (self.internal_case_id)
+        return "%s" % self.internal_case_id
 
     class Meta:
         verbose_name = "Queued Case"
-
-
 
 
 class Docket(models.Model):
@@ -244,7 +241,7 @@ class Docket(models.Model):
                          self.division_code])
 
     def __unicode__(self):
-        return "%s" % (self.case_id)
+        return "%s" % self.case_id
 
 
 class QueuedPDF(models.Model):
@@ -285,10 +282,11 @@ class QueuedPDF(models.Model):
                         self.document_id])
 
     def __unicode__(self):
-        return "%s" % (self.document_id)
+        return "%s" % self.document_id
 
     class Meta:
         verbose_name = "Queued PDF"
+
 
 class DocumentImage(models.Model):
     """Represents documents that are filed and scanned into the online system,
@@ -429,7 +427,8 @@ class DocumentImage(models.Model):
         return base_url + path_template % (self.docket.case_id, self.doc_id)
 
     def __unicode__(self):
-        return "Scanned PDF  %s for %s" % (self.doc_id, self.docket.docket_number)
+        return "Scanned PDF  %s for %s" % (self.doc_id,
+                                           self.docket.docket_number)
 
     class Meta:
         verbose_name = "Document Image"
@@ -538,7 +537,7 @@ class Action(models.Model):
         verbose_name_plural = "Action Entries"
 
     def __unicode__(self):
-        return "Action for %s" % (self.docket.docket_number)
+        return "Action for %s" % self.docket.docket_number
 
 
 class CrossReference(models.Model):
@@ -585,7 +584,8 @@ class CrossReference(models.Model):
     )
 
     def __unicode__(self):
-        return "%s for %s" % (self.cross_reference_type, self.docket.docket_number)
+        return "%s for %s" % (self.cross_reference_type,
+                              self.docket.docket_number)
 
     class Meta:
         verbose_name = "Cross Reference"
@@ -826,8 +826,7 @@ class TentativeRuling(models.Model):
     )
 
     def __unicode__(self):
-        return "Tentative ruling for %s" % (self.docket.docket_number)
+        return "Tentative ruling for %s" % self.docket.docket_number
 
     class Meta:
         verbose_name = "Tentative Ruling"
-

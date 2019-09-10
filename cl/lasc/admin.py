@@ -54,6 +54,7 @@ class DocketAdmin(Base):
         'docket_number',
     )
 
+
 @admin.register(DocumentFiled)
 class DocumentFiledAdmin(Base):
     fields = (
@@ -65,6 +66,7 @@ class DocumentFiledAdmin(Base):
         'date_created',
         'date_modified',
     )
+
 
 @admin.register(DocumentImage)
 class DocumentImageAdmin(Base):
@@ -89,7 +91,6 @@ class DocumentImageAdmin(Base):
         'date_modified',
     )
 
-
     readonly_fields = (
         'document_map_url',
         'show_url',
@@ -98,10 +99,12 @@ class DocumentImageAdmin(Base):
     )
 
     def show_url(self, instance):
-        return '<a href="%s">%s</a>' % (instance.document_map_url, instance.document_map_url)
+        return '<a href="%s">%s</a>' % (instance.document_map_url,
+                                        instance.document_map_url)
 
     show_url.short_description = 'URL'
     show_url.allow_tags = True
+
 
 @admin.register(Action)
 class ActionFiledAdmin(Base, CSSAdminMixin):
@@ -126,6 +129,7 @@ class CrossReferenceAdmin(Base):
         'date_modified',
     )
 
+
 @admin.register(Proceeding)
 class ProceedingAdmin(Base):
     fields = (
@@ -144,6 +148,7 @@ class ProceedingAdmin(Base):
         'date_created',
         'date_modified',
     )
+
 
 @admin.register(Party)
 class PartyAdmin(Base):
@@ -189,10 +194,12 @@ class QueuedPDFAdmin(admin.ModelAdmin):
     )
 
     def show_url(self, instance):
-        return '<a href="%s">%s</a>' % (instance.document_url, instance.document_url)
+        return '<a href="%s">%s</a>' % (instance.document_url,
+                                        instance.document_url)
 
     show_url.short_description = 'URL'
     show_url.allow_tags = True
+
 
 @admin.register(QueuedCase)
 class QueuedCaseAdmin(admin.ModelAdmin):
