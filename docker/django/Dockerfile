@@ -22,8 +22,8 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
 
 COPY requirements.txt requirements-test.txt ./
 RUN pip install --no-cache-dir -r requirements-test.txt && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install git+https://github.com/freelawproject/judge-pics@master && \
+    pip install --no-cache-dir -r requirements.txt
+RUN pip install git+https://github.com/freelawproject/judge-pics@master && \
     update-seals -f
 
 COPY requirements-flp.txt ./
