@@ -1,12 +1,16 @@
 # coding=utf-8
 
-import os, sys, argparse
+import argparse
+import os
+
+from datetime import datetime
+from datetime import timedelta
 from django.conf import settings
 from juriscraper.lasc.http import LASCSession
+
 from cl.lasc import tasks
+from cl.lib.argparse_types import valid_date
 from cl.lib.command_utils import VerboseCommand, logger
-from dateutil.rrule import rrule, WEEKLY
-import datetime
 
 LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
 LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
@@ -16,7 +20,6 @@ class Command(VerboseCommand):
     help = "Get all content from MAP LA Unlimited Civil Cases."
 
     def valid_actions(self, s):
-
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
                 "Unable to parse action. Valid actions are: %s" % (
@@ -27,12 +30,6 @@ class Command(VerboseCommand):
         return self.VALID_ACTIONS[s]
 
     def add_arguments(self, parser):
-        import datetime
-        dt = datetime.datetime.today()
-        minus_seven = datetime.timedelta(days=-7)
-        start = (dt + minus_seven).strftime('%m/%d/%Y')
-        end = (dt).strftime('%m/%d/%Y')
-
         parser.add_argument(
             '--action',
             type=self.valid_actions,
@@ -46,36 +43,33 @@ class Command(VerboseCommand):
             default='batch1',
             help="The celery queue where the tasks should be processed.",
         )
-        parser.add_argument(
-            '--index',
-            action='store_true',
-            default=False,
-            help='Do we index as we go, or leave that to be done later?'
-        )
+
+        # Action-specific parameters
         parser.add_argument(
             '--case',
-            default='19STCV25157;SS;CV',
-            help="T.",
+            help="A case that you want to download when using the add-case "
+                 "action. For example, '19STCV25157;SS;CV'",
+        )
+        parser.add_argument(
+            '--directory-glob',
+            help="A directory glob to use when importing bulk JSON files, for "
+                 "example, '/home/you/bulk-data/*.json'",
         )
 
-        parser.add_argument(
-            '--dir',
-            default='/Users/Palin/Desktop/Probate/',
-            help="",
-        )
+        today = datetime.today()
+        start = today - timedelta(days=7)
         parser.add_argument(
             '--start',
             default=start,
+            type=valid_date,
             help="Start Date",
         )
         parser.add_argument(
             '--end',
-            default=end,
+            default=today,
+            type=valid_date,
             help="End Date",
         )
-
-
-
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
