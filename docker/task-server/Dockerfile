@@ -20,9 +20,10 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         `# Other dependencies` \
         libffi-dev  libxml2-dev libxslt-dev python-dev
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install git+https://github.com/freelawproject/judge-pics@master && \
+COPY requirements.txt requirements-test.txt ./
+RUN pip install --no-cache-dir -r requirements-test.txt && \
+    pip install --no-cache-dir -r requirements.txt
+RUN pip install git+https://github.com/freelawproject/judge-pics@master && \
     update-seals -f
 
 COPY requirements-flp.txt ./
