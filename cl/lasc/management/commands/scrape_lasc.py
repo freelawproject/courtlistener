@@ -105,16 +105,19 @@ class Command(VerboseCommand):
             lasc_session.login()
             tasks.add_or_update_case(lasc_session, options['case'])
 
+    @staticmethod
+    def add_directory(options):
+        """Import JSON files from a directory provided at the command line.
 
-    def import_wormhole(options):
+        Use glob.globs' to identify JSON files to import.
 
+        :return: None
         """
-        Wormhole refers to how we shared data.
-        The code needs an directory wildcard to run.  It then glob.globs' the
-        partial directory and generates a list of cases to import.
-
-        :return:
-        """
+        if options['directory'] is None:
+            print("--directory is a required parameter when the "
+                  "'add-directory' action is selected.")
+        else:
+            tasks.add_cases_from_directory(options['directory-glob'])
 
         if "--dir" in sys.argv:
             dir = options['dir']
