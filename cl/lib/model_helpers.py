@@ -51,6 +51,18 @@ def make_path(root, filename):
         filename,
     )
 
+def make_lasc_path(instance, filename):
+    """Make a simple path for uploaded files.
+
+    Start with the `root` node, and use the current date as the subdirectories.
+    """
+
+    return os.path.join(
+        "lasc-data",
+        '%s' % filename,
+        filename,
+    ) + ".json"
+
 
 def make_recap_path(instance, filename):
     """Make a path to a good location on the local system for RECAP files.
@@ -105,6 +117,12 @@ def make_json_path(instance, filename):
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
     return make_path('json-data', filename)
+
+def make_lasc_json_path(instance, filename):
+    # As additional types are needed, this will need to mirror the format of
+    # make_pdf_path, by doing type checking.
+    return make_lasc_path(instance, filename)
+
 
 
 def make_pdf_thumb_path(instance, filename):

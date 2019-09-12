@@ -4,7 +4,7 @@ from django.db import models
 
 from cl.lib.storage import IncrementingFileSystemStorage, UUIDFileSystemStorage
 from cl.lib.model_helpers import make_json_path, make_pdf_path, \
-    make_pdf_thumb_path
+    make_pdf_thumb_path, make_lasc_json_path
 
 
 class THUMBNAIL_STATUSES(object):
@@ -131,7 +131,7 @@ class AbstractFile(models.Model):
 class AbstractJSON(AbstractFile):
     filepath = models.FileField(
         help_text="The path of the file in the local storage area.",
-        upload_to=make_json_path,
+        upload_to=make_lasc_json_path,
         storage=UUIDFileSystemStorage(),
         max_length=150,
         blank=True,

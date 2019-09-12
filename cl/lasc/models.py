@@ -429,7 +429,6 @@ class DocumentImage(models.Model):
     def __unicode__(self):
         return "Scanned PDF  %s for %s" % (self.doc_id,
                                            self.docket.docket_number)
-
     class Meta:
         verbose_name = "Document Image"
         verbose_name_plural = "Document Images"
