@@ -183,7 +183,7 @@ Any time you're contributing to or hacking on code base, whether adding features
 In general, the easiest way to run the test suite is via Django's `test` command. In docker, that's:
 
 ```bash
-docker exec -it cl_django python /opt/courtlistener/manage.py test --noinput cl
+docker exec -it cl-django python /opt/courtlistener/manage.py test --noinput cl
 ```
 
 The `--noinput` flag tells Django to destroy any old test databases without prompting for confirmation (typically this is what you want).
