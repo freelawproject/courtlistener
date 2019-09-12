@@ -75,36 +75,20 @@ class Command(VerboseCommand):
         super(Command, self).handle(*args, **options)
         options['action'](options)
 
-
+    @staticmethod
     def date_search(options):
         """
-        This code collects the last weeks worth of new cases,
-         and add them to the db.
+        Collect a list of cases from a date range and add them to the db.
 
-         --start mm/dd/yyyy format -- default one week ago
-         --end mm/dd/yyyy format -- default today
-
-        :return:
+        :return: None
         """
-
-        logger.info("Getting last 7 days worth of cases.")
-
-        s = datetime.datetime.strptime(options['start'], '%m/%d/%Y')
-        e = datetime.datetime.strptime(options['end'], '%m/%d/%Y')
-        dt = datetime.datetime.today()
-
-        dates = ["/".join([x.strftime('%m-%d-%Y'),
-                       (x + datetime.timedelta(days=7))
-                      .strftime('%m-%d-%Y')]) for x in list(rrule(freq=WEEKLY,
-                                                                  dtstart=s,
-                                                                  until=e))
-                        if x.strftime('%m-%d-%Y') != dt.strftime('%m-%d-%Y')]
-
-        sess = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-        sess.login()
-        for daterange in dates:
-            logger.info(daterange)
-            tasks.fetch_last_week(sess=sess, daterange=daterange)
+        lasc_session = LASCSession(username=LASC_USERNAME,
+                                   password=LASC_PASSWORD)
+        lasc_session.login()
+        start = options['start']
+        end = options['end']
+        logger.info("Getting cases between %s and %s, inclusive", start, end)
+        tasks.fetch_case_list_by_date(lasc_session, start, end)
 
 
 
