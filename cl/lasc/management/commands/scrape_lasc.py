@@ -131,30 +131,27 @@ class Command(VerboseCommand):
         else:
             tasks.remove_case(options['case'])
 
-        if "--case" in sys.argv:
-            case_id = options['case']
-            tasks.remove_case(case_id)
+    @staticmethod
+    def process_case_queue():
+        """Download all cases in case queue
 
-
-    def case_queue(self):
+        :return: None
         """
-        Finds all cases in case queue
-        :return:
-        """
-        lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+        lasc_session = LASCSession(username=LASC_USERNAME,
+                                   password=LASC_PASSWORD)
         lasc_session.login()
-        tasks.case_queue(sess=lasc_session)
+        tasks.process_case_queue(lasc_session=lasc_session)
 
-    def pdf_queue(self):
-        """
-        Pulls all pdfs in queue
-        :return:
-        """
+    @staticmethod
+    def process_pdf_queue():
+        """Download all PDFs in queue
 
-        lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+        :return: None
+        """
+        lasc_session = LASCSession(username=LASC_USERNAME,
+                                   password=LASC_PASSWORD)
         lasc_session.login()
-        tasks.pdf_queue(sess=lasc_session)
-
+        tasks.process_pdf_queue(lasc_session=lasc_session)
 
     VALID_ACTIONS = {
         'date': date_search,  #gets ~1k recent filings
