@@ -154,10 +154,10 @@ class Command(VerboseCommand):
         tasks.process_pdf_queue(lasc_session=lasc_session)
 
     VALID_ACTIONS = {
-        'date': date_search,  #gets ~1k recent filings
-        'add-case': add_case, #adds case by case id
-        'reset-db': reset_db,  # clean the database of the case
-        'case-queue': case_queue,
-        'pdf-queue': pdf_queue,
-        'wormhole': import_wormhole,  # fills in cases that are partial
+        'get-cases-by-date': date_search,
+        'add-or-update-case': add_or_update_case,
+        'add-directory': add_directory,
+        'rm-case': rm_case,
+        'process-case-queue': process_case_queue,
+        'process-pdf-queue': process_pdf_queue,
     }
