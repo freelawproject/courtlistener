@@ -90,20 +90,20 @@ class Command(VerboseCommand):
         logger.info("Getting cases between %s and %s, inclusive", start, end)
         tasks.fetch_case_list_by_date(lasc_session, start, end)
 
+    @staticmethod
+    def add_or_update_case(options):
+        """Add a case to the DB by internal case id
 
-
-    def add_case(options):
+        :return: None
         """
-        Adds case to db by internal case id
-        {docket_number}.
-        :return:
-        """
-
-        if "--case" in sys.argv:
-            case_id = options['case']
-            lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
+        if options['case'] is None:
+            print("--case is a required parameter when the add-case action is "
+                  "requested.")
+        else:
+            lasc_session = LASCSession(username=LASC_USERNAME,
+                                       password=LASC_PASSWORD)
             lasc_session.login()
-            tasks.add_case(lasc_session, case_id)
+            tasks.add_or_update_case(lasc_session, options['case'])
 
 
     def import_wormhole(options):
