@@ -119,17 +119,17 @@ class Command(VerboseCommand):
         else:
             tasks.add_cases_from_directory(options['directory-glob'])
 
-        if "--dir" in sys.argv:
-            dir = options['dir']
+    @staticmethod
+    def rm_case(options):
+        """Delete a case from db
 
-            dir = dir + "*.json"
-            tasks.import_wormhole_corpus(dir)
-
-    def reset_db(options):
+        :return: None
         """
-        Deletes case from db
-        :return:
-        """
+        if options['case'] is None:
+            print("--case is a required parameter when the rm-case action is "
+                  "requested.")
+        else:
+            tasks.remove_case(options['case'])
 
         if "--case" in sys.argv:
             case_id = options['case']
