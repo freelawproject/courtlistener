@@ -1,18 +1,19 @@
 # coding=utf-8
 
-import hashlib, json
+import hashlib
+import json
 from glob import glob
+
+from django.apps import apps
+from django.core.files.base import ContentFile
+from django.utils.encoding import force_bytes
+from juriscraper.lasc.fetch import LASCSearch
 
 from cl.lasc.models import Docket, QueuedCase, QueuedPDF, DocumentImage, \
     UPLOAD_TYPE
-from cl.lib.command_utils import logger
 from cl.lasc.models import LASCJSON, LASCPDF
+from cl.lib.command_utils import logger
 
-from django.core.files.base import ContentFile
-from django.utils.encoding import force_bytes
-from django.apps import apps
-
-from juriscraper.lasc.fetch import LASCSearch
 
 def process_case_queue(lasc_session):
     """Work through the queue of cases that need to be added to the database,
