@@ -236,11 +236,10 @@ def add_cases_from_directory(directory_glob):
         with open(fp, 'r') as f:
             query.case_data = f.read()
 
-        query._parse_case_data()
-        data = query.normalized_case_data
-        docket_number = query.normalized_case_data['Docket']['docket_number']
-        district = query.normalized_case_data['Docket']['district']
-        division_code = query.normalized_case_data['Docket']['division_code']
+        data = query._parse_case_data()
+        docket_number = data['Docket']['docket_number']
+        district = data['Docket']['district']
+        division_code = data['Docket']['division_code']
 
         case_id = ";".join([docket_number, district, division_code])
 
