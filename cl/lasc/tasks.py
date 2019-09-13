@@ -226,12 +226,12 @@ def add_cases_from_directory(directory_glob):
     query = LASCSearch(None)
     for fp in glob(directory_glob):
         with open(fp, 'r') as f:
-            query.case_data = f.read()
+            case_data = f.read()
 
-        data = query._parse_case_data()
-        docket_number = data['Docket']['docket_number']
-        district = data['Docket']['district']
-        division_code = data['Docket']['division_code']
+        clean_data = query._parse_case_data(case_data)
+        docket_number = clean_data['Docket']['docket_number']
+        district = clean_data['Docket']['district']
+        division_code = clean_data['Docket']['division_code']
 
         case_id = ";".join([docket_number, district, division_code])
 
@@ -241,10 +241,11 @@ def add_cases_from_directory(directory_glob):
             is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
 
             if is_queued.count() == 1:
-                data["Docket"]['judge_code'] = is_queued[0].judge_code
-                data["Docket"]['case_type_code'] = is_queued[0].case_type_code
+                clean_data["Docket"]['judge_code'] = is_queued[0].judge_code
+                clean_data["Docket"]['case_type_code'] = is_queued[
+                    0].case_type_code
 
-            docket = Docket.objects.create(**data["Docket"])
+            docket = Docket.objects.create(**clean_data["Docket"])
             docket.save()
 
             dock_obj = Docket.objects.filter(case_id=case_id)
@@ -254,8 +255,8 @@ def add_cases_from_directory(directory_glob):
 
             while models:
                 mdl = models.pop()
-                while data[mdl.__name__]:
-                    row = data[mdl.__name__].pop()
+                while clean_data[mdl.__name__]:
+                    row = clean_data[mdl.__name__].pop()
                     row["docket"] = dock_obj[0]
                     mdl.objects.create(**row).save()
 
@@ -297,6 +298,7 @@ def fetch_case_list_by_date(lasc_session, start, end):
                         case['internal_case_id'])
 
     logger.info("Added %s cases.", cases_added_cnt)
+
 
 def save_json(query, content_obj):
     json_file = LASCJSON(content_object=content_obj)
