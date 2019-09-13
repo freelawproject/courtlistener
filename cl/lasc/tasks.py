@@ -14,7 +14,6 @@ from django.apps import apps
 
 from juriscraper.lasc.fetch import LASCSearch
 
-
 def process_case_queue(lasc_session):
     """Work through the queue of cases that need to be added to the database,
     and add them one by one.
@@ -116,7 +115,7 @@ def add_or_update_case(lasc_session, case_id):
 def make_sha1(query):
     """
     Generate SHA1 from case_data
-    :param query: XXX
+    :param query: LASC Search Object
     :return: A generated SHA1 code.
     """
     return hashlib.sha1(force_bytes(json.loads(query.case_data))).hexdigest()
@@ -124,7 +123,7 @@ def make_sha1(query):
 
 def latest_sha(case_id):
     """
-    Get newest sha1 generated on case by case id
+    Query latest sha1 for Case by case_id
     :param case_id:
     :return:
     """
@@ -138,7 +137,7 @@ def latest_sha(case_id):
 
 def check_hash(query, case_id, case_hash):
     """
-
+    Check if case has changed by case_hash.  Return True/False
     :param query:
     :param case_id:
     :param case_hash:
@@ -275,7 +274,7 @@ def add_cases_from_directory(directory_glob):
                 is_queued[0].delete()
 
         elif dock_obj.count() == 1:
-            logger.info("Case already In System")
+            logger.info("Case Already In System")
 
 
 def fetch_case_list_by_date(lasc_session, start, end):
