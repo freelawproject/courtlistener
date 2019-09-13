@@ -1,181 +1,124 @@
 # coding=utf-8
 
-from datetime import datetime as dt
-import hashlib, json, os, redis
-from glob import glob as g
+import hashlib, json
+from glob import glob
 
-
-from cl.lasc.models import Docket, QueuedCase, QueuedPDF, \
-                         DocumentImage, UPLOAD_TYPE
+from cl.lasc.models import Docket, QueuedCase, QueuedPDF, DocumentImage, \
+    UPLOAD_TYPE
 from cl.lib.command_utils import logger
 from cl.lasc.models import LASCJSON, LASCPDF
 
 from django.core.files.base import ContentFile
-from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.apps import apps
-from django.conf import settings
 
-from juriscraper.lasc.http import LASCSession
 from juriscraper.lasc.fetch import LASCSearch
 
-from cl.celery import app
-from celery import Celery, Task
 
-LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
-LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
+def process_case_queue(lasc_session):
+    """Work through the queue of cases that need to be added to the database,
+    and add them one by one.
 
-
-def case_queue(count):
+    :param lasc_session: A Juriscraper.lasc.http.LASCSession object
+    :return: None
     """
-    :param lasc_session:
-    :param Number of loops to go thru if we only want pull a certain number.
-            most useful for testing purposes:
-    :return:
-    """
-    i = 0
     queue = QueuedCase.objects.all()
-    if count == 0:
-        count = queue.count()
+    for case in queue:
+        add_or_update_case(lasc_session, case.internal_case_id)
 
-    if queue.count() > 0:
-        for case in queue:
-            print case
-            add_case.apply_async(kwargs={"case_id":case.internal_case_id})
-            i += 1
-            if i >= count:
-                break
 
-def pdf_queue(sess):
-    """
-    :param lasc_session:
+def process_pdf_queue(lasc_session):
+    """Work through the queue of PDFs that need to be added to the database,
+    download them and add them one by one.
+
+    :param lasc_session: A Juriscraper.lasc.http.LASCSession object
     :return:
     """
-
     queue = QueuedPDF.objects.all()
-    if queue.count() > 0:
-        for pdf in queue:
+    for pdf in queue:
+        # Check if we already have the pdf
+        doc = DocumentImage.objects.get(doc_id=pdf.document_id)
+        if not doc.is_available:
+            query = LASCSearch(lasc_session)
+            query._get_pdf_from_url(pdf.document_url)
 
-            # Check if we already have the pdf
+            pdf_document = LASCPDF(
+                content_object=pdf,
+                docket_number=pdf.docket.case_id.split(";")[0],
+                document_id=pdf.document_id
+
+            )
+
+            pdf_document.filepath.save(
+                pdf.document_id,
+                ContentFile(query.pdf_data),
+            )
+
             doc = DocumentImage.objects.get(doc_id=pdf.document_id)
-            if doc.is_available == False:
+            doc.is_available = True
+            doc.save()
 
-                query = LASCSearch(sess)
-                query._get_pdf_from_url(pdf.document_url)
-
-                pdf_document = LASCPDF(
-                    content_object=pdf,
-                    docket_number=pdf.docket.case_id.split(";")[0],
-                    document_id=pdf.document_id
-                )
-
-                pdf_document.filepath.save(
-                    pdf.document_id,
-                    ContentFile(query.pdf_data),
-                )
-
-                doc = DocumentImage.objects.get(doc_id=pdf.document_id)
-                doc.is_available = True
-                doc.save()
-
-                pdf.delete()
-            else:
-                logger.info("Already Have Document")
-
-
-class lasc(Task):
-
-    import redis
-    r = redis.StrictRedis(host=settings.REDIS_HOST,
-                          port=settings.REDIS_PORT,
-                          db=settings.REDIS_DATABASES['CACHE'])
-
-    redis_key = 'lasc-cookie'
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
-        import pickle
-        print('{0!r} failed: {1!r}'.format(task_id, exc))
-        # perhaps we can relogin here
-
-        if "OperationalError" == type(exc).__name__:
-            print "OPERATIONAL ERROR"
+            pdf.delete()
         else:
-            sess = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-            sess.login()
-            lasc.r.getset(lasc.redis_key, str(pickle.dumps(sess.s.cookies)))
+            logger.info("Already have LASC PDF from docket ID %s with doc ID "
+                        "%s ", doc.docket_id, doc.doc_id)
 
 
-@app.task(bind=True, base=lasc)
-def add_case(self, case_id):
+def add_case(case_id, case_data, lasc):
+    is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
+
+    if is_queued.count() == 1:
+        case_data["Docket"]['judge_code'] = is_queued[0].judge_code
+        case_data["Docket"]['case_type_code'] = is_queued[0].case_type_code
+
+    docket = Docket.objects.create(**case_data["Docket"])
+
+    # XXX Why are we getting the docket again here?
+    docket = Docket.objects.filter(case_id=case_id)
+    models = [x for x in apps.get_app_config('lasc').get_models()
+              if x.__name__ not in ["Docket"]]
+
+    while models:
+        mdl = models.pop()
+        while case_data[mdl.__name__]:
+            case_data_row = case_data[mdl.__name__].pop()
+            case_data_row["docket"] = docket[0]
+            jj = {key: value for key, value in
+                  case_data_row.iteritems()}
+            mdl.objects.create(**jj).save()
+
+    save_json(lasc, docket[0])
+
+    if is_queued.count() == 1:
+        is_queued[0].delete()
+
+
+def add_or_update_case(lasc_session, case_id):
+    """Add a case from the LASC MAP using an authenticated session object
+
+    :param lasc_session: A Juriscraper.lasc.http.LASCSession object
+    :param case_id: The case ID to download, for example, '19STCV25157;SS;CV'
+    :return: None
     """
-    :param case_id:
-    :return:
-    """
-    import pickle
+    docket = Docket.objects.filter(case_id=case_id)
+    lasc = LASCSearch(lasc_session)
+    lasc.internal_case_id = case_id
 
-    if lasc.r.get(lasc.redis_key) == None :
-        sess = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-        sess.login()
-        lasc.r.getset(lasc.redis_key, str(pickle.dumps(sess.s.cookies)))
+    if docket.count() == 0:
+        # XXX I'm confused...is this when the query to LASC happens?
+        case_data = get_normalized_data(lasc)
+
+        add_case(case_id, case_data, lasc)
+
+    elif docket.count() == 1:
+        if latest_sha(case_id=case_id) != make_sha1(lasc):
+            logger.info("Send to Update")
+            update_case(lasc)
+        else:
+            logger.info("Case Up To Date")
     else:
-        sess = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
-        sess.cookies = pickle.loads(lasc.r.get(lasc.redis_key))
+        logger.info("Issue - More than one case in system")
 
-    logger.info("start")
-
-    query = LASCSearch(sess)
-    query.internal_case_id = case_id
-
-    try:
-        docket = docket_for_case(case_id)
-
-        if docket.count() == 0:
-            is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
-
-            data = get_normalized_data(query)
-
-            if is_queued.count() == 1:
-                data["Docket"]['judge_code'] = is_queued[0].judge_code
-                data["Docket"]['case_type_code'] = is_queued[0].case_type_code
-
-
-            docket = Docket.objects.create(**{key: value
-                                              for key, value in
-                                              data["Docket"].iteritems()})
-            docket.save()
-
-            docket = docket_for_case(case_id)
-            models = [x for x in apps.get_app_config('lasc').get_models()
-                      if x.__name__ not in ["Docket"]]
-
-            while models:
-                mdl = models.pop()
-                while data[mdl.__name__]:
-                    case_data_row = data[mdl.__name__].pop()
-                    case_data_row["docket"] = docket[0]
-                    jj = {key: value for key, value in case_data_row.iteritems()}
-                    mdl.objects.create(**jj).save()
-
-            save_json(query, content_obj=docket[0])
-
-            if is_queued.count() == 1:
-                is_queued[0].delete()
-            return "Saved New Case"
-        elif docket.count() == 1:
-            get_normalized_data(query)
-
-            if latest_sha(case_id=case_id) != makeSha1(query):
-                logger.info("Send to Update")
-                update_case(query)
-            else:
-                is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
-                if is_queued.count() == 1:
-                    is_queued[0].delete()
-                logger.info("Case Up To Date")
-        else:
-            logger.info("Issue - More than one case in system")
-    except Exception as e:
-        print case_id
-        return "None....." + str(e)
 
 def get_normalized_data(query):
     query._get_json_from_internal_case_id(query.internal_case_id)
@@ -183,11 +126,11 @@ def get_normalized_data(query):
     return query.normalized_case_data
 
 
-def makeSha1(query):
+def make_sha1(query):
     """
     Generate SHA1 from case_data
-    :param query:
-    :return:
+    :param query: XXX
+    :return: A generated SHA1 code.
     """
     return hashlib.sha1(force_bytes(json.loads(query.case_data))).hexdigest()
 
@@ -214,22 +157,20 @@ def check_hash(query, case_id, case_hash):
     :param case_hash:
     :return:
     """
-
     query._get_json_from_internal_case_id(case_id)
     query._parse_case_data()
 
     # hashlib.sha1(force_bytes(json.loads(query.case_data))).hexdigest()
     # if case_hash == hashlib.sha1(force_bytes(query.case_data)).hexdigest():
 
-    if case_hash == hashlib.sha1(force_bytes(json.loads(query.case_data)))\
-                                        .hexdigest():
-            return True
+    if case_hash == hashlib.sha1(force_bytes(json.loads(query.case_data))) \
+        .hexdigest():
+        return True
     else:
         return False
 
 
 def update_case(query):
-
     """
     This code should update cases that have detected changes
     Method currently deletes and replaces the data on the system except for
@@ -239,18 +180,17 @@ def update_case(query):
     :param case_id:
     :return:
     """
-
     docket_number = query.normalized_case_data['Docket']['docket_number']
     district = query.normalized_case_data['Docket']['district']
     division_code = query.normalized_case_data['Docket']['division_code']
 
     case_id = ";".join([docket_number, district, division_code])
 
-    docket = docket_for_case(case_id)[0]
+    docket = Docket.objects.filter(case_id=case_id)[0]
     docket.__dict__.update(query.normalized_case_data['Docket'])
     docket.save()
 
-    docket = docket_for_case(case_id)[0]
+    docket = Docket.objects.filter(case_id=case_id)[0]
 
     data = query.normalized_case_data
 
@@ -269,7 +209,6 @@ def update_case(query):
             jj = {key: value for key, value in row.iteritems()}
             mdl.objects.create(**jj).save()
 
-
     documents = query.normalized_case_data['DocumentImage']
     for row in documents:
         r = DocumentImage.objects.filter(doc_id=row['doc_id'])
@@ -283,18 +222,16 @@ def update_case(query):
             jj = {key: value for key, value in row.iteritems()}
             DocumentImage.objects.create(**jj).save()
 
-
     logger.info("Saving Data to DB")
     save_json(query, content_obj=docket)
 
 
 def remove_case(case_id):
-    dock_obj = docket_for_case(case_id)
+    dock_obj = Docket.objects.filter(case_id=case_id)
     dock_obj.delete()
 
 
 def get_filepath_from_case_id(case_id):
-
     l = Docket.objects.get(case_id=case_id)
     o_id = LASCJSON(content_object=l).object_id
     print o_id
@@ -302,17 +239,16 @@ def get_filepath_from_case_id(case_id):
     print x.filepath
 
 
-def import_wormhole_corpus(dir):
-    """
-    This is a function for importing the vast majority of data
-    collected on the cases over the preceding months.
+def add_cases_from_directory(directory_glob):
+    """Add cases from JSON saved to disk.
 
-
-    :param directory:
-    :return:
+    :param directory_glob: A glob in which we look for cases to add, typically
+    of the form /data/@json. Note that this will not recursively traverse
+    directories.
+    :return: None
     """
     query = LASCSearch(None)
-    for fp in g(dir):
+    for fp in glob(directory_glob):
         with open(fp, 'r') as f:
             query.case_data = f.read()
 
@@ -324,7 +260,7 @@ def import_wormhole_corpus(dir):
 
         case_id = ";".join([docket_number, district, division_code])
 
-        dock_obj = docket_for_case(case_id)
+        dock_obj = Docket.objects.filter(case_id=case_id)
 
         if dock_obj.count() == 0:
             is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
@@ -333,13 +269,11 @@ def import_wormhole_corpus(dir):
                 data["Docket"]['judge_code'] = is_queued[0].judge_code
                 data["Docket"]['case_type_code'] = is_queued[0].case_type_code
 
-
-            docket = Docket.objects.create(**{key: value
-                                              for key, value in
-                                              data["Docket"].iteritems()})
+            docket = Docket.objects.create(
+                **{key: value for key, value in data["Docket"].iteritems()})
             docket.save()
 
-            dock_obj = docket_for_case(case_id)
+            dock_obj = Docket.objects.filter(case_id=case_id)
 
             models = [x for x in apps.get_app_config('lasc').get_models()
                       if x.__name__ not in ["Docket"]]
@@ -361,45 +295,41 @@ def import_wormhole_corpus(dir):
             logger.info("Case already In System")
 
 
-def fetch_last_week(sess, daterange):
-    query = LASCSearch(sess)
-    # query._get_case_list_for_last_seven_days(daterange)
-    query._get_cases_around_dates(
-        daterange.split("/")[0], daterange.split("/")[1])
-    logger.info("Got data")
-    query._parse_date_data()
+def fetch_case_list_by_date(lasc_session, start, end):
+    """Search for cases by date and add them to the DB.
 
-    datum = query.normalized_date_data
-    logger.info("Saving Data to DB")
-    i = 0
-    for case in datum:
+    :param lasc_session: A Juriscraper.lasc.http.LASCSession object
+    :param start: The date you want to start searching for cases
+    :type start: datetime.date
+    :param end: The date you want to stop searching for cases
+    :type end: datetime.date
+    :return: None
+    """
+    lasc = LASCSearch(lasc_session)
+    cases = lasc.query_cases_by_date(start, end)
+
+    cases_added_cnt = 0
+    for case in cases:
         internal_case_id = case['case_id']
-        case_object = QueuedCase.\
-            objects.filter(internal_case_id=internal_case_id)
+        case_object = QueuedCase.objects.filter(
+            internal_case_id=internal_case_id)
         if not case_object.exists():
-            i += 1
-            dc = {}
-            dc['internal_case_id'] = internal_case_id
-            dc['judge_code'] = case['judge_code']
-            dc['case_type_code'] = case['case_type_code']
-            cd = QueuedCase.objects.\
-                create(**{key: value for key, value in dc.iteritems()})
-            cd.save()
-            logger.info("Adding %s" % (case['case_number']))
-    logger.info("Added %s cases." % (i))
+            QueuedCase.objects.create(**{
+                'internal_case_id': internal_case_id,
+                'judge_code': case['judge_code'],
+                'case_type_code': case['case_type_code'],
+            })
+            cases_added_cnt += 1
+            logger.info("Adding case '%s' to LASC database.",
+                        case['case_number'])
+
+    logger.info("Added %s cases.", cases_added_cnt)
 
 
 def save_json(query, content_obj):
     json_file = LASCJSON(content_object=content_obj)
     json_file.upload_type = UPLOAD_TYPE.DOCKET
     json_file.filepath.save(
-        makeSha1(query)[0:2],
+        'lasc.json',
         ContentFile(query.case_data),
     )
-
-def docket_for_case(case_id):
-    dn = case_id.split(";")
-    return Docket.objects \
-        .filter(docket_number=dn[0]) \
-        .filter(district=dn[1]) \
-        .filter(division_code=dn[2])
