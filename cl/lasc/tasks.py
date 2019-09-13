@@ -140,11 +140,7 @@ def check_hash(query, case_id, case_hash):
     :param case_hash:
     :return:
     """
-    query._get_json_from_internal_case_id(case_id)
-    query._parse_case_data()
-
-    # hashlib.sha1(force_bytes(json.loads(query.case_data))).hexdigest()
-    # if case_hash == hashlib.sha1(force_bytes(query.case_data)).hexdigest():
+    query.get_json_from_internal_case_id(case_id)
 
     if case_hash == hashlib.sha1(force_bytes(json.loads(query.case_data))) \
         .hexdigest():
@@ -160,7 +156,6 @@ def update_case(query):
     lasc_docket and connections for older json and pdf files.
 
     :param query:
-    :param case_id:
     :return:
     """
     docket_number = query.normalized_case_data['Docket']['docket_number']
