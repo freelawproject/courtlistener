@@ -97,28 +97,20 @@ def add_or_update_case(lasc_session, case_id):
     """
     docket = Docket.objects.filter(case_id=case_id)
     lasc = LASCSearch(lasc_session)
-    lasc.internal_case_id = case_id
+    case_data = lasc.get_json_from_internal_case_id(case_id)
 
     if docket.count() == 0:
-        # XXX I'm confused...is this when the query to LASC happens?
-        case_data = get_normalized_data(lasc)
-
+        logger.info("Adding Case")
         add_case(case_id, case_data, lasc)
 
     elif docket.count() == 1:
         if latest_sha(case_id=case_id) != make_sha1(lasc):
-            logger.info("Send to Update")
+            logger.info("Updating Case")
             update_case(lasc)
         else:
             logger.info("Case Up To Date")
     else:
         logger.info("Issue - More than one case in system")
-
-
-def get_normalized_data(query):
-    query._get_json_from_internal_case_id(query.internal_case_id)
-    query._parse_case_data()
-    return query.normalized_case_data
 
 
 def make_sha1(query):
