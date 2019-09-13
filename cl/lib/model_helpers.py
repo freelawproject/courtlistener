@@ -56,12 +56,11 @@ def make_lasc_path(instance, filename):
 
     Start with the `root` node, and use the current date as the subdirectories.
     """
-
     return os.path.join(
         "lasc-data",
-        '%s' % filename,
-        filename,
-    ) + ".json"
+        '%s' % instance.sha1[0:2],
+        '%s.json' % instance.sha1[2:],
+    )
 
 
 def make_recap_path(instance, filename):
