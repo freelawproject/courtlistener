@@ -209,11 +209,10 @@ def remove_case(case_id):
 
 
 def get_filepath_from_case_id(case_id):
-    l = Docket.objects.get(case_id=case_id)
-    o_id = LASCJSON(content_object=l).object_id
-    print o_id
-    x = LASCJSON.objects.get(object_id=o_id)
-    print x.filepath
+    docket = Docket.objects.get(case_id=case_id)
+    object_id = LASCJSON(content_object=docket).object_id
+    x = LASCJSON.objects.get(object_id=object_id)
+    return x.filepath
 
 
 def add_cases_from_directory(directory_glob):
