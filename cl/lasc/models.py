@@ -7,6 +7,7 @@ from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey, \
     GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 from django.utils.encoding import force_bytes
 
 from cl.lib.models import AbstractJSON, AbstractPDF
@@ -130,6 +131,31 @@ class QueuedCase(models.Model):
         verbose_name = "Queued Case"
 
 
+class CaseIDQuerySet(models.query.QuerySet):
+    """Add filtering by case_id string.
+
+    In our Docket model, we break up the case_id into the docket_number,
+    district, and division_code. This is great for granularity, but makes it
+    difficult to look them up by case_id, a common need. This class adds the
+    ability to do a query like:
+
+        Docket.objects.filter(case_id='19STCV25157;SS;CV')
+
+    """
+    def filter(self, *args, **kwargs):
+        clone = self._clone()
+        case_id = kwargs.pop('case_id', None)
+        if case_id:
+            case_id_parts = case_id.split(';')
+            clone.query.add_q(Q(docket_number=case_id_parts[0],
+                                district=case_id_parts[1],
+                                division_code=case_id_parts[2]))
+
+        # Add the rest of the args & kwargs
+        clone.query.add_q(Q(*args, **kwargs))
+        return clone
+
+
 class Docket(models.Model):
     """High-level table to contain all other LASC-related data"""
     json_document = GenericRelation(
@@ -231,6 +257,8 @@ class Docket(models.Model):
         help_text="The status of the case",
         blank=True,
     )
+
+    objects = CaseIDQuerySet.as_manager()
 
     class Meta:
         index_together = ('docket_number', 'district', 'division_code')
