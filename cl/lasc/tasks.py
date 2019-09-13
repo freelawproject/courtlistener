@@ -127,10 +127,7 @@ def latest_sha(case_id):
     :param case_id:
     :return:
     """
-
-    dn = case_id.split(";")
-    docket = Docket.objects \
-        .get(docket_number=dn[0])
+    docket = Docket.objects.get(case_id=case_id)
     o_id = LASCJSON(content_object=docket).object_id
     return LASCJSON.objects.filter(object_id=o_id).order_by('-pk')[0].sha1
 
