@@ -40,18 +40,17 @@ def process_pdf_queue(lasc_session):
         doc = DocumentImage.objects.get(doc_id=pdf.document_id)
         if not doc.is_available:
             query = LASCSearch(lasc_session)
-            query._get_pdf_from_url(pdf.document_url)
+            pdf_data = query.get_pdf_from_url(pdf.document_url)
 
             pdf_document = LASCPDF(
                 content_object=pdf,
                 docket_number=pdf.docket.case_id.split(";")[0],
                 document_id=pdf.document_id
-
             )
 
             pdf_document.filepath.save(
                 pdf.document_id,
-                ContentFile(query.pdf_data),
+                ContentFile(pdf_data),
             )
 
             doc = DocumentImage.objects.get(doc_id=pdf.document_id)
