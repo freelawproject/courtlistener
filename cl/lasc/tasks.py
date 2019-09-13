@@ -72,8 +72,6 @@ def add_case(case_id, case_data, lasc):
 
     docket = Docket.objects.create(**case_data["Docket"])
 
-    # XXX Why are we getting the docket again here?
-    docket = Docket.objects.filter(case_id=case_id)
     models = [x for x in apps.get_app_config('lasc').get_models()
               if x.__name__ not in ["Docket"]]
 
@@ -81,12 +79,10 @@ def add_case(case_id, case_data, lasc):
         mdl = models.pop()
         while case_data[mdl.__name__]:
             case_data_row = case_data[mdl.__name__].pop()
-            case_data_row["docket"] = docket[0]
-            jj = {key: value for key, value in
-                  case_data_row.iteritems()}
-            mdl.objects.create(**jj).save()
+            case_data_row["docket"] = docket
+            mdl.objects.create(**case_data_row).save()
 
-    save_json(lasc, docket[0])
+    save_json(lasc, docket)
 
     if is_queued.count() == 1:
         is_queued[0].delete()
@@ -205,8 +201,7 @@ def update_case(query):
         while data[mdl.__name__]:
             row = data[mdl.__name__].pop()
             row['docket'] = docket
-            jj = {key: value for key, value in row.iteritems()}
-            mdl.objects.create(**jj).save()
+            mdl.objects.create(**row).save()
 
     documents = query.normalized_case_data['DocumentImage']
     for row in documents:
@@ -218,8 +213,7 @@ def update_case(query):
             rr.save()
         else:
             row["docket"] = docket
-            jj = {key: value for key, value in row.iteritems()}
-            DocumentImage.objects.create(**jj).save()
+            DocumentImage.objects.create(**row).save()
 
     logger.info("Saving Data to DB")
     save_json(query, content_obj=docket)
@@ -268,8 +262,7 @@ def add_cases_from_directory(directory_glob):
                 data["Docket"]['judge_code'] = is_queued[0].judge_code
                 data["Docket"]['case_type_code'] = is_queued[0].case_type_code
 
-            docket = Docket.objects.create(
-                **{key: value for key, value in data["Docket"].iteritems()})
+            docket = Docket.objects.create(**data["Docket"])
             docket.save()
 
             dock_obj = Docket.objects.filter(case_id=case_id)
@@ -282,8 +275,7 @@ def add_cases_from_directory(directory_glob):
                 while data[mdl.__name__]:
                     row = data[mdl.__name__].pop()
                     row["docket"] = dock_obj[0]
-                    jj = {key: value for key, value in row.iteritems()}
-                    mdl.objects.create(**jj).save()
+                    mdl.objects.create(**row).save()
 
             save_json(query, dock_obj[0])
 
