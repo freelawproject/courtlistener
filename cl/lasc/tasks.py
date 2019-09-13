@@ -293,7 +293,7 @@ def fetch_case_list_by_date(lasc_session, start, end):
 
     cases_added_cnt = 0
     for case in cases:
-        internal_case_id = case['case_id']
+        internal_case_id = case['internal_case_id']
         case_object = QueuedCase.objects.filter(
             internal_case_id=internal_case_id)
         if not case_object.exists():
@@ -304,10 +304,9 @@ def fetch_case_list_by_date(lasc_session, start, end):
             })
             cases_added_cnt += 1
             logger.info("Adding case '%s' to LASC database.",
-                        case['case_number'])
+                        case['internal_case_id'])
 
     logger.info("Added %s cases.", cases_added_cnt)
-
 
 def save_json(query, content_obj):
     json_file = LASCJSON(content_object=content_obj)
