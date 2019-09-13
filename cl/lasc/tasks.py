@@ -319,6 +319,7 @@ def fetch_case_list_by_date(lasc_session, start, end):
 
 def save_json(query, content_obj):
     json_file = LASCJSON(content_object=content_obj)
+    json_file.sha1 = make_sha1(query)
     json_file.upload_type = UPLOAD_TYPE.DOCKET
     json_file.filepath.save(
         'lasc.json',
