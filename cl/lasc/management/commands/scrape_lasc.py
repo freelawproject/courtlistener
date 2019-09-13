@@ -16,6 +16,83 @@ LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
 LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
 
 
+def date_search(options):
+    """
+    Collect a list of cases from a date range and add them to the db.
+
+    :return: None
+    """
+    lasc_session = LASCSession(username=LASC_USERNAME,
+                               password=LASC_PASSWORD)
+    lasc_session.login()
+    start = options['start']
+    end = options['end']
+    logger.info("Getting cases between %s and %s, inclusive", start, end)
+    tasks.fetch_case_list_by_date(lasc_session, start, end)
+
+
+def add_or_update_case(options):
+    """Add a case to the DB by internal case id
+
+    :return: None
+    """
+    if options['case'] is None:
+        print("--case is a required parameter when the add-case action is "
+              "requested.")
+    else:
+        lasc_session = LASCSession(username=LASC_USERNAME,
+                                   password=LASC_PASSWORD)
+        lasc_session.login()
+        tasks.add_or_update_case(lasc_session, options['case'])
+
+
+def add_directory(options):
+    """Import JSON files from a directory provided at the command line.
+
+    Use glob.globs' to identify JSON files to import.
+
+    :return: None
+    """
+    if options['directory'] is None:
+        print("--directory is a required parameter when the "
+              "'add-directory' action is selected.")
+    else:
+        tasks.add_cases_from_directory(options['directory-glob'])
+
+
+def rm_case(options):
+    """Delete a case from db
+
+    :return: None
+    """
+    if options['case'] is None:
+        print("--case is a required parameter when the rm-case action is "
+              "requested.")
+    else:
+        tasks.remove_case(options['case'])
+
+
+def process_case_queue(options):
+    """Download all cases in case queue
+
+    :return: None
+    """
+    lasc_session = LASCSession(username=LASC_USERNAME,
+                               password=LASC_PASSWORD)
+    lasc_session.login()
+    tasks.process_case_queue(lasc_session=lasc_session)
+
+
+def process_pdf_queue(options):
+    """Download all PDFs in queue
+
+    :return: None
+    """
+    lasc_session = LASCSession(username=LASC_USERNAME,
+                               password=LASC_PASSWORD)
+    lasc_session.login()
+    tasks.process_pdf_queue(lasc_session=lasc_session)
+
 class Command(VerboseCommand):
     help = "Get all content from MAP LA Unlimited Civil Cases."
 
@@ -75,86 +152,8 @@ class Command(VerboseCommand):
         super(Command, self).handle(*args, **options)
         options['action'](options)
 
-    @staticmethod
-    def date_search(options):
-        """
-        Collect a list of cases from a date range and add them to the db.
-
-        :return: None
-        """
-        lasc_session = LASCSession(username=LASC_USERNAME,
-                                   password=LASC_PASSWORD)
-        lasc_session.login()
-        start = options['start']
-        end = options['end']
-        logger.info("Getting cases between %s and %s, inclusive", start, end)
-        tasks.fetch_case_list_by_date(lasc_session, start, end)
-
-    @staticmethod
-    def add_or_update_case(options):
-        """Add a case to the DB by internal case id
-
-        :return: None
-        """
-        if options['case'] is None:
-            print("--case is a required parameter when the add-case action is "
-                  "requested.")
-        else:
-            lasc_session = LASCSession(username=LASC_USERNAME,
-                                       password=LASC_PASSWORD)
-            lasc_session.login()
-            tasks.add_or_update_case(lasc_session, options['case'])
-
-    @staticmethod
-    def add_directory(options):
-        """Import JSON files from a directory provided at the command line.
-
-        Use glob.globs' to identify JSON files to import.
-
-        :return: None
-        """
-        if options['directory'] is None:
-            print("--directory is a required parameter when the "
-                  "'add-directory' action is selected.")
-        else:
-            tasks.add_cases_from_directory(options['directory-glob'])
-
-    @staticmethod
-    def rm_case(options):
-        """Delete a case from db
-
-        :return: None
-        """
-        if options['case'] is None:
-            print("--case is a required parameter when the rm-case action is "
-                  "requested.")
-        else:
-            tasks.remove_case(options['case'])
-
-    @staticmethod
-    def process_case_queue():
-        """Download all cases in case queue
-
-        :return: None
-        """
-        lasc_session = LASCSession(username=LASC_USERNAME,
-                                   password=LASC_PASSWORD)
-        lasc_session.login()
-        tasks.process_case_queue(lasc_session=lasc_session)
-
-    @staticmethod
-    def process_pdf_queue():
-        """Download all PDFs in queue
-
-        :return: None
-        """
-        lasc_session = LASCSession(username=LASC_USERNAME,
-                                   password=LASC_PASSWORD)
-        lasc_session.login()
-        tasks.process_pdf_queue(lasc_session=lasc_session)
-
     VALID_ACTIONS = {
-        'get-cases-by-date': date_search,
+        'add-cases-by-date': date_search,
         'add-or-update-case': add_or_update_case,
         'add-directory': add_directory,
         'rm-case': rm_case,
