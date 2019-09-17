@@ -97,17 +97,18 @@ def add_or_update_case(lasc_session, case_id):
     case_data = lasc.get_json_from_internal_case_id(case_id)
 
     if docket.count() == 0:
-        logger.info("Adding Case")
+        logger.info("Adding lasc case with ID: %s", case_id)
         add_case(case_id, case_data, lasc)
 
     elif docket.count() == 1:
         if latest_sha(case_id=case_id) != sha1_of_json_data(lasc.case_data):
-            logger.info("Updating Case")
+            logger.info("Updating lasc case with ID: %s", case_id)
             update_case(lasc)
         else:
-            logger.info("Case Up To Date")
+            logger.info("LASC case is already up to date: %s", case_id)
     else:
-        logger.info("Issue - More than one case in system")
+        logger.warn("Issue adding or updating lasc case with ID '%s' - Too "
+                    "many cases in system with that ID", case_id)
 
 
 def latest_sha(case_id):
@@ -170,7 +171,7 @@ def update_case(query):
             row["docket"] = docket
             DocumentImage.objects.create(**row).save()
 
-    logger.info("Saving Data to DB")
+    logger.info("Finished updating lasc case '%s'", case_id)
     save_json(query, content_obj=docket)
 
 
@@ -237,7 +238,8 @@ def add_cases_from_directory(directory_glob):
                 is_queued[0].delete()
 
         elif dock_obj.count() == 1:
-            logger.info("Case Already In System")
+            logger.warn("LASC case on file system at '%s' is already in "
+                        "the database ", fp)
 
 
 def fetch_case_list_by_date(lasc_session, start, end):
@@ -268,7 +270,7 @@ def fetch_case_list_by_date(lasc_session, start, end):
             logger.info("Adding case '%s' to LASC database.",
                         case['internal_case_id'])
 
-    logger.info("Added %s cases.", cases_added_cnt)
+    logger.info("Added %s cases to the QueuedCase table.", cases_added_cnt)
 
 
 def save_json(query, content_obj):
