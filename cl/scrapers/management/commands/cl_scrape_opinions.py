@@ -1,4 +1,3 @@
-import hashlib
 import signal
 import sys
 import time
@@ -14,6 +13,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from cl.alerts.models import RealTimeQueue
 from cl.citations.find_citations import get_citations
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.crypto import sha1
 from cl.lib.import_lib import get_candidate_judges
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
@@ -230,7 +230,7 @@ class Command(VerboseCommand):
 
                 # request.content is sometimes a str, sometimes unicode, so
                 # force it all to be bytes, pleasing hashlib.
-                sha1_hash = hashlib.sha1(force_bytes(content)).hexdigest()
+                sha1_hash = sha1(force_bytes(content))
                 if (court_str == 'nev' and
                         item['precedential_statuses'] == 'Unpublished'):
                     # Nevada's non-precedential cases have different SHA1

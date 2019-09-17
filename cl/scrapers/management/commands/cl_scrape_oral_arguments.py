@@ -1,4 +1,3 @@
-import hashlib
 import random
 import traceback
 from datetime import date
@@ -9,6 +8,7 @@ from django.utils.encoding import force_bytes
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
+from cl.lib.crypto import sha1
 from cl.lib.import_lib import get_candidate_judges, get_scotus_judges
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
@@ -130,7 +130,7 @@ class Command(cl_scrape_opinions.Command):
 
                 # request.content is sometimes a str, sometimes unicode, so
                 # force it all to be bytes, pleasing hashlib.
-                sha1_hash = hashlib.sha1(force_bytes(content)).hexdigest()
+                sha1_hash = sha1(force_bytes(content))
                 onwards = dup_checker.press_on(
                     Audio,
                     current_date,

@@ -1,11 +1,11 @@
 # coding=utf-8
 import copy
-import hashlib
 import logging
 import os
 import shutil
 
 from cl.corpus_importer.utils import mark_ia_upload_needed
+from cl.lib.crypto import sha1
 from cl.people_db.models import Attorney, Role
 
 try:
@@ -1216,7 +1216,7 @@ def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
 
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
-    rd.sha1 = hashlib.sha1(force_bytes(response.content)).hexdigest()
+    rd.sha1 = sha1(force_bytes(response.content))
     rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
 
     # Save and extract, skipping OCR.
