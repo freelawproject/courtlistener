@@ -1,6 +1,4 @@
 # coding=utf-8
-
-import hashlib
 import json
 
 from django.db import models
@@ -10,6 +8,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 from django.utils.encoding import force_bytes
 
+from cl.lib.crypto import sha1
 from cl.lib.models import AbstractJSON, AbstractPDF
 from cl.lib.model_helpers import make_pdf_path
 
@@ -44,7 +43,7 @@ class LASCJSON(AbstractJSON):
         # whitespace.
         with open(self.filepath.path, 'r') as f:
             j = json.load(f)
-        self.sha1 = hashlib.sha1(force_bytes(j)).hexdigest()
+        self.sha1 = sha1(force_bytes(j))
         super(LASCJSON, self).save(*args, **kwargs)
 
 

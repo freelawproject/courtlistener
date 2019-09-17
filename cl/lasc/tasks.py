@@ -1,18 +1,15 @@
 # coding=utf-8
-
-import hashlib
-import json
 from glob import glob
 
 from django.apps import apps
 from django.core.files.base import ContentFile
-from django.utils.encoding import force_bytes
 from juriscraper.lasc.fetch import LASCSearch
 
 from cl.lasc.models import Docket, QueuedCase, QueuedPDF, DocumentImage, \
     UPLOAD_TYPE
 from cl.lasc.models import LASCJSON, LASCPDF
 from cl.lib.command_utils import logger
+from cl.lib.crypto import sha1_of_json_data
 
 
 def process_case_queue(lasc_session):
@@ -104,22 +101,13 @@ def add_or_update_case(lasc_session, case_id):
         add_case(case_id, case_data, lasc)
 
     elif docket.count() == 1:
-        if latest_sha(case_id=case_id) != make_sha1(lasc):
+        if latest_sha(case_id=case_id) != sha1_of_json_data(lasc.case_data):
             logger.info("Updating Case")
             update_case(lasc)
         else:
             logger.info("Case Up To Date")
     else:
         logger.info("Issue - More than one case in system")
-
-
-def make_sha1(query):
-    """
-    Generate SHA1 from case_data
-    :param query: LASC Search Object
-    :return: A generated SHA1 code.
-    """
-    return hashlib.sha1(force_bytes(json.loads(query.case_data))).hexdigest()
 
 
 def latest_sha(case_id):
@@ -131,23 +119,6 @@ def latest_sha(case_id):
     docket = Docket.objects.get(case_id=case_id)
     o_id = LASCJSON(content_object=docket).object_id
     return LASCJSON.objects.filter(object_id=o_id).order_by('-pk')[0].sha1
-
-
-def check_hash(query, case_id, case_hash):
-    """
-    Check if case has changed by case_hash.  Return True/False
-    :param query:
-    :param case_id:
-    :param case_hash:
-    :return:
-    """
-    query.get_json_from_internal_case_id(case_id)
-
-    if case_hash == hashlib.sha1(force_bytes(json.loads(query.case_data))) \
-        .hexdigest():
-        return True
-    else:
-        return False
 
 
 def update_case(query):
@@ -302,7 +273,7 @@ def fetch_case_list_by_date(lasc_session, start, end):
 
 def save_json(query, content_obj):
     json_file = LASCJSON(content_object=content_obj)
-    json_file.sha1 = make_sha1(query)
+    json_file.sha1 = sha1_of_json_data(query)
     json_file.upload_type = UPLOAD_TYPE.DOCKET
     json_file.filepath.save(
         'lasc.json',

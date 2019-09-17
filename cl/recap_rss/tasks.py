@@ -12,7 +12,7 @@ from juriscraper.pacer import PacerRssFeed
 
 from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery import app
-from cl.lib.crypto import sha1
+from cl.lib.crypto import sha256
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.recap.tasks import find_docket_object
 from cl.recap.mergers import update_docket_metadata, add_docket_entries
@@ -143,7 +143,7 @@ def hash_item(item):
     """Hash an RSS item. Item should be a dict at this stage"""
     # Stringify, normalizing dates to strings.
     item_j = json.dumps(item, sort_keys=True, default=str)
-    item_hash = sha1(item_j)
+    item_hash = sha256(item_j)
     return item_hash
 
 

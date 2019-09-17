@@ -1,6 +1,4 @@
-import hashlib
 import logging
-import random
 import re
 from datetime import timedelta
 from email.utils import parseaddr
@@ -25,6 +23,7 @@ from django.views.decorators.debug import (sensitive_post_parameters,
 
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
+from cl.lib.crypto import sha1_activation_key
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
     ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm,
@@ -150,10 +149,7 @@ def view_settings(request):
         changed_email = old_email != new_email
         if changed_email:
             # Email was changed.
-
-            # Build the activation key for the new account
-            salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-            up.activation_key = hashlib.sha1(salt + user.username).hexdigest()
+            up.activation_key = sha1_activation_key(user.username)
             up.key_expires = now() + timedelta(5)
             up.email_confirmed = False
 
@@ -322,9 +318,7 @@ def register(request):
                 user.save()
 
                 # Build and assign the activation key
-                salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-                up.activation_key = hashlib.sha1(
-                    salt + user.username).hexdigest()
+                up.activation_key = sha1_activation_key(user.username)
                 up.key_expires = now() + timedelta(days=5)
                 up.save()
 
@@ -449,9 +443,7 @@ def request_email_confirmation(request):
                           email['from'], [cd['email']])
                 return HttpResponseRedirect(reverse('email_confirm_success'))
 
-            # make a new activation key for all associated accounts.
-            salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-            activation_key = hashlib.sha1(salt + cd['email']).hexdigest()
+            activation_key = sha1_activation_key(cd['email'])
             key_expires = now() + timedelta(days=5)
 
             for user in users:

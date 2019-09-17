@@ -11,6 +11,7 @@ from juriscraper.lib.string_utils import titlecase, harmonize, clean_string, Cas
 from lxml import etree
 
 from cl.corpus_importer.court_regexes import state_pairs
+from cl.lib.crypto import sha1_of_file
 from parse_judges import find_judge_names
 from regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
 
@@ -158,21 +159,12 @@ def parse_file(file_path):
 
     # Add the same sha1 and path values to every opinion (multiple opinions
     # can come from a single XML file).
-    sha1 = get_sha1(file_path)
+    sha1 = sha1_of_file(file_path)
     for opinion in info['opinions']:
         opinion['sha1'] = sha1
         opinion['local_path'] = file_path
 
     return info
-
-
-def get_sha1(file_path):
-    """Calculate the sha1 of a file at a given path."""
-    hasher = hashlib.sha1()
-    with open(file_path, 'rb') as f:
-        buf = f.read()
-        hasher.update(buf)
-    return hasher.hexdigest()
 
 
 def get_text(file_path):

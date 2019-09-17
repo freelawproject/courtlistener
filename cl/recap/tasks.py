@@ -1,5 +1,4 @@
 # coding=utf-8
-import hashlib
 import logging
 import os
 
@@ -15,6 +14,7 @@ from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
 from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
 from cl.celery import app
 from cl.corpus_importer.utils import mark_ia_upload_needed
+from cl.lib.crypto import sha1
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import map_cl_to_pacer_id
@@ -191,7 +191,7 @@ def process_recap_pdf(self, pk):
 
     # Do the file, finally.
     content = pq.filepath_local.read()
-    new_sha1 = hashlib.sha1(content).hexdigest()
+    new_sha1 = sha1(content)
     existing_document = all([
         rd.sha1 == new_sha1,
         rd.is_available,
