@@ -35,9 +35,9 @@ def sha1_of_file(file_path, buffer_size=2**16):
 
 def sha1_of_json_data(d):
     """
-    Generate SHA1 from case_data, stripping whitespace
+    Generate SHA1 from a python object, stripping whitespace
 
-    :param d: LASC Search Object
+    :param d: A string of JSON data
     :return: A generated SHA1 code.
     """
     json_as_python = json.loads(d)
