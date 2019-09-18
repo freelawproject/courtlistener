@@ -1,11 +1,11 @@
 from django.contrib import admin
-from cl.lib.admin import CSSAdminMixin
+from cl.lib.admin import AdminTweaksMixin
 from cl.lasc.models import Action, CrossReference, Docket, DocumentFiled, \
     DocumentImage, Party, Proceeding, \
     QueuedCase, QueuedPDF, TentativeRuling
 
 
-class Base(admin.ModelAdmin, CSSAdminMixin):
+class Base(admin.ModelAdmin, AdminTweaksMixin):
 
     readonly_fields = (
         'date_created',
@@ -16,7 +16,7 @@ class Base(admin.ModelAdmin, CSSAdminMixin):
     )
 
 
-class DocumentFiledInline(admin.TabularInline, CSSAdminMixin):
+class DocumentFiledInline(admin.TabularInline, AdminTweaksMixin):
     model = DocumentFiled
 
 
@@ -107,7 +107,7 @@ class DocumentImageAdmin(Base):
 
 
 @admin.register(Action)
-class ActionFiledAdmin(Base, CSSAdminMixin):
+class ActionFiledAdmin(Base, AdminTweaksMixin):
     fields = (
         'docket',
         'date_of_action',

@@ -1,4 +1,4 @@
-class CSSAdminMixin(object):
+class AdminTweaksMixin(object):
     class Media:
         css = {
             'all': (
