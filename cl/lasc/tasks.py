@@ -128,8 +128,8 @@ def update_case(query):
     Method currently deletes and replaces the data on the system except for
     lasc_docket and connections for older json and pdf files.
 
-    :param query:
-    :return:
+    :param lasc: A LASCSearch object
+    :return: None
     """
     docket_number = query.normalized_case_data['Docket']['docket_number']
     district = query.normalized_case_data['Docket']['district']
