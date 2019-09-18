@@ -53,11 +53,11 @@ def add_directory(options):
 
     :return: None
     """
-    if options['directory'] is None:
-        print("--directory is a required parameter when the "
+    if options['directory_glob'] is None:
+        print("--directory-glob is a required parameter when the "
               "'add-directory' action is selected.")
     else:
-        tasks.add_cases_from_directory(options['directory-glob'])
+        tasks.add_cases_from_directory(options['directory_glob'])
 
 
 def rm_case(options):
