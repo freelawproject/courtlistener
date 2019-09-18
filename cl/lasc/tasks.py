@@ -1,4 +1,5 @@
 # coding=utf-8
+import json
 from glob import glob
 
 from django.apps import apps
@@ -79,7 +80,7 @@ def add_case(case_id, case_data, lasc):
             case_data_row["docket"] = docket
             mdl.objects.create(**case_data_row).save()
 
-    save_json(lasc, docket)
+    save_json(lasc.case_data, docket)
 
     if is_queued.count() == 1:
         is_queued[0].delete()
@@ -122,7 +123,7 @@ def latest_sha(case_id):
     return LASCJSON.objects.filter(object_id=o_id).order_by('-pk')[0].sha1
 
 
-def update_case(query):
+def update_case(lasc):
     """
     This code should update cases that have detected changes
     Method currently deletes and replaces the data on the system except for
@@ -131,9 +132,9 @@ def update_case(query):
     :param lasc: A LASCSearch object
     :return: None
     """
-    docket_number = query.normalized_case_data['Docket']['docket_number']
-    district = query.normalized_case_data['Docket']['district']
-    division_code = query.normalized_case_data['Docket']['division_code']
+    docket_number = lasc.normalized_case_data['Docket']['docket_number']
+    district = lasc.normalized_case_data['Docket']['district']
+    division_code = lasc.normalized_case_data['Docket']['division_code']
 
     case_id = ";".join([docket_number, district, division_code])
 
@@ -143,7 +144,7 @@ def update_case(query):
 
     docket = Docket.objects.filter(case_id=case_id)[0]
 
-    data = query.normalized_case_data
+    data = lasc.normalized_case_data
 
     models = [x for x in apps.get_app_config('lasc').get_models()
               if x.__name__ not in ["Docket", "QueuedPDF",
@@ -159,7 +160,7 @@ def update_case(query):
             row['docket'] = docket
             mdl.objects.create(**row).save()
 
-    documents = query.normalized_case_data['DocumentImage']
+    documents = lasc.normalized_case_data['DocumentImage']
     for row in documents:
         r = DocumentImage.objects.filter(doc_id=row['doc_id'])
         if r.count() == 1:
@@ -172,7 +173,7 @@ def update_case(query):
             DocumentImage.objects.create(**row).save()
 
     logger.info("Finished updating lasc case '%s'", case_id)
-    save_json(query, content_obj=docket)
+    save_json(lasc.case_data, content_obj=docket)
 
 
 def remove_case(case_id):
@@ -200,7 +201,7 @@ def add_cases_from_directory(directory_glob):
         with open(fp, 'r') as f:
             case_data = f.read()
 
-        clean_data = query._parse_case_data(case_data)
+        clean_data = query._parse_case_data(json.loads(case_data))
         docket_number = clean_data['Docket']['docket_number']
         district = clean_data['Docket']['district']
         division_code = clean_data['Docket']['division_code']
@@ -232,7 +233,7 @@ def add_cases_from_directory(directory_glob):
                     row["docket"] = dock_obj[0]
                     mdl.objects.create(**row).save()
 
-            save_json(query, dock_obj[0])
+            save_json(case_data, dock_obj[0])
 
             if is_queued.count() == 1:
                 is_queued[0].delete()
@@ -273,11 +274,11 @@ def fetch_case_list_by_date(lasc_session, start, end):
     logger.info("Added %s cases to the QueuedCase table.", cases_added_cnt)
 
 
-def save_json(query, content_obj):
+def save_json(data, content_obj):
     json_file = LASCJSON(content_object=content_obj)
-    json_file.sha1 = sha1_of_json_data(query)
+    json_file.sha1 = sha1_of_json_data(data)
     json_file.upload_type = UPLOAD_TYPE.DOCKET
     json_file.filepath.save(
         'lasc.json',
-        ContentFile(query.case_data),
+        ContentFile(data),
     )
