@@ -188,16 +188,30 @@ def get_filepath_from_case_id(case_id):
     return x.filepath
 
 
-def add_cases_from_directory(directory_glob):
+def add_cases_from_directory(directory_glob, skip_until):
     """Add cases from JSON saved to disk.
 
     :param directory_glob: A glob in which we look for cases to add, typically
     of the form /data/@json. Note that this will not recursively traverse
     directories.
+    :param skip_until: Do no processing until an item with this file path is
+    encountered. This is intended to provide resumability to this function.
     :return: None
     """
     query = LASCSearch(None)
-    for fp in glob(directory_glob):
+    fps = sorted(glob(directory_glob))
+    if skip_until:
+        # Remove items from the list until the skip_until value is hit.
+        try:
+            skip_index = fps.index(skip_until)
+            fps = fps[skip_index:]
+        except ValueError:
+            logger.error("Unable to find '%s' in directory_glob: '%s'. "
+                         "The first few items of the glob look like: \n  %s",
+                         skip_until, directory_glob, '\n  '.join(fps[0:3]))
+            raise
+
+    for fp in fps:
         logger.info("Adding lasc case with file path %s to the DB", fp)
         with open(fp, 'r') as f:
             case_data = f.read()

@@ -57,7 +57,8 @@ def add_directory(options):
         print("--directory-glob is a required parameter when the "
               "'add-directory' action is selected.")
     else:
-        tasks.add_cases_from_directory(options['directory_glob'])
+        tasks.add_cases_from_directory(options['directory_glob'],
+                                       options['skip_until'])
 
 
 def rm_case(options):
@@ -133,6 +134,13 @@ class Command(VerboseCommand):
                  "example, '/home/you/bulk-data/*.json'. Note that to avoid "
                  "the shell interpreting the glob, you'll want to put it in "
                  "single quotes.",
+        )
+        parser.add_argument(
+            '--skip-until',
+            type=str,
+            help="When using --directory-glob, skip processing until an item "
+                 "at this location is encountered. Use a path comparable to "
+                 "that passed to --directory-glob."
         )
 
         today = datetime.today()
