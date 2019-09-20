@@ -198,6 +198,7 @@ def add_cases_from_directory(directory_glob):
     """
     query = LASCSearch(None)
     for fp in glob(directory_glob):
+        logger.info("Adding lasc case with file path %s to the DB", fp)
         with open(fp, 'r') as f:
             case_data = f.read()
 
