@@ -130,7 +130,9 @@ class Command(VerboseCommand):
         parser.add_argument(
             '--directory-glob',
             help="A directory glob to use when importing bulk JSON files, for "
-                 "example, '/home/you/bulk-data/*.json'",
+                 "example, '/home/you/bulk-data/*.json'. Note that to avoid "
+                 "the shell interpreting the glob, you'll want to put it in "
+                 "single quotes.",
         )
 
         today = datetime.today()
