@@ -4,6 +4,7 @@ from glob import glob
 
 from django.apps import apps
 from django.core.files.base import ContentFile
+from django.db import transaction
 from juriscraper.lasc.fetch import LASCSearch
 
 from cl.lasc.models import Docket, QueuedCase, QueuedPDF, DocumentImage, \
@@ -226,32 +227,33 @@ def add_cases_from_directory(directory_glob, skip_until):
         dock_obj = Docket.objects.filter(case_id=case_id)
 
         if dock_obj.count() == 0:
-            is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
+            with transaction.atomic():
+                is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
 
-            if is_queued.count() == 1:
-                clean_data["Docket"]['judge_code'] = is_queued[0].judge_code
-                clean_data["Docket"]['case_type_code'] = is_queued[
-                    0].case_type_code
+                if is_queued.count() == 1:
+                    d = clean_data['Docket']
+                    d['judge_code'] = is_queued[0].judge_code
+                    d['case_type_code'] = is_queued[0].case_type_code
 
-            docket = Docket.objects.create(**clean_data["Docket"])
-            docket.save()
+                docket = Docket.objects.create(**d)
+                docket.save()
 
-            dock_obj = Docket.objects.filter(case_id=case_id)
+                dock_obj = Docket.objects.filter(case_id=case_id)
 
-            models = [x for x in apps.get_app_config('lasc').get_models()
-                      if x.__name__ not in ["Docket"]]
+                models = [x for x in apps.get_app_config('lasc').get_models()
+                          if x.__name__ not in ["Docket"]]
 
-            while models:
-                mdl = models.pop()
-                while clean_data[mdl.__name__]:
-                    row = clean_data[mdl.__name__].pop()
-                    row["docket"] = dock_obj[0]
-                    mdl.objects.create(**row).save()
+                while models:
+                    mdl = models.pop()
+                    while clean_data[mdl.__name__]:
+                        row = clean_data[mdl.__name__].pop()
+                        row["docket"] = dock_obj[0]
+                        mdl.objects.create(**row).save()
 
-            save_json(case_data, dock_obj[0])
+                save_json(case_data, dock_obj[0])
 
-            if is_queued.count() == 1:
-                is_queued[0].delete()
+                if is_queued.count() == 1:
+                    is_queued[0].delete()
 
         elif dock_obj.count() == 1:
             logger.warn("LASC case on file system at '%s' is already in "
