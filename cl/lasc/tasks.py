@@ -230,8 +230,8 @@ def add_cases_from_directory(directory_glob, skip_until):
             with transaction.atomic():
                 is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
 
+                d = clean_data['Docket']
                 if is_queued.count() == 1:
-                    d = clean_data['Docket']
                     d['judge_code'] = is_queued[0].judge_code
                     d['case_type_code'] = is_queued[0].case_type_code
 
