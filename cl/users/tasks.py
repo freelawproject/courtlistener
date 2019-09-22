@@ -1,4 +1,3 @@
-import hashlib
 import logging
 from urlparse import urljoin
 
@@ -8,6 +7,7 @@ from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND, \
     HTTP_400_BAD_REQUEST
 
 from cl.celery import app
+from cl.lib.crypto import md5
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def update_mailchimp(self, email, status):
     allowed_statuses = ['unsubscribed', 'subscribed']
     assert status in allowed_statuses, \
         "'%s' is not an allowed status." % status
-    md5_hash = hashlib.md5(email).hexdigest()
+    md5_hash = md5(email)
     path = '/3.0/lists/%s/members/%s' % (MC_LIST_ID, md5_hash)
     try:
         r = requests.patch(

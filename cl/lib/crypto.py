@@ -1,11 +1,33 @@
+# File roughly ordered by quality of hashing algo. Better ones further down.
 import hashlib
 import json
 import random
 import uuid
 
 
+def md5(s):
+    """Return the md5 hexdigest of a string
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! This algorithm is obsolete for most purposes. Its !
+    ! usage is discouraged. Please use SHA256 instead.  !
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    :param s: The data to hash
+    :return a hexadecimal MD5 hash of the data
+    """
+    md5sum = hashlib.md5()
+    md5sum.update(s)
+    return md5sum.hexdigest()
+
+
 def sha1(s):
     """Return the sha1sum of a string.
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! This algorithm is obsolete for most purposes. Its !
+    ! usage is discouraged. Please use SHA256 instead.  !
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     :param s: The data to hash
     :return: a hexadecimal SHA1 hash of the data
@@ -17,6 +39,11 @@ def sha1(s):
 
 def sha1_of_file(file_path, buffer_size=2**16):
     """Generate a SHA1 hash of a file in constant memory
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! This algorithm is obsolete for most purposes. Its !
+    ! usage is discouraged. Please use SHA256 instead.  !
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     :param file_path: The path to the file to hash.
     :param buffer_size: The amount of data to read into memory at a time,
