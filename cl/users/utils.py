@@ -34,7 +34,7 @@ def create_stub_account(user_data, profile_data):
     new_user.last_name = user_data['last_name']
 
     # Associate a profile
-    profile = UserProfile(
+    profile = UserProfile.objects.create(
         user=new_user,
         stub_account=True,
         address1=profile_data['address1'],
