@@ -97,10 +97,14 @@ def process_stripe_callback(request):
                     charge['created']).replace(tzinfo=utc)
                 d.status = Donation.PROCESSED
                 payment_type = charge['metadata']['type']
-                if charge['metadata'].get('recurring'):
-                    send_thank_you_email(d, payment_type, recurring=True)
+                if charge['application'] == settings.XERO_APPLICATION_ID:
+                    # Don't send thank you's for Xero invoices
+                    pass
                 else:
-                    send_thank_you_email(d, payment_type)
+                    if charge['metadata'].get('recurring'):
+                        send_thank_you_email(d, payment_type, recurring=True)
+                    else:
+                        send_thank_you_email(d, payment_type)
             elif event['type'].endswith('failed'):
                 if not d:
                     return HttpResponse('<h1>200: No matching object in the '
