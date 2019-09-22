@@ -8,6 +8,19 @@ from cl.users.models import UserProfile
 
 
 def create_stub_account(user_data, profile_data):
+    """Create a minimal user account in CL
+
+    This can be helpful when receiving anonymous donations, payments from
+    external applications like XERO, etc.
+
+    :param user_data: Generally cleaned data from a cl.donate.forms.UserForm
+    :type user_data: dict
+    :param profile_data: Generallly cleaned data from a
+    cl.donate.forms.ProfileForm
+    :type profile_data: dict
+    :return: A tuple of a User and UserProfile objects
+    """
+
     email = user_data['email']
     new_user = User.objects.create_user(
         # Use a hash of the email address to reduce the odds of somebody
