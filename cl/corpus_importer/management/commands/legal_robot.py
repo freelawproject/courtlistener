@@ -49,9 +49,15 @@ def get_documents(options):
             break
         throttle.maybe_wait()
 
-        rd = RECAPDocument.objects.get(pk=result['id'])
-        logger.info("Doing item %s w/rd: %s, d: %s", i, rd.pk,
+        logger.info("Doing item %s w/rd: %s, d: %s", i, result['id'],
                     result['docket_id'])
+
+        try:
+            rd = RECAPDocument.objects.get(pk=result['id'])
+        except RECAPDocument.DoesNotExist:
+            logger.warn("Unable to find RECAP Document with id %s",
+                        result['id'])
+            continue
 
         if rd.is_available:
             logger.info("Already have pk %s; just tagging it.", rd.pk)
