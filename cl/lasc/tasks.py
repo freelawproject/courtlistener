@@ -217,7 +217,11 @@ def add_cases_from_directory(directory_glob, skip_until):
         with open(fp, 'r') as f:
             case_data = f.read()
 
-        clean_data = query._parse_case_data(json.loads(case_data))
+        try:
+            clean_data = query._parse_case_data(json.loads(case_data))
+        except IndexError:
+            logger.warn("Empty JSON file suspected for %s", fp)
+            continue
         docket_number = clean_data['Docket']['docket_number']
         district = clean_data['Docket']['district']
         division_code = clean_data['Docket']['division_code']
