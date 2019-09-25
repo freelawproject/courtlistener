@@ -46,6 +46,7 @@ CMD celery \
     --app=cl worker \
     --loglevel=info \
     --events \
-    --concurrency=1 \
+    --concurrency=4 \
     --pool=prefork \
     --queues=io_bound,celery
+
