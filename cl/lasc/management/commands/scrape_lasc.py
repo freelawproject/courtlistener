@@ -20,17 +20,15 @@ def date_search(options):
 
     :return: None
     """
-    lasc_session = LASCSession(username=LASC_USERNAME,
-                               password=LASC_PASSWORD)
-    lasc_session.login()
     start = options['start']
     end = options['end']
     logger.info("Getting cases between %s and %s, inclusive", start, end)
-    tasks.fetch_case_list_by_date(lasc_session, start, end)
+    tasks.fetch_case_list_by_date(start, end)
 
 
 def add_or_update_case(options):
-    """Add a case to the DB by internal case id
+    """
+    Add a case to the DB by internal case id
 
     :return: None
     """
@@ -38,28 +36,36 @@ def add_or_update_case(options):
         print("--case is a required parameter when the add-case action is "
               "requested.")
     else:
-        lasc_session = LASCSession(username=LASC_USERNAME,
-                                   password=LASC_PASSWORD)
-        lasc_session.login()
-        tasks.add_or_update_case(lasc_session, options['case'])
+        tasks.add_or_update_case_db.apply_async(
+                            kwargs={"case_id": options['case']},
+        )
 
 
 def add_directory(options):
-    """Import JSON files from a directory provided at the command line.
-
+    """
+    Import JSON files from a directory provided at the command line.
     Use glob.globs' to identify JSON files to import.
+    Passes files greater than 500 bytes to celery to add to system
+
+    Empty cases are roughly 181 Bytes
 
     :return: None
     """
+
     if options['directory_glob'] is None:
         print("--directory-glob is a required parameter when the "
               "'add-directory' action is selected.")
     else:
-        tasks.add_cases_from_directory(options['directory_glob'])
+        for fp in glob(options['directory_glob']):
+            if os.stat(fp).st_size > 500:
+                tasks.add_case_from_filepath.apply_async(
+                                        kwargs={"fp":fp},
+                )
 
 
 def rm_case(options):
-    """Delete a case from db
+    """
+    Delete a case from db
 
     :return: None
     """
@@ -71,25 +77,30 @@ def rm_case(options):
 
 
 def process_case_queue(options):
-    """Download all cases in case queue
+    """
+    Work through the queue of cases that need to be added to the database,
+    and add them one by one.
 
     :return: None
     """
-    lasc_session = LASCSession(username=LASC_USERNAME,
-                               password=LASC_PASSWORD)
-    lasc_session.login()
-    tasks.process_case_queue(lasc_session=lasc_session)
+    queue = QueuedCase.objects.all()
+    for case in queue:
+        tasks.add_or_update_case_db.apply_async(
+            kwargs={"case_id": case.internal_case_id})
 
 
 def process_pdf_queue(options):
-    """Download all PDFs in queue
+    """
+    Download all PDFs in queue
+    Work through the queue of PDFs that need to be added to the database,
+    download them and add them one by one.
 
     :return: None
     """
-    lasc_session = LASCSession(username=LASC_USERNAME,
-                               password=LASC_PASSWORD)
-    lasc_session.login()
-    tasks.process_pdf_queue(lasc_session=lasc_session)
+    queue = QueuedPDF.objects.all()
+    for pdf in queue:
+        tasks.download_pdf.apply_async(kwargs={"pdf": pdf})
+
 
 class Command(VerboseCommand):
     help = "Get all content from MAP LA Unlimited Civil Cases."
