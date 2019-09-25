@@ -135,6 +135,14 @@ def download_pdf(self, pdf):
 
 
 def add_case(case_id, case_data, lasc):
+    """
+    Adds a new case to the cl.lasc database
+
+    :param case_id:
+    :param case_data:
+    :param lasc:
+    :return:
+    """
     is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
 
     if is_queued.count() == 1:
@@ -217,6 +225,7 @@ def add_or_update_case_db(self, case_id):
 def latest_sha(case_id):
     """
     Query latest sha1 for Case by case_id
+
     :param case_id:
     :return:
     """
@@ -232,6 +241,7 @@ def update_case(lasc):
     lasc_docket and connections for older json and pdf files.
 
     :param lasc: A LASCSearch object
+    :param clean_data: A normalized data dictionary
     :return: None
     """
     docket_number = lasc.normalized_case_data['Docket']['docket_number']
