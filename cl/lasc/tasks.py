@@ -159,8 +159,20 @@ def add_case(case_id, case_data, lasc):
         is_queued[0].delete()
 
 
-def add_or_update_case(lasc_session, case_id):
-    """Add a case from the LASC MAP using an authenticated session object
+def check_login_status(self):
+    """
+    Checks the Login Status for LASC.  If no status is found runs log in
+    function and restores cookies and status
+
+    :rtype: object
+    :param self:
+    :return:
+    """
+    if fetch_redis('session:lasc:status') is None:
+        login_to_court()
+        self.retry(countdown=60)
+    elif fetch_redis('session:lasc:status') is "False":
+        self.retry(countdown=60)
 
 
 @app.task(bind=True, ignore_result=True, max_retries=1)
