@@ -67,40 +67,33 @@ def set_redis(key, value, expire_seconds):
     get_redis().getset(key, value)
     get_redis().expire(key, expire_seconds)
 
-def process_pdf_queue(lasc_session):
-    """Work through the queue of PDFs that need to be added to the database,
-    download them and add them one by one.
 
-    :param lasc_session: A Juriscraper.lasc.http.LASCSession object
+def login_to_court():
+    """
+    Update session:lasc:status & session:lasc:cookies
+    Log into MAP and reset status and cookies
+
     :return:
     """
-    queue = QueuedPDF.objects.all()
-    for pdf in queue:
-        # Check if we already have the pdf
-        doc = DocumentImage.objects.get(doc_id=pdf.document_id)
-        if not doc.is_available:
-            query = LASCSearch(lasc_session)
-            pdf_data = query.get_pdf_from_url(pdf.document_url)
+    set_redis("session:lasc:status", "False", 300)
+    lasc_session = LASCSession(username=LASC_USERNAME,
+                               password=LASC_PASSWORD)
+    lasc_session.login()
+    cookie_str = str(pickle.dumps(lasc_session.cookies))
+    set_redis("session:lasc:cookies", cookie_str, 1800)
+    set_redis("session:lasc:status", "True", 1800)
 
-            pdf_document = LASCPDF(
-                content_object=pdf,
-                docket_number=pdf.docket.case_id.split(";")[0],
-                document_id=pdf.document_id
-            )
 
-            pdf_document.filepath.save(
-                pdf.document_id,
-                ContentFile(pdf_data),
-            )
+def get_lasc_session():
+    """
+    Returns a LASC Session with stored cookies
 
-            doc = DocumentImage.objects.get(doc_id=pdf.document_id)
-            doc.is_available = True
-            doc.save()
-
-            pdf.delete()
-        else:
-            logger.info("Already have LASC PDF from docket ID %s with doc ID "
-                        "%s ", doc.docket_id, doc.doc_id)
+    :return:
+    """
+    session = LASCSession(username=LASC_USERNAME,
+                          password=LASC_PASSWORD)
+    session.cookies = pickle.loads(fetch_redis("session:lasc:cookies"))
+    return session
 
 
 def add_case(case_id, case_data, lasc):
