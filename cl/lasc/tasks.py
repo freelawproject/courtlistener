@@ -96,6 +96,44 @@ def get_lasc_session():
     return session
 
 
+@app.task(bind=True, ignore_result=True, max_retries=1)
+def download_pdf(self, pdf):
+    """
+    Downloads the PDF associated with the PDF DB Object passed in.
+
+    :param self:
+    :param pdf:
+    :return:
+    """
+    check_login_status(self)
+    lasc_session = get_lasc_session()
+    lasc = LASCSearch(lasc_session)
+
+    doc = DocumentImage.objects.get(doc_id=pdf.document_id)
+    if not doc.is_available:
+        pdf_data = lasc.get_pdf_from_url(pdf.document_url)
+
+        pdf_document = LASCPDF(
+            content_object=pdf,
+            docket_number=pdf.docket.case_id.split(";")[0],
+            document_id=pdf.document_id
+        )
+
+        pdf_document.filepath.save(
+            pdf.document_id,
+            ContentFile(pdf_data),
+        )
+
+        doc = DocumentImage.objects.get(doc_id=pdf.document_id)
+        doc.is_available = True
+        doc.save()
+
+        pdf.delete()
+    else:
+        logger.info("Already have LASC PDF from docket ID %s with doc ID "
+                    "%s ", doc.docket_id, doc.doc_id)
+
+
 def add_case(case_id, case_data, lasc):
     is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
 
