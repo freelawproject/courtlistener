@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 # Functions to parse court data in XML format into a list of dictionaries.
-import hashlib
 import os
 import re
 import xml.etree.cElementTree as ET
