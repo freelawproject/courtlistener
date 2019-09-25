@@ -234,7 +234,7 @@ def latest_sha(case_id):
     return LASCJSON.objects.filter(object_id=o_id).order_by('-pk')[0].sha1
 
 
-def update_case(lasc):
+def update_case(lasc, clean_data):
     """
     This code should update cases that have detected changes
     Method currently deletes and replaces the data on the system except for
@@ -244,19 +244,17 @@ def update_case(lasc):
     :param clean_data: A normalized data dictionary
     :return: None
     """
-    docket_number = lasc.normalized_case_data['Docket']['docket_number']
-    district = lasc.normalized_case_data['Docket']['district']
-    division_code = lasc.normalized_case_data['Docket']['division_code']
+    docket_number = clean_data['Docket']['docket_number']
+    district = clean_data['Docket']['district']
+    division_code = clean_data['Docket']['division_code']
 
     case_id = ";".join([docket_number, district, division_code])
 
     docket = Docket.objects.filter(case_id=case_id)[0]
-    docket.__dict__.update(query.normalized_case_data['Docket'])
+    docket.__dict__.update(clean_data['Docket'])
     docket.save()
 
     docket = Docket.objects.filter(case_id=case_id)[0]
-
-    data = lasc.normalized_case_data
 
     models = [x for x in apps.get_app_config('lasc').get_models()
               if x.__name__ not in ["Docket", "QueuedPDF",
@@ -267,12 +265,12 @@ def update_case(lasc):
         mdl = models.pop()
         print mdl.__name__
 
-        while data[mdl.__name__]:
-            row = data[mdl.__name__].pop()
+        while clean_data[mdl.__name__]:
+            row = clean_data[mdl.__name__].pop()
             row['docket'] = docket
             mdl.objects.create(**row).save()
 
-    documents = lasc.normalized_case_data['DocumentImage']
+    documents = clean_data['DocumentImage']
     for row in documents:
         r = DocumentImage.objects.filter(doc_id=row['doc_id'])
         if r.count() == 1:
