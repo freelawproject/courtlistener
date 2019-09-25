@@ -1,19 +1,17 @@
 # coding=utf-8
 
-import argparse
 import os
+import argparse
+from glob import glob
 
 from datetime import datetime
 from datetime import timedelta
-from django.conf import settings
-from juriscraper.lasc.http import LASCSession
 
 from cl.lasc import tasks
 from cl.lib.argparse_types import valid_date
 from cl.lib.command_utils import VerboseCommand, logger
 
-LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
-LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
+from cl.lasc.models import QueuedCase, QueuedPDF
 
 
 def date_search(options):
