@@ -329,19 +329,56 @@ def add_case_from_filepath(fp):
                     "the database ", fp)
 
 
-def fetch_case_list_by_date(lasc_session, start, end):
-    """Search for cases by date and add them to the DB.
+def fetch_case_list_by_date(start, end):
+    """
+    Search for cases by date and add them to the DB.
 
-    :param lasc_session: A Juriscraper.lasc.http.LASCSession object
     :param start: The date you want to start searching for cases
     :type start: datetime.date
     :param end: The date you want to stop searching for cases
     :type end: datetime.date
     :return: None
     """
-    lasc = LASCSearch(lasc_session)
-    cases = lasc.query_cases_by_date(start, end)
+    from datetime import datetime, timedelta
+    from dateutil.rrule import rrule, WEEKLY
 
+    start = datetime(start.year, start.month, start.day)
+    end = datetime(end.year, end.month, end.day)
+
+    end = min(end, datetime.today())
+    weekly_dates = rrule(freq=WEEKLY, dtstart=start, until=end)
+
+    lastday = []
+    for start in weekly_dates:
+        seven_days_later = start + timedelta(days=7)
+        end = min(seven_days_later, end)
+
+        if end not in lastday:
+            fetch_date_range.apply_async(
+                kwargs={"start": start.strftime('%m-%d-%Y'),
+                        "end": end.strftime('%m-%d-%Y')},
+            )
+
+        lastday.append(end)
+
+
+@app.task(bind=True, ignore_result=True, max_retries=2)
+def fetch_date_range(self, start, end):
+    """
+    Queries LASC for one week or less range and returns the cases filed.
+
+    :param self:
+    :param start: The date you want to start searching for cases
+    :type start: string
+    :param end: The date you want to stop searching for cases
+    :type end: string
+    :return:
+    """
+    check_login_status(self)
+    lasc_session = get_lasc_session()
+    lasc = LASCSearch(lasc_session)
+
+    cases = lasc.query_cases_by_date(start, end)
     cases_added_cnt = 0
     for case in cases:
         internal_case_id = case['internal_case_id']
