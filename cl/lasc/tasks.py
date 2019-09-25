@@ -418,6 +418,13 @@ def fetch_date_range(self, start, end):
 
 
 def save_json(data, content_obj):
+    """
+    Save json string to file and generate SHA1.
+
+    :param data: JSON response cleaned
+    :param content_obj:
+    :return:
+    """
     json_file = LASCJSON(content_object=content_obj)
     json_file.sha1 = sha1_of_json_data(data)
     json_file.upload_type = UPLOAD_TYPE.DOCKET
