@@ -1,29 +1,71 @@
 # coding=utf-8
+import os
 import json
-from glob import glob
+import redis
+import pickle
 
 from django.apps import apps
 from django.core.files.base import ContentFile
+from django.conf import settings
 from juriscraper.lasc.fetch import LASCSearch
+from juriscraper.lasc.http import LASCSession
 
-from cl.lasc.models import Docket, QueuedCase, QueuedPDF, DocumentImage, \
-    UPLOAD_TYPE
+from cl.lasc.models import Docket, QueuedCase, DocumentImage, UPLOAD_TYPE
 from cl.lasc.models import LASCJSON, LASCPDF
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1_of_json_data
 
+LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
+LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
 
-def process_case_queue(lasc_session):
-    """Work through the queue of cases that need to be added to the database,
-    and add them one by one.
+from cl.celery import app
 
-    :param lasc_session: A Juriscraper.lasc.http.LASCSession object
-    :return: None
+
+def get_redis():
     """
-    queue = QueuedCase.objects.all()
-    for case in queue:
-        add_or_update_case(lasc_session, case.internal_case_id)
+    Get redis instance.
 
+    :return:
+    """
+    return redis.StrictRedis(host=settings.REDIS_HOST,
+                             port=settings.REDIS_PORT,
+                             db=settings.REDIS_DATABASES['CACHE'])
+
+
+def fetch_redis(key):
+    """
+    Fetch redis string with associated key. Used to get cookie and status
+
+    :param key:
+    :return:
+    """
+    return get_redis().get(key)
+
+
+def delete_redis_object(key):
+    """
+    Remove redis value using the passed key
+    Used to clear failed cookie/status
+
+    :param key:
+    :return:
+    """
+    return get_redis().delete(key)
+
+
+def set_redis(key, value, expire_seconds):
+    """
+    Set data in Redis Database with expiration time.  Used for
+    session:lasc:status & session:lasc:cookies
+
+    :param key:
+    :param value:
+    :param expire_seconds:
+    :return:
+    """
+
+    get_redis().getset(key, value)
+    get_redis().expire(key, expire_seconds)
 
 def process_pdf_queue(lasc_session):
     """Work through the queue of PDFs that need to be added to the database,
