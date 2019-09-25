@@ -162,22 +162,39 @@ def add_case(case_id, case_data, lasc):
 def add_or_update_case(lasc_session, case_id):
     """Add a case from the LASC MAP using an authenticated session object
 
-    :param lasc_session: A Juriscraper.lasc.http.LASCSession object
+
+@app.task(bind=True, ignore_result=True, max_retries=1)
+def add_or_update_case_db(self, case_id):
+    """
+    Add a case from the LASC MAP using an authenticated session object
+
+    :param self
     :param case_id: The case ID to download, for example, '19STCV25157;SS;CV'
     :return: None
     """
-    docket = Docket.objects.filter(case_id=case_id)
+    check_login_status(self)
+    lasc_session = get_lasc_session()
     lasc = LASCSearch(lasc_session)
-    case_data = lasc.get_json_from_internal_case_id(case_id)
 
-    if docket.count() == 0:
+    clean_data = {}
+    try:
+        clean_data = lasc.get_json_from_internal_case_id(case_id)
+        logger.info("Successful Query")
+    except:
+        delete_redis_object("session:lasc:cookie")
+        delete_redis_object("session:lasc:status")
+        self.retry(countdown=60)
+
+    docket = Docket.objects.filter(case_id=case_id)
+    count = docket.count()
+
+    if count == 0:
         logger.info("Adding lasc case with ID: %s", case_id)
-        add_case(case_id, case_data, lasc)
-
-    elif docket.count() == 1:
+        add_case(case_id, clean_data, lasc)
+    elif count == 1:
         if latest_sha(case_id=case_id) != sha1_of_json_data(lasc.case_data):
             logger.info("Updating lasc case with ID: %s", case_id)
-            update_case(lasc)
+            update_case(lasc, clean_data)
         else:
             logger.info("LASC case is already up to date: %s", case_id)
     else:
