@@ -136,7 +136,16 @@ class Command(VerboseCommand):
         parser.add_argument(
             '--directory-glob',
             help="A directory glob to use when importing bulk JSON files, for "
-                 "example, '/home/you/bulk-data/*.json'",
+                 "example, '/home/you/bulk-data/*.json'. Note that to avoid "
+                 "the shell interpreting the glob, you'll want to put it in "
+                 "single quotes.",
+        )
+        parser.add_argument(
+            '--skip-until',
+            type=str,
+            help="When using --directory-glob, skip processing until an item "
+                 "at this location is encountered. Use a path comparable to "
+                 "that passed to --directory-glob.",
         )
 
         today = datetime.today()
