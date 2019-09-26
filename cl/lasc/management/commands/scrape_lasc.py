@@ -80,10 +80,10 @@ def process_case_queue(options):
 
     :return: None
     """
-    queue = QueuedCase.objects.all()
-    for case in queue:
-        tasks.add_or_update_case_db.apply_async(
-            kwargs={"case_id": case.internal_case_id})
+    case_ids = QueuedCase.objects.all().values_list(
+        'internal_case_id', flat=True)
+    for case_id in case_ids:
+        tasks.add_or_update_case_db.apply_async(kwargs={"case_id": case_id})
 
 
 def process_pdf_queue(options):
@@ -94,9 +94,9 @@ def process_pdf_queue(options):
 
     :return: None
     """
-    queue = QueuedPDF.objects.all()
-    for pdf in queue:
-        tasks.download_pdf.apply_async(kwargs={"pdf": pdf})
+    pdf_pks = QueuedPDF.objects.all().values_list('pk', flat=True)
+    for pdf_pk in pdf_pks:
+        tasks.download_pdf.apply_async(kwargs={"pdf_pk": pdf_pk})
 
 
 class Command(VerboseCommand):
