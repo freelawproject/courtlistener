@@ -54,23 +54,7 @@ def add_directory(options):
               "'add-directory' action is selected.")
     else:
         for fp in glob(options['directory_glob']):
-            if os.stat(fp).st_size > 500:
-                tasks.add_case_from_filepath.apply_async(
-                                        kwargs={"fp":fp},
-                )
-
-
-def rm_case(options):
-    """
-    Delete a case from db
-
-    :return: None
-    """
-    if options['case'] is None:
-        print("--case is a required parameter when the rm-case action is "
-              "requested.")
-    else:
-        tasks.remove_case(options['case'])
+            tasks.add_case_from_filepath.apply_async(kwargs={"filepath": fp})
 
 
 def process_case_queue(options):
@@ -171,7 +155,6 @@ class Command(VerboseCommand):
         'add-cases-by-date': date_search,
         'add-or-update-case': add_or_update_case,
         'add-directory': add_directory,
-        'rm-case': rm_case,
         'process-case-queue': process_case_queue,
         'process-pdf-queue': process_pdf_queue,
     }
