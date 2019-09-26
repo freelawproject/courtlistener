@@ -1,6 +1,5 @@
 # coding=utf-8
 
-import os
 import argparse
 from glob import glob
 
@@ -15,8 +14,7 @@ from cl.lasc.models import QueuedCase, QueuedPDF
 
 
 def date_search(options):
-    """
-    Collect a list of cases from a date range and add them to the db.
+    """Collects a list of cases from a date range and adds them to the db.
 
     :return: None
     """
@@ -27,8 +25,7 @@ def date_search(options):
 
 
 def add_or_update_case(options):
-    """
-    Add a case to the DB by internal case id
+    """Adds a case to the DB by internal case id
 
     :return: None
     """
@@ -37,13 +34,13 @@ def add_or_update_case(options):
               "requested.")
     else:
         tasks.add_or_update_case_db.apply_async(
-                            kwargs={"case_id": options['case']},
+            kwargs={"case_id": options['case']},
         )
 
 
 def add_directory(options):
-    """
-    Import JSON files from a directory provided at the command line.
+    """Import JSON files from a directory provided at the command line.
+
     Use glob.globs' to identify JSON files to import.
     Passes files greater than 500 bytes to celery to add to system
 
@@ -90,8 +87,8 @@ def process_case_queue(options):
 
 
 def process_pdf_queue(options):
-    """
-    Download all PDFs in queue
+    """Download all PDFs in queue
+
     Work through the queue of PDFs that need to be added to the database,
     download them and add them one by one.
 
