@@ -1,7 +1,6 @@
 # coding=utf-8
 import os
 import json
-import redis
 import pickle
 
 from django.apps import apps
@@ -14,6 +13,7 @@ from cl.lasc.models import Docket, QueuedCase, DocumentImage, UPLOAD_TYPE
 from cl.lasc.models import LASCJSON, LASCPDF
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1_of_json_data
+from cl.lib.redis_utils import make_redis_interface
 
 LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
 LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
@@ -21,15 +21,7 @@ LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
 from cl.celery import app
 
 
-def get_redis():
-    """
-    Get redis instance.
-
-    :return:
-    """
-    return redis.StrictRedis(host=settings.REDIS_HOST,
-                             port=settings.REDIS_PORT,
-                             db=settings.REDIS_DATABASES['CACHE'])
+LASC_SESSION_STATUS_KEY = "session:lasc:status"
 
 
 def fetch_redis(key):
@@ -39,7 +31,7 @@ def fetch_redis(key):
     :param key:
     :return:
     """
-    return get_redis().get(key)
+    return make_redis_interface('CACHE').get(key)
 
 
 def delete_redis_object(key):
@@ -50,7 +42,7 @@ def delete_redis_object(key):
     :param key:
     :return:
     """
-    return get_redis().delete(key)
+    return make_redis_interface('CACHE').delete(key)
 
 
 def set_redis(key, value, expire_seconds):
@@ -63,9 +55,9 @@ def set_redis(key, value, expire_seconds):
     :param expire_seconds:
     :return:
     """
-
-    get_redis().getset(key, value)
-    get_redis().expire(key, expire_seconds)
+    r = make_redis_interface('CACHE')
+    r.getset(key, value)
+    r.expire(key, expire_seconds)
 
 
 def login_to_court():

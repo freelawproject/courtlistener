@@ -1,4 +1,3 @@
-import redis
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
@@ -8,6 +7,7 @@ from django.utils.timezone import now
 from cl.alerts.models import DocketAlert
 from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.string_utils import trunc
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
@@ -25,9 +25,7 @@ def enqueue_docket_alert(d_pk):
     """
     # Create an expiring semaphor in redis or check if there's already one
     # there.
-    r = redis.StrictRedis(host=settings.REDIS_HOST,
-                          port=settings.REDIS_PORT,
-                          db=settings.REDIS_DATABASES['ALERTS'])
+    r = make_redis_interface('ALERTS')
     key = make_alert_key(d_pk)
     # Set to True if not already set. Redis doesn't do bools anymore, so use 1.
     currently_enqueued = bool(r.getset(key, 1))
@@ -95,9 +93,7 @@ def send_docket_alert(d_pk, since):
         DocketAlert.objects.filter(docket=docket).update(date_last_hit=now())
 
     # Work completed, clear the semaphor
-    r = redis.StrictRedis(host=settings.REDIS_HOST,
-                          port=settings.REDIS_PORT,
-                          db=settings.REDIS_DATABASES['ALERTS'])
+    r = make_redis_interface('ALERTS')
     r.delete(make_alert_key(d_pk))
 
 
