@@ -8,6 +8,7 @@ from datetime import timedelta
 
 from cl.lasc import tasks
 from cl.lib.argparse_types import valid_date
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 
 from cl.lasc.models import QueuedCase, QueuedPDF
@@ -53,8 +54,12 @@ def add_directory(options):
         print("--directory-glob is a required parameter when the "
               "'add-directory' action is selected.")
     else:
+        q = options['queue']
+        throttle = CeleryThrottle(queue_name=q)
         for fp in glob(options['directory_glob']):
-            tasks.add_case_from_filepath.apply_async(kwargs={"filepath": fp})
+            throttle.maybe_wait()
+            tasks.add_case_from_filepath.apply_async(kwargs={"filepath": fp},
+                                                     queue=q)
 
 
 def process_case_queue(options):
@@ -66,8 +71,12 @@ def process_case_queue(options):
     """
     case_ids = QueuedCase.objects.all().values_list(
         'internal_case_id', flat=True)
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q)
     for case_id in case_ids:
-        tasks.add_or_update_case_db.apply_async(kwargs={"case_id": case_id})
+        throttle.maybe_wait()
+        tasks.add_or_update_case_db.apply_async(kwargs={"case_id": case_id},
+                                                queue=q)
 
 
 def process_pdf_queue(options):
@@ -79,8 +88,12 @@ def process_pdf_queue(options):
     :return: None
     """
     pdf_pks = QueuedPDF.objects.all().values_list('pk', flat=True)
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q)
     for pdf_pk in pdf_pks:
-        tasks.download_pdf.apply_async(kwargs={"pdf_pk": pdf_pk})
+        throttle.maybe_wait()
+        tasks.download_pdf.apply_async(kwargs={"pdf_pk": pdf_pk},
+                                       queue=q)
 
 
 class Command(VerboseCommand):
