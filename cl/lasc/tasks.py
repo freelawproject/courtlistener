@@ -269,61 +269,35 @@ def remove_case(case_id):
 
 
 @app.task(ignore_result=True, max_retries=1)
-def add_case_from_filepath(fp):
+def add_case_from_filepath(filepath):
     """
-    Add case to database from filepath (fp)
+    Add case to database from filepath (file_path)
 
-    :param self:
-    :param fp: Filepath string
+    :param self: XXX!
+    :param filepath: Filepath string
     :return: None
     """
 
     fp = fp.replace('courtlistener', 'celery')
 
     query = LASCSearch(None)
-    with open(fp, 'r') as f:
-        case_data = f.read()
+    with open(filepath, 'r') as f:
+        original_data = f.read()
 
-    clean_data = query._parse_case_data(json.loads(case_data))
-    docket_number = clean_data['Docket']['docket_number']
-    district = clean_data['Docket']['district']
-    division_code = clean_data['Docket']['division_code']
+    case_data = query._parse_case_data(json.loads(original_data))
+    docket_number = case_data['Docket']['docket_number']
+    district = case_data['Docket']['district']
+    division_code = case_data['Docket']['division_code']
 
     case_id = ";".join([docket_number, district, division_code])
 
-    dock_obj = Docket.objects.filter(case_id=case_id)
+    ds = Docket.objects.filter(case_id=case_id)
 
-    if dock_obj.count() == 0:
-        is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
-
-        if is_queued.count() == 1:
-            clean_data["Docket"]['judge_code'] = is_queued[0].judge_code
-            clean_data["Docket"]['case_type_code'] = is_queued[
-                0].case_type_code
-
-        docket = Docket.objects.create(**clean_data["Docket"])
-        docket.save()
-
-        dock_obj = Docket.objects.filter(case_id=case_id)
-
-        models = [x for x in apps.get_app_config('lasc').get_models()
-                  if x.__name__ not in ["Docket"]]
-
-        while models:
-            mdl = models.pop()
-            while clean_data[mdl.__name__]:
-                row = clean_data[mdl.__name__].pop()
-                row["docket"] = dock_obj[0]
-                mdl.objects.create(**row).save()
-
-        save_json(case_data, dock_obj[0])
-
-        if is_queued.count() == 1:
-            is_queued[0].delete()
-
-    elif dock_obj.count() == 1:
+    if ds.count() == 0:
+        add_case(case_id, case_data, original_data)
+    elif ds.count() == 1:
         logger.warn("LASC case on file system at '%s' is already in "
-                    "the database ", fp)
+                    "the database ", filepath)
 
 
 def fetch_case_list_by_date(start, end):
