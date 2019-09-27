@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from juriscraper.lasc.fetch import LASCSearch
 from juriscraper.lasc.http import LASCSession
+from requests import RequestException
 
 from cl.celery import app
 from cl.lasc.models import Docket, DocumentImage, QueuedCase, QueuedPDF, \
@@ -81,41 +82,49 @@ def make_lasc_search(self):
 
 
 @app.task(bind=True, ignore_result=True, max_retries=1)
-def download_pdf(self, pdf):
+def download_pdf(self, pdf_pk):
+    """Downloads the PDF associated with the PDF DB Object ID passed in.
+
+    :param self: The celery instance
+    :param pdf_pk: The primary key of the QueuedPDF object we are downloading
+    :return: None; object is saved to DB and filesystem
     """
-    Downloads the PDF associated with the PDF DB Object passed in.
+    establish_good_login(self)
+    lasc = make_lasc_search(self)
 
-    :param self:
-    :param pdf:
-    :return:
-    """
-    check_login_status(self)
-    lasc_session = get_lasc_session()
-    lasc = LASCSearch(lasc_session)
+    q_pdf = QueuedPDF.objects.get(pk=pdf_pk)
 
-    doc = DocumentImage.objects.get(doc_id=pdf.document_id)
-    if not doc.is_available:
-        pdf_data = lasc.get_pdf_from_url(pdf.document_url)
+    doc = DocumentImage.objects.get(doc_id=q_pdf.document_id)
+    if doc.is_available:
+        logger.info("Already have LASC PDF from docket ID %s with doc ID %s ",
+                    doc.docket_id, doc.doc_id)
+        return
 
-        pdf_document = LASCPDF(
-            content_object=pdf,
-            docket_number=pdf.docket.case_id.split(";")[0],
-            document_id=pdf.document_id
-        )
+    try:
+        pdf_data = lasc.get_pdf_from_url(q_pdf.document_url)
+    except RequestException as exc:
+        logger.warning("Got RequestException trying to get PDF for PDF "
+                       "Queue %s", q_pdf.pk)
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc)
 
-        pdf_document.filepath.save(
-            pdf.document_id,
-            ContentFile(pdf_data),
-        )
+    pdf_document = LASCPDF(
+        content_object=q_pdf,
+        docket_number=q_pdf.docket.case_id.split(";")[0],
+        document_id=q_pdf.document_id
+    )
 
-        doc = DocumentImage.objects.get(doc_id=pdf.document_id)
-        doc.is_available = True
-        doc.save()
+    pdf_document.filepath.save(
+        q_pdf.document_id,
+        ContentFile(pdf_data),
+    )
 
-        pdf.delete()
-    else:
-        logger.info("Already have LASC PDF from docket ID %s with doc ID "
-                    "%s ", doc.docket_id, doc.doc_id)
+    doc.is_available = True
+    doc.save()
+
+    # Remove the PDF from the queue
+    q_pdf.delete()
 
 
 def add_case(case_id, case_data, lasc):
