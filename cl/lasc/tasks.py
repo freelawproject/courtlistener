@@ -1,5 +1,6 @@
 # coding=utf-8
 import json
+import logging
 import os
 import pickle
 from datetime import datetime
@@ -17,9 +18,10 @@ from cl.lasc.models import Docket, DocumentImage, QueuedCase, QueuedPDF, \
     UPLOAD_TYPE
 from cl.lasc.models import LASCJSON, LASCPDF
 from cl.lasc.utils import make_case_id
-from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1_of_json_data
 from cl.lib.redis_utils import make_redis_interface
+
+logger = logging.getLogger(__name__)
 
 LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
 LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
