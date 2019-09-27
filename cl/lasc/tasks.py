@@ -321,7 +321,15 @@ def fetch_date_range(self, start, end):
     establish_good_login(self)
     lasc = make_lasc_search()
 
-    cases = lasc.query_cases_by_date(start, end)
+    try:
+        cases = lasc.query_cases_by_date(start, end)
+    except RequestException as exc:
+        logger.warning("Got RequestException trying to get cases by date "
+                       "between %s and %s", start, end)
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc)
+
     cases_added_cnt = 0
     for case in cases:
         internal_case_id = case['internal_case_id']
