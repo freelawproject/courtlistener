@@ -2,6 +2,7 @@
 import json
 import os
 import pickle
+from datetime import datetime
 
 from django.apps import apps
 from django.conf import settings
@@ -9,6 +10,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from juriscraper.lasc.fetch import LASCSearch
 from juriscraper.lasc.http import LASCSession
+from juriscraper.lib.date_utils import make_date_range_tuples
 from requests import RequestException
 
 from cl.celery import app
@@ -215,8 +217,8 @@ def latest_sha(case_id):
 
 
 def update_case(lasc, clean_data):
-    """
-    This code should update cases that have detected changes
+    """Update an existing case with new data
+
     Method currently deletes and replaces the data on the system except for
     lasc_docket and connections for older json and pdf files.
 
@@ -263,16 +265,12 @@ def update_case(lasc, clean_data):
 
 @app.task(ignore_result=True, max_retries=1)
 def add_case_from_filepath(filepath):
-    """
-    Add case to database from filepath (file_path)
+    """Add case to database from filepath
 
-    :param self: XXX!
-    :param filepath: Filepath string
+    :param self: The celery object
+    :param filepath: Filepath string to where the item is stored
     :return: None
     """
-
-    fp = fp.replace('courtlistener', 'celery')
-
     query = LASCSearch(None)
     with open(filepath, 'r') as f:
         original_data = f.read()
@@ -308,15 +306,14 @@ def fetch_case_list_by_date(start, end):
 
 @app.task(bind=True, ignore_result=True, max_retries=2)
 def fetch_date_range(self, start, end):
-    """
-    Queries LASC for one week or less range and returns the cases filed.
+    """Queries LASC for one week or less range and returns the cases filed.
 
-    :param self:
+    :param self: the celery object
     :param start: The date you want to start searching for cases
-    :type start: string
+    :type start: datetime
     :param end: The date you want to stop searching for cases
-    :type end: string
-    :return:
+    :type end: datetime
+    :return: None
     """
     establish_good_login(self)
     lasc = make_lasc_search()
@@ -353,8 +350,9 @@ def save_json(data, content_obj):
     Save json string to file and generate SHA1.
 
     :param data: JSON response cleaned
-    :param content_obj:
-    :return:
+    :param content_obj: The content object associated with the JSON file in
+    the DB
+    :return: None
     """
     json_file = LASCJSON(content_object=content_obj)
     json_file.sha1 = sha1_of_json_data(data)
