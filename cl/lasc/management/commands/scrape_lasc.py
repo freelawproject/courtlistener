@@ -66,6 +66,7 @@ def add_directory(options):
         throttle = CeleryThrottle(queue_name=q)
         for fp in glob(options['directory_glob']):
             throttle.maybe_wait()
+            logger.info("Adding LASC JSON file at: %s", fp)
             tasks.add_case_from_filepath.apply_async(kwargs={"filepath": fp},
                                                      queue=q)
 
