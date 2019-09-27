@@ -299,27 +299,11 @@ def fetch_case_list_by_date(start, end):
     :type end: datetime.date
     :return: None
     """
-    from datetime import datetime, timedelta
-    from dateutil.rrule import rrule, WEEKLY
-
-    start = datetime(start.year, start.month, start.day)
-    end = datetime(end.year, end.month, end.day)
-
     end = min(end, datetime.today())
-    weekly_dates = rrule(freq=WEEKLY, dtstart=start, until=end)
 
-    lastday = []
-    for start in weekly_dates:
-        seven_days_later = start + timedelta(days=7)
-        end = min(seven_days_later, end)
-
-        if end not in lastday:
-            fetch_date_range.apply_async(
-                kwargs={"start": start.strftime('%m-%d-%Y'),
-                        "end": end.strftime('%m-%d-%Y')},
-            )
-
-        lastday.append(end)
+    date_ranges = make_date_range_tuples(start, end, gap=7)
+    for start, end in date_ranges:
+        fetch_date_range.apply_async(kwargs={"start": start, "end": end})
 
 
 @app.task(bind=True, ignore_result=True, max_retries=2)
