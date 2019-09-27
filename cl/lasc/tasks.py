@@ -62,12 +62,8 @@ def establish_good_login(self):
     :return: None
     """
     r = make_redis_interface('CACHE')
-    good_login = r.get(LASC_SESSION_STATUS_KEY) == SESSION_IS.OK
-    if good_login:
-        # XXX why do we retry if the session is good? Shouldn't we just
-        #  proceed?
-        self.retry(countdown=60)
-    else:
+    bad_login = r.get(LASC_SESSION_STATUS_KEY) != SESSION_IS.OK
+    if bad_login:
         login_to_court()
         self.retry(countdown=60)
 
