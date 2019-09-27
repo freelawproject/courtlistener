@@ -10,7 +10,6 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from juriscraper.lasc.fetch import LASCSearch
 from juriscraper.lasc.http import LASCSession
-from juriscraper.lib.date_utils import make_date_range_tuples
 from requests import RequestException
 
 from cl.celery import app
@@ -285,23 +284,6 @@ def add_case_from_filepath(filepath):
     elif ds.count() == 1:
         logger.warn("LASC case on file system at '%s' is already in "
                     "the database ", filepath)
-
-
-def fetch_case_list_by_date(start, end):
-    """
-    Search for cases by date and add them to the DB.
-
-    :param start: The date you want to start searching for cases
-    :type start: datetime.date
-    :param end: The date you want to stop searching for cases
-    :type end: datetime.date
-    :return: None
-    """
-    end = min(end, datetime.today())
-
-    date_ranges = make_date_range_tuples(start, end, gap=7)
-    for start, end in date_ranges:
-        fetch_date_range.apply_async(kwargs={"start": start, "end": end})
 
 
 @app.task(bind=True, ignore_result=True, max_retries=2)

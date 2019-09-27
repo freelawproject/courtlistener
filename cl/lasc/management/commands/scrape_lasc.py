@@ -6,6 +6,8 @@ from glob import glob
 from datetime import datetime
 from datetime import timedelta
 
+from juriscraper.lib.date_utils import make_date_range_tuples
+
 from cl.lasc import tasks
 from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
@@ -22,7 +24,12 @@ def date_search(options):
     start = options['start']
     end = options['end']
     logger.info("Getting cases between %s and %s, inclusive", start, end)
-    tasks.fetch_case_list_by_date(start, end)
+
+    end = min(end, datetime.today())
+    date_ranges = make_date_range_tuples(start, end, gap=7)
+    for start, end in date_ranges:
+        tasks.fetch_date_range.apply_async(kwargs={"start": start, "end": end},
+                                           queue=options['queue'])
 
 
 def add_or_update_case(options):
@@ -36,6 +43,7 @@ def add_or_update_case(options):
     else:
         tasks.add_or_update_case_db.apply_async(
             kwargs={"case_id": options['case']},
+            queue=options['queue'],
         )
 
 
