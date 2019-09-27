@@ -1,15 +1,17 @@
 # coding=utf-8
-import os
 import json
+import os
 import pickle
 
 from django.apps import apps
-from django.core.files.base import ContentFile
 from django.conf import settings
+from django.core.files.base import ContentFile
 from juriscraper.lasc.fetch import LASCSearch
 from juriscraper.lasc.http import LASCSession
 
-from cl.lasc.models import Docket, QueuedCase, DocumentImage, UPLOAD_TYPE
+from cl.celery import app
+from cl.lasc.models import Docket, DocumentImage, QueuedCase, QueuedPDF, \
+    UPLOAD_TYPE
 from cl.lasc.models import LASCJSON, LASCPDF
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1_of_json_data
@@ -17,8 +19,6 @@ from cl.lib.redis_utils import make_redis_interface
 
 LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
 LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
-
-from cl.celery import app
 
 
 LASC_SESSION_STATUS_KEY = "session:lasc:status"
