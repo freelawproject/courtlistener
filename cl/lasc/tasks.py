@@ -25,36 +25,59 @@ LASC_SESSION_STATUS_KEY = "session:lasc:status"
 LASC_SESSION_COOKIE_KEY = "session:lasc:cookies"
 
 
-def login_to_court():
-    """
-    Update session:lasc:status & session:lasc:cookies
-    Log into MAP and reset status and cookies
+class SESSION_IS(object):
+    LOGGING_IN = 'logging_in'
+    OK = 'ok'
 
-    :return:
+
+def login_to_court():
+    """Set the login cookies in redis for an LASC user
+
+    Replace any existing cookies in redis.
+
+    :return: None
     """
-    # TODO Explain why timeouts are the length they are
     r = make_redis_interface('CACHE')
-    r.set(LASC_SESSION_STATUS_KEY, "False", ex=60 * 5)
+    # Give yourself a few minutes to log in
+    r.set(LASC_SESSION_STATUS_KEY, SESSION_IS.LOGGING_IN, ex=60 * 2)
     lasc_session = LASCSession(username=LASC_USERNAME,
                                password=LASC_PASSWORD)
     lasc_session.login()
     cookie_str = str(pickle.dumps(lasc_session.cookies))
+    # Done logging in; save the cookies.
     r.set(LASC_SESSION_COOKIE_KEY, cookie_str, ex=60 * 30)
-    r.set(LASC_SESSION_STATUS_KEY, "True", ex=60 * 30)
+    r.set(LASC_SESSION_STATUS_KEY, SESSION_IS.OK, ex=60 * 30)
 
 
-def get_lasc_session():
+def establish_good_login(self):
+    """Make sure that we have good login credentials for LASC in redis
+
+    Checks the Login Status for LASC.  If no status is found runs login
+    function to store good keys in redis.
+
+    :param self: A Celery task object
+    :return: None
     """
-    Returns a LASC Session with stored cookies
-
-    :return:
-    """
-    session = LASCSession(username=LASC_USERNAME,
-                          password=LASC_PASSWORD)
     r = make_redis_interface('CACHE')
-    pickled_cookies = r.get(LASC_SESSION_COOKIE_KEY)
-    session.cookies = pickle.loads(pickled_cookies)
-    return session
+    good_login = r.get(LASC_SESSION_STATUS_KEY) == SESSION_IS.OK
+    if good_login:
+        # XXX why do we retry if the session is good? Shouldn't we just
+        #  proceed?
+        self.retry(countdown=60)
+    else:
+        login_to_court()
+        self.retry(countdown=60)
+
+
+def make_lasc_search(self):
+    """Create a logged-in LASCSearch object with cookies pulled from cache
+
+    :return: LASCSearch object
+    """
+    r = make_redis_interface('CACHE')
+    session = LASCSession()
+    session.cookies = pickle.loads(r.get(LASC_SESSION_COOKIE_KEY))
+    return LASCSearch(session)
 
 
 @app.task(bind=True, ignore_result=True, max_retries=1)
@@ -128,28 +151,6 @@ def add_case(case_id, case_data, lasc):
         is_queued[0].delete()
 
 
-def check_login_status(self):
-    """
-    Checks the Login Status for LASC.  If no status is found runs log in
-    function and restores cookies and status
-
-    :rtype: object
-    :param self:
-    :return:
-    """
-    r = make_redis_interface('CACHE')
-    good_login = bool(r.get(LASC_SESSION_STATUS_KEY))
-    if good_login:
-        # XXX note if/then logic flipped, good state goes first
-        # XXX what does countdown do and why?
-        self.retry(countdown=60)
-    else:
-        login_to_court()
-        self.retry(countdown=60)
-    elif fetch_redis('session:lasc:status') is "False":
-        self.retry(countdown=60)
-
-
 @app.task(bind=True, ignore_result=True, max_retries=1)
 def add_or_update_case_db(self, case_id):
     """
@@ -159,9 +160,9 @@ def add_or_update_case_db(self, case_id):
     :param case_id: The case ID to download, for example, '19STCV25157;SS;CV'
     :return: None
     """
-    check_login_status(self)
-    lasc_session = get_lasc_session()
-    lasc = LASCSearch(lasc_session)
+    # XXX seen these lines before; code smell
+    establish_good_login(self)
+    lasc = make_lasc_search()
 
     clean_data = {}
     try:
@@ -364,9 +365,8 @@ def fetch_date_range(self, start, end):
     :type end: string
     :return:
     """
-    check_login_status(self)
-    lasc_session = get_lasc_session()
-    lasc = LASCSearch(lasc_session)
+    establish_good_login(self)
+    lasc = make_lasc_search()
 
     cases = lasc.query_cases_by_date(start, end)
     cases_added_cnt = 0
