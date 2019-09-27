@@ -174,21 +174,24 @@ def add_or_update_case_db(self, case_id):
     try:
         clean_data = lasc.get_json_from_internal_case_id(case_id)
         logger.info("Successful Query")
-    except:
-        # XXX this except has to spell out all exceptions unless we have a
-        #  super good reason not to.
-        # XXX maybe wrap all session cleanup code in little function?
+    except RequestException:
+        if self.request.retries == self.max_retries:
+            logger.error("RequestException, unable to get case at %s", case_id)
+            return
         r = make_redis_interface('CACHE')
         r.delete(LASC_SESSION_COOKIE_KEY, LASC_SESSION_STATUS_KEY)
         self.retry(countdown=60)
 
-    docket = Docket.objects.filter(case_id=case_id)
-    count = docket.count()
+    if not clean_data:
+        logger.info("No information for case %s. Possibly sealed?", case_id)
+        return
 
-    if count == 0:
+    ds = Docket.objects.filter(case_id=case_id)
+    ds_count = ds.count()
+    if ds_count == 0:
         logger.info("Adding lasc case with ID: %s", case_id)
-        add_case(case_id, clean_data, lasc)
-    elif count == 1:
+        add_case(case_id, clean_data, lasc.case_data)
+    elif ds_count == 1:
         if latest_sha(case_id=case_id) != sha1_of_json_data(lasc.case_data):
             logger.info("Updating lasc case with ID: %s", case_id)
             update_case(lasc, clean_data)
