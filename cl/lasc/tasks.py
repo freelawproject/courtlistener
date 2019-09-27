@@ -127,23 +127,23 @@ def download_pdf(self, pdf_pk):
     q_pdf.delete()
 
 
-def add_case(case_id, case_data, lasc):
-    """
-    Adds a new case to the cl.lasc database
+def add_case(case_id, case_data, original_data):
+    """Adds a new case to the cl.lasc database
 
-    :param case_id:
-    :param case_data:
-    :param lasc:
-    :return:
+    :param case_id: A full LASC case_id
+    :param case_data: Parsed data representing a docket as returned by
+    Juriscraper
+    :param original_data: The original JSON object as a str
+    :return: None
     """
-    is_queued = QueuedCase.objects.filter(internal_case_id=case_id)
-
-    if is_queued.count() == 1:
-        case_data["Docket"]['judge_code'] = is_queued[0].judge_code
-        case_data["Docket"]['case_type_code'] = is_queued[0].case_type_code
+    # If the item is in the case queue, enhance it with metadata found there.
+    queued_cases = QueuedCase.objects.filter(internal_case_id=case_id)
+    if queued_cases.count() == 1:
+        case_data["Docket"]['judge_code'] = queued_cases[0].judge_code
+        case_data["Docket"]['case_type_code'] = queued_cases[0].case_type_code
+        queued_cases.delete()
 
     docket = Docket.objects.create(**case_data["Docket"])
-
     models = [x for x in apps.get_app_config('lasc').get_models()
               if x.__name__ not in ["Docket"]]
 
@@ -154,10 +154,7 @@ def add_case(case_id, case_data, lasc):
             case_data_row["docket"] = docket
             mdl.objects.create(**case_data_row).save()
 
-    save_json(lasc.case_data, docket)
-
-    if is_queued.count() == 1:
-        is_queued[0].delete()
+    save_json(original_data, docket)
 
 
 @app.task(bind=True, ignore_result=True, max_retries=1)
