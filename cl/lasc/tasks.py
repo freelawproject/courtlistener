@@ -230,12 +230,10 @@ def update_case(lasc, clean_data):
         docket.__dict__.update(clean_data['Docket'])
         docket.save()
 
-        docket = Docket.objects.filter(case_id=case_id)[0]
-
+        skipped_models = ["Docket", "QueuedPDF", "QueuedCase", "LASCPDF",
+                          "LASCJSON", "DocumentImage"]
         models = [x for x in apps.get_app_config('lasc').get_models()
-                  if x.__name__ not in ["Docket", "QueuedPDF",
-                                        "QueuedCase", "LASCPDF",
-                                        "LASCJSON", "DocumentImage"]]
+                  if x.__name__ not in skipped_models]
 
         while models:
             mdl = models.pop()
@@ -246,16 +244,18 @@ def update_case(lasc, clean_data):
                 mdl.objects.create(**row).save()
 
         documents = clean_data['DocumentImage']
+
         for row in documents:
-            r = DocumentImage.objects.filter(doc_id=row['doc_id'])
-            if r.count() == 1:
-                row['is_available'] = r[0].is_available
-                rr = r[0]
-                rr.__dict__.update(**row)
-                rr.save()
-            else:
+            dis = DocumentImage.objects.filter(doc_id=row['doc_id'])
+            dis_count = dis.count()
+            if dis_count == 1:
+                di = dis[0]
+                row['is_available'] = di.is_available
+                di.__dict__.update(**row)
+            elif dis_count == 0:
                 row["docket"] = docket
-                DocumentImage.objects.create(**row).save()
+                di = DocumentImage(**row)
+            di.save()
 
         logger.info("Finished updating lasc case '%s'", case_id)
         save_json(lasc.case_data, content_obj=docket)
