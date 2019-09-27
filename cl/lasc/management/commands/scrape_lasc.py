@@ -1,38 +1,32 @@
 # coding=utf-8
 
 import argparse
-import os
+from glob import glob
 
 from datetime import datetime
 from datetime import timedelta
-from django.conf import settings
-from juriscraper.lasc.http import LASCSession
 
 from cl.lasc import tasks
 from cl.lib.argparse_types import valid_date
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 
-LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
-LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
+from cl.lasc.models import QueuedCase, QueuedPDF
 
 
 def date_search(options):
-    """
-    Collect a list of cases from a date range and add them to the db.
+    """Collects a list of cases from a date range and adds them to the db.
 
     :return: None
     """
-    lasc_session = LASCSession(username=LASC_USERNAME,
-                               password=LASC_PASSWORD)
-    lasc_session.login()
     start = options['start']
     end = options['end']
     logger.info("Getting cases between %s and %s, inclusive", start, end)
-    tasks.fetch_case_list_by_date(lasc_session, start, end)
+    tasks.fetch_case_list_by_date(start, end)
 
 
 def add_or_update_case(options):
-    """Add a case to the DB by internal case id
+    """Adds a case to the DB by internal case id
 
     :return: None
     """
@@ -40,59 +34,67 @@ def add_or_update_case(options):
         print("--case is a required parameter when the add-case action is "
               "requested.")
     else:
-        lasc_session = LASCSession(username=LASC_USERNAME,
-                                   password=LASC_PASSWORD)
-        lasc_session.login()
-        tasks.add_or_update_case(lasc_session, options['case'])
+        tasks.add_or_update_case_db.apply_async(
+            kwargs={"case_id": options['case']},
+        )
 
 
 def add_directory(options):
     """Import JSON files from a directory provided at the command line.
 
     Use glob.globs' to identify JSON files to import.
+    Passes files greater than 500 bytes to celery to add to system
+
+    Empty cases are roughly 181 Bytes
 
     :return: None
     """
+
     if options['directory_glob'] is None:
         print("--directory-glob is a required parameter when the "
               "'add-directory' action is selected.")
     else:
-        tasks.add_cases_from_directory(options['directory_glob'],
-                                       options['skip_until'])
-
-
-def rm_case(options):
-    """Delete a case from db
-
-    :return: None
-    """
-    if options['case'] is None:
-        print("--case is a required parameter when the rm-case action is "
-              "requested.")
-    else:
-        tasks.remove_case(options['case'])
+        q = options['queue']
+        throttle = CeleryThrottle(queue_name=q)
+        for fp in glob(options['directory_glob']):
+            throttle.maybe_wait()
+            tasks.add_case_from_filepath.apply_async(kwargs={"filepath": fp},
+                                                     queue=q)
 
 
 def process_case_queue(options):
-    """Download all cases in case queue
+    """
+    Work through the queue of cases that need to be added to the database,
+    and add them one by one.
 
     :return: None
     """
-    lasc_session = LASCSession(username=LASC_USERNAME,
-                               password=LASC_PASSWORD)
-    lasc_session.login()
-    tasks.process_case_queue(lasc_session=lasc_session)
+    case_ids = QueuedCase.objects.all().values_list(
+        'internal_case_id', flat=True)
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q)
+    for case_id in case_ids:
+        throttle.maybe_wait()
+        tasks.add_or_update_case_db.apply_async(kwargs={"case_id": case_id},
+                                                queue=q)
 
 
 def process_pdf_queue(options):
     """Download all PDFs in queue
 
+    Work through the queue of PDFs that need to be added to the database,
+    download them and add them one by one.
+
     :return: None
     """
-    lasc_session = LASCSession(username=LASC_USERNAME,
-                               password=LASC_PASSWORD)
-    lasc_session.login()
-    tasks.process_pdf_queue(lasc_session=lasc_session)
+    pdf_pks = QueuedPDF.objects.all().values_list('pk', flat=True)
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q)
+    for pdf_pk in pdf_pks:
+        throttle.maybe_wait()
+        tasks.download_pdf.apply_async(kwargs={"pdf_pk": pdf_pk},
+                                       queue=q)
+
 
 class Command(VerboseCommand):
     help = "Get all content from MAP LA Unlimited Civil Cases."
@@ -140,7 +142,7 @@ class Command(VerboseCommand):
             type=str,
             help="When using --directory-glob, skip processing until an item "
                  "at this location is encountered. Use a path comparable to "
-                 "that passed to --directory-glob."
+                 "that passed to --directory-glob.",
         )
 
         today = datetime.today()
@@ -166,7 +168,6 @@ class Command(VerboseCommand):
         'add-cases-by-date': date_search,
         'add-or-update-case': add_or_update_case,
         'add-directory': add_directory,
-        'rm-case': rm_case,
         'process-case-queue': process_case_queue,
         'process-pdf-queue': process_pdf_queue,
     }
