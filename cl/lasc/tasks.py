@@ -22,42 +22,7 @@ from cl.celery import app
 
 
 LASC_SESSION_STATUS_KEY = "session:lasc:status"
-
-
-def fetch_redis(key):
-    """
-    Fetch redis string with associated key. Used to get cookie and status
-
-    :param key:
-    :return:
-    """
-    return make_redis_interface('CACHE').get(key)
-
-
-def delete_redis_object(key):
-    """
-    Remove redis value using the passed key
-    Used to clear failed cookie/status
-
-    :param key:
-    :return:
-    """
-    return make_redis_interface('CACHE').delete(key)
-
-
-def set_redis(key, value, expire_seconds):
-    """
-    Set data in Redis Database with expiration time.  Used for
-    session:lasc:status & session:lasc:cookies
-
-    :param key:
-    :param value:
-    :param expire_seconds:
-    :return:
-    """
-    r = make_redis_interface('CACHE')
-    r.getset(key, value)
-    r.expire(key, expire_seconds)
+LASC_SESSION_COOKIE_KEY = "session:lasc:cookies"
 
 
 def login_to_court():
@@ -67,13 +32,15 @@ def login_to_court():
 
     :return:
     """
-    set_redis("session:lasc:status", "False", 300)
+    # TODO Explain why timeouts are the length they are
+    r = make_redis_interface('CACHE')
+    r.set(LASC_SESSION_STATUS_KEY, "False", ex=60 * 5)
     lasc_session = LASCSession(username=LASC_USERNAME,
                                password=LASC_PASSWORD)
     lasc_session.login()
     cookie_str = str(pickle.dumps(lasc_session.cookies))
-    set_redis("session:lasc:cookies", cookie_str, 1800)
-    set_redis("session:lasc:status", "True", 1800)
+    r.set(LASC_SESSION_COOKIE_KEY, cookie_str, ex=60 * 30)
+    r.set(LASC_SESSION_STATUS_KEY, "True", ex=60 * 30)
 
 
 def get_lasc_session():
@@ -84,7 +51,9 @@ def get_lasc_session():
     """
     session = LASCSession(username=LASC_USERNAME,
                           password=LASC_PASSWORD)
-    session.cookies = pickle.loads(fetch_redis("session:lasc:cookies"))
+    r = make_redis_interface('CACHE')
+    pickled_cookies = r.get(LASC_SESSION_COOKIE_KEY)
+    session.cookies = pickle.loads(pickled_cookies)
     return session
 
 
@@ -168,7 +137,13 @@ def check_login_status(self):
     :param self:
     :return:
     """
-    if fetch_redis('session:lasc:status') is None:
+    r = make_redis_interface('CACHE')
+    good_login = bool(r.get(LASC_SESSION_STATUS_KEY))
+    if good_login:
+        # XXX note if/then logic flipped, good state goes first
+        # XXX what does countdown do and why?
+        self.retry(countdown=60)
+    else:
         login_to_court()
         self.retry(countdown=60)
     elif fetch_redis('session:lasc:status') is "False":
@@ -193,8 +168,11 @@ def add_or_update_case_db(self, case_id):
         clean_data = lasc.get_json_from_internal_case_id(case_id)
         logger.info("Successful Query")
     except:
-        delete_redis_object("session:lasc:cookie")
-        delete_redis_object("session:lasc:status")
+        # XXX this except has to spell out all exceptions unless we have a
+        #  super good reason not to.
+        # XXX maybe wrap all session cleanup code in little function?
+        r = make_redis_interface('CACHE')
+        r.delete(LASC_SESSION_COOKIE_KEY, LASC_SESSION_STATUS_KEY)
         self.retry(countdown=60)
 
     docket = Docket.objects.filter(case_id=case_id)
