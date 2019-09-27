@@ -136,6 +136,7 @@ def add_case(case_id, case_data, original_data):
     :param original_data: The original JSON object as a str
     :return: None
     """
+    logger.info("Adding LASC case %s", case_id)
     with transaction.atomic():
         # If the item is in the case queue, enhance it with metadata found
         # there.

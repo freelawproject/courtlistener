@@ -51,20 +51,31 @@ def add_directory(options):
     """Import JSON files from a directory provided at the command line.
 
     Use glob.globs' to identify JSON files to import.
-    Passes files greater than 500 bytes to celery to add to system
-
-    Empty cases are roughly 181 Bytes
 
     :return: None
     """
-
-    if options['directory_glob'] is None:
+    dir_glob = options['directory_glob']
+    skip_until = options['skip_until']
+    if dir_glob is None:
         print("--directory-glob is a required parameter when the "
               "'add-directory' action is selected.")
     else:
+        dir_glob = options['directory_glob']
+        fps = sorted(glob(dir_glob))
+        if skip_until:
+            # Remove items from the list until the skip_until value is hit.
+            try:
+                skip_index = fps.index(skip_until)
+                fps = fps[skip_index:]
+            except ValueError:
+                logger.error("Unable to find '%s' in directory_glob: '%s'. "
+                             "The first few items of the glob look like: \n  "
+                             "%s", skip_until, dir_glob, '\n  '.join(fps[0:3]))
+                raise
+
         q = options['queue']
         throttle = CeleryThrottle(queue_name=q)
-        for fp in glob(options['directory_glob']):
+        for fp in fps:
             throttle.maybe_wait()
             logger.info("Adding LASC JSON file at: %s", fp)
             tasks.add_case_from_filepath.apply_async(kwargs={"filepath": fp},
