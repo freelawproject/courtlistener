@@ -261,11 +261,6 @@ def update_case(lasc, clean_data):
         save_json(lasc.case_data, content_obj=docket)
 
 
-def remove_case(case_id):
-    dock_obj = Docket.objects.filter(case_id=case_id)
-    dock_obj.delete()
-
-
 @app.task(ignore_result=True, max_retries=1)
 def add_case_from_filepath(filepath):
     """
