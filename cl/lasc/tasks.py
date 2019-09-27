@@ -199,15 +199,15 @@ def add_or_update_case_db(self, case_id):
             logger.info("LASC case is already up to date: %s", case_id)
     else:
         logger.warn("Issue adding or updating lasc case with ID '%s' - Too "
-                    "many cases in system with that ID", case_id)
+                    "many cases in system with that ID (%s cases)",
+                    case_id, ds_count)
 
 
 def latest_sha(case_id):
-    """
-    Query latest sha1 for Case by case_id
+    """Get the latest SHA1 for a case by case_id
 
-    :param case_id:
-    :return:
+    :param case_id: The semicolon-delimited lasc ID for the case
+    :return: The SHA1 for the case
     """
     docket = Docket.objects.get(case_id=case_id)
     o_id = LASCJSON(content_object=docket).object_id
