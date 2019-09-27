@@ -6,6 +6,7 @@ import pickle
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.db import transaction
 from juriscraper.lasc.fetch import LASCSearch
 from juriscraper.lasc.http import LASCSession
 from requests import RequestException
@@ -14,6 +15,7 @@ from cl.celery import app
 from cl.lasc.models import Docket, DocumentImage, QueuedCase, QueuedPDF, \
     UPLOAD_TYPE
 from cl.lasc.models import LASCJSON, LASCPDF
+from cl.lasc.utils import make_case_id
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1_of_json_data
 from cl.lib.redis_utils import make_redis_interface
@@ -70,7 +72,7 @@ def establish_good_login(self):
         self.retry(countdown=60)
 
 
-def make_lasc_search(self):
+def make_lasc_search():
     """Create a logged-in LASCSearch object with cookies pulled from cache
 
     :return: LASCSearch object
@@ -90,7 +92,7 @@ def download_pdf(self, pdf_pk):
     :return: None; object is saved to DB and filesystem
     """
     establish_good_login(self)
-    lasc = make_lasc_search(self)
+    lasc = make_lasc_search()
 
     q_pdf = QueuedPDF.objects.get(pk=pdf_pk)
 
@@ -115,16 +117,17 @@ def download_pdf(self, pdf_pk):
         document_id=q_pdf.document_id
     )
 
-    pdf_document.filepath.save(
-        q_pdf.document_id,
-        ContentFile(pdf_data),
-    )
+    with transaction.atomic():
+        pdf_document.filepath.save(
+            q_pdf.document_id,
+            ContentFile(pdf_data),
+        )
 
-    doc.is_available = True
-    doc.save()
+        doc.is_available = True
+        doc.save()
 
-    # Remove the PDF from the queue
-    q_pdf.delete()
+        # Remove the PDF from the queue
+        q_pdf.delete()
 
 
 def add_case(case_id, case_data, original_data):
@@ -136,37 +139,38 @@ def add_case(case_id, case_data, original_data):
     :param original_data: The original JSON object as a str
     :return: None
     """
-    # If the item is in the case queue, enhance it with metadata found there.
-    queued_cases = QueuedCase.objects.filter(internal_case_id=case_id)
-    if queued_cases.count() == 1:
-        case_data["Docket"]['judge_code'] = queued_cases[0].judge_code
-        case_data["Docket"]['case_type_code'] = queued_cases[0].case_type_code
-        queued_cases.delete()
+    with transaction.atomic():
+        # If the item is in the case queue, enhance it with metadata found
+        # there.
+        queued_cases = QueuedCase.objects.filter(internal_case_id=case_id)
+        if queued_cases.count() == 1:
+            case_data["Docket"]['judge_code'] = queued_cases[0].judge_code
+            case_data["Docket"]['case_type_code'] = queued_cases[
+                0].case_type_code
+            queued_cases.delete()
 
-    docket = Docket.objects.create(**case_data["Docket"])
-    models = [x for x in apps.get_app_config('lasc').get_models()
-              if x.__name__ not in ["Docket"]]
+        docket = Docket.objects.create(**case_data["Docket"])
+        models = [x for x in apps.get_app_config('lasc').get_models()
+                  if x.__name__ not in ["Docket"]]
 
-    while models:
-        mdl = models.pop()
-        while case_data[mdl.__name__]:
-            case_data_row = case_data[mdl.__name__].pop()
-            case_data_row["docket"] = docket
-            mdl.objects.create(**case_data_row).save()
+        while models:
+            mdl = models.pop()
+            while case_data[mdl.__name__]:
+                case_data_row = case_data[mdl.__name__].pop()
+                case_data_row["docket"] = docket
+                mdl.objects.create(**case_data_row).save()
 
-    save_json(original_data, docket)
+        save_json(original_data, docket)
 
 
 @app.task(bind=True, ignore_result=True, max_retries=1)
 def add_or_update_case_db(self, case_id):
-    """
-    Add a case from the LASC MAP using an authenticated session object
+    """Add a case from the LASC MAP using an authenticated session object
 
-    :param self
+    :param self: The celery object
     :param case_id: The case ID to download, for example, '19STCV25157;SS;CV'
     :return: None
     """
-    # XXX seen these lines before; code smell
     establish_good_login(self)
     lasc = make_lasc_search()
 
@@ -221,46 +225,41 @@ def update_case(lasc, clean_data):
     :param clean_data: A normalized data dictionary
     :return: None
     """
-    docket_number = clean_data['Docket']['docket_number']
-    district = clean_data['Docket']['district']
-    division_code = clean_data['Docket']['division_code']
+    case_id = make_case_id(clean_data)
+    with transaction.atomic():
+        docket = Docket.objects.filter(case_id=case_id)[0]
+        docket.__dict__.update(clean_data['Docket'])
+        docket.save()
 
-    case_id = ";".join([docket_number, district, division_code])
+        docket = Docket.objects.filter(case_id=case_id)[0]
 
-    docket = Docket.objects.filter(case_id=case_id)[0]
-    docket.__dict__.update(clean_data['Docket'])
-    docket.save()
+        models = [x for x in apps.get_app_config('lasc').get_models()
+                  if x.__name__ not in ["Docket", "QueuedPDF",
+                                        "QueuedCase", "LASCPDF",
+                                        "LASCJSON", "DocumentImage"]]
 
-    docket = Docket.objects.filter(case_id=case_id)[0]
+        while models:
+            mdl = models.pop()
 
-    models = [x for x in apps.get_app_config('lasc').get_models()
-              if x.__name__ not in ["Docket", "QueuedPDF",
-                                    "QueuedCase", "LASCPDF",
-                                    "LASCJSON", "DocumentImage"]]
+            while clean_data[mdl.__name__]:
+                row = clean_data[mdl.__name__].pop()
+                row['docket'] = docket
+                mdl.objects.create(**row).save()
 
-    while models:
-        mdl = models.pop()
-        print mdl.__name__
+        documents = clean_data['DocumentImage']
+        for row in documents:
+            r = DocumentImage.objects.filter(doc_id=row['doc_id'])
+            if r.count() == 1:
+                row['is_available'] = r[0].is_available
+                rr = r[0]
+                rr.__dict__.update(**row)
+                rr.save()
+            else:
+                row["docket"] = docket
+                DocumentImage.objects.create(**row).save()
 
-        while clean_data[mdl.__name__]:
-            row = clean_data[mdl.__name__].pop()
-            row['docket'] = docket
-            mdl.objects.create(**row).save()
-
-    documents = clean_data['DocumentImage']
-    for row in documents:
-        r = DocumentImage.objects.filter(doc_id=row['doc_id'])
-        if r.count() == 1:
-            row['is_available'] = r[0].is_available
-            rr = r[0]
-            rr.__dict__.update(**row)
-            rr.save()
-        else:
-            row["docket"] = docket
-            DocumentImage.objects.create(**row).save()
-
-    logger.info("Finished updating lasc case '%s'", case_id)
-    save_json(lasc.case_data, content_obj=docket)
+        logger.info("Finished updating lasc case '%s'", case_id)
+        save_json(lasc.case_data, content_obj=docket)
 
 
 def remove_case(case_id):
@@ -285,11 +284,7 @@ def add_case_from_filepath(filepath):
         original_data = f.read()
 
     case_data = query._parse_case_data(json.loads(original_data))
-    docket_number = case_data['Docket']['docket_number']
-    district = case_data['Docket']['district']
-    division_code = case_data['Docket']['division_code']
-
-    case_id = ";".join([docket_number, district, division_code])
+    case_id = make_case_id(case_data)
 
     ds = Docket.objects.filter(case_id=case_id)
 
