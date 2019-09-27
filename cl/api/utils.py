@@ -4,7 +4,6 @@ import os
 from collections import OrderedDict, defaultdict
 from datetime import date
 
-import redis
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
 from django.conf import settings
@@ -26,6 +25,7 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import RelatedFilter
 from rest_framework_filters.backends import DjangoFilterBackend
 
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.utils import mkdir_p
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
@@ -192,11 +192,7 @@ class LoggingMixin(object):
         endpoint = resolve(request.path_info).url_name
         response_ms = self._get_response_ms()
 
-        r = redis.StrictRedis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            db=settings.REDIS_DATABASES['STATS'],
-        )
+        r = make_redis_interface('STATS')
         pipe = r.pipeline()
 
         # Global and daily tallies for all URLs.
@@ -433,11 +429,7 @@ def invert_user_logs(start, end):
             }
         }
     """
-    r = redis.StrictRedis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=settings.REDIS_DATABASES['STATS'],
-    )
+    r = make_redis_interface('STATS')
     pipe = r.pipeline()
 
     dates = [d.date().isoformat() for d in rrule(
@@ -491,11 +483,7 @@ def get_avg_ms_for_endpoint(endpoint, d):
     that day.
     """
     d_str = d.isoformat()
-    r = redis.StrictRedis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=settings.REDIS_DATABASES['STATS'],
-    )
+    r = make_redis_interface('STATS')
     pipe = r.pipeline()
     pipe.zscore('api:v3.endpoint.d:%s.timings' % d_str, endpoint)
     pipe.zscore('api:v3.endpoint.d:%s.counts' % d_str, endpoint)
