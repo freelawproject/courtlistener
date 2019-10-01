@@ -3,6 +3,7 @@
 Test Issue 412: Add admin-visible notice to various pages showing if they are
 blocked from search engines
 """
+from django.urls import reverse
 from timeout_decorator import timeout_decorator
 
 from cl.search.models import Docket
@@ -23,15 +24,12 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
     def test_admin_viewing_blocked_opinion(self):
         """ For a blocked Opinion, an Admin should see indication. """
         # Admin logs into CL using her admin account
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('admin', 'password')
 
-        # She ends up on the SERP page and clicks the link for an Opinion
-        # she knows is blocked
-        blocked_opinion = self.browser.find_element_by_link_text(
-            'Blocked Opinion (Test 2015)'
-        )
-        blocked_opinion.click()
+        # Then she loads up a blocked case
+        self.browser.get('%s%s' % (self.live_server_url,
+                                   reverse('view_case', args=('11', 'asdf'))))
 
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
@@ -41,15 +39,12 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
     def test_non_admin_viewing_blocked_opinion(self):
         """ For a blocked Opinion, a Non-admin should see NO indication. """
         # Pandora (not an Admin) logs into CL using her admin account
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('pandora', 'password')
 
-        # She ends up on the SERP page and clicks the link for an Opinion
-        # she knows is blocked
-        blocked_opinion = self.browser.find_element_by_link_text(
-            'Blocked Opinion (Test 2015)'
-        )
-        blocked_opinion.click()
+        # Then she loads up a blocked case
+        self.browser.get('%s%s' % (self.live_server_url,
+                                   reverse('view_case', args=('11', 'asdf'))))
 
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
@@ -59,15 +54,12 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
     def test_admin_viewing_not_blocked_opinion(self):
         """ For a non-blocked Opinion, there should be no indication """
         # Admin logs into CL using her admin account
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('admin', 'password')
 
-        # She ends up on the SERP page and clicks the link for an Opinion
-        # she knows is definitely NOT blocked
-        blocked_opinion = self.browser.find_element_by_link_text(
-            'Not Blocked Opinion (Test 2015)'
-        )
-        blocked_opinion.click()
+        # Then she loads up a case that's not blocked
+        self.browser.get('%s%s' % (self.live_server_url,
+                                   reverse('view_case', args=('10', 'asdf'))))
 
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
@@ -86,13 +78,13 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
     def test_admin_viewing_blocked_docket(self):
         """ For a blocked Dockets, an Admin should see indication. """
         # Admin navigates to CL and logs in
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('admin', 'password')
 
         # Pulls up a page for a Docket that is blocked to search engines
         docket = Docket.objects.get(pk=11)
         self.browser.get(
-            '%s%s' % (self.server_url, docket.get_absolute_url(),)
+            '%s%s' % (self.live_server_url, docket.get_absolute_url(),)
         )
 
         # And sees a badge that lets her know it's blocked
@@ -102,13 +94,13 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
     def test_non_admin_viewing_blocked_docket(self):
         """ For a blocked Docket, a Non-admin should see NO indication. """
         # Pandora navigates to CL and logs in
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('pandora', 'password')
 
         # Pulls up a page for a Docket that is blocked to search engines
         docket = Docket.objects.get(pk=11)
         self.browser.get(
-            '%s%s' % (self.server_url, docket.get_absolute_url(),)
+            '%s%s' % (self.live_server_url, docket.get_absolute_url(),)
         )
 
         # And does not see a badge indicating that it's blocked.
@@ -125,13 +117,13 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
     def test_admin_viewing_not_blocked_docket(self):
         """ For a non-blocked Docket, there should be no indication. """
         # Admin navigates to CL and logs in
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('admin', 'password')
 
         # Pulls up a page for a Docket that is not blocked to search engines
         docket = Docket.objects.get(pk=10)
         self.browser.get(
-            '%s%s' % (self.server_url, docket.get_absolute_url(),)
+            '%s%s' % (self.live_server_url, docket.get_absolute_url(),)
         )
 
         # And does not see a badge that lets her know it's blocked
@@ -151,7 +143,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
     def test_admin_viewing_blocked_audio_page(self):
         """ For a blocked Audio pages, an Admin should see indication. """
         # Admin logs into CL using her admin account
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('admin', 'password')
 
         # She selects Oral Arguments to toggle the results to audio
@@ -176,7 +168,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
     def test_non_admin_viewing_blocked_audio_page(self):
         """ For a blocked Audio pages, a Non-admin should see NO indication. """
         # Pandora logs into CL using her admin account
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('pandora', 'password')
 
         # She selects Oral Arguments to toggle the results to audio
@@ -201,7 +193,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
     def test_admin_viewing_not_blocked_audio_page(self):
         """ For a non-blocked Audio pages, there should be no indication """
         # Admin logs into CL using her admin account
-        self.browser.get(self.server_url)
+        self.browser.get(self.live_server_url)
         self.attempt_sign_in('admin', 'password')
 
         # She selects Oral Arguments to toggle the results to audio

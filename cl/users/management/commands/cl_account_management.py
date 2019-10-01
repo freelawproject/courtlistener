@@ -1,11 +1,10 @@
 import datetime
-import hashlib
-import random
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
 from django.utils.timezone import now
 
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
+from cl.lib.crypto import sha1_activation_key
 from cl.users.models import UserProfile
 from cl.users.utils import emails
 
@@ -109,9 +108,7 @@ class Command(VerboseCommand):
 
             if not self.options['simulate']:
                 # Build and save a new activation key for the account.
-                salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-                activation_key = hashlib.sha1(
-                    salt + up.user.username).hexdigest()
+                activation_key = sha1_activation_key(up.user.username)
                 key_expires = now() + datetime.timedelta(5)
                 up.activation_key = activation_key
                 up.key_expires = key_expires

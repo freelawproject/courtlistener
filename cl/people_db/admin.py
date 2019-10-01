@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from cl.lib.admin import CSSAdminMixin
+from cl.lib.admin import AdminTweaksMixin
 # Judge DB imports
 from cl.people_db.models import (
     ABARating, Education, Person, PoliticalAffiliation, Position,
@@ -111,7 +111,7 @@ class FinancialDisclosureAdmin(admin.ModelAdmin):
 
 
 @admin.register(Person)
-class PersonAdmin(admin.ModelAdmin, CSSAdminMixin):
+class PersonAdmin(admin.ModelAdmin, AdminTweaksMixin):
     prepopulated_fields = {"slug": ['name_first', 'name_middle', 'name_last',
                                     'name_suffix']}
     inlines = (

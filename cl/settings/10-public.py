@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     'cl.donate',
     'cl.favorites',
     'cl.people_db',
+    'cl.lasc',
     'cl.lib',
     'cl.opinion_page',
     'cl.recap',
@@ -227,6 +228,9 @@ REDIS_DATABASES = {
 if DEVELOPMENT:
     # In a development machine, these setting make sense
     CELERY_WORKER_CONCURRENCY = 2
+    # This makes the tasks run outside the async worker and is needed for tests
+    # to pass
+    CELERY_TASK_ALWAYS_EAGER = True
 else:
     # Celery settings for production sites
     CELERY_WORKER_CONCURRENCY = 20
@@ -314,6 +318,9 @@ MIN_DONATION = {
 }
 MAX_FREE_DOCKET_ALERTS = 5
 DOCKET_ALERT_RECAP_BONUS = 10
+# If people pay via XERO invoices, this is the ID we see in our stripe
+# callbacks
+XERO_APPLICATION_ID = 'ca_1pvP3rYcArUkd3InUnImFI9llOiSIq6k'
 
 
 #######
@@ -342,6 +349,9 @@ REST_FRAMEWORK = {
     },
     'OVERRIDE_THROTTLE_RATES': {
         # Throttling down.
+        # Doing a background check service, we told them we didn't want to work
+        # with them.
+        'elios': '10/hour',
         'shreyngd': '100/hour',
         'leo': '100/hour',
         'miffy': '100/hour',

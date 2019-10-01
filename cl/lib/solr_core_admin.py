@@ -1,82 +1,11 @@
 import StringIO
 import json
-import os
-import shutil
 
 import lxml
 import requests
 from django.conf import settings
 
 from cl.lib.sunburnt import SolrError
-
-
-def create_temp_solr_core(core_name, core_source_path, schema_path,
-                          delete_if_present=True,
-                          url=settings.SOLR_HOST):
-    """ Create a new core by copying core from `core_source_path` and updating it """
-
-    # Path on testing machine
-    core_path_local = os.path.join(settings.SOLR_TEMP_CORE_PATH_LOCAL, core_name)
-
-    # Path on Solr machine
-    core_path_docker = os.path.join(settings.SOLR_TEMP_CORE_PATH_DOCKER, core_name)
-
-    if delete_if_present and os.path.exists(core_path_local):
-        print(u"Core at %s already exists! Deleting it." % core_path_local)
-        delete_solr_core(core_name)
-
-    # Copy core from source directory to core_name directory
-    shutil.copytree(
-        core_source_path,
-        core_path_local,
-        symlinks=True,
-    )
-
-    # Delete the properties file. It'll get created by the GET request.
-    if os.path.exists(os.path.join(core_path_local, 'core.properties')):
-        os.unlink(os.path.join(core_path_local, 'core.properties'))
-
-    # Copy the schema.xml file (syslinks won't work with Docker).
-    schema_destination = os.path.join(core_path_local, 'conf', 'schema.xml')
-    if os.path.exists(schema_destination):
-        os.unlink(schema_destination)
-
-    shutil.copyfile(
-        os.path.abspath(schema_path),
-        schema_destination
-    )
-
-    # Inform Solr of the core.
-    params = {
-        'wt': 'json',
-        'action': 'CREATE',
-        'name': core_name,
-        'instanceDir': core_path_docker,
-        # This is supposedly optional, but didn't work without it:
-        'dataDir': 'data',
-    }
-    r = requests.get('%s/solr/admin/cores' % url, params=params)
-    if r.status_code != 200:
-        raise Exception("Problem creating core. Got status_code of %s. Check "
-                        "the Solr logs for details." % r.status_code)
-
-
-def delete_solr_core(core_name, delete_index=True, delete_data=True,
-                     delete_instance=True, url=settings.SOLR_HOST):
-    """ Delete a solr core by name."""
-    params = {
-        'wt': 'json',
-        'action': 'UNLOAD',
-        'core': core_name,
-        'deleteIndex': str(delete_index).lower(),
-        'deleteDataDir': str(delete_data).lower(),
-        'deleteInstanceDir': str(delete_instance).lower(),
-    }
-    r = requests.get('%s/solr/admin/cores' % url, params=params)
-    if r.status_code != 200:
-        raise Exception("Problem deleting core. Got status_code of %s. Check "
-                        "the Solr logs for details. Maybe delete /tmp/solr ?" %
-                        r.status_code)
 
 
 def swap_solr_core(current_core, desired_core, url=settings.SOLR_HOST):
@@ -166,13 +95,3 @@ def get_data_dir(core, url=settings.SOLR_HOST):
     status_doc = get_solr_core_status(url=url)
     return str(status_doc.xpath(
             '//*[@name="%s"]//*[@name="dataDir"]/text()' % core)[0])
-
-
-def reload_pagerank_external_file_cache(url=settings.SOLR_HOST):
-    """Hit the URL of reloadCache to reload ExternalFileField (necessary for
-    Solr version prior to 4.1)
-    """
-    r = requests.get('%s/solr/reloadCache' % url)
-    if r.status_code != 200:
-        raise Exception("Problem reloading pagerank cache. Got status_code of "
-                        "%s. Check the Solr logs for details." % r.status_code)

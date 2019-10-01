@@ -80,11 +80,6 @@ urlpatterns = [
         views.coverage_data,
         name='coverage_data'),
 
-    # Pagerank file
-    url(r'^api/bulk/external_pagerank/$',
-        views.serve_pagerank_file,
-        name='pagerank_file'),
-
     # Deprecation Dates:
     # v1: 2016-04-01
     # v2: 2016-04-01

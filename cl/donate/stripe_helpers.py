@@ -9,10 +9,50 @@ from django.http import HttpResponseNotAllowed, HttpResponse
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
 
-from cl.donate.models import Donation
+from cl.donate.models import Donation, PROVIDERS
 from cl.donate.utils import send_thank_you_email, PaymentFailureException
+from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)
+
+
+def handle_xero_payment(charge):
+    """Gather data from a callback triggered by a payment in Xero
+
+    When we send invoices to folks via Xero, they now have the option to make
+    a payment via Stripe. When they do, it triggers our callback, but when that
+    happens we don't know anything about the charge.
+
+    To address this, gather data from the Stripe charge, add a user and a
+    donation to the database.
+
+    :param charge: A Stripe charge object: https://stripe.com/docs/api/charges
+    :return: None
+    """
+    billing_details = charge['billing_details']
+    user, profile = create_stub_account({
+        'email': billing_details['email'],
+        # Stripe doesn't split up first/last name (smart), but we
+        # do (doh). Just stuff it in the first_name field.
+        'first_name': billing_details['name'],
+        'last_name': '',
+    }, {
+        'address1': billing_details['address']['line1'],
+        'address2': billing_details['address']['line2'],
+        'city': billing_details['address']['city'],
+        'state': billing_details['address']['state'],
+        'zip_code': billing_details['address']['postal_code'],
+        'wants_newsletter': False,
+    })
+    Donation.objects.create(
+        donor=user,
+        amount=charge['amount'] / 100,  # Stripe does pennies.
+        payment_provider=PROVIDERS.CREDIT_CARD,
+        payment_id=charge['id'],
+        status=Donation.AWAITING_PAYMENT,
+        referrer='XERO invoice number: %s' %
+                 charge['metadata']['Invoice%20number'],
+    )
 
 
 @csrf_exempt
@@ -34,6 +74,9 @@ def process_stripe_callback(request):
                 event['livemode'] != settings.PAYMENT_TESTING_MODE:
             charge = event['data']['object']
 
+            if charge['application'] == settings.XERO_APPLICATION_ID:
+                handle_xero_payment(charge)
+
             # Sometimes stripe can process a transaction and call our callback
             # faster than we can even save things to our own DB. If that
             # happens wait a second up to five times until it works.
@@ -54,10 +97,14 @@ def process_stripe_callback(request):
                     charge['created']).replace(tzinfo=utc)
                 d.status = Donation.PROCESSED
                 payment_type = charge['metadata']['type']
-                if charge['metadata'].get('recurring'):
-                    send_thank_you_email(d, payment_type, recurring=True)
+                if charge['application'] == settings.XERO_APPLICATION_ID:
+                    # Don't send thank you's for Xero invoices
+                    pass
                 else:
-                    send_thank_you_email(d, payment_type)
+                    if charge['metadata'].get('recurring'):
+                        send_thank_you_email(d, payment_type, recurring=True)
+                    else:
+                        send_thank_you_email(d, payment_type)
             elif event['type'].endswith('failed'):
                 if not d:
                     return HttpResponse('<h1>200: No matching object in the '
@@ -93,8 +140,7 @@ def process_stripe_callback(request):
 
 
 def process_stripe_payment(amount, email, kwargs, stripe_redirect_url):
-    """
-    Process a stripe payment.
+    """Process a stripe payment.
 
     :param amount: The amount, in pennies, that you wish to charge
     :param email: The email address of the person being charged

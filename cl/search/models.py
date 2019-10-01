@@ -16,7 +16,8 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path, make_recap_path, \
-    make_recap_pdf_path, make_recap_thumb_path, make_docket_number_core
+    make_docket_number_core
+from cl.lib.models import AbstractPDF
 from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
     normalize_search_dicts
 from cl.lib.storage import IncrementingFileSystemStorage
@@ -52,17 +53,6 @@ SOURCES = (
     ('ZCR', 'columbia merged with court and resource.org'),
     ('ZL', 'columbia merged with lawbox'),
 )
-
-
-class THUMBNAIL_STATUSES(object):
-    NEEDED = 0
-    COMPLETE = 1
-    FAILED = 2
-    NAMES = (
-        (NEEDED, "Thumbnail needed"),
-        (COMPLETE, "Thumbnail completed successfully"),
-        (FAILED, 'Unable to generate thumbnail'),
-    )
 
 
 class OriginatingCourtInformation(models.Model):
@@ -442,6 +432,7 @@ class Docket(models.Model):
         blank=True,
         db_index=True,
     )
+    # Nullable for unique constraint requirements.
     pacer_case_id = fields.CharNullField(
         help_text="The cased ID provided by PACER.",
         max_length=100,
@@ -884,60 +875,12 @@ class DocketEntry(models.Model):
         )
 
 
-class RECAPDocument(models.Model):
-    """
-        The model for Docket Documents and Attachments.
-    """
-    PACER_DOCUMENT = 1
-    ATTACHMENT = 2
-    DOCUMENT_TYPES = (
-        (PACER_DOCUMENT, "PACER Document"),
-        (ATTACHMENT, "Attachment"),
-    )
-    OCR_COMPLETE = 1
-    OCR_UNNECESSARY = 2
-    OCR_FAILED = 3
-    OCR_NEEDED = 4
-    OCR_STATUSES = (
-        (OCR_COMPLETE, "OCR Complete"),
-        (OCR_UNNECESSARY, "OCR Not Necessary"),
-        (OCR_FAILED, "OCR Failed"),
-        (OCR_NEEDED, "OCR Needed"),
-    )
-    docket_entry = models.ForeignKey(
-        DocketEntry,
-        help_text="Foreign Key to the DocketEntry object to which it belongs. "
-                  "Multiple documents can belong to a DocketEntry. "
-                  "(Attachments and Documents together)",
-        related_name="recap_documents",
-        on_delete=models.CASCADE,
-    )
-    tags = models.ManyToManyField(
-        'search.Tag',
-        help_text="The tags associated with the document.",
-        related_name="recap_documents",
-        blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The date the file was imported to Local Storage.",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.",
-        auto_now=True,
-        db_index=True,
-    )
+class AbstractPacerDocument(models.Model):
     date_upload = models.DateTimeField(
         help_text="upload_date in RECAP. The date the file was uploaded to "
                   "RECAP. This information is provided by RECAP.",
         blank=True,
         null=True,
-    )
-    document_type = models.IntegerField(
-        help_text="Whether this is a regular document or an attachment.",
-        db_index=True,
-        choices=DOCUMENT_TYPES,
     )
     document_number = models.CharField(
         help_text="If the file is a document, the number is the "
@@ -964,67 +907,6 @@ class RECAPDocument(models.Model):
         null=True,
         default=False,
     )
-    sha1 = models.CharField(
-        help_text="The ID used for a document in RECAP",
-        max_length=40,  # As in RECAP
-        blank=True,
-    )
-    page_count = models.IntegerField(
-        help_text="The number of pages in the document, if known",
-        blank=True,
-        null=True,
-    )
-    file_size = models.IntegerField(
-        help_text="The size of the file in bytes, if known",
-        blank=True,
-        null=True,
-    )
-    filepath_local = models.FileField(
-        help_text="The path of the file in the local storage area.",
-        upload_to=make_recap_pdf_path,
-        storage=IncrementingFileSystemStorage(),
-        max_length=1000,
-        db_index=True,
-        blank=True,
-    )
-    filepath_ia = models.CharField(
-        help_text="The URL of the file in IA",
-        max_length=1000,
-        blank=True,
-    )
-    ia_upload_failure_count = models.SmallIntegerField(
-        help_text="Number of times the upload to the Internet Archive failed.",
-        null=True,
-        blank=True,
-    )
-    thumbnail = models.FileField(
-        help_text="A thumbnail of the first page of the document",
-        upload_to=make_recap_thumb_path,
-        storage=IncrementingFileSystemStorage(),
-        null=True,
-        blank=True,
-    )
-    thumbnail_status = models.SmallIntegerField(
-        help_text="The status of the thumbnail generation",
-        choices=THUMBNAIL_STATUSES.NAMES,
-        default=THUMBNAIL_STATUSES.NEEDED,
-    )
-    description = models.TextField(
-        help_text="The short description of the docket entry that appears on "
-                  "the attachments page.",
-        blank=True,
-    )
-    plain_text = models.TextField(
-        help_text="Plain text of the document after extraction using "
-                  "pdftotext, wpd2txt, etc.",
-        blank=True,
-    )
-    ocr_status = models.SmallIntegerField(
-        help_text="The status of OCR processing on this item.",
-        choices=OCR_STATUSES,
-        null=True,
-        blank=True,
-    )
     is_free_on_pacer = models.NullBooleanField(
         help_text="Is this item freely available as an opinion on PACER?",
         db_index=True,
@@ -1032,6 +914,45 @@ class RECAPDocument(models.Model):
     is_sealed = models.NullBooleanField(
         help_text="Is this item sealed or otherwise unavailable on PACER?",
         db_index=True,
+    )
+
+    class Meta:
+        abstract = True
+
+
+class RECAPDocument(AbstractPacerDocument, AbstractPDF):
+    """
+        The model for Docket Documents and Attachments.
+    """
+    PACER_DOCUMENT = 1
+    ATTACHMENT = 2
+    DOCUMENT_TYPES = (
+        (PACER_DOCUMENT, "PACER Document"),
+        (ATTACHMENT, "Attachment"),
+    )
+    docket_entry = models.ForeignKey(
+        DocketEntry,
+        help_text="Foreign Key to the DocketEntry object to which it belongs. "
+                  "Multiple documents can belong to a DocketEntry. "
+                  "(Attachments and Documents together)",
+        related_name="recap_documents",
+        on_delete=models.CASCADE,
+    )
+    tags = models.ManyToManyField(
+        'search.Tag',
+        help_text="The tags associated with the document.",
+        related_name="recap_documents",
+        blank=True,
+    )
+    document_type = models.IntegerField(
+        help_text="Whether this is a regular document or an attachment.",
+        db_index=True,
+        choices=DOCUMENT_TYPES,
+    )
+    description = models.TextField(
+        help_text="The short description of the docket entry that appears on "
+                  "the attachments page.",
+        blank=True,
     )
 
     class Meta:
@@ -1310,6 +1231,233 @@ class RECAPDocument(models.Model):
         out['text'] = text_template.render({'item': self}).translate(null_map)
 
         return normalize_search_dicts(out)
+
+
+class BankruptcyInformation(models.Model):
+    docket = models.OneToOneField(
+        Docket,
+        help_text="The docket that the bankruptcy info is associated with.",
+        on_delete=models.CASCADE,
+        related_name='bankruptcy_information',
+    )
+    date_created = models.DateTimeField(
+        help_text="The date time this item was created.",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="Timestamp of last update.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_converted = models.DateTimeField(
+        help_text="The date when the bankruptcy was converted from one "
+                  "chapter to another.",
+        blank=True,
+        null=True,
+    )
+    date_last_to_file_claims = models.DateTimeField(
+        help_text="The last date for filing claims.",
+        blank=True,
+        null=True,
+    )
+    date_last_to_file_govt = models.DateTimeField(
+        help_text="The last date for the government to file claims.",
+        blank=True,
+        null=True,
+    )
+    date_debtor_dismissed = models.DateTimeField(
+        help_text="The date the debtor was dismissed.",
+        blank=True,
+        null=True,
+    )
+    chapter = models.CharField(
+        help_text="The chapter the bankruptcy is currently filed under.",
+        max_length=10,
+        blank=True,
+    )
+    trustee_str = models.TextField(
+        help_text="The name of the trustee handling the case.",
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name_plural = "Bankruptcy Information"
+
+    def __unicode__(self):
+        return 'Bankruptcy Info for docket %s' % self.docket_id
+
+
+class Claim(models.Model):
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket that the claim is associated with.",
+        related_name="claims",
+        on_delete=models.CASCADE,
+    )
+    tags = models.ManyToManyField(
+        'search.Tag',
+        help_text="The tags associated with the document.",
+        related_name="claims",
+        blank=True,
+    )
+    date_created = models.DateTimeField(
+        help_text="The date time this item was created.",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="Timestamp of last update.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_claim_modified = models.DateTimeField(
+        help_text="Date the claim was last modified to our knowledge.",
+        blank=True,
+        null=True,
+    )
+    date_original_entered = models.DateTimeField(
+        help_text="Date the claim was originally entered.",
+        blank=True,
+        null=True,
+    )
+    date_original_filed = models.DateTimeField(
+        help_text="Date the claim was originally filed.",
+        blank=True,
+        null=True,
+    )
+    date_last_amendment_entered = models.DateTimeField(
+        help_text="Date the last amendment was entered.",
+        blank=True,
+        null=True,
+    )
+    date_last_amendment_filed = models.DateTimeField(
+        help_text="Date the last amendment was filed.",
+        blank=True,
+        null=True,
+    )
+    claim_number = models.CharField(
+        help_text="The number of the claim.",
+        max_length=10,
+        blank=True,
+        db_index=True,
+    )
+    creditor_details = models.TextField(
+        help_text="The details of the creditor from the claims register; "
+                  "typically their address.",
+        blank=True,
+    )
+    creditor_id = models.CharField(
+        help_text="The ID of the creditor from the claims register; "
+                  "typically a seven digit number",
+        max_length=50,
+        blank=True,
+    )
+    status = models.CharField(
+        help_text="The status of the claim.",
+        max_length=1000,
+        blank=True,
+    )
+    entered_by = models.CharField(
+        help_text="The person that entered the claim.",
+        max_length=1000,
+        blank=True,
+    )
+    filed_by = models.CharField(
+        help_text="The person that filed the claim.",
+        max_length=1000,
+        blank=True,
+    )
+    # An additional field, admin_claimed, should be added here eventually too.
+    # It's ready in Juriscraper, but rarely used and skipped for the moment.
+    amount_claimed = models.CharField(
+        help_text="The amount claimed, usually in dollars.",
+        max_length=100,
+        blank=True,
+    )
+    unsecured_claimed = models.CharField(
+        help_text="The unsecured claimed, usually in dollars.",
+        max_length=100,
+        blank=True,
+    )
+    secured_claimed = models.CharField(
+        help_text="The secured claimed, usually in dollars.",
+        max_length=100,
+        blank=True,
+    )
+    priority_claimed = models.CharField(
+        help_text="The priority claimed, usually in dollars.",
+        max_length=100,
+        blank=True,
+    )
+    description = models.TextField(
+        help_text="The description of the claim that appears on the claim "
+                  "register.",
+        blank=True,
+    )
+    remarks = models.TextField(
+        help_text="The remarks of the claim that appear on the claim "
+                  "register.",
+        blank=True,
+    )
+
+    def __unicode__(self):
+        return "Claim #%s on docket %s with pk %s" % \
+               (self.claim_number, self.docket_id, self.pk)
+
+
+class ClaimHistory(AbstractPacerDocument, AbstractPDF):
+    DOCKET_ENTRY = 1
+    CLAIM_ENTRY = 2
+    CLAIM_TYPES = (
+        (DOCKET_ENTRY, "A docket entry referenced from the claim register."),
+        (CLAIM_ENTRY, "A document only referenced from the claim register"),
+    )
+    claim = models.ForeignKey(
+        Claim,
+        help_text="The claim that the history row is associated with.",
+        related_name="claim_history_entries",
+        on_delete=models.CASCADE,
+    )
+    date_filed = models.DateField(
+        help_text="The created date of the claim.",
+        null=True,
+        blank=True,
+    )
+    claim_document_type = models.IntegerField(
+        help_text="The type of document that is used in the history row for "
+                  "the claim. One of: %s" %
+                  ', '.join(['%s (%s)' % (t[0], t[1]) for t in CLAIM_TYPES]),
+        choices=CLAIM_TYPES,
+    )
+    description = models.TextField(
+        help_text="The text content of the docket entry that appears in the "
+                  "docket or claims registry page.",
+        blank=True,
+    )
+    # Items should either have a claim_doc_id or a pacer_doc_id, depending on
+    # their claim_document_type value.
+    claim_doc_id = models.CharField(
+        help_text="The ID of a claims registry document.",
+        max_length=32,  # Same as in RECAP
+        blank=True,
+    )
+    pacer_dm_id = models.IntegerField(
+        help_text="The dm_id value pulled out of links and possibly other "
+                  "pages in PACER. Collected but not currently used.",
+        null=True,
+        blank=True,
+    )
+    pacer_case_id = models.CharField(
+        help_text="The cased ID provided by PACER. Noted in this case on a "
+                  "per-document-level, since we've learned that some "
+                  "documents from other cases can appear in curious places.",
+        max_length=100,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name_plural = "Claim History Entries"
 
 
 class Court(models.Model):
@@ -2384,6 +2532,9 @@ class Tag(models.Model):
         elif type(thing) == RECAPDocument:
             return self.recap_documents.through.objects.get_or_create(
                     recapdocument_id=thing.pk, tag_id=self.pk)
+        elif type(thing) == Claim:
+            return self.claims.through.objects.get_or_create(
+                claim_id=thing.pk, tag_id=self.pk)
         else:
             raise NotImplementedError("Object type not supported for tagging.")
 

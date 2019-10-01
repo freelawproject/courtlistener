@@ -23,11 +23,11 @@ from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
     Attorney, Role, PartyType, CriminalCount, CriminalComplaint
 from cl.recap.management.commands.import_idb import Command
 from cl.recap.models import ProcessingQueue, UPLOAD_TYPE
-from cl.recap.tasks import process_recap_pdf, add_attorney, \
-    process_recap_docket, process_recap_attachment, \
-    add_parties_and_attorneys, update_case_names, \
-    process_recap_appellate_docket, find_docket_object, add_docket_entries, \
-    update_docket_metadata, normalize_long_description
+from cl.recap.tasks import process_recap_pdf, process_recap_docket, process_recap_attachment, \
+    process_recap_appellate_docket, find_docket_object
+from cl.recap.mergers import add_attorney, update_case_names, \
+    update_docket_metadata, normalize_long_description, add_docket_entries, \
+    add_parties_and_attorneys
 from cl.search.models import Docket, RECAPDocument, DocketEntry, \
     OriginatingCourtInformation
 
@@ -289,7 +289,7 @@ class DebugRecapUploadtest(TestCase):
         self.assertEqual(RECAPDocument.objects.count(), 0)
         mock.assert_not_called()
 
-    @mock.patch('cl.recap.tasks.add_attorney')
+    @mock.patch('cl.recap.mergers.add_attorney')
     def test_debug_does_not_create_docket(self, add_atty_mock):
         """If debug is passed, do we avoid creating a docket?"""
         pq = ProcessingQueue.objects.create(

@@ -1,11 +1,10 @@
 import os
 
 from django.contrib.auth.models import User
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.utils.timezone import now
 
+from cl.lib.model_helpers import make_path
+from cl.lib.models import AbstractFile
 from cl.lib.storage import UUIDFileSystemStorage
 from cl.recap.constants import NOS_CODES, DATASET_SOURCES, NOO_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
@@ -20,6 +19,7 @@ class UPLOAD_TYPE:
     APPELLATE_ATTACHMENT_PAGE = 6
     IA_XML_FILE = 7
     CASE_REPORT_PAGE = 8
+    CLAIMS_REGISTER = 9
 
     NAMES = (
         (DOCKET, 'HTML Docket'),
@@ -30,17 +30,7 @@ class UPLOAD_TYPE:
         (APPELLATE_ATTACHMENT_PAGE, 'Appellate HTML attachment page'),
         (IA_XML_FILE, 'Internet Archive XML docket'),
         (CASE_REPORT_PAGE, 'Case report (iquery.pl) page'),
-    )
-
-
-def make_path(root, filename):
-    d = now()
-    return os.path.join(
-        root,
-        '%s' % d.year,
-        '%02d' % d.month,
-        '%02d' % d.day,
-        filename,
+        (CLAIMS_REGISTER, 'Claims register page'),
     )
 
 
@@ -52,7 +42,7 @@ def make_recap_data_path(instance, filename):
     return make_path('recap-data', filename)
 
 
-class PacerHtmlFiles(models.Model):
+class PacerHtmlFiles(AbstractFile):
     """This is a simple object for holding original HTML content from PACER
 
     We use this object to make sure that for every item we receive from users,
@@ -60,16 +50,6 @@ class PacerHtmlFiles(models.Model):
     essential as we do more and more data work where we're purchasing content.
     If we don't keep an original copy, a bug could be devastating.
     """
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     filepath = models.FileField(
         help_text="The path of the original data from PACER.",
         upload_to=make_recap_data_path,
@@ -80,17 +60,6 @@ class PacerHtmlFiles(models.Model):
         help_text="The type of object that is uploaded",
         choices=UPLOAD_TYPE.NAMES,
     )
-    content_type = models.ForeignKey(ContentType)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey()
-
-    @property
-    def file_contents(self):
-        with open(self.filepath.path, 'r') as f:
-            return f.read().decode('utf-8')
-
-    def print_file_contents(self):
-        print(self.file_contents)
 
 
 class ProcessingQueue(models.Model):

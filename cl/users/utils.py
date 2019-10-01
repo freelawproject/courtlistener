@@ -1,30 +1,40 @@
 # coding=utf-8
-import hashlib
-
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 
+from cl.lib.crypto import md5
 from cl.users.models import UserProfile
 
 
 def create_stub_account(user_data, profile_data):
+    """Create a minimal user account in CL
+
+    This can be helpful when receiving anonymous donations, payments from
+    external applications like XERO, etc.
+
+    :param user_data: Generally cleaned data from a cl.donate.forms.UserForm
+    :type user_data: dict
+    :param profile_data: Generallly cleaned data from a
+    cl.donate.forms.ProfileForm
+    :type profile_data: dict
+    :return: A tuple of a User and UserProfile objects
+    """
+
     email = user_data['email']
     new_user = User.objects.create_user(
-        # Username can only be 30 chars long. Use a hash of the
-        # email address to reduce the odds of somebody
-        # wanting to create an account that already exists.
-        # We'll change this to good values later, when the stub
-        # account is upgraded to a real account with a real
-        # username.
-        hashlib.md5(email).hexdigest()[:30],
+        # Use a hash of the email address to reduce the odds of somebody
+        # wanting to create an account that already exists. We'll change this
+        # to good values later, when/if the stub account is upgraded to a real
+        # account with a real username.
+        md5(email),
         email,
     )
     new_user.first_name = user_data['first_name']
     new_user.last_name = user_data['last_name']
 
     # Associate a profile
-    profile = UserProfile(
+    profile = UserProfile.objects.create(
         user=new_user,
         stub_account=True,
         address1=profile_data['address1'],
@@ -45,7 +55,7 @@ def convert_to_stub_account(user):
     """
     user.first_name = "Deleted"
     user.last_name = ''
-    user.username = hashlib.md5(user.email).hexdigest()[:30]
+    user.username = md5(user.email)
     user.set_unusable_password()
     user.save()
 
