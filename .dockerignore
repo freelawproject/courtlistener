@@ -2,7 +2,8 @@
 *
 
 # Except a few things...
-!requirements.txt
+!requirements*.txt
+!.circleci
 !cl
 
 # But no matter what, ignore these things.

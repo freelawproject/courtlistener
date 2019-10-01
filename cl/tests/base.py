@@ -2,8 +2,10 @@
 Base class(es) for functional testing CourtListener using Selenium and PhantomJS
 """
 import os
+import socket
 from contextlib import contextmanager
 
+import scorched
 from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test.utils import override_settings
@@ -14,7 +16,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.expected_conditions import staleness_of
 
 from cl.audio.models import Audio
-from cl.lib.solr_core_admin import create_temp_solr_core, delete_solr_core
 from cl.search.models import Opinion
 from cl.search.tasks import add_items_to_solr
 
@@ -32,26 +33,26 @@ if 'SELENIUM_TIMEOUT' in os.environ:
 )
 class BaseSeleniumTest(StaticLiveServerTestCase):
     """Base class for Selenium Tests. Sets up a few attributes:
-        * server_url - either from a sys argument for liveserver or
-            the default from the LiveServerTestCase
-        * browser - instance of Selenium WebDriver
-        * screenshot - boolean for if the test should save a final screenshot
-        Also sets window size to default of 1024x768.
+      * browser - instance of Selenium WebDriver
+      * screenshot - boolean for if the test should save a final screenshot
+      * Also sets window size to default of 1024x768.
+      * Binds the host to 0.0.0.0 to allow external access.
+
+    See this URL for notes: https://marcgibbons.com/post/selenium-in-docker/
     """
+    host = '0.0.0.0'
 
     @staticmethod
-    def _create_browser(options=None):
-        if options is None:
-            options = webdriver.ChromeOptions()
+    def _create_browser():
+        options = webdriver.ChromeOptions()
+        if settings.SELENIUM_HEADLESS is True:
             options.add_argument('headless')
-            options.add_argument("silent")
+        options.add_argument("silent")
+        options.add_experimental_option('w3c', False)
 
-        if 'SELENIUM_REMOTE_ADDRESS' in os.environ:
-            address = str(os.environ['SELENIUM_REMOTE_ADDRESS']).strip()
-            if not address.startswith('http'):
-                address = 'http://' + address
+        if settings.DOCKER_SELENIUM_HOST:
             capabilities = options.to_capabilities()
-            return webdriver.Remote(address,
+            return webdriver.Remote(settings.DOCKER_SELENIUM_HOST,
                                     desired_capabilities=capabilities)
         return webdriver.Chrome(chrome_options=options)
 
@@ -63,11 +64,12 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             cls.screenshot = True
         else:
             cls.screenshot = False
-        cls.server_url = cls.live_server_url
+
+        # Set host to externally accessible web server address
+        cls.host = socket.gethostbyname(socket.gethostname())
 
     def setUp(self):
         self.reset_browser()
-        self._initialize_test_solr()
         self._update_index()
 
     def reset_browser(self):
@@ -77,17 +79,15 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             # it's ok we forgive you http://stackoverflow.com/a/610923
             pass
         finally:
-            options = webdriver.ChromeOptions()
-            options.add_argument('headless')
-            self.browser = self._create_browser(options)
+            self.browser = self._create_browser()
 
-        self.browser.implicitly_wait(15)
+        self.browser.implicitly_wait(5)
 
     def tearDown(self):
         if self.screenshot:
             filename = type(self).__name__ + '.png'
             print('\nSaving screenshot: %s' % (filename,))
-            self.browser.save_screenshot(type(self).__name__ + '.png')
+            self.browser.save_screenshot('/tmp/' + filename)
         self.browser.quit()
         self._teardown_test_solr()
 
@@ -116,7 +116,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self.assertIn('Sign In', self.browser.title)
         self.browser.find_element_by_id('username').send_keys(username)
         self.browser.find_element_by_id('password').send_keys(password + '\n')
-        self.assertTrue(self.extract_result_count_from_serp() > 0)
 
     def get_url_and_wait(self, url, timeout=30):
         self.browser.get(url)
@@ -132,21 +131,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         return count
 
     @staticmethod
-    def _initialize_test_solr():
-        """ Try to initialize a pair of Solr cores for testing purposes """
-        root = settings.INSTALL_ROOT
-        create_temp_solr_core(
-            settings.SOLR_OPINION_TEST_CORE_NAME,
-            settings.SOLR_EXAMPLE_CORE_PATH_OPINION,
-            os.path.join(settings.SOLR_EXAMPLE_CORE_PATH_OPINION, 'conf', 'schema.xml'),
-        )
-        create_temp_solr_core(
-            settings.SOLR_AUDIO_TEST_CORE_NAME,
-            settings.SOLR_EXAMPLE_CORE_PATH_AUDIO,
-            os.path.join(settings.SOLR_EXAMPLE_CORE_PATH_AUDIO, 'conf', 'schema.xml'),
-        )
-
-    @staticmethod
     def _update_index():
         # For now, until some model/api issues are worked out for Audio
         # objects, we'll avoid using the cl_update_index command and do
@@ -158,6 +142,10 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
 
     @staticmethod
     def _teardown_test_solr():
-        """ Try to clean up and remove the test Solr cores """
-        delete_solr_core(settings.SOLR_OPINION_TEST_CORE_NAME)
-        delete_solr_core(settings.SOLR_AUDIO_TEST_CORE_NAME)
+        """Empty out the test cores that we use"""
+        conns = [settings.SOLR_OPINION_TEST_URL,
+                 settings.SOLR_AUDIO_TEST_URL]
+        for conn in conns:
+            si = scorched.SolrInterface(conn, mode='rw')
+            si.delete_all()
+            si.commit()

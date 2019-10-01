@@ -3,9 +3,9 @@ from collections import deque
 
 import time
 
-import redis
-from django.conf import settings
 from django.utils.timezone import now
+
+from cl.lib.redis_utils import make_redis_interface
 
 PRIORITY_SEP = '\x06\x16'
 DEFAULT_PRIORITY_STEPS = [0, 3, 6, 9]
@@ -47,11 +47,7 @@ def get_queue_length(queue_name='celery'):
     """
     priority_names = [make_queue_name_for_pri(queue_name, pri) for pri in
                       DEFAULT_PRIORITY_STEPS]
-    r = redis.StrictRedis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=settings.REDIS_DATABASES['CELERY'],
-    )
+    r = make_redis_interface('CELERY')
     return sum([r.llen(x) for x in priority_names])
 
 

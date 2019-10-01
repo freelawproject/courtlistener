@@ -21,6 +21,7 @@ virtualenv ~/virtualenvs/courtlistener
 source ~/virtualenvs/courtlistener/bin/activate
 
 pip install -r /tmp/requirements.txt
+pip install -r /tmp/requirements-flp.txt
 pip install -r /tmp/requirements-test.txt
 # This dependency isn't in the requirements file for some reason.
 pip install git+https://github.com/freelawproject/judge-pics@master

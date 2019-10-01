@@ -1,11 +1,11 @@
 # coding=utf-8
 import copy
-import hashlib
 import logging
 import os
 import shutil
 
 from cl.corpus_importer.utils import mark_ia_upload_needed
+from cl.lib.crypto import sha1
 from cl.people_db.models import Attorney, Role
 
 try:
@@ -30,7 +30,7 @@ from juriscraper.lib.exceptions import ParsingException
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
     CaseQuery, DocketReport, FreeOpinionReport, PacerSession, \
-    PossibleCaseNumberApi, ShowCaseDocApi
+    PossibleCaseNumberApi, ShowCaseDocApi, ClaimsRegister
 from requests.exceptions import ChunkedEncodingError, HTTPError, \
     ConnectionError, ReadTimeout, ConnectTimeout
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -51,13 +51,15 @@ from cl.lib.recap_utils import get_document_filename, get_bucket_name, \
     get_docket_filename
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
-from cl.recap.tasks import update_docket_metadata, add_parties_and_attorneys, \
-    find_docket_object, add_docket_entries, \
-    process_orphan_documents, update_docket_appellate_metadata, \
-    make_recap_sequence_number
+from cl.recap.tasks import find_docket_object
+from cl.recap.mergers import update_docket_metadata, \
+    update_docket_appellate_metadata, make_recap_sequence_number, \
+    add_docket_entries, add_parties_and_attorneys, process_orphan_documents, \
+    add_claims_to_docket, add_bankruptcy_data_to_docket
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import get_page_count, extract_recap_pdf
-from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag
+from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag, \
+    ClaimHistory
 from cl.search.tasks import add_items_to_solr
 
 logger = logging.getLogger(__name__)
@@ -84,6 +86,7 @@ def generate_ia_json(d_pk, database='default'):
     # objects the docket has such as docket entries, parties, etc.
     ds = Docket.objects.filter(pk=d_pk).select_related(
         'originating_court_information',
+        'bankruptcy_information',
         'idb_data',
     ).prefetch_related(
         'panel',
@@ -95,6 +98,10 @@ def generate_ia_json(d_pk, database='default'):
         Prefetch(
             'docket_entries__recap_documents',
             queryset=RECAPDocument.objects.all().defer('plain_text')
+        ),
+        Prefetch(
+            'claims__claim_history_entries',
+            queryset=ClaimHistory.objects.all().defer('plain_text')
         ),
     ).using(database)
     d = ds[0]
@@ -133,6 +140,18 @@ def generate_ia_json(d_pk, database='default'):
         accepted_media_type='application/json; indent=2',
     )
     return d, json_str
+
+
+@app.task(bind=True, ignore_result=True)
+def save_ia_docket_to_disk(self, d_pk, output_directory):
+    """For each docket given, save it to disk.
+
+    :param d_pk: The PK of the docket to serialize to disk
+    :param output_directory: The location to save the docket's JSON
+    """
+    _, j = generate_ia_json(d_pk)
+    with open(os.path.join(output_directory, '%s.json' % d_pk), 'w') as f:
+        f.write(j)
 
 
 @app.task(bind=True, ignore_result=True)
@@ -262,7 +281,7 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
             description=row.description,
             nature_of_suit=row.nature_of_suit,
             cause=row.cause,
-         )
+        )
 
     return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
 
@@ -617,7 +636,7 @@ def make_fjc_idb_lookup_params(item):
           interval_step=10 * 60, ignore_results=True)
 def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
                                 cookies, case_name=None, office_number=None,
-                                docket_number_letters=None, extra_data=None):
+                                docket_number_letters=None):
     """Get the pacer_case_id and title values for a district court docket. Use
     heuristics to disambiguate the results.
 
@@ -634,7 +653,8 @@ def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
     :param court_id: The CourtListener court ID for the docket number
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
-    :param case_name: The case name to use for disambiguation
+    :param case_name: The case name to use for disambiguation. Disambiguation
+    is done in Juriscraper using edit distance.
     :param office_number: The number (or letter) where the case took place.
     Typically, this is in the beginning of the docket number before the colon.
     This will be used for disambiguation. If you passed it as part of the
@@ -790,8 +810,9 @@ def filter_docket_by_tags(self, data, tags, court_id):
     return data
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60,
-          interval_step=10 * 60, ignore_result=True)
+# Retry 10 times. First one after 1m, then again every 5 minutes.
+@app.task(bind=True, max_retries=10, interval_start=1 * 60,
+          interval_step=5 * 60, ignore_result=True)
 def get_docket_by_pacer_case_id(self, data, court_id, cookies,
                                 tag_names=None, **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
@@ -837,14 +858,24 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
         first_missing_date = get_first_missing_de_date(d)
         kwargs.setdefault('date_start', first_missing_date)
 
-    logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
-    report.query(pacer_case_id, **kwargs)
+    logging_id = '%s.%s' % (court_id, pacer_case_id)
+    logger.info("Querying docket report %s", logging_id)
+    try:
+        report.query(pacer_case_id, **kwargs)
+    except ConnectionError as exc:
+        logger.warning("Ran into ConnectionError while getting docket "
+                       "for %s. Retrying.", logging_id)
+        if self.request.retries == self.max_retries:
+            logger.error("Max retries exceeded for %s. Aborting chain.",
+                         logging_id)
+            self.request.chain = None
+            return None
+        raise self.retry(exc)
     docket_data = report.data
-    logger.info("Querying and parsing complete for %s.%s" % (court_id,
-                                                             pacer_case_id))
+    logger.info("Querying and parsing complete for %s", logging_id)
 
     if not docket_data:
-        logger.info("No valid docket data for %s.%s", court_id, pacer_case_id)
+        logger.info("No valid docket data for %s", logging_id)
         self.request.chain = None
         return
 
@@ -910,7 +941,7 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
     s = PacerSession(cookies=cookies)
     report = AppellateDocketReport(court_id, s)
     logging_id = "%s - %s" % (court_id, docket_number)
-    logger.info("Querying docket report %s",  logging_id)
+    logger.info("Querying docket report %s", logging_id)
 
     try:
         report.query(docket_number, **kwargs)
@@ -1017,6 +1048,65 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
         logger.warning("Unable to get attachment page for %s", rd)
         raise self.retry(exc=exc)
     return att_report
+
+
+# Retry 10 times. First one after 1m, then again every 5 minutes.
+@app.task(bind=True, max_retries=10, interval_start=1 * 60,
+          interval_step=5 * 60, ignore_result=True)
+def get_bankr_claims_registry(self, data, cookies, tag_names=None):
+    """Get the bankruptcy claims registry for a docket
+
+    :param data: A dict of data containing, primarily, a key to 'docket_pk' for
+    the docket for which we want to get the registry. Other keys will be
+    ignored.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-in PACER user.
+    :param tag_names: A list of tag names that should be stored with the claims
+    registry information in the DB.
+    """
+    s = PacerSession(cookies=cookies)
+    if data is None or data.get('docket_pk') is None:
+        logger.warning("Empty data argument or parameter. Terminating chains "
+                       "and exiting.")
+        self.request.chain = None
+        return
+
+    d = Docket.objects.get(pk=data['docket_pk'])
+    logging_id = "docket %s with pacer_case_id %s" % (d.pk, d.pacer_case_id)
+    logger.info("Querying claims information for %s", logging_id)
+    report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
+    try:
+        report.query(d.pacer_case_id, d.docket_number)
+    except ConnectionError as exc:
+        logger.warning("Ran into ConnectionError while getting claims "
+                       "report for %s. Retrying.", logging_id)
+        if self.request.retries == self.max_retries:
+            self.request.chain = None
+            logger.error("Max retries completed for %s. Unable to get "
+                         "claims data. Aborting task, but allowing next task "
+                         "to run.", logging_id)
+            return data
+        raise self.retry(exc)
+    claims_data = report.data
+    logger.info("Querying and parsing complete for %s", logging_id)
+
+    # Save the HTML
+    pacer_file = PacerHtmlFiles(content_object=d,
+                                upload_type=UPLOAD_TYPE.CLAIMS_REGISTER)
+    pacer_file.filepath.save(
+        'random.html',  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(report.response.text),
+    )
+
+    if not claims_data:
+        logger.info("No valid claims data for %s", logging_id)
+        return data
+
+    # Merge the contents into CL
+    add_bankruptcy_data_to_docket(d, claims_data)
+    add_claims_to_docket(d, claims_data['claims'], tag_names)
+    logger.info("Created/updated claims data for %s", logging_id)
+    return data
 
 
 @app.task(bind=True, max_retries=15, interval_start=5,
@@ -1126,7 +1216,7 @@ def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
 
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
-    rd.sha1 = hashlib.sha1(force_bytes(response.content)).hexdigest()
+    rd.sha1 = sha1(force_bytes(response.content))
     rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
 
     # Save and extract, skipping OCR.

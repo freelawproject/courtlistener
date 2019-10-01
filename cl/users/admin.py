@@ -5,7 +5,7 @@ from rest_framework.authtoken.models import Token
 from cl.alerts.admin import AlertInline, DocketAlertInline
 from cl.donate.admin import DonationInline, MonthlyDonationInline
 from cl.favorites.admin import FavoriteInline
-from cl.lib.admin import CSSAdminMixin
+from cl.lib.admin import AdminTweaksMixin
 from cl.users.models import UserProfile, BarMembership
 
 
@@ -27,7 +27,7 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
 
 
-class UserAdmin(admin.ModelAdmin, CSSAdminMixin):
+class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     inlines = (
         UserProfileInline,
         DonationInline,

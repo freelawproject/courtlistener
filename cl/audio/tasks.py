@@ -1,4 +1,3 @@
-import hashlib
 import json
 import subprocess
 import traceback
@@ -19,6 +18,7 @@ from cl.audio.utils import get_audio_binary, make_af_filename
 from cl.celery import app
 from cl.corpus_importer.tasks import upload_to_ia, increment_failure_count
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.crypto import uuid_hex
 from cl.lib.recap_utils import get_bucket_name
 
 TRANSCRIPTS_BUCKET_NAME = 'freelawproject-transcripts'
@@ -122,13 +122,11 @@ def upload_item_as_raw_file(path, client=None):
         b.create()
         b.make_public(future=True)
 
-    # Re-encode the file as a temp file and upload it. When we leave the context
-    # manager, the temp file gets automatically deleted.
+    # Re-encode the file as a temp file and upload it. When we leave the
+    # context manager, the temp file gets automatically deleted.
     with NamedTemporaryFile(prefix='transcode_', suffix='.raw') as tmp:
         encode_as_linear16(path, tmp)
-
-        # Name it after a SHA2 hash of the item, to avoid collisions.
-        file_name = 'transcripts-%s' % hashlib.sha256(tmp.read()).hexdigest()
+        file_name = 'transcripts-%s' % uuid_hex()
         blob = Blob(file_name, b)
         blob.upload_from_file(tmp, rewind=True)
 

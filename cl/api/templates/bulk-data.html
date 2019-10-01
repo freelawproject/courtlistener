@@ -122,14 +122,12 @@
         <p>
             On the 15th of each month, we re-generate the <a href="https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/">CiteGeist scores</a> for the entire collection. Since a single new citation can have a ripple effect across the entire citation network, we store these values in a flat file rather than in our database. This saves us from having to update millions of records every month.
         </p>
-        <p>This file can be obtained with:</p>
-        <blockquote>
-            <code>curl -O {% get_full_host %}{% url "pagerank_file" %}</code>
-        </blockquote>
+        <p>Historically, this file was easily available via a URL, but with our increasingly distributed architecture, that's now prohibitively difficult to maintain. If you are interested in obtaining this file for your research, please let us know and we can usually get you a copy manually.
+        </p>
         <p>When inspecting this file, you will find two columns of data. The
             first column corresponds to the ID numbers of the items in our
             opinion database, and the second value corresponds to the CiteGeist
-            score for that item.
+            score for those items.
         </p>
 
 

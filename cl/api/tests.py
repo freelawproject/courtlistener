@@ -5,7 +5,6 @@ import json
 import shutil
 from datetime import timedelta, date
 
-import redis
 from django.conf import settings
 from django.contrib.auth.models import User, Permission
 from django.core import mail
@@ -21,6 +20,7 @@ from cl.api.utils import BulkJsonHistory, SEND_API_WELCOME_EMAIL_COUNT
 from cl.api.views import coverage_data
 from cl.audio.api_views import AudioViewSet
 from cl.audio.models import Audio
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
     Command as OralArgumentCommand
@@ -37,11 +37,6 @@ class BasicAPIPageTest(TestCase):
     def setUp(self):
         self.client = Client()
 
-        # Need pagerank file for test_pagerank_file()
-        from cl.search.management.commands.cl_calculate_pagerank import Command
-        command = Command()
-        command.do_pagerank(chown=False)
-
     def test_api_index(self):
         r = self.client.get(reverse('api_index'))
         self.assertEqual(r.status_code, 200)
@@ -56,10 +51,6 @@ class BasicAPIPageTest(TestCase):
 
     def test_bulk_data_index(self):
         r = self.client.get(reverse('bulk_data_index'))
-        self.assertEqual(r.status_code, 200)
-
-    def test_pagerank_file(self):
-        r = self.client.get(reverse('pagerank_file'))
         self.assertEqual(r.status_code, 200)
 
     def test_coverage_api(self):
@@ -191,11 +182,7 @@ class ApiEventCreationTestCase(TestCase):
     @staticmethod
     def flush_stats():
         # Flush existing stats (else previous tests cause issues)
-        r = redis.StrictRedis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            db=settings.REDIS_DATABASES['STATS'],
-        )
+        r = make_redis_interface('STATS')
         r.flushdb()
 
     def setUp(self):

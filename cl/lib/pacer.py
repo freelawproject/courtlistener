@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from juriscraper.lib.string_utils import titlecase
 from juriscraper.pacer import AppellateDocketReport, DocketReport, \
-    DocketHistoryReport, InternetArchive, CaseQuery
+    DocketHistoryReport, InternetArchive, CaseQuery, ClaimsRegister
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
@@ -192,8 +192,10 @@ def process_docket_data(d, filepath, report_type):
     history report data.
     :param report_type: Whether it's a docket or a docket history report.
     """
-    from cl.recap.tasks import update_docket_metadata, add_docket_entries, \
-        add_parties_and_attorneys, update_docket_appellate_metadata
+    from cl.recap.mergers import add_docket_entries, \
+        add_parties_and_attorneys, update_docket_appellate_metadata, \
+        update_docket_metadata, add_bankruptcy_data_to_docket, \
+        add_claims_to_docket
     if report_type == UPLOAD_TYPE.DOCKET:
         report = DocketReport(map_cl_to_pacer_id(d.court_id))
     elif report_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
@@ -204,20 +206,31 @@ def process_docket_data(d, filepath, report_type):
         report = InternetArchive()
     elif report_type == UPLOAD_TYPE.CASE_REPORT_PAGE:
         report = CaseQuery(map_cl_to_pacer_id(d.court_id))
+    elif report_type == UPLOAD_TYPE.CLAIMS_REGISTER:
+        report = ClaimsRegister(map_cl_to_pacer_id(d.court_id))
+    else:
+        raise NotImplementedError("The report type with id '%s' is not yet "
+                                  "supported. Perhaps you need to add it?" %
+                                  report_type)
     with open(filepath, 'r') as f:
         text = f.read().decode('utf-8')
     report._parse_text(text)
     data = report.data
     if data == {}:
         return None
-    update_docket_metadata(d, data)
-    d, og_info = update_docket_appellate_metadata(d, data)
-    if og_info is not None:
-        og_info.save()
-        d.originating_court_information = og_info
-    d.save()
-    if data.get('docket_entries'):
-        add_docket_entries(d, data['docket_entries'])
+
+    if report_type == UPLOAD_TYPE.CLAIMS_REGISTER:
+        add_bankruptcy_data_to_docket(d, data)
+        add_claims_to_docket(d, data['claims'])
+    else:
+        update_docket_metadata(d, data)
+        d, og_info = update_docket_appellate_metadata(d, data)
+        if og_info is not None:
+            og_info.save()
+            d.originating_court_information = og_info
+        d.save()
+        if data.get('docket_entries'):
+            add_docket_entries(d, data['docket_entries'])
     if report_type in (UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.APPELLATE_DOCKET,
                        UPLOAD_TYPE.IA_XML_FILE):
         add_parties_and_attorneys(d, data['parties'])

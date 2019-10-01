@@ -4,7 +4,6 @@ import traceback
 from datetime import date, datetime, timedelta
 from urllib import quote
 
-import redis
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -25,6 +24,7 @@ from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     make_stats_variable, merge_form_with_courts, make_get_string, \
@@ -194,11 +194,7 @@ def get_homepage_stats():
     """Get any stats that are displayed on the homepage and return them as a
     dict
     """
-    r = redis.StrictRedis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=settings.REDIS_DATABASES['STATS'],
-    )
+    r = make_redis_interface('STATS')
     ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
     last_ten_days = ['api:v3.d:%s.count' %
                      (date.today() - timedelta(days=x)).isoformat()

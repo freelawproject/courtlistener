@@ -2,7 +2,6 @@ import argparse
 import os
 import time
 
-import redis
 from django.conf import settings
 from django.db.models import Q
 from django.utils.timezone import now
@@ -13,6 +12,7 @@ from cl.corpus_importer.tasks import upload_pdf_to_ia, upload_recap_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.redis_utils import make_redis_interface
 from cl.search.models import RECAPDocument, Docket
 
 PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
@@ -74,9 +74,7 @@ def upload_recap_data(options):
     """Upload RECAP data to Internet Archive."""
     q = options['queue']
     database = options['database']
-    r = redis.StrictRedis(host=settings.REDIS_HOST,
-                          port=settings.REDIS_PORT,
-                          db=settings.REDIS_DATABASES['CACHE'])
+    r = make_redis_interface('CACHE')
     redis_key = 'recap-docket-last-id'
     last_pk = r.getset(redis_key, 0)
     ds = Docket.objects.filter(
