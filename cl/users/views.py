@@ -31,7 +31,8 @@ from cl.users.forms import (
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import subscribe_to_mailchimp, update_mailchimp
-from cl.users.utils import convert_to_stub_account, emails, message_dict
+from cl.users.utils import convert_to_stub_account, emails, message_dict, \
+    sanitize_redirection
 from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
@@ -255,23 +256,7 @@ def take_out_done(request):
 @never_cache
 def register(request):
     """allow only an anonymous user to register"""
-    redirect_to = request.GET.get('next', '')
-    if 'sign-in' in redirect_to:
-        # thus, we don't redirect people back to the sign-in form
-        redirect_to = ''
-
-    # security checks:
-    # Light security check -- make sure redirect_to isn't garbage.
-    if not redirect_to or ' ' in redirect_to:
-        redirect_to = settings.LOGIN_REDIRECT_URL
-
-    # Heavier security check -- redirects to http://example.com should
-    # not be allowed, but things like /view/?param=http://example.com
-    # should be allowed. This regex checks if there is a '//' *before* a
-    # question mark.
-    elif '//' in redirect_to and re.match(r'[^\?]*//', redirect_to):
-        redirect_to = settings.LOGIN_REDIRECT_URL
-
+    redirect_to = sanitize_redirection(request)
     if request.user.is_anonymous:
         if request.method == 'POST':
             try:
@@ -362,7 +347,7 @@ def register(request):
 def register_success(request):
     """Tell the user they have been registered and allow them to continue where
     they left off."""
-    redirect_to = request.GET.get('next', '')
+    redirect_to = sanitize_redirection(request)
     email = request.GET.get('email', '')
     default_from = parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
     return render(request, 'register/registration_complete.html', {
