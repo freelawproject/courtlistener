@@ -117,7 +117,7 @@ def download_pdf(self, pdf_pk):
     )
 
     with transaction.atomic():
-        pdf_document.filepath.save(
+        pdf_document.filepath_s3.save(
             q_pdf.document_id,
             ContentFile(pdf_data),
         )
