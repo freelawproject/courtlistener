@@ -9,6 +9,9 @@ from django.db.models import Q
 from cl.lib.models import AbstractJSON, AbstractPDF
 from cl.lib.model_helpers import make_pdf_path
 
+from storages.backends.s3boto3 import S3Boto3Storage
+
+
 class UPLOAD_TYPE:
     DOCKET = 1
     NAMES = (
@@ -45,9 +48,11 @@ class LASCPDF(AbstractPDF):
     """
     Do we want to have a different file path generator <----
     """
-    filepath = models.FileField(
-        help_text="The path of the file in the local storage area.",
+
+    filepath_s3 = models.FileField(
+        help_text="The path of the file in the s3 bucket.",
         upload_to=make_pdf_path,
+        storage=S3Boto3Storage(),
         max_length=150,
         blank=True,
     )
