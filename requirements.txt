@@ -82,3 +82,5 @@ usaddress
 wsgiref==0.1.2
 xlrd
 unidecode
+django-storages==1.7.1
+boto3==1.9.38
