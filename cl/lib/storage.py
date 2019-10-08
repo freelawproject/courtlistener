@@ -3,6 +3,8 @@ import uuid
 import os
 from django.core.files.storage import FileSystemStorage
 import itertools
+from django.conf import settings
+from storages.backends.s3boto3 import S3Boto3Storage
 
 
 class IncrementingFileSystemStorage(FileSystemStorage):
@@ -50,3 +52,14 @@ class UUIDFileSystemStorage(FileSystemStorage):
         dir_name, file_name = os.path.split(name)
         _, file_ext = os.path.splitext(file_name)
         return os.path.join(dir_name, uuid.uuid4().hex + file_ext)
+
+
+class AWSMediaStorage(S3Boto3Storage):
+    """Implements AWS file system storage.
+
+    We use AWSMediaStorage to upload LASC PDF files to AWS.
+    """
+    location = ""
+    AWS_DEFAULT_ACL = settings.AWS_DEFAULT_ACL
+    file_overwrite = True
+    custom_domain = False
