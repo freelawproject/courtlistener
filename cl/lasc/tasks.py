@@ -116,9 +116,12 @@ def download_pdf(self, pdf_pk):
         document_id=q_pdf.document_id
     )
 
+    logger.info("%s, ID #%s from docket ID %s ",
+                doc.document_type, doc.doc_id, q_pdf.docket.case_id)
+
     with transaction.atomic():
         pdf_document.filepath_s3.save(
-            q_pdf.document_id,
+            doc.document_type,
             ContentFile(pdf_data),
         )
 
