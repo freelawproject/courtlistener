@@ -9,6 +9,9 @@ from django.utils.timezone import now
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
 
+from django.utils.text import slugify
+from cl.lib.string_utils import trunc
+
 
 def make_docket_number_core(docket_number):
     """Make a core docket number from an existing docket number.
@@ -99,10 +102,14 @@ def make_pdf_path(instance, filename, thumbs=False):
         court_id = instance.claim.docket.court_id
         pacer_case_id = instance.pacer_case_id
     elif type(instance) == LASCPDF:
-        root = 'state/ca/lasc/gov.ca.lasc.%s/' % (instance.docket_number)
-        fn = 'gov.ca.lasc.%s.%s.pdf' % (instance.docket_number,
-                                                      instance.document_id)
-        return os.path.join(root, fn)
+        slug = slugify(trunc(filename, 40))
+        root = "/us/state/ca/lasc/%s/" % instance.docket_number
+        file_name = "gov.ca.lasc.%s.%s.%s.pdf" \
+                    % (instance.docket_number,
+                       instance.document_id,
+                       slug)
+
+        return os.path.join(root, file_name)
     else:
         raise ValueError("Unknown model type in make_pdf_path "
                          "function: %s" % type(instance))
