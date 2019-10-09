@@ -32,7 +32,7 @@ from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import Citation, Docket, OpinionCluster, RECAPDocument
+from cl.search.models import Citation, Docket, OpinionCluster, RECAPDocument, DOCUMENT_STATUSES
 
 
 def redirect_docket_recap(request, court, pacer_case_id):
@@ -302,7 +302,7 @@ def view_opinion(request, pk, _):
                 request.user.groups.filter(name__in=settings.RELATED_USER_GROUPS).exists())):
 
             # Use cache if enabled
-            mlt_cache_key = 'opinion-mlt%s' % pk
+            mlt_cache_key = 'mlt-opinion:%s' % pk
             related_items = cache.get(mlt_cache_key) if settings.RELATED_USE_CACHE else None
 
             if related_items is None:
@@ -331,15 +331,7 @@ def view_opinion(request, pk, _):
         'related_algorithm': 'mlt',
         'related_items': related_items,
         'related_item_ids': [item['id'] for item in related_items],
-        'related_search_params': '&' + urlencode({
-            'stat_Precedential': 'on',
-            'stat_Non-Precedential': 'on',
-            'stat_Errata': 'on',
-            'stat_Separate Opinion': 'on',
-            'stat_In-chambers': 'on',
-            'stat_Relating-to orders': 'on',
-            'stat_Unknown Status': 'on',
-        })
+        'related_search_params': '&' + urlencode({'stat_' + v: 'on' for s, v in DOCUMENT_STATUSES})
     })
 
 
