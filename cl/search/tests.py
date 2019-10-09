@@ -23,7 +23,7 @@ from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase, \
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import Court, Docket, Opinion, OpinionCluster, \
-    RECAPDocument, DocketEntry, Citation, sort_cites
+    RECAPDocument, DocketEntry, Citation, sort_cites, DOCUMENT_STATUSES
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
@@ -578,19 +578,15 @@ class SearchTest(IndexedSolrTestCase):
         expected_first_pk = 2  # Howard v. Honda
         expected_second_pk = 3  # case name cluster 3
 
-        r = self.client.get(reverse('show_results'), {
+        params = {
             'type': 'o',
             'q': 'related:%i' % seed_pk,
+        }
 
-            # disable all status filters (otherwise results do not match detail page)
-            'stat_Precedential': 'on',
-            'stat_Non-Precedential': 'on',
-            'stat_Errata': 'on',
-            'stat_Separate Opinion': 'on',
-            'stat_In-chambers': 'on',
-            'stat_Relating-to orders': 'on',
-            'stat_Unknown Status': 'on',
-        })
+        # disable all status filters (otherwise results do not match detail page)
+        params.update({'stat_' + v: 'on' for s, v in DOCUMENT_STATUSES})
+
+        r = self.client.get(reverse('show_results'), params)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
         self.assertEqual(expected_article_count, self.get_article_count(r))
