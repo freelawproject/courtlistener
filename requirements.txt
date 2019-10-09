@@ -3,6 +3,7 @@ anyjson==0.3.3
 argparse==1.2.1
 astroid==1.3.6
 beautifulsoup4==4.8.0
+boto3==1.9.38
 cchardet==2.1.1
 # Before upgrading, note: https://github.com/celery/celery/issues/4878
 celery~=4.3.0
@@ -29,6 +30,7 @@ django-redis-cache~=2.0.0
 djangorestframework==3.6.2
 djangorestframework-filters~=0.11.0
 django-rest-swagger==2.1.2
+django-storages==1.7.1
 djangorestframework-xml==1.4.0
 docutils==0.12
 drf-dynamic-fields
