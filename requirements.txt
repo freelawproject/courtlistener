@@ -14,7 +14,7 @@ coreschema==0.0.4
 # Unfortunately, higher versions emit an insane Python 2.7 error EVERYWHERE.
 # Once we have py3, we can upgrade: https://stackoverflow.com/q/51778764/64911
 cryptography==2.2.2
-datadiff==1.1.5
+datadiff==2.0.0
 defusedxml==0.5.0
 disposable-email-domains
 Django~=1.11.0
