@@ -208,21 +208,16 @@ def do_ocr(options):
         ocr_status=RECAPDocument.OCR_NEEDED,
     ).values_list('pk', flat=True).order_by()
     count = rds.count()
-    print(rds)
     throttle = CeleryThrottle(queue_name=q)
     for i, pk in enumerate(rds):
         throttle.maybe_wait()
-        print(pk)
         if options['index']:
-            # extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q).apply_async()
             extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q).apply_async()
-
         else:
             chain(
                 extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q),
                 add_docket_to_solr_by_rds.s().set(queue=q),
             ).apply_async()
-
         if i % 1000 == 0:
             logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
 
