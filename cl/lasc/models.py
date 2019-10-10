@@ -38,15 +38,14 @@ class LASCJSON(AbstractJSON):
 
 
 class LASCPDF(AbstractPDF):
-    """Use the content framework to associate PDFs with our dockets
+    """Store the original PDF from LASC's API.
+
+    Store PDF in AWSMediaStorage S3 bucket. 
     """
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
 
-    """
-    Do we want to have a different file path generator <----
-    """
 
     filepath_s3 = models.FileField(
         help_text="The path of the file in the s3 bucket.",
