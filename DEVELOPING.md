@@ -161,7 +161,9 @@ monolithic one that is fully functional.
     those regexes in another? That'd be much easier to review than trying to 
     see the whole thing at once. 
 
-1. Finally, we have both an editorconfig and an eslint configuration. Please use them. 
+1. We have both an editorconfig and an eslint configuration. Please use them.
+
+1. We do not yet have a Code of Conduct, but we do have [our employee manual][hr], and we expect all our employees and volunteers to abide by it. 
 
 These guidelines are a little sloppy compared with many projects. Those 
 projects have greater quality needs, are popular enough to demand a high 
@@ -174,6 +176,7 @@ work done. That's the goal here.
 [bdfl]: https://en.wikipedia.org/wiki/Benevolent_dictator_for_life
 [format]: https://github.com/angular/angular.js/blob/master/DEVELOPERS.md#-git-commit-guidelines
 [format-plugin]: https://plugins.jetbrains.com/plugin/9861-git-commit-template/
+[hr]: https://github.com/freelawproject/hr/blob/master/handbook/handbook.md
 
 
 ## Testing
