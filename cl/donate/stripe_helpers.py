@@ -56,7 +56,7 @@ def handle_xero_payment(charge):
         payment_id=charge['id'],
         status=Donation.AWAITING_PAYMENT,
         referrer='XERO invoice number: %s' %
-                 charge['metadata']['Invoice%20number'],
+                 charge['metadata']['Invoice number'],
     )
 
 
