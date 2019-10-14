@@ -101,11 +101,11 @@ def process_stripe_callback(request):
                 d.clearing_date = datetime.utcfromtimestamp(
                     charge['created']).replace(tzinfo=utc)
                 d.status = Donation.PROCESSED
-                payment_type = charge['metadata']['type']
                 if charge['application'] == settings.XERO_APPLICATION_ID:
                     # Don't send thank you's for Xero invoices
                     pass
                 else:
+                    payment_type = charge['metadata']['type']
                     if charge['metadata'].get('recurring'):
                         send_thank_you_email(d, payment_type, recurring=True)
                     else:
