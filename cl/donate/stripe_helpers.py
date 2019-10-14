@@ -51,7 +51,7 @@ def handle_xero_payment(charge):
         })
     Donation.objects.create(
         donor=user,
-        amount=charge['amount'] / 100,  # Stripe does pennies.
+        amount=float(charge['amount']) / 100,  # Stripe does pennies.
         payment_provider=PROVIDERS.CREDIT_CARD,
         payment_id=charge['id'],
         status=Donation.AWAITING_PAYMENT,
