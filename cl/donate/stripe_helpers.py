@@ -33,7 +33,7 @@ def handle_xero_payment(charge):
     billing_details = charge['billing_details']
     email = billing_details['email']
     try:
-        user = User.objects.get(email__iexect=email)
+        user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
         user, _ = create_stub_account({
             'email': email,
