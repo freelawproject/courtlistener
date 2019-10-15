@@ -3,13 +3,11 @@ import os
 import re
 
 from django.core.exceptions import ValidationError
-from django.utils.text import get_valid_filename
+from django.utils.text import get_valid_filename, slugify
 from django.utils.timezone import now
 
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
-
-from django.utils.text import slugify
 from cl.lib.string_utils import trunc
 
 
