@@ -81,7 +81,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_swagger',
-    'storages',
     'django_filters',
 
     # CourtListener Apps
@@ -539,3 +538,5 @@ DEV_AWS_STORAGE_BUCKET_NAME = "dev-com-courtlistener-storage"
 DEV_AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % DEV_AWS_STORAGE_BUCKET_NAME
 
 CLOUDFRONT_DOMAIN = ""
+
+
