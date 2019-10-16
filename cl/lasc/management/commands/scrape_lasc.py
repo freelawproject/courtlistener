@@ -25,7 +25,7 @@ def date_search(options):
     end = options['end']
     logger.info("Getting cases between %s and %s, inclusive", start, end)
 
-    end = min(end, datetime.today())
+    end = min(end, datetime.today().date())
     date_ranges = make_date_range_tuples(start, end, gap=7)
     for start, end in date_ranges:
         tasks.fetch_date_range.apply_async(kwargs={"start": start, "end": end},
