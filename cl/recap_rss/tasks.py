@@ -55,7 +55,7 @@ def abort_or_retry(task, feed_status, exc):
     raise task.retry(exc=exc, countdown=5)
 
 
-@app.task(bind=True, max_retries=5)
+@app.task(bind=True, max_retries=0)
 def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     """Check if the feed changed
 
