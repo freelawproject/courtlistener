@@ -1,10 +1,49 @@
 # coding=utf-8
+import re
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 
 from cl.lib.crypto import md5
 from cl.users.models import UserProfile
+
+
+def sanitize_redirection(request):
+    """Security and sanity checks on redirections.
+
+    Much of this code was grabbed from Django. The basic idea here is to:
+    1. Prevent open redirect attacks. Imagine getting an email:
+
+      Subject: Your CourtListener account is conformed
+      Body: Click here to continue: https://www.courtlistener.com/?next=https://cortlistener.com/evil/thing
+
+    Without proper redirect sanitation, a user might click that link, and get
+    redirected to cortlistener.com, which could be a spoof of the real thing.
+
+    2. Prevent illogical redirects. Like, don't let people redirect back to
+    the sign-in page, for example.
+
+    :return: Either the value requested or the default LOGIN_REDIRECT_URL, if
+    a sanity or security check failed.
+    """
+    redirect_to = request.GET.get('next', '')
+    if 'sign-in' in redirect_to:
+        # thus, we don't redirect people back to the sign-in form
+        redirect_to = ''
+
+    # Light security check -- make sure redirect_to isn't garbage.
+    if not redirect_to or ' ' in redirect_to:
+        redirect_to = settings.LOGIN_REDIRECT_URL
+
+    # Heavier security check -- redirects to http://example.com should
+    # not be allowed, but things like /view/?param=http://example.com
+    # should be allowed. This regex checks if there is a '//' *before* a
+    # question mark.
+    elif '//' in redirect_to and re.match(r'[^?]*//', redirect_to):
+        redirect_to = settings.LOGIN_REDIRECT_URL
+
+    return redirect_to
 
 
 def create_stub_account(user_data, profile_data):

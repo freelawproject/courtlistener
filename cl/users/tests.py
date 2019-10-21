@@ -45,6 +45,19 @@ class UserTest(LiveServerTestCase):
             host=self.live_server_url,
         )
 
+    def test_no_open_redirect(self):
+        """Prevent open redirects, which can cause spoofing attacks"""
+        response = self.client.get("{host}{path}".format(
+            host=self.live_server_url,
+            path='/register/success/?next=https://evil.com&email=e%40e.net',
+        ))
+        self.assertNotIn(
+            'evil.com',
+            response.content,
+            msg="evil.com found in HTML of response. This suggests it was not"
+                "cleaned by the sanitize_redirection function.",
+        )
+
     def test_signing_in(self):
         """Can we create a user on the backend then sign them in"""
         params = {
