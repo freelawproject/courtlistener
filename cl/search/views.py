@@ -10,9 +10,9 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.urls import reverse
 from django.db.models import Sum, Count
 from django.shortcuts import HttpResponseRedirect, render, get_object_or_404
+from django.urls import reverse
 from django.utils.timezone import utc, make_aware
 from django.views.decorators.cache import never_cache
 from requests import RequestException
@@ -53,20 +53,22 @@ def get_solr_result_objects(cd, facet):
     """
     search_type = cd['type']
     if search_type == 'o':
-        # This is a `related:<pk>` prefix query?
-        related_prefix_match = re.search(r'(^|\s)(?P<pfx>related:(?P<pk>[0-9]+))($|\s)', cd['q'])
+        si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+
+        # This is a `related:<pks>` prefix query?
+        related_prefix_match = re.search(r'(^|\s)(?P<pfx>related:(?P<pks>(([0-9]+)(,[0-9]+)*)))($|\s)', cd['q'])
         if related_prefix_match:
             results = get_mlt_query(
+                si,
                 cd,
                 facet,
-                settings.SOLR_OPINION_URL,
-                settings.SOLR_OPINION_HL_FIELDS,
-                related_prefix_match.group('pk'),
+                # Seed IDs
+                related_prefix_match.group('pks').split(','),
+                # Original query
                 cd['q'].replace(related_prefix_match.group('pfx'), '')
             )
         else:
-            # Default search interface
-            si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+            # Default search query
             results = si.query().add_extra(**build_main_query(cd, facet=facet))
 
     elif search_type == 'r':

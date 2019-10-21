@@ -1,4 +1,5 @@
 from scorched import SolrInterface
+from scorched.exc import SolrError
 from scorched.search import Options, SolrSearch
 
 
@@ -6,6 +7,7 @@ class ExtraSolrInterface(SolrInterface):
     """Extends the SolrInterface class so that it uses the ExtraSolrSearch
     class.
     """
+    hl_fields = None
 
     def __init__(self, *args, **kwargs):
         super(ExtraSolrInterface, self).__init__(*args, **kwargs)
@@ -23,6 +25,22 @@ class ExtraSolrInterface(SolrInterface):
             return q.query(*args, **kwargs)
         else:
             return q
+
+    def mlt_query(self, hl_fields, *args, **kwargs):
+        """
+        :returns: MoreLikeThisHighlightsSolrSearch -- A MoreLikeThis search with highlights.
+
+        Build a solr MLT query
+        """
+        self.hl_fields = hl_fields
+        q = MoreLikeThisHighlightsSolrSearch(self)
+
+        if len(args) + len(kwargs) > 0:
+            res = q.query(*args, **kwargs)
+        else:
+            res = q
+
+        return res
 
 
 class ExtraSolrSearch(SolrSearch):
@@ -86,13 +104,16 @@ class MoreLikeThisHighlightsSolrSearch(ExtraSolrSearch):
 
     def execute(self, constructor=None):
         """
-        Execute MLT-query.
-
-        Solr-URL: self.interface.conn.mlt_url + '?' + urllib.urlencode(self.options(), doseq=True)
+        Execute MLT-query and add highlighting to MLT search results.
         """
-        ret = self.interface.mlt_search(**self.options())
 
-        # Add solr_highlighting to mlt results
+        try:
+            ret = self.interface.mlt_search(**self.options())
+        except TypeError:
+            # Catch exception when seed is not available
+            raise SolrError('Seed documents for MoreLikeThis query do not exist')
+
+        # Add solr_highlighting to MLT results
         for doc in ret:
             # Initialize empty highlights dict
             doc['solr_highlights'] = {}
@@ -109,26 +130,3 @@ class MoreLikeThisHighlightsSolrSearch(ExtraSolrSearch):
             ret = self.constructor(ret, constructor)
 
         return ret
-
-
-class MoreLikeThisHighlightsSolrInterface(ExtraSolrInterface):
-    """
-    A search interface especially for MoreLikeThis queries (with highlights)
-    """
-    def __init__(self, hl_fields, *args, **kwargs):
-        super(MoreLikeThisHighlightsSolrInterface, self).__init__(*args, **kwargs)
-
-        self.hl_fields = hl_fields
-
-    def query(self, *args, **kwargs):
-        """
-        :returns: MoreLikeThisHighlightsSolrSearch -- A MoreLikeThis search with highlights.
-
-        Build a solr MLT query
-        """
-
-        q = MoreLikeThisHighlightsSolrSearch(self)
-        if len(args) + len(kwargs) > 0:
-            return q.query(*args, **kwargs)
-        else:
-            return q
