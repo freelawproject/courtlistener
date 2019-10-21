@@ -161,55 +161,6 @@ SOLR_TEST_URLS = {
 
 }
 
-SOLR_EXAMPLE_CORE_PATH_OPINION = os.path.join(os.sep, 'usr', 'local', 'solr',
-                                      'example', 'solr', 'collection1')
-SOLR_EXAMPLE_CORE_PATH_PERSON = os.path.join(os.sep, 'usr', 'local', 'solr',
-                                      'example', 'solr', 'person')
-SOLR_EXAMPLE_CORE_PATH_AUDIO = os.path.join(os.sep, 'usr', 'local', 'solr',
-                                      'example', 'solr', 'audio')
-SOLR_EXAMPLE_CORE_PATH_RECAP = os.path.join(os.sep, 'usr', 'local', 'solr',
-                                      'example', 'solr', 'recap')
-SOLR_TEMP_CORE_PATH_LOCAL = os.path.join(os.sep, 'tmp', 'solr')
-SOLR_TEMP_CORE_PATH_DOCKER = os.path.join(os.sep, 'tmp', 'solr')
-
-SOLR_OPINION_HL_FIELDS = [
-    'caseName',
-    'citation',
-    'court_citation_string',
-    'docketNumber',
-    'judge',
-    'lexisCite',
-    'neutralCite',
-    'suitNature',
-    'text'
-]
-SOLR_RECAP_HL_FIELDS = [
-    'assignedTo',
-    'caseName',
-    'cause',
-    'court_citation_string',
-    'docketNumber',
-    'juryDemand',
-    'referredTo',
-    'short_description',
-    'suitNature',
-    'text'
-]
-SOLR_AUDIO_HL_FIELDS = [
-    'text',
-    'caseName',
-    'judge',
-    'docketNumber',
-    'court_citation_string'
-]
-SOLR_PEOPLE_HL_FIELDS = [
-    'name',
-    'dob_city',
-    'dob_state',
-    'name_reverse'
-]
-
-
 #########
 # Redis #
 #########
@@ -445,8 +396,8 @@ MARKDOWN_DEUX_STYLES = {
 ##########
 # MATOMO #
 ##########
-MATOMO_URL = 'http://192.168.0.243/piwik.php'
 MATOMO_BASE_URL = '//192.168.0.243/'
+MATOMO_URL = '%spiwik.php' % MATOMO_BASE_URL
 MATOMO_SITE_ID = '1'
 
 
@@ -575,5 +526,6 @@ if DEVELOPMENT:
 ###################
 
 RELATED_COUNT = 5
-RELATED_USE_CACHE = True
-RELATED_USER_GROUPS = ['recommender_system_tester']
+RELATED_USE_CACHE = False
+RELATED_CACHE_TIMEOUT = 60 * 60 * 24 * 7
+RELATED_USER_GROUPS = ['recommendation_system_tester']
