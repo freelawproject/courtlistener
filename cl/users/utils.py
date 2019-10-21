@@ -4,6 +4,7 @@ import re
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.db import transaction
 
 from cl.lib.crypto import md5
 from cl.users.models import UserProfile
@@ -59,30 +60,30 @@ def create_stub_account(user_data, profile_data):
     :type profile_data: dict
     :return: A tuple of a User and UserProfile objects
     """
+    with transaction.atomic():
+        email = user_data['email']
+        new_user = User.objects.create_user(
+            # Use a hash of the email address to reduce the odds of somebody
+            # wanting to create an account that already exists. We'll change
+            # this to good values later, when/if the stub account is upgraded
+            # to a real account with a real username.
+            md5(email),
+            email,
+        )
+        new_user.first_name = user_data['first_name']
+        new_user.last_name = user_data['last_name']
 
-    email = user_data['email']
-    new_user = User.objects.create_user(
-        # Use a hash of the email address to reduce the odds of somebody
-        # wanting to create an account that already exists. We'll change this
-        # to good values later, when/if the stub account is upgraded to a real
-        # account with a real username.
-        md5(email),
-        email,
-    )
-    new_user.first_name = user_data['first_name']
-    new_user.last_name = user_data['last_name']
-
-    # Associate a profile
-    profile = UserProfile.objects.create(
-        user=new_user,
-        stub_account=True,
-        address1=profile_data['address1'],
-        address2=profile_data.get('address2'),
-        city=profile_data['city'],
-        state=profile_data['state'],
-        zip_code=profile_data['zip_code'],
-        wants_newsletter=profile_data['wants_newsletter']
-    )
+        # Associate a profile
+        profile = UserProfile.objects.create(
+            user=new_user,
+            stub_account=True,
+            address1=profile_data['address1'],
+            address2=profile_data.get('address2'),
+            city=profile_data['city'],
+            state=profile_data['state'],
+            zip_code=profile_data['zip_code'],
+            wants_newsletter=profile_data['wants_newsletter']
+        )
     return new_user, profile
 
 

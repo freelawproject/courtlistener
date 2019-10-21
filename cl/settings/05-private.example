@@ -102,3 +102,10 @@ GOOGLE_AUTH = {
 TIME_ZONE = 'America/Los_Angeles'
 
 FUNDRAISING_MODE = False
+
+AWS_ACCESS_KEY_ID = ''
+AWS_SECRET_ACCESS_KEY = ''
+
+# Development credentials available upon request
+
+
