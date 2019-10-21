@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'rest_framework_swagger',
     'django_filters',
+    'storages',
 
     # CourtListener Apps
     'cl.alerts',
@@ -529,3 +530,16 @@ RELATED_COUNT = 5
 RELATED_USE_CACHE = False
 RELATED_CACHE_TIMEOUT = 60 * 60 * 24 * 7
 RELATED_USER_GROUPS = ['recommendation_system_tester']
+
+
+#######
+# AWS #
+#######
+AWS_STORAGE_BUCKET_NAME = 'com-courtlistener-storage'
+AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
+AWS_DEFAULT_ACL = "public-read"
+
+DEV_AWS_STORAGE_BUCKET_NAME = "dev-com-courtlistener-storage"
+DEV_AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % DEV_AWS_STORAGE_BUCKET_NAME
+
+CLOUDFRONT_DOMAIN = ""

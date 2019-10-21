@@ -5,6 +5,7 @@ from datetime import datetime
 
 import stripe
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.http import HttpResponseNotAllowed, HttpResponse
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
@@ -30,28 +31,32 @@ def handle_xero_payment(charge):
     :return: None
     """
     billing_details = charge['billing_details']
-    user, profile = create_stub_account({
-        'email': billing_details['email'],
-        # Stripe doesn't split up first/last name (smart), but we
-        # do (doh). Just stuff it in the first_name field.
-        'first_name': billing_details['name'],
-        'last_name': '',
-    }, {
-        'address1': billing_details['address']['line1'],
-        'address2': billing_details['address']['line2'],
-        'city': billing_details['address']['city'],
-        'state': billing_details['address']['state'],
-        'zip_code': billing_details['address']['postal_code'],
-        'wants_newsletter': False,
-    })
+    email = billing_details['email']
+    try:
+        user = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        user, _ = create_stub_account({
+            'email': email,
+            # Stripe doesn't split up first/last name (smart), but we
+            # do (doh). Just stuff it in the first_name field.
+            'first_name': billing_details['name'],
+            'last_name': '',
+        }, {
+            'address1': billing_details['address']['line1'],
+            'address2': billing_details['address']['line2'],
+            'city': billing_details['address']['city'],
+            'state': billing_details['address']['state'],
+            'zip_code': billing_details['address']['postal_code'],
+            'wants_newsletter': False,
+        })
     Donation.objects.create(
         donor=user,
-        amount=charge['amount'] / 100,  # Stripe does pennies.
+        amount=float(charge['amount']) / 100,  # Stripe does pennies.
         payment_provider=PROVIDERS.CREDIT_CARD,
         payment_id=charge['id'],
         status=Donation.AWAITING_PAYMENT,
         referrer='XERO invoice number: %s' %
-                 charge['metadata']['Invoice%20number'],
+                 charge['metadata']['Invoice number'],
     )
 
 
@@ -96,11 +101,11 @@ def process_stripe_callback(request):
                 d.clearing_date = datetime.utcfromtimestamp(
                     charge['created']).replace(tzinfo=utc)
                 d.status = Donation.PROCESSED
-                payment_type = charge['metadata']['type']
                 if charge['application'] == settings.XERO_APPLICATION_ID:
                     # Don't send thank you's for Xero invoices
                     pass
                 else:
+                    payment_type = charge['metadata']['type']
                     if charge['metadata'].get('recurring'):
                         send_thank_you_email(d, payment_type, recurring=True)
                     else:
