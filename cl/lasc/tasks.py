@@ -65,10 +65,14 @@ def establish_good_login(self):
     :return: None
     """
     r = make_redis_interface('CACHE')
-    bad_login = r.get(LASC_SESSION_STATUS_KEY) != SESSION_IS.OK
+    retry_backoff = 60
+    status = r.get(LASC_SESSION_STATUS_KEY)
+    if status == SESSION_IS.LOGGING_IN:
+        self.retry(countdown=retry_backoff)
+    bad_login = status != SESSION_IS.OK
     if bad_login:
         login_to_court()
-        self.retry(countdown=60)
+        self.retry(countdown=retry_backoff)
 
 
 def make_lasc_search():
