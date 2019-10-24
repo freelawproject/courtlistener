@@ -47,6 +47,7 @@ from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_date
+from cl.lib.pacer_session import get_pacer_cookie_from_cache
 from cl.lib.recap_utils import get_document_filename, get_bucket_name, \
     get_docket_filename
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
@@ -633,9 +634,9 @@ def make_fjc_idb_lookup_params(item):
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60, ignore_results=True)
-def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
-                                cookies, case_name=None, office_number=None,
-                                docket_number_letters=None):
+def get_pacer_case_id_and_title(
+    self, pass_through, docket_number, court_id, cookies=None, user_pk=None,
+    case_name=None, office_number=None, docket_number_letters=None):
     """Get the pacer_case_id and title values for a district court docket. Use
     heuristics to disambiguate the results.
 
@@ -652,6 +653,9 @@ def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
     :param court_id: The CourtListener court ID for the docket number
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
+    :param user_pk: The PK of a user making the request. This can be provided
+    instead of the cookies parameter. If so, this will get the user's cookies
+    from redis instead of passing them in as an argument.
     :param case_name: The case name to use for disambiguation. Disambiguation
     is done in Juriscraper using edit distance.
     :param office_number: The number (or letter) where the case took place.
@@ -673,6 +677,9 @@ def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
     """
     logger.info("Getting pacer_case_id for docket_number %s in court %s",
                 docket_number, court_id)
+    if not cookies:
+        # Get cookies from Redis if not provided
+        cookies = get_pacer_cookie_from_cache(user_pk)
     s = PacerSession(cookies=cookies)
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
     try:
@@ -812,8 +819,8 @@ def filter_docket_by_tags(self, data, tags, court_id):
 # Retry 10 times. First one after 1m, then again every 5 minutes.
 @app.task(bind=True, max_retries=10, interval_start=1 * 60,
           interval_step=5 * 60, ignore_result=True)
-def get_docket_by_pacer_case_id(self, data, court_id, cookies,
-                                tag_names=None, **kwargs):
+def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
+                                user_pk=None, tag_names=None, **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -826,11 +833,17 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     :param court_id: A courtlistener court ID.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
+    :param user_pk: The PK of a user making the request. This can be provided
+    instead of the cookies parameter. If so, this will get the user's cookies
+    from redis instead of passing them in as an argument.
     :param tag_names: A list of tag names that should be stored with the item
     in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     :return: A dict indicating if we need to update Solr.
     """
+    if not cookies:
+        # Get cookies from Redis if not provided
+        cookies = get_pacer_cookie_from_cache(user_pk)
     s = PacerSession(cookies=cookies)
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
