@@ -51,13 +51,12 @@ from cl.lib.recap_utils import get_document_filename, get_bucket_name, \
     get_docket_filename
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
-from cl.recap.tasks import find_docket_object
-from cl.recap.mergers import update_docket_metadata, \
+from cl.recap.mergers import find_docket_object, update_docket_metadata, \
     update_docket_appellate_metadata, make_recap_sequence_number, \
     add_docket_entries, add_parties_and_attorneys, process_orphan_documents, \
     add_claims_to_docket, add_bankruptcy_data_to_docket
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import get_page_count, extract_recap_pdf
+from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag, \
     ClaimHistory
 from cl.search.tasks import add_items_to_solr
