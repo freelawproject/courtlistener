@@ -12,6 +12,7 @@ from cl.lasc import tasks
 from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.db_tools import queryset_generator
 
 from cl.lasc.models import QueuedCase, QueuedPDF
 
@@ -107,8 +108,9 @@ def process_pdf_queue(options):
 
     :return: None
     """
-    pdf_pks = QueuedPDF.objects.all().order_by('-document_id')\
-        .values_list('pk', flat=True)
+    pdf_pks = queryset_generator(QueuedPDF.objects.all()
+                                 .order_by('-document_id')
+                                 .values_list('pk', flat=True))
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
     for pdf_pk in pdf_pks:
