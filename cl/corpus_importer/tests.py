@@ -17,7 +17,7 @@ from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
-from cl.recap.tasks import find_docket_object
+from cl.recap.mergers import find_docket_object
 from cl.search.models import Docket, RECAPDocument
 
 
