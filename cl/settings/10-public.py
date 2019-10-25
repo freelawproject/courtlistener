@@ -29,6 +29,7 @@ DEFAULT_CHARSET = 'utf-8'
 LANGUAGE_CODE = 'en-us'
 USE_TZ = True
 DATETIME_FORMAT = 'N j, Y, P e'
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 
 TEMPLATES = [{
     'BACKEND': 'django.template.backends.django.DjangoTemplates',
