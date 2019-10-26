@@ -9,7 +9,7 @@ from cl.recap.filters import ProcessingQueueFilter, \
     FjcIntegratedDatabaseFilter, PacerFetchQueueFilter
 from cl.recap.models import ProcessingQueue, FjcIntegratedDatabase, \
     PacerFetchQueue
-from cl.recap.tasks import process_recap_upload
+from cl.recap.tasks import process_recap_upload, do_pacer_fetch
 from cl.search.filters import RECAPDocumentFilter
 from cl.search.models import RECAPDocument
 
@@ -38,7 +38,7 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
 
     def perform_create(self, serializer):
         fq = serializer.save(user=self.request.user)
-        #do_pacer_fetch(fq)
+        do_pacer_fetch(fq)
 
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
