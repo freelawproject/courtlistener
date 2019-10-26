@@ -2,22 +2,27 @@
 import logging
 import os
 
+import requests
 from celery.canvas import chain
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
     DocketHistoryReport, DocketReport
+from requests import HTTPError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
 from cl.celery import app
+from cl.corpus_importer.tasks import download_pacer_pdf_by_rd, \
+    update_rd_metadata, get_pacer_case_id_and_title, \
+    get_docket_by_pacer_case_id
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.crypto import sha1
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.pacer_session import get_pacer_cookie_from_cache
 from cl.lib.recap_utils import get_document_filename
 from cl.recap.mergers import add_docket_entries, add_parties_and_attorneys, \
     update_docket_appellate_metadata, update_docket_metadata, \
@@ -54,6 +59,78 @@ def process_recap_upload(pq):
               add_or_update_recap_docket.s()).apply_async()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         process_recap_appellate_attachment.delay(pq.pk)
+
+
+def do_pacer_fetch(fq):
+    """Process a request made by a user to get an item from PACER.
+
+    :param fq: The PacerFetchQueue item to process
+    :return: None
+    """
+    c = None
+    if fq.request_type == REQUEST_TYPE.DOCKET:
+        # Request by docket_id
+        court_id = fq.court_id or getattr(fq.docket, 'court_id', None)
+        kwargs = {
+            # Universal params
+            'court_id': court_id,
+            'user_pk': fq.user_id,
+            'docket_pk': fq.docket_id,
+
+            # Scraping params
+            'doc_num_start': fq.de_number_start,
+            'doc_num_end': fq.de_number_end,
+            'date_start': fq.de_date_start,
+            'date_end': fq.de_date_end,
+            'show_parties_and_counsel': fq.show_parties_and_counsel,
+            'show_terminated_parties': fq.show_terminated_parties,
+            'show_list_of_member_cases': fq.show_list_of_member_cases,
+        }
+        if (fq.docket_id and not fq.docket.pacer_case_id) or fq.docket_number:
+            # We lack the pacer_case_id either on the docket or from the
+            # submission. Look it up.
+            docket_number = fq.docket_number or \
+                            getattr(fq.docket, 'docket_number', None)
+            c = chain(
+                get_pacer_case_id_and_title.si(
+                    pass_through=None,
+                    docket_number=docket_number,
+                    court_id=court_id,
+                    user_pk=fq.user_id,
+                ),
+                get_docket_by_pacer_case_id.s(**kwargs),
+            )
+        else:
+            if fq.docket_id is not None and fq.docket.pacer_case_id:
+                # We have the docket and its pacer_case_id
+                kwargs.update({
+                    'data': {'pacer_case_id': fq.docket.pacer_case_id},
+                    'court_id': fq.docket.court_id,
+                })
+            elif fq.pacer_case_id:
+                # We lack the docket, but have a pacer_case_id
+                kwargs.update({
+                    'data': {'pacer_case_id': fq.pacer_case_id},
+                })
+            c = chain(get_docket_by_pacer_case_id.si(**kwargs))
+        c |= add_or_update_recap_docket.s()
+    elif fq.request_type == REQUEST_TYPE.PDF:
+        # Request by recap_document_id
+        rd_pk = fq.recap_document_id
+        if fq.recap_document_id:
+            c = chain(
+                fetch_pacer_doc_by_rd.si(rd_pk, fq.pk, fq.user_id),
+                extract_recap_pdf.si(rd_pk),
+                add_items_to_solr.si([rd_pk], 'search.RECAPDocument'),
+            )
+    if c is not None:
+        c |= mark_fq_successful.si(fq.pk)
+        c.apply_async()
+    else:
+        # Somehow failed to make a chain. Log an error.
+        fq.status = PROCESSING_STATUS.INVALID_CONTENT
+        fq.message = "Invalid submission, unable to make chain for processing."
+        fq.save()
 
 
 def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
@@ -726,3 +803,72 @@ def update_docket_from_hidden_api(data):
         # Delete the second one, which was created via race condition, and
         # shouldn't have existed anyway.
         d.delete()
+
+
+@app.task(bind=True, max_retries=3, interval_start=5,
+          interval_step=5, ignore_result=True)
+@transaction.atomic
+def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk, user_pk):
+    """Fetch a PACER PDF by rd_pk
+
+    This is very similar to get_pacer_doc_by_rd, except that it manages
+    status as it proceeds and it gets the cookie info from redis.
+
+    :param rd_pk: The PK of the RECAP Document to get.
+    :param fq_pk: The PK of the RECAP Fetch Queue to update.
+    :param user_pk: The PK of the User that made the request.
+    :return: The RECAPDocument PK
+    """
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    fq.status = PROCESSING_STATUS.IN_PROGRESS
+    fq.save()
+
+    if rd.is_available:
+        fq.status = PROCESSING_STATUS.SUCCESSFUL
+        fq.message = "PDF already marked as 'is_available'. Doing nothing."
+        fq.save()
+        self.request.chain = None
+        return
+
+    cookies = get_pacer_cookie_from_cache(user_pk)
+    if not cookies:
+        fq.status = PROCESSING_STATUS.FAILED
+        fq.message = "Unable to find cached cookies. Aborting request."
+        fq.save()
+        self.request.chain = None
+        return
+
+    pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    try:
+        r = download_pacer_pdf_by_rd(rd.pk, pacer_case_id, rd.pacer_doc_id,
+                                     cookies)
+    except (requests.RequestException, HTTPError):
+        fq.status = PROCESSING_STATUS.FAILED
+        fq.message = "Failed to get PDF from network."
+        fq.save()
+        self.request.chain = None
+        return
+
+    court_id = rd.docket_entry.docket.court_id
+    success, msg = update_rd_metadata(
+        self, rd_pk, r, court_id, pacer_case_id, rd.pacer_doc_id,
+        rd.document_number, rd.attachment_number)
+
+    if success is False:
+        fq.status = PROCESSING_STATUS.FAILED
+        fq.message = msg
+        fq.save()
+        self.request.chain = None
+        return
+
+    return rd.pk
+
+
+@app.task
+def mark_fq_successful(fq_pk):
+    fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    fq.status = PROCESSING_STATUS.SUCCESSFUL
+    fq.date_completed = now()
+    fq.message = "Successfully completed fetch and save."
+    fq.save()
