@@ -784,7 +784,7 @@ PACER_TO_CL_IDS = {
   --data 'request_type=1' \
   --data 'pacer_username=xxx' \
   --data 'pacer_password=yyy' \
-  --data 'docket_number=5:16-cv-00432'
+  --data 'docket_number=5:16-cv-00432' \
   --data 'court=okwd' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   {% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}</pre>
@@ -793,7 +793,7 @@ PACER_TO_CL_IDS = {
   --data 'request_type=1' \
   --data 'pacer_username=xxx' \
   --data 'pacer_password=yyy' \
-  --data 'docket_number=5:16-cv-00432'
+  --data 'docket_number=5:16-cv-00432' \
   --data 'court=okwd' \
   --data 'show_parties_and_counsel=true' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
