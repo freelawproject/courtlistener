@@ -184,11 +184,12 @@ def add_or_update_case_db(self, case_id):
         clean_data = lasc.get_json_from_internal_case_id(case_id)
         logger.info("Successful Query")
     except RequestException as e:
-        if self.request.retries == self.max_retries:
+        retries_remaining = self.max_retries - self.request.retries
+        if retries_remaining == 0:
             logger.error("RequestException, unable to get case at %s", case_id)
             return
         logger.info("Failed to get JSON for '%s', with RequestException: %s. "
-                    "%s retries remaining.", case_id, e, self.request.retries)
+                    "%s retries remaining.", case_id, e, retries_remaining)
         r = make_redis_interface('CACHE')
         r.delete(LASC_SESSION_COOKIE_KEY, LASC_SESSION_STATUS_KEY)
         self.retry()
