@@ -85,7 +85,7 @@ def make_lasc_search():
     return LASCSearch(session)
 
 
-@app.task(bind=True, ignore_result=True, max_retries=1)
+@app.task(bind=True, ignore_result=True, max_retries=3)
 def download_pdf(self, pdf_pk):
     """Downloads the PDF associated with the PDF DB Object ID passed in.
 
@@ -169,7 +169,7 @@ def add_case(case_id, case_data, original_data):
         save_json(original_data, docket)
 
 
-@app.task(bind=True, ignore_result=True, max_retries=1)
+@app.task(bind=True, ignore_result=True, max_retries=3)
 def add_or_update_case_db(self, case_id):
     """Add a case from the LASC MAP using an authenticated session object
 
@@ -271,7 +271,7 @@ def update_case(lasc, clean_data):
         save_json(lasc.case_data, content_obj=docket)
 
 
-@app.task(ignore_result=True, max_retries=1)
+@app.task(ignore_result=True, max_retries=3)
 def add_case_from_filepath(filepath):
     """Add case to database from filepath
 
@@ -295,7 +295,7 @@ def add_case_from_filepath(filepath):
                     "the database ", filepath)
 
 
-@app.task(bind=True, ignore_result=True, max_retries=2)
+@app.task(bind=True, ignore_result=True, max_retries=3)
 def fetch_date_range(self, start, end):
     """Queries LASC for one week or less range and returns the cases filed.
 
