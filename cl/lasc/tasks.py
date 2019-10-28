@@ -69,9 +69,9 @@ def establish_good_login(self):
     status = r.get(LASC_SESSION_STATUS_KEY)
     if status == SESSION_IS.LOGGING_IN:
         self.retry(countdown=retry_backoff)
-    bad_login = status != SESSION_IS.OK
-    if bad_login:
-        login_to_court()
+    if status == SESSION_IS.OK:
+        return
+    login_to_court()
 
 
 def make_lasc_search():
