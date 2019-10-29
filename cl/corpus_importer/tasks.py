@@ -820,7 +820,8 @@ def filter_docket_by_tags(self, data, tags, court_id):
 @app.task(bind=True, max_retries=10, interval_start=1 * 60,
           interval_step=5 * 60, ignore_result=True)
 def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
-                                user_pk=None, tag_names=None, **kwargs):
+                                user_pk=None, docket_pk=None, tag_names=None,
+                                **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -836,6 +837,8 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
     :param user_pk: The PK of a user making the request. This can be provided
     instead of the cookies parameter. If so, this will get the user's cookies
     from redis instead of passing them in as an argument.
+    :param docket_pk: The PK of the docket to update. Can also be provided in
+    the data param, above.
     :param tag_names: A list of tag names that should be stored with the item
     in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
@@ -853,7 +856,9 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
     pacer_case_id = data.get('pacer_case_id')
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
 
-    if data.get('docket_pk') is not None:
+    if docket_pk:
+        d = Docket.objects.get(pk=docket_pk)
+    elif data.get('docket_pk') is not None:
         d = Docket.objects.get(pk=data['docket_pk'])
     else:
         try:
@@ -898,11 +903,11 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
         if count > 1:
             d = d.earliest('date_created')
 
-        # Ensure that we set the case ID. This is needed on dockets that have
-        # matching docket numbers, but that never got PACER data before. This
-        # was previously rare, but since we added the FJC data to the dockets
-        # table, this is now quite common.
-        d.pacer_case_id = pacer_case_id
+    # Ensure that we set the case ID. This is needed on dockets that have
+    # matching docket numbers, but that never got PACER data before. This was
+    # previously rare, but since we added the FJC data to the dockets table,
+    # this is now quite common.
+    d.pacer_case_id = pacer_case_id
 
     d.add_recap_source()
     update_docket_metadata(d, docket_data)

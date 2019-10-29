@@ -3,7 +3,7 @@
 import argparse
 from glob import glob
 
-from datetime import datetime
+from datetime import date
 from datetime import timedelta
 
 from juriscraper.lib.date_utils import make_date_range_tuples
@@ -26,7 +26,7 @@ def date_search(options):
     end = options['end']
     logger.info("Getting cases between %s and %s, inclusive", start, end)
 
-    end = min(end, datetime.today().date())
+    end = min(end, date.today())
     date_ranges = make_date_range_tuples(start, end, gap=7)
     for start, end in date_ranges:
         tasks.fetch_date_range.apply_async(kwargs={"start": start, "end": end},
@@ -168,7 +168,7 @@ class Command(VerboseCommand):
                  "that passed to --directory-glob.",
         )
 
-        today = datetime.today()
+        today = date.today()
         start = today - timedelta(days=7)
         parser.add_argument(
             '--start',
