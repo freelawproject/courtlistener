@@ -535,7 +535,8 @@ AWS_STORAGE_BUCKET_NAME = 'com-courtlistener-storage'
 AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
 AWS_DEFAULT_ACL = "public-read"
 
-DEV_AWS_STORAGE_BUCKET_NAME = "dev-com-courtlistener-storage"
-DEV_AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % DEV_AWS_STORAGE_BUCKET_NAME
+if DEVELOPMENT:
+    AWS_STORAGE_BUCKET_NAME = "dev-com-courtlistener-storage"
+    AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
 
 CLOUDFRONT_DOMAIN = ""
