@@ -24,8 +24,7 @@ from cl.celery import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.document_processors import get_page_count, make_pdftotext_process, \
-    extract_by_ocr
-from cl.lib.mojibake import fix_mojibake
+    extract_by_ocr, extract_from_pdf
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
 from cl.lib.utils import is_iter
@@ -90,29 +89,6 @@ def extract_from_html(path):
         return '', True
     except:
         return '', True
-
-
-def extract_from_pdf(path, opinion, do_ocr=False):
-    """ Extract text from pdfs.
-
-    Here, we use pdftotext. If that fails, try to use tesseract under the
-    assumption it's an image-based PDF. Once that is complete, we check for the
-    letter e in our content. If it's not there, we try to fix the mojibake
-    that ca9 sometimes creates.
-    """
-    process = make_pdftotext_process(path)
-    content, err = process.communicate()
-    if content.strip() == '' and do_ocr:
-        success, content = extract_by_ocr(path)
-        if success:
-            opinion.extracted_by_ocr = True
-        elif content == '' or not success:
-            content = 'Unable to extract document content.'
-    elif 'e' not in content:
-        # It's a corrupt PDF from ca9. Fix it.
-        content = fix_mojibake(unicode(content, 'utf-8', errors='ignore'))
-
-    return content, err
 
 
 def extract_from_txt(path):
