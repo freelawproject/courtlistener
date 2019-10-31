@@ -9,8 +9,6 @@ import uuid
 from tempfile import NamedTemporaryFile
 
 import eyed3
-from PyPDF2 import PdfFileReader
-from PyPDF2.utils import PdfReadError
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.encoding import smart_text, DjangoUnicodeDecodeError, \
@@ -26,6 +24,7 @@ from cl.audio.utils import get_audio_binary
 from cl.celery import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.document_processors import get_page_count
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
@@ -178,35 +177,6 @@ def convert_file_to_txt(path):
         stderr=subprocess.PIPE,
     )
     return p.communicate()[0].decode('utf-8')
-
-
-def get_page_count(path, extension):
-    """Get the number of pages, if appropriate mimetype.
-
-    :param path: A path to a binary (pdf, wpd, doc, txt, html, etc.)
-    :param extension: The extension of the binary.
-    :return: The number of pages if possible, else return None
-    """
-    if extension == 'pdf':
-        try:
-            reader = PdfFileReader(path)
-            return int(reader.getNumPages())
-        except (IOError, ValueError, TypeError, KeyError, AssertionError,
-                PdfReadError):
-            # IOError: File doesn't exist. My bad.
-            # ValueError: Didn't get an int for the page count. Their bad.
-            # TypeError: NumberObject has no attribute '__getitem__'. Ugh.
-            # KeyError, AssertionError: assert xrefstream["/Type"] == "/XRef". WTF?
-            # PdfReadError: Something else. I have no words.
-            pass
-    elif extension == 'wpd':
-        # Best solution appears to be to dig into the binary format
-        pass
-    elif extension == 'doc':
-        # Best solution appears to be to dig into the XML of the file
-        # itself: http://stackoverflow.com/a/12972502/64911
-        pass
-    return None
 
 
 @app.task
