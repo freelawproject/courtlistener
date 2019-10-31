@@ -6,7 +6,6 @@ import random
 import subprocess
 import traceback
 import uuid
-from tempfile import NamedTemporaryFile
 
 import eyed3
 from django.conf import settings
@@ -24,7 +23,8 @@ from cl.audio.utils import get_audio_binary
 from cl.celery import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.document_processors import get_page_count, make_pdftotext_process
+from cl.lib.document_processors import get_page_count, make_pdftotext_process, \
+    extract_by_ocr
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
@@ -337,22 +337,6 @@ def cleanup_ocr_text(txt):
     for replacement in simple_replacements:
         txt = txt.replace(replacement[0], replacement[1])
     return txt
-
-
-@app.task
-def extract_by_ocr(path):
-    """Extract the contents of a PDF using OCR."""
-    fail_msg = (u"Unable to extract the content from this file. Please try "
-                u"reading the original.")
-    with NamedTemporaryFile(prefix='ocr_', suffix=".tiff") as tmp:
-        out, err, returncode = rasterize_pdf(path, tmp.name)
-        if returncode != 0:
-            return False, fail_msg
-
-        txt = convert_file_to_txt(tmp.name)
-        txt = cleanup_ocr_text(txt)
-
-    return True, txt
 
 
 def set_mp3_meta_data(audio_obj, mp3_path):

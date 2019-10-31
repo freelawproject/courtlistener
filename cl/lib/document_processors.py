@@ -1,9 +1,12 @@
 import subprocess
+from tempfile import NamedTemporaryFile
 
 from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
 
-from cl.scrapers.tasks import DEVNULL
+from cl.celery import app
+from cl.scrapers.tasks import DEVNULL, rasterize_pdf, convert_file_to_txt, \
+    cleanup_ocr_text
 
 
 def get_page_count(path, extension):
@@ -43,3 +46,19 @@ def make_pdftotext_process(path):
         stdout=subprocess.PIPE,
         stderr=DEVNULL
     )
+
+
+@app.task
+def extract_by_ocr(path):
+    """Extract the contents of a PDF using OCR."""
+    fail_msg = (u"Unable to extract the content from this file. Please try "
+                u"reading the original.")
+    with NamedTemporaryFile(prefix='ocr_', suffix=".tiff") as tmp:
+        out, err, returncode = rasterize_pdf(path, tmp.name)
+        if returncode != 0:
+            return False, fail_msg
+
+        txt = convert_file_to_txt(tmp.name)
+        txt = cleanup_ocr_text(txt)
+
+    return True, txt
