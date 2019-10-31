@@ -18,7 +18,7 @@ from cl.lib.import_lib import get_candidate_judges
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import ErrorLog
-from cl.scrapers.tasks import extract_doc_content
+from cl.lib.document_processors import extract_doc_content
 from cl.scrapers.utils import (
     get_extension, get_binary_content, signal_handler
 )
