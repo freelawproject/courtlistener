@@ -86,7 +86,9 @@ def extract_from_pdf(path, opinion, do_ocr=False):
     if content.strip() == '' and do_ocr:
         success, content = extract_by_ocr(path)
         if success:
-            opinion.extracted_by_ocr = True
+            if opinion is not None:
+                opinion.extracted_by_ocr = True
+
         elif content == '' or not success:
             content = 'Unable to extract document content.'
     elif 'e' not in content:
