@@ -17,6 +17,8 @@ from cl.lib.mojibake import fix_mojibake
 from cl.lib.string_utils import anonymize
 from cl.search.models import Opinion
 
+DEVNULL = open('/dev/null', 'w')
+
 
 def get_page_count(path, extension):
     """Get the number of pages, if appropriate mimetype.
@@ -55,7 +57,6 @@ def make_pdftotext_process(path):
         stdout=subprocess.PIPE,
         stderr=DEVNULL
     )
-
 
 @app.task
 def extract_by_ocr(path):
@@ -98,7 +99,6 @@ def extract_from_pdf(path, opinion, do_ocr=False):
     return content, err
 
 
-DEVNULL = open('/dev/null', 'w')
 
 
 def get_clean_body_content(content):
