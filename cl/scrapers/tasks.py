@@ -24,7 +24,7 @@ from cl.audio.utils import get_audio_binary
 from cl.celery import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.document_processors import get_page_count
+from cl.lib.document_processors import get_page_count, make_pdftotext_process
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
@@ -90,16 +90,6 @@ def extract_from_html(path):
         return '', True
     except:
         return '', True
-
-
-def make_pdftotext_process(path):
-    """Make a subprocess to hand to higher-level code."""
-    return subprocess.Popen(
-        ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
-        shell=False,
-        stdout=subprocess.PIPE,
-        stderr=DEVNULL
-    )
 
 
 def extract_from_pdf(path, opinion, do_ocr=False):

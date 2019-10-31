@@ -1,5 +1,9 @@
+import subprocess
+
 from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
+
+from cl.scrapers.tasks import DEVNULL
 
 
 def get_page_count(path, extension):
@@ -29,3 +33,13 @@ def get_page_count(path, extension):
         # itself: http://stackoverflow.com/a/12972502/64911
         pass
     return None
+
+
+def make_pdftotext_process(path):
+    """Make a subprocess to hand to higher-level code."""
+    return subprocess.Popen(
+        ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=DEVNULL
+    )
