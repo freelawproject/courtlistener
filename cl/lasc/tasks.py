@@ -18,8 +18,9 @@ from cl.lasc.models import Docket, DocumentImage, QueuedCase, QueuedPDF, \
     UPLOAD_TYPE
 from cl.lasc.models import LASCJSON, LASCPDF
 from cl.lasc.utils import make_case_id
-from cl.lib.crypto import sha1_of_json_data
+from cl.lib.crypto import sha1_of_json_data, sha1_of_file
 from cl.lib.redis_utils import make_redis_interface
+from cl.lib.document_processors import get_page_count, extract_from_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +122,10 @@ def download_pdf(self, pdf_pk):
     logger.info("%s, ID #%s from docket ID %s ",
                 doc.document_type, doc.doc_id, q_pdf.docket.case_id)
 
+    with open("%s/lasc-extraction-queue/%s.pdf" %
+              (settings.MEDIA_ROOT, doc.doc_id), "wb") as file:
+        file.write(pdf_data)
+
     with transaction.atomic():
         pdf_document.filepath_s3.save(
             doc.document_type,
@@ -132,6 +137,9 @@ def download_pdf(self, pdf_pk):
 
         # Remove the PDF from the queue
         q_pdf.delete()
+
+    process_pdf.apply_async(kwargs={"doc_id": q_pdf.document_id},
+                            queue="celery")
 
 
 def add_case(case_id, case_data, original_data):
@@ -354,3 +362,28 @@ def save_json(data, content_obj):
         'lasc.json',
         ContentFile(data),
     )
+
+@app.task(bind=True, ignore_result=True, max_retries=3, retry_backoff=15)
+def process_pdf(self, doc_id):
+    """
+
+    :param self:
+    :param doc_id:
+    :return:
+    """
+
+    path = "%s/lasc-extraction-queue/%s.pdf" % (settings.MEDIA_ROOT, doc_id)
+    logger.info("Doing extraction of LASC PDF at %s #%s", path, doc_id)
+
+    page_count = get_page_count(path, "pdf")
+    content, err = extract_from_pdf(path, None, True)
+
+    item = LASCPDF.objects.filter(document_id=doc_id)[0]
+    item.page_count = page_count
+    item.plain_text = content
+    item.ocr_status = LASCPDF.OCR_COMPLETE
+    item.file_size = os.path.getsize(path)
+    item.sha1 = sha1_of_file(path)
+    item.save()
+
+    os.remove(path)

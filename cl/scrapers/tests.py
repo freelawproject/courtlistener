@@ -14,8 +14,9 @@ from cl.scrapers.management.commands import (
 )
 from cl.scrapers.models import UrlHash, ErrorLog
 from cl.scrapers.tasks import (
-    extract_from_txt, extract_doc_content, process_audio_file
+    process_audio_file
 )
+from cl.lib.document_processors import extract_from_txt, extract_doc_content
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
 from cl.search.models import Court, Opinion

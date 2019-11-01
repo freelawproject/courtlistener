@@ -9,7 +9,8 @@ from cl.lib.pacer import PacerXMLParser
 from cl.lib.recap_utils import get_ia_document_url_from_path, \
     get_local_document_url_from_path
 from cl.search.models import RECAPDocument, Docket
-from cl.scrapers.tasks import get_page_count, extract_recap_pdf
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.lib.document_processors import get_page_count
 
 
 class CleanupPacerXMLParser(PacerXMLParser):

@@ -29,7 +29,8 @@ from cl.recap.mergers import add_docket_entries, add_parties_and_attorneys, \
     process_orphan_documents, find_docket_object
 from cl.recap.models import PacerHtmlFiles, ProcessingQueue, UPLOAD_TYPE, \
     FjcIntegratedDatabase, REQUEST_TYPE, PacerFetchQueue, PROCESSING_STATUS
-from cl.scrapers.tasks import extract_recap_pdf, get_page_count
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.lib.document_processors import get_page_count
 from cl.search.models import Docket, DocketEntry, RECAPDocument, Tag
 from cl.search.tasks import add_or_update_recap_docket, add_items_to_solr
 
