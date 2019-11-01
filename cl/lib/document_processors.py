@@ -141,6 +141,7 @@ def extract_from_docx(path):
     process = subprocess.Popen(['docx2txt', path, '-'], shell=False,
                                stdout=subprocess.PIPE, stderr=DEVNULL)
     content, err = process.communicate()
+    content = content.decode('utf-8', errors='ignore')
     return content, err
 
 
@@ -202,7 +203,7 @@ def extract_from_wpd(path, opinion):
     process = subprocess.Popen(['wpd2html', path], shell=False,
                                stdout=subprocess.PIPE, stderr=DEVNULL)
     content, err = process.communicate()
-
+    content = content.decode('utf-8', errors='ignore')
     content = get_clean_body_content(content)
 
     if 'not for publication' in content.lower():
