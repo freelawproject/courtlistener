@@ -17,6 +17,7 @@ from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.string_utils import anonymize
 from cl.search.models import Opinion
+from cl.lib.models import AbstractPDF
 
 DEVNULL = open('/dev/null', 'w')
 
@@ -75,7 +76,7 @@ def extract_by_ocr(path):
     return True, txt
 
 
-def extract_from_pdf(path, opinion, do_ocr=False):
+def extract_from_pdf(path, do_ocr=False):
     """ Extract text from pdfs.
 
     Here, we use pdftotext. If that fails, try to use tesseract under the
@@ -83,21 +84,24 @@ def extract_from_pdf(path, opinion, do_ocr=False):
     letter e in our content. If it's not there, we try to fix the mojibake
     that ca9 sometimes creates.
     """
+    ocr_status = AbstractPDF.OCR_NEEDED
+
     process = make_pdftotext_process(path)
     content, err = process.communicate()
     if content.strip() == '' and do_ocr:
         success, content = extract_by_ocr(path)
         if success:
-            if opinion is not None:
-                opinion.extracted_by_ocr = True
+            ocr_status = AbstractPDF.OCR_COMPLETE
 
         elif content == '' or not success:
             content = 'Unable to extract document content.'
+            ocr_status = AbstractPDF.OCR_FAILED
     elif 'e' not in content:
         # It's a corrupt PDF from ca9. Fix it.
-        content = fix_mojibake(unicode(content, 'utf-8', errors='ignore'))
+        ocr_status = AbstractPDF.OCR_UNNECESSARY
+        content = fix_mojibake(content)
 
-    return content, err
+    return content, ocr_status, err
 
 
 
