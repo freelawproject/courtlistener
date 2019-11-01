@@ -2,6 +2,7 @@ import argparse
 import csv
 
 from django.conf import settings
+from django.core.paginator import Paginator
 
 from cl.corpus_importer.tasks import save_ia_docket_to_disk
 from cl.lib.celery_utils import CeleryThrottle
@@ -15,26 +16,27 @@ BULK_OUTPUT_DIRECTORY = '/sata/sample-data/pharma-dockets'
 def query_dockets(query_string):
     """Identify the d_pks for all the dockets that we need to export
 
-    :param query: The query to run as a URL-encoded string (typically starts
+    :param query_string: The query to run as a URL-encoded string (typically starts
      with 'q='). E.g. 'q=foo&type=r&order_by=dateFiled+asc&court=dcd'
-    :return: a list of docket PKs to export
+    :return: a set of docket PKs to export
     """
-    page_size = 50000
     main_query = build_main_query_from_query_string(
         query_string,
-        {'rows': page_size, 'fl': ['docket_id']},
-        {'group': False, 'facet': False},
+        {'fl': ['docket_id']},
+        {'group': True, 'facet': False, 'highlight': False},
     )
+    main_query['group.limit'] = 0
+    main_query['sort'] = 'dateFiled asc'
     si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
-    results = si.query().add_extra(**main_query).execute()
-    logger.info("Got %s search results for query %s",
-                results.result.numFound, query_string)
-    assert results.result.numFound != page_size, \
-        "Got %s results. Page size too small." % page_size
+    search = si.query().add_extra(**main_query)
+    page_size = 1000
+    paginator = Paginator(search, page_size)
     d_pks = set()
-    for result in results:
-        d_pks.add(result['id'])
-    return list(d_pks)
+    for page_number in paginator.page_range:
+        page = paginator.page(page_number)
+        for item in page:
+            d_pks.add(item['groupValue'])
+    return d_pks
 
 
 def get_query_from_link(url):
@@ -57,24 +59,27 @@ def query_and_export(options):
     :param options: The argparse options
     :return None
     """
-    q = options['queue']
-    offset = options['offset'] # XXX
-    throttle = CeleryThrottle(queue_name=q)
     f = options['file']
     reader = csv.DictReader(f)
+    d_pks = set()
     for row in reader:
         query_params = get_query_from_link(row['Link'])
         logger.info('Doing query: %s', query_params)
-        d_pks = query_dockets(query_params)
-        for i, d_pk in enumerate(d_pks):
-            if i >= options['limit'] > 0:
-                break
-            logger.info("Doing item %s with pk %s", i, d_pk)
-            throttle.maybe_wait()
-            save_ia_docket_to_disk.apply_async(
-                args=(d_pk, options['output_directory']),
-                queue=q,
-            )
+        d_pks.update(query_dockets(query_params))
+
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q)
+    for i, d_pk in enumerate(d_pks):
+        if i < options['offset']:
+            continue
+        if i >= options['limit'] > 0:
+            break
+        logger.info("Doing item %s with pk %s", i, d_pk)
+        throttle.maybe_wait()
+        save_ia_docket_to_disk.apply_async(
+            args=(d_pk, options['output_directory']),
+            queue=q,
+        )
 
 
 class Command(VerboseCommand):
@@ -105,7 +110,7 @@ class Command(VerboseCommand):
             type=argparse.FileType('r'),
             help="Where is the CSV that has the information about what to "
                  "download?",
-            required=False,
+            required=True,
         )
         parser.add_argument(
             '--output-directory',
@@ -117,5 +122,4 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        logger.info("Using PACER username: %s" % PACER_USERNAME)
         query_and_export(options)
