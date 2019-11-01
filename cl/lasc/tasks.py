@@ -20,7 +20,8 @@ from cl.lasc.models import LASCJSON, LASCPDF
 from cl.lasc.utils import make_case_id
 from cl.lib.crypto import sha1_of_json_data, sha1_of_file
 from cl.lib.redis_utils import make_redis_interface
-from cl.lib.document_processors import get_page_count, extract_from_pdf
+from cl.lib.document_processors import get_page_count, extract_from_pdf, \
+     anonymize
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +140,7 @@ def download_pdf(self, pdf_pk):
         q_pdf.delete()
 
     process_pdf.apply_async(kwargs={"doc_id": q_pdf.document_id},
-                            queue="celery")
+                            queue="batch3")
 
 
 def add_case(case_id, case_data, original_data):
@@ -376,12 +377,16 @@ def process_pdf(self, doc_id):
     logger.info("Doing extraction of LASC PDF at %s #%s", path, doc_id)
 
     page_count = get_page_count(path, "pdf")
-    content, err = extract_from_pdf(path, None, True)
+    content, ocr_status, err = extract_from_pdf(path, True)
+
+    content, blocked = anonymize(content)
+    if blocked:
+        logger.info("PI found in LASC data #%s", doc_id)
 
     item = LASCPDF.objects.filter(document_id=doc_id)[0]
     item.page_count = page_count
     item.plain_text = content
-    item.ocr_status = LASCPDF.OCR_COMPLETE
+    item.ocr_status = ocr_status
     item.file_size = os.path.getsize(path)
     item.sha1 = sha1_of_file(path)
     item.save()
