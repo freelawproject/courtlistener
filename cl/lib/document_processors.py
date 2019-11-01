@@ -88,7 +88,11 @@ def extract_from_pdf(path, do_ocr=False):
 
     process = make_pdftotext_process(path)
     content, err = process.communicate()
-    if content.strip() == '' and do_ocr:
+    content = content.decode('utf-8', errors='ignore')
+
+    if content.strip() != '':
+        ocr_status = AbstractPDF.OCR_UNNECESSARY
+    elif content.strip() == '' and do_ocr:
         success, content = extract_by_ocr(path)
         if success:
             ocr_status = AbstractPDF.OCR_COMPLETE
