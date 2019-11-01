@@ -48,5 +48,5 @@ CMD celery \
     --events \
     --concurrency=4 \
     --pool=prefork \
-    --queues=io_bound,celery,batch1,batch2,lasc-pdf-queue
+    --queues=io_bound,celery,batch1,batch2,batch3,batch4,batch5,batch6,batch7,batch8,batch9
 
