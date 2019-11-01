@@ -257,7 +257,11 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     elif extension == 'html':
         content, err = extract_from_html(path)
     elif extension == 'pdf':
-        content, err = extract_from_pdf(path, opinion, do_ocr)
+        content, ocr_status, err = extract_from_pdf(path, do_ocr)
+        if ocr_status == 1:
+            opinion.extracted_by_ocr = True
+        else:
+            opinion.extracted_by_ocr = False
     elif extension == 'txt':
         content, err = extract_from_txt(path)
     elif extension == 'wpd':
