@@ -36,6 +36,8 @@ def query_dockets(query_string):
         page = paginator.page(page_number)
         for item in page:
             d_pks.add(item['groupValue'])
+    logger.info("After %s pages, got back %s results.",
+                len(paginator.page_range), len(d_pks))
     return d_pks
 
 
@@ -62,7 +64,11 @@ def query_and_export(options):
     f = options['file']
     reader = csv.DictReader(f)
     d_pks = set()
-    for row in reader:
+    for i, row in enumerate(reader):
+        if i < options['query_offset']:
+            continue
+        if i >= options['query_limit'] > 0:
+            break
         query_params = get_query_from_link(row['Link'])
         logger.info('Doing query: %s', query_params)
         d_pks.update(query_dockets(query_params))
@@ -104,6 +110,21 @@ class Command(VerboseCommand):
             default=0,
             help="After doing this number, stop. This number is not additive "
                  "with the offset parameter. Default is to do all of them.",
+        )
+        parser.add_argument(
+            '--query-offset',
+            type=int,
+            default=0,
+            help="The number of queries to skip before beginning. Default is "
+                 "to skip none.",
+        )
+        parser.add_argument(
+            '--query-limit',
+            type=int,
+            default=0,
+            help="After doing this number of queries, do no more and proceed "
+                 "to generating dockets. This number is not additive with the "
+                 "offset parameter. Default is to do all of them.",
         )
         parser.add_argument(
             '--file',
