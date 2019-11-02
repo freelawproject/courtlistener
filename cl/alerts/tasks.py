@@ -92,7 +92,7 @@ def send_docket_alert(d_pk, since):
 
         DocketAlert.objects.filter(docket=docket).update(date_last_hit=now())
 
-    # Work completed, clear the semaphor
+    # Work completed, clear the semaphore
     r = make_redis_interface('ALERTS')
     r.delete(make_alert_key(d_pk))
 
