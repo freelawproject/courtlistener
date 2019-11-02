@@ -133,7 +133,6 @@ def do_search(request, rows=20, order_by=None, type=None, facet=True,
             cd['type'] = type
 
         # Do the query, hitting the cache if desired
-        # noinspection PyBroadException
         try:
             results = get_solr_result_objects(cd, facet)
             paged_results = paginate_cached_solr_results(request, cd, results,
