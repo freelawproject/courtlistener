@@ -130,12 +130,8 @@ def extract_from_doc(path):
     https://stackoverflow.com/questions/13404116/subprocess-popen-command-antiword-produces-different-output-in-shell-vs-web-a
     """
 
-    new_env = dict(os.environ)  # Copy current environment
-    new_env['LANG'] = 'en_US.UTF-8'
-
     process = subprocess.Popen(['antiword', path, '-i', '1'], shell=False,
-                               stdout=subprocess.PIPE, stderr=DEVNULL,
-                               env=new_env)
+                               stdout=subprocess.PIPE, stderr=DEVNULL)
     content, err = process.communicate()
     content = content.decode('utf-8', errors='ignore')
     return content, err
