@@ -80,7 +80,8 @@ def query_and_export(options):
             continue
         if i >= options['limit'] > 0:
             break
-        logger.info("Doing item %s with pk %s", i, d_pk)
+        if i % 1000 == 0:
+            logger.info("Doing item %s with pk %s", i, d_pk)
         throttle.maybe_wait()
         save_ia_docket_to_disk.apply_async(
             args=(d_pk, options['output_directory']),
