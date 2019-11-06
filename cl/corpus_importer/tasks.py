@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 
+from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.crypto import sha1
 from cl.people_db.models import Attorney, Role
@@ -301,6 +302,7 @@ def process_free_opinion_result(self, row_pk, cnt):
     delattr(row_copy, 'court_id')
     # If we don't do this, the id of result tries to smash that of the docket.
     delattr(row_copy, 'id')
+    start_time = now()
     try:
         with transaction.atomic():
             d = lookup_and_save(row_copy)
@@ -386,6 +388,11 @@ def process_free_opinion_result(self, row_pk, cnt):
         result.delete()
         self.request.chain = None
         return
+
+    if rd_created:
+        newly_enqueued = enqueue_docket_alert(d.pk)
+        if newly_enqueued:
+            send_docket_alert(d.pk, start_time)
 
     return {'result': result, 'rd_pk': rd.pk,
             'pacer_court_id': result.court_id}
