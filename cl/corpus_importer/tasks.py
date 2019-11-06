@@ -303,20 +303,20 @@ def process_free_opinion_result(self, row_pk, cnt):
     delattr(row_copy, 'id')
     try:
         with transaction.atomic():
-            docket = lookup_and_save(row_copy)
-            if not docket:
+            d = lookup_and_save(row_copy)
+            if not d:
                 msg = "Unable to create docket for %s" % result
                 logger.error(msg)
                 result.error_msg = msg
                 result.save()
                 self.request.chain = None
                 return
-            docket.blocked, docket.date_blocked = get_blocked_status(docket)
-            mark_ia_upload_needed(docket)
-            docket.save()
+            d.blocked, d.date_blocked = get_blocked_status(d)
+            mark_ia_upload_needed(d)
+            d.save()
 
             de, de_created = DocketEntry.objects.update_or_create(
-                docket=docket,
+                docket=d,
                 entry_number=result.document_number,
                 defaults={
                     'date_filed': result.date_filed,
