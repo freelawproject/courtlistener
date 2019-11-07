@@ -12,7 +12,6 @@ from cl.lasc import tasks
 from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.db_tools import queryset_generator
 
 from cl.lasc.models import QueuedCase, QueuedPDF
 
