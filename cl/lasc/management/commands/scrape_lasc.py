@@ -3,7 +3,7 @@
 import argparse
 from glob import glob
 
-from datetime import datetime
+from datetime import date
 from datetime import timedelta
 
 from juriscraper.lib.date_utils import make_date_range_tuples
@@ -12,6 +12,7 @@ from cl.lasc import tasks
 from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.db_tools import queryset_generator
 
 from cl.lasc.models import QueuedCase, QueuedPDF
 
@@ -25,7 +26,7 @@ def date_search(options):
     end = options['end']
     logger.info("Getting cases between %s and %s, inclusive", start, end)
 
-    end = min(end, datetime.today().date())
+    end = min(end, date.today())
     date_ranges = make_date_range_tuples(start, end, gap=7)
     for start, end in date_ranges:
         tasks.fetch_date_range.apply_async(kwargs={"start": start, "end": end},
@@ -107,7 +108,9 @@ def process_pdf_queue(options):
 
     :return: None
     """
-    pdf_pks = QueuedPDF.objects.all().values_list('pk', flat=True)
+    pdf_pks = queryset_generator(QueuedPDF.objects.all()
+                                 .order_by('-document_id')
+                                 .values_list('pk', flat=True))
     q = options['queue']
     throttle = CeleryThrottle(queue_name=q)
     for pdf_pk in pdf_pks:
@@ -165,7 +168,7 @@ class Command(VerboseCommand):
                  "that passed to --directory-glob.",
         )
 
-        today = datetime.today()
+        today = date.today()
         start = today - timedelta(days=7)
         parser.add_argument(
             '--start',
