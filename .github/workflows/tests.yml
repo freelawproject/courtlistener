@@ -12,6 +12,7 @@ jobs:
         uses: actions/checkout@v1
         with:
           repository: freelawproject/courtlistener-solr-server
+          ref: master
       - name: make courtlistener dir and move to it
         run: cd .. && mkdir courtlistener && cd courtlistener
       - name: Check out CourtListener
