@@ -1,3 +1,6 @@
+# !/usr/bin/python
+# -*- coding: utf-8 -*-
+
 import re
 import argparse
 import requests
@@ -5,6 +8,7 @@ from internetarchive import get_files
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Opinion, OpinionCluster, Docket, Citation
+from cl.citations import find_citations
 
 def find_docket_no_section(str):
     """
