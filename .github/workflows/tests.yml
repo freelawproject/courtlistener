@@ -17,6 +17,8 @@ jobs:
         run: mkdir courtlistener && cd courtlistener
       - name: Check out CourtListener
         uses: actions/checkout@v1
+      - name: ls -R root dir
+        run: ls -Rla
       - name: Start docker compose
         run: cd courtlistener/docker/courtlistener && docker-compose up -d
         
