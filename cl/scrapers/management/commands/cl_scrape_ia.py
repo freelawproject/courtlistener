@@ -79,38 +79,55 @@ def get_citation(str):
 
 def update_tax_opinions(options):
     """
-    This function can be run as a cronjob to add docket and case information to
-    scraped tax court cases.
+    This code should identifies tax opinions without docket numbers or citations
+    and attempts to parse and add the citation and docket numbers to the case.
 
+    http://www.ustaxcourt.gov/UstcInOp/asp/Todays.asp is an identifier for
+    bad scrapes in tax court.
     :param options:
     :return:
     """
-
-    tax_dockets = Docket.objects.all().filter(court_id="tax").\
-        filter(docket_number=None)
-
-    for docket in tax_dockets:
-        if OpinionCluster.objects.filter(docket_id=docket.id):
-            oc = OpinionCluster.objects.get(docket_id=docket.id)
-            op = Opinion.objects.get(cluster_id=oc.id)
-
-            if op.plain_text is not None:
-                case_dict = get_citation(op.plain_text)
-                if not case_dict:
-                    continue
+    op_clusters = OpinionCluster.objects.filter(docket__court="tax").\
+                                filter(docket__docket_number=None)
+    for oc in op_clusters:
+        docket_number = None
+        cites = None
+        op_obj = Opinion.objects.get(cluster_id=oc.id)
+        if op_obj.plain_text != "" and \
+            op_obj.download_url != "http://www.ustaxcourt.gov/UstcInOp/asp/Todays.asp":
+            for row in op_obj.plain_text.split("\n")[:250]:
+                cites = find_citations.get_citations(row, html=False)
                 try:
-                    docket_section = find_docket_no_section(op.plain_text)
+                    docket_section = find_docket_no_section(op_obj.plain_text)
                     docket_number = get_docket_numbers(docket_section).\
                         replace(".", "")
-
                 except Exception as e:
-                    print str(e)
-                    continue
-                case_dict['cluster_id'] = oc.id
-                Citation.objects.create(**case_dict)
-                docket.docket_number = docket_number
-                docket.save()
+                    pass
 
+                if cites:
+                    cite_dict = cites[0].__dict__
+
+                    if "T.C." == cite_dict['reporter'] or \
+                        "T.C. No." == cite_dict['reporter']:
+                        cite_type = 4
+                    else:
+                        cite_type = 8
+
+                    Citation.objects.create(**{
+                        "volume" : cite_dict['volume'],
+                        "reporter" : cite_dict['reporter'],
+                        "page" : cite_dict['page'],
+                        "type" : cite_type,
+                        "cluster_id": oc.id
+                    })
+
+                    if docket_number:
+                        docket = Docket.objects.get(id=oc.docket_id)
+                        docket.docket_number = docket_number
+                        docket.save()
+
+                    logger.info("Saved Citation %s with docket no(s) %s" % (cite_dict, docket_number))
+                    break
 
 def add_cases_from_IA(options):
     """
