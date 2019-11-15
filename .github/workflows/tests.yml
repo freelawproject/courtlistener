@@ -13,6 +13,8 @@ jobs:
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: master
+      - name: List files
+        run: ls -l
       - name: make courtlistener dir and move to it
         run: cd .. && mkdir courtlistener && cd courtlistener
       - name: Check out CourtListener
