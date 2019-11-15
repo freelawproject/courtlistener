@@ -345,15 +345,43 @@ def extract_base_citation(words, reporter_index):
     Given a list of words and the index of a federal reporter, look before and
     after for volume and page.  If found, construct and return a
     Citation object.
+
+    If we are given neutral, tax court opinions we treat them differently.
+    The formats often follow {REPORTER} {YEAR}-{ITERATIVE_NUMBER}
+    ex. T.C. Memo. 2019-13
     """
-    volume = strip_punct(words[reporter_index - 1])
+    reporter = words[reporter_index]
+    rep_plus_one = words[reporter_index + 1]
+    normal = True
+
+    if VARIATIONS_ONLY.get(reporter):
+        for report in VARIATIONS_ONLY.get(reporter):
+            lookup_ed = EDITIONS.get(report)
+            if reporter in REPORTERS[lookup_ed][0]['variations'].keys():
+                if REPORTERS[lookup_ed][0]['mlz_jurisdiction'][0] == "us:c;tax.court" \
+                    and REPORTERS[lookup_ed][0]['cite_type'] == "neutral" \
+                    and "-" in rep_plus_one:
+                    volume, page = rep_plus_one.split('-')
+                    normal = False
+    if EDITIONS.get(reporter):
+        rep = EDITIONS.get(reporter)
+        # print rep
+        if REPORTERS[rep][0]['mlz_jurisdiction'][0] == "us:c;tax.court" \
+            and REPORTERS[rep][0]['cite_type'] == "neutral" \
+            and "-" in rep_plus_one:
+            volume, page = rep_plus_one.split('-')
+            normal = False
+
+    if normal:
+        volume = strip_punct(words[reporter_index - 1])
     if volume.isdigit():
         volume = int(volume)
     else:
         # No volume, therefore not a valid citation
         return None
 
-    page = strip_punct(words[reporter_index + 1])
+    if normal:
+        page = strip_punct(words[reporter_index + 1])
     if page.isdigit():
         # Most page numbers will be digits.
         page = int(page)
@@ -370,7 +398,6 @@ def extract_base_citation(words, reporter_index):
             # Not Roman, and not a weird connecticut page number.
             return None
 
-    reporter = words[reporter_index]
     return Citation(reporter, page, volume, reporter_found=reporter,
                     reporter_index=reporter_index)
 
