@@ -8,17 +8,19 @@ jobs:
     steps:
       - name: Make solr dir and move to it
         run: mkdir courtlistener-solr-server && cd courtlistener-solr-server
+      - name: ls -R root dir
+        run: pwd && ls -Rla
       - name: Check out solr
         uses: actions/checkout@v1
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: master
       - name: make courtlistener dir and move to it
-        run: mkdir courtlistener && cd courtlistener
+        run: pwd && mkdir courtlistener && cd courtlistener
       - name: Check out CourtListener
         uses: actions/checkout@v1
       - name: ls -R root dir
-        run: ls -Rla
+        run: pwd && ls -Rla
       - name: Start docker compose
         run: cd courtlistener/docker/courtlistener && docker-compose up -d
         
