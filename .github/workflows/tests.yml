@@ -15,11 +15,11 @@ jobs:
           ref: master
       # The mv fails b/c trying to move dir into itself, mask that with `true`.
       - name: mv solr code to solr dir
-        run: mv courtlistener-solr-server courtlistener-solr-server && true
+        run: rsync -av --remove-source-files --exclude courtlistener-solr-server * courtlistener-solr-server
       - name: Check out CourtListener
         uses: actions/checkout@v1
       - name: mv courtlistener code to courtlistener dir
-        run: mv courtlistener courtlistener && true
+        run: rsync -av --remove-source-files --exclude courtlistener * courtlistener
       - name: Start docker compose
         run: docker-compose up -d
         working-directory: courtlistener/docker/courtlistener
