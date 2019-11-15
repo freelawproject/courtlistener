@@ -13,13 +13,13 @@ jobs:
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: master
-      # See: https://unix.stackexchange.com/a/13934/45614
+      # The mv fails b/c trying to move dir into itself, mask that with `true`.
       - name: mv solr code to solr dir
-        run: shopt -s extglob && mv !(courtlistener-solr-server) courtlistener-solr-server
+        run: mv courtlistener-solr-server courtlistener-solr-server && true
       - name: Check out CourtListener
         uses: actions/checkout@v1
       - name: mv courtlistener code to courtlistener dir
-        run: shopt -s extglob && mv !(courtlistener) courtlistener
+        run: mv courtlistener courtlistener && true
       - name: Start docker compose
         run: docker-compose up -d
         working-directory: courtlistener/docker/courtlistener
