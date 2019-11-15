@@ -6,21 +6,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Make solr dir and move to it
-        run: mkdir courtlistener-solr-server && cd courtlistener-solr-server
-      - name: ls -R root dir
-        run: pwd && ls -Rla
+      - name: Make solr and courtlistener directories
+        run: mkdir courtlistener-solr-server courtlistener
       - name: Check out solr
         uses: actions/checkout@v1
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: master
-      - name: make courtlistener dir and move to it
-        run: pwd && mkdir courtlistener && cd courtlistener
+      - name: mv solr code to solr dir
+        run: mv * courtlistener-solr-server
       - name: Check out CourtListener
         uses: actions/checkout@v1
-      - name: ls -R root dir
-        run: pwd && ls -Rla
+      - name: mv courtlistener code to courtlistener dir
+        run: mv * courtlistener
       - name: Start docker compose
-        run: cd courtlistener/docker/courtlistener && docker-compose up -d
-        
+        run: docker-compose up -d
+        working-directory: courtlistener/docker/courtlistener
