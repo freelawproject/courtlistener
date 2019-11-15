@@ -20,7 +20,7 @@ def find_docket_no_section(str):
     """
     regex = r"Docket No.*.Filed|Docket No.*.(, [0-9]{4}.)"
     matches = re.finditer(regex, str)
-    r = r"[0-9]{3,5}-[0-9A-Za-z]{2,4}(\.)"
+    r = r"[0-9]{3,5}-[0-9A-Za-z]{2,4}(\.)|([0-9]{3,5}-[0-9A-Za-z]{2,4} [A-Z](\.))"
     for matchNum, match in enumerate(matches, start=1):
         xst = str[match.start():]
         matches2 = re.finditer(r, str[match.start():])
@@ -34,7 +34,7 @@ def get_docket_numbers(parsed_text):
     :param parsed_text:
     :return:
     """
-    regex = r"[0-9]{3,5}-[0-9A-Za-z]{2,4}(\,|\.)"
+    regex = r"[0-9]{3,5}-[0-9A-Za-z]{2,4}(\.)|([0-9]{3,5}-[0-9A-Za-z]{2,4} [A-Z](\.))"
     matches = re.finditer(regex, parsed_text, re.MULTILINE)
     hits = []
     for matchNum, match in enumerate(matches, start=1):
