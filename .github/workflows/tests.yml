@@ -9,7 +9,7 @@ jobs:
       - name: Make solr dir and move to it
         run: mkdir courtlistner-solr-server && cd courtlistener-solr-server
       - name: Check out solr
-        uses: actions/chcekout@v1
+        uses: actions/checkout@v1
         with:
           repository: freelawproject/courtlistener-solr-server
       - name: make courtlistener dir and move to it
