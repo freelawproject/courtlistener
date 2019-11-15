@@ -514,7 +514,7 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True,
     citations = []
     # Exclude first and last tokens when looking for reporters, because valid
     # citations must have a volume before and a page after the reporter.
-    for i in xrange(1, len(words) - 1):
+    for i in xrange(0, len(words) - 1):
         # Find reporter
         if words[i] in (EDITIONS.keys() + VARIATIONS_ONLY.keys()):
             citation = extract_base_citation(words, i)
