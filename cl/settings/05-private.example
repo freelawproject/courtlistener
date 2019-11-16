@@ -20,14 +20,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'courtlistener',
-        'USER': 'django',
-        'PASSWORD': 'your-password',
-        'CONN_MAX_AGE': 600,
-    },
-    'docker': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'courtlistener',
-        'USER': 'postgres',
+        'USER': 'postgres',  # Use 'django' in prod
         'PASSWORD': 'postgres',
         'CONN_MAX_AGE': 600,
     }
