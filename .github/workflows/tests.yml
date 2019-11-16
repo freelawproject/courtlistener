@@ -13,10 +13,12 @@ jobs:
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: origin/master
-      - name: Check out CourtListener
-        uses: actions/checkout@v1
-      - name: ls
-        run: ls -Ra
-      - name: Start docker compose
-        run: docker-compose up -d
-        working-directory: courtlistener/docker/courtlistener
+      - name: get info
+        run: pwd && ls -Ra
+#       - name: Check out CourtListener
+#         uses: actions/checkout@v1
+#       - name: ls
+#         run: ls -Ra
+#       - name: Start docker compose
+#         run: docker-compose up -d
+#         working-directory: courtlistener/docker/courtlistener
