@@ -11,6 +11,8 @@ jobs:
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: origin/master
+      - name: Set up solr permissions
+        run: pwd && ls && cd ../courtlistener-solr-server && ls
       - name: Check out CourtListener
         uses: actions/checkout@v1
       - name: Create the private settings file
@@ -27,4 +29,4 @@ jobs:
         working-directory: docker/courtlistener
         run: docker-compose logs
       - name: Run the tests!
-        run: docker exec cl-django python /opt/courtlistener/manage.py test cl
+        run: docker exec cl-django python /opt/courtlistener/manage.py test cl --fastfail
