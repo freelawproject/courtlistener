@@ -13,6 +13,9 @@ jobs:
           ref: origin/master
       - name: Check out CourtListener
         uses: actions/checkout@v1
+      - name: Create the private settings file
+        working-directory: cl/settings
+        run: cp 05-private.example 05-private.py
       - name: Create docker network
         run: docker network create -d bridge --attachable cl_net_overlay
       - name: Start docker compose
