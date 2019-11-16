@@ -9,14 +9,14 @@ jobs:
 #       - name: Make solr and courtlistener directories
 #         run: mkdir courtlistener-solr-server
       - name: get info
-        run: pwd && ls -Ra
+        run: cd .. && pwd && ls -Ra
       - name: Check out solr
         uses: actions/checkout@v1
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: origin/master
       - name: get info
-        run: pwd && ls -Ra
+        run: cd .. && pwd && ls -Ra
 #       - name: Check out CourtListener
 #         uses: actions/checkout@v1
 #       - name: ls
