@@ -16,12 +16,14 @@ jobs:
       - name: Create docker network
         run: docker network create -d bridge --attachable cl_net_overlay
       - name: Start docker compose
-        run: docker-compose up -d
         working-directory: docker/courtlistener
+        run: docker-compose up -d
       - name: List docker statuses
         run: docker ps -a
       - name: Show the logs
-        run: docker logs cl-django
+        working-directory: docker/courtlistener
+        run: docker-compose logs
+        
 #       - name: Run the tests!
 # #         run: docker exec cl-django python /opt/courtlistener/manage.py test cl
 #         run: python /opt/courtlistener/manage.py test cl
