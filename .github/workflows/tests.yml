@@ -25,6 +25,6 @@ jobs:
         run: docker ps -a
       - name: Show the logs
         working-directory: docker/courtlistener
-        run: docker-compose logs        
+        run: docker-compose logs
       - name: Run the tests!
-        run: docker exec cl-django python /opt/courtlistener/manage.py test cl
+        run: docker exec cl-django python /opt/courtlistener/manage.py test cl --dbname docker

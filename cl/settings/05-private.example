@@ -24,6 +24,13 @@ DATABASES = {
         'PASSWORD': 'your-password',
         'CONN_MAX_AGE': 600,
     },
+    'docker': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'courtlistener',
+        'USER': 'postgres',
+        'PASSWORD': 'postgres',
+        'CONN_MAX_AGE': 600,
+    }
 }
 API_READ_DATABASES = ['replica']
 
