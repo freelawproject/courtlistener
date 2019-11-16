@@ -6,8 +6,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Make solr and courtlistener directories
-        run: mkdir courtlistener-solr-server
+#       - name: Make solr and courtlistener directories
+#         run: mkdir courtlistener-solr-server
+      - name: get info
+        run: pwd && ls -Ra
       - name: Check out solr
         uses: actions/checkout@v1
         with:
