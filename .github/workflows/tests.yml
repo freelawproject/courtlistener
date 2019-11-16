@@ -14,7 +14,7 @@ jobs:
           repository: freelawproject/courtlistener-solr-server
           ref: master
       - name: ls
-        run: ls -R
+        run: ls -aR
       # The mv fails b/c trying to move dir into itself, mask that with `true`.
 #       - name: mv solr code to solr dir
 #         run: rsync -av --remove-source-files --exclude courtlistener-solr-server * courtlistener-solr-server
