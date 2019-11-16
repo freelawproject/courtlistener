@@ -146,7 +146,7 @@ class Command(VerboseCommand):
                     # dockets. Updating them all would be very bad.
                     add_items_to_solr.s('search.RECAPDocument'),
                     mark_status_successful.si(new_status.pk),
-                ).apply_async()
+                ).apply_async(expires=60 * 30)
 
             # Trim if not too recently trimmed.
             trim_cutoff_date = now() - timedelta(
