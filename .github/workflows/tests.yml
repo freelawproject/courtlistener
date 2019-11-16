@@ -21,4 +21,6 @@ jobs:
       - name: List docker statuses
         run: docker ps -a
       - name: Run the tests!
-        run: docker exec cl-django python /opt/courtlistener/manage.py test cl
+#         run: docker exec cl-django python /opt/courtlistener/manage.py test cl
+        container: cl-django
+        run: python /opt/courtlistener/manage.py test cl
