@@ -7,21 +7,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Make solr and courtlistener directories
-        run: mkdir courtlistener-solr-server courtlistener
+        run: mkdir courtlistener-solr-server
       - name: Check out solr
         uses: actions/checkout@v1
         with:
           repository: freelawproject/courtlistener-solr-server
-          ref: master
-      - name: ls
-        run: ls -aR
-      # The mv fails b/c trying to move dir into itself, mask that with `true`.
-#       - name: mv solr code to solr dir
-#         run: rsync -av --remove-source-files --exclude courtlistener-solr-server * courtlistener-solr-server
-#       - name: Check out CourtListener
-#         uses: actions/checkout@v1
-#       - name: mv courtlistener code to courtlistener dir
-#         run: rsync -av --remove-source-files --exclude courtlistener * courtlistener
-#       - name: Start docker compose
-#         run: docker-compose up -d
-#         working-directory: courtlistener/docker/courtlistener
+          ref: origin/master
+      - name: mv solr code to solr dir
+        run: rsync -av --remove-source-files --exclude courtlistener-solr-server * courtlistener-solr-server
+      - name: Check out CourtListener
+        uses: actions/checkout@v1
+      - name: mv courtlistener code to courtlistener dir
+        run: rsync -av --remove-source-files --exclude courtlistener * courtlistener
+      - name: Start docker compose
+        run: docker-compose up -d
+        working-directory: courtlistener/docker/courtlistener
