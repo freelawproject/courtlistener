@@ -6,19 +6,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: get info
-        run: cd .. && pwd && ls -R
       - name: Check out solr
         uses: actions/checkout@v1
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: origin/master
-      - name: get info
-        run: cd .. && pwd && ls -R
       - name: Check out CourtListener
         uses: actions/checkout@v1
-      - name: ls
-        run: cd .. && pwd && ls -R
+      - name: Create docker network
+        run: docker network create -d bridge --attachable cl_net_overlay
       - name: Start docker compose
         run: docker-compose up -d
         working-directory: docker/courtlistener
