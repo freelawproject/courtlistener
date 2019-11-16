@@ -19,4 +19,4 @@ jobs:
         run: docker-compose up -d
         working-directory: docker/courtlistener
       - name: Run the tests!
-        run: docker exec -it cl-django python /opt/courtlistener/manage.py test cl
+        run: docker exec -i cl-django python /opt/courtlistener/manage.py test cl
