@@ -12,7 +12,16 @@ jobs:
           repository: freelawproject/courtlistener-solr-server
           ref: origin/master
       - name: Set up solr permissions
-        run: pwd && ls && cd ../courtlistener-solr-server && ls
+        run: |
+          cd ../courtlistener-solr-server
+          chown -R :1024 data
+          chown -R :1024 solr
+          find data -type d -exec chmod g+s {} \;
+          find solr -type d -exec chmod g+s {} \;
+          find data -type d -exec chmod 775 {} \;
+          find solr -type d -exec chmod 775 {} \;
+          find data -type f -exec chmod 664 {} \;
+          find solr -type f -exec chmod 664 {} \;
       - name: Check out CourtListener
         uses: actions/checkout@v1
       - name: Create the private settings file
