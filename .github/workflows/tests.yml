@@ -39,11 +39,15 @@ jobs:
         run: docker-compose logs
       - name: Run the tests!
         run: docker exec -e SELENIUM_DEBUG=1 cl-django python /opt/courtlistener/manage.py test cl --failfast
-      - name: Zip selenium screenshots
-        run: ls -R /tmp && zip -v /tmp/selenium-screenshots.zip /tmp/*-selenium.png
+      - name: cp selenium results from docker to host
         if: failure()
+        run: |
+          mkdir selenium-screenshots
+          docker cp cl-django:/tmp/*-selenium.png selenium-screenshots
+      - name: Zip selenium screenshots
+        run: ls -R && zip -v selenium-screenshots.zip selenium-screenshots/*
       - name: Save selenium screenshot as Github artifacts
         uses: actions/upload-artifact@master
         with:
           name: selenium-screenshots
-          path: /tmp/selenium-screenshots.zip
+          path: selenium-screenshots.zip
