@@ -85,7 +85,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
 
     def tearDown(self):
         if self.screenshot:
-            filename = type(self).__name__ + '.png'
+            filename = type(self).__name__ + '-selenium.png'
             print('\nSaving screenshot: %s' % (filename,))
             self.browser.save_screenshot('/tmp/' + filename)
         self.browser.quit()
