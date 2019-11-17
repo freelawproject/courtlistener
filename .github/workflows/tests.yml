@@ -43,7 +43,7 @@ jobs:
         if: failure()
         run: |
           mkdir selenium-screenshots
-          docker cp 'cl-django:/tmp/*-selenium.png' selenium-screenshots
+          docker cp 'cl-django:/tmp/AlertSeleniumTest-selenium.png' selenium-screenshots/
       - name: Zip selenium screenshots
         run: ls -R && zip -v selenium-screenshots.zip selenium-screenshots/*
       - name: Save selenium screenshot as Github artifacts
