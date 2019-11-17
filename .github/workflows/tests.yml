@@ -43,7 +43,6 @@ jobs:
         if: failure()
         run: |
           mkdir selenium-screenshots
-#          docker cp cl-django:/tmp/*-selenium.png selenium-screenshots
           docker exec cl-django ls /tmp/
       - name: Zip selenium screenshots
         run: ls -R && zip -v selenium-screenshots.zip selenium-screenshots/*
