@@ -134,7 +134,20 @@ class CiteTest(TestCase):
             ('2017 IL App (1st) 143684-B',
              [Citation(volume=2017, reporter='IL App (1st)', page='143684-B',
                        canonical_reporter=u'IL App (1st)', lookup_index=0,
-                       reporter_index=1, reporter_found='IL App (1st)')])
+                       reporter_index=1, reporter_found='IL App (1st)')]),
+            # Test with atypical formatting for Tax Court Memos
+             ('1 T.C. No. 233',
+             [Citation(volume=1, reporter='T.C. No.', page=233,
+                       canonical_reporter=u'T.C. No.', lookup_index=0,
+                       reporter_index=1, reporter_found='T.C. No.')]),
+            ('word T.C. Memo. 2019-233',
+             [Citation(volume=2019, reporter='T.C. Memo.', page=233,
+                       canonical_reporter=u'T.C. Memo.', lookup_index=0,
+                       reporter_index=1, reporter_found='T.C. Memo.')]),
+            ('something T.C. Summary Opinion 2019-233',
+             [Citation(volume=2019, reporter='T.C. Summary Opinion', page=233,
+                       canonical_reporter=u'T.C. Summary Opinion', lookup_index=0,
+                       reporter_index=1, reporter_found='T.C. Summary Opinion')]),
         )
         for q, a in test_pairs:
             print "Testing citation extraction for %s..." % q,
