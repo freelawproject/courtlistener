@@ -39,6 +39,7 @@ jobs:
         run: docker-compose logs
       - name: Run the tests!
         run: docker exec -e SELENIUM_DEBUG=1 cl-django python /opt/courtlistener/manage.py test cl --failfast
+        continue-on-error: true
       - name: Zip selenium screenshots
         run: zip -r /tmp/selenium-screenshots.zip /tmp/*-selenium.png
       - name: Save selenium screenshot as Github artifacts

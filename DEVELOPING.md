@@ -267,7 +267,12 @@ Screenshots will be saved into the `cl-django` container. To grab them, [you can
 
 [cp]: https://stackoverflow.com/a/22050116/64911
 
+### Black
+
+
 ### CI/CD
+
+XXX UPDATE THIS
 
 This Github project is configured to run tests for every pull request. A webhook triggers [CircleCI][circleci-cl-builds] to run `.circleci/config.yml`. `config.yml` makes CircleCI run tests inside a Docker container. The custom Docker image used to run tests is built from `.circleci/Dockerfile` and pushed to [Docker Hub][hub-cl-testing].
 
