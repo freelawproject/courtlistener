@@ -92,9 +92,9 @@
     {% for de in docket_entries %}
         <div class="row {% cycle "odd" "even" %}"
              {% if de.entry_number %}
-                id="#entry-{{ de.entry_number }}"
+                id="entry-{{ de.entry_number }}"
              {% else %}
-                id="#minute-entry-{{ de.pk }}"
+                id="minute-entry-{{ de.pk }}"
              {% endif %}
             >
             <div class="col-xs-1 text-center"><p>{{ de.entry_number|default_if_none:"" }}</p></div>
