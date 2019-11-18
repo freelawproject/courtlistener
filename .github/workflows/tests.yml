@@ -1,0 +1,56 @@
+name: docker build and test
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out solr
+        uses: actions/checkout@v1
+        with:
+          repository: freelawproject/courtlistener-solr-server
+          ref: origin/master
+      - name: Set up solr permissions
+        run: |
+          cd ../courtlistener-solr-server
+          sudo chown -R :1024 data
+          sudo chown -R :1024 solr
+          sudo find data -type d -exec chmod g+s {} \;
+          sudo find solr -type d -exec chmod g+s {} \;
+          sudo find data -type d -exec chmod 775 {} \;
+          sudo find solr -type d -exec chmod 775 {} \;
+          sudo find data -type f -exec chmod 664 {} \;
+          sudo find solr -type f -exec chmod 664 {} \;
+      - name: Check out CourtListener
+        uses: actions/checkout@v1
+      - name: Create the private settings file
+        working-directory: cl/settings
+        run: cp 05-private.example 05-private.py
+      - name: Create docker network
+        run: docker network create -d bridge --attachable cl_net_overlay
+      - name: Start docker compose
+        working-directory: docker/courtlistener
+        run: docker-compose up -d
+      - name: List docker statuses
+        run: docker ps -a
+      - name: Show the logs
+        working-directory: docker/courtlistener
+        run: docker-compose logs
+      - name: Run the tests!
+        run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=300 cl-django python /opt/courtlistener/manage.py test cl --failfast
+      - name: cp selenium results from docker to host
+        if: failure()
+        run: |
+          # This is annoying b/c docker cp doesn't support globs. See:
+          # https://stackoverflow.com/q/35806102/
+          # https://github.com/moby/moby/issues/7710
+          mkdir selenium-screenshots
+          docker exec cl-django bash -c "mkdir /extract && mv /tmp/*-selenium.png /extract"
+          docker cp 'cl-django:/extract' selenium-screenshots/
+      - name: Save selenium screenshot as Github artifacts
+        uses: actions/upload-artifact@master
+        if: failure()
+        with:
+          name: selenium-screenshots
+          path: selenium-screenshots/extract

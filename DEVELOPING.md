@@ -140,14 +140,16 @@ commit that you submit as part of a PR, if you can avoid it.
 project][format]. This is pretty easy if you use [this plugin][format-plugin] 
 for Intellij/PyCharm/et al.
 
-1. If you want to change whitespace, do it in its own commit and ideally in its
-own PR. We encourage code cleanup and whitespace/reformatting is part of that, 
-BUT the more isolated it is from other changes, the better. When whitespace is
-combined with other code changes, the PR's become impossible to read and risky
-to merge. 
+1. We use the [black][black] code formatter to make sure all our Python code 
+has the same formatting. This is an automated tool that you *must* run on any
+code you run before you push it to Github. When you run it, it will reformat 
+your code. We recommend [integrating it into your editor][black-ed].
 
-    A suggestion: If this stuff bugs you, do a round of whitespace/formatting 
-    cleanup before you start on each file and/or once you're done.  
+    Beyond what black will do for you by default, if you somehow find a way to
+    do whitespace or other formatting changes, do so in their own commit and 
+    ideally in its own PR. When whitespace is combined with other code changes, 
+    the PR's become impossible to read and risky to merge. This is a big reason
+    we use black. 
 
 1. *KEEP YOUR PR's SMALL*. A good PR should land a specific thing of some sort. 
 It doesn't have to be done — it doesn't even have to work! — but it should be 
@@ -161,9 +163,11 @@ monolithic one that is fully functional.
     those regexes in another? That'd be much easier to review than trying to 
     see the whole thing at once. 
 
-1. We have both an editorconfig and an eslint configuration. Please use them.
+1. We have an editorconfig, an eslint configuration, and a black configuration. 
+Please use them.
 
-1. We do not yet have a Code of Conduct, but we do have [our employee manual][hr], and we expect all our employees and volunteers to abide by it. 
+1. We do not yet have a Code of Conduct, but we do have [our employee 
+manual][hr], and we expect all our employees and volunteers to abide by it. 
 
 These guidelines are a little sloppy compared with many projects. Those 
 projects have greater quality needs, are popular enough to demand a high 
@@ -177,6 +181,8 @@ work done. That's the goal here.
 [format]: https://github.com/angular/angular.js/blob/master/DEVELOPERS.md#-git-commit-guidelines
 [format-plugin]: https://plugins.jetbrains.com/plugin/9861-git-commit-template/
 [hr]: https://github.com/freelawproject/hr/blob/master/handbook/handbook.md
+[black]: https://black.readthedocs.io/en/stable/
+[black-ed]: https://black.readthedocs.io/en/stable/editor_integration.html
 
 
 ## Testing
@@ -192,6 +198,12 @@ docker exec -it cl-django python /opt/courtlistener/manage.py test --noinput cl
 The `--noinput` flag tells Django to destroy any old test databases without prompting for confirmation (typically this is what you want).
 
 The `cl` parameter is the name of the Python package to search for tests. It's not required, but a good habit to learn as you can more specifically specify tests by provided more details, such as `cl.search` to execute only tests in the search module.
+
+Other useful flags are:
+
+ - `--failfast`: This makes the test suite crash as soon as one test fails, instead of running the whole suite to completion.
+ 
+ - `--keepdb`: Whenever tests are run, they generate a little DB on the side to run within by running all of your migrations. Using this flag keeps the DB between test runs, which can save some time.  
 
 For more details, Django provides a lot of documentation on [testing in Django][django-testing]. Make sure to read the docs related to the current release used in CourtListener.
 
@@ -263,15 +275,14 @@ That will create screenshots at the end of every test as part of the `tearDown` 
 
     self.browser.save_screenshot('/tmp/' + filename)
     
-Screenshots will be saved into the `cl-django` container. To grab them, [you can use][cp] `docker cp`.
+Screenshots will be saved into the `cl-django` container. To grab them, [you can use][cp] `docker cp`. On GitHub, *if* the tests fail, these are stored as an "artifact" of the build, and you can download them to inspect them.
 
 [cp]: https://stackoverflow.com/a/22050116/64911
 
+
 ### CI/CD
 
-This Github project is configured to run tests for every pull request. A webhook triggers [CircleCI][circleci-cl-builds] to run `.circleci/config.yml`. `config.yml` makes CircleCI run tests inside a Docker container. The custom Docker image used to run tests is built from `.circleci/Dockerfile` and pushed to [Docker Hub][hub-cl-testing].
-
-This currently needs to be upgraded to use our new docker compose files.
+We use Github Actions to run the full test suite and the `black` code formatter on every push. If the tests fail or your code is not formatted properly according to `black`, your code probably won't get merged. (See above for more details about Black.)
 
 
 #### Updating the testing container
