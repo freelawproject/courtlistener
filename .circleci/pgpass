@@ -1,2 +1,0 @@
-localhost:5432:*:postgres:password
-localhost:5432:courtlistener:django:your-password
