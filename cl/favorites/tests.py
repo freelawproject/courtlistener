@@ -98,16 +98,16 @@ class UserFavoritesTest(BaseSeleniumTest):
         link.click()
 
         # Clicking it brings her to the sign in page
-        self.assert_text_in_body('Sign in')
-        self.assert_text_in_body('Username')
-        self.assert_text_in_body('Password')
+        self.assert_text_in_node('Sign in', 'body')
+        self.assert_text_in_node('Username', 'body')
+        self.assert_text_in_node('Password', 'body')
 
         # She logs in
         self.browser.find_element_by_id('username').send_keys('pandora')
         self.browser.find_element_by_id('password').send_keys('password\n')
 
         # And is brought back to that item!
-        self.assert_text_in_body(title.strip())
+        self.assert_text_in_node(title.strip(), 'body')
 
         # Clicking the star now brings up the "Save Favorite" dialog. Nice!
         star = self.browser.find_element_by_id('favorites-star')
@@ -220,7 +220,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.click_link_for_new_page(short_title)
 
         self.assertIn(short_title, self.browser.title)
-        self.assert_text_in_body(short_title)
+        self.assert_text_in_node(short_title, 'body')
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_user_can_change_favorites(self):
@@ -243,7 +243,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # She sees an edit link next to one of them and clicks it
         self.assertIn('Favorites', self.browser.title)
-        self.assert_text_in_body('Totes my Notes 2')  # in favorites.json
+        self.assert_text_in_node('Totes my Notes 2', 'body')  # in favorites.json
         edit_link = self.browser.find_element_by_link_text('Edit / Delete')
         edit_link.click()
 
@@ -255,13 +255,10 @@ class UserFavoritesTest(BaseSeleniumTest):
         notes = modal.find_element_by_id('save-favorite-notes-field')
         # -- via favorites.json[pk=1]
         self.assertEqual(
-                name.get_attribute('value'),
-                'Formerly known as \"case name cluster 3\"'
+            name.get_attribute('value'),
+            'Formerly known as \"case name cluster 3\"'
         )
-        self.assertEqual(
-                notes.get_attribute('value'),
-                'Totes my Notes 2'
-        )
+        self.assertEqual(notes.get_attribute('value'), 'Totes my Notes 2')
 
         name.clear()
         name.send_keys('Renamed Favorite')
@@ -276,12 +273,12 @@ class UserFavoritesTest(BaseSeleniumTest):
         # And notices the change on the page immediately
         time.sleep(0.5)  # Selenium is too fast.
         self.assertIn('Favorites', self.browser.title)
-        self.assert_text_in_body('Renamed Favorite')
-        self.assert_text_in_body('Modified Notes')
-        self.assert_text_not_in_body('case name cluster 3')
-        self.assert_text_not_in_body('Totes my Notes 2')
+        self.assert_text_in_node('Renamed Favorite', 'body')
+        self.assert_text_in_node('Modified Notes', 'body')
+        self.assert_text_not_in_node('case name cluster 3', 'body')
+        self.assert_text_not_in_node('Totes my Notes 2', 'body')
 
         # Skeptical, she hits refresh to be sure
         self.browser.refresh()
-        self.assert_text_in_body('Renamed Favorite')
-        self.assert_text_in_body('Modified Notes')
+        self.assert_text_in_node('Renamed Favorite', 'body')
+        self.assert_text_in_node('Modified Notes', 'body')
