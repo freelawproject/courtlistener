@@ -93,10 +93,10 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self.browser.quit()
         self._teardown_test_solr()
 
+    @retry(AssertionError, tries=3, delay=0.25, backoff=1)
     def assert_text_in_body(self, text, timeout=SELENIUM_TIMEOUT):
-        with self.wait_for_page_load(timeout=timeout):
-            body_tag = self.browser.find_element_by_tag_name('body')
-            self.assertIn(text, body_tag.text)
+        body_tag = self.browser.find_element_by_tag_name('body')
+        self.assertIn(text, body_tag.text)
 
     def assert_text_not_in_body(self, text):
         self.assertNotIn(
