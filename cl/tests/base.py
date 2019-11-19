@@ -105,12 +105,12 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
 
     # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
     @contextmanager
-    def wait_for_page_load(self, timeout=30):
+    def wait_for_page_load(self, timeout=SELENIUM_TIMEOUT):
         old_page = self.browser.find_element_by_tag_name('html')
         yield
         WebDriverWait(self.browser, timeout).until(staleness_of(old_page))
 
-    def click_link_for_new_page(self, link_text, timeout=30):
+    def click_link_for_new_page(self, link_text, timeout=SELENIUM_TIMEOUT):
         with self.wait_for_page_load(timeout=timeout):
             self.browser.find_element_by_link_text(link_text).click()
 
@@ -120,7 +120,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self.browser.find_element_by_id('username').send_keys(username)
         self.browser.find_element_by_id('password').send_keys(password + '\n')
 
-    def get_url_and_wait(self, url, timeout=30):
+    def get_url_and_wait(self, url, timeout=SELENIUM_TIMEOUT):
         self.browser.get(url)
         wait = WebDriverWait(self.browser, timeout)
         wait.until(EC.presence_of_element_located((By.TAG_NAME, 'html')))
