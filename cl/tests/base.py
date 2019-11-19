@@ -103,8 +103,8 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         )
 
     # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
-    @contextmanager
     @retry(TimeoutError, tries=3, delay=0.25, backoff=1)
+    @contextmanager
     def wait_for_page_load(self, timeout=SELENIUM_TIMEOUT):
         old_page = self.browser.find_element_by_tag_name('html')
         yield
