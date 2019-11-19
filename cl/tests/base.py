@@ -93,8 +93,10 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self.browser.quit()
         self._teardown_test_solr()
 
-    def assert_text_in_body(self, text):
-        self.assertIn(text, self.browser.find_element_by_tag_name('body').text)
+    def assert_text_in_body(self, text, timeout=SELENIUM_TIMEOUT):
+        with self.wait_for_page_load(timeout=timeout):
+            body_tag = self.browser.find_element_by_tag_name('body')
+            self.assertIn(text, body_tag.text)
 
     def assert_text_not_in_body(self, text):
         self.assertNotIn(
@@ -103,7 +105,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         )
 
     # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
-    @retry(TimeoutError, tries=3, delay=0.25, backoff=1)
     @contextmanager
     def wait_for_page_load(self, timeout=SELENIUM_TIMEOUT):
         old_page = self.browser.find_element_by_tag_name('html')
