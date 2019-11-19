@@ -94,15 +94,40 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self._teardown_test_solr()
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
-    def assert_text_in_body(self, text, timeout=SELENIUM_TIMEOUT):
-        body_tag = self.browser.find_element_by_tag_name('body')
-        self.assertIn(text, body_tag.text)
+    def assert_text_in_node(self, text, tag_name):
+        """Is the text in a given node?
 
-    def assert_text_not_in_body(self, text):
-        self.assertNotIn(
-            text,
-            self.browser.find_element_by_tag_name('body').text
-        )
+        :param text: The text you want to look for
+        :param tag_name: The node in the HTML you want to check
+        :raises: AssertionError if the text cannot be found
+        :returns None
+        """
+        node = self.browser.find_element_by_tag_name(tag_name)
+        self.assertIn(text, node.text)
+
+    @retry(AssertionError, tries=3, delay=0.25, backoff=1)
+    def assert_text_not_in_node(self, text, tag_name):
+        """Assert that text is not in a node by name
+
+        :param text: The text you want not to appear
+        :param tag_name: The node in your HTML you want to check
+        :raises: AssertionError if the text is NOT in the node
+        :return: None
+        """
+        node = self.browser.find_element_by_tag_name(tag_name)
+        self.assertNotIn(text, node.text)
+
+    @retry(AssertionError, tries=3, delay=0.25, backoff=1)
+    def assert_text_in_node_by_id(self, text, tag_id):
+        """Is the text in a node selected by ID?
+
+        :param text: The text you want to look for
+        :param tag_id: The ID of the node in the HTML you want to check
+        :raises: AssertionError if the text cannot be found
+        :returns None
+        """
+        node = self.browser.find_element_by_id(tag_id)
+        self.assertIn(text, node.text)
 
     # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
     @contextmanager
