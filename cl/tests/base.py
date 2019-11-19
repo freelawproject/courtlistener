@@ -110,6 +110,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         yield
         WebDriverWait(self.browser, timeout).until(staleness_of(old_page))
 
+    @retry(TimeoutError, tries=3, delay=0.25, backoff=1)
     def click_link_for_new_page(self, link_text, timeout=SELENIUM_TIMEOUT):
         with self.wait_for_page_load(timeout=timeout):
             self.browser.find_element_by_link_text(link_text).click()
