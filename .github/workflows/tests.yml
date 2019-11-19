@@ -38,7 +38,7 @@ jobs:
         working-directory: docker/courtlistener
         run: docker-compose logs
       - name: Run the tests!
-        run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=60 cl-django python /opt/courtlistener/manage.py test cl.search.tests.OpinionSearchFunctionalTest --failfast
+        run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=120 cl-django python /opt/courtlistener/manage.py test cl --failfast
       - name: cp selenium results from docker to host
         if: failure()
         run: |
