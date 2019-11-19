@@ -1,5 +1,5 @@
 ansible
-argparse==1.4.0
+argparse
 boto3==1.9.38
 cchardet==2.1.1
 # Before upgrading, note: https://github.com/celery/celery/issues/4878
