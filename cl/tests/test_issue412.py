@@ -180,10 +180,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         searchbox.send_keys('\n')
 
         # The SERP updates and she selects the one she knows is blocked
-        blocked_argument = self.browser.find_element_by_link_text(
-            'Blocked Oral Argument (Test 2015)'
-        )
-        blocked_argument.click()
+        self.click_link_for_new_page('Blocked Oral Argument (Test 2015)')
 
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
