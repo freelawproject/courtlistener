@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test.utils import override_settings
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -128,6 +129,19 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         """
         node = self.browser.find_element_by_id(tag_id)
         self.assertIn(text, node.text)
+
+    @retry(NoSuchElementException, tries=3, delay=0.25, backoff=1)
+    def find_element_by_id(self, node, id_):
+        """Find an element by its ID.
+
+        This only exists to add the retry functionality, without which, things
+        break, likely due to timing errors.
+
+        :param node: The node under which we search for the element.
+        :param id_: The ID of the element to find.
+        :return: The element found.
+        """
+        return node.find_element_by_id(id_)
 
     # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
     @contextmanager
