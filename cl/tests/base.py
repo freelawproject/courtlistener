@@ -14,8 +14,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.expected_conditions import staleness_of
+from timeout_decorator import TimeoutError
 
 from cl.audio.models import Audio
+from cl.lib.decorators import retry
 from cl.search.models import Opinion
 from cl.search.tasks import add_items_to_solr
 
@@ -105,6 +107,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
 
     # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
     @contextmanager
+    @retry(TimeoutError, tries=3, delay=0.25, backoff=1)
     def wait_for_page_load(self, timeout=SELENIUM_TIMEOUT):
         old_page = self.browser.find_element_by_tag_name('html')
         yield
