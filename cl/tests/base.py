@@ -51,9 +51,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             options.add_argument('headless')
         options.add_argument("silent")
         options.add_experimental_option('w3c', False)
-        # See https://stackoverflow.com/questions/40514022/, which says this
-        # helps with timeout errors.
-        options.add_argument("--dns-prefetch-disable")
 
         if settings.DOCKER_SELENIUM_HOST:
             capabilities = options.to_capabilities()
