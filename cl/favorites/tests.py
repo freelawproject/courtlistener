@@ -249,10 +249,11 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # Greeted with an "Edit This Favorite" dialog, she fixes a typo in
         # the name and notes fields
-        modal = self.browser.find_element_by_id('modal-save-favorite')
-        self.assertIn('Edit This Favorite', modal.text)
-        name = modal.find_element_by_id('save-favorite-name-field')
-        notes = modal.find_element_by_id('save-favorite-notes-field')
+        self.assert_text_in_node_by_id(
+            'Edit This Favorite', 'modal-save-favorite')
+        modal = self.find_element_by_id(self.browser, 'modal-save-favorite')
+        name = self.find_element_by_id(modal, 'save-favorite-name-field')
+        notes = self.find_element_by_id(modal, 'save-favorite-notes-field')
         # -- via favorites.json[pk=1]
         self.assertEqual(
             name.get_attribute('value'),
