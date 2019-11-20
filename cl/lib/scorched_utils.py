@@ -1,4 +1,5 @@
 from scorched import SolrInterface
+from scorched.exc import SolrError
 from scorched.search import Options, SolrSearch
 
 
@@ -6,6 +7,7 @@ class ExtraSolrInterface(SolrInterface):
     """Extends the SolrInterface class so that it uses the ExtraSolrSearch
     class.
     """
+    hl_fields = None
 
     def __init__(self, *args, **kwargs):
         super(ExtraSolrInterface, self).__init__(*args, **kwargs)
@@ -23,6 +25,22 @@ class ExtraSolrInterface(SolrInterface):
             return q.query(*args, **kwargs)
         else:
             return q
+
+    def mlt_query(self, hl_fields, *args, **kwargs):
+        """
+        :returns: MoreLikeThisHighlightsSolrSearch -- A MoreLikeThis search with highlights.
+
+        Build a solr MLT query
+        """
+        self.hl_fields = hl_fields
+        q = MoreLikeThisHighlightsSolrSearch(self)
+
+        if len(args) + len(kwargs) > 0:
+            res = q.query(*args, **kwargs)
+        else:
+            res = q
+
+        return res
 
 
 class ExtraSolrSearch(SolrSearch):
@@ -72,3 +90,43 @@ class ExtraOptions(Options):
 
     def options(self):
         return self.option_dict
+
+
+class MoreLikeThisHighlightsSolrSearch(ExtraSolrSearch):
+    """
+    By default Solr MoreLikeThis queries do not support highlighting. Thus, we need to produce the highlights in Python.
+
+    A MoreLikeThis search with highlight fields that are taken directly from search results
+    """
+
+    # Limit length of text field
+    text_max_length = 500
+
+    def execute(self, constructor=None):
+        """
+        Execute MLT-query and add highlighting to MLT search results.
+        """
+
+        try:
+            ret = self.interface.mlt_search(**self.options())
+        except TypeError:
+            # Catch exception when seed is not available
+            raise SolrError('Seed documents for MoreLikeThis query do not exist')
+
+        # Add solr_highlighting to MLT results
+        for doc in ret:
+            # Initialize empty highlights dict
+            doc['solr_highlights'] = {}
+
+            # Copy each highlight field
+            for field_name in self.interface.hl_fields:
+                if field_name in doc:
+                    if field_name == 'text':  # max text length
+                        doc[field_name] = doc[field_name][:self.text_max_length]
+
+                    doc['solr_highlights'][field_name] = [doc[field_name]]
+
+        if constructor:
+            ret = self.constructor(ret, constructor)
+
+        return ret

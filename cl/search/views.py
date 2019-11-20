@@ -1,4 +1,5 @@
 import logging
+import re
 import traceback
 from datetime import date, datetime, timedelta
 from urllib import quote
@@ -9,9 +10,9 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.urls import reverse
 from django.db.models import Sum, Count
 from django.shortcuts import HttpResponseRedirect, render, get_object_or_404
+from django.urls import reverse
 from django.utils.timezone import utc, make_aware
 from django.views.decorators.cache import never_cache
 from requests import RequestException
@@ -27,7 +28,7 @@ from cl.lib.redis_utils import make_redis_interface
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     make_stats_variable, merge_form_with_courts, make_get_string, \
-    regroup_snippets
+    regroup_snippets, get_mlt_query
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
 from cl.stats.models import Stat
@@ -53,7 +54,23 @@ def get_solr_result_objects(cd, facet):
     search_type = cd['type']
     if search_type == 'o':
         si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
-        results = si.query().add_extra(**build_main_query(cd, facet=facet))
+
+        # This is a `related:<pks>` prefix query?
+        related_prefix_match = re.search(r'(^|\s)(?P<pfx>related:(?P<pks>(([0-9]+)(,[0-9]+)*)))($|\s)', cd['q'])
+        if related_prefix_match:
+            results = get_mlt_query(
+                si,
+                cd,
+                facet,
+                # Seed IDs
+                related_prefix_match.group('pks').split(','),
+                # Original query
+                cd['q'].replace(related_prefix_match.group('pfx'), '')
+            )
+        else:
+            # Default search query
+            results = si.query().add_extra(**build_main_query(cd, facet=facet))
+
     elif search_type == 'r':
         si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
         results = si.query().add_extra(**build_main_query(cd, facet=facet))

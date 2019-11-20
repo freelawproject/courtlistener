@@ -25,6 +25,12 @@
     {% endif %}
 {% endblock %}
 
+{% block matomo-scripts %}
+  {% if related_items %}
+  _paq.push(['trackEvent', 'viewRelated', 'viewRelated_{{ related_algorithm }}_seed_{{ cluster.pk }}', '{{ related_item_ids|join:"," }}']);
+  {% endif %}
+{% endblock %}
+
 {% block sidebar %}
     <div class="col-sm-3" id="sidebar">
         {# show the admin tools if applicable #}
@@ -126,25 +132,34 @@
             </div>
         {% endif %}
 
+        {# Related opinions #}
+        {% if related_items %}
+            <div id="recommendations" class="sidebar-section">
+                <h3><span>Related Opinions</span></h3>
+
+                <p class="bottom">The following opinions cover similar topics:</p>
+
+                {% url 'show_results' as show_results_url %}
+
+                {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
+                {% with event_category='clickRelated' event_action='clickRelated_'|add:related_algorithm|add:'_seed'|add:pk_str %}
+                {% with opinions=related_items full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
+
+                  {% include 'includes/opinions_sidebar.html' %}
+
+                {% endwith %}{% endwith %}{% endwith %}
+            </div>
+        {% endif %}
+
         {# Visualizations #}
         {% if cluster.top_visualizations %}
             <div id="visualizations" class="sidebar-section">
                 <h3><span>Visualizations</span></h3>
-                <ul>
-                    {% for viz in cluster.top_visualizations|slice:":5" %}
-                        <li>
-                            <a href="{{ viz.get_absolute_url }}">
-                                {{ viz.title|truncatewords:10 }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-                <p>
-                    <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
-                       class="btn btn-default">
-                        View Full List
-                    </a>
-                </p>
+                {% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug as cluster_visualizations_url %}
+
+                {% with opinions=cluster.top_visualizations|slice:":5" full_list_url=cluster_visualizations_url|add:"?q"|add:request.META.QUERY_STRING %}
+                    {% include 'includes/opinions_sidebar.html' %}
+                {% endwith %}
             </div>
         {% endif %}
 

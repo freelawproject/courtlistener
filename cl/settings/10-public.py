@@ -162,11 +162,6 @@ SOLR_TEST_URLS = {
     'search.OpinionCluster': SOLR_OPINION_TEST_URL,
 
 }
-SOLR_EXAMPLE_CORE_PATH = os.path.join(os.sep, 'usr', 'local', 'solr',
-                                      'example', 'solr', 'collection1')
-SOLR_TEMP_CORE_PATH_LOCAL = os.path.join(os.sep, 'tmp', 'solr')
-SOLR_TEMP_CORE_PATH_DOCKER = os.path.join(os.sep, 'tmp', 'solr')
-
 
 #########
 # Redis #
@@ -403,7 +398,8 @@ MARKDOWN_DEUX_STYLES = {
 ##########
 # MATOMO #
 ##########
-MATOMO_URL = 'http://192.168.0.243/piwik.php'
+MATOMO_BASE_URL = '//192.168.0.243/'
+MATOMO_URL = '%spiwik.php' % MATOMO_BASE_URL
 MATOMO_SITE_ID = '1'
 
 
@@ -525,6 +521,15 @@ if DEVELOPMENT:
         'level': 'DEBUG',
         'propagate': False,
     }
+
+###################
+# Related content #
+###################
+
+RELATED_COUNT = 5
+RELATED_USE_CACHE = False
+RELATED_CACHE_TIMEOUT = 60 * 60 * 24 * 7
+RELATED_USER_GROUPS = ['recommendation_system_tester']
 
 
 #######

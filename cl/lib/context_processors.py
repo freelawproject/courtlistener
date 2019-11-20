@@ -13,6 +13,9 @@ def inject_settings(request):
         'FUNDRAISING_MODE': settings.FUNDRAISING_MODE,
         'MAX_FREE_DOCKET_ALERTS': settings.MAX_FREE_DOCKET_ALERTS,
         'DOCKET_ALERT_RECAP_BONUS': settings.DOCKET_ALERT_RECAP_BONUS,
+        'MATOMO_URL': settings.MATOMO_URL,
+        'MATOMO_BASE_URL': settings.MATOMO_BASE_URL,
+        'MATOMO_SITE_ID': settings.MATOMO_SITE_ID,
     }
 
 

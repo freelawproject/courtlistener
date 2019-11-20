@@ -1,21 +1,22 @@
 from collections import defaultdict, OrderedDict
 from itertools import groupby
+from urllib import urlencode
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.urls import reverse
 from django.db.models import F, Prefetch
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from reporters_db import EDITIONS, NAMES_TO_EDITIONS, REPORTERS, \
     VARIATIONS_ONLY
-
 from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_300_MULTIPLE_CHOICES
 
 from cl.alerts.models import DocketAlert
@@ -31,7 +32,7 @@ from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import Citation, Docket, OpinionCluster, RECAPDocument
+from cl.search.models import Citation, Docket, OpinionCluster, RECAPDocument, DOCUMENT_STATUSES
 
 
 def redirect_docket_recap(request, court, pacer_case_id):
@@ -280,12 +281,14 @@ def view_opinion(request, pk, _):
     if not is_bot(request):
         # Get the citing results from Solr for speed. Only do this for humans
         # to save on disk usage.
+
+        # Save IDs because we use them several times
+        sub_opinion_ids = cluster.sub_opinions.values_list('pk', flat=True)
+
         conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
         q = {
             'q': 'cites:({ids})'.format(
-                ids=' OR '.join([str(pk) for pk in
-                                 (cluster.sub_opinions
-                                  .values_list('pk', flat=True))])
+                ids=' OR '.join([str(pk) for pk in sub_opinion_ids])
             ),
             'rows': 5,
             'start': 0,
@@ -293,8 +296,67 @@ def view_opinion(request, pk, _):
             'caller': 'view_opinion',
         }
         citing_clusters = conn.raw_query(**q).execute()
+
+        # Related opinions with Solr-MoreLikeThis query
+        # Beta test:
+        # - feature is only available for specific user groups
+        # - for better performance, we try to avoid DB queries and, thus, check
+        #   first if user is logged in and no admin/staff.
+        if request.user.is_authenticated and (request.user.is_superuser or request.user.is_staff
+            or (hasattr(settings, 'RELATED_USER_GROUPS') and
+                request.user.groups.filter(name__in=settings.RELATED_USER_GROUPS).exists())):
+
+            # Use cache if enabled
+            mlt_cache_key = 'mlt-opinion:%s' % pk
+            related_items = cache.get(mlt_cache_key) if settings.RELATED_USE_CACHE else None
+
+            if related_items is None:
+                # Cache is empty
+
+                # Turn list of opinion IDs into list of Q objects
+                sub_opinion_queries = [conn.Q(id=sub_id) for sub_id in sub_opinion_ids]
+
+                # Take one Q object from the list
+                sub_opinion_query = sub_opinion_queries.pop()
+
+                # OR the Q object with the ones remaining in the list
+                for item in sub_opinion_queries:
+                    sub_opinion_query |= item
+
+                mlt_query = conn.query(sub_opinion_query) \
+                    .mlt('text', count=settings.RELATED_COUNT) \
+                    .field_limit(fields=['id', 'caseName', 'absolute_url'])
+                mlt_res = mlt_query.execute()
+
+                if mlt_res.more_like_this is not None:
+                    # Only a single sub opinion
+                    related_items = mlt_res.more_like_this.docs
+                elif mlt_res.more_like_these is not None:
+                    # Multiple sub opinions
+
+                    # Get result list for each sub opinion
+                    sub_docs = [sub_res.docs for sub_id, sub_res in mlt_res.more_like_these.items()]
+
+                    # Merge sub results by interleaving
+                    # - exclude items that are sub opinions
+                    related_items = [item for pair in zip(*sub_docs)
+                                     for item in pair
+                                     if item['id'] not in sub_opinion_ids]
+
+                    # Limit number of results
+                    related_items = related_items[:settings.RELATED_COUNT]
+                else:
+                    # No MLT results are available (this should not happen)
+                    related_items = []
+
+                cache.set(mlt_cache_key, related_items, settings.RELATED_CACHE_TIMEOUT)
+
+        else:
+            related_items = []
     else:
         citing_clusters = None
+        related_items = []
+        sub_opinion_ids = []
 
     return render(request, 'view_opinion.html', {
         'title': title,
@@ -305,6 +367,11 @@ def view_opinion(request, pk, _):
         'private': cluster.blocked,
         'citing_clusters': citing_clusters,
         'top_authorities': cluster.authorities[:5],
+        'sub_opinion_ids': sub_opinion_ids,
+        'related_algorithm': 'mlt',
+        'related_items': related_items,
+        'related_item_ids': [item['id'] for item in related_items],
+        'related_search_params': '&' + urlencode({'stat_' + v: 'on' for s, v in DOCUMENT_STATUSES})
     })
 
 
