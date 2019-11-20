@@ -303,10 +303,13 @@ def view_opinion(request, pk, _):
         # - feature is only available for specific user groups
         # - for better performance, we try to avoid DB queries and, thus, check
         #   first if user is logged in and no admin/staff.
-        if request.user.is_authenticated and (request.user.is_superuser or request.user.is_staff
-            or (hasattr(settings, 'RELATED_USER_GROUPS') and
-                request.user.groups.filter(name__in=settings.RELATED_USER_GROUPS).exists())):
-
+        is_authenticated = request.user.is_authenticated
+        has_admin_access = request.user.is_superuser or request.user.is_staff
+        beta_group_exists = hasattr(settings, 'RELATED_USER_GROUPS')
+        user_in_beta_group = request.user.groups.filter(
+            name__in=settings.RELATED_USER_GROUPS).exists()
+        is_beta_member = beta_group_exists and user_in_beta_group
+        if is_authenticated and (has_admin_access or is_beta_member):
             # Use cache if enabled
             mlt_cache_key = 'mlt-opinion:%s' % pk
             related_items = cache.get(mlt_cache_key) if settings.RELATED_USE_CACHE else None
