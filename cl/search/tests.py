@@ -589,9 +589,11 @@ class SearchTest(IndexedSolrTestCase):
         self.assertEqual(r.status_code, HTTP_200_OK)
 
         self.assertEqual(expected_article_count, self.get_article_count(r))
+        exp_first_url = reverse('view_case', args=(expected_first_pk, 'asdf'))
+        exp_second_url = reverse(
+            'view_case', args=(expected_second_pk, 'asdf'))
         self.assertTrue(
-            r.content.index('/opinion/%i/' % expected_first_pk)
-            < r.content.index('/opinion/%i/' % expected_second_pk),
+            r.content.index(exp_first_url) < r.content.index(exp_second_url),
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'."
         )
 
@@ -603,14 +605,14 @@ class SearchTest(IndexedSolrTestCase):
         expected_first_pk = 2  # Howard v. Honda
         expected_second_pk = 3  # case name cluster 3
 
-        r = self.client.get('/opinion/%i/asdf/' % seed_pk)
+        r = self.client.get(reverse('view_case', args=(seed_pk, 'asdf')))
         self.assertEqual(r.status_code, 200)
 
         # Test for click tracking order
+        mlt_template = "'clickRelated_mlt_seed%i', %i,"
         self.assertTrue(
-            r.content.index("'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk))
-            <
-            r.content.index("'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_second_pk)),
+            r.content.index(mlt_template % (seed_pk, expected_first_pk))
+            < r.content.index(mlt_template % (seed_pk, expected_second_pk)),
             msg="Related opinions are in wrong order."
         )
 
