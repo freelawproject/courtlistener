@@ -1,5 +1,4 @@
 import logging
-import re
 import traceback
 from datetime import date, datetime, timedelta
 from urllib import quote
@@ -28,7 +27,8 @@ from cl.lib.redis_utils import make_redis_interface
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     make_stats_variable, merge_form_with_courts, make_get_string, \
-    regroup_snippets, get_mlt_query
+    regroup_snippets, build_mlt_query
+from cl.search.constants import SOLR_OPINION_HL_FIELDS
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
 from cl.stats.models import Stat
@@ -56,17 +56,9 @@ def get_solr_result_objects(cd, facet):
         si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
 
         # This is a `related:<pks>` prefix query?
-        related_prefix_match = re.search(r'(^|\s)(?P<pfx>related:(?P<pks>(([0-9]+)(,[0-9]+)*)))($|\s)', cd['q'])
-        if related_prefix_match:
-            results = get_mlt_query(
-                si,
-                cd,
-                facet,
-                # Seed IDs
-                related_prefix_match.group('pks').split(','),
-                # Original query
-                cd['q'].replace(related_prefix_match.group('pfx'), '')
-            )
+        if 'related:' in cd['q']:
+            si.mlt_query(SOLR_OPINION_HL_FIELDS)\
+                .add_extra(**build_mlt_query(cd, facet=facet))
         else:
             # Default search query
             results = si.query().add_extra(**build_main_query(cd, facet=facet))

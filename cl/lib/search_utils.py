@@ -726,38 +726,36 @@ def build_court_count_query(group=False):
     return params
 
 
-def get_mlt_query(si, cd, facet, seed_pks, filter_query):
-    """
-    By default Solr MoreLikeThis queries do not support highlighting. Thus, we use a special search interface
-    and build the Solr query manually.
+def build_mlt_query(cd, facet):
+    """Build a query for MLT
 
-    :param si: SolrInterface
-    :param cd: Cleaned search form data
-    :param facet: Set to True to enable facets
-    :param seed_pks: List of IDs of the documents for that related documents should be returned
-    :param filter_query:
-    :return: Executed SolrSearch
+    :param cd: The cleaned data from the search form
+    :param facet: Whether to use faceting in the query
+    :returns: A dict for the query to send to Solr
     """
-    hl_fields = SOLR_OPINION_HL_FIELDS
-
     # Reset query for query builder
     cd['q'] = ''
 
     # Build main query as always
-    q = build_main_query(cd, facet=facet)
-    cleaned_fq = filter_query.strip()
+    main_params = build_main_query(cd, facet=facet)
 
-    q.update({
+    # Parse the query
+    related_prefix_match = re.search(
+        r'(^|\s)(?P<pfx>related:(?P<pks>(([0-9]+)(,[0-9]+)*)))($|\s)', cd['q'])
+    filter_query = cd['q'].replace(
+        related_prefix_match.group('pfx'), '').strip()
+    seed_pks = related_prefix_match.group('pks').split(',')
+    main_params.update({
         'caller': 'mlt_query',
         'q': 'id:(' + (' OR '.join(seed_pks)) + ')',
         'mlt': 'true',  # Python boolean does not work here
         'mlt.fl': 'text',
 
         # Retrieve fields as highlight replacement
-        'fl': q['fl'] + ',' + (','.join(hl_fields)),
+        'fl': main_params['fl'] + ',' + (','.join(SOLR_OPINION_HL_FIELDS)),
 
         # Original query as filter query
-        'fq': q['fq'] + [cleaned_fq],
+        'fq': main_params['fq'] + [filter_query],
 
         # unset fields not used for MLT
         'boost': '',
@@ -766,4 +764,4 @@ def get_mlt_query(si, cd, facet, seed_pks, filter_query):
         'qf': '',
     })
 
-    return si.mlt_query(hl_fields).add_extra(**q)
+    return main_params
