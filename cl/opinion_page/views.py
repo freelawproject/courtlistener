@@ -312,10 +312,12 @@ def view_opinion(request, pk, _):
         if is_authenticated and (has_admin_access or is_beta_member):
             # Use cache if enabled
             mlt_cache_key = 'mlt-opinion:%s' % pk
-            related_items = cache.get(mlt_cache_key) if settings.RELATED_USE_CACHE else None
+            related_items = None
+            if settings.RELATED_USE_CACHE:
+                related_items = cache.get(mlt_cache_key)
 
             if related_items is None:
-                # Cache is empty
+                # Cache is empty or disabled
 
                 # Turn list of opinion IDs into list of Q objects
                 sub_opinion_queries = [conn.Q(id=sub_id) for sub_id in
