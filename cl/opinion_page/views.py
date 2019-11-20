@@ -32,7 +32,8 @@ from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import Citation, Docket, OpinionCluster, RECAPDocument, DOCUMENT_STATUSES
+from cl.search.models import Citation, Docket, OpinionCluster, RECAPDocument,\
+    DOCUMENT_STATUSES
 
 
 def redirect_docket_recap(request, court, pacer_case_id):
@@ -314,12 +315,13 @@ def view_opinion(request, pk, _):
                 # Cache is empty
 
                 # Turn list of opinion IDs into list of Q objects
-                sub_opinion_queries = [conn.Q(id=sub_id) for sub_id in sub_opinion_ids]
+                sub_opinion_queries = [conn.Q(id=sub_id) for sub_id in
+                                       sub_opinion_ids]
 
                 # Take one Q object from the list
                 sub_opinion_query = sub_opinion_queries.pop()
 
-                # OR the Q object with the ones remaining in the list
+                # OR the remaining Q object with the first one we removed
                 for item in sub_opinion_queries:
                     sub_opinion_query |= item
 
@@ -335,7 +337,8 @@ def view_opinion(request, pk, _):
                     # Multiple sub opinions
 
                     # Get result list for each sub opinion
-                    sub_docs = [sub_res.docs for sub_id, sub_res in mlt_res.more_like_these.items()]
+                    sub_docs = [sub_res.docs for sub_id, sub_res in
+                                mlt_res.more_like_these.items()]
 
                     # Merge sub results by interleaving
                     # - exclude items that are sub opinions
@@ -349,7 +352,8 @@ def view_opinion(request, pk, _):
                     # No MLT results are available (this should not happen)
                     related_items = []
 
-                cache.set(mlt_cache_key, related_items, settings.RELATED_CACHE_TIMEOUT)
+                cache.set(mlt_cache_key, related_items,
+                          settings.RELATED_CACHE_TIMEOUT)
 
         else:
             related_items = []

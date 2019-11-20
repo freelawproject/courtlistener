@@ -287,9 +287,7 @@ class IndexingTest(EmptySolrTestCase):
         )
 
 
-@override_settings(
-    RELATED_USE_CACHE=False,
-)
+@override_settings(RELATED_USE_CACHE=False)
 class SearchTest(IndexedSolrTestCase):
     @staticmethod
     def get_article_count(r):
@@ -572,7 +570,8 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_more_like_this_opinion(self):
         """Does the MoreLikeThis query return the correct number and order of
-        articles."""
+        articles?
+        """
         seed_pk = 1
         expected_article_count = 3
         expected_first_pk = 2  # Howard v. Honda
@@ -583,7 +582,7 @@ class SearchTest(IndexedSolrTestCase):
             'q': 'related:%i' % seed_pk,
         }
 
-        # disable all status filters (otherwise results do not match detail page)
+        # disable all status filters so results match detail page
         params.update({'stat_' + v: 'on' for s, v in DOCUMENT_STATUSES})
 
         r = self.client.get(reverse('show_results'), params)
@@ -597,7 +596,9 @@ class SearchTest(IndexedSolrTestCase):
         )
 
     def test_more_like_this_opinion_detail(self):
-        """MoreLikeThis query on opinion detail page (cache must be disabled)"""
+        """MoreLikeThis query on opinion detail page (cache must be
+        disabled)
+        """
         seed_pk = 1
         expected_first_pk = 2  # Howard v. Honda
         expected_second_pk = 3  # case name cluster 3

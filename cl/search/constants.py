@@ -1,4 +1,5 @@
-# Solr fields that are used for highlighting or other output in the search results
+# Solr fields that are used for highlighting or other output in the search
+# results
 SOLR_OPINION_HL_FIELDS = [
     'caseName',
     'citation',
