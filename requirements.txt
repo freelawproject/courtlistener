@@ -63,7 +63,7 @@ pyparsing==2.4.2
 PyPDF2==1.26.0
 python-dateutil==2.5.0
 python-igraph
-python-mimeparse==0.1.4
+python-mimeparse==1.6.0
 pytz
 redis~=3.2.0
 requests==2.20.0
