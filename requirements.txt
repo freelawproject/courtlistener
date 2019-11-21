@@ -48,7 +48,7 @@ lxml==3.5.0
 Markdown~=2.6
 markdown2~=2.3.0
 mock
-ndg-httpsclient==0.4.0
+ndg-httpsclient==0.5.1
 networkx==1.10
 nose
 openapi-codec==1.3.1
