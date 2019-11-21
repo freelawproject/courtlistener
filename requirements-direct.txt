@@ -53,7 +53,7 @@ itypes==1.1.0
 # version, which actually should work. See:
 # https://github.com/celery/kombu/issues/1063
 kombu==4.6.4
-logilab-common==0.63.2
+logilab-common==1.4.4
 lxml==3.5.0
 Markdown~=2.6
 markdown2~=2.3.0
