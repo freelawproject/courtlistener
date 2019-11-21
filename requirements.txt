@@ -72,7 +72,7 @@ seal_rookery
 selenium
 simplejson
 six
-sqlparse==0.1.15
+sqlparse==0.3.0
 stripe==1.22.3
 timeout-decorator
 tldextract
