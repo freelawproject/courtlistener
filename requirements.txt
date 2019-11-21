@@ -7,7 +7,7 @@ celery==4.3.0
 certifi==2019.9.11
 chardet==3.0.4
 coreapi==2.3.3
-cryptography==2.2.2
+cryptography==2.3
 defusedxml==0.6.0
 disposable-email-domains
 Django~=1.11.0
