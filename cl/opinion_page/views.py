@@ -4,6 +4,7 @@ from urllib import urlencode
 
 from django.conf import settings
 from django.core.cache import cache
+from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import F, Prefetch
@@ -308,7 +309,7 @@ def view_opinion(request, pk, _):
 
             # Use cache if enabled
             mlt_cache_key = 'mlt-opinion:%s' % pk
-            related_items = cache.get(mlt_cache_key) if settings.RELATED_USE_CACHE else None
+            related_items = caches['db_cache'].get(mlt_cache_key) if settings.RELATED_USE_CACHE else None
 
             if related_items is None:
                 # Cache is empty

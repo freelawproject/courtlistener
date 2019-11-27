@@ -527,7 +527,7 @@ if DEVELOPMENT:
 ###################
 
 RELATED_COUNT = 5
-RELATED_USE_CACHE = False
+RELATED_USE_CACHE = True
 RELATED_CACHE_TIMEOUT = 60 * 60 * 24 * 7
 RELATED_USER_GROUPS = ['recommendation_system_tester']
 
