@@ -1,5 +1,3 @@
-import os
-
 from django.contrib.auth.models import User
 from django.db import models
 
@@ -62,21 +60,24 @@ class PacerHtmlFiles(AbstractFile):
     )
 
 
-class ProcessingQueue(models.Model):
-    AWAITING_PROCESSING = 1
-    PROCESSING_SUCCESSFUL = 2
-    PROCESSING_FAILED = 3
-    PROCESSING_IN_PROGRESS = 4
+class PROCESSING_STATUS:
+    ENQUEUED = 1
+    SUCCESSFUL = 2
+    FAILED = 3
+    IN_PROGRESS = 4
     QUEUED_FOR_RETRY = 5
     INVALID_CONTENT = 6
-    PROCESSING_STATUSES = (
-        (AWAITING_PROCESSING, 'Awaiting processing in queue.'),
-        (PROCESSING_SUCCESSFUL, 'Item processed successfully.'),
-        (PROCESSING_FAILED, 'Item encountered an error while processing.'),
-        (PROCESSING_IN_PROGRESS, 'Item is currently being processed.'),
+    NAMES = (
+        (ENQUEUED, 'Awaiting processing in queue.'),
+        (SUCCESSFUL, 'Item processed successfully.'),
+        (FAILED, 'Item encountered an error while processing.'),
+        (IN_PROGRESS, 'Item is currently being processed.'),
         (QUEUED_FOR_RETRY, 'Item failed processing, but will be retried.'),
         (INVALID_CONTENT, 'Item failed validity tests.'),
     )
+
+
+class ProcessingQueue(models.Model):
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -131,9 +132,9 @@ class ProcessingQueue(models.Model):
     status = models.SmallIntegerField(
         help_text="The current status of this upload. Possible values "
                   "are: %s" % ', '.join(['(%s): %s' % (t[0], t[1]) for t in
-                                         PROCESSING_STATUSES]),
-        default=AWAITING_PROCESSING,
-        choices=PROCESSING_STATUSES,
+                                         PROCESSING_STATUS.NAMES]),
+        default=PROCESSING_STATUS.ENQUEUED,
+        choices=PROCESSING_STATUS.NAMES,
         db_index=True,
     )
     upload_type = models.SmallIntegerField(
@@ -214,6 +215,148 @@ class ProcessingQueue(models.Model):
 
     def print_file_contents(self):
         print(self.file_contents)
+
+
+class REQUEST_TYPE:
+    DOCKET = 1
+    PDF = 2
+
+    NAMES = (
+        (DOCKET, 'HTML Docket'),
+        (PDF, 'PDF'),
+    )
+
+
+class PacerFetchQueue(models.Model):
+    """The queue of requests being made of PACER."""
+
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_completed = models.DateTimeField(
+        help_text="When the item was completed or errored out.",
+        db_index=True,
+        null=True,
+        blank=True,
+    )
+    user = models.ForeignKey(
+        User,
+        help_text="The user that made the request.",
+        related_name='pacer_fetch_queue_items',
+        on_delete=models.CASCADE,
+    )
+    status = models.SmallIntegerField(
+        help_text="The current status of this request. Possible values "
+                  "are: %s" % ', '.join(['(%s): %s' % (t[0], t[1]) for t in
+                                         PROCESSING_STATUS.NAMES]),
+        default=PROCESSING_STATUS.ENQUEUED,
+        choices=PROCESSING_STATUS.NAMES,
+        db_index=True,
+    )
+    request_type = models.SmallIntegerField(
+        help_text="The type of object that is requested",
+        choices=REQUEST_TYPE.NAMES,
+    )
+    message = models.TextField(
+        help_text="Any messages that may help a user during or after "
+                  "processing.",
+        blank=True,
+    )
+
+    #
+    # Shared request parameters (can be used across multiple request types)
+    #
+    court = models.ForeignKey(
+        Court,
+        help_text="The court where the request will be made",
+        related_name='pacer_fetch_queue_items',
+        on_delete=models.CASCADE,
+        null=True,
+    )
+
+    #
+    # Docket request parameters
+    #
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The ID of an existing docket object in the CourtListener "
+                  "database that should be updated.",
+        related_name='pacer_fetch_queue_items',
+        on_delete=models.CASCADE,
+        null=True,
+    )
+    pacer_case_id = models.CharField(
+        help_text="The case ID provided by PACER for the case to update (must "
+                  "be used in combination with the court field).",
+        max_length=100,
+        db_index=True,
+        blank=True,
+    )
+    docket_number = models.CharField(
+        help_text="The docket number of a case to update (must be used in "
+                  "combination with the court field).",
+        max_length=50,
+        blank=True,
+    )
+    de_date_start = models.DateField(
+        help_text="Only fetch docket entries (de) newer than this date. "
+                  "Default is 1 Jan. 1960. Timezone appears to be that of the "
+                  "court.",
+        null=True,
+        blank=True,
+    )
+    de_date_end = models.DateField(
+        help_text="Only fetch docket entries (de) older than or equal to this "
+                  "date. Timezone appears to be that of the court.",
+        null=True,
+        blank=True,
+    )
+    de_number_start = models.IntegerField(
+        help_text="Only fetch docket entries (de) >= than this value. "
+                  "Warning: Using this parameter will not return numberless "
+                  "entries.",
+        null=True,
+        blank=True,
+    )
+    de_number_end = models.IntegerField(
+        help_text="Only fetch docket entries (de) <= this value. "
+                  "Warning: Using this parameter will not return numberless "
+                  "entries.",
+        null=True,
+        blank=True,
+    )
+    show_parties_and_counsel = models.BooleanField(
+        help_text="Should we pull parties and counsel for a docket report?",
+        default=True,
+    )
+    show_terminated_parties = models.BooleanField(
+        help_text="Should we pull terminated parties and counsel as well?",
+        default=True,
+    )
+    show_list_of_member_cases = models.BooleanField(
+        help_text="Should we pull the list of member cases? This can add "
+                  "considerable expense to each docket.",
+        default=False,
+    )
+
+    #
+    # PDF request parameters
+    #
+    recap_document = models.ForeignKey(
+        RECAPDocument,
+        help_text="The ID of the RECAP Document in the CourtListener databae "
+                  "that you wish to fetch or update.",
+        related_name='pacer_fetch_queue_items',
+        on_delete=models.CASCADE,
+        null=True,
+    )
 
 
 class FjcIntegratedDatabase(models.Model):
