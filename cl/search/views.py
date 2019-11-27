@@ -29,6 +29,7 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query, get_query_citation, \
     make_stats_variable, merge_form_with_courts, make_get_string, \
     regroup_snippets, get_mlt_query
+from cl.search.constants import RELATED_PATTERN
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion
 from cl.stats.models import Stat
@@ -55,8 +56,8 @@ def get_solr_result_objects(cd, facet):
     if search_type == 'o':
         si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
 
-        # This is a `related:<pks>` prefix query?
-        related_prefix_match = re.search(r'(^|\s)(?P<pfx>related:(?P<pks>(([0-9]+)(,[0-9]+)*)))($|\s)', cd['q'])
+        # Is this a `related:<pks>` prefix query?
+        related_prefix_match = re.search(RELATED_PATTERN, cd['q'])
         if related_prefix_match:
             results = get_mlt_query(
                 si,
