@@ -651,14 +651,15 @@
     </ul>
 
     <h3 id="recap-endpoint">RECAP Endpoints</h3>
-    <p>The RECAP endpoints provide two high-level features. They allow you to check if a PACER item exists in CourtListener, and they allow you to upload items to CourtListener for processing and addition to the <a href="{% url "advanced_r" %}">RECAP Archive</a>.
+    <p>The RECAP endpoints provide three high-level features. They allow you to check if a PACER item exists in CourtListener, they allow you to upload items to CourtListener for processing, and they allow you to request that we fetch items from PACER on your behalf.
     </p>
-    <p>These endpoints require authentication with a CourtListener account that has special permissions. To obtain permission to use these endpoints, please <a href="{% url "contact" %}">get in touch</a>.
+    <p>Some of these endpoints require authentication with a CourtListener account that has special permissions. To obtain permission to use these endpoints, please <a href="{% url "contact" %}">get in touch</a>.
     </p>
     <p>The endpoints for RECAP are:</p>
     <ul>
       <li><code>{% url "processingqueue-list" version="v3" %}</code>: This endpoint can be used to upload items and to check on the progress of an upload.</li>
       <li><code>{% url "fast-recapdocument-list" version="v3" %}</code>: This endpoint can be used to check if documents are in RECAP</li>
+      <li><code>{% url "pacerfetchqueue-list" version="v3" %}</code>: Use this endpoint to ask our server to fetch an item from PACER on your behalf.</li>
     </ul>
     <h4 id="processing-queue-endpoint">{% url "processingqueue-list" version="v3" %}</h4>
     <p>This endpoint can be used to upload PACER content to the RECAP Archive. We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/master/cl/recap/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using POST requests and multipart form data.
@@ -746,6 +747,94 @@ PACER_TO_CL_IDS = {
     <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Take care:</strong> The fourth digit of a PACER document ID can be a zero or one. We always normalize it to zero and you will need to do so as well in your queries. For more on these IDs, see the <a href="https://github.com/freelawproject/juriscraper">Juriscraper Project</a>.
     </p>
     <p>To query whether a case is in the RECAP Archive, use the <code>Docket</code> endpoint described above.
+    </p>
+
+    <h4 id="pacer-fetch">{% url "pacerfetchqueue-list" version="v3" %}</h4>
+    <p>If you've identified an item in PACER that we do not have, you can use this API to ask us to download it and add it to the RECAP Archive.
+    </p>
+    <p>This API can currently either download dockets or PDFs. Dockets are more complicated than PDFs because there are a handful of options available when purchasing dockets on PACER.
+    </p>
+    <p>To purchase a PDF:</p>
+    <ol>
+      <li>Set <code>request_type</code> to <code>2</code>, which indicates PDFs.</li>
+      <li>Identify the PDF you wish to add to our system. To identify the PDF use the <code>recap_document</code> field to provide the RECAP Document ID of the item you wish to download.</li>
+    </ol>
+    <p>An example of downloading a PDF by <code>recap_document</code> ID might be:
+    </p>
+    <pre class="scrollable">curl -X POST \
+    --data 'request_type=2' \
+    --data 'pacer_username=xxx' \
+    --data 'pacer_password=yyy' \
+    --data 'recap_document=112' \
+    --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+    {% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}</pre>
+
+    <p>A known issue we currently have is that if we do not have the <code>pacer_doc_id</code> for a particular <code>recap_document</code>, we will not be able to download it.
+    </p>
+
+    <p>Fetching dockets is done similarly:</p>
+    <ol>
+      <li>Provide the <code>request_type</code> of <code>1</code> for dockets.</li>
+      <li>Indicate the docket you want by either a CourtListener <code>docket</code> ID, a <code>pacer_case_id</code>-<code>court</code> pair or a <code>docket_number</code>-<code>court</code> pair.</li>
+      Note that this is the CourtListener court ID, not the PACER court ID (they're usually the same, but not always).
+      <li>Set any options you need for the docket purchase itself (place an <code>OPTIONS</code> request to this API for details on the available fields).</li>
+    </ol>
+    <p>For example, this request identifies a case by docket number and court:</p>
+    <pre class="scrollable">curl -X POST \
+  --data 'request_type=1' \
+  --data 'pacer_username=xxx' \
+  --data 'pacer_password=yyy' \
+  --data 'docket_number=5:16-cv-00432' \
+  --data 'court=okwd' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  {% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}</pre>
+    <p>This one gets it by docket number and court, including parties and counsel:</p>
+    <pre class="scrollable">curl -X POST \
+  --data 'request_type=1' \
+  --data 'pacer_username=xxx' \
+  --data 'pacer_password=yyy' \
+  --data 'docket_number=5:16-cv-00432' \
+  --data 'court=okwd' \
+  --data 'show_parties_and_counsel=true' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  {% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}</pre>
+    <p>For the full list of options on a docket request, do an HTTP <code>OPTIONS</code> request to the endpoint.</p>
+    <p>Finally, this request updates an existing docket in CourtListener by its ID, but only gets the parties and counsel. Docket entries are excluded by requesting only ones from before 1980:
+    </p>
+    <pre class="scrollable">curl -X POST \
+  --data 'request_type=1' \
+  --data 'pacer_username=xxx' \
+  --data 'pacer_password=yyy' \
+  --data 'docket=5' \
+  --data 'show_parties_and_counsel=true' \
+  --data 'de_date_end=1980-01-01' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  {% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}</pre>
+    <p>A few general notes:</p>
+    <ol>
+      <li>
+        <p>Whenever a docket is created or updated, we look for PDFs that we already have from that case, and we link them up to the newly created or updated docket. As a result, some docket updates may immediately have PDFs associated with them.</p>
+      </li>
+      <li>
+        <p>Your first request in a while will take longer than subsequent requests because we will need to gather your PACER cookies by logging you in. Subsequent requests within the same hour will use your cached cookies.</p>
+      </li>
+      <li>
+        <p>As explained in the security section below, we cache your PACER cookies once we get them. As a result, if we already have your cookies due to a successful previous request, we may not throw an error if your credentials are wrong on a subsequent request &mdash; after all, we never save your password, and since we have the cached cookies, we don't need to test the credentials you just sent.</p>
+      </li>
+    </ol>
+
+    <h4>Security of RECAP Fetch API</h4>
+    <p>A security maxim is to never share your password. This API requires that you violate this maxim. Why should you do so, and how do we handle your password securely?
+    </p>
+    <p>While we prefer not to have unhashed user passwords, PACER lacks any permissions-based or granular authentication system. This means that the only way we can act on your behalf is to have your credentials.
+    </p>
+    <p>Once we have your password, we work to rid ourselves of it as quickly as possible. We do not store it in our database or logs at any time. Instead, we use it to immediately log into the PACER system. That gives us cookies for your account, which we store in our in-memory database with a one hour expiration period. As soon as we have the cookies, we throw away your username and password.
+    </p>
+    <p>The result of this system is that we have your password only until we have logged you in, and after that point, we only have a cache of your cookies for one hour.
+    </p>
+    <p>This API gets content on your behalf using <em>your</em> access rights. This means that if you use this API to request a sealed item from PACER, we will go get it and add it to our system, just like you asked. <strong>Do not do this</strong>. If you do this accidentally, please get in touch as soon as possible so we can revert the error.
+    </p>
+    <p>If you have questions about our approach, please see <a href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.
     </p>
 
     <h2>Footnotes</h2>

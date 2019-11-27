@@ -47,6 +47,7 @@ router.register(r'attorneys', people_views.AttorneyViewSet,
 
 # RECAP
 router.register(r'recap', recap_views.PacerProcessingQueueViewSet)
+router.register(r'recap-fetch', recap_views.PacerFetchRequestViewSet)
 router.register(r'recap-query', recap_views.PacerDocIdLookupViewSet,
                 base_name='fast-recapdocument')
 router.register(r'fjc-integrated-database',

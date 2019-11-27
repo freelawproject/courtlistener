@@ -1,19 +1,29 @@
+# These are the direct dependencies of CourtListener only, removing any
+# subdependencies.
+#
+# Note that we use ~= in many places to note that minor versions are allowed
+# here, while in requirements.txt we always use == to lock things down properly
+
 ansible
-argparse
 beautifulsoup4~=4.8.0
-boto3==1.9.38
-cchardet==2.1.1
-celery==4.3.0
-certifi==2019.9.11
-chardet==3.0.4
-coreapi==2.3.3
+# Required for django-storage
+boto3~=1.9.0
+# Before upgrading, note: https://github.com/celery/celery/issues/4878
+celery~=4.3.0
+# Always do the most updated version of certifi, no version lock.
+certifi
+# Needed for get_schema_view view (https://www.django-rest-framework.org/coreapi/schemas/#adding-a-view-with-get_schema_view)
+coreapi~=2.3.0
+# Unfortunately, higher versions emit an insane Python 2.7 error EVERYWHERE.
+# Once we have py3, we can upgrade: https://stackoverflow.com/q/51778764/64911
 cryptography==2.2.2
-defusedxml==0.6.0
+defusedxml~=0.6.0
 disposable-email-domains
 Django~=1.11.0
-django-cors-headers==3.0.2
-django-debug-toolbar==1.3.2
-django-extensions~=2.2.0
+# We have the last version of this that supports py2.
+django-cors-headers~=3.0.0
+
+# XXX Items below here need vetting for Py3.
 django-filter==1.1
 django-localflavor==1.1
 django-mathfilters

@@ -931,8 +931,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         label = (self.browser
                  .find_element_by_css_selector('label[for="id_type_0"]'))
         self.assertIn('selected', label.get_attribute('class'))
-        self.assert_text_in_body('Date Filed')
-        self.assert_text_not_in_body('Date Argued')
+        self.assert_text_in_node('Date Filed', 'body')
+        self.assert_text_not_in_node('Date Argued', 'body')
 
         # She clicks on Oral Arguments
         self.browser.find_element_by_id('navbar-oa').click()

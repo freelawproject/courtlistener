@@ -152,4 +152,4 @@ class AlertSeleniumTest(BaseSeleniumTest):
 
         # And gets redirected to the SERP where they see a notice about their
         # alert being edited.
-        self.assert_text_in_body("editing your alert")
+        self.assert_text_in_node("editing your alert", 'body')

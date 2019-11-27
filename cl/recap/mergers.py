@@ -12,6 +12,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.import_lib import get_candidate_judges
+from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import get_blocked_status, map_pacer_to_cl_id, \
     normalize_attorney_contact, normalize_attorney_role
 from cl.lib.string_utils import anonymize
@@ -19,13 +20,56 @@ from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.models import Attorney, AttorneyOrganization, \
     AttorneyOrganizationAssociation, CriminalComplaint, CriminalCount, Party, \
     PartyType, Role
-from cl.recap.models import ProcessingQueue, UPLOAD_TYPE
+from cl.recap.models import ProcessingQueue, UPLOAD_TYPE, PROCESSING_STATUS
 from cl.search.models import BankruptcyInformation, Claim, ClaimHistory, Court, \
-    DocketEntry, OriginatingCourtInformation, RECAPDocument, Tag
+    DocketEntry, OriginatingCourtInformation, RECAPDocument, Tag, Docket
 
 logger = logging.getLogger(__name__)
 
 cnt = CaseNameTweaker()
+
+
+def find_docket_object(court_id, pacer_case_id, docket_number):
+    """Attempt to find the docket based on the parsed docket data. If cannot be
+    found, create a new docket. If multiple are found, return all of them.
+
+    :param court_id: The CourtListener court_id to lookup
+    :param pacer_case_id: The PACER case ID for the docket
+    :param docket_number: The docket number to lookup.
+    :returns a tuple. The first item is either a QuerySet of all the items
+    found if more than one is identified or just the docket found if only one
+    is identified. The second item in the tuple is the count of items found
+    (this number is zero if we had to create a new docket item).
+    """
+    # Attempt several lookups of decreasing specificity. Note that
+    # pacer_case_id is required for Docket and Docket History uploads.
+    d = None
+    docket_number_core = make_docket_number_core(docket_number)
+    for kwargs in [{'pacer_case_id': pacer_case_id,
+                    'docket_number_core': docket_number_core},
+                   {'pacer_case_id': pacer_case_id},
+                   {'pacer_case_id': None,
+                    'docket_number_core': docket_number_core}]:
+        ds = Docket.objects.filter(court_id=court_id, **kwargs)
+        count = ds.count()
+        if count == 0:
+            continue  # Try a looser lookup.
+        if count == 1:
+            d = ds[0]
+            break  # Nailed it!
+        elif count > 1:
+            return ds, count  # Problems. Let caller decide what to do.
+
+    if d is None:
+        # Couldn't find a docket. Make a new one.
+        d = Docket(
+            source=Docket.RECAP,
+            pacer_case_id=pacer_case_id,
+            court_id=court_id,
+        )
+        return d, 0
+
+    return d, 1
 
 
 def add_attorney(atty, p, d):
@@ -959,7 +1003,7 @@ def process_orphan_documents(rds_created, court_id, docket_date):
     pqs = ProcessingQueue.objects.filter(
         pacer_doc_id__in=pacer_doc_ids,
         court_id=court_id,
-        status=ProcessingQueue.PROCESSING_FAILED,
+        status=PROCESSING_STATUS.FAILED,
         upload_type=UPLOAD_TYPE.PDF,
         debug=False,
         date_modified__gt=cutoff_date,

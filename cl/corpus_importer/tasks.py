@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 
+from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.crypto import sha1
 from cl.people_db.models import Attorney, Role
@@ -47,17 +48,17 @@ from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import lookup_and_save, get_blocked_status, \
     map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_date
+from cl.lib.pacer_session import get_pacer_cookie_from_cache
 from cl.lib.recap_utils import get_document_filename, get_bucket_name, \
     get_docket_filename
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
-from cl.recap.tasks import find_docket_object
-from cl.recap.mergers import update_docket_metadata, \
+from cl.recap.mergers import find_docket_object, update_docket_metadata, \
     update_docket_appellate_metadata, make_recap_sequence_number, \
     add_docket_entries, add_parties_and_attorneys, process_orphan_documents, \
     add_claims_to_docket, add_bankruptcy_data_to_docket
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import get_page_count, extract_recap_pdf
+from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag, \
     ClaimHistory
 from cl.search.tasks import add_items_to_solr
@@ -301,22 +302,23 @@ def process_free_opinion_result(self, row_pk, cnt):
     delattr(row_copy, 'court_id')
     # If we don't do this, the id of result tries to smash that of the docket.
     delattr(row_copy, 'id')
+    start_time = now()
     try:
         with transaction.atomic():
-            docket = lookup_and_save(row_copy)
-            if not docket:
+            d = lookup_and_save(row_copy)
+            if not d:
                 msg = "Unable to create docket for %s" % result
                 logger.error(msg)
                 result.error_msg = msg
                 result.save()
                 self.request.chain = None
                 return
-            docket.blocked, docket.date_blocked = get_blocked_status(docket)
-            mark_ia_upload_needed(docket)
-            docket.save()
+            d.blocked, d.date_blocked = get_blocked_status(d)
+            mark_ia_upload_needed(d)
+            d.save()
 
             de, de_created = DocketEntry.objects.update_or_create(
-                docket=docket,
+                docket=d,
                 entry_number=result.document_number,
                 defaults={
                     'date_filed': result.date_filed,
@@ -386,6 +388,11 @@ def process_free_opinion_result(self, row_pk, cnt):
         result.delete()
         self.request.chain = None
         return
+
+    if rd_created:
+        newly_enqueued = enqueue_docket_alert(d.pk)
+        if newly_enqueued:
+            send_docket_alert(d.pk, start_time)
 
     return {'result': result, 'rd_pk': rd.pk,
             'pacer_court_id': result.court_id}
@@ -634,9 +641,9 @@ def make_fjc_idb_lookup_params(item):
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60,
           interval_step=10 * 60, ignore_results=True)
-def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
-                                cookies, case_name=None, office_number=None,
-                                docket_number_letters=None):
+def get_pacer_case_id_and_title(
+    self, pass_through, docket_number, court_id, cookies=None, user_pk=None,
+    case_name=None, office_number=None, docket_number_letters=None):
     """Get the pacer_case_id and title values for a district court docket. Use
     heuristics to disambiguate the results.
 
@@ -653,6 +660,9 @@ def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
     :param court_id: The CourtListener court ID for the docket number
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
+    :param user_pk: The PK of a user making the request. This can be provided
+    instead of the cookies parameter. If so, this will get the user's cookies
+    from redis instead of passing them in as an argument.
     :param case_name: The case name to use for disambiguation. Disambiguation
     is done in Juriscraper using edit distance.
     :param office_number: The number (or letter) where the case took place.
@@ -674,6 +684,9 @@ def get_pacer_case_id_and_title(self, pass_through, docket_number, court_id,
     """
     logger.info("Getting pacer_case_id for docket_number %s in court %s",
                 docket_number, court_id)
+    if not cookies:
+        # Get cookies from Redis if not provided
+        cookies = get_pacer_cookie_from_cache(user_pk)
     s = PacerSession(cookies=cookies)
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
     try:
@@ -813,8 +826,9 @@ def filter_docket_by_tags(self, data, tags, court_id):
 # Retry 10 times. First one after 1m, then again every 5 minutes.
 @app.task(bind=True, max_retries=10, interval_start=1 * 60,
           interval_step=5 * 60, ignore_result=True)
-def get_docket_by_pacer_case_id(self, data, court_id, cookies,
-                                tag_names=None, **kwargs):
+def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
+                                user_pk=None, docket_pk=None, tag_names=None,
+                                **kwargs):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -827,11 +841,19 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     :param court_id: A courtlistener court ID.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
+    :param user_pk: The PK of a user making the request. This can be provided
+    instead of the cookies parameter. If so, this will get the user's cookies
+    from redis instead of passing them in as an argument.
+    :param docket_pk: The PK of the docket to update. Can also be provided in
+    the data param, above.
     :param tag_names: A list of tag names that should be stored with the item
     in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     :return: A dict indicating if we need to update Solr.
     """
+    if not cookies:
+        # Get cookies from Redis if not provided
+        cookies = get_pacer_cookie_from_cache(user_pk)
     s = PacerSession(cookies=cookies)
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
@@ -841,7 +863,9 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
     pacer_case_id = data.get('pacer_case_id')
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
 
-    if data.get('docket_pk') is not None:
+    if docket_pk:
+        d = Docket.objects.get(pk=docket_pk)
+    elif data.get('docket_pk') is not None:
         d = Docket.objects.get(pk=data['docket_pk'])
     else:
         try:
@@ -886,11 +910,11 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies,
         if count > 1:
             d = d.earliest('date_created')
 
-        # Ensure that we set the case ID. This is needed on dockets that have
-        # matching docket numbers, but that never got PACER data before. This
-        # was previously rare, but since we added the FJC data to the dockets
-        # table, this is now quite common.
-        d.pacer_case_id = pacer_case_id
+    # Ensure that we set the case ID. This is needed on dockets that have
+    # matching docket numbers, but that never got PACER data before. This was
+    # previously rare, but since we added the FJC data to the dockets table,
+    # this is now quite common.
+    d.pacer_case_id = pacer_case_id
 
     d.add_recap_source()
     update_docket_metadata(d, docket_data)

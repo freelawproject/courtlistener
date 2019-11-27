@@ -8,8 +8,8 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.urls import reverse
 from django.test import TestCase
+from django.urls import reverse
 from juriscraper.pacer import PacerRssFeed
 from rest_framework.status import (
     HTTP_200_OK,
@@ -19,17 +19,18 @@ from rest_framework.status import (
 )
 from rest_framework.test import APIClient
 
-from cl.people_db.models import Party, AttorneyOrganizationAssociation, \
-    Attorney, Role, PartyType, CriminalCount, CriminalComplaint
+from cl.people_db.models import Attorney, AttorneyOrganizationAssociation, \
+    CriminalComplaint, CriminalCount, Party, PartyType, Role
 from cl.recap.management.commands.import_idb import Command
-from cl.recap.models import ProcessingQueue, UPLOAD_TYPE
-from cl.recap.tasks import process_recap_pdf, process_recap_docket, process_recap_attachment, \
-    process_recap_appellate_docket, find_docket_object
-from cl.recap.mergers import add_attorney, update_case_names, \
-    update_docket_metadata, normalize_long_description, add_docket_entries, \
-    add_parties_and_attorneys
-from cl.search.models import Docket, RECAPDocument, DocketEntry, \
-    OriginatingCourtInformation
+from cl.recap.mergers import add_attorney, add_docket_entries, \
+    add_parties_and_attorneys, normalize_long_description, \
+    update_case_names, update_docket_metadata
+from cl.recap.models import PROCESSING_STATUS, ProcessingQueue, UPLOAD_TYPE
+from cl.recap.mergers import find_docket_object
+from cl.recap.tasks import process_recap_appellate_docket, \
+    process_recap_attachment, process_recap_docket, process_recap_pdf
+from cl.search.models import Docket, DocketEntry, \
+    OriginatingCourtInformation, RECAPDocument
 
 
 @mock.patch('cl.recap.views.process_recap_upload')
@@ -208,7 +209,7 @@ class ProcessingQueueApiFilterTest(TestCase):
             'pacer_doc_id': 'asdf',
             'document_number': '1',
             'filepath_local': f,
-            'status': ProcessingQueue.AWAITING_PROCESSING,
+            'status': PROCESSING_STATUS.ENQUEUED,
             'upload_type': UPLOAD_TYPE.PDF,
         }
 
@@ -216,7 +217,7 @@ class ProcessingQueueApiFilterTest(TestCase):
         """Can we filter with the status and upload_type filters?"""
         # Create two PQ objects with different values.
         ProcessingQueue.objects.create(**self.params)
-        self.params['status'] = ProcessingQueue.PROCESSING_FAILED
+        self.params['status'] = PROCESSING_STATUS.FAILED
         self.params['upload_type'] = UPLOAD_TYPE.ATTACHMENT_PAGE
         ProcessingQueue.objects.create(**self.params)
 
@@ -228,7 +229,7 @@ class ProcessingQueueApiFilterTest(TestCase):
 
         total_awaiting_processing = 1
         r = self.client.get(self.path, {
-            'status': ProcessingQueue.AWAITING_PROCESSING,
+            'status': PROCESSING_STATUS.ENQUEUED,
         })
         j = json.loads(r.content)
         self.assertEqual(j['count'], total_awaiting_processing)
@@ -369,7 +370,7 @@ class RecapPdfTaskTest(TestCase):
             pass
 
     def test_pq_has_default_status(self):
-        self.assertTrue(self.pq.status == ProcessingQueue.AWAITING_PROCESSING)
+        self.assertTrue(self.pq.status == PROCESSING_STATUS.ENQUEUED)
 
     @mock.patch('cl.recap.tasks.extract_recap_pdf')
     def test_recap_document_already_exists(self, mock):
@@ -388,7 +389,7 @@ class RecapPdfTaskTest(TestCase):
 
         # Did we update pq appropriately?
         self.pq.refresh_from_db()
-        self.assertEqual(self.pq.status, self.pq.PROCESSING_SUCCESSFUL)
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
         self.assertEqual(self.pq.error_message,
                          'Successful upload! Nice work.')
         self.assertFalse(self.pq.filepath_local)
@@ -409,8 +410,8 @@ class RecapPdfTaskTest(TestCase):
             process_recap_pdf(self.pq.pk)
         self.pq.refresh_from_db()
         # This doesn't do the celery retries, unfortunately. If we get that
-        # working, the correct status is self.pq.PROCESSING_FAILED.
-        self.assertEqual(self.pq.status, self.pq.QUEUED_FOR_RETRY)
+        # working, the correct status is PROCESSING_STATUS.FAILED.
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.QUEUED_FOR_RETRY)
         self.assertIn('Unable to find docket entry', self.pq.error_message)
 
     @mock.patch('cl.recap.tasks.extract_recap_pdf')
@@ -428,7 +429,7 @@ class RecapPdfTaskTest(TestCase):
         self.assertIn('gov.uscourts.scotus.asdf.1.0', rd.filepath_local.name)
 
         self.pq.refresh_from_db()
-        self.assertEqual(self.pq.status, self.pq.PROCESSING_SUCCESSFUL)
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
         self.assertEqual(self.pq.error_message,
                          "Successful upload! Nice work.")
         self.assertFalse(self.pq.filepath_local)
@@ -444,8 +445,8 @@ class RecapPdfTaskTest(TestCase):
             process_recap_pdf(self.pq.pk)
         self.pq.refresh_from_db()
         # This doesn't do the celery retries, unfortunately. If we get that
-        # working, the correct status is self.pq.PROCESSING_FAILED.
-        self.assertEqual(self.pq.status, self.pq.QUEUED_FOR_RETRY)
+        # working, the correct status is PROCESSING_STATUS.FAILED.
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.QUEUED_FOR_RETRY)
         self.assertIn('Unable to find docket', self.pq.error_message)
 
 
@@ -984,11 +985,11 @@ class RecapDocketTaskTest(TestCase):
                 b"file content more content",
             ),
             upload_type=UPLOAD_TYPE.PDF,
-            status=ProcessingQueue.PROCESSING_FAILED,
+            status=PROCESSING_STATUS.FAILED,
         )
         process_recap_docket(self.pq.pk)
         pq.refresh_from_db()
-        self.assertEqual(pq.status, pq.PROCESSING_SUCCESSFUL)
+        self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
 
 
 class RecapDocketAppellateTaskTest(TestCase):
@@ -1113,7 +1114,7 @@ class RecapAttachmentPageTaskTest(TestCase):
             num_attachments_to_create,
         )
         self.pq.refresh_from_db()
-        self.assertEqual(self.pq.status, ProcessingQueue.PROCESSING_SUCCESSFUL)
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
 
     def test_no_rd_match(self, mock):
         """If there's no RECAPDocument to match on, do we fail gracefully?"""
@@ -1122,8 +1123,8 @@ class RecapAttachmentPageTaskTest(TestCase):
             process_recap_attachment(self.pq.pk)
         self.pq.refresh_from_db()
         # This doesn't do the celery retries, unfortunately. If we get that
-        # working, the correct status is self.pq.PROCESSING_FAILED.
-        self.assertEqual(self.pq.status, self.pq.QUEUED_FOR_RETRY)
+        # working, the correct status is PROCESSING_STATUS.FAILED.
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.QUEUED_FOR_RETRY)
 
 
 class RecapUploadAuthenticationTest(TestCase):

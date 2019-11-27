@@ -1,7 +1,8 @@
 from rest_framework_filters import FilterSet
 
 from cl.api.utils import DATETIME_LOOKUPS, BASIC_TEXT_LOOKUPS, DATE_LOOKUPS
-from cl.recap.models import ProcessingQueue, FjcIntegratedDatabase
+from cl.recap.models import ProcessingQueue, FjcIntegratedDatabase, \
+    PacerFetchQueue
 
 
 class ProcessingQueueFilter(FilterSet):
@@ -12,6 +13,20 @@ class ProcessingQueueFilter(FilterSet):
             'pacer_case_id': ['exact', 'in'],
             'status': ['exact', 'in'],
             'upload_type': ['exact', 'in'],
+        }
+
+
+class PacerFetchQueueFilter(FilterSet):
+    class Meta:
+        model = PacerFetchQueue
+        fields = {
+            'status': ['exact', 'in'],
+            'request_type': ['exact'],
+            'court': ['exact'],
+            'docket': ['exact'],
+            'pacer_case_id': ['exact', 'in'],
+            'docket_number': ['exact'],
+            'recap_document': ['exact', 'in'],
         }
 
 

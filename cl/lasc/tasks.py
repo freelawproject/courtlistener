@@ -65,10 +65,12 @@ def establish_good_login(self):
     :return: None
     """
     r = make_redis_interface('CACHE')
-    bad_login = r.get(LASC_SESSION_STATUS_KEY) != SESSION_IS.OK
-    if bad_login:
-        login_to_court()
-        self.retry(countdown=60)
+    status = r.get(LASC_SESSION_STATUS_KEY)
+    if status == SESSION_IS.LOGGING_IN:
+        self.retry()
+    if status == SESSION_IS.OK:
+        return
+    login_to_court()
 
 
 def make_lasc_search():
@@ -82,7 +84,7 @@ def make_lasc_search():
     return LASCSearch(session)
 
 
-@app.task(bind=True, ignore_result=True, max_retries=1)
+@app.task(bind=True, ignore_result=True, max_retries=3, retry_backoff=15)
 def download_pdf(self, pdf_pk):
     """Downloads the PDF associated with the PDF DB Object ID passed in.
 
@@ -166,7 +168,7 @@ def add_case(case_id, case_data, original_data):
         save_json(original_data, docket)
 
 
-@app.task(bind=True, ignore_result=True, max_retries=1)
+@app.task(bind=True, ignore_result=True, max_retries=3, retry_backoff=15)
 def add_or_update_case_db(self, case_id):
     """Add a case from the LASC MAP using an authenticated session object
 
@@ -181,13 +183,16 @@ def add_or_update_case_db(self, case_id):
     try:
         clean_data = lasc.get_json_from_internal_case_id(case_id)
         logger.info("Successful Query")
-    except RequestException:
-        if self.request.retries == self.max_retries:
+    except RequestException as e:
+        retries_remaining = self.max_retries - self.request.retries
+        if retries_remaining == 0:
             logger.error("RequestException, unable to get case at %s", case_id)
             return
+        logger.info("Failed to get JSON for '%s', with RequestException: %s. "
+                    "%s retries remaining.", case_id, e, retries_remaining)
         r = make_redis_interface('CACHE')
         r.delete(LASC_SESSION_COOKIE_KEY, LASC_SESSION_STATUS_KEY)
-        self.retry(countdown=60)
+        self.retry()
 
     if not clean_data:
         logger.info("No information for case %s. Possibly sealed?", case_id)
@@ -268,7 +273,7 @@ def update_case(lasc, clean_data):
         save_json(lasc.case_data, content_obj=docket)
 
 
-@app.task(ignore_result=True, max_retries=1)
+@app.task(ignore_result=True, max_retries=3, retry_backoff=15)
 def add_case_from_filepath(filepath):
     """Add case to database from filepath
 
@@ -292,7 +297,7 @@ def add_case_from_filepath(filepath):
                     "the database ", filepath)
 
 
-@app.task(bind=True, ignore_result=True, max_retries=2)
+@app.task(bind=True, ignore_result=True, max_retries=3, retry_backoff=15)
 def fetch_date_range(self, start, end):
     """Queries LASC for one week or less range and returns the cases filed.
 
