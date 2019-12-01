@@ -169,7 +169,8 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
         # Dora goes to CL and searches for Bonvini
         self.browser.get(self.live_server_url)
-        self.browser.find_element_by_id('id_q').send_keys('bonvini\n')
+        self.browser.find_element_by_id('id_q').send_keys('bonvini')
+        self.browser.find_element_by_id('id_q').submit()
 
         # She's brought to the SERP.
         self.assertIn('Search Results', self.browser.title)
