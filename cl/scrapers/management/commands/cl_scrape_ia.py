@@ -2,14 +2,17 @@
 # -*- coding: utf-8 -*-
 
 import os
+import json
 import re
 import argparse
 import requests
-from internetarchive import get_files
+from internetarchive import get_files, search_items
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Opinion, OpinionCluster, Docket, Citation
 from cl.citations import find_citations
+
+from django.conf import settings
 
 def find_docket_no_section(str):
     """
