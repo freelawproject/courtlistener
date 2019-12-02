@@ -85,7 +85,6 @@ class Command(VerboseCommand):
         parser.add_argument(
             '--reporter',
             help="Reporter Abbreviation.",
-            default="T.C."
         )
 
     def handle(self, *args, **options):
