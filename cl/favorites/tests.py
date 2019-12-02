@@ -71,7 +71,8 @@ class UserFavoritesTest(BaseSeleniumTest):
         # an initial query on her subject: Lissner
         self.browser.get(self.live_server_url)
         search_box = self.browser.find_element_by_id('id_q')
-        search_box.send_keys('lissner\n')
+        search_box.send_keys('lissner')
+        search_box.submit()
 
         # She looks over the results and sees one in particular possibly of
         # interest so she clicks on the title
@@ -104,7 +105,8 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # She logs in
         self.browser.find_element_by_id('username').send_keys('pandora')
-        self.browser.find_element_by_id('password').send_keys('password\n')
+        self.browser.find_element_by_id('password').send_keys('password')
+        self.browser.find_element_by_id('password').submit()
 
         # And is brought back to that item!
         self.assert_text_in_node(title.strip(), 'body')
@@ -127,7 +129,8 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.attempt_sign_in('pandora', 'password')
 
         search_box = self.browser.find_element_by_id('id_q')
-        search_box.send_keys('lissner\n')
+        search_box.send_keys('lissner')
+        search_box.submit()
 
         # Drilling into the result she's interested brings her to the details
         # TODO: Candidate for refactor

@@ -159,7 +159,8 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self.click_link_for_new_page('Sign in / Register')
         self.assertIn('Sign In', self.browser.title)
         self.browser.find_element_by_id('username').send_keys(username)
-        self.browser.find_element_by_id('password').send_keys(password + '\n')
+        self.browser.find_element_by_id('password').send_keys(password)
+        self.browser.find_element_by_id('password').submit()
 
     def get_url_and_wait(self, url, timeout=SELENIUM_TIMEOUT):
         self.browser.get(url)

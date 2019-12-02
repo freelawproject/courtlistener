@@ -869,7 +869,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
     def _perform_wildcard_search(self):
         searchbox = self.browser.find_element_by_id('id_q')
-        searchbox.send_keys('\n')
+        searchbox.submit()
         result_count = self.browser.find_element_by_id('result-count')
         self.assertIn('Opinions', result_count.text)
 
@@ -907,7 +907,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # She types part of the docket number into the docket number
         # filter on the left and hits enter
         text_box = self.browser.find_element_by_id('id_docket_number')
-        text_box.send_keys('1337\n')
+        text_box.send_keys('1337')
+        text_box.submit()
 
         # The SERP refreshes and she sees resuls that
         # only contain fragments of the docker number she entered
@@ -922,7 +923,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def test_opinion_search_result_detail_page(self):
         # Dora navitages to CL and does a simple wild card search
         self.browser.get(self.live_server_url)
-        self.browser.find_element_by_id('id_q').send_keys('voutila\n')
+        self.browser.find_element_by_id('id_q').send_keys('voutila')
+        self.browser.find_element_by_id('id_q').submit()
 
         # Seeing an Opinion immediately on the first page of results, she
         # wants more details so she clicks the title and drills into the result
@@ -1070,7 +1072,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # Dora remembers this Lissner guy and wonders if he's been involved
         # in any litigation. She types his name into the search box and hits
         # Enter
-        search_box.send_keys('lissner\n')
+        search_box.send_keys('lissner')
+        search_box.submit()
 
         # The browser brings her to a search engine result page with some
         # results. She notices her query is still in the searchbox and
