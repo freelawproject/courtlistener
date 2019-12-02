@@ -237,14 +237,6 @@ class Command(VerboseCommand):
             help="Reporter Abbreviation.",
             default="T.C."
         )
-        parser.add_argument(
-            '--skip-until',
-            type=str,
-            help="When using --directory-glob, skip processing until an item "
-                 "at this location is encountered. Use a path comparable to "
-                 "that passed to --directory-glob.",
-        )
-
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
@@ -253,5 +245,4 @@ class Command(VerboseCommand):
     VALID_ACTIONS = {
         'download-from-ia': download_from_internet_archive,
         'update-tax-cases': update_tax_opinions,
-        'add-from-ia':add_cases_from_IA,
     }
