@@ -19,7 +19,7 @@ coreapi~=2.3.0
 cryptography==2.2.2
 defusedxml~=0.6.0
 disposable-email-domains
-Django~=1.11.0
+Django~=3.0
 # We have the last version of this that supports py2.
 django-cors-headers~=3.0.0
 
