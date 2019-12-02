@@ -133,35 +133,6 @@ def update_tax_opinions(options):
                     logger.info("Saved Citation %s with docket no(s) %s" % (cite_dict, docket_number))
                     break
 
-def add_cases_from_IA(options):
-    """
-    This function will collect cases from IA, determine if we have it - and
-    then add missing cases to our DB.
-
-    Provide the Vol(ume) and Court code information to extract from IA.
-    Currently the code only provides the cite and URL.
-
-    :param options:
-    :return:
-    """
-
-    base = 'law.free.cap'
-
-    volume = options['vol']
-    reporter = options['court']
-
-    ia_key = ".".join([base,
-                       reporter.lower().replace(" ", "-").replace(".", ""),
-                       volume])
-
-    for item in get_files(ia_key):
-        if "json.json" not in item.name and "json" in item.name:
-            url = "https://archive.org/download/%s/%s" % (ia_key, item.name)
-            cite = " ".join([volume, reporter, item.name.split(".")[0]])
-            print cite, url
-
-
-
 def download_from_internet_archive(options):
     """
     Download cases from internet archive via case law and add write them to
