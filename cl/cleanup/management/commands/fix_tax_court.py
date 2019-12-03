@@ -76,7 +76,8 @@ def update_tax_opinions():
                 docket = Docket.objects.get(id=oc.docket_id)
                 docket.docket_number = docket_numbers
                 docket.save()
-                logger.info("Saving Docket")
+                logger.info("Adding Docket Numbers: %s to %s" %
+                            (docket_numbers, docket.case_name))
 
             for line_of_text in opinion.plain_text.split("\n")[:250]:
                 cites = find_citations.get_citations(line_of_text, html=False)
@@ -104,9 +105,11 @@ def update_tax_opinions():
                             "cluster_id": oc.id
                         })
 
+
                         logger.info(
-                            "Saved Citation %s with docket no(s) %s" % (
-                                cite_dict, docket_numbers))
+                            "Saved Citation %s %s %s with docket no(s) %s" % (
+                                cite_dict['volume'], cite_dict['reporter'],
+                                cite_dict['page'], docket_numbers))
                     break
 
 
