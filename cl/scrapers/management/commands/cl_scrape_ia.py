@@ -11,70 +11,79 @@ from cl.lib.utils import mkdir_p
 
 from django.conf import settings
 
+def get_from_ia(reporter, volume):
+    """
+    Download cases from internet archive via case law and write them to
+    disk.
+
+    Requires a reporter abbreviation to identify cases to download as
+    used by IA.  (Ex. T.C. => tc)
+
+    Opitionally pass in a volume number to download that volume only.  If no
+    Volume number provided the code will cycle through the entire reporter
+    collection on IA.
+
+    :param reporter:
+    :param volume:
+    :return:
+    """
+
+    reporter_key = ".".join(['law.free.cap', reporter])
+
+    # 35-38 checks that the returned reporter is the requested one.
+    # Ex. searching for Mich will return both Mich-app. and Mich.
+    for item in search_items(reporter_key):
+        ia_key = item['identifier']
+        if ia_key.split(".")[3] != reporter:
+            continue
+
+        # 42-45 checks if we requested a specific volume of the
+        # reporter and if so skips all other volumes of that reporter
+        ia_volume = ia_key.split(".")[-1]
+        if volume is not None:
+            if volume != ia_volume:
+                continue
+
+        for item in get_files(ia_key):
+            if "json.json" in item.name:
+                continue
+
+            if "json" in item.name:
+                url = "https://archive.org/download/%s/%s" % (
+                    ia_key, item.name)
+                file_path = os.path.join(settings.MEDIA_ROOT,
+                                         'harvard_corpus',
+                                         '%s' % ia_key,
+                                         '%s' % item.name,
+                                         )
+                directory = file_path.rsplit("/", 1)[0]
+                if os.path.exists(file_path):
+                    logger.info("Already captured: %s", url)
+                    continue
+
+                logger.info("Capturing: %s", url)
+                mkdir_p(directory)
+                data = requests.get(url, timeout=60).json()
+                with open(file_path, 'w') as outfile:
+                    json.dump(data, outfile, indent=2)
+
+
 class Command(VerboseCommand):
     help = 'Download and save Harvard corpus on IA to disk.'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--volume',
-            help="Volume number. If left blank code will cycle through all "
-                 "volumes of reporter in IA.",
+            help="Volume number. If none provided, code will cycle through all "
+                 "volumes of reporter on IA.",
         )
         parser.add_argument(
             '--reporter',
-            help="Reporter abbreviation as used on IA.",
+            help="Reporter abbreviation as saved on IA.",
             required=True,
         )
 
     def handle(self, *args, **options):
-        """
-        Download cases from internet archive via case law and write them to
-        disk.
-
-        Requires a reporter abbreviation to identify cases to download as
-        used by IA.  (Ex. T.C. => tc)
-
-        Opitionally pass in a volume number to download that volume only.  If no
-        Volume number provided the code will cycle through the entire reporter
-        collection on IA.
-
-        :param options:
-        :return:
-        """
         reporter = options['reporter']
-        reporter_key = ".".join(['law.free.cap', reporter])
         volume = options['volume']
-
-        for item in search_items(reporter_key):
-            ia_key = item['identifier']
-            if ia_key.split(".")[3] != reporter:
-                continue
-
-            ia_volume = ia_key.split(".")[-1]
-            if volume is not None:
-                if volume != ia_volume:
-                    continue
-
-            for item in get_files(ia_key):
-                if "json.json" in item.name:
-                    continue
-
-                if "json" in item.name:
-                    url = "https://archive.org/download/%s/%s" % (
-                    ia_key, item.name)
-                    cite = " ".join(
-                        [ia_volume, reporter, item.name.split(".")[0]])
-                    file_path = os.path.join(settings.MEDIA_ROOT,
-                                             'harvard_corpus',
-                                             '%s' % ia_key,
-                                             '%s' % item.name,
-                                             )
-                    directory = file_path.rsplit("/", 1)[0]
-                    if os.path.exists(file_path):
-                        logger.info("Already captured: %s", cite)
-                        continue
-
-                    logger.info("Capturing (%s): %s", cite, url)
-                    mkdir_p(directory)
-                    with open(file_path, 'w') as outfile:
-                        json.dump(requests.get(url).json(), outfile, indent=2)
+        get_from_ia(reporter, volume)
