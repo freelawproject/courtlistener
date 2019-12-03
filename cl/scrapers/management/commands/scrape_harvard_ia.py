@@ -11,33 +11,29 @@ from cl.lib.utils import mkdir_p
 
 from django.conf import settings
 
+
 def get_from_ia(reporter, volume):
     """
     Download cases from internet archive via case law and write them to
     disk.
 
-    Requires a reporter abbreviation to identify cases to download as
-    used by IA.  (Ex. T.C. => tc)
-
-    Opitionally pass in a volume number to download that volume only.  If no
-    Volume number provided the code will cycle through the entire reporter
-    collection on IA.
-
-    :param reporter:
-    :param volume:
-    :return:
+    :param reporter: (str) Requires a reporter abbreviation to identify
+    cases to download as used by IA.  (Ex. T.C. => tc)
+    :param volume: (int) Specific volume number of the reporter.  If blank
+    function will cycle through all volumes of the reporter on IA.
+    :return: None
     """
 
     reporter_key = ".".join(['law.free.cap', reporter])
 
-    # 35-38 checks that the returned reporter is the requested one.
+    # Checks that the returned reporter is the requested one.
     # Ex. searching for Mich will return both Mich-app. and Mich.
-    for item in search_items(reporter_key):
-        ia_key = item['identifier']
+    for ia_identifier in search_items(reporter_key):
+        ia_key = ia_identifier['identifier']
         if ia_key.split(".")[3] != reporter:
             continue
 
-        # 42-45 checks if we requested a specific volume of the
+        # Checks if we requested a specific volume of the
         # reporter and if so skips all other volumes of that reporter
         ia_volume = ia_key.split(".")[-1]
         if volume is not None:
@@ -63,7 +59,7 @@ def get_from_ia(reporter, volume):
 
                 logger.info("Capturing: %s", url)
                 mkdir_p(directory)
-                data = requests.get(url, timeout=60).json()
+                data = requests.get(url, timeout=10).json()
                 with open(file_path, 'w') as outfile:
                     json.dump(data, outfile, indent=2)
 
@@ -74,8 +70,8 @@ class Command(VerboseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             '--volume',
-            help="Volume number. If none provided, code will cycle through all "
-                 "volumes of reporter on IA.",
+            help="Volume number. If none provided, code will cycle through "
+                 "all volumes of reporter on IA.",
         )
         parser.add_argument(
             '--reporter',
