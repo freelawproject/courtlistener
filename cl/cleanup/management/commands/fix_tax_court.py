@@ -46,6 +46,46 @@ def get_tax_docket_numbers(opinion_text):
     return docket_string
 
 
+def generate_citation(opinion_text, cluster_id):
+    """
+    Generate_Citation returns a dictionary representation of our
+    Citation object.
+
+    This data will only be returned if found, otherwise none is returned and
+    no Citation object is added to the system.  It could be a failed parse
+    or the data could simply not be available.
+
+    :param opinion_text: The plain_text of our opinion from the scrape.
+    :param cluster_id: The id of the associated Opinion_Cluster related
+                        to this opinion
+    :return: cite_dict => Returns dictionary of the citation data
+    """
+    for line_of_text in opinion_text.split("\n")[:250]:
+        cites = find_citations.get_citations(line_of_text, html=False)
+        if not cites:
+            return
+
+        for cite in cites:
+            cite_dict = cite.__dict__
+            if "T.C." not in cite_dict['reporter']:
+                continue
+
+            if "T.C." == cite_dict['reporter']:
+                cite_type = 4
+            elif "T.C. No." == cite_dict['reporter']:
+                cite_type = 4
+            else:
+                cite_type = 8
+
+            if not Citation.objects.filter(volume=cite_dict['volume'],
+                                           reporter=cite_dict[
+                                               'reporter'],
+                                           page=cite_dict['page'],
+                                           cluster_id=cluster_id):
+                cite_dict['cite_type'] = cite_type
+                return cite_dict
+
+
 def update_tax_opinions():
     """
     This code should identifies tax opinions without
@@ -79,37 +119,24 @@ def update_tax_opinions():
                 logger.info("Adding Docket Numbers: %s to %s" %
                             (docket_numbers, docket.case_name))
 
-            for line_of_text in opinion.plain_text.split("\n")[:250]:
-                cites = find_citations.get_citations(line_of_text, html=False)
+            cite_dict = generate_citation(opinion.plain_text, oc.id)
 
-                if cites:
-                    cite_dict = cites[0].__dict__
+            if cite_dict is None:
+                continue
 
-                    if "T.C." == cite_dict['reporter']:
-                        cite_type = 4
-                    elif "T.C. No." == cite_dict['reporter']:
-                        cite_type = 4
-                    else:
-                        cite_type = 8
+            Citation.objects.create(**{
+                "volume": cite_dict['volume'],
+                "reporter": cite_dict['reporter'],
+                "page": cite_dict['page'],
+                "type": cite_dict['cite_type'],
+                "cluster_id": oc.id
+            })
 
-                    if not Citation.objects.filter(volume=cite_dict['volume'],
-                                                   reporter=cite_dict[
-                                                       'reporter'],
-                                                   page=cite_dict['page'],
-                                                   cluster_id=oc.id):
-                        Citation.objects.create(**{
-                            "volume": cite_dict['volume'],
-                            "reporter": cite_dict['reporter'],
-                            "page": cite_dict['page'],
-                            "type": cite_type,
-                            "cluster_id": oc.id
-                        })
-
-                        logger.info(
-                            "Saved Citation %s %s %s with docket no(s) %s" % (
-                                cite_dict['volume'], cite_dict['reporter'],
-                                cite_dict['page'], docket_numbers))
-                    break
+            logger.info("Citation saved %s %s %s" % (cite_dict['volume'],
+                                                     cite_dict['reporter'],
+                                                     cite_dict['page']
+                                                     )
+                        )
 
 
 class Command(VerboseCommand):
