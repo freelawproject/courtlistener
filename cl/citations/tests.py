@@ -13,7 +13,8 @@ from cl.citations.management.commands.cl_add_parallel_citations import \
     identify_parallel_citations, make_edge_list
 from cl.citations.match_citations import match_citation
 from cl.citations.reporter_tokenizer import tokenize
-from cl.citations.tasks import find_citations_for_opinion_by_pks, create_cited_html
+from cl.citations.tasks import find_citations_for_opinion_by_pks, \
+    create_cited_html
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 
@@ -109,20 +110,22 @@ class CiteTest(TestCase):
             ('2 U.S. 3, 4-5 (3 Atl. 33)',
              [Citation(volume=2, reporter="U.S.", page=3, extra=u'4-5',
                        canonical_reporter=u"U.S.", lookup_index=0,
-                       reporter_index=1, reporter_found="U.S.", court='scotus'),
+                       reporter_index=1, reporter_found="U.S.",
+                       court='scotus'),
               Citation(volume=3, reporter="A.", page=33,
                        canonical_reporter=u"A.", lookup_index=0,
                        reporter_index=5, reporter_found="Atl.")]),
             # Test with the page number as a Roman numeral
             ('12 Neb. App. lxiv (2004)',
-             [Citation(volume=12, reporter='Neb. Ct. App.', page='lxiv', year=2004,
-                      canonical_reporter=u'Neb. Ct. App.', lookup_index=0,
-                      reporter_index=1, reporter_found='Neb. App.')]),
+             [Citation(volume=12, reporter='Neb. Ct. App.', page='lxiv',
+                       year=2004, canonical_reporter=u'Neb. Ct. App.',
+                       lookup_index=0, reporter_index=1,
+                       reporter_found='Neb. App.')]),
             # Test with the 'digit-REPORTER-digit' corner-case formatting
             ('2007-NMCERT-008',
              [Citation(volume=2007, reporter='NMCERT', page=8,
-                      canonical_reporter=u'NMCERT', lookup_index=0,
-                      reporter_index=1, reporter_found='NMCERT')]),
+                       canonical_reporter=u'NMCERT', lookup_index=0,
+                       reporter_index=1, reporter_found='NMCERT')]),
             ('2006-Ohio-2095',
              [Citation(volume=2006, reporter='Ohio', page=2095,
                        canonical_reporter=u'Ohio', lookup_index=0,
@@ -134,7 +137,34 @@ class CiteTest(TestCase):
             ('2017 IL App (1st) 143684-B',
              [Citation(volume=2017, reporter='IL App (1st)', page='143684-B',
                        canonical_reporter=u'IL App (1st)', lookup_index=0,
-                       reporter_index=1, reporter_found='IL App (1st)')])
+                       reporter_index=1, reporter_found='IL App (1st)')]),
+            # Test with atypical formatting for Tax Court Memos
+            ('the 1 T.C. No. 233',
+             [Citation(volume=1, reporter='T.C. No.', page=233,
+                       canonical_reporter=u'T.C. No.', lookup_index=0,
+                       reporter_index=2, reporter_found='T.C. No.')]),
+            ('word T.C. Memo. 2019-233',
+             [Citation(volume=2019, reporter='T.C. Memo.', page=233,
+                       canonical_reporter=u'T.C. Memo.', lookup_index=0,
+                       reporter_index=1, reporter_found='T.C. Memo.')]),
+            ('something T.C. Summary Opinion 2019-233',
+             [Citation(volume=2019, reporter='T.C. Summary Opinion', page=233,
+                       canonical_reporter=u'T.C. Summary Opinion',
+                       lookup_index=0,
+                       reporter_index=1,
+                       reporter_found='T.C. Summary Opinion')]),
+            ('T.C. Summary Opinion 2018-133',
+             [Citation(volume=2018, reporter='T.C. Summary Opinion', page=133,
+                       canonical_reporter=u'T.C. Summary Opinion',
+                       lookup_index=0,
+                       reporter_index=0,
+                       reporter_found='T.C. Summary Opinion')]),
+            ('1     UNITED STATES TAX COURT REPORT   (2018)',
+             [Citation(volume=1, reporter='T.C.', page=2018,
+                       canonical_reporter=u'T.C.',
+                       lookup_index=0,
+                       reporter_index=1,
+                       reporter_found='UNITED STATES TAX COURT REPORT')]),
         )
         for q, a in test_pairs:
             print "Testing citation extraction for %s..." % q,
@@ -162,12 +192,12 @@ class CiteTest(TestCase):
         ]
         for pair in test_pairs:
             date_in_reporter = is_date_in_reporter(
-                    REPORTERS[pair[0]][0]['editions'], pair[1])
+                REPORTERS[pair[0]][0]['editions'], pair[1])
             self.assertEqual(
-                    date_in_reporter, pair[2],
-                    msg='is_date_in_reporter(REPORTERS[%s][0]["editions"], %s) != '
-                        '%s\nIt\'s equal to: %s' %
-                        (pair[0], pair[1], pair[2], date_in_reporter))
+                date_in_reporter, pair[2],
+                msg='is_date_in_reporter(REPORTERS[%s][0]["editions"], %s) != '
+                    '%s\nIt\'s equal to: %s' %
+                    (pair[0], pair[1], pair[2], date_in_reporter))
 
     def test_disambiguate_citations(self):
         test_pairs = [
@@ -482,4 +512,3 @@ class ParallelCitationTest(SimpleTestCase):
             hash(citations[1]),
         )
         Citation.fuzzy_hash = Citation.__hash__
-
