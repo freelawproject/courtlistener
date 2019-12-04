@@ -11,6 +11,7 @@ jobs:
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: master
+          path: ../courtlistener-solr-server
       - name: Set up solr permissions
         run: |
           cd ../courtlistener-solr-server
