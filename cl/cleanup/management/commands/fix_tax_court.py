@@ -22,21 +22,20 @@ def get_tax_docket_numbers(opinion_text):
     parsed_text = None
     regex = r"Docket No.*.Filed|Docket No.*.(, [0-9]{4}.)"
     matches = re.finditer(regex, opinion_text)
-    r = r"[0-9]{3,5}-[0-9A-Za-z]{2,4}(\.)|" \
-        r"([0-9]{3,5}-[0-9A-Za-z]{2,4} [A-Z](\.))"
+    r = r"[0-9]{3,5}-[0-9A-Za-z]{2,4}(\.)|([0-9]{3,5}-[0-9A-Za-z]{2," \
+        r"4} [A-Z](\.)) "
     for matchNum, match in enumerate(matches, start=1):
         xst = opinion_text[match.start():]
         second_matches = re.finditer(r, opinion_text[match.start():])
         for match_num_2, second_match in enumerate(second_matches, start=1):
             parsed_text = xst[:second_match.end()]
             break
-
     # If we cant find the general area of docket number strings.  Give up.
     if parsed_text is None:
         return None
 
-    regex = r"[0-9]{3,5}-[0-9A-Za-z]{2,4}(\,|.)|([0-9]{3,5}-[0-9A-Za-z]{2," \
-            r"4} [A-Z](\.|\,)) "
+    regex = r"[0-9]{3,5}-[0-9A-Za-z]{2,4}(\,|\.)|([0-9]{3,5}-[0-9A-Za-z]{2," \
+            r"4} [A-Z](\,|\.)) "
 
     matches = re.finditer(regex, parsed_text, re.MULTILINE)
     hits = []
@@ -106,10 +105,11 @@ def update_tax_opinions():
         op_obj = Opinion.objects.filter(cluster_id=oc.id)
         for opinion in op_obj:
             if opinion.plain_text == "":
+                logger.info('Nothing to parse.')
                 continue
             if opinion.download_url == bad_url:
+                logger.info("Failed scrape, nothing to parse.")
                 continue
-
             docket_numbers = get_tax_docket_numbers(opinion.plain_text)
 
             if docket_numbers:
