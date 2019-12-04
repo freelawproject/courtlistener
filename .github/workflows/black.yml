@@ -1,6 +1,6 @@
 name: black
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   black:
