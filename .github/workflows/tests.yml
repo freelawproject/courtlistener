@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out solr
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2-beta
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: origin/master
@@ -23,7 +23,7 @@ jobs:
           sudo find data -type f -exec chmod 664 {} \;
           sudo find solr -type f -exec chmod 664 {} \;
       - name: Check out CourtListener
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2-beta
       - name: Create the private settings file
         working-directory: cl/settings
         run: cp 05-private.example 05-private.py
