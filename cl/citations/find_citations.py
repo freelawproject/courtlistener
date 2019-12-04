@@ -107,8 +107,8 @@ class Citation(object):
 
     def _get_cite_type(self):
         """Figure out the Citation.type value."""
-        cite_type = (REPORTERS[self.canonical_reporter][self.lookup_index]
-        ['cite_type'])
+        canon = REPORTERS[self.canonical_reporter]
+        cite_type = (canon[self.lookup_index]['cite_type'])
         if cite_type == 'federal':
             return ModelCitation.FEDERAL
         elif cite_type == 'state':
@@ -230,8 +230,8 @@ def get_court_by_paren(paren_string, citation):
     """Takes the citation string, usually something like "2d Cir", and maps
     that back to the court code.
 
-    Does not work on SCOTUS, since that court lacks parentheticals, and needs to
-    be handled after disambiguation has been completed.
+    Does not work on SCOTUS, since that court lacks parentheticals, and
+    needs to be handled after disambiguation has been completed.
     """
     if citation.year is None:
         court_str = strip_punct(paren_string)
@@ -281,14 +281,14 @@ def add_post_citation(citation, words):
         Post-citation info: year=1894
 
         Full citation: 123 F.2d 345, 347-348 (4th Cir. 1990)
-        Post-citation info: year=1990, court="4th Cir.", extra (page range)="347-348"
+        Post-citation info: year=1990, court="4th Cir.",
+        extra (page range)="347-348"
     """
     # Start looking 2 tokens after the reporter (1 after page), and go to
     # either the end of the words list or to FORWARD_SEEK tokens from where you
     # started.
-    for start in xrange(
-        citation.reporter_index + 2,
-        min((citation.reporter_index + FORWARD_SEEK), len(words))):
+    fwd_sk = (citation.reporter_index + FORWARD_SEEK)
+    for start in xrange(citation.reporter_index + 2, min(fwd_sk, len(words))):
         if words[start].startswith('('):
             # Get the year by looking for a token that ends in a paren.
             for end in xrange(start, start + FORWARD_SEEK):
@@ -321,9 +321,8 @@ def add_defendant(citation, words):
     future, this could be improved.
     """
     start_index = None
-    for index in xrange(
-        citation.reporter_index - 1,
-        max(citation.reporter_index - BACKWARD_SEEK, 0), -1):
+    back_seek = citation.reporter_index - BACKWARD_SEEK
+    for index in xrange(citation.reporter_index - 1, max(back_seek, 0), -1):
         word = words[index]
         if word == ',':
             # Skip it
@@ -361,16 +360,17 @@ def extract_base_citation(words, reporter_index):
     if VARIATIONS_ONLY.get(reporter):
         for report in VARIATIONS_ONLY.get(reporter):
             lookup_ed = EDITIONS.get(report)
-            if reporter not in REPORTERS[lookup_ed][0]['variations'].keys():
-                continue
-            if REPORTERS[lookup_ed][0]['mlz_jurisdiction'][0] == tx_str:
-                if REPORTERS[lookup_ed][0]['cite_type'] == "neutral":
-                    if "-" in rep_plus_one:
-                        volume, page = rep_plus_one.split('-')
-                        normal = False
+            if reporter in REPORTERS[lookup_ed][0]['variations'].keys():
+                if REPORTERS[lookup_ed][0]['mlz_jurisdiction'][0] != tx_str:
+                    continue
+                if REPORTERS[lookup_ed][0]['cite_type'] != "neutral":
+                    continue
+                if "-" in rep_plus_one:
+                    volume, page = rep_plus_one.split('-')
+                    normal = False
     if EDITIONS.get(reporter):
         rep = EDITIONS.get(reporter)
-        if REPORTERS[rep][0]['mlz_jurisdiction'][0] == "us:c;tax.court":
+        if REPORTERS[rep][0]['mlz_jurisdiction'][0] == tx_str:
             if REPORTERS[rep][0]['cite_type'] == "neutral":
                 if "-" in rep_plus_one:
                     volume, page = rep_plus_one.split('-')
@@ -464,15 +464,15 @@ def disambiguate_reporters(citations):
                 if citation.year:
                     # attempt resolution by date
                     possible_citations = []
-                    for i in range(0, len(
-                        REPORTERS[EDITIONS[citation.reporter]])):
+                    rep_len = len(REPORTERS[EDITIONS[citation.reporter]])
+                    for i in range(0, rep_len):
                         if is_date_in_reporter(
                             REPORTERS[EDITIONS[citation.reporter]][i][
                                 'editions'], citation.year):
                             possible_citations.append((citation.reporter, i,))
                     if len(possible_citations) == 1:
-                        # We were able to identify only one hit after filtering
-                        # by year.
+                        # We were able to identify only one hit
+                        # after filtering by year.
                         citation.reporter = possible_citations[0][0]
                         citation.lookup_index = possible_citations[0][1]
                         unambiguous_citations.append(citation)
@@ -498,12 +498,11 @@ def disambiguate_reporters(citations):
                     if citation.year:
                         # attempt resolution by date
                         possible_citations = []
-                        for i in range(0, len(
-                            REPORTERS[citation.canonical_reporter])):
+                        rep_can = len(REPORTERS[citation.canonical_reporter])
+                        for i in range(0, rep_can):
                             if is_date_in_reporter(
                                 REPORTERS[citation.canonical_reporter][i][
-                                    'editions'],
-                                citation.year):
+                                    'editions'], citation.year):
                                 possible_citations.append(
                                     (citation.reporter, i))
                         if len(possible_citations) == 1:
@@ -512,14 +511,14 @@ def disambiguate_reporters(citations):
                             citation.lookup_index = possible_citations[0][1]
                             unambiguous_citations.append(citation)
                             continue
-                    # Attempt resolution by unique variation (e.g. Cr. can only
-                    # be Cranch[0])
+                    # Attempt resolution by unique variation
+                    # (e.g. Cr. can only be Cranch[0])
                     possible_citations = []
-                    for i in range(0, len(
-                        REPORTERS[citation.canonical_reporter])):
+                    reps = REPORTERS[citation.canonical_reporter]
+                    for i in range(0, len(reps)):
                         for variation in \
-                        REPORTERS[citation.canonical_reporter][i][
-                            'variations'].items():
+                            REPORTERS[citation.canonical_reporter][i][
+                                'variations'].items():
                             if variation[0] == cached_variation:
                                 possible_citations.append((variation[1], i))
                     if len(possible_citations) == 1:
@@ -535,9 +534,9 @@ def disambiguate_reporters(citations):
                     for i in range(0, len(REPORTERS[EDITIONS[reporter_key]])):
                         # This inner loop works regardless of the number of
                         # reporters under the key.
-                        if is_date_in_reporter(
-                            REPORTERS[EDITIONS[reporter_key]][i]['editions'],
-                            citation.year):
+                        key = REPORTERS[EDITIONS[reporter_key]]
+                        cite_year = citation.year
+                        if is_date_in_reporter(key[i]['editions'], cite_year):
                             possible_citations.append((reporter_key, i,))
                 if len(possible_citations) == 1:
                     # We were able to identify only one hit after filtering by
