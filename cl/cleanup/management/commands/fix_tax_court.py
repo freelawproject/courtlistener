@@ -105,7 +105,6 @@ def update_tax_opinions():
                             "cluster_id": oc.id
                         })
 
-
                         logger.info(
                             "Saved Citation %s %s %s with docket no(s) %s" % (
                                 cite_dict['volume'], cite_dict['reporter'],
