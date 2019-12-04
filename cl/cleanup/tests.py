@@ -106,3 +106,91 @@ income tax returns:
                 msg="Success"
             )
             print "✓"
+
+    def test_tax_court_citation_extractor(self):
+        """Find Tax Court Citations """
+
+        test_pairs = (
+            ("""  1 UNITED STATES TAX COURT REPORT (2018)    
+
+
+
+                     UNITED STATES TAX COURT
+
+
+
+
+ BENTLEY COURT II LIMITED PARTNERSHIP, B.F. BENTLEY, INC., TAX
+                 MATTERS PARTNER, Petitioner v.
+          COMMISSIONER OF INTERNAL REVENUE, Respondent
+
+
+
+     Docket No. 5393-04.                Filed May 31, 2006.
+
+
+
+     Nancy Ortmeyer Kuhn, for petitioner.
+        """, {'reporter_index': 1,
+              'canonical_reporter': u'T.C.',
+              'match_id': None,
+              'extra': None,
+              'plaintiff': None,
+              'reporter': u'T.C.',
+              'year': None,
+              'volume': 1,
+              'reporter_found': 'UNITED STATES TAX COURT REPORT',
+              'cite_type': 4, 'lookup_index': 0,
+              'court': None,
+              'equality_attributes': ['reporter', 'volume', 'page',
+                                      'canonical_reporter', 'lookup_index'],
+              'match_url': None,
+              'page': 2018,
+              'defendant': None}),
+
+                ("""  T.C. Memo. 2003-150
+
+
+
+                                  UNITED STATES TAX COURT
+
+
+
+                       RIVER CITY RANCHES #1 LTD., LEON SHEPARD,
+                                  TAX MATTERS PARTNER,
+                       RIVER CITY RANCHES #2 LTD., LEON SHEPARD,
+                                   TAX MATTERS PARTNER,
+                        RIVER CITY RANCHES #3 LTD., LEON SHEPARD,
+                                   TAX MATTERS PARTNER,
+
+
+                """, {'reporter_index': 0,
+                      'canonical_reporter': u'T.C. Memo.',
+                      'match_id': None,
+                      'extra': None,
+                      'plaintiff': None,
+                      'reporter': 'T.C. Memo.',
+                      'year': None,
+                      'volume': 2003,
+                      'reporter_found': 'T.C. Memo.',
+                      'cite_type': 8,
+                      'lookup_index': 0,
+                      'court': None,
+                      'equality_attributes': ['reporter', 'volume', 'page',
+                                              'canonical_reporter',
+                                              'lookup_index'],
+                      'match_url': None,
+                      'page': 150,
+                      'defendant': None}
+)
+        )
+        for q, a in test_pairs:
+            cite = generate_citation(q, 111)
+            print cite
+            print "Searching for %s" % a
+            self.assertEqual(
+                cite,
+                a,
+                msg="Success"
+            )
+            print "✓"
