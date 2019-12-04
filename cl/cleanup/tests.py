@@ -6,100 +6,185 @@ from cl.cleanup.management.commands.fix_tax_court import get_tax_docket_numbers
 class CleanupTest(TestCase):
 
     def test_tax_court_cleanup_docket_numbers(self):
-        """Can we find and make Citation objects from strings?"""
+        """Find docket numbers in tax court opinions"""
+        # First set of docket numbers is split over two pages- very difficult
         test_pairs = (
-            # Basic test
-            ("""            
-                        T.C. Memo. 2013-100
+            ("""  T.C. Memo. 2003-150
 
 
 
-
-                        UNITED STATES TAX COURT
-
+                      UNITED STATES TAX COURT
 
 
 
-         LORRAINE C. BOYD AND MARVIN T. BOYD, Petitioners v.
+           RIVER CITY RANCHES #1 LTD., LEON SHEPARD,
+                      TAX MATTERS PARTNER,
+           RIVER CITY RANCHES #2 LTD., LEON SHEPARD,
+                       TAX MATTERS PARTNER,
+            RIVER CITY RANCHES #3 LTD., LEON SHEPARD,
+                       TAX MATTERS PARTNER,
+            RIVER CITY RANCHES #4 LTD., LEON SHEPARD,
+                       TAX MATTERS PARTNER,
+            RIVER CITY RANCHES #5 LTD., LEON SHEPARD,
+                       TAX MATTERS PARTNER,
+            RIVER CITY RANCHES #6 LTD., LEON SHEPARD,
+                       TAX MATTERS PARTNER,
+                     ET AL.,1 Petitioners v.
           COMMISSIONER OF INTERNAL REVENUE, Respondent
 
 
 
+    Docket Nos.     787-91,    4876-94,   Filed May 23, 2003.
+                   9550-94,    9552-94,
+                   9554-94,   13595-94,
+                  13597-94,   13599-94,
+                    382-95,     383-95,
 
-      Docket No. 1780-12L.                         Filed April 11, 2013.
+    1
+        The Appendix sets forth, for each of these consolidated
+cases, the docket number, partnership, and tax matters partner.
+By orders issued from June 22, 2000, through May 15, 2001, the
+Court removed Walter J. Hoyt III (Jay Hoyt), as tax matters
+partner in each of the consolidated cases. In those orders, the
+Court appointed a successor tax matters partner in each case.
+                                 - 2 -
 
-
-
-
-      Lorraine C. Boyd and Marvin T. Boyd, pro sese.
-
-      Sze Wan Florence Char, for respondent.
-
-
-
-
-                          MEMORANDUM OPINION
-
-
-      WELLS, Judge: This case is before the Court on respondent’s motion to
-
-dismiss for lack of jurisdiction, respondent’s motion for summary judgment
-                                          -2-""",
-             "1780-12L"),
-
-
-            ("""
-                        T.C. Memo. 2018-28
-
-
-
-                  UNITED STATES TAX COURT
-
-
-
-     DAVID KEEFE AND CANDACE KEEFE, Petitioners v.
-    COMMISSIONER OF INTERNAL REVENUE, Respondent
-
-
-
-Docket Nos. 15189-14, 29804-15.              Filed March 15, 2018.
-            29804-16.
-
-
-
-Richard Michael Gabor, for petitioners.
-
-Eliezer Klein and Peter N. Scharff, for respondent.
-                                        -2-
-
-[*2]         MEMORANDUM FINDINGS OF FACT AND OPINION
+                     385-95,     386-95,
+                   14718-95,   14719-95,
+                   14720-95,   14722-95,
+                   14724-95,   21461-95,
+                    5196-96,    5197-96,
+                    5198-96,    5238-96,
+                    5239-96,    5240-96,
+                    5241-96,    9779-96,
+                    9780-96,    9781-96,
+                   14038-96,   21774-96,
+                    3304-97,    3305-97,
+                    3306-97,    3311-97,
+                    3749-97,   15747-98,
+                   15748-98,   15749-98,
+                   15750-98,   15751-98,
+                   15752-98,   15753-98,
+                   15754-98,   19106-98,
+                   13250-99,   13251-99,
+                   13256-99,   13257-99,
+                   13258-99,   13259-99,
+                   13260-99,   13261-99,
+                   13262-99,   16557-99,
+                   16563-99,   16568-99,
+                   16570-99,   16572-99,
+                   16574-99,   16578-99,
+                   16581-99,   17125-99.
 
 
-       MARVEL, Chief Judge: Respondent determined the following deficiencies
+     Montgomery W. Cobb, for petitioners.
 
-in Federal income tax, accuracy-related penalties under section 6662(a),1 and
+     Terri Ann Merriam and Wendy S. Pearson, for participating
+partners in docket Nos. 9554-94, 13599-94, 383-95, and 16578-99.
 
-additions to tax under section 6651(a)(1) with respect to petitioners’ joint Federal
+     Thomas A. Dombrowski, Catherine A. Caballero, Alan E.
+Staines, Thomas N. Tomashek, Dean H. Wakayama, and Nhi Luu, for
+respondent.
 
-income tax returns:
 
-                                              Penalty          Addition to tax
-           Year          Deficiency         sec. 6662(a)       sec. 6651(a)(1)
-           2004            $78,292            $15,658                 --
-           2005            144,053             28,811                 --
-           2006            218,228             43,646               $408
-           2007            143,729             28,161                675
-           2008            141,870             12,817             35,468
-           2009            252,777             50,555                 --
-           2010            309,060             61,812                 --""",
-             "15189-14, 29804-15, 29804-16"),
+                               Contents
+
+
+FINDINGS OF FACT   . . . . . . . . . . . . . . . . . . . . . . . 7
+
+A.   Overview of the Hoyt Operations       . . . . . . . . . . . . . 7
+
+B.   Formation and Operation of the Hoyt Sheep Partnerships . . 9
+                              - 3 -
+            """,
+             "787-91, 4876-94, 9550-94, 9552-94, 9554-94, 13595-94, 13597-94, 13599-94, 382-95, 383-95, 385-95, 386-95, 14718-95, 14719-95, 14720-95, 14722-95, 14724-95, 21461-95, 5196-96, 5197-96, 5198-96, 5238-96, 5239-96, 5240-96, 5241-96, 9779-96, 9780-96, 9781-96, 14038-96, 21774-96, 3304-97, 3305-97, 3306-97, 3311-97, 3749-97, 15747-98, 15748-98, 15749-98, 15750-98, 15751-98, 15752-98, 15753-98, 15754-98, 19106-98, 13250-99, 13251-99, 13256-99, 13257-99, 13258-99, 13259-99, 13260-99, 13261-99, 13262-99, 16557-99, 16563-99, 16568-99, 16570-99, 16572-99, 16574-99, 16578-99, 16581-99, 17125-99"),
+            ("""            T.C. Memo. 2009-295
+
+
+
+                     UNITED STATES TAX COURT
+
+
+
+VIRGINIA HISTORIC TAX CREDIT FUND 2001 LP, VIRGINIA HISTORIC TAX
+ CREDIT FUND 2001, LLC, TAX MATTERS PARTNER, ET AL.,1 Petitioner
+         v. COMMISSIONER OF INTERNAL REVENUE, Respondent
+
+
+
+     Docket Nos. 716-08, 870-08,       Filed December 21, 2009.
+                 871-08.
+
+
+
+          R issued a partnership and its two pass-thru
+     partners (lower-tier partnerships) notices of final
+     partnership administrative adjustment (FPAAs) for 2001
+     and 2002 increasing each of the partnerships’ ordinary
+     income for unreported sales of Virginia Historic
+     Rehabilitation Tax Credits (State tax credits). In
+     doing so, R determined that certain limited partners
+     and members (investors) of the partnerships were not
+     partners for Federal tax purposes but instead were
+     purchasers of State tax credits from the partnerships.
+     R determined, in the alternative, that the investors’
+
+
+     1
+      This case is consolidated for trial, briefing, and opinion
+with Virginia Historic Tax Credit Fund""",
+             "716-08, 870-08, 871-08"),
+            ("""              T.C. Memo. 2010-266
+
+
+
+                      UNITED STATES TAX COURT
+
+
+          TAX PRACTICE MANAGEMENT, INC., Petitioner v.
+          COMMISSIONER OF INTERNAL REVENUE, Respondent
+
+     JOSEPH ANTHONY D’ERRICO, Petitioner v. COMMISSIONER OF
+                   INTERNAL REVENUE, Respondent
+
+
+     Docket Nos. 1477-09, 1483-09.    Filed December 7, 2010.
+
+
+
+     Adam L. Karp, for petitioners.
+
+     Jeremy L. McPherson, for respondent.
+
+
+    """, "1477-09, 1483-09"),
+            ("""                       T.C. Memo. 2006-113
+
+
+
+                     UNITED STATES TAX COURT
+
+
+
+
+ BENTLEY COURT II LIMITED PARTNERSHIP, B.F. BENTLEY, INC., TAX
+                 MATTERS PARTNER, Petitioner v.
+          COMMISSIONER OF INTERNAL REVENUE, Respondent
+
+
+
+     Docket No. 5393-04L.                Filed May 31, 2006.
+
+
+
+     Nancy Ortmeyer Kuhn, for petitioner.
+
+     Wilton A. Baker, for respondent.""",
+             "5393-04L")
         )
-
-
         for q, a in test_pairs:
-            print "Testing docket number extraction for %s..." % a,
             docket_numbers_found = get_tax_docket_numbers(q)
-            print docket_numbers_found
+            print "Searching for %s" % a,
             self.assertEqual(
                 docket_numbers_found,
                 a,
