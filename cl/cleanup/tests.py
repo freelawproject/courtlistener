@@ -1,6 +1,7 @@
 # coding=utf-8
 from django.test import TestCase
-from cl.cleanup.management.commands.fix_tax_court import get_tax_docket_numbers
+from cl.cleanup.management.commands.fix_tax_court import generate_citation, \
+    get_tax_docket_numbers
 
 
 class CleanupTest(TestCase):
