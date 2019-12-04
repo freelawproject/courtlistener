@@ -356,7 +356,7 @@ def add_post_citation(citation, words):
                     else:
                         citation.year = get_year(words[end])
                     citation.court = get_court_by_paren(
-                        u" ".join(words[start : end + 1]), citation
+                        u" ".join(words[start: end + 1]), citation
                     )
                     break
 
@@ -364,7 +364,7 @@ def add_post_citation(citation, words):
                 # Then there's content between page and (), starting with a
                 # comma, which we skip
                 citation.extra = u" ".join(
-                    words[citation.reporter_index + 2 : start]
+                    words[citation.reporter_index + 2: start]
                 )
             break
 
@@ -391,7 +391,7 @@ def add_defendant(citation, words):
             break
     if start_index:
         citation.defendant = u" ".join(
-            words[start_index : citation.reporter_index - 1]
+            words[start_index: citation.reporter_index - 1]
         )
 
 
