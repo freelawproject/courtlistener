@@ -94,14 +94,14 @@ def update_tax_opinions():
     :return: None
     """
     logger.info("Start updating Tax Opinions")
-    op_clusters = OpinionCluster.objects.filter(docket__court="tax"). \
+    ocs = OpinionCluster.objects.filter(docket__court="tax"). \
         filter(docket__docket_number=None)
 
     # We had a number of failed scrapes and the bad_url helps identify them
     bad_url = "http://www.ustaxcourt.gov/UstcInOp/asp/Todays.asp"
-    for oc in op_clusters:
-        op_obj = Opinion.objects.filter(cluster_id=oc.id)
-        for opinion in op_obj:
+    for oc in ocs:
+        op_objs = oc.sub_opinions.all
+        for opinion in op_objs:
             if opinion.plain_text == "":
                 logger.info('Nothing to parse.')
                 continue
