@@ -68,11 +68,11 @@ def generate_citation(opinion_text, cluster_id):
                 continue
 
             if "T.C." == cite_dict['reporter']:
-                cite_type = 4
+                cite_type = Citation.SPECIALTY
             elif "T.C. No." == cite_dict['reporter']:
-                cite_type = 4
+                cite_type = Citation.SPECIALTY
             else:
-                cite_type = 8
+                cite_type = Citation.NEUTRAL
 
             if not Citation.objects.filter(volume=cite_dict['volume'],
                                            reporter=cite_dict[
