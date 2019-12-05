@@ -683,7 +683,7 @@ international_pairs = (
 
 def match_court_string(court_str, federal_appeals=False,
                        federal_district=False, bankruptcy=False, state=False,
-                       state_ag=False, international=False, unknown=False):
+                       state_ag=False, international=False):
     """Look up a court string and return a CourtListener ID.
 
     Note you cannot use bankruptcy and federal_district together due to
@@ -699,8 +699,6 @@ def match_court_string(court_str, federal_appeals=False,
     :param state: Whether the string might be a state court.
     :param state_ag: Whether it might be a state AG "court".
     :param international: Whether it might be an international court.
-    :param unknown: Whether the type of court is known or not.
-    Searches all courts
     :returns The abbreviation for the court, if possible. Else, returns None
     """
     assert not (federal_district and bankruptcy), \
@@ -734,14 +732,7 @@ def match_court_string(court_str, federal_appeals=False,
         for regex, value in fd_pairs:
             if re.search(regex, court_str):
                 matches.append(value)
-    if unknown:
-        for regex, value in fd_pairs + fb_pairs + ca_pairs + state_ag_pairs \
-                            + state_pairs + international_pairs:
-            if re.search(regex, court_str):
-                print value
-                matches.append(value)
 
     # Safety check. If we have more than one match, that's a problem.
-    assert len(matches) >= 1, "Too many (%s) matches for %s" % (len(matches),
-                                                                court_str)
+    assert len(matches) >= 1, "Too many matches for %s" % court_str
     return matches[0] if matches else None
