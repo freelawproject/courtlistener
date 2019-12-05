@@ -85,7 +85,7 @@ def generate_citation(opinion_text, cluster_id):
 
 def update_tax_opinions():
     """
-    This code should identifies tax opinions without
+    This code identifies tax opinions without
     docket numbers or citations and attempts to parse them out
     and add the citation and docket numbers to the case.
 
