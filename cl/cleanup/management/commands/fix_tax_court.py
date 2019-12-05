@@ -108,12 +108,9 @@ def update_tax_opinions():
             if opinion.download_url == bad_url:
                 logger.info("Failed scrape, nothing to parse.")
                 continue
-            docket_numbers = get_tax_docket_numbers(opinion.plain_text)
 
+            docket_numbers = get_tax_docket_numbers(opinion.plain_text)
             if docket_numbers:
-                docket = Docket.objects.get(id=oc.docket_id)
-                docket.docket_number = docket_numbers
-                docket.save()
                 logger.info("Adding Docket Numbers: %s to %s" %
                             (docket_numbers, oc.docket.case_name))
                 oc.docket.docket_number = docket_numbers
@@ -124,6 +121,10 @@ def update_tax_opinions():
             if cite_dict is None:
                 continue
 
+            logger.info("Citation saved %s %s %s" % (cite_dict['volume'],
+                                                     cite_dict['reporter'],
+                                                     cite_dict['page']))
+
             Citation.objects.create(**{
                 "volume": cite_dict['volume'],
                 "reporter": cite_dict['reporter'],
@@ -131,12 +132,6 @@ def update_tax_opinions():
                 "type": cite_dict['cite_type'],
                 "cluster_id": oc.id
             })
-
-            logger.info("Citation saved %s %s %s" % (cite_dict['volume'],
-                                                     cite_dict['reporter'],
-                                                     cite_dict['page']
-                                                     )
-                        )
 
 
 class Command(VerboseCommand):
