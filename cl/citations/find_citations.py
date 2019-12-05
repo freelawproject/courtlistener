@@ -352,29 +352,13 @@ def extract_base_citation(words, reporter_index):
     ex. T.C. Memo. 2019-13
     """
     volume, page = None, None
-
     reporter = words[reporter_index]
-    rep_plus_one = words[reporter_index + 1]
     normal = True
-    tx_str = "us:c;tax.court"
-    if VARIATIONS_ONLY.get(reporter):
-        for report in VARIATIONS_ONLY.get(reporter):
-            lookup_ed = EDITIONS.get(report)
-            if reporter in REPORTERS[lookup_ed][0]['variations'].keys():
-                if REPORTERS[lookup_ed][0]['mlz_jurisdiction'][0] != tx_str:
-                    continue
-                if REPORTERS[lookup_ed][0]['cite_type'] != "neutral":
-                    continue
-                if "-" in rep_plus_one:
-                    volume, page = rep_plus_one.split('-')
-                    normal = False
-    if EDITIONS.get(reporter):
-        rep = EDITIONS.get(reporter)
-        if REPORTERS[rep][0]['mlz_jurisdiction'][0] == tx_str:
-            if REPORTERS[rep][0]['cite_type'] == "neutral":
-                if "-" in rep_plus_one:
-                    volume, page = rep_plus_one.split('-')
-                    normal = False
+    # T.C. Summary and T.C. Memo are edge cases.  They have atypical
+    # formats so we simply check if the reporter is either before proceeding.
+    if "T.C. Summary" in reporter or "T.C. Memo" in reporter:
+        normal = False
+        volume, page = words[reporter_index + 1].split('-')
 
     if normal:
         volume = strip_punct(words[reporter_index - 1])
