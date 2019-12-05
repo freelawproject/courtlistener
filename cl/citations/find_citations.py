@@ -361,6 +361,8 @@ def extract_base_citation(words, reporter_index):
         volume, page = words[reporter_index + 1].split('-')
 
     if normal:
+        if reporter_index == 0:
+            return None
         volume = strip_punct(words[reporter_index - 1])
     if volume.isdigit():
         volume = int(volume)
