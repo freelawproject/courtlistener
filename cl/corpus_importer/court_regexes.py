@@ -196,9 +196,10 @@ fd_pairs = (
     # Federal speciality courts
     (re.compile('U\. S\. Court of Customs Appeals', re.I), 'ccpa'),
     (re.compile(u'Commerce Court', re.I), 'com'),
-    (re.compile(u'Court of Claims|United States Claims Court', re.I), 'cc'),
+    (re.compile(u'Court of Claims', re.I), 'cc'),
+        (re.compile(u'United States Claims Court', re.I), 'cc'),
     (re.compile(u'(^|\s)U\. S\. Court of Customs and Patent Appeals', re.I), 'ccpa'),
-    (re.compile(u'(^|\s)U\. S\. Court of International Trade|United States Court of International Trade', re.I), 'cit'),
+    (re.compile(u'(^|\s)(U\. S\.)|(United States) Court of International Trade', re.I), 'cit'),
     (re.compile(u'(^|\s)U\. S\. Customs Court', re.I), 'cusc'),
     (re.compile(u'(^|\s)U\. S\. District Court for the District of Columbia', re.I), 'dcd'),
 
@@ -247,7 +248,7 @@ ca_pairs = (
     (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Tenth Circuit', re.I), 'ca10'),
     (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Eleventh Circuit', re.I), 'ca11'),
     (re.compile(u'(^|\s)(U\. ?S\.)|(United States) Court of Appeals for the District of Columbia Circuit', re.I), 'cadc'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) Court of Appeals for the Federal Circuit|', re.I), 'cafc'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) Court of Appeals for the Federal Circuit', re.I), 'cafc'),
 )
 
 # noinspection PyPep8
@@ -377,25 +378,29 @@ fb_pairs = (
 state_pairs = (
     (re.compile('D((istrict)|\.) (of )?C((olumbia)|\.) Court of Appeals', re.I), 'dc'),
         (re.compile('D((istrict)|\.) (of )?C((olumbia)|\.) Municipal Court of Appeals', re.I), 'dc'),
-            (re.compile('Municipal Court of Appeals? (for the )?D((istrict)|\.) (of )?C((olumbia)|\.)', re.I), 'dc'),
+        (re.compile('Municipal Court of Appeals? (for the )?D((istrict)|\.) (of )?C((olumbia)|\.)', re.I), 'dc'),
         (re.compile('Supreme Court of the D((istrict)|\.) (of )?C((olumbia)|\.)', re.I), 'dc'),
-    (re.compile('Supreme Court of Alabama|Alabama Supreme Court', re.I), 'ala'),
+    (re.compile('Supreme Court of Alabama', re.I), 'ala'),
+        (re.compile('Alabama Supreme Court', re.I), 'ala'),
     (re.compile('Court of Criminal Appeals? of Alabama', re.I), 'alacrimapp'),
         (re.compile('Alabama Court of Criminal Appeals?', re.I), 'alacrimapp'),
     (re.compile('Court of Civil Appeals? of Alabama', re.I), 'alacivapp'),
     (re.compile('Court of Appeals? of Alabama', re.I), 'alactapp'),  # Abolished.
     (re.compile('Supreme Court of Alaska', re.I), 'alaska'),
     (re.compile('Court of Appeals? of Alaska', re.I), 'alaskactapp'),
-    (re.compile('Supreme Court of Arizona|Arizona Supreme Court', re.I), 'ariz'),
+    (re.compile('Supreme Court of Arizona', re.I), 'ariz'),
+        (re.compile('Arizona Supreme Court', re.I), 'ariz'),
     (re.compile('Court of Appeals,? of Arizona', re.I), 'arizctapp'),
     (re.compile('Tax Court of Arizona', re.I), 'ariztaxct'),
     (re.compile('Supreme Court of Arkansas', re.I), 'ark'),
     (re.compile('Court of Appeals? of Arkansas', re.I), 'arkctapp'),
 
     (re.compile('Supreme Court of California', re.I), 'cal'),
-    (re.compile('California Court of Appeals|Court of Appeal of the State of California', re.I), 'calctapp'),
+    (re.compile('California Court of Appeals', re.I), 'calctapp'),
+        (re.compile('Court of Appeal of the State of California',re.I), 'calctapp'),
         (re.compile('Court of Appeals? of California', re.I), 'calctapp'),
-    (re.compile('Appellate Division, Superior Court|Appellate Division of the Superior Court of the State of California', re.I), 'calappdeptsuperct'),
+    (re.compile('Appellate Division, Superior Court', re.I), 'calappdeptsuperct'),
+        (re.compile('Appellate Division of the Superior Court of the State of California', re.I), 'calappdeptsuperct'),
         (re.compile('California Superior Court\.? +Appellate ((Division)|(Department))', re.I), 'calappdeptsuperct'),
 
     (re.compile('Supreme Court of Colorado', re.I), 'colo'),
@@ -416,7 +421,7 @@ state_pairs = (
         (re.compile('Superior Court,? +((%s))' % conn_counties, re.I), 'connsuperct'),
 
     (re.compile('Supreme Court of (the State of )?Delaware', re.I), 'del'),
-        (re.compile('Delaware Supreme Court|Delaware Superior Court', re.I), 'del'),
+        (re.compile('Delaware Supreme Court', re.I), 'del'),
         (re.compile('(High )?Court of Errors and Appeals (Court )?of Delaware', re.I), 'del'),
         # This is a guess, but there's only one case in this jurisdiction and
         # it has to do with a governor that passed in office. Seems like
@@ -425,7 +430,9 @@ state_pairs = (
     (re.compile('Court of Chancery of (the State of )?Delaware', re.I), 'delch'),
         (re.compile('Chancery Court of Delaware|Delaware Court of Chancery', re.I), 'delch'),
     (re.compile('Superior Court of (the State of )?Delaware', re.I), 'delsuperct'),
-        # These two merged into the Superior court of Delaware
+        (re.compile('Delaware Superior Court', re.I), 'delsuperct'),
+
+    # These two merged into the Superior court of Delaware
         (re.compile('Orphans\'? Court( Court)? of Delaware', re.I), 'delsuperct'),
         (re.compile('Court of General Sessions', re.I), 'delsuperct'),
         (re.compile('Court of Oyer and Terminer of Delaware', re.I), 'delsuperct'),
@@ -435,12 +442,13 @@ state_pairs = (
     (re.compile('Circuit Court of ((the )?United States of )?Delaware', re.I), 'circtdel'),
         (re.compile('Circuit Court,  Delaware', re.I), 'circtdel'),
         (re.compile('Circuit Court.*Dover', re.I), 'circtdel'),
-    (re.compile('Family Court of Delaware|Delaware Family Court', re.I), 'delfamct'),
+    (re.compile('Family Court of Delaware', re.I), 'delfamct'),
+        (re.compile('Delaware Family Court', re.I), 'delfamct'),
     (re.compile('Court on the Judiciary of Delaware', re.I), 'deljudct'),
         (re.compile('Delaware Court on the Judiciary', re.I), 'deljudct'),
 
 
-(re.compile('Supreme Court of Florida', re.I), 'fla'),
+    (re.compile('Supreme Court of Florida', re.I), 'fla'),
         (re.compile('Supreme Court.*Nassau County', re.I), 'fla'),
         (re.compile('Court of Florida, Division B', re.I), 'fla'),
     (re.compile('District Courts? of Appeal, ((Lakeland,)|(of) )?Florida', re.I), 'fladistctapp'),
@@ -454,11 +462,13 @@ state_pairs = (
         (re.compile('Hawaii Court of Appeals?', re.I), 'hawapp'),
         (re.compile('Hawaii Intermediate Court of Appeals?', re.I), 'hawapp'),
 
-    (re.compile('Supreme Court of (the state of )?Idaho|Idaho Supreme Court', re.I), 'idaho'),
+    (re.compile('Supreme Court of (the state of )?Idaho', re.I), 'idaho'),
+        (re.compile('Idaho Supreme Court', re.I), 'idaho'),
     (re.compile('Court of Appeals? of Idaho', re.I), 'idahoctapp'),
         (re.compile('Idaho Court of Appeals', re.I), 'idahoctapp'),
 
-    (re.compile('Supreme Court of Illinois|Illinois Supreme Court', re.I), 'ill'),
+    (re.compile('Supreme Court of Illinois', re.I), 'ill'),
+        (re.compile('Illinois Supreme Court', re.I), 'ill'),
     (re.compile('Appellate Court of Illinois', re.I), 'illappct'),
         (re.compile('Illinois Appellate Court', re.I), 'illappct'),
 
@@ -477,23 +487,25 @@ state_pairs = (
     (re.compile('Court of Appeals? of Kansas', re.I), 'kanctapp'),
 
     (re.compile('Supreme Court of Kentucky', re.I), 'ky'),
-    (re.compile('Court of Appeals? of Kentucky|Kentucky Court of Appeals', re.I), 'kyctapp'),
+    (re.compile('Court of Appeals? of Kentucky', re.I), 'kyctapp'),
+        (re.compile('Kentucky Court of Appeals', re.I), 'kyctapp'),
 
     (re.compile('Supreme Court of Louisiana', re.I), 'la'),
     (re.compile('Court of Appeals? of Louisiana', re.I), 'lactapp'),
     (re.compile('Louisiana Circuit Courts of Appeal', re.I), 'lactapp'),
 
-    (re.compile('Supreme Judicial Court of Maine|Maine Supreme Judicial Court', re.I), 'me'),
+    (re.compile('Supreme Judicial Court of Maine', re.I), 'me'),
+        (re.compile('Maine Supreme Judicial Court', re.I), 'me'),
 
     (re.compile('Court of Appeals? of Maryland', re.I), 'md'),
         (re.compile('Supreme Court of Maryland', re.I), 'md'),
     (re.compile('Court of Special Appeals? of Maryland', re.I), 'mdctspecapp'),
 
     (re.compile('Supreme (Judicial )?Court of Massachusetts', re.I), 'mass'),
-    (re.compile('Massachusetts Supreme Judicial Court', re.I), 'mass'),
+        (re.compile('Massachusetts Supreme Judicial Court', re.I), 'mass'),
 
     (re.compile('Appeals? Court of Massachusetts', re.I), 'massappct'),
-    (re.compile('Massachusetts Appeals Court', re.I), 'massappct'),
+        (re.compile('Massachusetts Appeals Court', re.I), 'massappct'),
     (re.compile('Massachusetts Superior Court', re.I), 'masssuperct'),
     (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),
 
@@ -519,7 +531,8 @@ state_pairs = (
         (re.compile('Kansas City.? (of )?Court of appeals', re.I), 'moctapp'),
         (re.compile('Springfield,? Court of appeals', re.I), 'moctapp'),
 
-    (re.compile('Supreme Court of Montana|Montana Supreme Court', re.I), 'mont'),
+    (re.compile('Supreme Court of Montana', re.I), 'mont'),
+        (re.compile('Montana Supreme Court', re.I), 'mont'),
     (re.compile('Tax Appeal Board of the State of Montana', re.I), 'monttc'),
 
     (re.compile('Supreme Court of Nebraska|Nebraska Supreme Court', re.I), 'neb'),
@@ -540,9 +553,11 @@ state_pairs = (
     (re.compile('Court of Appeals? of New Mexico', re.I), 'nmctapp'),
         (re.compile('New Mexico Court of Appeals', re.I), 'nmctapp'),
 
-    (re.compile('Court of Appeals? of (the State of )?New York|New York Court of Appeals', re.I), 'ny'),
-    (re.compile('Appellate Division of the Supreme Court of (the State of )?New York|New York Supreme Court, Appellate Term', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court.*((%s))' % ny_counties, re.I), 'nyappdiv'),
+    (re.compile('Court of Appeals? of (the State of )?New York', re.I), 'ny'),
+        (re.compile('New York Court of Appeals', re.I), 'ny'),
+    (re.compile('Appellate Division of the Supreme Court of (the State of )?New York', re.I), 'nyappdiv'),
+        (re.compile('New York Supreme Court, Appellate Term', re.I), 'nyappdiv'),
+    (re.compile('Supreme Court.*((%s))' % ny_counties, re.I), 'nyappdiv'),
     (re.compile('Supreme Court of the State of New York', re.I), 'nysupct'),
     (re.compile('Family Court.*New York', re.I), 'nyfamct'),
     (re.compile('Surrogate\'s Court', re.I), 'nysurct'),
@@ -593,7 +608,8 @@ state_pairs = (
     (re.compile('State of Rhode Island, Superior Court', re.I), 'risuperct'),
 
     (re.compile('Supreme Court of South Carolina', re.I), 'sc'),
-    (re.compile('Court of Appeals? of South Carolina|South Carolina Court of Appeals', re.I), 'scctapp'),
+    (re.compile('Court of Appeals? of South Carolina', re.I), 'scctapp'),
+        (re.compile('South Carolina Court of Appeals', re.I), 'scctapp'),
 
     (re.compile('Supreme Court of South Dakota', re.I), 'sd'),
 
@@ -623,7 +639,8 @@ state_pairs = (
     (re.compile('Supreme Court of Appeals? of Virginia', re.I), 'va'),
     (re.compile('Court of Appeals? of Virginia', re.I), 'vactapp'),
 
-    (re.compile('Supreme Court of Washington|Washington Supreme Court', re.I), 'wash'),
+    (re.compile('Supreme Court of Washington', re.I), 'wash'),
+        (re.compile('Washington Supreme Court', re.I), 'wash'),
     (re.compile('Court of Appeals? of Washington', re.I), 'washctapp'),
 
     (re.compile('Supreme Court of( Appeals? of)?,? West Virginia', re.I), 'wva'),
@@ -682,6 +699,8 @@ def match_court_string(court_str, federal_appeals=False,
     :param state: Whether the string might be a state court.
     :param state_ag: Whether it might be a state AG "court".
     :param international: Whether it might be an international court.
+    :param unknown: Whether the type of court is known or not.
+    Searches all courts
     :returns The abbreviation for the court, if possible. Else, returns None
     """
     assert not (federal_district and bankruptcy), \
@@ -716,12 +735,13 @@ def match_court_string(court_str, federal_appeals=False,
             if re.search(regex, court_str):
                 matches.append(value)
     if unknown:
-        for regex, value in fd_pairs + fb_pairs + ca_pairs + state_ag_pairs + state_pairs + international_pairs:
+        for regex, value in fd_pairs + fb_pairs + ca_pairs + state_ag_pairs \
+                            + state_pairs + international_pairs:
             if re.search(regex, court_str):
                 print value
                 matches.append(value)
 
-
     # Safety check. If we have more than one match, that's a problem.
-    assert len(matches) >= 1, "Too many (%s) matches for %s" % (len(matches), court_str)
+    assert len(matches) >= 1, "Too many (%s) matches for %s" % (len(matches),
+                                                                court_str)
     return matches[0] if matches else None
