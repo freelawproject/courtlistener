@@ -22,8 +22,7 @@ def get_tax_docket_numbers(opinion_text):
     parsed_text = None
     regex = r"Docket No.*.Filed|Docket No.*.(, [0-9]{4}.)"
     matches = re.finditer(regex, opinion_text)
-    r = r"[0-9]{3,5}-[0-9A-Za-z]{2,4}(\.)|([0-9]{3,5}-[0-9A-Za-z]{2," \
-        r"4} [A-Z](\.)) "
+    r = r"[0-9]{3,5}-[\w]{2,4}(\.)( [A-Z](\.))?"
     for matchNum, match in enumerate(matches, start=1):
         xst = opinion_text[match.start():]
         second_matches = re.finditer(r, opinion_text[match.start():])
@@ -34,8 +33,7 @@ def get_tax_docket_numbers(opinion_text):
     if parsed_text is None:
         return None
 
-    regex = r"[0-9]{3,5}-[0-9A-Za-z]{2,4}(\,|\.)|([0-9]{3,5}-[0-9A-Za-z]{2," \
-            r"4} [A-Z](\,|\.)) "
+    regex = r"[0-9]{3,5}-[\w]{2,4}([A-Z])?(\,|\.)"
 
     matches = re.finditer(regex, parsed_text, re.MULTILINE)
     hits = []
