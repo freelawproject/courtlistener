@@ -20,7 +20,7 @@ def get_tax_docket_numbers(opinion_text):
     :return docket_string: as string of docket numbers Ex. (18710-94, 12321-95)
     """
     parsed_text = None
-    regex = r"Docket No.*.Filed|Docket No.*.(, [0-9]{4}.)"
+    regex = r"Docket No.*Filed|Docket No.*(, [0-9]{4}.)"
     matches = re.finditer(regex, opinion_text)
     r = r"[0-9]{3,5}-[\w]{2,4}(\.)( [A-Z](\.))?"
     for matchNum, match in enumerate(matches, start=1):
