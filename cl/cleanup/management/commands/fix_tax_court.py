@@ -115,7 +115,9 @@ def update_tax_opinions():
                 docket.docket_number = docket_numbers
                 docket.save()
                 logger.info("Adding Docket Numbers: %s to %s" %
-                            (docket_numbers, docket.case_name))
+                            (docket_numbers, oc.docket.case_name))
+                oc.docket.docket_number = docket_numbers
+                oc.docket.save()
 
             cite_dict = generate_citation(opinion.plain_text, oc.id)
 
