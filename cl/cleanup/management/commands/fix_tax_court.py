@@ -10,7 +10,7 @@ from cl.search.models import Opinion, OpinionCluster, Docket, Citation
 
 def get_tax_docket_numbers(opinion_text):
     """
-    get_docket_numbers parses the opinon plain text for docket numbers.
+    Parse opinon plain text for docket numbers.
 
     First we idenitify where the docket numbers are in the document.
     This is normally at the start of the document but can often follow
