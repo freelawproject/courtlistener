@@ -2422,6 +2422,11 @@ class Opinion(models.Model):
         "in this opinion",
         blank=True,
     )
+    joined_by_str = models.TextField(
+        help_text="Other judges that joined the primary author "
+                  "in this opinion str",
+        blank=True,
+    )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
         auto_now_add=True,
