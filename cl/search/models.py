@@ -1902,6 +1902,72 @@ class OpinionCluster(models.Model):
         "outcome.",
         blank=True,
     )
+    headnotes = models.TextField(
+        help_text='Headnotes are summary descriptions of the legal '
+                  'issues discussed by the court in the particular case. '
+                  'They appear at the beginning of each case just after '
+                  'the summary and disposition. '
+                  'They are short paragraphs with a heading in bold face type.'
+                  ' From Wikipedia - A headnote is a brief summary of a '
+                  'particular point of law that is added to the text of a court'
+                  'decision to aid readers in locating discussion of a legal'
+                  'issue in an opinion. As the term implies, headnotes appear'
+                  'at the beginning of the published opinion. Frequently, '
+                  'headnotes are value-added components appended to '
+                  'decisions by the publisher who compiles the '
+                  'decisions of a court for resale. As handed down by '
+                  'the court, a decision or written opinion does not contain '
+                  'headnotes. These are added later by an editor not '
+                  'connected to the court, but who instead works for a '
+                  'legal publishing house. ',
+        blank=True,
+    )
+    summary = models.TextField(
+        help_text="A summary of what happened in the case. "
+                  "Appears at the beginning of the case just "
+                  "after the title of the case and court "
+                  "information. Not identified as such.",
+        blank=True,
+    )
+    disposition = models.TextField(
+        help_text="Description of the procedural outcome of the case, "
+                  "e.g. Reversed, dismissed etc. "
+                  "Generally a short paragraph that appears "
+                  "just after the summary or synopsis",
+        blank=True,
+    )
+    history = models.TextField(
+        help_text="History of the case (similar to the summary, "
+                  "but focused on past events related to this case). "
+                  "Appears at the beginning of the case just after "
+                  "the title of the case and court information",
+        blank=True,
+    )
+    other_date = models.TextField(
+        help_text="Other date(s) as specified in the text "
+                  "(case header). This may include follow-up dates.",
+        blank=True,
+    )
+    cross_reference = models.TextField(
+        help_text="Cross-reference citation "
+                  "(often to a past or future similar case). "
+                  "It does NOT identify this case.",
+        blank=True,
+    )
+    correction = models.TextField(
+        help_text="Publisher's correction to the case text. "
+                  "Example: Replace last paragraph on page 476 "
+                  "with this text: blah blah blah. This is basically an"
+                  " unstructured text that can be used to manually "
+                  "correct case content according to publisher's "
+                  "instructions. No footnotes is expected within it.",
+        blank=True,
+    )
+    html_harvard = models.TextField(
+        help_text="Casebody XML stores structure of "
+                  "a legal case document body from Harvard Case Law Project.",
+        blank=True,
+    )
     citation_count = models.IntegerField(
         help_text="The number of times this document is cited by other "
         "opinion",
@@ -1926,6 +1992,27 @@ class OpinionCluster(models.Model):
     blocked = models.BooleanField(
         help_text="Whether a document should be blocked from indexing by "
         "search engines",
+        db_index=True,
+        default=False,
+    )
+    filepath_local = models.FileField(
+        help_text="Path to Harvard json local storage.",
+        max_length=1000,
+        blank=True,
+    )
+    sha1 = models.CharField(
+        help_text="unique ID for the document, as generated via SHA1 of the "
+                  "binary file or text data",
+        max_length=40,
+        db_index=True,
+    )
+    page_count = models.IntegerField(
+        help_text="The number of pages in the opinion cluster.",
+        blank=True,
+        null=True,
+    )
+    image_missing = models.BooleanField(
+        help_text="Whether case is missing document image.",
         db_index=True,
         default=False,
     )
