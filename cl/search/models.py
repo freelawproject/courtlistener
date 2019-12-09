@@ -2370,10 +2370,17 @@ def sort_cites(c):
 class Opinion(models.Model):
     OPINION_TYPES = (
         ("010combined", "Combined Opinion"),
+        ("015unamimous", "Unanimous Opinion"),
         ("020lead", "Lead Opinion"),
-        ("030concurrence", "Concurrence"),
+        ("025plurality", "Plurality Opinion"),
+        ("030concurrence", "Concurrence Opinion"),
+        ("035concurrenceinpart", "In Part Opinion"),
         ("040dissent", "Dissent"),
         ("050addendum", "Addendum"),
+        ("060remittitur", "Remittitur"),
+        ("070rehearing", "Rehearing"),
+        ("080onthemerits", "On the Merits"),
+        ("090onmotiontostrike", "On Motion to Strike Cost Bill"),
     )
     cluster = models.ForeignKey(
         OpinionCluster,
