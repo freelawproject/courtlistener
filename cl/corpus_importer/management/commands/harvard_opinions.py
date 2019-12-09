@@ -134,10 +134,8 @@ def parse_harvard_opinions(reporter, volume):
                     data['decision_date'])
                 if str(cluster.date_filed) != str(date_filed):
                     logger.info("Duplicate cite string different date filed")
-                    continue
                 elif cluster.page_count != pg_count:
                     logger.info("Duplicate cite string but diff page count")
-                    continue
                 else:
                     logger.info("%s Already in CL." % cite)
                     continue
