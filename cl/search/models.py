@@ -2484,6 +2484,11 @@ class Opinion(models.Model):
     html_columbia = models.TextField(
         help_text="HTML of Columbia archive", blank=True, null=True,
     )
+    html_harvard = models.TextField(
+        help_text='HTML of Harvard CaseLaw Access Project',
+        blank=True,
+        null=True,
+    )
     html_with_citations = models.TextField(
         help_text="HTML of the document with citation links and other "
         "post-processed markup added",
