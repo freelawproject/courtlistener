@@ -446,3 +446,34 @@ class IAUploaderTest(TestCase):
 
         with self.assertNumQueries(5):
             generate_ia_json(3)
+
+
+class HarvardTests(TestCase):
+    """
+    This is the start of tests for the Harvard import.  Need to flush out
+    what I want to test.
+    """
+    def test_cite_split(self):
+        """Test various aspects of harvard import."""
+        tests = ((
+                     "1 Mass. 245",
+                     "Mass.",
+                 ),
+                 (
+                     "115 Mich. App. 647",
+                     "Mich. App.",
+                 ),
+                 (
+                     "10 T.C. 1233",
+                     "T.C."
+                 ),
+                 (
+                     "702 F.2d 1234",
+                     "F.2d"
+                 ),
+                 (
+                     "702 F. 2d 1234",
+                     "F. 2d")
+                )
+        for q, a in tests:
+            self.assertEqual(q.split(" ", 1)[1].rsplit(" ", 1)[0], a)
