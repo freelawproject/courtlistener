@@ -58,6 +58,8 @@ SOURCES = (
     ("ZR", "columbia merged with resource.org"),
     ("ZCR", "columbia merged with court and resource.org"),
     ("ZL", "columbia merged with lawbox"),
+    ('U', 'Harvard, Library Innovation Lab Case Law Access Project'),
+    ('CU', 'court website merged with Harvard'),
 )
 
 
@@ -197,6 +199,8 @@ class Docket(models.Model):
     COLUMBIA_AND_RECAP_AND_IDB = 13
     COLUMBIA_AND_SCRAPER_AND_IDB = 14
     COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB = 15
+    HARVARD = 16
+    SCRAPER_AND_HARVARD = 17
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -217,6 +221,8 @@ class Docket(models.Model):
             COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
             "Columbia, RECAP, Scraper, and IDB",
         ),
+        (HARVARD, "Harvard"),
+        (SCRAPER_AND_HARVARD, "Scraper and Harvard")
     )
     RECAP_SOURCES = [
         RECAP,
