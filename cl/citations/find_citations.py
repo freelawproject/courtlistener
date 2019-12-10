@@ -376,12 +376,11 @@ def extract_base_citation(words, reporter_index):
         # Most page numbers will be digits.
         page = int(page)
     else:
-        regex = r'\d{1,6}[-]?[a-zA-Z]{1,6}'
         if isroman(page):
             # Some places like Nebraska have Roman numerals, e.g. in
             # '250 Neb. xxiv (1996)'. No processing needed.
             pass
-        elif re.match(regex, page):
+        elif re.match(r'\d{1,6}[-]?[a-zA-Z]{1,6}', page):
             # Some places, like Connecticut, have pages like "13301-M".
             # Other places, like Illinois have "pages" like "110311-B".
             pass
