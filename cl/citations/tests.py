@@ -95,6 +95,7 @@ class CiteTest(TestCase):
              [Citation(volume=22, reporter='A.2d', page=332,
                        canonical_reporter=u'A.', lookup_index=0,
                        reporter_index=2, reporter_found='A.2d')]),
+            # Test if reporter in string will find proper citation string
             ('A.2d 332 11 A.2d 333',
              [Citation(volume=11, reporter='A.2d', page=333,
                        canonical_reporter=u'A.', lookup_index=0,
