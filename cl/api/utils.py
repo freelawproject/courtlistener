@@ -447,9 +447,10 @@ def invert_user_logs(start, end):
     out = defaultdict(dict)
     for d, result in zip(dates, results):
         for user_id, count in result:
-            if user_id == 'None':
-                continue
-            user_id = int(user_id)
+            if user_id == 'None' or user_id == 'AnonymousUser':
+                user_id = 'AnonymousUser'
+            else:
+                user_id = int(user_id)
             count = int(count)
             if out.get(user_id):
                 out[user_id][d] = count
