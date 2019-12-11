@@ -143,6 +143,24 @@ class CiteTest(TestCase):
              [Citation(volume=2017, reporter='IL App (1st)', page='143684-B',
                        canonical_reporter=u'IL App (1st)', lookup_index=0,
                        reporter_index=1, reporter_found='IL App (1st)')]),
+        )
+        for q, a in test_pairs:
+            print "Testing citation extraction for %s..." % q,
+            cites_found = get_citations(q)
+            self.assertEqual(
+                cites_found,
+                a,
+                msg='%s\n%s\n\n    !=\n\n%s' % (
+                    q,
+                    ",\n".join([str(cite.__dict__) for cite in cites_found]),
+                    ",\n".join([str(cite.__dict__) for cite in a]),
+                )
+            )
+            print "✓"
+
+    def test_find_tc_citations(self):
+        """Can we parse tax court citations properly?"""
+        test_pairs = (
             # Test with atypical formatting for Tax Court Memos
             ('the 1 T.C. No. 233',
              [Citation(volume=1, reporter='T.C. No.', page=233,
