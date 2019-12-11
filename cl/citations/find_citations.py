@@ -356,9 +356,14 @@ def extract_base_citation(words, reporter_index):
     normal = True
     # T.C. Summary and T.C. Memo are edge cases.  They have atypical
     # formats so we simply check if the reporter is either before proceeding.
-    if "T.C. Summary" in reporter or "T.C. Memo" in reporter:
-        normal = False
-        volume, page = words[reporter_index + 1].split('-')
+    if "T.C. Summary" in reporter or "T. C. Summary" in reporter \
+        or "T.C. Memo" in reporter or "T. C. Memo" in reporter:
+        is_tax_court = True
+        emdash = '\u2014'
+        endash = '\u2013'
+        hyphen = '\u002D'
+        volume, page = words[reporter_index + 1].replace(emdash, hyphen) \
+            .replace(endash, hyphen).split('-')
 
     if normal:
         if reporter_index == 0:
