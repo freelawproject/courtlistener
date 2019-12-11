@@ -45,7 +45,7 @@ def get_tax_docket_numbers(opinion_text):
 
 def generate_citation(opinion_text, cluster_id):
     """
-    Generate_Citation returns a dictionary representation of our
+    Returns a dictionary representation of our
     Citation object.
 
     This data will only be returned if found, otherwise none is returned and
@@ -98,7 +98,7 @@ def update_tax_opinions():
     # We had a number of failed scrapes and the bad_url helps identify them
     bad_url = "http://www.ustaxcourt.gov/UstcInOp/asp/Todays.asp"
     for oc in ocs:
-        op_objs = oc.sub_opinions.all
+        op_objs = oc.sub_opinions.all()
         for opinion in op_objs:
             if opinion.plain_text == "":
                 logger.info('Nothing to parse.')
