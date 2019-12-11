@@ -353,7 +353,7 @@ def extract_base_citation(words, reporter_index):
     """
     volume, page = None, None
     reporter = words[reporter_index]
-    normal = True
+    is_tax_court = False
     # T.C. Summary and T.C. Memo are edge cases.  They have atypical
     # formats so we simply check if the reporter is either before proceeding.
     if "T.C. Summary" in reporter or "T. C. Summary" in reporter \
@@ -365,7 +365,7 @@ def extract_base_citation(words, reporter_index):
         volume, page = words[reporter_index + 1].replace(emdash, hyphen) \
             .replace(endash, hyphen).split('-')
 
-    if normal:
+    if not is_tax_court:
         if reporter_index == 0:
             return None
         volume = strip_punct(words[reporter_index - 1])
@@ -375,7 +375,7 @@ def extract_base_citation(words, reporter_index):
         # No volume, therefore not a valid citation
         return None
 
-    if normal:
+    if not is_tax_court:
         page = strip_punct(words[reporter_index + 1])
     if page.isdigit():
         # Most page numbers will be digits.
