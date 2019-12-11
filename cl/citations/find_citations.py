@@ -21,7 +21,7 @@ STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
 
 # Store court values to avoid repeated DB queries
 if (not set(sys.argv).isdisjoint(['test', 'syncdb', 'shell', 'migrate'])
-        or any('pytest' in s for s in set(sys.argv))):
+    or any('pytest' in s for s in set(sys.argv))):
     # If it's a test, we can't count on the database being prepped, so we have
     # to load lazily
     ALL_COURTS = Court.objects.all().values('citation_string', 'pk')
@@ -35,6 +35,7 @@ class Citation(object):
     """Convenience class which represents a single citation found in a
     document.
     """
+
     def __init__(self, reporter, page, volume, canonical_reporter=None,
                  lookup_index=None, extra=None, defendant=None, plaintiff=None,
                  court=None, year=None, match_url=None, match_id=None,
@@ -106,8 +107,8 @@ class Citation(object):
 
     def _get_cite_type(self):
         """Figure out the Citation.type value."""
-        cite_type = (REPORTERS[self.canonical_reporter][self.lookup_index]
-                     ['cite_type'])
+        canon = REPORTERS[self.canonical_reporter]
+        cite_type = (canon[self.lookup_index]['cite_type'])
         if cite_type == 'federal':
             return ModelCitation.FEDERAL
         elif cite_type == 'state':
@@ -225,12 +226,25 @@ def is_scotus_reporter(citation):
         return False
 
 
+def is_neutral_tc_reporter(reporter):
+    """Test whether the reporter is a neutral Tax Court reporter.
+
+    These take the format of T.C. Memo YEAR-SERIAL
+
+    :param reporter: A string of the reporter, e.g. "F.2d" or "T.C. Memo"
+    :return True if a T.C. neutral citation, else False
+    """
+    if re.match(r'T\. ?C\. (Summary|Memo)', reporter):
+        return True
+    return False
+
+
 def get_court_by_paren(paren_string, citation):
     """Takes the citation string, usually something like "2d Cir", and maps
     that back to the court code.
 
-    Does not work on SCOTUS, since that court lacks parentheticals, and needs to
-    be handled after disambiguation has been completed.
+    Does not work on SCOTUS, since that court lacks parentheticals, and
+    needs to be handled after disambiguation has been completed.
     """
     if citation.year is None:
         court_str = strip_punct(paren_string)
@@ -280,14 +294,14 @@ def add_post_citation(citation, words):
         Post-citation info: year=1894
 
         Full citation: 123 F.2d 345, 347-348 (4th Cir. 1990)
-        Post-citation info: year=1990, court="4th Cir.", extra (page range)="347-348"
+        Post-citation info: year=1990, court="4th Cir.",
+        extra (page range)="347-348"
     """
     # Start looking 2 tokens after the reporter (1 after page), and go to
     # either the end of the words list or to FORWARD_SEEK tokens from where you
     # started.
-    for start in xrange(
-            citation.reporter_index + 2,
-            min((citation.reporter_index + FORWARD_SEEK), len(words))):
+    fwd_sk = (citation.reporter_index + FORWARD_SEEK)
+    for start in xrange(citation.reporter_index + 2, min(fwd_sk, len(words))):
         if words[start].startswith('('):
             # Get the year by looking for a token that ends in a paren.
             for end in xrange(start, start + FORWARD_SEEK):
@@ -302,14 +316,15 @@ def add_post_citation(citation, words):
                         citation.year = get_year(words[end - 1])
                     else:
                         citation.year = get_year(words[end])
-                    citation.court = get_court_by_paren(u' '.join(words[start:end + 1]), citation)
+                    citation.court = get_court_by_paren(
+                        u' '.join(words[start:end + 1]), citation)
                     break
 
             if start > citation.reporter_index + 2:
                 # Then there's content between page and (), starting with a
                 # comma, which we skip
                 citation.extra = u' '.join(
-                        words[citation.reporter_index + 2:start])
+                    words[citation.reporter_index + 2:start])
             break
 
 
@@ -319,9 +334,8 @@ def add_defendant(citation, words):
     future, this could be improved.
     """
     start_index = None
-    for index in xrange(
-            citation.reporter_index - 1,
-            max(citation.reporter_index - BACKWARD_SEEK, 0), -1):
+    back_seek = citation.reporter_index - BACKWARD_SEEK
+    for index in xrange(citation.reporter_index - 1, max(back_seek, 0), -1):
         word = words[index]
         if word == ',':
             # Skip it
@@ -336,7 +350,7 @@ def add_defendant(citation, words):
             break
     if start_index:
         citation.defendant = u' '.join(
-                words[start_index:citation.reporter_index - 1])
+            words[start_index:citation.reporter_index - 1])
 
 
 def extract_base_citation(words, reporter_index):
@@ -345,15 +359,29 @@ def extract_base_citation(words, reporter_index):
     Given a list of words and the index of a federal reporter, look before and
     after for volume and page.  If found, construct and return a
     Citation object.
+
+    If we are given neutral, tax court opinions we treat them differently.
+    The formats often follow {REPORTER} {YEAR}-{ITERATIVE_NUMBER}
+    ex. T.C. Memo. 2019-13
     """
-    volume = strip_punct(words[reporter_index - 1])
+    reporter = words[reporter_index]
+    neutral_tc_reporter = is_neutral_tc_reporter(reporter)
+    if neutral_tc_reporter:
+        volume, page = words[reporter_index + 1].split('-')
+    else:
+        # "Normal" reporter: XX F.2d YY
+        if reporter_index == 0:
+            return None
+        volume = strip_punct(words[reporter_index - 1])
+        page = strip_punct(words[reporter_index + 1])
+
+    # Normalize volume and page
     if volume.isdigit():
         volume = int(volume)
     else:
         # No volume, therefore not a valid citation
         return None
 
-    page = strip_punct(words[reporter_index + 1])
     if page.isdigit():
         # Most page numbers will be digits.
         page = int(page)
@@ -362,15 +390,15 @@ def extract_base_citation(words, reporter_index):
             # Some places like Nebraska have Roman numerals, e.g. in
             # '250 Neb. xxiv (1996)'. No processing needed.
             pass
-        elif re.match('\d{1,6}[-]?[a-zA-Z]{1,6}', page):
+        elif re.match(r'\d{1,6}[-]?[a-zA-Z]{1,6}', page):
             # Some places, like Connecticut, have pages like "13301-M".
             # Other places, like Illinois have "pages" like "110311-B".
             pass
         else:
-            # Not Roman, and not a weird connecticut page number.
+            # Not Roman, and not a weird connecticut page number. Thus a bad
+            # value. Abort.
             return None
 
-    reporter = words[reporter_index]
     return Citation(reporter, page, volume, reporter_found=reporter,
                     reporter_index=reporter_index)
 
@@ -432,12 +460,15 @@ def disambiguate_reporters(citations):
                 if citation.year:
                     # attempt resolution by date
                     possible_citations = []
-                    for i in range(0, len(REPORTERS[EDITIONS[citation.reporter]])):
-                        if is_date_in_reporter(REPORTERS[EDITIONS[citation.reporter]][i]['editions'], citation.year):
+                    rep_len = len(REPORTERS[EDITIONS[citation.reporter]])
+                    for i in range(0, rep_len):
+                        if is_date_in_reporter(
+                            REPORTERS[EDITIONS[citation.reporter]][i][
+                                'editions'], citation.year):
                             possible_citations.append((citation.reporter, i,))
                     if len(possible_citations) == 1:
-                        # We were able to identify only one hit after filtering
-                        # by year.
+                        # We were able to identify only one hit
+                        # after filtering by year.
                         citation.reporter = possible_citations[0][0]
                         citation.lookup_index = possible_citations[0][1]
                         unambiguous_citations.append(citation)
@@ -447,7 +478,8 @@ def disambiguate_reporters(citations):
         elif VARIATIONS_ONLY.get(citation.reporter) is not None:
             if len(VARIATIONS_ONLY[citation.reporter]) == 1:
                 # Only one variation -- great, use it.
-                citation.canonical_reporter = EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]
+                citation.canonical_reporter = EDITIONS[
+                    VARIATIONS_ONLY[citation.reporter][0]]
                 cached_variation = citation.reporter
                 citation.reporter = VARIATIONS_ONLY[citation.reporter][0]
                 if len(REPORTERS[citation.canonical_reporter]) == 1:
@@ -462,21 +494,27 @@ def disambiguate_reporters(citations):
                     if citation.year:
                         # attempt resolution by date
                         possible_citations = []
-                        for i in range(0, len(REPORTERS[citation.canonical_reporter])):
-                            if is_date_in_reporter(REPORTERS[citation.canonical_reporter][i]['editions'],
-                                                   citation.year):
-                                possible_citations.append((citation.reporter, i))
+                        rep_can = len(REPORTERS[citation.canonical_reporter])
+                        for i in range(0, rep_can):
+                            if is_date_in_reporter(
+                                REPORTERS[citation.canonical_reporter][i][
+                                    'editions'], citation.year):
+                                possible_citations.append(
+                                    (citation.reporter, i))
                         if len(possible_citations) == 1:
                             # We were able to identify only one hit after
                             # filtering by year.
                             citation.lookup_index = possible_citations[0][1]
                             unambiguous_citations.append(citation)
                             continue
-                    # Attempt resolution by unique variation (e.g. Cr. can only
-                    # be Cranch[0])
+                    # Attempt resolution by unique variation
+                    # (e.g. Cr. can only be Cranch[0])
                     possible_citations = []
-                    for i in range(0, len(REPORTERS[citation.canonical_reporter])):
-                        for variation in REPORTERS[citation.canonical_reporter][i]['variations'].items():
+                    reps = REPORTERS[citation.canonical_reporter]
+                    for i in range(0, len(reps)):
+                        for variation in \
+                            REPORTERS[citation.canonical_reporter][i][
+                                'variations'].items():
                             if variation[0] == cached_variation:
                                 possible_citations.append((variation[1], i))
                     if len(possible_citations) == 1:
@@ -492,12 +530,15 @@ def disambiguate_reporters(citations):
                     for i in range(0, len(REPORTERS[EDITIONS[reporter_key]])):
                         # This inner loop works regardless of the number of
                         # reporters under the key.
-                        if is_date_in_reporter(REPORTERS[EDITIONS[reporter_key]][i]['editions'], citation.year):
+                        key = REPORTERS[EDITIONS[reporter_key]]
+                        cite_year = citation.year
+                        if is_date_in_reporter(key[i]['editions'], cite_year):
                             possible_citations.append((reporter_key, i,))
                 if len(possible_citations) == 1:
                     # We were able to identify only one hit after filtering by
                     # year.
-                    citation.canonical_reporter = EDITIONS[possible_citations[0][0]]
+                    citation.canonical_reporter = EDITIONS[
+                        possible_citations[0][0]]
                     citation.reporter = possible_citations[0][0]
                     citation.lookup_index = possible_citations[0][1]
                     unambiguous_citations.append(citation)
@@ -514,7 +555,7 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True,
     citations = []
     # Exclude first and last tokens when looking for reporters, because valid
     # citations must have a volume before and a page after the reporter.
-    for i in xrange(1, len(words) - 1):
+    for i in xrange(0, len(words) - 1):
         # Find reporter
         if words[i] in (EDITIONS.keys() + VARIATIONS_ONLY.keys()):
             citation = extract_base_citation(words, i)
