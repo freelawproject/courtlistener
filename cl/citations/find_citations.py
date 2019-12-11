@@ -226,6 +226,19 @@ def is_scotus_reporter(citation):
         return False
 
 
+def is_neutral_tc_reporter(reporter):
+    """Test whether the reporter is a neutral Tax Court reporter.
+
+    These take the format of T.C. Memo YEAR-SERIAL
+
+    :param reporter: A string of the reporter, e.g. "F.2d" or "T.C. Memo"
+    :return True if a T.C. neutral citation, else False
+    """
+    if re.match(r'T\. ?C\. (Summary|Memo)', reporter):
+        return True
+    return False
+
+
 def get_court_by_paren(paren_string, citation):
     """Takes the citation string, usually something like "2d Cir", and maps
     that back to the court code.
@@ -351,32 +364,24 @@ def extract_base_citation(words, reporter_index):
     The formats often follow {REPORTER} {YEAR}-{ITERATIVE_NUMBER}
     ex. T.C. Memo. 2019-13
     """
-    volume, page = None, None
     reporter = words[reporter_index]
-    is_tax_court = False
-    # T.C. Summary and T.C. Memo are edge cases.  They have atypical
-    # formats so we simply check if the reporter is either before proceeding.
-    if "T.C. Summary" in reporter or "T. C. Summary" in reporter \
-        or "T.C. Memo" in reporter or "T. C. Memo" in reporter:
-        is_tax_court = True
-        emdash = '\u2014'
-        endash = '\u2013'
-        hyphen = '\u002D'
-        volume, page = words[reporter_index + 1].replace(emdash, hyphen) \
-            .replace(endash, hyphen).split('-')
-
-    if not is_tax_court:
+    neutral_tc_reporter = is_neutral_tc_reporter(reporter)
+    if neutral_tc_reporter:
+        volume, page = words[reporter_index + 1].split('-')
+    else:
+        # "Normal" reporter: XX F.2d YY
         if reporter_index == 0:
             return None
         volume = strip_punct(words[reporter_index - 1])
+        page = strip_punct(words[reporter_index + 1])
+
+    # Normalize volume and page
     if volume.isdigit():
         volume = int(volume)
     else:
         # No volume, therefore not a valid citation
         return None
 
-    if not is_tax_court:
-        page = strip_punct(words[reporter_index + 1])
     if page.isdigit():
         # Most page numbers will be digits.
         page = int(page)
@@ -390,7 +395,8 @@ def extract_base_citation(words, reporter_index):
             # Other places, like Illinois have "pages" like "110311-B".
             pass
         else:
-            # Not Roman, and not a weird connecticut page number.
+            # Not Roman, and not a weird connecticut page number. Thus a bad
+            # value. Abort.
             return None
 
     return Citation(reporter, page, volume, reporter_found=reporter,
