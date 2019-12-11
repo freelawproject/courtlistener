@@ -116,7 +116,7 @@ def update_tax_opinions():
 
             cite = generate_citation(opinion.plain_text, oc.id)
 
-            if cite_dict is None:
+            if cite is None:
                 continue
 
             logger.info("Citation saved %s %s %s" % (cite.volume,
