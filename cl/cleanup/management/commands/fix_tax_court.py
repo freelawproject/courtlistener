@@ -20,8 +20,8 @@ def get_tax_docket_numbers(opinion_text):
     :return docket_string: as string of docket numbers Ex. (18710-94, 12321-95)
     """
     parsed_text = None
-    regex = r"Docket No.*Filed|Docket No.*(, [0-9]{4}.)"
-    matches = re.finditer(regex, opinion_text)
+    docket_no_re = r"Docket No.*Filed|Docket No.*(, [0-9]{4}.)"
+    matches = re.finditer(docket_no_re, opinion_text)
     r = r"[0-9]{3,5}-[\w]{2,4}(\.)( [A-Z](\.))?"
     for matchNum, match in enumerate(matches, start=1):
         xst = opinion_text[match.start():]
@@ -33,9 +33,9 @@ def get_tax_docket_numbers(opinion_text):
     if parsed_text is None:
         return None
 
-    regex = r"[0-9]{3,5}-[\w]{2,4}([A-Z])?(\,|\.)"
+    docket_end_re = r"[0-9]{3,5}-[\w]{2,4}([A-Z])?(\,|\.)"
 
-    matches = re.finditer(regex, parsed_text, re.MULTILINE)
+    matches = re.finditer(docket_end_re, parsed_text, re.MULTILINE)
     hits = []
     for matchNum, match in enumerate(matches, start=1):
         hits.append(match.group())
@@ -101,7 +101,7 @@ def update_tax_opinions():
         op_objs = oc.sub_opinions.all()
         for opinion in op_objs:
             if opinion.plain_text == "":
-                logger.info('Nothing to parse.')
+                # logger.info('Nothing to parse.')
                 continue
             if opinion.download_url == bad_url:
                 logger.info("Failed scrape, nothing to parse.")
