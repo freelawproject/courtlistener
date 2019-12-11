@@ -63,24 +63,22 @@ def generate_citation(opinion_text, cluster_id):
             return
 
         for cite in cites:
-            cite_dict = cite.__dict__
-            if "T.C." not in cite_dict['reporter']:
+            if "T.C." not in cite.reporter or "T. C." not in cite.reporter:
                 continue
 
-            if "T.C." == cite_dict['reporter']:
+            if "T.C." == cite.reporter:
                 cite_type = Citation.SPECIALTY
-            elif "T.C. No." == cite_dict['reporter']:
+            elif "T.C. No." == cite.reporter:
                 cite_type = Citation.SPECIALTY
             else:
                 cite_type = Citation.NEUTRAL
 
-            if not Citation.objects.filter(volume=cite_dict['volume'],
-                                           reporter=cite_dict[
-                                               'reporter'],
-                                           page=cite_dict['page'],
+            if not Citation.objects.filter(volume=cite.volume,
+                                           reporter=cite.reporter,
+                                           page=cite.page,
                                            cluster_id=cluster_id):
-                cite_dict['cite_type'] = cite_type
-                return cite_dict
+                cite.type = cite_type
+                return cite
 
 
 def update_tax_opinions():
@@ -116,20 +114,20 @@ def update_tax_opinions():
                 oc.docket.docket_number = docket_numbers
                 oc.docket.save()
 
-            cite_dict = generate_citation(opinion.plain_text, oc.id)
+            cite = generate_citation(opinion.plain_text, oc.id)
 
             if cite_dict is None:
                 continue
 
-            logger.info("Citation saved %s %s %s" % (cite_dict['volume'],
-                                                     cite_dict['reporter'],
-                                                     cite_dict['page']))
+            logger.info("Citation saved %s %s %s" % (cite.volume,
+                                                     cite.reporter,
+                                                     cite.page))
 
-            Citation.objects.create(**{
-                "volume": cite_dict['volume'],
-                "reporter": cite_dict['reporter'],
-                "page": cite_dict['page'],
-                "type": cite_dict['cite_type'],
+            Citation.objects.get_or_create(**{
+                "volume": cite.volume,
+                "reporter": cite.reporter,
+                "page": cite.page,
+                "type": cite.type,
                 "cluster_id": oc.id
             })
 
