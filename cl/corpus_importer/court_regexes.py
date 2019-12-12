@@ -197,10 +197,15 @@ fd_pairs = (
     (re.compile('U\. S\. Court of Customs Appeals', re.I), 'ccpa'),
     (re.compile(u'Commerce Court', re.I), 'com'),
     (re.compile(u'Court of Claims', re.I), 'cc'),
+        (re.compile(u'United States Claims Court', re.I), 'cc'),
     (re.compile(u'(^|\s)U\. S\. Court of Customs and Patent Appeals', re.I), 'ccpa'),
-    (re.compile(u'(^|\s)U\. S\. Court of International Trade', re.I), 'cit'),
+    (re.compile(u'(^|\s)(U\. S\.)|(United States) Court of International Trade', re.I), 'cit'),
     (re.compile(u'(^|\s)U\. S\. Customs Court', re.I), 'cusc'),
     (re.compile(u'(^|\s)U\. S\. District Court for the District of Columbia', re.I), 'dcd'),
+
+    # United States Tax Court
+    (re.compile(u'United States Tax Court', re.I), 'tax'),
+    (re.compile(u'United States Board of Tax Appeals', re.I), 'bta'),
 
     # this was a special circuit court when california was first founded, it
     # only had one judge
@@ -231,19 +236,19 @@ fd_pairs = (
 ca_pairs = (
     (re.compile(u'Supreme Court of the United States', re.I), 'scotus'),
 
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Second Circuit', re.I), 'ca2'),
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Third Circuit', re.I), 'ca3'),
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Fourth Circuit', re.I), 'ca4'),
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Fifth Circuit', re.I), 'ca5'),
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Sixth Circuit', re.I), 'ca6'),
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Seventh Circuit', re.I), 'ca7'),
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Eighth Circuit', re.I), 'ca8'),
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Ninth Circuit', re.I), 'ca9'),
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Tenth Circuit', re.I), 'ca10'),
-    (re.compile(u'(^|\s)U\. ?S\. ((Circuit Courts?)|(Court of Appeals)) for the Eleventh Circuit', re.I), 'ca11'),
-    (re.compile(u'(^|\s)U\. ?S\. Court of Appeals for the District of Columbia Circuit', re.I), 'cadc'),
-    (re.compile(u'(^|\s)U\. ?S\. Court of Appeals for the Federal Circuit', re.I), 'cafc'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Second Circuit', re.I), 'ca2'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Third Circuit', re.I), 'ca3'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Fourth Circuit', re.I), 'ca4'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Fifth Circuit', re.I), 'ca5'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Sixth Circuit', re.I), 'ca6'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Seventh Circuit', re.I), 'ca7'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Eighth Circuit', re.I), 'ca8'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Ninth Circuit', re.I), 'ca9'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Tenth Circuit', re.I), 'ca10'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Eleventh Circuit', re.I), 'ca11'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) Court of Appeals for the District of Columbia Circuit', re.I), 'cadc'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) Court of Appeals for the Federal Circuit', re.I), 'cafc'),
 )
 
 # noinspection PyPep8
@@ -373,9 +378,10 @@ fb_pairs = (
 state_pairs = (
     (re.compile('D((istrict)|\.) (of )?C((olumbia)|\.) Court of Appeals', re.I), 'dc'),
         (re.compile('D((istrict)|\.) (of )?C((olumbia)|\.) Municipal Court of Appeals', re.I), 'dc'),
-            (re.compile('Municipal Court of Appeals? (for the )?D((istrict)|\.) (of )?C((olumbia)|\.)', re.I), 'dc'),
+        (re.compile('Municipal Court of Appeals? (for the )?D((istrict)|\.) (of )?C((olumbia)|\.)', re.I), 'dc'),
         (re.compile('Supreme Court of the D((istrict)|\.) (of )?C((olumbia)|\.)', re.I), 'dc'),
     (re.compile('Supreme Court of Alabama', re.I), 'ala'),
+        (re.compile('Alabama Supreme Court', re.I), 'ala'),
     (re.compile('Court of Criminal Appeals? of Alabama', re.I), 'alacrimapp'),
         (re.compile('Alabama Court of Criminal Appeals?', re.I), 'alacrimapp'),
     (re.compile('Court of Civil Appeals? of Alabama', re.I), 'alacivapp'),
@@ -383,6 +389,7 @@ state_pairs = (
     (re.compile('Supreme Court of Alaska', re.I), 'alaska'),
     (re.compile('Court of Appeals? of Alaska', re.I), 'alaskactapp'),
     (re.compile('Supreme Court of Arizona', re.I), 'ariz'),
+        (re.compile('Arizona Supreme Court', re.I), 'ariz'),
     (re.compile('Court of Appeals,? of Arizona', re.I), 'arizctapp'),
     (re.compile('Tax Court of Arizona', re.I), 'ariztaxct'),
     (re.compile('Supreme Court of Arkansas', re.I), 'ark'),
@@ -390,8 +397,10 @@ state_pairs = (
 
     (re.compile('Supreme Court of California', re.I), 'cal'),
     (re.compile('California Court of Appeals', re.I), 'calctapp'),
+        (re.compile('Court of Appeal of the State of California',re.I), 'calctapp'),
         (re.compile('Court of Appeals? of California', re.I), 'calctapp'),
     (re.compile('Appellate Division, Superior Court', re.I), 'calappdeptsuperct'),
+        (re.compile('Appellate Division of the Superior Court of the State of California', re.I), 'calappdeptsuperct'),
         (re.compile('California Superior Court\.? +Appellate ((Division)|(Department))', re.I), 'calappdeptsuperct'),
 
     (re.compile('Supreme Court of Colorado', re.I), 'colo'),
@@ -419,9 +428,11 @@ state_pairs = (
         # Supreme court level stuff.
         (re.compile('In vacation of Delaware', re.I), 'del'),
     (re.compile('Court of Chancery of (the State of )?Delaware', re.I), 'delch'),
-        (re.compile('Chancery Court of Delaware', re.I), 'delch'),
+        (re.compile('Chancery Court of Delaware|Delaware Court of Chancery', re.I), 'delch'),
     (re.compile('Superior Court of (the State of )?Delaware', re.I), 'delsuperct'),
-        # These two merged into the Superior court of Delaware
+        (re.compile('Delaware Superior Court', re.I), 'delsuperct'),
+
+    # These two merged into the Superior court of Delaware
         (re.compile('Orphans\'? Court( Court)? of Delaware', re.I), 'delsuperct'),
         (re.compile('Court of General Sessions', re.I), 'delsuperct'),
         (re.compile('Court of Oyer and Terminer of Delaware', re.I), 'delsuperct'),
@@ -432,8 +443,10 @@ state_pairs = (
         (re.compile('Circuit Court,  Delaware', re.I), 'circtdel'),
         (re.compile('Circuit Court.*Dover', re.I), 'circtdel'),
     (re.compile('Family Court of Delaware', re.I), 'delfamct'),
+        (re.compile('Delaware Family Court', re.I), 'delfamct'),
     (re.compile('Court on the Judiciary of Delaware', re.I), 'deljudct'),
         (re.compile('Delaware Court on the Judiciary', re.I), 'deljudct'),
+
 
     (re.compile('Supreme Court of Florida', re.I), 'fla'),
         (re.compile('Supreme Court.*Nassau County', re.I), 'fla'),
@@ -450,10 +463,12 @@ state_pairs = (
         (re.compile('Hawaii Intermediate Court of Appeals?', re.I), 'hawapp'),
 
     (re.compile('Supreme Court of (the state of )?Idaho', re.I), 'idaho'),
+        (re.compile('Idaho Supreme Court', re.I), 'idaho'),
     (re.compile('Court of Appeals? of Idaho', re.I), 'idahoctapp'),
         (re.compile('Idaho Court of Appeals', re.I), 'idahoctapp'),
 
     (re.compile('Supreme Court of Illinois', re.I), 'ill'),
+        (re.compile('Illinois Supreme Court', re.I), 'ill'),
     (re.compile('Appellate Court of Illinois', re.I), 'illappct'),
         (re.compile('Illinois Appellate Court', re.I), 'illappct'),
 
@@ -473,27 +488,32 @@ state_pairs = (
 
     (re.compile('Supreme Court of Kentucky', re.I), 'ky'),
     (re.compile('Court of Appeals? of Kentucky', re.I), 'kyctapp'),
+        (re.compile('Kentucky Court of Appeals', re.I), 'kyctapp'),
 
     (re.compile('Supreme Court of Louisiana', re.I), 'la'),
     (re.compile('Court of Appeals? of Louisiana', re.I), 'lactapp'),
     (re.compile('Louisiana Circuit Courts of Appeal', re.I), 'lactapp'),
 
     (re.compile('Supreme Judicial Court of Maine', re.I), 'me'),
+        (re.compile('Maine Supreme Judicial Court', re.I), 'me'),
 
     (re.compile('Court of Appeals? of Maryland', re.I), 'md'),
         (re.compile('Supreme Court of Maryland', re.I), 'md'),
     (re.compile('Court of Special Appeals? of Maryland', re.I), 'mdctspecapp'),
 
     (re.compile('Supreme (Judicial )?Court of Massachusetts', re.I), 'mass'),
+        (re.compile('Massachusetts Supreme Judicial Court', re.I), 'mass'),
+
     (re.compile('Appeals? Court of Massachusetts', re.I), 'massappct'),
+        (re.compile('Massachusetts Appeals Court', re.I), 'massappct'),
     (re.compile('Massachusetts Superior Court', re.I), 'masssuperct'),
     (re.compile('Massachusetts Appellate Division', re.I), 'massdistct'),
 
-    (re.compile('Supreme Court of Michigan', re.I), 'mich'),
+    (re.compile('Supreme Court of Michigan|Michigan Supreme Court', re.I), 'mich'),
     (re.compile('Michigan Court of Appeals', re.I), 'michctapp'),
         (re.compile('Court of Appeals? of Michigan', re.I), 'michctapp'),
 
-    (re.compile('Supreme Court of Minnesota', re.I), 'minn'),
+    (re.compile('Supreme Court of Minnesota|Minnesota Supreme Court', re.I), 'minn'),
     (re.compile('Court of Appeals? of Minnesota', re.I), 'minnctapp'),
         (re.compile('Minnesota Court of Appeals?', re.I), 'minnctapp'),
 
@@ -512,9 +532,10 @@ state_pairs = (
         (re.compile('Springfield,? Court of appeals', re.I), 'moctapp'),
 
     (re.compile('Supreme Court of Montana', re.I), 'mont'),
+        (re.compile('Montana Supreme Court', re.I), 'mont'),
     (re.compile('Tax Appeal Board of the State of Montana', re.I), 'monttc'),
 
-    (re.compile('Supreme Court of Nebraska', re.I), 'neb'),
+    (re.compile('Supreme Court of Nebraska|Nebraska Supreme Court', re.I), 'neb'),
     (re.compile('Court of Appeals? of Nebraska', re.I), 'nebctapp'),
         (re.compile('Nebraska Court of Appeals', re.I), 'nebctapp'),
 
@@ -533,8 +554,10 @@ state_pairs = (
         (re.compile('New Mexico Court of Appeals', re.I), 'nmctapp'),
 
     (re.compile('Court of Appeals? of (the State of )?New York', re.I), 'ny'),
+        (re.compile('New York Court of Appeals', re.I), 'ny'),
     (re.compile('Appellate Division of the Supreme Court of (the State of )?New York', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court.*((%s))' % ny_counties, re.I), 'nyappdiv'),
+        (re.compile('New York Supreme Court, Appellate Term', re.I), 'nyappdiv'),
+    (re.compile('Supreme Court.*((%s))' % ny_counties, re.I), 'nyappdiv'),
     (re.compile('Supreme Court of the State of New York', re.I), 'nysupct'),
     (re.compile('Family Court.*New York', re.I), 'nyfamct'),
     (re.compile('Surrogate\'s Court', re.I), 'nysurct'),
@@ -560,7 +583,7 @@ state_pairs = (
         (re.compile('Ohio Court of Appeals', re.I), 'ohioctapp'),
     (re.compile('Court of Claims of Ohio', re.I), 'ohioctcl'),
 
-    (re.compile('Supreme Court (of )?Oklahoma', re.I), 'okla'),
+    (re.compile('Supreme Court (of )?Oklahoma|Oklahoma Supreme Court', re.I), 'okla'),
     (re.compile('Court of Criminal Appeals? (of )?Oklahoma', re.I), 'oklacrimapp'),
         (re.compile('Criminal Courts? of Appeals? of Oklahoma', re.I), 'oklacrimapp'),
     (re.compile('Court of Civils? Appeals? of Oklahoma', re.I), 'oklacivapp'),
@@ -586,6 +609,7 @@ state_pairs = (
 
     (re.compile('Supreme Court of South Carolina', re.I), 'sc'),
     (re.compile('Court of Appeals? of South Carolina', re.I), 'scctapp'),
+        (re.compile('South Carolina Court of Appeals', re.I), 'scctapp'),
 
     (re.compile('Supreme Court of South Dakota', re.I), 'sd'),
 
@@ -616,11 +640,12 @@ state_pairs = (
     (re.compile('Court of Appeals? of Virginia', re.I), 'vactapp'),
 
     (re.compile('Supreme Court of Washington', re.I), 'wash'),
+        (re.compile('Washington Supreme Court', re.I), 'wash'),
     (re.compile('Court of Appeals? of Washington', re.I), 'washctapp'),
 
     (re.compile('Supreme Court of( Appeals? of)?,? West Virginia', re.I), 'wva'),
 
-    (re.compile('Supreme Court of Wisconsin', re.I), 'wis'),
+    (re.compile('Supreme Court of Wisconsin|Wisconsin Supreme Court', re.I), 'wis'),
     (re.compile('Court of Appeals? of (of )?Wisconsin', re.I), 'wisctapp'),
         (re.compile('Wisconsin Court of Appeals', re.I), 'wisctapp'),
 
