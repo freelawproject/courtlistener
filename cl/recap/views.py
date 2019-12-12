@@ -3,10 +3,13 @@ from rest_framework.viewsets import ModelViewSet
 from cl.api.utils import RECAPUploaders, LoggingMixin, RECAPUsersReadOnly, \
     BigPagination
 from cl.recap.api_serializers import ProcessingQueueSerializer, \
-    PacerDocIdLookUpSerializer, FjcIntegratedDatabaseSerializer
-from cl.recap.filters import ProcessingQueueFilter, FjcIntegratedDatabaseFilter
-from cl.recap.models import ProcessingQueue, FjcIntegratedDatabase
-from cl.recap.tasks import process_recap_upload
+    PacerDocIdLookUpSerializer, FjcIntegratedDatabaseSerializer, \
+    PacerFetchQueueSerializer
+from cl.recap.filters import ProcessingQueueFilter, \
+    FjcIntegratedDatabaseFilter, PacerFetchQueueFilter
+from cl.recap.models import ProcessingQueue, FjcIntegratedDatabase, \
+    PacerFetchQueue
+from cl.recap.tasks import process_recap_upload, do_pacer_fetch
 from cl.search.filters import RECAPDocumentFilter
 from cl.search.models import RECAPDocument
 
@@ -23,6 +26,19 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     def perform_create(self, serializer):
         pq = serializer.save(uploader=self.request.user)
         process_recap_upload(pq)
+
+
+class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
+    queryset = PacerFetchQueue.objects.all().order_by('-id')
+    serializer_class = PacerFetchQueueSerializer
+    filter_class = PacerFetchQueueFilter
+    ordering_fields = (
+        'date_created', 'date_modified', 'date_completed',
+    )
+
+    def perform_create(self, serializer):
+        fq = serializer.save(user=self.request.user)
+        do_pacer_fetch(fq)
 
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):

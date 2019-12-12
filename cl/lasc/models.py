@@ -1,17 +1,15 @@
 # coding=utf-8
-import json
 
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey, \
     GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from django.utils.encoding import force_bytes
 
-from cl.lib.crypto import sha1
 from cl.lib.models import AbstractJSON, AbstractPDF
 from cl.lib.model_helpers import make_pdf_path
 
+from cl.lib.storage import AWSMediaStorage
 
 class UPLOAD_TYPE:
     DOCKET = 1
@@ -38,14 +36,6 @@ class LASCJSON(AbstractJSON):
     class Meta:
         verbose_name = 'LASC JSON File'
 
-    def save(self, *args, **kwargs):
-        # Always generate a fresh hash when the file is saved, nuking
-        # whitespace.
-        with open(self.filepath.path, 'r') as f:
-            j = json.load(f)
-        self.sha1 = sha1(force_bytes(j))
-        super(LASCJSON, self).save(*args, **kwargs)
-
 
 class LASCPDF(AbstractPDF):
     """Use the content framework to associate PDFs with our dockets
@@ -57,9 +47,11 @@ class LASCPDF(AbstractPDF):
     """
     Do we want to have a different file path generator <----
     """
-    filepath = models.FileField(
-        help_text="The path of the file in the local storage area.",
+
+    filepath_s3 = models.FileField(
+        help_text="The path of the file in the s3 bucket.",
         upload_to=make_pdf_path,
+        storage=AWSMediaStorage(),
         max_length=150,
         blank=True,
     )

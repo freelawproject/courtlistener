@@ -132,7 +132,6 @@ class AbstractJSON(AbstractFile):
     filepath = models.FileField(
         help_text="The path of the file in the local storage area.",
         upload_to=make_lasc_json_path,
-        storage=UUIDFileSystemStorage(),
         max_length=150,
         blank=True,
     )

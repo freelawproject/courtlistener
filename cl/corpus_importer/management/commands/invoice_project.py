@@ -43,7 +43,7 @@ def get_attachment_pages(options):
     main_query = build_main_query_from_query_string(
         Q_DOCS_ONLY,
         {'rows': page_size, 'fl': ['id', 'docket_id']},
-        {'group': False, 'facet': False},
+        {'group': False, 'facet': False, 'highlight': False},
     )
     si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
     results = si.query().add_extra(**main_query)
@@ -99,7 +99,7 @@ def get_documents(options):
     main_query = build_main_query_from_query_string(
         Q_INVOICES,
         {'rows': page_size, 'fl': ['id', 'docket_id']},
-        {'group': False, 'facet': False},
+        {'group': False, 'facet': False, 'highlight': False},
     )
     si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
     results = si.query().add_extra(**main_query).execute()

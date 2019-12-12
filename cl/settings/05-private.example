@@ -4,10 +4,14 @@ from datetime import date
 # Debug settings #
 ##################
 DEBUG = True
-ALLOWED_HOSTS = ['127.0.0.1']
 # DEBUG can be set to True on any machine, but this is used to tune down
 # resource consumption (SOLR, queryset iterator size, etc) on dev machines.
 DEVELOPMENT = True
+
+if DEVELOPMENT:
+    ALLOWED_HOSTS = ['*']
+else:
+    ALLOWED_HOSTS = ['127.0.0.1', '.courtlistener.com']
 
 ADMINS = (
     ('Joe Schmoe', 'joe@courtlistener.com'),
@@ -20,10 +24,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'courtlistener',
-        'USER': 'django',
-        'PASSWORD': 'your-password',
+        'USER': 'postgres',  # Use 'django' in prod
+        'PASSWORD': 'postgres',
         'CONN_MAX_AGE': 600,
-    },
+    }
 }
 API_READ_DATABASES = ['replica']
 
@@ -102,3 +106,10 @@ GOOGLE_AUTH = {
 TIME_ZONE = 'America/Los_Angeles'
 
 FUNDRAISING_MODE = False
+
+AWS_ACCESS_KEY_ID = ''
+AWS_SECRET_ACCESS_KEY = ''
+
+# Development credentials available upon request
+
+

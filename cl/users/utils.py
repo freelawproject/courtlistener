@@ -1,10 +1,50 @@
 # coding=utf-8
+import re
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.db import transaction
 
 from cl.lib.crypto import md5
 from cl.users.models import UserProfile
+
+
+def sanitize_redirection(request):
+    """Security and sanity checks on redirections.
+
+    Much of this code was grabbed from Django. The basic idea here is to:
+    1. Prevent open redirect attacks. Imagine getting an email:
+
+      Subject: Your CourtListener account is conformed
+      Body: Click here to continue: https://www.courtlistener.com/?next=https://cortlistener.com/evil/thing
+
+    Without proper redirect sanitation, a user might click that link, and get
+    redirected to cortlistener.com, which could be a spoof of the real thing.
+
+    2. Prevent illogical redirects. Like, don't let people redirect back to
+    the sign-in page, for example.
+
+    :return: Either the value requested or the default LOGIN_REDIRECT_URL, if
+    a sanity or security check failed.
+    """
+    redirect_to = request.GET.get('next', '')
+    if 'sign-in' in redirect_to:
+        # thus, we don't redirect people back to the sign-in form
+        redirect_to = ''
+
+    # Light security check -- make sure redirect_to isn't garbage.
+    if not redirect_to or ' ' in redirect_to:
+        redirect_to = settings.LOGIN_REDIRECT_URL
+
+    # Heavier security check -- redirects to http://example.com should
+    # not be allowed, but things like /view/?param=http://example.com
+    # should be allowed. This regex checks if there is a '//' *before* a
+    # question mark.
+    elif '//' in redirect_to and re.match(r'[^?]*//', redirect_to):
+        redirect_to = settings.LOGIN_REDIRECT_URL
+
+    return redirect_to
 
 
 def create_stub_account(user_data, profile_data):
@@ -20,30 +60,30 @@ def create_stub_account(user_data, profile_data):
     :type profile_data: dict
     :return: A tuple of a User and UserProfile objects
     """
+    with transaction.atomic():
+        email = user_data['email']
+        new_user = User.objects.create_user(
+            # Use a hash of the email address to reduce the odds of somebody
+            # wanting to create an account that already exists. We'll change
+            # this to good values later, when/if the stub account is upgraded
+            # to a real account with a real username.
+            md5(email),
+            email,
+        )
+        new_user.first_name = user_data['first_name']
+        new_user.last_name = user_data['last_name']
 
-    email = user_data['email']
-    new_user = User.objects.create_user(
-        # Use a hash of the email address to reduce the odds of somebody
-        # wanting to create an account that already exists. We'll change this
-        # to good values later, when/if the stub account is upgraded to a real
-        # account with a real username.
-        md5(email),
-        email,
-    )
-    new_user.first_name = user_data['first_name']
-    new_user.last_name = user_data['last_name']
-
-    # Associate a profile
-    profile = UserProfile.objects.create(
-        user=new_user,
-        stub_account=True,
-        address1=profile_data['address1'],
-        address2=profile_data.get('address2'),
-        city=profile_data['city'],
-        state=profile_data['state'],
-        zip_code=profile_data['zip_code'],
-        wants_newsletter=profile_data['wants_newsletter']
-    )
+        # Associate a profile
+        profile = UserProfile.objects.create(
+            user=new_user,
+            stub_account=True,
+            address1=profile_data['address1'],
+            address2=profile_data.get('address2'),
+            city=profile_data['city'],
+            state=profile_data['state'],
+            zip_code=profile_data['zip_code'],
+            wants_newsletter=profile_data['wants_newsletter']
+        )
     return new_user, profile
 
 

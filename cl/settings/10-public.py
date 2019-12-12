@@ -29,6 +29,7 @@ DEFAULT_CHARSET = 'utf-8'
 LANGUAGE_CODE = 'en-us'
 USE_TZ = True
 DATETIME_FORMAT = 'N j, Y, P e'
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 
 TEMPLATES = [{
     'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -82,6 +83,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'rest_framework_swagger',
     'django_filters',
+    'storages',
 
     # CourtListener Apps
     'cl.alerts',
@@ -434,7 +436,6 @@ if DEVELOPMENT:
 else:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    ALLOWED_HOSTS = ['.courtlistener.com',]
 
 
 ########################
@@ -524,3 +525,17 @@ if DEVELOPMENT:
         'level': 'DEBUG',
         'propagate': False,
     }
+
+
+#######
+# AWS #
+#######
+AWS_STORAGE_BUCKET_NAME = 'com-courtlistener-storage'
+AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
+AWS_DEFAULT_ACL = "public-read"
+
+if DEVELOPMENT:
+    AWS_STORAGE_BUCKET_NAME = "dev-com-courtlistener-storage"
+    AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
+
+CLOUDFRONT_DOMAIN = ""

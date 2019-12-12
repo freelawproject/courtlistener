@@ -111,11 +111,8 @@ def make_payment_page_context(request):
             # Either this is a new account, a stubbed one, or a user that's
             # simply not logged into their account
             try:
-                stub_account = User.objects.filter(
-                    profile__stub_account=True
-                ).get(
-                    email__iexact=request.POST.get('email')
-                )
+                stub_account = User.objects.filter(profile__stub_account=True)\
+                    .get(email__iexact=request.POST.get('email'))
             except User.DoesNotExist:
                 # Either a regular account or an email address we've never
                 # seen before. Create a new user from the POST data.
