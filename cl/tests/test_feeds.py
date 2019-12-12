@@ -51,7 +51,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
 
         self.assertIn('Feeds', self.browser.title)
         self.assertIn('/feeds', self.browser.current_url)
-        self.assert_text_in_body('Feeds')
+        self.assert_text_in_node('Feeds', 'body')
 
         # Podcasts
         self.browser.get(self.live_server_url)
@@ -60,7 +60,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
 
         self.assertIn("Podcasts", self.browser.title)
         self.assertIn("/podcasts", self.browser.current_url)
-        self.assert_text_in_body("Podcasts")
+        self.assert_text_in_node("Podcasts", 'body')
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_feeds_page_shows_jurisdiction_links(self):
@@ -72,7 +72,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             has_opinion_scraper=True,
         )
         self.browser.get('%s%s' % (self.live_server_url, reverse('feeds_info')))
-        self.assert_text_in_body('Jurisdiction Feeds for Opinions')
+        self.assert_text_in_node('Jurisdiction Feeds for Opinions', 'body')
 
         for court in courts:
             link = self.browser.find_element_by_link_text(court.full_name)
@@ -169,7 +169,8 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
         # Dora goes to CL and searches for Bonvini
         self.browser.get(self.live_server_url)
-        self.browser.find_element_by_id('id_q').send_keys('bonvini\n')
+        self.browser.find_element_by_id('id_q').send_keys('bonvini')
+        self.browser.find_element_by_id('id_q').submit()
 
         # She's brought to the SERP.
         self.assertIn('Search Results', self.browser.title)

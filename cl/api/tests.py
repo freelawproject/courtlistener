@@ -5,7 +5,6 @@ import json
 import shutil
 from datetime import timedelta, date
 
-import redis
 from django.conf import settings
 from django.contrib.auth.models import User, Permission
 from django.core import mail
@@ -21,6 +20,7 @@ from cl.api.utils import BulkJsonHistory, SEND_API_WELCOME_EMAIL_COUNT
 from cl.api.views import coverage_data
 from cl.audio.api_views import AudioViewSet
 from cl.audio.models import Audio
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
     Command as OralArgumentCommand
@@ -182,11 +182,7 @@ class ApiEventCreationTestCase(TestCase):
     @staticmethod
     def flush_stats():
         # Flush existing stats (else previous tests cause issues)
-        r = redis.StrictRedis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            db=settings.REDIS_DATABASES['STATS'],
-        )
+        r = make_redis_interface('STATS')
         r.flushdb()
 
     def setUp(self):

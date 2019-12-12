@@ -1,38 +1,40 @@
 # coding=utf-8
 
 import argparse
-import os
+from glob import glob
 
-from datetime import datetime
+from datetime import date
 from datetime import timedelta
-from django.conf import settings
-from juriscraper.lasc.http import LASCSession
+
+from juriscraper.lib.date_utils import make_date_range_tuples
 
 from cl.lasc import tasks
 from cl.lib.argparse_types import valid_date
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.db_tools import queryset_generator
 
-LASC_USERNAME = os.environ.get('LASC_USERNAME', settings.LASC_USERNAME)
-LASC_PASSWORD = os.environ.get('LASC_PASSWORD', settings.LASC_PASSWORD)
+from cl.lasc.models import QueuedCase, QueuedPDF
 
 
 def date_search(options):
-    """
-    Collect a list of cases from a date range and add them to the db.
+    """Collects a list of cases from a date range and adds them to the db.
 
     :return: None
     """
-    lasc_session = LASCSession(username=LASC_USERNAME,
-                               password=LASC_PASSWORD)
-    lasc_session.login()
     start = options['start']
     end = options['end']
     logger.info("Getting cases between %s and %s, inclusive", start, end)
-    tasks.fetch_case_list_by_date(lasc_session, start, end)
+
+    end = min(end, date.today())
+    date_ranges = make_date_range_tuples(start, end, gap=7)
+    for start, end in date_ranges:
+        tasks.fetch_date_range.apply_async(kwargs={"start": start, "end": end},
+                                           queue=options['queue'])
 
 
 def add_or_update_case(options):
-    """Add a case to the DB by internal case id
+    """Adds a case to the DB by internal case id
 
     :return: None
     """
@@ -40,10 +42,10 @@ def add_or_update_case(options):
         print("--case is a required parameter when the add-case action is "
               "requested.")
     else:
-        lasc_session = LASCSession(username=LASC_USERNAME,
-                                   password=LASC_PASSWORD)
-        lasc_session.login()
-        tasks.add_or_update_case(lasc_session, options['case'])
+        tasks.add_or_update_case_db.apply_async(
+            kwargs={"case_id": options['case']},
+            queue=options['queue'],
+        )
 
 
 def add_directory(options):
@@ -53,46 +55,69 @@ def add_directory(options):
 
     :return: None
     """
-    if options['directory_glob'] is None:
+    dir_glob = options['directory_glob']
+    skip_until = options['skip_until']
+    if dir_glob is None:
         print("--directory-glob is a required parameter when the "
               "'add-directory' action is selected.")
     else:
-        tasks.add_cases_from_directory(options['directory_glob'],
-                                       options['skip_until'])
+        dir_glob = options['directory_glob']
+        fps = sorted(glob(dir_glob))
+        if skip_until:
+            # Remove items from the list until the skip_until value is hit.
+            try:
+                skip_index = fps.index(skip_until)
+                fps = fps[skip_index:]
+            except ValueError:
+                logger.error("Unable to find '%s' in directory_glob: '%s'. "
+                             "The first few items of the glob look like: \n  "
+                             "%s", skip_until, dir_glob, '\n  '.join(fps[0:3]))
+                raise
 
-
-def rm_case(options):
-    """Delete a case from db
-
-    :return: None
-    """
-    if options['case'] is None:
-        print("--case is a required parameter when the rm-case action is "
-              "requested.")
-    else:
-        tasks.remove_case(options['case'])
+        q = options['queue']
+        throttle = CeleryThrottle(queue_name=q)
+        for fp in fps:
+            throttle.maybe_wait()
+            logger.info("Adding LASC JSON file at: %s", fp)
+            tasks.add_case_from_filepath.apply_async(kwargs={"filepath": fp},
+                                                     queue=q)
 
 
 def process_case_queue(options):
-    """Download all cases in case queue
+    """
+    Work through the queue of cases that need to be added to the database,
+    and add them one by one.
 
     :return: None
     """
-    lasc_session = LASCSession(username=LASC_USERNAME,
-                               password=LASC_PASSWORD)
-    lasc_session.login()
-    tasks.process_case_queue(lasc_session=lasc_session)
+    case_ids = QueuedCase.objects.all().values_list(
+        'internal_case_id', flat=True)
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q)
+    for case_id in case_ids:
+        throttle.maybe_wait()
+        tasks.add_or_update_case_db.apply_async(kwargs={"case_id": case_id},
+                                                queue=q)
 
 
 def process_pdf_queue(options):
     """Download all PDFs in queue
 
+    Work through the queue of PDFs that need to be added to the database,
+    download them and add them one by one.
+
     :return: None
     """
-    lasc_session = LASCSession(username=LASC_USERNAME,
-                               password=LASC_PASSWORD)
-    lasc_session.login()
-    tasks.process_pdf_queue(lasc_session=lasc_session)
+    pdf_pks = queryset_generator(QueuedPDF.objects.all()
+                                 .order_by('-document_id')
+                                 .values_list('pk', flat=True))
+    q = options['queue']
+    throttle = CeleryThrottle(queue_name=q)
+    for pdf_pk in pdf_pks:
+        throttle.maybe_wait()
+        tasks.download_pdf.apply_async(kwargs={"pdf_pk": pdf_pk},
+                                       queue=q)
+
 
 class Command(VerboseCommand):
     help = "Get all content from MAP LA Unlimited Civil Cases."
@@ -140,10 +165,10 @@ class Command(VerboseCommand):
             type=str,
             help="When using --directory-glob, skip processing until an item "
                  "at this location is encountered. Use a path comparable to "
-                 "that passed to --directory-glob."
+                 "that passed to --directory-glob.",
         )
 
-        today = datetime.today()
+        today = date.today()
         start = today - timedelta(days=7)
         parser.add_argument(
             '--start',
@@ -166,7 +191,6 @@ class Command(VerboseCommand):
         'add-cases-by-date': date_search,
         'add-or-update-case': add_or_update_case,
         'add-directory': add_directory,
-        'rm-case': rm_case,
         'process-case-queue': process_case_queue,
         'process-pdf-queue': process_pdf_queue,
     }

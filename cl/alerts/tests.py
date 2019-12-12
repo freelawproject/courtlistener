@@ -148,8 +148,9 @@ class AlertSeleniumTest(BaseSeleniumTest):
 
         # So Pan signs in.
         self.browser.find_element_by_id('username').send_keys('pandora')
-        self.browser.find_element_by_id('password').send_keys('password' + '\n')
+        self.browser.find_element_by_id('password').send_keys('password')
+        self.browser.find_element_by_id('password').submit()
 
         # And gets redirected to the SERP where they see a notice about their
         # alert being edited.
-        self.assert_text_in_body("editing your alert")
+        self.assert_text_in_node("editing your alert", 'body')

@@ -100,7 +100,7 @@ class Command(VerboseCommand):
         main_query = build_main_query_from_query_string(
             QUERY_STRING,
             {'rows': 10000, 'fl': ['id', 'docket_id']},
-            {'group': False, 'facet': False},
+            {'group': False, 'facet': False, 'highlight': False},
         )
         docket_ids = get_docket_ids(main_query)
         get_pacer_dockets(options, docket_ids, [BAL_TAG, BAL_TAG_2019])

@@ -14,8 +14,8 @@ from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery import app
 from cl.lib.crypto import sha256
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.recap.tasks import find_docket_object
-from cl.recap.mergers import update_docket_metadata, add_docket_entries
+from cl.recap.mergers import add_docket_entries, find_docket_object, \
+    update_docket_metadata
 from cl.recap_rss.models import RssFeedStatus, RssItemCache
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def abort_or_retry(task, feed_status, exc):
     raise task.retry(exc=exc, countdown=5)
 
 
-@app.task(bind=True, max_retries=5)
+@app.task(bind=True, max_retries=0)
 def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     """Check if the feed changed
 

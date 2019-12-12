@@ -1,0 +1,7 @@
+datadiff
+django-debug-toolbar
+django-extensions
+pylint
+pytest~=4.4.0
+pytest-django~=3.4.0
+

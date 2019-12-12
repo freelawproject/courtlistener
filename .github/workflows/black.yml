@@ -1,0 +1,13 @@
+name: black
+
+on: [push, pull_request]
+
+jobs:
+  black:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2-beta
+      - name: Black Code Formatter
+        uses: lgeiger/black-action@master
+        with:
+          args: ". --check"

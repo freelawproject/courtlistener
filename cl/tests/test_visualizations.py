@@ -42,9 +42,9 @@ class VisualizationCrudTests(BaseSeleniumTest):
         self.assertIn('Create a New Citation Network', self.browser.title)
 
         # Once there, she notices inputs for a First and Second Case
-        self.assert_text_in_body('Create a New Citation Network')
-        self.assert_text_in_body('First Case')
-        self.assert_text_in_body('Second Case')
+        self.assert_text_in_node('Create a New Citation Network', 'body')
+        self.assert_text_in_node('First Case', 'body')
+        self.assert_text_in_node('Second Case', 'body')
 
         # For the First Case, she starts typing 'Marsh'
         first_case = self.browser.find_element_by_id(
@@ -89,16 +89,16 @@ class VisualizationCrudTests(BaseSeleniumTest):
         more = self.browser.find_element_by_id('more')
         self.assertIn('More Options', more.text)
 
-        self.assert_text_not_in_body('Title')
-        self.assert_text_not_in_body('Description')
+        self.assert_text_not_in_node('Title', 'body')
+        self.assert_text_not_in_node('Description', 'body')
         more.click()
 
         # Wow, looks like she can enter a Title and Description
-        self.assert_text_in_body('Title')
+        self.assert_text_in_node('Title', 'body')
         title = self.browser.find_element_by_id('id_title')
         title.send_keys('Selenium Test Visualization')
 
-        self.assert_text_in_body('Description')
+        self.assert_text_in_node('Description', 'body')
         description = self.browser.find_element_by_id('id_notes')
         description.send_keys('Test description.\n#FreeKe$ha')
 

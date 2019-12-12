@@ -285,7 +285,7 @@ def robots(request):
     # it, then use it to query a date field in the DB. We could use fewer hours
     # here if we had a datetime in the DB instead, but we have to go a little
     # bigger here to make sure items are on robots.txt long enough.
-    block_threshold = now() - timedelta(hours=36)
+    block_threshold = now() - timedelta(hours=24 * 5)
     blocked_dockets = Docket.objects.filter(
         date_blocked__gt=block_threshold)
     blocked_opinions = OpinionCluster.objects.filter(
