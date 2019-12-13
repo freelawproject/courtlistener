@@ -428,6 +428,11 @@ def invert_user_logs(start, end):
                 total: 33,
             }
         }
+    :param start: The beginning date (inclusive) you want the results for. A
+    string to be interpreted by dateparser
+    :param end: The end date (inclusive) you want the results for. A string to
+    be interpreted by dateparser.
+    :return The inverted dictionary
     """
     r = make_redis_interface('STATS')
     pipe = r.pipeline()
@@ -472,6 +477,31 @@ def invert_user_logs(start, end):
             out[user.username] = v
 
     return out
+
+
+def get_count_for_endpoint(endpoint, start, end):
+    """Get the count of hits for an endpoint by name, during a date range
+
+    :param endpoint: The endpoint to get the count for. Typically something
+    like 'docket-list' or 'docket-detail'
+    :param start: The beginning date (inclusive) you want the results for. A
+    string to be interpreted by dateparser
+    :param end: The end date (inclusive) you want the results for. A string to
+    be interpreted by dateparser.
+    :return int: The count for that endpoint
+    """
+    r = make_redis_interface('STATS')
+    pipe = r.pipeline()
+
+    dates = [d.date().isoformat() for d in rrule(
+        DAILY,
+        dtstart=parser.parse(start, fuzzy=False),
+        until=parser.parse(end, fuzzy=False),
+    )]
+    for d in dates:
+        pipe.zscore('api:v3.endpoint.d:%s.counts' % d, endpoint)
+    results = pipe.execute()
+    return sum(r for r in results if r)
 
 
 def get_avg_ms_for_endpoint(endpoint, d):
