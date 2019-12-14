@@ -53,6 +53,12 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         options.add_argument("silent")
         options.add_experimental_option('w3c', False)
 
+        # Workaround for
+        # https://bugs.chromium.org/p/chromium/issues/detail?id=1033941
+        options.add_argument(
+            "--disable-features=AvoidFlashBetweenNavigation,PaintHolding"
+        )
+
         if settings.DOCKER_SELENIUM_HOST:
             capabilities = options.to_capabilities()
             return webdriver.Remote(settings.DOCKER_SELENIUM_HOST,
