@@ -5,6 +5,7 @@ Created on Tue Mar 15 12:22:17 2016
 @author: elliott
 """
 
+"""
 "the first amendment"
 "that amendment"
 
@@ -59,3 +60,4 @@ Rev. Rul. 95-55, 1995-2 C.B. 313.
 
 #Non-Student Law Review article:
 Jack Greenberg, Diversity, the University, and the World Outside,103 COLUMBIA L. REV. 610 (2003).
+"""

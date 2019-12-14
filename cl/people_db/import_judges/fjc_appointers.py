@@ -12,4 +12,4 @@ def set_appointer(item):
             pos_str = '(%s)'%posnum
         else:
             pos_str = ''
-        name = item['President name'+pos_str])
+        name = item['President name'+pos_str]
