@@ -235,7 +235,7 @@ with Virginia Historic Tax Credit Fund""",
                     "year": None,
                     "volume": 1,
                     "reporter_found": "UNITED STATES TAX COURT REPORT",
-                    "cite_type": 4,
+                    "type": 4,
                     "lookup_index": 0,
                     "court": None,
                     "equality_attributes": [
@@ -278,7 +278,7 @@ with Virginia Historic Tax Credit Fund""",
                     "year": None,
                     "volume": 2003,
                     "reporter_found": "T.C. Memo.",
-                    "cite_type": 8,
+                    "type": 8,
                     "lookup_index": 0,
                     "court": None,
                     "equality_attributes": [
@@ -296,7 +296,7 @@ with Virginia Historic Tax Credit Fund""",
         )
         for q, a in test_pairs:
             cite = generate_citation(q, 111)
-            print cite
-            print "Searching for %s" % a
-            self.assertEqual(cite, a, msg="Success")
+            print cite.__dict__
+            print "%s" % a
+            self.assertEqual(cite.__dict__, a, msg="Success")
             print "✓"
