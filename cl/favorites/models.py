@@ -15,14 +15,14 @@ class Favorite(models.Model):
     )
     cluster_id = models.ForeignKey(
         OpinionCluster,
-        verbose_name='the opinion cluster that is favorited',
+        verbose_name="the opinion cluster that is favorited",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     audio_id = models.ForeignKey(
         Audio,
-        verbose_name='the audio file that is favorited',
+        verbose_name="the audio file that is favorited",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -44,31 +44,26 @@ class Favorite(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
         auto_now_add=True,
-        db_index=True
+        db_index=True,
     )
     date_modified = models.DateTimeField(
-        auto_now=True,
-        db_index=True,
-        null=True,
+        auto_now=True, db_index=True, null=True,
     )
-    name = models.CharField(
-        'a name for the alert',
-        max_length=100,
-    )
+    name = models.CharField("a name for the alert", max_length=100,)
     notes = models.TextField(
-        'notes about the favorite',
+        "notes about the favorite",
         validators=[MaxLengthValidator(500)],
         max_length=500,
-        blank=True
+        blank=True,
     )
 
     class Meta:
         unique_together = (
-            ('cluster_id', 'user'),
-            ('audio_id', 'user'),
-            ('docket_id', 'user'),
-            ('recap_doc_id', 'user'),
+            ("cluster_id", "user"),
+            ("audio_id", "user"),
+            ("docket_id", "user"),
+            ("recap_doc_id", "user"),
         )
 
     def __unicode__(self):
-        return u'Favorite %s' % self.id
+        return u"Favorite %s" % self.id

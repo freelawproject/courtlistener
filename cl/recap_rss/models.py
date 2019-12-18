@@ -9,17 +9,18 @@ class RssFeedStatus(models.Model):
     We use this class to determine whether we should crawl RSS at a given court
     or if we have done it recently enough not to bother.
     """
+
     PROCESSING_SUCCESSFUL = 1
     UNCHANGED = 2
     PROCESSING_FAILED = 3
     PROCESSING_IN_PROGRESS = 4
     QUEUED_FOR_RETRY = 5
     PROCESSING_STATUSES = (
-        (PROCESSING_SUCCESSFUL, 'Feed processed successfully.'),
+        (PROCESSING_SUCCESSFUL, "Feed processed successfully."),
         (UNCHANGED, "Feed unchanged since last visit"),
-        (PROCESSING_FAILED, 'Feed encountered an error while processing.'),
-        (PROCESSING_IN_PROGRESS, 'Feed is currently being processed.'),
-        (QUEUED_FOR_RETRY, 'Feed failed processing, but will be retried.'),
+        (PROCESSING_FAILED, "Feed encountered an error while processing."),
+        (PROCESSING_IN_PROGRESS, "Feed is currently being processed."),
+        (QUEUED_FOR_RETRY, "Feed failed processing, but will be retried."),
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -34,7 +35,7 @@ class RssFeedStatus(models.Model):
     court = models.ForeignKey(
         Court,
         help_text="The court where the upload was from",
-        related_name='rss_feed_statuses',
+        related_name="rss_feed_statuses",
         on_delete=models.CASCADE,
     )
     date_last_build = models.DateTimeField(
@@ -43,36 +44,32 @@ class RssFeedStatus(models.Model):
         blank=True,
     )
     status = models.SmallIntegerField(
-        help_text="The current status of this feed. Possible values are: %s" %
-                  ', '.join(['(%s): %s' % (t[0], t[1]) for t in
-                             PROCESSING_STATUSES]),
+        help_text="The current status of this feed. Possible values are: %s"
+        % ", ".join(["(%s): %s" % (t[0], t[1]) for t in PROCESSING_STATUSES]),
         choices=PROCESSING_STATUSES,
         db_index=True,
     )
     is_sweep = models.BooleanField(
         help_text="Whether this object is tracking the progress of a sweep or "
-                  "a partial crawl.",
+        "a partial crawl.",
         default=False,
     )
 
     class Meta:
-        verbose_name_plural = 'RSS Feed Statuses'
+        verbose_name_plural = "RSS Feed Statuses"
 
     def __unicode__(self):
-        return u'RssFeedStatus: %s, %s' % (self.pk, self.court_id)
+        return u"RssFeedStatus: %s, %s" % (self.pk, self.court_id)
 
 
 class RssItemCache(models.Model):
     """A cache for hashes of the RSS models to make it faster to look them up
     and merge them in.
     """
+
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
         db_index=True,
     )
-    hash = models.CharField(
-        max_length=64,
-        unique=True,
-        db_index=True,
-    )
+    hash = models.CharField(max_length=64, unique=True, db_index=True,)

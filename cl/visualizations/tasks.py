@@ -13,10 +13,10 @@ from cl.visualizations.utils import emails, new_title_for_viz
 def blacklisted_url(url):
     """Check if a URL is blacklisted."""
     blacklist = [
-        'content_mobile.php',  # Mobile version of starger's site
-        'https://www.courtlistener.com',  # Self-embeds.
-        'localhost',
-        'translate.google',  # Google translate
+        "content_mobile.php",  # Mobile version of starger's site
+        "https://www.courtlistener.com",  # Self-embeds.
+        "localhost",
+        "translate.google",  # Google translate
     ]
     if len([b for b in blacklist if b in url]) > 0:
         return True
@@ -41,7 +41,7 @@ def get_title(self, referer_id):
     # Set the exponential back off in case we need it, starting at 15 minutes,
     # then 30, 60, 120...
     countdown = 15 * 60 * (2 ** self.request.retries)
-    retried_exceeded = (self.request.retries >= self.max_retries)
+    retried_exceeded = self.request.retries >= self.max_retries
 
     referer = Referer.objects.get(pk=referer_id)
     if blacklisted_url(referer.url):
@@ -50,7 +50,7 @@ def get_title(self, referer_id):
     try:
         r = requests.get(
             referer.url,
-            headers={'User-Agent': "CourtListener"},
+            headers={"User-Agent": "CourtListener"},
             verify=False,  # Integrity of a referer's referent is not important.
         )
     except MissingSchema:
@@ -68,29 +68,30 @@ def get_title(self, referer_id):
 
     html_tree = html.fromstring(r.text)
     try:
-        title = getattr(html_tree.xpath('//title')[0], 'text', '')
+        title = getattr(html_tree.xpath("//title")[0], "text", "")
         if title is not None:
             title = title.strip()
     except IndexError:
-        title = ''
+        title = ""
 
     if title:
         referer.page_title = trunc(
-            title,
-            referer._meta.get_field('page_title').max_length,
+            title, referer._meta.get_field("page_title").max_length,
         )
         referer.save()
 
         if new_title_for_viz(referer):
             # Only send the email if we haven't seen this page title before for
             # this visualization.
-            email = emails['referer_detected']
-            email_body = email['body'] % (referer.url, referer.page_title, reverse(
-                    'admin:visualizations_referer_change',
-                    args=(referer.pk,)
-            ))
-            send_mail(email['subject'], email_body, email['from'],
-                      email['to'])
+            email = emails["referer_detected"]
+            email_body = email["body"] % (
+                referer.url,
+                referer.page_title,
+                reverse(
+                    "admin:visualizations_referer_change", args=(referer.pk,)
+                ),
+            )
+            send_mail(email["subject"], email_body, email["from"], email["to"])
     else:
         try:
             # Create an exception to catch.

@@ -24,12 +24,12 @@ def get_from_ia(reporter, volume):
     :return: None
     """
 
-    reporter_key = ".".join(['law.free.cap', reporter])
+    reporter_key = ".".join(["law.free.cap", reporter])
 
     # Checks that the returned reporter is the requested one.
     # Ex. searching for Mich will return both Mich-app. and Mich.
     for ia_identifier in search_items(reporter_key):
-        ia_key = ia_identifier['identifier']
+        ia_key = ia_identifier["identifier"]
         if ia_key.split(".")[3] != reporter:
             continue
 
@@ -46,12 +46,15 @@ def get_from_ia(reporter, volume):
 
             if "json" in item.name:
                 url = "https://archive.org/download/%s/%s" % (
-                    ia_key, item.name)
-                file_path = os.path.join(settings.MEDIA_ROOT,
-                                         'harvard_corpus',
-                                         '%s' % ia_key,
-                                         '%s' % item.name,
-                                         )
+                    ia_key,
+                    item.name,
+                )
+                file_path = os.path.join(
+                    settings.MEDIA_ROOT,
+                    "harvard_corpus",
+                    "%s" % ia_key,
+                    "%s" % item.name,
+                )
                 directory = file_path.rsplit("/", 1)[0]
                 if os.path.exists(file_path):
                     logger.info("Already captured: %s", url)
@@ -60,26 +63,26 @@ def get_from_ia(reporter, volume):
                 logger.info("Capturing: %s", url)
                 mkdir_p(directory)
                 data = requests.get(url, timeout=10).json()
-                with open(file_path, 'w') as outfile:
+                with open(file_path, "w") as outfile:
                     json.dump(data, outfile, indent=2)
 
 
 class Command(VerboseCommand):
-    help = 'Download and save Harvard corpus on IA to disk.'
+    help = "Download and save Harvard corpus on IA to disk."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--volume',
+            "--volume",
             help="Volume number. If none provided, code will cycle through "
-                 "all volumes of reporter on IA.",
+            "all volumes of reporter on IA.",
         )
         parser.add_argument(
-            '--reporter',
+            "--reporter",
             help="Reporter abbreviation as saved on IA.",
             required=True,
         )
 
     def handle(self, *args, **options):
-        reporter = options['reporter']
-        volume = options['volume']
+        reporter = options["reporter"]
+        volume = options["volume"]
         get_from_ia(reporter, volume)

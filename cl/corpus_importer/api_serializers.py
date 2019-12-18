@@ -1,23 +1,36 @@
 from rest_framework.serializers import CharField
 from rest_framework.serializers import ModelSerializer
 
-from cl.people_db.models import Attorney, CriminalComplaint, CriminalCount, \
-    Party, PartyType, Role
+from cl.people_db.models import (
+    Attorney,
+    CriminalComplaint,
+    CriminalCount,
+    Party,
+    PartyType,
+    Role,
+)
 from cl.recap.models import FjcIntegratedDatabase
-from cl.search.models import BankruptcyInformation, Claim, ClaimHistory, \
-    Docket, DocketEntry, OriginatingCourtInformation, RECAPDocument
+from cl.search.models import (
+    BankruptcyInformation,
+    Claim,
+    ClaimHistory,
+    Docket,
+    DocketEntry,
+    OriginatingCourtInformation,
+    RECAPDocument,
+)
 
 
 class CriminalCountSerializer(ModelSerializer):
     class Meta:
         model = CriminalCount
-        exclude = ('party_type',)
+        exclude = ("party_type",)
 
 
 class CriminalComplaintSerializer(ModelSerializer):
     class Meta:
         model = CriminalComplaint
-        exclude = ('party_type',)
+        exclude = ("party_type",)
 
 
 class PartyTypeSerializer(ModelSerializer):
@@ -26,13 +39,13 @@ class PartyTypeSerializer(ModelSerializer):
 
     class Meta:
         model = PartyType
-        exclude = ('docket', 'party')
+        exclude = ("docket", "party")
 
 
 class RoleSerializer(ModelSerializer):
     class Meta:
         model = Role
-        exclude = ('party', 'attorney', 'docket')
+        exclude = ("party", "attorney", "docket")
 
 
 class AttorneySerializer(ModelSerializer):
@@ -40,7 +53,7 @@ class AttorneySerializer(ModelSerializer):
 
     class Meta:
         model = Attorney
-        exclude = ('organizations',)
+        exclude = ("organizations",)
 
 
 class PartySerializer(ModelSerializer):
@@ -49,15 +62,15 @@ class PartySerializer(ModelSerializer):
 
     class Meta:
         model = Party
-        fields = '__all__'
+        fields = "__all__"
 
 
 class RECAPDocumentSerializer(ModelSerializer):
-    absolute_url = CharField(source='get_absolute_url', read_only=True)
+    absolute_url = CharField(source="get_absolute_url", read_only=True)
 
     class Meta:
         model = RECAPDocument
-        exclude = ('docket_entry', 'plain_text', 'tags')
+        exclude = ("docket_entry", "plain_text", "tags")
 
 
 class DocketEntrySerializer(ModelSerializer):
@@ -65,52 +78,59 @@ class DocketEntrySerializer(ModelSerializer):
 
     class Meta:
         model = DocketEntry
-        exclude = ('tags', 'docket')
+        exclude = ("tags", "docket")
 
 
 class OriginalCourtInformationSerializer(ModelSerializer):
-
     class Meta:
         model = OriginatingCourtInformation
-        fields = '__all__'
+        fields = "__all__"
 
 
 class FjcIntegratedDatabaseSerializer(ModelSerializer):
     class Meta:
         model = FjcIntegratedDatabase
-        fields = '__all__'
+        fields = "__all__"
 
 
 class BankruptcyInformationSerializer(ModelSerializer):
     class Meta:
         model = BankruptcyInformation
-        fields = '__all__'
+        fields = "__all__"
+
 
 class ClaimHistorySerializer(ModelSerializer):
     class Meta:
         model = ClaimHistory
-        exclude = ('claim', 'plain_text')
+        exclude = ("claim", "plain_text")
+
 
 class ClaimSerializer(ModelSerializer):
     claim_history_entries = ClaimHistorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Claim
-        exclude = ('docket', 'tags')
+        exclude = ("docket", "tags")
+
 
 class IADocketSerializer(ModelSerializer):
     docket_entries = DocketEntrySerializer(many=True, read_only=True)
     parties = PartySerializer(many=True, read_only=True)
     original_court_info = OriginalCourtInformationSerializer(
-        source='originating_court_information',
+        source="originating_court_information",
     )
     bankruptcy_information = BankruptcyInformationSerializer()
     claims = ClaimSerializer(many=True, read_only=True)
     idb_data = FjcIntegratedDatabaseSerializer()
-    absolute_url = CharField(source='get_absolute_url', read_only=True)
+    absolute_url = CharField(source="get_absolute_url", read_only=True)
 
     class Meta:
         model = Docket
-        exclude = ('view_count', 'tags', 'originating_court_information',
-                   'ia_upload_failure_count', 'ia_needs_upload',
-                   'ia_date_first_change')
+        exclude = (
+            "view_count",
+            "tags",
+            "originating_court_information",
+            "ia_upload_failure_count",
+            "ia_needs_upload",
+            "ia_date_first_change",
+        )

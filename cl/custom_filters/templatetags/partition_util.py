@@ -56,7 +56,7 @@ def rows(thelist, n):
 
     if list_len % n != 0:
         split += 1
-    return [thelist[split * i:split * (i + 1)] for i in range(n)]
+    return [thelist[split * i : split * (i + 1)] for i in range(n)]
 
 
 def rows_distributed(thelist, n):

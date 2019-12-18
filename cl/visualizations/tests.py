@@ -14,18 +14,16 @@ from cl.search.models import OpinionCluster
 class TestVizUtils(TestCase):
     """ Tests for Visualization app utils """
 
-    fixtures = ['scotus_map_data.json']
+    fixtures = ["scotus_map_data.json"]
 
     def test_reverse_endpoints_does_not_reverse_good_inputs(self):
         """
         Test the utility function does not change the order of endpoints that
         are already in correct order
         """
-        start = OpinionCluster.objects.get(
-            case_name='Marsh v. Chambers'
-        )
+        start = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
         end = OpinionCluster.objects.get(
-            case_name='Town of Greece v. Galloway'
+            case_name="Town of Greece v. Galloway"
         )
         new_start, new_end = utils.reverse_endpoints_if_needed(start, end)
         self.assertEqual(new_start, start)
@@ -37,14 +35,11 @@ class TestVizUtils(TestCase):
         endpoints.
         """
         real_end = OpinionCluster.objects.get(
-            case_name='Town of Greece v. Galloway'
+            case_name="Town of Greece v. Galloway"
         )
-        real_start = OpinionCluster.objects.get(
-            case_name='Marsh v. Chambers'
-        )
+        real_start = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
         reversed_start, reversed_end = utils.reverse_endpoints_if_needed(
-            real_end,
-            real_start
+            real_end, real_start
         )
         self.assertEqual(real_start, reversed_start)
         self.assertEqual(real_end, reversed_end)
@@ -53,16 +48,14 @@ class TestVizUtils(TestCase):
 class TestVizModels(TestCase):
     """ Tests for Visualization models """
 
-    fixtures = ['scotus_map_data.json', 'visualizations.json']
+    fixtures = ["scotus_map_data.json", "visualizations.json"]
 
     def setUp(self):
-        self.user = User.objects.create_user('Joe', 'joe@cl.com', 'password')
+        self.user = User.objects.create_user("Joe", "joe@cl.com", "password")
         self.start = OpinionCluster.objects.get(
-            case_name='Town of Greece v. Galloway'
+            case_name="Town of Greece v. Galloway"
         )
-        self.end = OpinionCluster.objects.get(
-            case_name='Marsh v. Chambers'
-        )
+        self.end = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
 
     def test_SCOTUSMap_builds_nx_digraph(self):
         """ Tests build_nx_digraph method to see how it works """
@@ -70,15 +63,15 @@ class TestVizModels(TestCase):
             user=self.user,
             cluster_start=self.start,
             cluster_end=self.end,
-            title='Test SCOTUSMap',
-            notes='Test Notes'
+            title="Test SCOTUSMap",
+            notes="Test Notes",
         )
 
         build_kwargs = {
-            'parent_authority': self.end,
-            'visited_nodes': {},
-            'good_nodes': {},
-            'max_hops': 3,
+            "parent_authority": self.end,
+            "visited_nodes": {},
+            "good_nodes": {},
+            "max_hops": 3,
         }
 
         g = viz.build_nx_digraph(**build_kwargs)
@@ -102,43 +95,42 @@ class TestVizModels(TestCase):
 class TestViews(TestCase):
     """ Tests for Visualization views """
 
-    view = 'new_visualization'
+    view = "new_visualization"
 
-    fixtures = ['scotus_map_data.json', 'visualizations.json']
+    fixtures = ["scotus_map_data.json", "visualizations.json"]
 
     def setUp(self):
         self.start = OpinionCluster.objects.get(
-            case_name='Town of Greece v. Galloway'
+            case_name="Town of Greece v. Galloway"
         )
-        self.end = OpinionCluster.objects.get(
-            case_name='Marsh v. Chambers'
-        )
-        self.user = User.objects.create_user('user', 'user@cl.com', 'password')
+        self.end = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
+        self.user = User.objects.create_user("user", "user@cl.com", "password")
         self.user.save()
         self.user_profile = UserProfile.objects.create(
-            user=self.user,
-            email_confirmed=True
+            user=self.user, email_confirmed=True
         )
 
     def test_new_visualization_view_provides_form(self):
         """ Test a GET to the Visualization view provides a VizForm """
-        self.assertTrue(self.client.login(
-            username='user', password='password'))
+        self.assertTrue(
+            self.client.login(username="user", password="password")
+        )
         response = self.client.get(reverse(self.view))
         self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.context['form'], VizForm)
+        self.assertIsInstance(response.context["form"], VizForm)
 
     def test_new_visualization_view_creates_map_on_post(self):
         """ Test a valid POST creates a new ScotusMap object """
         SCOTUSMap.objects.all().delete()
 
-        self.assertTrue(self.client.login(
-            username='user', password='password'))
+        self.assertTrue(
+            self.client.login(username="user", password="password")
+        )
         data = {
-            'cluster_start': 2674862,
-            'cluster_end': 111014,
-            'title': 'Test Map Title',
-            'notes': 'Just some notes'
+            "cluster_start": 2674862,
+            "cluster_end": 111014,
+            "title": "Test Map Title",
+            "notes": "Just some notes",
         }
         response = self.client.post(reverse(self.view), data=data)
 
@@ -146,37 +138,40 @@ class TestViews(TestCase):
         self.assertEqual(1, SCOTUSMap.objects.count())
 
         # Should not raise DoesNotExist exception.
-        _ = SCOTUSMap.objects.get(title='Test Map Title')
+        _ = SCOTUSMap.objects.get(title="Test Map Title")
 
     def test_published_visualizations_show_in_gallery(self):
         """ Test that a user can see published visualizations from others """
-        self.assertTrue(self.client.login(
-            username='user', password='password'))
-        response = self.client.get(reverse('viz_gallery'))
-        html = response.content.decode('utf-8')
-        html = ' '.join(html.split())
-        self.assertIn('Shared by Admin', html)
-        self.assertIn('FREE KESHA', html)
+        self.assertTrue(
+            self.client.login(username="user", password="password")
+        )
+        response = self.client.get(reverse("viz_gallery"))
+        html = response.content.decode("utf-8")
+        html = " ".join(html.split())
+        self.assertIn("Shared by Admin", html)
+        self.assertIn("FREE KESHA", html)
 
     def test_cannot_view_anothers_private_visualization(self):
         """ Test unpublished visualizations cannot be seen by others """
         viz = SCOTUSMap.objects.get(pk=2)
-        self.assertFalse(viz.published, 'Test SCOTUSMap should be unpublished')
+        self.assertFalse(viz.published, "Test SCOTUSMap should be unpublished")
         url = reverse(
-            'view_visualization', kwargs={'pk': viz.pk, 'slug': viz.slug}
+            "view_visualization", kwargs={"pk": viz.pk, "slug": viz.slug}
         )
 
-        self.assertTrue(self.client.login(
-            username='admin', password='password'))
+        self.assertTrue(
+            self.client.login(username="admin", password="password")
+        )
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'My Private Visualization', response.content)
+        self.assertIn(b"My Private Visualization", response.content)
 
-        self.assertTrue(self.client.login(
-            username='user', password='password'))
+        self.assertTrue(
+            self.client.login(username="user", password="password")
+        )
         response = self.client.get(url)
         self.assertNotEqual(response.status_code, 200)
-        self.assertNotIn(b'My Private Visualization', response.context)
+        self.assertNotIn(b"My Private Visualization", response.context)
 
     def test_view_counts_increment_by_one(self):
         """ Test the view count for a Visualization increments on page view
@@ -187,15 +182,15 @@ class TestViews(TestCase):
         old_view_count = viz.view_count
         old_date_modified = viz.date_modified
 
-        self.assertTrue(self.client.login(
-            username='user', password='password'))
+        self.assertTrue(
+            self.client.login(username="user", password="password")
+        )
         response = self.client.get(viz.get_absolute_url())
 
-        viz.refresh_from_db(fields=['view_count', 'date_modified'])
+        viz.refresh_from_db(fields=["view_count", "date_modified"])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            old_view_count + 1,
-            viz.view_count,
+            old_view_count + 1, viz.view_count,
         )
 
         self.assertEqual(
@@ -211,7 +206,7 @@ class TestVizAjaxCrud(TestCase):
     code relies on currently.
     """
 
-    fixtures = ['scotus_map_data.json', 'visualizations.json']
+    fixtures = ["scotus_map_data.json", "visualizations.json"]
 
     def setUp(self):
         self.live_viz = SCOTUSMap.objects.get(pk=1)
@@ -233,10 +228,10 @@ class TestVizAjaxCrud(TestCase):
         post = self.factory.post(url, data=data)
         if username:
             post.user = User.objects.get(username=username)
-        post.META['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest'
+        post.META["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest"
         return post
 
-    def post_ajax_view(self, view, pk, username='admin'):
+    def post_ajax_view(self, view, pk, username="admin"):
         """
         Generates a simple POST for the given view with the given
         private key as the POST data.
@@ -250,9 +245,7 @@ class TestVizAjaxCrud(TestCase):
 
         """
         post = self._build_post(
-            reverse(view),
-            username=username,
-            data={'pk': pk}
+            reverse(view), username=username, data={"pk": pk}
         )
         response = view(post)
         self.assertEqual(response.status_code, 200)

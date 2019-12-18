@@ -40,7 +40,7 @@ def add_items_to_solr(item_pks, app_label, force_commit=False):
         except InvalidDocumentError:
             print("Unable to parse: %s" % item)
 
-    si = scorched.SolrInterface(settings.SOLR_URLS[app_label], mode='w')
+    si = scorched.SolrInterface(settings.SOLR_URLS[app_label], mode="w")
     try:
         si.add(search_dicts)
         if force_commit:
@@ -54,8 +54,9 @@ def add_items_to_solr(item_pks, app_label, force_commit=False):
 
 
 @app.task(ignore_resutls=True)
-def add_or_update_recap_docket(data, force_commit=False,
-                               update_threshold=60*60):
+def add_or_update_recap_docket(
+    data, force_commit=False, update_threshold=60 * 60
+):
     """Add an entire docket to Solr or update it if it's already there.
 
     This is an expensive operation because to add or update a RECAP docket in
@@ -82,12 +83,13 @@ def add_or_update_recap_docket(data, force_commit=False,
     if data is None:
         return
 
-    si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode='w')
+    si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode="w")
     some_time_ago = now() - timedelta(seconds=update_threshold)
-    d = Docket.objects.get(pk=data['docket_pk'])
-    too_fresh = d.date_last_index is not None and \
-                      (d.date_last_index > some_time_ago)
-    update_not_required = not data.get('content_updated', False)
+    d = Docket.objects.get(pk=data["docket_pk"])
+    too_fresh = d.date_last_index is not None and (
+        d.date_last_index > some_time_ago
+    )
+    update_not_required = not data.get("content_updated", False)
     if all([too_fresh, update_not_required]):
         return
     else:
@@ -117,7 +119,7 @@ def add_docket_to_solr_by_rds(item_pks, force_commit=False):
     needed).
     :return: None
     """
-    si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode='w')
+    si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode="w")
     rds = RECAPDocument.objects.filter(pk__in=item_pks).order_by()
     try:
         metadata = rds[0].get_docket_metadata()
@@ -134,7 +136,7 @@ def add_docket_to_solr_by_rds(item_pks, force_commit=False):
 
 @app.task
 def delete_items(items, app_label, force_commit=False):
-    si = scorched.SolrInterface(settings.SOLR_URLS[app_label], mode='w')
+    si = scorched.SolrInterface(settings.SOLR_URLS[app_label], mode="w")
     try:
         si.delete_by_ids(list(items))
         if force_commit:

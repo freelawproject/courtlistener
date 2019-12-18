@@ -24,10 +24,10 @@ def get_tax_docket_numbers(opinion_text):
     matches = re.finditer(docket_no_re, opinion_text)
     r = r"[0-9]{3,5}-[\w]{2,4}(\.)( [A-Z](\.))?"
     for matchNum, match in enumerate(matches, start=1):
-        xst = opinion_text[match.start():]
-        second_matches = re.finditer(r, opinion_text[match.start():])
+        xst = opinion_text[match.start() :]
+        second_matches = re.finditer(r, opinion_text[match.start() :])
         for match_num_2, second_match in enumerate(second_matches, start=1):
-            parsed_text = xst[:second_match.end()]
+            parsed_text = xst[: second_match.end()]
             break
     # If we cant find the general area of docket number strings.  Give up.
     if parsed_text is None:
@@ -39,7 +39,7 @@ def get_tax_docket_numbers(opinion_text):
     hits = []
     for matchNum, match in enumerate(matches, start=1):
         hits.append(match.group())
-    docket_string = ', '.join(hits).replace(',,', ',').replace('.', '')
+    docket_string = ", ".join(hits).replace(",,", ",").replace(".", "")
     return docket_string
 
 
@@ -73,10 +73,12 @@ def generate_citation(opinion_text, cluster_id):
             else:
                 cite_type = Citation.NEUTRAL
 
-            if not Citation.objects.filter(volume=cite.volume,
-                                           reporter=cite.reporter,
-                                           page=cite.page,
-                                           cluster_id=cluster_id):
+            if not Citation.objects.filter(
+                volume=cite.volume,
+                reporter=cite.reporter,
+                page=cite.page,
+                cluster_id=cluster_id,
+            ):
                 cite.type = cite_type
                 return cite
 
@@ -92,8 +94,9 @@ def update_tax_opinions():
     :return: None
     """
     logger.info("Start updating Tax Opinions")
-    ocs = OpinionCluster.objects.filter(docket__court="tax"). \
-        filter(docket__docket_number=None)
+    ocs = OpinionCluster.objects.filter(docket__court="tax").filter(
+        docket__docket_number=None
+    )
 
     # We had a number of failed scrapes and the bad_url helps identify them
     bad_url = "http://www.ustaxcourt.gov/UstcInOp/asp/Todays.asp"
@@ -109,8 +112,10 @@ def update_tax_opinions():
 
             docket_numbers = get_tax_docket_numbers(opinion.plain_text)
             if docket_numbers:
-                logger.info("Adding Docket Numbers: %s to %s" %
-                            (docket_numbers, oc.docket.case_name))
+                logger.info(
+                    "Adding Docket Numbers: %s to %s"
+                    % (docket_numbers, oc.docket.case_name)
+                )
                 oc.docket.docket_number = docket_numbers
                 oc.docket.save()
 
@@ -119,22 +124,27 @@ def update_tax_opinions():
             if cite is None:
                 continue
 
-            logger.info("Citation saved %s %s %s" % (cite.volume,
-                                                     cite.reporter,
-                                                     cite.page))
+            logger.info(
+                "Citation saved %s %s %s"
+                % (cite.volume, cite.reporter, cite.page)
+            )
 
-            Citation.objects.get_or_create(**{
-                "volume": cite.volume,
-                "reporter": cite.reporter,
-                "page": cite.page,
-                "type": cite.type,
-                "cluster_id": oc.id
-            })
+            Citation.objects.get_or_create(
+                **{
+                    "volume": cite.volume,
+                    "reporter": cite.reporter,
+                    "page": cite.page,
+                    "type": cite.type,
+                    "cluster_id": oc.id,
+                }
+            )
 
 
 class Command(VerboseCommand):
-    help = 'Update scraped Tax Court opinions. ' \
-           'Add citation and docket numbers.'
+    help = (
+        "Update scraped Tax Court opinions. "
+        "Add citation and docket numbers."
+    )
 
     def handle(self, *args, **options):
         update_tax_opinions()

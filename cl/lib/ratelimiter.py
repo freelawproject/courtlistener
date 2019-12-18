@@ -11,14 +11,14 @@ from ratelimit.exceptions import Ratelimited
 # See: https://www.bing.com/webmaster/help/how-to-verify-bingbot-3905dc26
 # and: https://support.google.com/webmasters/answer/80553?hl=en
 APPROVED_DOMAINS = [
-    'google.com',
-    'googlebot.com',
-    'search.msn.com',
-    'localhost',  # For dev.
+    "google.com",
+    "googlebot.com",
+    "search.msn.com",
+    "localhost",  # For dev.
 ]
 
 
-ratelimiter = ratelimit(key='ip', rate='250/h', block=True)
+ratelimiter = ratelimit(key="ip", rate="250/h", block=True)
 
 
 def ratelimit_if_not_whitelisted(view):
@@ -54,8 +54,12 @@ def get_ip_from_host(host):
 
 def host_is_approved(host):
     """Check whether the domain is in our approved whitelist."""
-    return any([host.endswith(approved_domain) for approved_domain in
-                APPROVED_DOMAINS])
+    return any(
+        [
+            host.endswith(approved_domain)
+            for approved_domain in APPROVED_DOMAINS
+        ]
+    )
 
 
 def verify_ip_address(ip_address):
@@ -79,10 +83,10 @@ def is_whitelisted(request):
 
     Returns True if so, else False.
     """
-    cache_name = getattr(settings, 'RATELIMIT_USE_CACHE', 'default')
+    cache_name = getattr(settings, "RATELIMIT_USE_CACHE", "default")
     cache = caches[cache_name]
-    whitelist_cache_prefix = 'rl:whitelist'
-    ip_address = request.META.get('REMOTE_ADDR')
+    whitelist_cache_prefix = "rl:whitelist"
+    ip_address = request.META.get("REMOTE_ADDR")
     if ip_address is None:
         return False
 

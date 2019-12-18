@@ -35,7 +35,7 @@ def get_or_cache_pacer_cookies(user_pk, username, password):
     :param password: The PACER password of the user
     :return: Cookies for the PACER user
     """
-    r = make_redis_interface('CACHE')
+    r = make_redis_interface("CACHE")
     cookies = get_pacer_cookie_from_cache(user_pk, r=r)
     if cookies:
         return cookies
@@ -55,7 +55,7 @@ def get_pacer_cookie_from_cache(user_pk, r=None):
     :return Either None if no cache cookies or the cookies if they're found.
     """
     if not r:
-        r = make_redis_interface('CACHE')
+        r = make_redis_interface("CACHE")
     pickled_cookie = r.get(session_key % user_pk)
     if pickled_cookie:
         return pickle.loads(pickled_cookie)

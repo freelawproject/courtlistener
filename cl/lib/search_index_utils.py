@@ -17,6 +17,7 @@ def solr_list(m2m_list, field):
 
 class InvalidDocumentError(Exception):
     """The document could not be formed"""
+
     def __init__(self, message):
         Exception.__init__(self, message)
 

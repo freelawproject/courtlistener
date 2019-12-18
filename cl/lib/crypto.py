@@ -37,7 +37,7 @@ def sha1(s):
     return sha1sum.hexdigest()
 
 
-def sha1_of_file(file_path, buffer_size=2**16):
+def sha1_of_file(file_path, buffer_size=2 ** 16):
     """Generate a SHA1 hash of a file in constant memory
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -51,7 +51,7 @@ def sha1_of_file(file_path, buffer_size=2**16):
     :return: A hexadecimal SHA1 hash of the file.
     """
     sha1sum = hashlib.sha1()
-    with open(file_path, 'rb') as f:
+    with open(file_path, "rb") as f:
         while True:
             data = f.read(buffer_size)
             if not data:
@@ -68,7 +68,7 @@ def sha1_of_json_data(d):
     :return: A generated SHA1 code.
     """
     json_as_python = json.loads(d)
-    json_without_spaces = json.dumps(json_as_python, separators=(',', ':'))
+    json_without_spaces = json.dumps(json_as_python, separators=(",", ":"))
     return sha1(json_without_spaces)
 
 

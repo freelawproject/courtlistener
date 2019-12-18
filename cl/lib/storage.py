@@ -35,8 +35,9 @@ class IncrementingFileSystemStorage(FileSystemStorage):
         count = itertools.count(1)
         while self.exists(name):
             # file_ext includes the dot.
-            name = os.path.join(dir_name,
-                                "%s_%s%s" % (file_root, next(count), file_ext))
+            name = os.path.join(
+                dir_name, "%s_%s%s" % (file_root, next(count), file_ext)
+            )
 
         return name
 
@@ -48,6 +49,7 @@ class UUIDFileSystemStorage(FileSystemStorage):
     be unique. Keeps the path from upload_to param and the extension of the
     original file.
     """
+
     def get_available_name(self, name, max_length=None):
         dir_name, file_name = os.path.split(name)
         _, file_ext = os.path.splitext(file_name)
@@ -59,6 +61,7 @@ class AWSMediaStorage(S3Boto3Storage):
 
     We use AWSMediaStorage to upload LASC PDF files to AWS.
     """
+
     location = ""
     AWS_DEFAULT_ACL = settings.AWS_DEFAULT_ACL
     file_overwrite = True

@@ -5,21 +5,22 @@ from django.utils.timezone import now
 
 from cl.stats.models import Stat
 
-MILESTONES = OrderedDict((
-    ('XXS',  [1e0, 5e0]),         # 1 - 5
-    ('XS',   [1e1, 2.5e1, 5e1,   # 10 - 500
-              1e2, 2.5e2, 5e2]),
-    ('SM',   [1e3, 2.5e3, 5e3,   # 1_000 - 50_000
-              1e4, 2.5e4, 5e4]),
-    ('MD',   [1e5, 2.5e5, 5e5]),  # 100_000 - 500_000
-    ('LG',   [1e6, 2.5e6, 5e6]),  # 1M - 5M
-    ('XL',   [1e7, 2.5e7, 5e7]),  # 10M - 50M
-    ('XXL',  [1e8, 2.5e8, 5e8]),  # 100M - 500M
-    ('XXXL', [1e9, 2.5e9, 5e9]),  # 1B - 5B
-))
+MILESTONES = OrderedDict(
+    (
+        ("XXS", [1e0, 5e0]),  # 1 - 5
+        ("XS", [1e1, 2.5e1, 5e1, 1e2, 2.5e2, 5e2]),  # 10 - 500
+        ("SM", [1e3, 2.5e3, 5e3, 1e4, 2.5e4, 5e4]),  # 1_000 - 50_000
+        ("MD", [1e5, 2.5e5, 5e5]),  # 100_000 - 500_000
+        ("LG", [1e6, 2.5e6, 5e6]),  # 1M - 5M
+        ("XL", [1e7, 2.5e7, 5e7]),  # 10M - 50M
+        ("XXL", [1e8, 2.5e8, 5e8]),  # 100M - 500M
+        ("XXXL", [1e9, 2.5e9, 5e9]),  # 1B - 5B
+    )
+)
 
-MILESTONES_FLAT = sorted([item for sublist in MILESTONES.values()
-                          for item in sublist])
+MILESTONES_FLAT = sorted(
+    [item for sublist in MILESTONES.values() for item in sublist]
+)
 
 
 def get_milestone_range(start, end):
@@ -47,13 +48,14 @@ def tally_stat(name, inc=1, date_logged=now()):
        - the event happened today.
        - the event happened once.
     """
-    stat, created = Stat.objects.get_or_create(name=name, date_logged=date_logged,
-                                               defaults={'count': inc})
+    stat, created = Stat.objects.get_or_create(
+        name=name, date_logged=date_logged, defaults={"count": inc}
+    )
     if created:
         return stat.count
     else:
         count_cache = stat.count
-        stat.count = F('count') + inc
+        stat.count = F("count") + inc
         stat.save()
         # stat doesn't have the new value when it's updated with a F object, so
         # we fake the return value instead of looking it up again for the user.

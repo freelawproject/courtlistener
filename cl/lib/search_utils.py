@@ -11,48 +11,26 @@ from cl.search.forms import SearchForm
 from cl.search.models import Court
 
 boosts = {
-    'qf': {
-        'o': {
-            'text': 1,
-            'caseName': 4,
-            'docketNumber': 2,
-        },
-        'r': {
-            'text': 1,
-            'caseName': 4,
-            'docketNumber': 3,
-            'description': 2,
-        },
-        'oa': {
-            'text': 1,
-            'caseName': 4,
-            'docketNumber': 2,
-        },
-        'p': {
-            'text': 1,
-            'name': 4,
+    "qf": {
+        "o": {"text": 1, "caseName": 4, "docketNumber": 2,},
+        "r": {"text": 1, "caseName": 4, "docketNumber": 3, "description": 2,},
+        "oa": {"text": 1, "caseName": 4, "docketNumber": 2,},
+        "p": {
+            "text": 1,
+            "name": 4,
             # Suppress these fields b/c a match on them returns the wrong
             # person.
-            'appointer': 0.3,
-            'supervisor': 0.3,
-            'predecessor': 0.3,
+            "appointer": 0.3,
+            "supervisor": 0.3,
+            "predecessor": 0.3,
         },
     },
     # Phrase-based boosts.
-    'pf': {
-        'o': {
-            'text': 3,
-            'caseName': 3,
-        },
-        'r': {
-            'text': 3,
-            'caseName': 3,
-            'description': 3,
-        },
-        'oa': {
-            'caseName': 3,
-        },
-        'p': {
+    "pf": {
+        "o": {"text": 3, "caseName": 3,},
+        "r": {"text": 3, "caseName": 3, "description": 3,},
+        "oa": {"caseName": 3,},
+        "p": {
             # None here. Phrases don't make much sense for people.
         },
     },
@@ -64,8 +42,8 @@ def make_get_string(request, nuke_fields=None):
     the pagination parameters.
     """
     if nuke_fields is None:
-        nuke_fields = ['page']
-    get_dict = parse_qs(request.META['QUERY_STRING'])
+        nuke_fields = ["page"]
+    get_dict = parse_qs(request.META["QUERY_STRING"])
     for key in nuke_fields:
         try:
             del get_dict[key]
@@ -73,7 +51,7 @@ def make_get_string(request, nuke_fields=None):
             pass
     get_string = urlencode(get_dict, True)
     if len(get_string) > 0:
-        get_string += '&'
+        get_string += "&"
     return get_string
 
 
@@ -81,9 +59,9 @@ def get_query_citation(cd):
     """Extract citations from the query string and return them, or return
     None
     """
-    if not cd.get('q'):
+    if not cd.get("q"):
         return None
-    citations = get_citations(cd['q'], html=False)
+    citations = get_citations(cd["q"], html=False)
 
     matches = None
     if len(citations) == 1:
@@ -115,19 +93,20 @@ def make_stats_variable(search_form, paged_results):
     """
     facet_fields = []
     try:
-        solr_facet_values = dict(paged_results.object_list.facet_counts
-                                 .facet_fields['status_exact'])
+        solr_facet_values = dict(
+            paged_results.object_list.facet_counts.facet_fields["status_exact"]
+        )
     except (AttributeError, KeyError):
         # AttributeError: Query failed.
         # KeyError: Faceting not enabled on field.
         solr_facet_values = {}
 
     for field in search_form:
-        if not field.html_name.startswith('stat_'):
+        if not field.html_name.startswith("stat_"):
             continue
 
         try:
-            count = solr_facet_values[field.html_name.replace('stat_', '')]
+            count = solr_facet_values[field.html_name.replace("stat_", "")]
         except KeyError:
             # Happens when a field is iterated on that doesn't exist in the
             # facets variable
@@ -172,14 +151,19 @@ def merge_form_with_courts(courts, search_form):
     requires manual adjustment here.
     """
     # Are any of the checkboxes checked?
-    checked_statuses = [field.value() for field in search_form
-                        if field.html_name.startswith('court_')]
+    checked_statuses = [
+        field.value()
+        for field in search_form
+        if field.html_name.startswith("court_")
+    ]
     no_facets_selected = not any(checked_statuses)
     all_facets_selected = all(checked_statuses)
-    court_count = len([status for status in checked_statuses if status is True])
+    court_count = len(
+        [status for status in checked_statuses if status is True]
+    )
     court_count_human = court_count
     if all_facets_selected:
-        court_count_human = 'All'
+        court_count_human = "All"
 
     for field in search_form:
         if no_facets_selected:
@@ -189,16 +173,16 @@ def merge_form_with_courts(courts, search_form):
             for court in courts:
                 # We're merging two lists, so we have to do a nested loop
                 # to find the right value.
-                if 'court_%s' % court.pk == field.html_name:
+                if "court_%s" % court.pk == field.html_name:
                     court.checked = field.value()
                     break
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
     court_tabs = {
-        'federal': [],
-        'district': [],
-        'state': [],
-        'special': [],
+        "federal": [],
+        "district": [],
+        "state": [],
+        "special": [],
     }
     bap_bundle = []
     b_bundle = []
@@ -206,9 +190,9 @@ def merge_form_with_courts(courts, search_form):
     state_bundles = []
     for court in courts:
         if court.jurisdiction == Court.FEDERAL_APPELLATE:
-            court_tabs['federal'].append(court)
+            court_tabs["federal"].append(court)
         elif court.jurisdiction == Court.FEDERAL_DISTRICT:
-            court_tabs['district'].append(court)
+            court_tabs["district"].append(court)
         elif court.jurisdiction in Court.BANKRUPTCY_JURISDICTIONS:
             # Bankruptcy gets bundled into BAPs and regular courts.
             if court.jurisdiction == Court.FEDERAL_BANKRUPTCY_PANEL:
@@ -225,22 +209,25 @@ def merge_form_with_courts(courts, search_form):
                 state_bundle = [court]
             else:
                 state_bundle.append(court)
-        elif court.jurisdiction in [Court.FEDERAL_SPECIAL, Court.COMMITTEE,
-                                    Court.INTERNATIONAL]:
-            court_tabs['special'].append(court)
+        elif court.jurisdiction in [
+            Court.FEDERAL_SPECIAL,
+            Court.COMMITTEE,
+            Court.INTERNATIONAL,
+        ]:
+            court_tabs["special"].append(court)
 
     # append the final state bundle after the loop ends. Hack?
     state_bundles.append(state_bundle)
 
     # Put the bankruptcy bundles in the courts dict
     if bap_bundle:
-        court_tabs['bankruptcy_panel'] = [bap_bundle]
-    court_tabs['bankruptcy'] = [b_bundle]
+        court_tabs["bankruptcy_panel"] = [bap_bundle]
+    court_tabs["bankruptcy"] = [b_bundle]
 
     # Divide the state bundles into the correct partitions
-    court_tabs['state'].append(state_bundles[:17])
-    court_tabs['state'].append(state_bundles[17:34])
-    court_tabs['state'].append(state_bundles[34:])
+    court_tabs["state"].append(state_bundles[:17])
+    court_tabs["state"].append(state_bundles[17:34])
+    court_tabs["state"].append(state_bundles[34:])
 
     return court_tabs, court_count_human, court_count
 
@@ -254,11 +241,11 @@ def make_fq(cd, field, key):
     around this bug, we do some minimal query parsing ourselves.
     """
     q = cd[key]
-    q = q.replace(':', ' ')
+    q = q.replace(":", " ")
 
     if q.startswith('"') and q.endswith('"'):
         # User used quotes. Just pass it through.
-        return '%s:(%s)' % (field, q)
+        return "%s:(%s)" % (field, q)
 
     # Iterate over the query word by word. If the word is a conjunction
     # word, detect that and use the user's request. Else, make sure there's
@@ -267,20 +254,20 @@ def make_fq(cd, field, key):
     clean_q = [words[0]]
     needs_default_conjunction = True
     for word in words[1:]:
-        if word.lower() in ['and', 'or', 'not']:
+        if word.lower() in ["and", "or", "not"]:
             clean_q.append(word.upper())
             needs_default_conjunction = False
         else:
             if needs_default_conjunction:
-                clean_q.append('AND')
+                clean_q.append("AND")
             clean_q.append(word)
             needs_default_conjunction = True
-    fq = '%s:(%s)' % (field, ' '.join(clean_q))
+    fq = "%s:(%s)" % (field, " ".join(clean_q))
     return fq
 
 
 def make_boolean_fq(cd, field, key):
-    return '%s:%s' % (field, str(cd[key]).lower())
+    return "%s:%s" % (field, str(cd[key]).lower())
 
 
 def make_fq_proximity_query(cd, field, key):
@@ -295,41 +282,41 @@ def make_fq_proximity_query(cd, field, key):
          https://github.com/freelawproject/courtlistener/issues/381
     """
     # Remove all valid Solr tokens, replacing with a space.
-    q = re.sub('[\^\?\*:\(\)!\"~\-\[\]]', ' ', cd[key])
+    q = re.sub('[\^\?\*:\(\)!"~\-\[\]]', " ", cd[key])
 
     # Remove all valid Solr words
     tokens = []
     for token in q.split():
-        if token not in ['AND', 'OR', 'NOT', 'TO']:
+        if token not in ["AND", "OR", "NOT", "TO"]:
             tokens.append(token)
-    return '%s:("%s"~5)' % (field, ' '.join(tokens))
+    return '%s:("%s"~5)' % (field, " ".join(tokens))
 
 
 def make_date_query(query_field, before, after):
     """Given the cleaned data from a form, return a valid Solr fq string"""
     if any([before, after]):
-        if hasattr(after, 'strftime'):
-            date_filter = '[%sT00:00:00Z TO ' % after.isoformat()
+        if hasattr(after, "strftime"):
+            date_filter = "[%sT00:00:00Z TO " % after.isoformat()
         else:
-            date_filter = '[* TO '
-        if hasattr(before, 'strftime'):
-            date_filter = '%s%sT23:59:59Z]' % (date_filter, before.isoformat())
+            date_filter = "[* TO "
+        if hasattr(before, "strftime"):
+            date_filter = "%s%sT23:59:59Z]" % (date_filter, before.isoformat())
         else:
-            date_filter = '%s*]' % date_filter
+            date_filter = "%s*]" % date_filter
     else:
         # No date filters were requested
         return ""
-    return '%s:%s' % (query_field, date_filter)
+    return "%s:%s" % (query_field, date_filter)
 
 
 def make_cite_count_query(cd):
     """Given the cleaned data from a form, return a valid Solr fq string"""
-    start = cd.get('cited_gt') or u'*'
-    end = cd.get('cited_lt') or u'*'
-    if start == '*' and end == '*':
+    start = cd.get("cited_gt") or u"*"
+    end = cd.get("cited_lt") or u"*"
+    if start == "*" and end == "*":
         return ""
     else:
-        return 'citeCount:[%s TO %s]' % (start, end)
+        return "citeCount:[%s TO %s]" % (start, end)
 
 
 def get_selected_field_string(cd, prefix):
@@ -340,50 +327,56 @@ def get_selected_field_string(cd, prefix):
     Final strings are of the form "A" OR "B" OR "C", with quotes in case there
     are spaces in the values.
     """
-    selected_fields = ['"%s"' % k.replace(prefix, '')
-                       for k, v in cd.items()
-                       if (k.startswith(prefix) and v is True)]
+    selected_fields = [
+        '"%s"' % k.replace(prefix, "")
+        for k, v in cd.items()
+        if (k.startswith(prefix) and v is True)
+    ]
     if len(selected_fields) == cd["_%scount" % prefix]:
         # All the boxes are checked. No need for filtering.
-        return ''
+        return ""
     else:
-        selected_field_string = ' OR '.join(selected_fields)
+        selected_field_string = " OR ".join(selected_fields)
         return selected_field_string
 
 
 def make_boost_string(fields):
     qf_array = []
     for k, v in fields.items():
-        qf_array.append('%s^%s' % (k, v))
-    return ' '.join(qf_array)
+        qf_array.append("%s^%s" % (k, v))
+    return " ".join(qf_array)
 
 
 def add_boosts(main_params, cd):
     """Add any boosts that make sense for the query."""
-    if cd['type'] == 'o' and main_params['sort'].startswith('score'):
-        main_params['boost'] = 'pagerank'
+    if cd["type"] == "o" and main_params["sort"].startswith("score"):
+        main_params["boost"] = "pagerank"
 
     # Apply standard qf parameters
-    qf = boosts['qf'][cd['type']].copy()
-    main_params['qf'] = make_boost_string(qf)
+    qf = boosts["qf"][cd["type"]].copy()
+    main_params["qf"] = make_boost_string(qf)
 
-    if cd['type'] in ['o', 'r', 'oa']:
+    if cd["type"] in ["o", "r", "oa"]:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
-        vs_query = any([' v ' in main_params['q'],
-                        ' v. ' in main_params['q'],
-                        ' vs. ' in main_params['q']])
-        in_re_query = main_params['q'].lower().startswith('in re ')
-        matter_of_query = main_params['q'].lower().startswith('matter of ')
-        ex_parte_query = main_params['q'].lower().startswith('ex parte ')
+        vs_query = any(
+            [
+                " v " in main_params["q"],
+                " v. " in main_params["q"],
+                " vs. " in main_params["q"],
+            ]
+        )
+        in_re_query = main_params["q"].lower().startswith("in re ")
+        matter_of_query = main_params["q"].lower().startswith("matter of ")
+        ex_parte_query = main_params["q"].lower().startswith("ex parte ")
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
-            qf.update({'caseName': 50})
-            main_params['qf'] = make_boost_string(qf)
+            qf.update({"caseName": 50})
+            main_params["qf"] = make_boost_string(qf)
 
     # Apply phrase-based boosts
-    if cd['type'] in ['o', 'r', 'oa']:
-        main_params['pf'] = make_boost_string(boosts['pf'][cd['type']])
-        main_params['ps'] = 5
+    if cd["type"] in ["o", "r", "oa"]:
+        main_params["pf"] = make_boost_string(boosts["pf"][cd["type"]])
+        main_params["ps"] = 5
 
 
 def add_faceting(main_params, cd, facet):
@@ -393,11 +386,11 @@ def add_faceting(main_params, cd, facet):
         return
 
     facet_params = {}
-    if cd['type'] == 'o':
+    if cd["type"] == "o":
         facet_params = {
-            'facet': 'true',
-            'facet.mincount': 0,
-            'facet.field': '{!ex=dt}status_exact',
+            "facet": "true",
+            "facet.mincount": 0,
+            "facet.field": "{!ex=dt}status_exact",
         }
     main_params.update(facet_params)
 
@@ -412,57 +405,125 @@ def add_highlighting(main_params, cd, highlight):
         return
 
     # Common highlighting params up here.
-    main_params.update({
-        'hl': 'true',
-        'f.text.hl.snippets': '5',
-        'f.text.hl.maxAlternateFieldLength': '500',
-        'f.text.hl.alternateField': 'text',
-    })
+    main_params.update(
+        {
+            "hl": "true",
+            "f.text.hl.snippets": "5",
+            "f.text.hl.maxAlternateFieldLength": "500",
+            "f.text.hl.alternateField": "text",
+        }
+    )
 
-    if highlight == 'text':
-        main_params['hl.fl'] = 'text'
+    if highlight == "text":
+        main_params["hl.fl"] = "text"
         return
 
-    assert highlight == 'all', "Got unexpected highlighting value."
+    assert highlight == "all", "Got unexpected highlighting value."
     # Requested fields for the main query. We only need the fields
     # here that are not requested as part of highlighting. Facet
     # params are not set here because they do not retrieve results,
     # only counts (they are set to 0 rows).
-    if cd['type'] == 'o':
-        fl = ['absolute_url', 'citeCount', 'court_id', 'dateFiled',
-              'download_url', 'id',  'local_path', 'sibling_ids', 'source',
-              'status']
-        hlfl = ['caseName', 'citation', 'court_citation_string', 'docketNumber',
-                'judge', 'lexisCite', 'neutralCite', 'suitNature', 'text']
-    elif cd['type'] == 'r':
-        fl = ['absolute_url', 'assigned_to_id', 'attachment_number', 'attorney',
-              'court_id', 'dateArgued', 'dateFiled', 'dateTerminated',
-              'docket_absolute_url', 'docket_id', 'document_number', 'id',
-              'is_available', 'page_count', 'party', 'referred_to_id']
-        hlfl = ['assignedTo', 'caseName', 'cause', 'court_citation_string',
-                'docketNumber', 'juryDemand', 'referredTo', 'short_description',
-                'suitNature', 'text']
-    elif cd['type'] == 'oa':
-        fl = ['id', 'absolute_url', 'court_id', 'local_path', 'source',
-              'download_url', 'docket_id', 'dateArgued', 'duration']
-        hlfl = ['text', 'caseName', 'judge', 'docketNumber',
-                'court_citation_string']
-    elif cd['type'] == 'p':
-        fl = ['id', 'absolute_url', 'dob', 'date_granularity_dob', 'dod',
-              'date_granularity_dod', 'political_affiliation',
-              'aba_rating', 'school', 'appointer', 'supervisor', 'predecessor',
-              'selection_method', 'court']
-        hlfl = ['name', 'dob_city', 'dob_state', 'name_reverse']
+    if cd["type"] == "o":
+        fl = [
+            "absolute_url",
+            "citeCount",
+            "court_id",
+            "dateFiled",
+            "download_url",
+            "id",
+            "local_path",
+            "sibling_ids",
+            "source",
+            "status",
+        ]
+        hlfl = [
+            "caseName",
+            "citation",
+            "court_citation_string",
+            "docketNumber",
+            "judge",
+            "lexisCite",
+            "neutralCite",
+            "suitNature",
+            "text",
+        ]
+    elif cd["type"] == "r":
+        fl = [
+            "absolute_url",
+            "assigned_to_id",
+            "attachment_number",
+            "attorney",
+            "court_id",
+            "dateArgued",
+            "dateFiled",
+            "dateTerminated",
+            "docket_absolute_url",
+            "docket_id",
+            "document_number",
+            "id",
+            "is_available",
+            "page_count",
+            "party",
+            "referred_to_id",
+        ]
+        hlfl = [
+            "assignedTo",
+            "caseName",
+            "cause",
+            "court_citation_string",
+            "docketNumber",
+            "juryDemand",
+            "referredTo",
+            "short_description",
+            "suitNature",
+            "text",
+        ]
+    elif cd["type"] == "oa":
+        fl = [
+            "id",
+            "absolute_url",
+            "court_id",
+            "local_path",
+            "source",
+            "download_url",
+            "docket_id",
+            "dateArgued",
+            "duration",
+        ]
+        hlfl = [
+            "text",
+            "caseName",
+            "judge",
+            "docketNumber",
+            "court_citation_string",
+        ]
+    elif cd["type"] == "p":
+        fl = [
+            "id",
+            "absolute_url",
+            "dob",
+            "date_granularity_dob",
+            "dod",
+            "date_granularity_dod",
+            "political_affiliation",
+            "aba_rating",
+            "school",
+            "appointer",
+            "supervisor",
+            "predecessor",
+            "selection_method",
+            "court",
+        ]
+        hlfl = ["name", "dob_city", "dob_state", "name_reverse"]
 
-    main_params.update({
-        'fl': ','.join(fl),
-        'hl.fl': ','.join(hlfl),
-    })
+    main_params.update(
+        {"fl": ",".join(fl), "hl.fl": ",".join(hlfl),}
+    )
     for field in hlfl:
-        if field == 'text':
+        if field == "text":
             continue
-        main_params['f.%s.hl.fragListBuilder' % field] = 'single'
-        main_params['f.%s.hl.alternateField' % field] = field
+        main_params["f.%s.hl.fragListBuilder" % field] = "single"
+        main_params["f.%s.hl.alternateField" % field] = field
 
 
 def add_filter_queries(main_params, cd):
@@ -470,134 +531,152 @@ def add_filter_queries(main_params, cd):
     # Changes here are usually mirrored in place_facet_queries, below.
     main_fq = []
 
-    if cd['type'] == 'o':
-        if cd['case_name']:
-            main_fq.append(make_fq(cd, 'caseName', 'case_name'))
-        if cd['judge']:
-            main_fq.append(make_fq(cd, 'judge', 'judge'))
-        if cd['docket_number']:
-            main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
-        if cd['citation']:
-            main_fq.append(make_fq_proximity_query(cd, 'citation', 'citation'))
-        if cd['neutral_cite']:
-            main_fq.append(make_fq(cd, 'neutralCite', 'neutral_cite'))
-        main_fq.append(make_date_query('dateFiled', cd['filed_before'],
-                                       cd['filed_after']))
+    if cd["type"] == "o":
+        if cd["case_name"]:
+            main_fq.append(make_fq(cd, "caseName", "case_name"))
+        if cd["judge"]:
+            main_fq.append(make_fq(cd, "judge", "judge"))
+        if cd["docket_number"]:
+            main_fq.append(make_fq(cd, "docketNumber", "docket_number"))
+        if cd["citation"]:
+            main_fq.append(make_fq_proximity_query(cd, "citation", "citation"))
+        if cd["neutral_cite"]:
+            main_fq.append(make_fq(cd, "neutralCite", "neutral_cite"))
+        main_fq.append(
+            make_date_query("dateFiled", cd["filed_before"], cd["filed_after"])
+        )
 
         # Citation count
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
 
-    elif cd['type'] == 'r':
-        if cd['case_name']:
-            main_fq.append(make_fq(cd, 'caseName', 'case_name'))
-        if cd['description']:
-            main_fq.append(make_fq(cd, 'description', 'description'))
-        if cd['docket_number']:
-            main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
-        if cd['nature_of_suit']:
-            main_fq.append(make_fq(cd, 'suitNature', 'nature_of_suit'))
-        if cd['cause']:
-            main_fq.append(make_fq(cd, 'cause', 'cause'))
-        if cd['document_number']:
-            main_fq.append(make_fq(cd, 'document_number', 'document_number'))
-        if cd['attachment_number']:
-            main_fq.append(make_fq(cd, 'attachment_number', 'attachment_number'))
-        if cd['assigned_to']:
-            main_fq.append(make_fq(cd, 'assignedTo', 'assigned_to'))
-        if cd['referred_to']:
-            main_fq.append(make_fq(cd, 'referredTo', 'referred_to'))
-        if cd['available_only']:
-            main_fq.append(make_boolean_fq(cd, 'is_available', 'available_only'))
-        if cd['party_name']:
-            main_fq.append(make_fq(cd, 'party', 'party_name'))
-        if cd['atty_name']:
-            main_fq.append(make_fq(cd, 'attorney', 'atty_name'))
+    elif cd["type"] == "r":
+        if cd["case_name"]:
+            main_fq.append(make_fq(cd, "caseName", "case_name"))
+        if cd["description"]:
+            main_fq.append(make_fq(cd, "description", "description"))
+        if cd["docket_number"]:
+            main_fq.append(make_fq(cd, "docketNumber", "docket_number"))
+        if cd["nature_of_suit"]:
+            main_fq.append(make_fq(cd, "suitNature", "nature_of_suit"))
+        if cd["cause"]:
+            main_fq.append(make_fq(cd, "cause", "cause"))
+        if cd["document_number"]:
+            main_fq.append(make_fq(cd, "document_number", "document_number"))
+        if cd["attachment_number"]:
+            main_fq.append(
+                make_fq(cd, "attachment_number", "attachment_number")
+            )
+        if cd["assigned_to"]:
+            main_fq.append(make_fq(cd, "assignedTo", "assigned_to"))
+        if cd["referred_to"]:
+            main_fq.append(make_fq(cd, "referredTo", "referred_to"))
+        if cd["available_only"]:
+            main_fq.append(
+                make_boolean_fq(cd, "is_available", "available_only")
+            )
+        if cd["party_name"]:
+            main_fq.append(make_fq(cd, "party", "party_name"))
+        if cd["atty_name"]:
+            main_fq.append(make_fq(cd, "attorney", "atty_name"))
 
-        main_fq.append(make_date_query('dateFiled', cd['filed_before'],
-                                       cd['filed_after']))
+        main_fq.append(
+            make_date_query("dateFiled", cd["filed_before"], cd["filed_after"])
+        )
 
-    elif cd['type'] == 'oa':
-        if cd['case_name']:
-            main_fq.append(make_fq(cd, 'caseName', 'case_name'))
-        if cd['judge']:
-            main_fq.append(make_fq(cd, 'judge', 'judge'))
-        if cd['docket_number']:
-            main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
-        main_fq.append(make_date_query('dateArgued', cd['argued_before'],
-                                       cd['argued_after']))
+    elif cd["type"] == "oa":
+        if cd["case_name"]:
+            main_fq.append(make_fq(cd, "caseName", "case_name"))
+        if cd["judge"]:
+            main_fq.append(make_fq(cd, "judge", "judge"))
+        if cd["docket_number"]:
+            main_fq.append(make_fq(cd, "docketNumber", "docket_number"))
+        main_fq.append(
+            make_date_query(
+                "dateArgued", cd["argued_before"], cd["argued_after"]
+            )
+        )
 
-    elif cd['type'] == 'p':
-        if cd['name']:
-            main_fq.append(make_fq(cd, 'name', "name"))
-        if cd['dob_city']:
-            main_fq.append(make_fq(cd, 'dob_city', 'dob_city'))
-        if cd['dob_state']:
-            main_fq.append(make_fq(cd, 'dob_state_id', 'dob_state'))
-        if cd['school']:
-            main_fq.append(make_fq(cd, 'school', 'school'))
-        if cd['appointer']:
-            main_fq.append(make_fq(cd, 'appointer', 'appointer'))
-        if cd['selection_method']:
-            main_fq.append(make_fq(cd, 'selection_method_id', 'selection_method'))
-        if cd['political_affiliation']:
-            main_fq.append(make_fq(cd, 'political_affiliation_id', 'political_affiliation'))
-        main_fq.append(make_date_query('dob', cd['born_before'],
-                                       cd['born_after']))
+    elif cd["type"] == "p":
+        if cd["name"]:
+            main_fq.append(make_fq(cd, "name", "name"))
+        if cd["dob_city"]:
+            main_fq.append(make_fq(cd, "dob_city", "dob_city"))
+        if cd["dob_state"]:
+            main_fq.append(make_fq(cd, "dob_state_id", "dob_state"))
+        if cd["school"]:
+            main_fq.append(make_fq(cd, "school", "school"))
+        if cd["appointer"]:
+            main_fq.append(make_fq(cd, "appointer", "appointer"))
+        if cd["selection_method"]:
+            main_fq.append(
+                make_fq(cd, "selection_method_id", "selection_method")
+            )
+        if cd["political_affiliation"]:
+            main_fq.append(
+                make_fq(
+                    cd, "political_affiliation_id", "political_affiliation"
+                )
+            )
+        main_fq.append(
+            make_date_query("dob", cd["born_before"], cd["born_after"])
+        )
 
     # Facet filters
-    if cd['type'] == 'o':
-        selected_stats_string = get_selected_field_string(cd, 'stat_')
+    if cd["type"] == "o":
+        selected_stats_string = get_selected_field_string(cd, "stat_")
         if len(selected_stats_string) > 0:
-            main_fq.append('{!tag=dt}status_exact:(%s)' % selected_stats_string)
+            main_fq.append(
+                "{!tag=dt}status_exact:(%s)" % selected_stats_string
+            )
 
-    selected_courts_string = get_selected_field_string(cd, 'court_')
+    selected_courts_string = get_selected_field_string(cd, "court_")
     if len(selected_courts_string) > 0:
-        main_fq.append('court_exact:(%s)' % selected_courts_string)
+        main_fq.append("court_exact:(%s)" % selected_courts_string)
 
     # If a param has been added to the fq variables, then we add them to the
     # main_params var. Otherwise, we don't, as doing so throws an error.
     if len(main_fq) > 0:
-        if 'fq' in main_params:
-            main_params['fq'].append(main_fq)
+        if "fq" in main_params:
+            main_params["fq"].append(main_fq)
         else:
-            main_params['fq'] = main_fq
+            main_params["fq"] = main_fq
 
 
 def map_to_docket_entry_sorting(sort_string):
     """Convert a RECAP sorting param to a docket entry sorting parameter."""
-    if sort_string == 'dateFiled asc':
-        return 'entry_date_filed asc'
-    elif sort_string == 'dateFiled desc':
-        return 'entry_date_filed desc'
+    if sort_string == "dateFiled asc":
+        return "entry_date_filed asc"
+    elif sort_string == "dateFiled desc":
+        return "entry_date_filed desc"
     else:
         return sort_string
 
 
 def add_grouping(main_params, cd, group):
     """Add any grouping parameters."""
-    if cd['type'] == 'o':
+    if cd["type"] == "o":
         # Group clusters. Because this uses faceting, we use the collapse query
         # parser here instead of the usual result grouping. Faceting with
         # grouping has terrible performance.
         group_fq = "{!collapse field=cluster_id sort='type asc'}"
-        if 'fq' in main_params:
-            main_params['fq'].append(group_fq)
+        if "fq" in main_params:
+            main_params["fq"].append(group_fq)
         else:
-            main_params['fq'] = group_fq
+            main_params["fq"] = group_fq
 
-    elif cd['type'] == 'r' and group is True:
-        docket_query = re.match('docket_id:\d+', cd['q'])
+    elif cd["type"] == "r" and group is True:
+        docket_query = re.match("docket_id:\d+", cd["q"])
         if docket_query:
-            group_sort = map_to_docket_entry_sorting(main_params['sort'])
+            group_sort = map_to_docket_entry_sorting(main_params["sort"])
         else:
-            group_sort = 'score desc'
+            group_sort = "score desc"
         group_params = {
-            'group': 'true',
-            'group.ngroups': 'true',
-            'group.limit': 5 if not docket_query else 500,
-            'group.field': 'docket_id',
-            'group.sort': group_sort,
+            "group": "true",
+            "group.ngroups": "true",
+            "group.limit": 5 if not docket_query else 500,
+            "group.field": "docket_id",
+            "group.sort": group_sort,
         }
         main_params.update(group_params)
 
@@ -619,38 +698,39 @@ def regroup_snippets(results):
     if results is None:
         return
 
-    if hasattr(results, 'paginator'):
+    if hasattr(results, "paginator"):
         group_field = results.object_list.group_field
     else:
         group_field = results.group_field
     if group_field is not None:
-        if hasattr(results, 'paginator'):
-            groups = getattr(results.object_list.groups, group_field)['groups']
+        if hasattr(results, "paginator"):
+            groups = getattr(results.object_list.groups, group_field)["groups"]
         else:
             groups = results
 
         for group in groups:
             snippets = []
-            for doc in group['doclist']['docs']:
-                for snippet in doc['solr_highlights']['text']:
+            for doc in group["doclist"]["docs"]:
+                for snippet in doc["solr_highlights"]["text"]:
                     if snippet not in snippets:
                         snippets.append(snippet)
-            group['snippets'] = snippets
+            group["snippets"] = snippets
 
 
 def print_params(params):
     if settings.DEBUG:
-        print("Params sent to search are:\n%s" % ' &\n'.join(
-            ['  %s = %s' % (k, v) for k, v in params.items()]
-        ))
+        print(
+            "Params sent to search are:\n%s"
+            % " &\n".join(["  %s = %s" % (k, v) for k, v in params.items()])
+        )
         # print results_si.execute()
 
 
-def build_main_query(cd, highlight='all', order_by='', facet=True, group=True):
+def build_main_query(cd, highlight="all", order_by="", facet=True, group=True):
     main_params = {
-        'q': cd['q'] or '*',
-        'sort': cd.get('order_by', order_by),
-        'caller': 'build_main_query',
+        "q": cd["q"] or "*",
+        "sort": cd.get("order_by", order_by),
+        "caller": "build_main_query",
     }
     add_faceting(main_params, cd, facet)
     add_boosts(main_params, cd)
@@ -662,7 +742,9 @@ def build_main_query(cd, highlight='all', order_by='', facet=True, group=True):
     return main_params
 
 
-def build_main_query_from_query_string(query_string, updates=None, kwargs=None):
+def build_main_query_from_query_string(
+    query_string, updates=None, kwargs=None
+):
     """Build a main query dict from a query string
 
     :param query_string: A GET string to build from.
@@ -690,17 +772,17 @@ def build_main_query_from_query_string(query_string, updates=None, kwargs=None):
 
 def build_coverage_query(court, q):
     params = {
-        'facet': 'true',
-        'facet.range': 'dateFiled',
-        'facet.range.start': '1600-01-01T00:00:00Z',  # Assume very early date.
-        'facet.range.end': 'NOW/DAY',
-        'facet.range.gap': '+1YEAR',
-        'rows': 0,
-        'q': q or '*',  # Without this, results will be omitted.
-        'caller': 'build_coverage_query',
+        "facet": "true",
+        "facet.range": "dateFiled",
+        "facet.range.start": "1600-01-01T00:00:00Z",  # Assume very early date.
+        "facet.range.end": "NOW/DAY",
+        "facet.range.gap": "+1YEAR",
+        "rows": 0,
+        "q": q or "*",  # Without this, results will be omitted.
+        "caller": "build_coverage_query",
     }
-    if court.lower() != 'all':
-        params['fq'] = ['court_exact:%s' % court]
+    if court.lower() != "all":
+        params["fq"] = ["court_exact:%s" % court]
     return params
 
 
@@ -711,19 +793,21 @@ def build_court_count_query(group=False):
     bad performance.
     """
     params = {
-        'q': '*',
-        'facet': 'true',
-        'facet.field': 'court_exact',
-        'facet.limit': -1,
-        'rows': 0,
-        'caller': 'build_court_count_query',
+        "q": "*",
+        "facet": "true",
+        "facet.field": "court_exact",
+        "facet.limit": -1,
+        "rows": 0,
+        "caller": "build_court_count_query",
     }
     if group:
-        params.update({
-            'group': 'true',
-            'group.ngroups': 'true',
-            'group.field': 'docket_id',
-            'group.limit': '0',
-            'group.facet': 'true',
-        })
+        params.update(
+            {
+                "group": "true",
+                "group.ngroups": "true",
+                "group.field": "docket_id",
+                "group.limit": "0",
+                "group.facet": "true",
+            }
+        )
     return params

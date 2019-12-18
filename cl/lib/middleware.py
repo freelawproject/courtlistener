@@ -28,21 +28,26 @@ class MaintenanceModeMiddleware(MiddlewareMixin):
     We also eschew using the code from Github to reduce our reliance on third-
     party code.
     """
+
     def __init__(self, *args, **kwargs):
         super(MaintenanceModeMiddleware, self).__init__(*args, **kwargs)
         if not settings.MAINTENANCE_MODE_ENABLED:
             raise MiddlewareNotUsed
 
     def process_request(self, request):
-        if hasattr(request, 'user'):
+        if hasattr(request, "user"):
             if settings.MAINTENANCE_MODE_ALLOW_STAFF and request.user.is_staff:
                 return None
 
         for ip_address_re in settings.MAINTENANCE_MODE_ALLOWED_IPS:
-            if ip_address_re.match(request.META['REMOTE_ADDR']):
+            if ip_address_re.match(request.META["REMOTE_ADDR"]):
                 return None
 
-        r = render(request, 'maintenance.html', {'private': True},
-                   status=HTTP_503_SERVICE_UNAVAILABLE)
+        r = render(
+            request,
+            "maintenance.html",
+            {"private": True},
+            status=HTTP_503_SERVICE_UNAVAILABLE,
+        )
         add_never_cache_headers(r)
         return r
