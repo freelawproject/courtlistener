@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class VerboseCommand(BaseCommand):
     def handle(self, *args, **options):
-        verbosity = options.get('verbosity')
+        verbosity = options.get("verbosity")
         if verbosity == 0:
             logger.setLevel(logging.WARN)
         elif verbosity == 1:  # default

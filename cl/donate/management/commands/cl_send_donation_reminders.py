@@ -13,8 +13,10 @@ from cl.stats.models import Stat
 
 
 class Command(VerboseCommand):
-    help = ('Sends the annual reminders to people that donated and wanted a '
-            'reminder.')
+    help = (
+        "Sends the annual reminders to people that donated and wanted a "
+        "reminder."
+    )
 
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
@@ -26,7 +28,7 @@ class Command(VerboseCommand):
         self.verbosity = 0
 
     def gather_stats_and_users(self):
-        about_a_year_ago = (now() - timedelta(days=355))
+        about_a_year_ago = now() - timedelta(days=355)
 
         # Gather some stats to email
         self.new_doc_count = Opinion.objects.filter(
@@ -34,48 +36,43 @@ class Command(VerboseCommand):
         ).count()
         self.court_count = Court.objects.all().count()
         self.bulk_data_count = Stat.objects.filter(
-            name__startswith='bulk_data',
-            date_logged__gte=about_a_year_ago
-        ).aggregate(Sum('count'))['count__sum']
+            name__startswith="bulk_data", date_logged__gte=about_a_year_ago
+        ).aggregate(Sum("count"))["count__sum"]
         self.alerts_sent_count = Stat.objects.filter(
-            name='alerts.sent',
-            date_logged__gte=about_a_year_ago,
-        ).aggregate(Sum('count'))['count__sum']
+            name="alerts.sent", date_logged__gte=about_a_year_ago,
+        ).aggregate(Sum("count"))["count__sum"]
 
         self.users = User.objects.filter(
             donations__date_created__gt=about_a_year_ago,
             donations__date_created__lte=about_a_year_ago + timedelta(days=1),
             donations__send_annual_reminder=True,
             donations__status=Donation.PROCESSED,
-        ).annotate(Sum('donations__amount'))
+        ).annotate(Sum("donations__amount"))
 
     def send_reminder_email(self, user, amount):
         """Send an email imploring the person for another donation."""
         email_subject = "Please donate again to Free Law Project"
         email_sender = "CourtListener <mike@courtlistener.com>"
-        txt_template = loader.get_template('reminder_email.txt')
-        html_template = loader.get_template('reminder_email.html')
+        txt_template = loader.get_template("reminder_email.txt")
+        html_template = loader.get_template("reminder_email.html")
         context = {
-            'amount': amount,
-            'new_doc_count': self.new_doc_count,
-            'bulk_data_count': self.bulk_data_count,
-            'alerts_sent_count': self.alerts_sent_count,
-            'court_count': self.court_count
+            "amount": amount,
+            "new_doc_count": self.new_doc_count,
+            "bulk_data_count": self.bulk_data_count,
+            "alerts_sent_count": self.alerts_sent_count,
+            "court_count": self.court_count,
         }
         txt = txt_template.render(context)
         html = html_template.render(context)
         msg = EmailMultiAlternatives(
-            email_subject,
-            txt,
-            email_sender,
-            [user.email],
+            email_subject, txt, email_sender, [user.email],
         )
-        msg.attach_alternative(html, 'text/html')
+        msg.attach_alternative(html, "text/html")
         msg.send(fail_silently=False)
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        self.verbosity = options.get('verbosity', 1)
+        self.verbosity = options.get("verbosity", 1)
         self.gather_stats_and_users()
         for user in self.users:
             # Iterate over the people and send them emails

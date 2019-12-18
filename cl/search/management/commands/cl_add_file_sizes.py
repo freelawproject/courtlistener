@@ -6,7 +6,7 @@ from cl.search.models import RECAPDocument
 
 
 class Command(VerboseCommand):
-    help = 'Save file sizes for all items in RECAP'
+    help = "Save file sizes for all items in RECAP"
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
@@ -32,4 +32,3 @@ class Command(VerboseCommand):
                 continue
             if i % 1000 == 0:
                 logger.info("Completed %s items", i)
-

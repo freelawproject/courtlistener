@@ -1,7 +1,7 @@
 import os
 import sys
 
-execfile('/etc/courtlistener')
+execfile("/etc/courtlistener")
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 from django.conf import settings
@@ -15,16 +15,20 @@ from optparse import OptionParser
 
 
 def cleaner(simulate=False, verbose=False):
-    docs = queryset_generator(Document.objects.filter(date_filed__gt = '1993-08-02'))
+    docs = queryset_generator(
+        Document.objects.filter(date_filed__gt="1993-08-02")
+    )
     for doc in docs:
         caseNameShortOrig = doc.citation.caseNameShort
         caseNameFullOrig = doc.citation.caseNameFull
         caseNameShort = harmonize(clean_string(caseNameShortOrig))
-        caseNameFull  = harmonize(clean_string(caseNameFullOrig))
+        caseNameFull = harmonize(clean_string(caseNameFullOrig))
         doc.citation.caseNameShort = caseNameShort
         doc.citation.caseNameFull = caseNameFull
         if verbose:
-            if (caseNameShortOrig != caseNameShort) or (caseNameFullOrig != caseNameFull):
+            if (caseNameShortOrig != caseNameShort) or (
+                caseNameFullOrig != caseNameFull
+            ):
                 print "Document: %s" % doc.pk
             if caseNameShortOrig != caseNameShort:
                 print "Short name, replacing: '%s'" % caseNameShortOrig
@@ -39,11 +43,22 @@ def cleaner(simulate=False, verbose=False):
 def main():
     usage = "usage: %prog [--verbose] [---simulate]"
     parser = OptionParser(usage)
-    parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
-        default=False, help="Display log during execution")
-    parser.add_option('-s', '--simulate', action="store_true",
-        dest='simulate', default=False, help="Simulate the corrections without " + \
-        "actually making them.")
+    parser.add_option(
+        "-v",
+        "--verbose",
+        action="store_true",
+        dest="verbose",
+        default=False,
+        help="Display log during execution",
+    )
+    parser.add_option(
+        "-s",
+        "--simulate",
+        action="store_true",
+        dest="simulate",
+        default=False,
+        help="Simulate the corrections without " + "actually making them.",
+    )
     (options, args) = parser.parse_args()
 
     verbose = options.verbose
@@ -57,7 +72,5 @@ def main():
     return cleaner(simulate, verbose)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-

@@ -12,7 +12,10 @@ from django.utils.timezone import now
 from cl.lib.string_utils import trunc
 from cl.search.models import OpinionCluster
 from cl.visualizations.utils import (
-    set_shortest_path_to_end, graphs_intersect, within_max_hops, TooManyNodes
+    set_shortest_path_to_end,
+    graphs_intersect,
+    within_max_hops,
+    TooManyNodes,
 )
 
 
@@ -26,19 +29,19 @@ class SCOTUSMap(models.Model):
     cluster_start = models.ForeignKey(
         OpinionCluster,
         help_text="The starting cluster for the visualization",
-        related_name='visualizations_starting_here',
+        related_name="visualizations_starting_here",
         on_delete=models.CASCADE,
     )
     cluster_end = models.ForeignKey(
         OpinionCluster,
         help_text="The ending cluster for the visualization",
-        related_name='visualizations_ending_here',
+        related_name="visualizations_ending_here",
         on_delete=models.CASCADE,
     )
     clusters = models.ManyToManyField(
         OpinionCluster,
         help_text="The clusters involved in this visualization, including the "
-                  "start and end clusters.",
+        "start and end clusters.",
         related_name="visualizations",
         blank=True,
     )
@@ -74,7 +77,7 @@ class SCOTUSMap(models.Model):
     )
     notes = models.TextField(
         help_text="A description to help explain the diagram, in Markdown "
-                  "format",
+        "format",
         blank=True,
     )
     view_count = models.IntegerField(
@@ -82,8 +85,7 @@ class SCOTUSMap(models.Model):
         default=0,
     )
     published = models.BooleanField(
-        help_text="Whether the visualization has been shared.",
-        default=False,
+        help_text="Whether the visualization has been shared.", default=False,
     )
     deleted = models.BooleanField(
         help_text="Has a user chosen to delete this visualization?",
@@ -91,7 +93,7 @@ class SCOTUSMap(models.Model):
     )
     generation_time = models.FloatField(
         help_text="The length of time it takes to generate a visuzalization, "
-                  "in seconds.",
+        "in seconds.",
         default=0,
     )
 
@@ -109,10 +111,17 @@ class SCOTUSMap(models.Model):
     @property
     def referers_displayed(self):
         """Return good referers"""
-        return self.referers.filter(display=True).order_by('date_created')
+        return self.referers.filter(display=True).order_by("date_created")
 
-    def build_nx_digraph(self, parent_authority, visited_nodes, good_nodes,
-                         max_hops, hops_taken=0, max_nodes=70):
+    def build_nx_digraph(
+        self,
+        parent_authority,
+        visited_nodes,
+        good_nodes,
+        max_hops,
+        hops_taken=0,
+        max_nodes=70,
+    ):
         """Recursively build a networkx graph
 
         Process is:
@@ -181,25 +190,25 @@ class SCOTUSMap(models.Model):
         if len(good_nodes) == 0:
             # Add the beginning and end.
             good_nodes = {
-                self.cluster_start_id: {'shortest_path': 0},
+                self.cluster_start_id: {"shortest_path": 0},
             }
 
         is_already_handled_with_shorter_path = (
-            parent_authority.pk in visited_nodes and
-            visited_nodes[parent_authority.pk]['hops_taken'] < hops_taken
+            parent_authority.pk in visited_nodes
+            and visited_nodes[parent_authority.pk]["hops_taken"] < hops_taken
         )
-        has_no_more_hops_remaining = (hops_taken == max_hops)
+        has_no_more_hops_remaining = hops_taken == max_hops
         blocking_conditions = [
             is_already_handled_with_shorter_path,
             has_no_more_hops_remaining,
         ]
         if not any(blocking_conditions):
-            visited_nodes[parent_authority.pk] = {'hops_taken': hops_taken}
+            visited_nodes[parent_authority.pk] = {"hops_taken": hops_taken}
             hops_taken += 1
             for child_authority in parent_authority.authorities.filter(
-                        docket__court='scotus',
-                        date_filed__gte=self.cluster_start.date_filed
-                    ).order_by('date_filed'):
+                docket__court="scotus",
+                date_filed__gte=self.cluster_start.date_filed,
+            ).order_by("date_filed"):
                 # Combine our present graph with the result of the next
                 # recursion
                 sub_graph = networkx.DiGraph()
@@ -217,8 +226,9 @@ class SCOTUSMap(models.Model):
                     # Parent links to a node already in the network. Check if we
                     # could make it to the end in max_dod hops. Set
                     # shortest_path for the child_authority
-                    if within_max_hops(good_nodes, child_authority.pk,
-                                       hops_taken, max_hops):
+                    if within_max_hops(
+                        good_nodes, child_authority.pk, hops_taken, max_hops
+                    ):
                         g.add_edge(parent_authority.pk, child_authority.pk)
                         is_shorter = set_shortest_path_to_end(
                             good_nodes,
@@ -274,7 +284,7 @@ class SCOTUSMap(models.Model):
         j = {
             "meta": {
                 "donate": "Please consider donating to support more projects "
-                          "from Free Law Project",
+                "from Free Law Project",
                 "version": 1.1,
             },
         }
@@ -283,38 +293,39 @@ class SCOTUSMap(models.Model):
         for cluster in self.clusters.all():
             opinions_cited = {}
             for node in g.neighbors(cluster.pk):
-                opinions_cited[node] = {'opacitiy': 1}
+                opinions_cited[node] = {"opacitiy": 1}
 
-            opinion_clusters.append({
-                "id": cluster.pk,
-                "absolute_url": cluster.get_absolute_url(),
-                "case_name": cluster.case_name,
-                "case_name_short": cluster.case_name_short,
-                "citation_count": g.in_degree(cluster.pk),
-                "date_filed": cluster.date_filed.isoformat(),
-                "decision_direction": cluster.scdb_decision_direction,
-                "votes_majority": cluster.scdb_votes_majority,
-                "votes_minority": cluster.scdb_votes_minority,
-                "scdb_id": cluster.scdb_id,
-                "sub_opinions": [{
-                    "type": "combined",
-                    "opinions_cited": opinions_cited,
-                }]
-            })
+            opinion_clusters.append(
+                {
+                    "id": cluster.pk,
+                    "absolute_url": cluster.get_absolute_url(),
+                    "case_name": cluster.case_name,
+                    "case_name_short": cluster.case_name_short,
+                    "citation_count": g.in_degree(cluster.pk),
+                    "date_filed": cluster.date_filed.isoformat(),
+                    "decision_direction": cluster.scdb_decision_direction,
+                    "votes_majority": cluster.scdb_votes_majority,
+                    "votes_minority": cluster.scdb_votes_minority,
+                    "scdb_id": cluster.scdb_id,
+                    "sub_opinions": [
+                        {"type": "combined", "opinions_cited": opinions_cited,}
+                    ],
+                }
+            )
 
-        j['opinion_clusters'] = opinion_clusters
+        j["opinion_clusters"] = opinion_clusters
 
         return json.dumps(j, indent=2)
 
     def __unicode__(self):
-        return u'{pk}: {title}'.format(
-            pk=getattr(self, 'pk', None),
-            title=self.title
+        return u"{pk}: {title}".format(
+            pk=getattr(self, "pk", None), title=self.title
         )
 
     def get_absolute_url(self):
-        return reverse('view_visualization', kwargs={'pk': self.pk,
-                                                     'slug': self.slug})
+        return reverse(
+            "view_visualization", kwargs={"pk": self.pk, "slug": self.slug}
+        )
 
     def make_title(self):
         """Make a title for the network
@@ -327,22 +338,22 @@ class SCOTUSMap(models.Model):
             case_name_preference = [
                 obj.case_name_short,
                 obj.case_name,
-                obj.case_name_full
+                obj.case_name_full,
             ]
             return next((_ for _ in case_name_preference if _), u"Unknown")
 
         return u"{start} ({start_year}) to {end} ({end_year})".format(
-                start=get_best_case_name(self.cluster_start),
-                start_year=self.cluster_start.date_filed.year,
-                end=get_best_case_name(self.cluster_end),
-                end_year=self.cluster_end.date_filed.year,
+            start=get_best_case_name(self.cluster_start),
+            start_year=self.cluster_start.date_filed.year,
+            end=get_best_case_name(self.cluster_end),
+            end_year=self.cluster_end.date_filed.year,
         )
 
     def save(self, *args, **kwargs):
         # Note that the title needs to be made first, so that the slug can be
         # generated from it.
         if not self.title:
-            self.title = trunc(self.make_title(), 200, ellipsis=u'…')
+            self.title = trunc(self.make_title(), 200, ellipsis=u"…")
 
         if self.published is True and self.date_published is None:
             # First time shared.
@@ -363,11 +374,12 @@ class SCOTUSMap(models.Model):
 
 class Referer(models.Model):
     """Holds the referer domains where embedded maps are placed"""
+
     map = models.ForeignKey(
         SCOTUSMap,
         help_text="The visualization that was embedded and which generated a "
-                  "referer",
-        related_name='referers',
+        "referer",
+        related_name="referers",
         on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
@@ -391,14 +403,12 @@ class Referer(models.Model):
         blank=True,
     )
     display = models.BooleanField(
-        help_text="Should this item be displayed?",
-        default=False,
+        help_text="Should this item be displayed?", default=False,
     )
 
     def __unicode__(self):
-        return u'{pk}: Refers to {map}'.format(
-            pk=getattr(self, 'pk', None),
-            map=self.map,
+        return u"{pk}: Refers to {map}".format(
+            pk=getattr(self, "pk", None), map=self.map,
         )
 
     class Meta:
@@ -408,9 +418,10 @@ class Referer(models.Model):
 
 class JSONVersion(models.Model):
     """Used for holding a variety of versions of the data."""
+
     map = models.ForeignKey(
         SCOTUSMap,
-        help_text='The visualization that the json is affiliated with.',
+        help_text="The visualization that the json is affiliated with.",
         related_name="json_versions",
         on_delete=models.CASCADE,
     )
@@ -429,10 +440,9 @@ class JSONVersion(models.Model):
     )
 
     def __unicode__(self):
-        return u'<JSONVersion {pk}> for <{map}>'.format(
-            pk=getattr(self, 'pk', None),
-            map=self.map,
+        return u"<JSONVersion {pk}> for <{map}>".format(
+            pk=getattr(self, "pk", None), map=self.map,
         )
 
     class Meta:
-        ordering = ['-date_modified']
+        ordering = ["-date_modified"]

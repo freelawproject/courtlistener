@@ -35,42 +35,42 @@ from cl.search.models import OpinionCluster, Citation
 
 
 class Command(VerboseCommand):
-    help = 'Import data from the SCDB Case Centered CSV.'
+    help = "Import data from the SCDB Case Centered CSV."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--debug',
-            action='store_true',
+            "--debug",
+            action="store_true",
             default=False,
-            help="Don't change the data. Only pretend."
+            help="Don't change the data. Only pretend.",
         )
         parser.add_argument(
-            '--start_at',
+            "--start_at",
             type=int,
             default=0,
-            help="The row number you wish to begin at in the SCDB CSV"
+            help="The row number you wish to begin at in the SCDB CSV",
         )
         parser.add_argument(
-            '--file',
+            "--file",
             type=str,
             required=True,
-            help="The path to the SCDB Case Centered file you wish to input."
+            help="The path to the SCDB Case Centered file you wish to input.",
         )
         parser.add_argument(
-            '--skip-human-review',
-            action='store_true',
+            "--skip-human-review",
+            action="store_true",
             default=False,
             help="Don't seek human review. Instead report the number of cases "
-                 "needing human review at the end."
+            "needing human review at the end.",
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        self.debug = options['debug']
-        self.file = options['file']
-        self.skip_human_review = options['skip_human_review']
+        self.debug = options["debug"]
+        self.file = options["file"]
+        self.skip_human_review = options["skip_human_review"]
         if self.skip_human_review and not self.debug:
-            raise CommandError('Cannot skip review without --debug flag.')
+            raise CommandError("Cannot skip review without --debug flag.")
         if self.skip_human_review:
             self.skipped_count = 0
 
@@ -78,12 +78,14 @@ class Command(VerboseCommand):
             action_zero=lambda *args, **kwargs: None,
             action_one=self.enhance_item_with_scdb,
             action_many=self.get_human_review,
-            start_row=options['start_at'],
+            start_row=options["start_at"],
         )
 
         if self.skip_human_review:
-            logger.info("\nSkipped %s items in SCDB which came up for human "
-                        "review." % self.skipped_count)
+            logger.info(
+                "\nSkipped %s items in SCDB which came up for human "
+                "review." % self.skipped_count
+            )
 
     @staticmethod
     def set_if_falsy(obj, attribute, new_value):
@@ -98,23 +100,33 @@ class Command(VerboseCommand):
 
         does_not_currently_have_a_value = not current_value
         current_value_not_zero = current_value != 0
-        new_value_not_blank = new_value.strip() != ''
+        new_value_not_blank = new_value.strip() != ""
         ok = True
-        if all([does_not_currently_have_a_value, current_value_not_zero,
-                new_value_not_blank]):
-            logger.info("Updating %s with %s." %
-                        (attribute, new_value.encode('utf-8')))
+        if all(
+            [
+                does_not_currently_have_a_value,
+                current_value_not_zero,
+                new_value_not_blank,
+            ]
+        ):
+            logger.info(
+                "Updating %s with %s." % (attribute, new_value.encode("utf-8"))
+            )
             setattr(obj, attribute, new_value)
         else:
             # Report if there's a difference -- that might spell trouble.
             values_differ = False
-            if (isinstance(current_value, basestring) and
-                    isinstance(new_value, basestring) and
-                    ''.join(current_value.split()) != ''.join(new_value.split())):
+            if (
+                isinstance(current_value, basestring)
+                and isinstance(new_value, basestring)
+                and "".join(current_value.split())
+                != "".join(new_value.split())
+            ):
                 # Handles strings and normalizes them for comparison.
                 values_differ = True
-            elif (isinstance(current_value, int) and
-                  current_value != int(new_value)):
+            elif isinstance(current_value, int) and current_value != int(
+                new_value
+            ):
                 # Handles ints, which need no normalization for comparison.
                 values_differ = True
 
@@ -132,8 +144,10 @@ class Command(VerboseCommand):
                 ok = False
             else:
                 # The values were the same.
-                logger.info("'%s' field unchanged -- old and new values were "
-                            "the same: %s" % (attribute, new_value))
+                logger.info(
+                    "'%s' field unchanged -- old and new values were "
+                    "the same: %s" % (attribute, new_value)
+                )
         return ok
 
     @staticmethod
@@ -145,10 +159,10 @@ class Command(VerboseCommand):
         :param scdb_info: A dict with the SCDB information.
         """
         fields = {
-            'usCite': ("U.S.", Citation.FEDERAL),
-            'sctCite': ("S. Ct.", Citation.FEDERAL),
-            'ledCite': ("L. Ed.", Citation.FEDERAL),
-            'lexisCite': ("U.S. LEXIS", Citation.LEXIS),
+            "usCite": ("U.S.", Citation.FEDERAL),
+            "sctCite": ("S. Ct.", Citation.FEDERAL),
+            "ledCite": ("L. Ed.", Citation.FEDERAL),
+            "lexisCite": ("U.S. LEXIS", Citation.LEXIS),
         }
         for scdb_field, reporter_info in fields.items():
             try:
@@ -160,8 +174,9 @@ class Command(VerboseCommand):
                     disambiguate=False,
                 )[0]
             except IndexError:
-                logger.warn("Unable to parse citation for: %s",
-                            scdb_info[scdb_field])
+                logger.warn(
+                    "Unable to parse citation for: %s", scdb_info[scdb_field]
+                )
             else:
                 cite = cluster.citations.filter(reporter=reporter_info[0])
                 if cite:
@@ -189,22 +204,27 @@ class Command(VerboseCommand):
 
         Take that item and enhance it with the SCDB content.
         """
-        logger.info('Enhancing cluster {id} with data from SCDB ('
-                    'https://www.courtlistener.com{path}).'.format(
-            id=cluster.pk,
-            path=cluster.get_absolute_url(),
-        ))
+        logger.info(
+            "Enhancing cluster {id} with data from SCDB ("
+            "https://www.courtlistener.com{path}).".format(
+                id=cluster.pk, path=cluster.get_absolute_url(),
+            )
+        )
         attribute_tuples = [
-            (cluster, 'scdb_votes_majority', scdb_info['majVotes']),
-            (cluster, 'scdb_votes_minority', scdb_info['minVotes']),
-            (cluster, 'scdb_decision_direction', scdb_info['decisionDirection']),
-            (cluster.docket, 'docket_number', scdb_info['docket']),
+            (cluster, "scdb_votes_majority", scdb_info["majVotes"]),
+            (cluster, "scdb_votes_minority", scdb_info["minVotes"]),
+            (
+                cluster,
+                "scdb_decision_direction",
+                scdb_info["decisionDirection"],
+            ),
+            (cluster.docket, "docket_number", scdb_info["docket"]),
         ]
         for attribute_tuple in attribute_tuples:
             self.set_if_falsy(*attribute_tuple)
 
         self.do_citations(cluster, scdb_info)
-        scdb_ok = self.set_if_falsy(cluster, 'scdb_id', scdb_info['caseId'])
+        scdb_ok = self.set_if_falsy(cluster, "scdb_id", scdb_info["caseId"])
 
         if scdb_ok:
             logger.info("Saving to database (or faking if debug=True)")
@@ -226,13 +246,13 @@ class Command(VerboseCommand):
         for cluster in clusters:
             dn = cluster.docket.docket_number
             if dn:
-                dn = dn.replace(', Original', ' ORIG')
-                dn = dn.replace('___, ORIGINAL', 'ORIG')
-                dn = dn.replace(', Orig', ' ORIG')
-                dn = dn.replace(', Misc', ' M')
-                dn = dn.replace(' Misc', ' M')
-                dn = dn.replace('NO. ', '')
-                if dn == d['docket']:
+                dn = dn.replace(", Original", " ORIG")
+                dn = dn.replace("___, ORIGINAL", "ORIG")
+                dn = dn.replace(", Orig", " ORIG")
+                dn = dn.replace(", Misc", " M")
+                dn = dn.replace(" Misc", " M")
+                dn = dn.replace("NO. ", "")
+                if dn == d["docket"]:
                     good_cluster_ids.append(cluster.pk)
             else:
                 # No docket number. Assume it's good for now; it'll get
@@ -254,17 +274,18 @@ class Command(VerboseCommand):
         result.
         """
         good_cluster_ids = []
-        bad_words = ['v', 'versus']
+        bad_words = ["v", "versus"]
         exclude = set(string.punctuation)
-        scdb_case_name = ''.join(c for c in d['caseName'] if
-                                 c not in exclude)
+        scdb_case_name = "".join(c for c in d["caseName"] if c not in exclude)
         scdb_words = set(scdb_case_name.lower().split())
         for cluster in clusters:
-            case_name = ''.join(c for c in cluster.case_name if
-                                c not in exclude)
+            case_name = "".join(
+                c for c in cluster.case_name if c not in exclude
+            )
             case_name_words = case_name.lower().split()
-            cluster_words = set([word for word in case_name_words if
-                                 word not in bad_words])
+            cluster_words = set(
+                [word for word in case_name_words if word not in bad_words]
+            )
             if scdb_words.issuperset(cluster_words):
                 good_cluster_ids.append(cluster.pk)
 
@@ -276,34 +297,39 @@ class Command(VerboseCommand):
 
     def get_human_review(self, clusters, d):
         for i, cluster in enumerate(clusters):
-            logger.info('%s: Cluster %s (%0.3f sim):' % (
-                i,
-                cluster.pk,
-                gen_diff_ratio(
-                    cluster.case_name.lower(),
-                    d['caseName'].lower()
-                ),
-            ))
-            logger.info('https://www.courtlistener.com%s' %
-                        cluster.get_absolute_url())
-            logger.info('%s' % cluster.case_name.encode('utf-8'))
+            logger.info(
+                "%s: Cluster %s (%0.3f sim):"
+                % (
+                    i,
+                    cluster.pk,
+                    gen_diff_ratio(
+                        cluster.case_name.lower(), d["caseName"].lower()
+                    ),
+                )
+            )
+            logger.info(
+                "https://www.courtlistener.com%s" % cluster.get_absolute_url()
+            )
+            logger.info("%s" % cluster.case_name.encode("utf-8"))
             if cluster.docket.docket_number:
-                logger.info(cluster.docket.docket_number.encode('utf-8'))
+                logger.info(cluster.docket.docket_number.encode("utf-8"))
             logger.info(cluster.date_filed)
-        logger.info('SCDB info:')
-        logger.info(d['caseName'])
-        if d['docket']:
-            logger.info(d['docket'])
-        logger.info(d['dateDecision'])
+        logger.info("SCDB info:")
+        logger.info(d["caseName"])
+        if d["docket"]:
+            logger.info(d["docket"])
+        logger.info(d["dateDecision"])
 
         if self.skip_human_review:
-            logger.info('Skipping human review and just returning the first '
-                        'item.')
+            logger.info(
+                "Skipping human review and just returning the first item."
+            )
             self.skipped_count += 1
             return clusters[0]
         else:
-            choice = raw_input('Which item should we update? [0-%s] ' %
-                               (len(clusters) - 1))
+            choice = raw_input(
+                "Which item should we update? [0-%s] " % (len(clusters) - 1)
+            )
 
             try:
                 choice = int(choice)
@@ -313,11 +339,8 @@ class Command(VerboseCommand):
             return cluster
 
     def iterate_scdb_and_take_actions(
-            self,
-            action_zero,
-            action_one,
-            action_many,
-            start_row=0):
+        self, action_zero, action_one, action_many, start_row=0
+    ):
         """Iterates over the SCDB, looking for a single match for every item. If
         a single match is identified it takes the action in the action_one
         function using the Cluster identified and the dict of the SCDB
@@ -342,23 +365,23 @@ class Command(VerboseCommand):
             # Iterate over every item, looking for matches in various ways.
             if i < start_row:
                 continue
-            logger.info("\nRow is: %s. ID is: %s (%s)" % (i, d['caseId'],
-                                                          d['caseName']))
+            logger.info(
+                "\nRow is: %s. ID is: %s (%s)"
+                % (i, d["caseId"], d["caseName"])
+            )
 
             clusters = OpinionCluster.objects.none()
             if len(clusters) == 0:
                 logger.info("Checking scdb_id for SCDB field 'caseID'...")
-                clusters = (OpinionCluster.objects
-                            .filter(scdb_id=d['caseId']))
+                clusters = OpinionCluster.objects.filter(scdb_id=d["caseId"])
                 logger.info("%s matches found." % clusters.count())
-            if d['usCite'].strip() and clusters.count() == 0:
+            if d["usCite"].strip() and clusters.count() == 0:
                 # None found by scdb_id. Try by citation number. Only do these
                 # lookups if there is a usCite value, as newer cases don't yet
                 # have citations.
                 logger.info("Checking by federal citation")
                 clusters = OpinionCluster.objects.filter(
-                    citation=d['usCite'],
-                    scdb_id='',
+                    citation=d["usCite"], scdb_id="",
                 )
                 logger.info("%s matches found." % clusters.count())
 
@@ -370,21 +393,22 @@ class Command(VerboseCommand):
                 logger.info("Checking by date...")
                 clusters = OpinionCluster.objects.filter(
                     date_filed=datetime.strptime(
-                        d['dateDecision'], '%m/%d/%Y'
+                        d["dateDecision"], "%m/%d/%Y"
                     ),
-                    docket__court_id='scotus',
-                    scdb_id='',
+                    docket__court_id="scotus",
+                    scdb_id="",
                 )
                 logger.info("%s matches found." % clusters.count())
 
             if clusters.count() > 1:
-                if d['docket']:
+                if d["docket"]:
                     logger.info("Winnowing by docket number...")
                     clusters = self.winnow_by_docket_number(clusters, d)
                     logger.info("%s matches found." % clusters.count())
                 else:
-                    logger.info("Cannot winnow by docket number -- there "
-                                "isn't one.")
+                    logger.info(
+                        "Cannot winnow by docket number -- there isn't one."
+                    )
 
             if clusters.count() > 1:
                 logger.info("Winnowing by case name...")
@@ -393,19 +417,18 @@ class Command(VerboseCommand):
 
             # Searching complete, run actions.
             if clusters.count() == 0:
-                logger.info('No items found.')
+                logger.info("No items found.")
                 cluster = action_zero(d)
             elif clusters.count() == 1:
-                logger.info('Exactly one match found.')
+                logger.info("Exactly one match found.")
                 cluster = clusters[0]
             else:
-                logger.info('%s items found:' % clusters.count())
+                logger.info("%s items found:" % clusters.count())
                 cluster = action_many(clusters, d)
 
             if cluster is not None:
                 action_one(cluster, d)
             else:
-                logger.info('OK. No changes will be made.')
+                logger.info("OK. No changes will be made.")
 
         f.close()
-

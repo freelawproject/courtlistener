@@ -13,8 +13,11 @@ from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.utils.encoding import smart_text, DjangoUnicodeDecodeError, \
-    force_text
+from django.utils.encoding import (
+    smart_text,
+    DjangoUnicodeDecodeError,
+    force_text,
+)
 from django.utils.timezone import now
 from eyed3 import id3
 from lxml.etree import XMLSyntaxError
@@ -33,19 +36,22 @@ from cl.lib.utils import is_iter
 from cl.scrapers.models import ErrorLog
 from cl.search.models import Opinion, RECAPDocument
 
-DEVNULL = open('/dev/null', 'w')
+DEVNULL = open("/dev/null", "w")
 
 
 def get_clean_body_content(content):
     """Parse out the body from an html string, clean it up, and send it along.
     """
-    cleaner = Cleaner(style=True,
-                      remove_tags=['a', 'body', 'font', 'noscript', 'img'])
+    cleaner = Cleaner(
+        style=True, remove_tags=["a", "body", "font", "noscript", "img"]
+    )
     try:
         return cleaner.clean_html(content)
     except XMLSyntaxError:
-        return "Unable to extract the content from this file. Please try " \
-               "reading the original."
+        return (
+            "Unable to extract the content from this file. Please try "
+            "reading the original."
+        )
 
 
 def extract_from_doc(path):
@@ -53,8 +59,12 @@ def extract_from_doc(path):
 
     We use antiword to pull the text out of MS Doc files.
     """
-    process = subprocess.Popen(['antiword', path, '-i', '1'], shell=False,
-                               stdout=subprocess.PIPE, stderr=DEVNULL)
+    process = subprocess.Popen(
+        ["antiword", path, "-i", "1"],
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=DEVNULL,
+    )
     content, err = process.communicate()
     return content, err
 
@@ -64,8 +74,12 @@ def extract_from_docx(path):
 
     We use docx2txt to pull out the text. Pretty simple.
     """
-    process = subprocess.Popen(['docx2txt', path, '-'], shell=False,
-                               stdout=subprocess.PIPE, stderr=DEVNULL)
+    process = subprocess.Popen(
+        ["docx2txt", path, "-"],
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=DEVNULL,
+    )
     content, err = process.communicate()
     return content, err
 
@@ -78,7 +92,7 @@ def extract_from_html(path):
     try:
         content = open(path).read()
         content = get_clean_body_content(content)
-        encodings = ['utf-8', 'ISO8859', 'cp1252']
+        encodings = ["utf-8", "ISO8859", "cp1252"]
         for encoding in encodings:
             try:
                 content = force_text(content, encoding=encoding)
@@ -88,9 +102,9 @@ def extract_from_html(path):
                 return content, False
 
         # Fell through, therefore unable to decode the string.
-        return '', True
+        return "", True
     except:
-        return '', True
+        return "", True
 
 
 def make_pdftotext_process(path):
@@ -99,7 +113,7 @@ def make_pdftotext_process(path):
         ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
         shell=False,
         stdout=subprocess.PIPE,
-        stderr=DEVNULL
+        stderr=DEVNULL,
     )
 
 
@@ -113,15 +127,15 @@ def extract_from_pdf(path, opinion, do_ocr=False):
     """
     process = make_pdftotext_process(path)
     content, err = process.communicate()
-    if content.strip() == '' and do_ocr:
+    if content.strip() == "" and do_ocr:
         success, content = extract_by_ocr(path)
         if success:
             opinion.extracted_by_ocr = True
-        elif content == '' or not success:
-            content = 'Unable to extract document content.'
-    elif 'e' not in content:
+        elif content == "" or not success:
+            content = "Unable to extract document content."
+    elif "e" not in content:
         # It's a corrupt PDF from ca9. Fix it.
-        content = fix_mojibake(unicode(content, 'utf-8', errors='ignore'))
+        content = fix_mojibake(unicode(content, "utf-8", errors="ignore"))
 
     return content, err
 
@@ -142,12 +156,12 @@ def extract_from_txt(path):
         data = open(path).read()
         try:
             # Alas, cp1252 is probably still more popular than utf-8.
-            content = smart_text(data, encoding='cp1252')
+            content = smart_text(data, encoding="cp1252")
         except DjangoUnicodeDecodeError:
-            content = smart_text(data, encoding='utf-8', errors='ignore')
+            content = smart_text(data, encoding="utf-8", errors="ignore")
     except:
         err = True
-        content = ''
+        content = ""
     return content, err
 
 
@@ -158,26 +172,25 @@ def extract_from_wpd(path, opinion):
     that's done, we pull out the body of the HTML, and do some minor cleanup
     on it.
     """
-    process = subprocess.Popen(['wpd2html', path], shell=False,
-                               stdout=subprocess.PIPE, stderr=DEVNULL)
+    process = subprocess.Popen(
+        ["wpd2html", path], shell=False, stdout=subprocess.PIPE, stderr=DEVNULL
+    )
     content, err = process.communicate()
 
     content = get_clean_body_content(content)
 
-    if 'not for publication' in content.lower():
+    if "not for publication" in content.lower():
         opinion.precedential_status = "Unpublished"
 
     return content, err
 
 
 def convert_file_to_txt(path):
-    tesseract_command = ['tesseract', path, 'stdout', '-l', 'eng']
+    tesseract_command = ["tesseract", path, "stdout", "-l", "eng"]
     p = subprocess.Popen(
-        tesseract_command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        tesseract_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
-    return p.communicate()[0].decode('utf-8')
+    return p.communicate()[0].decode("utf-8")
 
 
 def get_page_count(path, extension):
@@ -187,22 +200,28 @@ def get_page_count(path, extension):
     :param extension: The extension of the binary.
     :return: The number of pages if possible, else return None
     """
-    if extension == 'pdf':
+    if extension == "pdf":
         try:
             reader = PdfFileReader(path)
             return int(reader.getNumPages())
-        except (IOError, ValueError, TypeError, KeyError, AssertionError,
-                PdfReadError):
+        except (
+            IOError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AssertionError,
+            PdfReadError,
+        ):
             # IOError: File doesn't exist. My bad.
             # ValueError: Didn't get an int for the page count. Their bad.
             # TypeError: NumberObject has no attribute '__getitem__'. Ugh.
             # KeyError, AssertionError: assert xrefstream["/Type"] == "/XRef". WTF?
             # PdfReadError: Something else. I have no words.
             pass
-    elif extension == 'wpd':
+    elif extension == "wpd":
         # Best solution appears to be to dig into the binary format
         pass
-    elif extension == 'doc':
+    elif extension == "doc":
         # Best solution appears to be to dig into the XML of the file
         # itself: http://stackoverflow.com/a/12972502/64911
         pass
@@ -228,29 +247,31 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
 
     path = opinion.local_path.path
 
-    extension = path.split('.')[-1]
-    if extension == 'doc':
+    extension = path.split(".")[-1]
+    if extension == "doc":
         content, err = extract_from_doc(path)
-    elif extension == 'docx':
+    elif extension == "docx":
         content, err = extract_from_docx(path)
-    elif extension == 'html':
+    elif extension == "html":
         content, err = extract_from_html(path)
-    elif extension == 'pdf':
+    elif extension == "pdf":
         content, err = extract_from_pdf(path, opinion, do_ocr)
-    elif extension == 'txt':
+    elif extension == "txt":
         content, err = extract_from_txt(path)
-    elif extension == 'wpd':
+    elif extension == "wpd":
         content, err = extract_from_wpd(path, opinion)
     else:
-        print ('*****Unable to extract content due to unknown extension: %s '
-               'on opinion: %s****' % (extension, opinion))
+        print(
+            "*****Unable to extract content due to unknown extension: %s "
+            "on opinion: %s****" % (extension, opinion)
+        )
         return
 
     # Do page count, if possible
     opinion.page_count = get_page_count(path, extension)
 
     # Do blocked status
-    if extension in ['html', 'wpd']:
+    if extension in ["html", "wpd"]:
         opinion.html, blocked = anonymize(content)
     else:
         opinion.plain_text, blocked = anonymize(content)
@@ -259,8 +280,9 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
         opinion.cluster.date_blocked = now()
 
     if err:
-        print ("****Error extracting text from %s: %s****" %
-               (extension, opinion))
+        print(
+            "****Error extracting text from %s: %s****" % (extension, opinion)
+        )
         return
 
     # Save item, and index Solr if needed.
@@ -277,14 +299,15 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
             opinion.cluster.save(index=False)
             opinion.save(index=True)
     except Exception:
-        print("****Error saving text to the db for: %s****\n%s" %
-              (opinion, traceback.format_exc()))
+        print(
+            "****Error saving text to the db for: %s****\n%s"
+            % (opinion, traceback.format_exc())
+        )
         return
 
     # Identify and link citations within the document content
     find_citations_for_opinion_by_pks.apply_async(
-        ([opinion.pk],),
-        countdown=random.randint(0, 3600)
+        ([opinion.pk],), countdown=random.randint(0, 3600)
     )
 
 
@@ -312,11 +335,11 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
                 success, content = extract_by_ocr(path)
                 if success:
                     rd.ocr_status = RECAPDocument.OCR_COMPLETE
-                elif content == u'' or not success:
-                    content = u'Unable to extract document content.'
+                elif content == u"" or not success:
+                    content = u"Unable to extract document content."
                     rd.ocr_status = RECAPDocument.OCR_FAILED
             else:
-                content = u''
+                content = u""
                 rd.ocr_status = RECAPDocument.OCR_NEEDED
         else:
             rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
@@ -345,19 +368,25 @@ def rasterize_pdf(path, destination):
     # 30% of the RAM when Tesseract processes them. See:
     # https://github.com/tesseract-ocr/tesseract/issues/431#issuecomment-250549208
     gs = [
-        'gs',
-        '-dQUIET',  # Suppress printing routine info
-        '-dSAFER',  # Lock down the filesystem to only files on command line
-        '-dBATCH',  # Exit after finishing file. Don't wait for more commands.
-        '-dNOPAUSE',  # Don't pause after each page
-        '-sDEVICE=tiffgray',
-        '-sCompression=lzw',
-        '-r300x300',  # Set the resolution to 300 DPI.
-        '-o', destination,
+        "gs",
+        "-dQUIET",  # Suppress printing routine info
+        "-dSAFER",  # Lock down the filesystem to only files on command line
+        "-dBATCH",  # Exit after finishing file. Don't wait for more commands.
+        "-dNOPAUSE",  # Don't pause after each page
+        "-sDEVICE=tiffgray",
+        "-sCompression=lzw",
+        "-r300x300",  # Set the resolution to 300 DPI.
+        "-o",
+        destination,
         path,
     ]
-    p = subprocess.Popen(gs, close_fds=True, stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE, universal_newlines=True)
+    p = subprocess.Popen(
+        gs,
+        close_fds=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
     stdout, stderr = p.communicate()
     return stdout, stderr, p.returncode
 
@@ -371,8 +400,8 @@ def cleanup_ocr_text(txt):
     :return: Txt output, cleaned up.
     """
     simple_replacements = (
-        (u'Fi|ed', u'Filed'),
-        (u' Il ', u' II '),
+        (u"Fi|ed", u"Filed"),
+        (u" Il ", u" II "),
     )
     for replacement in simple_replacements:
         txt = txt.replace(replacement[0], replacement[1])
@@ -382,9 +411,11 @@ def cleanup_ocr_text(txt):
 @app.task
 def extract_by_ocr(path):
     """Extract the contents of a PDF using OCR."""
-    fail_msg = (u"Unable to extract the content from this file. Please try "
-                u"reading the original.")
-    with NamedTemporaryFile(prefix='ocr_', suffix=".tiff") as tmp:
+    fail_msg = (
+        u"Unable to extract the content from this file. Please try "
+        u"reading the original."
+    )
+    with NamedTemporaryFile(prefix="ocr_", suffix=".tiff") as tmp:
         out, err, returncode = rasterize_pdf(path, tmp.name)
         if returncode != 0:
             return False, fail_msg
@@ -414,28 +445,30 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     )
     audio_file.initTag()
     audio_file.tag.title = best_case_name(audio_obj)
-    audio_file.tag.album = u'{court}, {year}'.format(
-        court=court.full_name,
-        year=audio_obj.docket.date_argued.year
+    audio_file.tag.album = u"{court}, {year}".format(
+        court=court.full_name, year=audio_obj.docket.date_argued.year
     )
     audio_file.tag.artist = court.full_name
     audio_file.tag.artist_url = court.url
     audio_file.tag.audio_source_url = audio_obj.download_url
     audio_file.tag.comments.set(
-        u'Argued: {date_argued}. Docket number: {docket_number}'.format(
-            date_argued=audio_obj.docket.date_argued.strftime('%Y-%m-%d'),
+        u"Argued: {date_argued}. Docket number: {docket_number}".format(
+            date_argued=audio_obj.docket.date_argued.strftime("%Y-%m-%d"),
             docket_number=audio_obj.docket.docket_number,
-        ))
-    audio_file.tag.genre = u'Speech'
-    audio_file.tag.publisher = u'Free Law Project'
-    audio_file.tag.publisher_url = u'https://free.law'
-    audio_file.tag.recording_date = audio_obj.docket.date_argued.strftime('%Y-%m-%d')
+        )
+    )
+    audio_file.tag.genre = u"Speech"
+    audio_file.tag.publisher = u"Free Law Project"
+    audio_file.tag.publisher_url = u"https://free.law"
+    audio_file.tag.recording_date = audio_obj.docket.date_argued.strftime(
+        "%Y-%m-%d"
+    )
 
     # Add images to the mp3. If it has a seal, use that for the Front Cover
     # and use the FLP logo for the Publisher Logo. If it lacks a seal, use the
     # Publisher logo for both the front cover and the Publisher logo.
     try:
-        has_seal = seals_data[court.pk]['has_seal']
+        has_seal = seals_data[court.pk]["has_seal"]
     except AttributeError:
         # Unknown court in Seal Rookery.
         has_seal = False
@@ -444,29 +477,35 @@ def set_mp3_meta_data(audio_obj, mp3_path):
         has_seal = False
 
     flp_image_frames = [
-        3,   # "Front Cover". Complete list at eyed3/id3/frames.py
+        3,  # "Front Cover". Complete list at eyed3/id3/frames.py
         14,  # "Publisher logo".
     ]
     if has_seal:
-        with open(os.path.join(seals_root,
-                               '512', '%s.png' % court.pk), 'r') as f:
+        with open(
+            os.path.join(seals_root, "512", "%s.png" % court.pk), "r"
+        ) as f:
             audio_file.tag.images.set(
-                3,
-                f.read(),
-                'image/png',
-                u'Seal for %s' % court.short_name,
+                3, f.read(), "image/png", u"Seal for %s" % court.short_name,
             )
         flp_image_frames.remove(3)
 
     for frame in flp_image_frames:
-        with open(os.path.join(settings.INSTALL_ROOT,
-                               'cl', 'audio', 'static', 'png',
-                               'producer-300x300.png'), 'r') as f:
+        with open(
+            os.path.join(
+                settings.INSTALL_ROOT,
+                "cl",
+                "audio",
+                "static",
+                "png",
+                "producer-300x300.png",
+            ),
+            "r",
+        ) as f:
             audio_file.tag.images.set(
                 frame,
                 f.read(),
-                'image/png',
-                u'Created for the public domain by Free Law Project',
+                "image/png",
+                u"Created for the public domain by Free Law Project",
             )
 
     audio_file.tag.save()
@@ -478,37 +517,51 @@ def process_audio_file(pk):
     meta data to the database.
     """
     af = Audio.objects.get(pk=pk)
-    tmp_path = os.path.join('/tmp', 'audio_' + uuid.uuid4().hex + '.mp3')
+    tmp_path = os.path.join("/tmp", "audio_" + uuid.uuid4().hex + ".mp3")
     av_path = get_audio_binary()
     av_command = [
-        av_path, '-i', af.local_path_original_file.path,
-        '-ar', '22050',  # sample rate (audio samples/s) of 22050Hz
-        '-ab', '48k',    # constant bit rate (sample resolution) of 48kbps
-        tmp_path
+        av_path,
+        "-i",
+        af.local_path_original_file.path,
+        "-ar",
+        "22050",  # sample rate (audio samples/s) of 22050Hz
+        "-ab",
+        "48k",  # constant bit rate (sample resolution) of 48kbps
+        tmp_path,
     ]
     try:
         _ = subprocess.check_output(av_command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        print('%s failed command: %s\nerror code: %s\noutput: %s\n%s' %
-              (av_path, av_command, e.returncode, e.output,
-               traceback.format_exc()))
+        print(
+            "%s failed command: %s\nerror code: %s\noutput: %s\n%s"
+            % (
+                av_path,
+                av_command,
+                e.returncode,
+                e.output,
+                traceback.format_exc(),
+            )
+        )
         raise
 
     set_mp3_meta_data(af, tmp_path)
     try:
-        with open(tmp_path, 'r') as mp3:
+        with open(tmp_path, "r") as mp3:
             cf = ContentFile(mp3.read())
-            file_name = trunc(best_case_name(af).lower(), 72) + '_cl.mp3'
+            file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
             af.file_with_date = af.docket.date_argued
             af.local_path_mp3.save(file_name, cf, save=False)
     except:
-        msg = ("Unable to save mp3 to audio_file in scraper.tasks."
-               "process_audio_file for item: %s\n"
-               "Traceback:\n"
-               "%s" % (af.pk, traceback.format_exc()))
+        msg = (
+            "Unable to save mp3 to audio_file in scraper.tasks."
+            "process_audio_file for item: %s\n"
+            "Traceback:\n"
+            "%s" % (af.pk, traceback.format_exc())
+        )
         print(msg)
-        ErrorLog.objects.create(log_level='CRITICAL', court=af.docket.court,
-                                message=msg)
+        ErrorLog.objects.create(
+            log_level="CRITICAL", court=af.docket.court, message=msg
+        )
 
     af.duration = eyed3.load(tmp_path).info.time_secs
     af.processing_complete = True

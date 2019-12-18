@@ -42,63 +42,68 @@ def get_cut_off_date(rate, d=datetime.date.today()):
         cut_off_date = d - datetime.timedelta(days=7)
     elif rate == Alert.MONTHLY:
         if datetime.date.today().day > 28:
-            raise InvalidDateError('Monthly alerts cannot be run on the 29th, '
-                                   '30th or 31st.')
+            raise InvalidDateError(
+                "Monthly alerts cannot be run on the 29th, 30th or 31st."
+            )
 
         # Get the first of the month of the previous month regardless of the
         # current date
         early_last_month = d - datetime.timedelta(days=28)
-        cut_off_date = datetime.datetime(early_last_month.year,
-                                         early_last_month.month, 1)
+        cut_off_date = datetime.datetime(
+            early_last_month.year, early_last_month.month, 1
+        )
     return cut_off_date
 
 
 def send_alert(user_profile, hits):
-    subject = 'New hits for your alerts'
+    subject = "New hits for your alerts"
 
-    txt_template = loader.get_template('alert_email.txt')
-    html_template = loader.get_template('alert_email.html')
-    context = {'hits': hits}
+    txt_template = loader.get_template("alert_email.txt")
+    html_template = loader.get_template("alert_email.html")
+    context = {"hits": hits}
     txt = txt_template.render(context)
     html = html_template.render(context)
-    msg = EmailMultiAlternatives(subject, txt, settings.DEFAULT_ALERTS_EMAIL,
-                                 [user_profile.user.email])
+    msg = EmailMultiAlternatives(
+        subject, txt, settings.DEFAULT_ALERTS_EMAIL, [user_profile.user.email]
+    )
     msg.attach_alternative(html, "text/html")
     msg.send(fail_silently=False)
 
 
 class Command(VerboseCommand):
-    help = 'Sends the alert emails on a real time, daily, weekly or monthly ' \
-           'basis.'
+    help = (
+        "Sends the alert emails on a real time, daily, weekly or monthly "
+        "basis."
+    )
 
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
         self.connections = {
-            'o': ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r'),
-            'oa': ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode='r'),
-            'r': ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r'),
+            "o": ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r"),
+            "oa": ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r"),
+            "r": ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r"),
         }
         self.options = {}
         self.valid_ids = {}
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--rate',
+            "--rate",
             required=True,
             choices=Alert.ALL_FREQUENCIES,
-            help="The rate to send emails (%s)" %
-                 ', '.join(Alert.ALL_FREQUENCIES),
+            help="The rate to send emails (%s)"
+            % ", ".join(Alert.ALL_FREQUENCIES),
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         self.options = options
-        if options['rate'] == Alert.REAL_TIME:
+        if options["rate"] == Alert.REAL_TIME:
             self.remove_stale_rt_items()
             self.valid_ids = self.get_new_ids()
 
-        self.send_emails(options['rate'])
-        if options['rate'] == Alert.REAL_TIME:
+        self.send_emails(options["rate"])
+        if options["rate"] == Alert.REAL_TIME:
             self.clean_rt_queue()
 
     def run_query(self, alert, rate):
@@ -107,50 +112,59 @@ class Command(VerboseCommand):
         logger.info("Now running the query: %s\n" % alert.query)
 
         # Make a dict from the query string.
-        qd = QueryDict(alert.query.encode('utf-8'), mutable=True)
+        qd = QueryDict(alert.query.encode("utf-8"), mutable=True)
         try:
-            del qd['filed_before']
+            del qd["filed_before"]
         except KeyError:
             pass
-        qd['order_by'] = 'score desc'
+        qd["order_by"] = "score desc"
         cut_off_date = get_cut_off_date(rate)
         # Default to 'o', if not available, according to the front end.
-        query_type = qd.get('type', 'o')
-        if query_type in ['o', 'r']:
-            qd['filed_after'] = cut_off_date
-        elif query_type == 'oa':
-            qd['argued_after'] = cut_off_date
+        query_type = qd.get("type", "o")
+        if query_type in ["o", "r"]:
+            qd["filed_after"] = cut_off_date
+        elif query_type == "oa":
+            qd["argued_after"] = cut_off_date
         logger.info("Data sent to SearchForm is: %s\n" % qd)
         search_form = SearchForm(qd)
         if search_form.is_valid():
             cd = search_form.cleaned_data
 
-            if rate == Alert.REAL_TIME and \
-                    len(self.valid_ids[query_type]) == 0:
+            if (
+                rate == Alert.REAL_TIME
+                and len(self.valid_ids[query_type]) == 0
+            ):
                 # Bail out. No results will be found if no valid_ids.
                 return query_type, results
 
             main_params = search_utils.build_main_query(cd, facet=False)
-            main_params.update({
-                'rows': '20',
-                'start': '0',
-                'hl.tag.pre': '<em><strong>',
-                'hl.tag.post': '</strong></em>',
-                'caller': 'cl_send_alerts:%s' % query_type,
-            })
+            main_params.update(
+                {
+                    "rows": "20",
+                    "start": "0",
+                    "hl.tag.pre": "<em><strong>",
+                    "hl.tag.post": "</strong></em>",
+                    "caller": "cl_send_alerts:%s" % query_type,
+                }
+            )
 
             if rate == Alert.REAL_TIME:
-                main_params['fq'].append('id:(%s)' % ' OR '.join(
-                    [str(i) for i in self.valid_ids[query_type]]
-                ))
+                main_params["fq"].append(
+                    "id:(%s)"
+                    % " OR ".join([str(i) for i in self.valid_ids[query_type]])
+                )
 
             # Ignore warnings from this bit of code. Otherwise, it complains
             # about the query URL being too long and having to POST it instead
             # of being able to GET it.
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                results = self.connections[query_type].query().add_extra(
-                    **main_params).execute()
+                results = (
+                    self.connections[query_type]
+                    .query()
+                    .add_extra(**main_params)
+                    .execute()
+                )
             regroup_snippets(results)
 
         logger.info("There were %s results." % len(results))
@@ -167,11 +181,15 @@ class Command(VerboseCommand):
             alerts = user.alerts.filter(rate=rate)
             logger.info("Running alerts for user '%s': %s" % (user, alerts))
 
-            not_donated_enough = user.profile.total_donated_last_year < \
-                settings.MIN_DONATION['rt_alerts']
+            not_donated_enough = (
+                user.profile.total_donated_last_year
+                < settings.MIN_DONATION["rt_alerts"]
+            )
             if not_donated_enough and rate == Alert.REAL_TIME:
-                logger.info('User: %s has not donated enough for their %s '
-                            'RT alerts to be sent.\n' % (user, alerts.count()))
+                logger.info(
+                    "User: %s has not donated enough for their %s "
+                    "RT alerts to be sent.\n" % (user, alerts.count())
+                )
                 continue
 
             hits = []
@@ -180,15 +198,16 @@ class Command(VerboseCommand):
                     qd, results = self.run_query(alert, rate)
                 except:
                     traceback.print_exc()
-                    logger.info("Search for this alert failed: %s\n" %
-                                alert.query)
+                    logger.info(
+                        "Search for this alert failed: %s\n" % alert.query
+                    )
                     continue
 
                 # hits is a multi-dimensional array. It consists of alerts,
                 # paired with a list of document dicts, of the form:
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
                 if len(results) > 0:
-                    hits.append([alert, qd.get('type', 'o'), results])
+                    hits.append([alert, qd.get("type", "o"), results])
                     alert.query_run = qd.urlencode()
                     alert.date_last_hit = now()
                     alert.save()
@@ -197,7 +216,7 @@ class Command(VerboseCommand):
                 alerts_sent_count += 1
                 send_alert(user.profile, hits)
 
-        tally_stat('alerts.sent.%s' % rate, inc=alerts_sent_count)
+        tally_stat("alerts.sent.%s" % rate, inc=alerts_sent_count)
         logger.info("Sent %s %s email alerts." % (alerts_sent_count, rate))
 
     def clean_rt_queue(self):
@@ -239,18 +258,23 @@ class Command(VerboseCommand):
             ids = RealTimeQueue.objects.filter(item_type=item_type)
             if ids:
                 main_params = {
-                    'q': '*',  # Vital!
-                    'caller': 'cl_send_alerts:%s' % item_type,
-                    'rows': MAX_RT_ITEM_QUERY,
-                    'fl': 'id',
-                    'fq': ['id:(%s)' % ' OR '.join(
-                        [str(i.item_pk) for i in ids]
-                    )],
+                    "q": "*",  # Vital!
+                    "caller": "cl_send_alerts:%s" % item_type,
+                    "rows": MAX_RT_ITEM_QUERY,
+                    "fl": "id",
+                    "fq": [
+                        "id:(%s)" % " OR ".join([str(i.item_pk) for i in ids])
+                    ],
                 }
-                results = self.connections[item_type].query().add_extra(
-                    **main_params).execute()
-                valid_ids[item_type] = [int(r['id']) for r in
-                                        results.result.docs]
+                results = (
+                    self.connections[item_type]
+                    .query()
+                    .add_extra(**main_params)
+                    .execute()
+                )
+                valid_ids[item_type] = [
+                    int(r["id"]) for r in results.result.docs
+                ]
             else:
                 valid_ids[item_type] = []
         return valid_ids

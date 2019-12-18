@@ -21,7 +21,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.crypto import uuid_hex
 from cl.lib.recap_utils import get_bucket_name
 
-TRANSCRIPTS_BUCKET_NAME = 'freelawproject-transcripts'
+TRANSCRIPTS_BUCKET_NAME = "freelawproject-transcripts"
 
 
 def make_transcription_chain(path, phrases, af_id):
@@ -49,8 +49,7 @@ def make_transcription_chain(path, phrases, af_id):
 def get_storage_client():
     """Build a storage client for the user, and return it."""
     return storage.Client.from_service_account_json(
-        settings.GOOGLE_AUTH['PATH'],
-        project=settings.GOOGLE_AUTH['PROJECT'],
+        settings.GOOGLE_AUTH["PATH"], project=settings.GOOGLE_AUTH["PROJECT"],
     )
 
 
@@ -61,13 +60,11 @@ def get_speech_service():
     https://github.com/GoogleCloudPlatform/python-docs-samples/blob/master/speech/api-client/transcribe_async.py#L35
     """
     credentials = GoogleCredentials.from_stream(
-        settings.GOOGLE_AUTH['PATH'],
-    ).create_scoped(
-        ['https://www.googleapis.com/auth/cloud-platform'],
-    )
+        settings.GOOGLE_AUTH["PATH"],
+    ).create_scoped(["https://www.googleapis.com/auth/cloud-platform"],)
     http = httplib2.Http()
     credentials.authorize(http)
-    return discovery.build('speech', 'v1beta1', http=http)
+    return discovery.build("speech", "v1beta1", http=http)
 
 
 def encode_as_linear16(path, tmp):
@@ -79,6 +76,7 @@ def encode_as_linear16(path, tmp):
     # https://trac.ffmpeg.org/wiki/audio%20types
     assert isinstance(path, basestring), "path argument is not a str."
     av_path = get_audio_binary()
+    # fmt: off
     av_command = [
         av_path,
         '-y',           # Assume yes (clobber existing files)
@@ -86,14 +84,17 @@ def encode_as_linear16(path, tmp):
         '-f', 's16le',  # Force output format
         '-ac', '1',     # Mono
         '-ar', '16k',   # Sample rate of 16000Mhz
-        tmp.name,       # Output file
+        tmp.name,  # Output file
     ]
+    # fmt: on
     try:
         _ = subprocess.check_output(av_command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        print('%s failed command: %s\n'
-              'error code: %s\n'
-              'output: %s\n' % (av_path, av_command, e.returncode, e.output))
+        print(
+            "%s failed command: %s\n"
+            "error code: %s\n"
+            "output: %s\n" % (av_path, av_command, e.returncode, e.output)
+        )
         print(traceback.format_exc())
         raise e
 
@@ -108,29 +109,30 @@ def upload_item_as_raw_file(path, client=None):
     try:
         b = client.get_bucket(TRANSCRIPTS_BUCKET_NAME)
     except Forbidden as e:
-        print("Received Forbidden (403) error while getting bucket. This could "
-              "mean that you do not have billing set up for this "
-              "account/project, or that somebody else has taken this bucket "
-              "from the global namespace.")
+        print(
+            "Received Forbidden (403) error while getting bucket. This could "
+            "mean that you do not have billing set up for this "
+            "account/project, or that somebody else has taken this bucket "
+            "from the global namespace."
+        )
         raise e
     except NotFound:
         b = client.bucket(TRANSCRIPTS_BUCKET_NAME)
-        b.lifecycle_rules = [{
-            'action': {'type': 'Delete'},
-            'condition': {'age': 7},
-        }]
+        b.lifecycle_rules = [
+            {"action": {"type": "Delete"}, "condition": {"age": 7},}
+        ]
         b.create()
         b.make_public(future=True)
 
     # Re-encode the file as a temp file and upload it. When we leave the
     # context manager, the temp file gets automatically deleted.
-    with NamedTemporaryFile(prefix='transcode_', suffix='.raw') as tmp:
+    with NamedTemporaryFile(prefix="transcode_", suffix=".raw") as tmp:
         encode_as_linear16(path, tmp)
-        file_name = 'transcripts-%s' % uuid_hex()
+        file_name = "transcripts-%s" % uuid_hex()
         blob = Blob(file_name, b)
         blob.upload_from_file(tmp, rewind=True)
 
-    return {'blob_name': blob.name, 'bucket_name': blob.bucket.name}
+    return {"blob_name": blob.name, "bucket_name": blob.bucket.name}
 
 
 @app.task
@@ -147,29 +149,50 @@ def do_speech_to_text(returned_info, phrases, service=None):
     if service is None:
         service = get_speech_service()
     default_phrases = [
-        'remand', 'appellant', 'appellee', 'et al.', 'deposition', 'officer',
-        'factual', 'reasonable', 'claimant', 'complainant', 'defendant',
-        'devisee', 'executor', 'executrix', 'petitioner', 'plaintiff',
-        'respondant',
+        "remand",
+        "appellant",
+        "appellee",
+        "et al.",
+        "deposition",
+        "officer",
+        "factual",
+        "reasonable",
+        "claimant",
+        "complainant",
+        "defendant",
+        "devisee",
+        "executor",
+        "executrix",
+        "petitioner",
+        "plaintiff",
+        "respondant",
     ]
     default_phrases.extend(phrases)
     assert len(default_phrases) <= 500, "phrase API limit exceeded."
-    response = service.speech().asyncrecognize(
-        body={
-            'config': {
-                'encoding': 'LINEAR16',
-                'sampleRate': 16000,
-                'maxAlternatives': 10,
-                'speechContext': {'phrases': default_phrases},
-            },
-            'audio': {
-                'uri': 'gs://%s/%s' % (returned_info['bucket_name'],
-                                       returned_info['blob_name']),
+    response = (
+        service.speech()
+        .asyncrecognize(
+            body={
+                "config": {
+                    "encoding": "LINEAR16",
+                    "sampleRate": 16000,
+                    "maxAlternatives": 10,
+                    "speechContext": {"phrases": default_phrases},
+                },
+                "audio": {
+                    "uri": "gs://%s/%s"
+                    % (
+                        returned_info["bucket_name"],
+                        returned_info["blob_name"],
+                    ),
+                },
             }
-        }).execute()
+        )
+        .execute()
+    )
 
     # Use a dict to send all values to the next task as a single var
-    returned_info.update({'operation_name': response['name']})
+    returned_info.update({"operation_name": response["name"]})
     return returned_info
 
 
@@ -186,16 +209,18 @@ def poll_for_result_and_save(self, returned_info, af_id, service=None):
         service = get_speech_service()
     af = Audio.objects.get(pk=af_id)
 
-    polling_response = (service.operations()
-                        .get(name=returned_info['operation_name'])
-                        .execute())
-    if 'done' in polling_response and polling_response['done']:
+    polling_response = (
+        service.operations()
+        .get(name=returned_info["operation_name"])
+        .execute()
+    )
+    if "done" in polling_response and polling_response["done"]:
         af.stt_google_response = json.dumps(polling_response, indent=2)
         af.stt_status = af.STT_COMPLETE
         af.save()
         return returned_info
     else:
-        last_try = (self.request.retries == self.max_retries)
+        last_try = self.request.retries == self.max_retries
         if last_try:
             af.stt_status = af.STT_FAILED
             af.save(index=False)  # Skip indexing if we have no new content.
@@ -216,8 +241,8 @@ def delete_blob_from_google(returned_info, client=None):
     """
     if client is None:
         client = get_storage_client()
-    b = client.get_bucket(returned_info['bucket_name'])
-    blob = b.get_blob(returned_info['blob_name'])
+    b = client.get_bucket(returned_info["bucket_name"])
+    blob = b.get_blob(returned_info["blob_name"])
     blob.delete()
 
 
@@ -229,7 +254,7 @@ def upload_audio_to_ia(self, af_pk):
         d.court_id,
         d.docket_number,
         d.date_argued,
-        af.local_path_original_file.path.rsplit('.', 1)[1]
+        af.local_path_original_file.path.rsplit(".", 1)[1],
     )
     bucket_name = get_bucket_name(d.court_id, slugify(d.docket_number))
     responses = upload_to_ia(
@@ -239,11 +264,11 @@ def upload_audio_to_ia(self, af_pk):
         title=best_case_name(d),
         collection=settings.IA_OA_COLLECTIONS,
         court_id=d.court_id,
-        source_url='https://www.courtlistener.com%s' % af.get_absolute_url(),
-        media_type='audio',
-        description='This item represents an oral argument audio file as '
-                    'scraped from a U.S. Government website by Free Law '
-                    'Project.',
+        source_url="https://www.courtlistener.com%s" % af.get_absolute_url(),
+        media_type="audio",
+        description="This item represents an oral argument audio file as "
+        "scraped from a U.S. Government website by Free Law "
+        "Project.",
     )
     if responses is None:
         increment_failure_count(af)
@@ -252,8 +277,9 @@ def upload_audio_to_ia(self, af_pk):
     if all(r.ok for r in responses):
         af.ia_upload_failure_count = None
         af.filepath_ia = "https://archive.org/download/%s/%s" % (
-            bucket_name, file_name)
+            bucket_name,
+            file_name,
+        )
         af.save()
     else:
         increment_failure_count(af)
-

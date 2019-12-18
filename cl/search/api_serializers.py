@@ -9,208 +9,225 @@ from cl.audio.models import Audio
 from cl.people_db.models import Person, PartyType
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
 from cl.search.models import (
-    Citation, Court, Docket, DocketEntry, Opinion, OpinionsCited,
-    OpinionCluster, OriginatingCourtInformation, RECAPDocument, Tag,
+    Citation,
+    Court,
+    Docket,
+    DocketEntry,
+    Opinion,
+    OpinionsCited,
+    OpinionCluster,
+    OriginatingCourtInformation,
+    RECAPDocument,
+    Tag,
 )
 
 
 class PartyTypeSerializer(HyperlinkedModelSerializerWithId):
-    party_type = serializers.CharField(source='name')
+    party_type = serializers.CharField(source="name")
 
     class Meta:
         model = PartyType
-        fields = ('party', 'party_type',)
+        fields = (
+            "party",
+            "party_type",
+        )
 
 
 class OriginalCourtInformationSerializer(HyperlinkedModelSerializerWithId):
-
     class Meta:
         model = OriginatingCourtInformation
-        fields = '__all__'
+        fields = "__all__"
 
 
-class DocketSerializer(DynamicFieldsMixin,
-                       HyperlinkedModelSerializerWithId):
+class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     court = serializers.HyperlinkedRelatedField(
         many=False,
-        view_name='court-detail',
+        view_name="court-detail",
         queryset=Court.objects.exclude(jurisdiction=Court.TESTING_COURT),
     )
     original_court_info = OriginalCourtInformationSerializer(
-        source='originating_court_information',
+        source="originating_court_information",
     )
     idb_data = FjcIntegratedDatabaseSerializer()
     clusters = serializers.HyperlinkedRelatedField(
         many=True,
-        view_name='opinioncluster-detail',
+        view_name="opinioncluster-detail",
         queryset=OpinionCluster.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     audio_files = serializers.HyperlinkedRelatedField(
         many=True,
-        view_name='audio-detail',
+        view_name="audio-detail",
         queryset=Audio.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     assigned_to = serializers.HyperlinkedRelatedField(
         many=False,
-        view_name='person-detail',
+        view_name="person-detail",
         queryset=Person.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     referred_to = serializers.HyperlinkedRelatedField(
         many=False,
-        view_name='person-detail',
+        view_name="person-detail",
         queryset=Person.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
-    absolute_url = serializers.CharField(source='get_absolute_url',
-                                         read_only=True)
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
 
     class Meta:
         model = Docket
-        exclude = ('view_count', 'parties', 'originating_court_information')
+        exclude = ("view_count", "parties", "originating_court_information")
 
 
-class RECAPDocumentSerializer(DynamicFieldsMixin,
-                              HyperlinkedModelSerializerWithId):
+class RECAPDocumentSerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
     tags = serializers.HyperlinkedRelatedField(
         many=True,
-        view_name='tag-detail',
+        view_name="tag-detail",
         queryset=Tag.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
-    absolute_url = serializers.CharField(source='get_absolute_url',
-                                         read_only=True)
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
 
     class Meta:
         model = RECAPDocument
-        exclude = ('docket_entry',)
+        exclude = ("docket_entry",)
 
 
-class DocketEntrySerializer(DynamicFieldsMixin,
-                            HyperlinkedModelSerializerWithId):
+class DocketEntrySerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
     docket = serializers.HyperlinkedRelatedField(
         many=False,
-        view_name='docket-detail',
+        view_name="docket-detail",
         queryset=Docket.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     recap_documents = RECAPDocumentSerializer(many=True, read_only=True)
 
     class Meta:
         model = DocketEntry
-        fields = '__all__'
+        fields = "__all__"
 
 
 class FullDocketSerializer(DocketSerializer):
     docket_entries = DocketEntrySerializer(many=True, read_only=True)
 
 
-class CourtSerializer(DynamicFieldsMixin,
-                      HyperlinkedModelSerializerWithId):
+class CourtSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     class Meta:
         model = Court
-        exclude = ('notes',)
+        exclude = ("notes",)
 
 
-class OpinionSerializer(DynamicFieldsMixin,
-                        HyperlinkedModelSerializerWithId):
-    absolute_url = serializers.CharField(source='get_absolute_url',
-                                         read_only=True)
+class OpinionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
     cluster = serializers.HyperlinkedRelatedField(
         many=False,
-        view_name='opinioncluster-detail',
+        view_name="opinioncluster-detail",
         queryset=OpinionCluster.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     author = serializers.HyperlinkedRelatedField(
         many=False,
-        view_name='person-detail',
+        view_name="person-detail",
         queryset=Person.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     joined_by = serializers.HyperlinkedRelatedField(
         many=True,
-        view_name='person-detail',
+        view_name="person-detail",
         queryset=Person.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
 
     class Meta:
         model = Opinion
-        fields = '__all__'
+        fields = "__all__"
 
 
-class OpinionsCitedSerializer(DynamicFieldsMixin,
-                              HyperlinkedModelSerializerWithId):
+class OpinionsCitedSerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
     # These attributes seem unnecessary and this endpoint serializes the same
     # data without them, but when they're not here the API does a query that
     # pulls back ALL Opinions.
     citing_opinion = serializers.HyperlinkedRelatedField(
         many=False,
-        view_name='opinion-detail',
+        view_name="opinion-detail",
         queryset=Opinion.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     cited_opinion = serializers.HyperlinkedRelatedField(
         many=False,
-        view_name='opinion-detail',
+        view_name="opinion-detail",
         queryset=Opinion.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
 
     class Meta:
         model = OpinionsCited
-        fields = '__all__'
+        fields = "__all__"
 
 
 class CitationSerializer(ModelSerializer):
     class Meta:
         model = Citation
-        exclude = ('id', 'cluster',)
+        exclude = (
+            "id",
+            "cluster",
+        )
 
 
-class OpinionClusterSerializer(DynamicFieldsMixin,
-                               HyperlinkedModelSerializerWithId):
-    absolute_url = serializers.CharField(source='get_absolute_url',
-                                         read_only=True)
+class OpinionClusterSerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
     panel = serializers.HyperlinkedRelatedField(
         many=True,
-        view_name='person-detail',
+        view_name="person-detail",
         queryset=Person.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     non_participating_judges = serializers.HyperlinkedRelatedField(
         many=True,
-        view_name='person-detail',
+        view_name="person-detail",
         queryset=Person.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     docket = serializers.HyperlinkedRelatedField(
         many=False,
-        view_name='docket-detail',
+        view_name="docket-detail",
         queryset=Docket.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     sub_opinions = serializers.HyperlinkedRelatedField(
         many=True,
-        view_name='opinion-detail',
+        view_name="opinion-detail",
         queryset=Opinion.objects.all(),
-        style={'base_template': 'input.html'},
+        style={"base_template": "input.html"},
     )
     citations = CitationSerializer(many=True)
 
     class Meta:
         model = OpinionCluster
-        fields = '__all__'
+        fields = "__all__"
 
 
-class TagSerializer(DynamicFieldsMixin,
-                    HyperlinkedModelSerializerWithId):
+class TagSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     class Meta:
         model = Tag
-        fields = '__all__'
+        fields = "__all__"
 
 
 class SearchResultSerializer(serializers.Serializer):
@@ -226,38 +243,36 @@ class SearchResultSerializer(serializers.Serializer):
         raise NotImplementedError
 
     solr_field_mappings = {
-        u'boolean': serializers.BooleanField,
-        u'string': serializers.CharField,
-        u'text_en_splitting_cl': serializers.CharField,
-        u'text_no_word_parts': serializers.CharField,
-        u'date': serializers.DateTimeField,
-
+        u"boolean": serializers.BooleanField,
+        u"string": serializers.CharField,
+        u"text_en_splitting_cl": serializers.CharField,
+        u"text_no_word_parts": serializers.CharField,
+        u"date": serializers.DateTimeField,
         # Numbers
-        u'int': serializers.IntegerField,
-        u'tint': serializers.IntegerField,
-        u'long': serializers.IntegerField,
+        u"int": serializers.IntegerField,
+        u"tint": serializers.IntegerField,
+        u"long": serializers.IntegerField,
         # schema.SolrFloatField: serializers.FloatField,
         # schema.SolrDoubleField: serializers.IntegerField,
-
         # Other
-        u'pagerank': serializers.CharField,
+        u"pagerank": serializers.CharField,
     }
-    skipped_fields = ['_version_', 'django_ct', 'django_id', 'text']
+    skipped_fields = ["_version_", "django_ct", "django_id", "text"]
 
     def get_fields(self):
         """Return a list of fields so that they don't have to be declared one
         by one and updated whenever there's a new field.
         """
         fields = {
-            'snippet': serializers.CharField(read_only=True),
+            "snippet": serializers.CharField(read_only=True),
         }
         # Map each field in the Solr schema to a DRF field
-        for field in self._context['schema']['fields']:
-            if field.get('multiValued'):
+        for field in self._context["schema"]["fields"]:
+            if field.get("multiValued"):
                 drf_field = serializers.ListField
             else:
-                drf_field = self.solr_field_mappings[field[u'type']]
-            fields[field[u'name']] = drf_field(read_only=True)
+                drf_field = self.solr_field_mappings[field[u"type"]]
+            fields[field[u"name"]] = drf_field(read_only=True)
 
         for field in self.skipped_fields:
             if field in fields:

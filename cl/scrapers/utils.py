@@ -19,16 +19,18 @@ from cl.search.models import RECAPDocument
 def test_for_meta_redirections(r):
     mime = magic.from_buffer(r.content, mime=True)
     extension = mimetypes.guess_extension(mime)
-    if extension == '.html':
+    if extension == ".html":
         html_tree = html.fromstring(r.text)
         try:
-            path = "//meta[translate(@http-equiv, 'REFSH', 'refsh') = " \
-                   "'refresh']/@content"
+            path = (
+                "//meta[translate(@http-equiv, 'REFSH', 'refsh') = "
+                "'refresh']/@content"
+            )
             attr = html_tree.xpath(path)[0]
             wait, text = attr.split(";")
             if text.lower().startswith("url="):
                 url = text[4:]
-                if not url.startswith('http'):
+                if not url.startswith("http"):
                     # Relative URL, adapt
                     url = urljoin(r.url, url)
                 return True, url
@@ -45,7 +47,9 @@ def follow_redirections(r, s):
     """
     redirected, url = test_for_meta_redirections(r)
     if redirected:
-        logger.info('Following a meta redirection to: %s' % url.encode('utf-8'))
+        logger.info(
+            "Following a meta redirection to: %s" % url.encode("utf-8")
+        )
         r = follow_redirections(s.get(url), s)
     return r
 
@@ -53,36 +57,36 @@ def follow_redirections(r, s):
 def get_extension(content):
     """A handful of workarounds for getting extensions we can trust."""
     file_str = magic.from_buffer(content)
-    if file_str.startswith('Composite Document File V2 Document'):
+    if file_str.startswith("Composite Document File V2 Document"):
         # Workaround for issue with libmagic1==5.09-2 in Ubuntu 12.04. Fixed
         # in libmagic 5.11-2.
-        mime = 'application/msword'
-    elif file_str == '(Corel/WP)':
-        mime = 'application/vnd.wordperfect'
-    elif file_str == 'C source, ASCII text':
-        mime = 'text/plain'
+        mime = "application/msword"
+    elif file_str == "(Corel/WP)":
+        mime = "application/vnd.wordperfect"
+    elif file_str == "C source, ASCII text":
+        mime = "text/plain"
     else:
         # No workaround necessary
         mime = magic.from_buffer(content, mime=True)
     extension = mimetypes.guess_extension(mime)
-    if extension == '.obj':
+    if extension == ".obj":
         # It could be a wpd, if it's not a PDF
-        if 'PDF' in content[0:40]:
+        if "PDF" in content[0:40]:
             # Does 'PDF' appear in the beginning of the content?
-            extension = '.pdf'
+            extension = ".pdf"
         else:
-            extension = '.wpd'
-    if extension == '.wsdl':
+            extension = ".wpd"
+    if extension == ".wsdl":
         # It's probably an HTML file, like those from Resource.org
-        extension = '.html'
-    if extension == '.ksh':
-        extension = '.txt'
-    if extension == '.asf':
-        extension = '.wma'
+        extension = ".html"
+    if extension == ".ksh":
+        extension = ".txt"
+    if extension == ".asf":
+        extension = ".wma"
     return extension
 
 
-def get_binary_content(download_url, cookies, adapter, method='GET'):
+def get_binary_content(download_url, cookies, adapter, method="GET"):
     """ Downloads the file, covering a few special cases such as invalid SSL
     certificates and empty file errors.
 
@@ -97,23 +101,23 @@ def get_binary_content(download_url, cookies, adapter, method='GET'):
     """
     if not download_url:
         # Occurs when a DeferredList fetcher fails.
-        msg = 'NoDownloadUrlError: %s\n%s' % (download_url,
-                                              traceback.format_exc())
+        msg = "NoDownloadUrlError: %s\n%s" % (
+            download_url,
+            traceback.format_exc(),
+        )
         return msg, None
     # noinspection PyBroadException
     try:
-        if method == 'LOCAL':
-            url = os.path.join(
-                settings.MEDIA_ROOT,
-                download_url)
+        if method == "LOCAL":
+            url = os.path.join(settings.MEDIA_ROOT, download_url)
             mr = MockRequest(url=url)
             r = mr.get()
         else:
             # Note that we do a GET even if site.method is POST. This is
             # deliberate.
             s = requests.session()
-            s.mount('https://', adapter)
-            headers = {'User-Agent': 'CourtListener'}
+            s.mount("https://", adapter)
+            headers = {"User-Agent": "CourtListener"}
 
             r = s.get(
                 download_url,
@@ -125,8 +129,10 @@ def get_binary_content(download_url, cookies, adapter, method='GET'):
 
             # test for empty files (thank you CA1)
             if len(r.content) == 0:
-                msg = 'EmptyFileError: %s\n%s' % (download_url,
-                                                  traceback.format_exc())
+                msg = "EmptyFileError: %s\n%s" % (
+                    download_url,
+                    traceback.format_exc(),
+                )
                 return msg, None
 
             # test for and follow meta redirects
@@ -134,19 +140,21 @@ def get_binary_content(download_url, cookies, adapter, method='GET'):
 
             r.raise_for_status()
     except:
-        msg = 'DownloadingError: %s\n%s' % (download_url,
-                                            traceback.format_exc())
+        msg = "DownloadingError: %s\n%s" % (
+            download_url,
+            traceback.format_exc(),
+        )
         return msg, None
 
     # Success!
-    return '', r
+    return "", r
 
 
 def signal_handler(signal, frame):
     # Trigger this with CTRL+4
-    logger.info('**************')
-    logger.info('Signal caught. Finishing the current court, then exiting...')
-    logger.info('**************')
+    logger.info("**************")
+    logger.info("Signal caught. Finishing the current court, then exiting...")
+    logger.info("**************")
     global die_now
     die_now = True
 
@@ -165,7 +173,7 @@ def extract_recap_documents(docs, skip_ocr=False, order_by=None, queue=None):
     :param queue: The celery queue to send the content to.
     :type queue: str
     """
-    docs = docs.exclude(filepath_local='')
+    docs = docs.exclude(filepath_local="")
     if skip_ocr:
         # Focus on the items that we don't know if they need OCR.
         docs = docs.filter(ocr_status=None)
@@ -174,14 +182,14 @@ def extract_recap_documents(docs, skip_ocr=False, order_by=None, queue=None):
         docs = docs.filter(ocr_status=RECAPDocument.OCR_NEEDED)
 
     if order_by is not None:
-        if order_by == 'small-first':
-            docs = docs.order_by('page_count')
-        elif order_by == 'big-first':
-            docs = docs.order_by('-page_count')
+        if order_by == "small-first":
+            docs = docs.order_by("page_count")
+        elif order_by == "big-first":
+            docs = docs.order_by("-page_count")
 
     count = docs.count()
     throttle = CeleryThrottle(queue_name=queue)
-    for i, pk in enumerate(docs.values_list('pk', flat=True)):
+    for i, pk in enumerate(docs.values_list("pk", flat=True)):
         throttle.maybe_wait()
         extract_recap_pdf.apply_async((pk, skip_ocr), priority=5, queue=queue)
         if i % 1000 == 0:

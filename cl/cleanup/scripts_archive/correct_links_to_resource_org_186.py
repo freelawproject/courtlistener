@@ -1,7 +1,7 @@
 import os
 import sys
 
-execfile('/etc/courtlistener')
+execfile("/etc/courtlistener")
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -20,18 +20,27 @@ def link_fixer(link):
     Fixed: http://bulk.resource.org/courts.gov/c/F2/996/996.F2d.311.html
     """
     # Very crude and lazy replacement of US with F2
-    link_parts = link.split('US')
-    fixed = 'F2'.join(link_parts)
+    link_parts = link.split("US")
+    fixed = "F2".join(link_parts)
 
     # Fixes the number
-    link_parts = fixed.split('/')
+    link_parts = fixed.split("/")
     number = int(link_parts[-2]) + 177
-    fixed = '/'.join(link_parts[0:-2]) + "/" + str(number) + "/" + str(link_parts[-1])
+    fixed = (
+        "/".join(link_parts[0:-2])
+        + "/"
+        + str(number)
+        + "/"
+        + str(link_parts[-1])
+    )
 
     return fixed
 
+
 def cleaner(simulate=False, verbose=False):
-    docs = queryset_generator(Document.objects.filter(source = 'R', time_retrieved__gt = '2011-06-01'))
+    docs = queryset_generator(
+        Document.objects.filter(source="R", time_retrieved__gt="2011-06-01")
+    )
     for doc in docs:
         original_link = doc.download_url
         fixed = link_fixer(original_link)
@@ -46,11 +55,22 @@ def cleaner(simulate=False, verbose=False):
 def main():
     usage = "usage: %prog [--verbose] [---simulate]"
     parser = OptionParser(usage)
-    parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
-        default=False, help="Display log during execution")
-    parser.add_option('-s', '--simulate', action="store_true",
-        dest='simulate', default=False, help="Simulate the corrections without " + \
-        "actually making them.")
+    parser.add_option(
+        "-v",
+        "--verbose",
+        action="store_true",
+        dest="verbose",
+        default=False,
+        help="Display log during execution",
+    )
+    parser.add_option(
+        "-s",
+        "--simulate",
+        action="store_true",
+        dest="simulate",
+        default=False,
+        help="Simulate the corrections without " + "actually making them.",
+    )
     (options, args) = parser.parse_args()
 
     verbose = options.verbose
@@ -64,5 +84,5 @@ def main():
     return cleaner(simulate, verbose)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

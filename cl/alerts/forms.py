@@ -8,41 +8,35 @@ from cl.alerts.models import Alert
 
 class CreateAlertForm(ModelForm):
     def __init__(self, *args, **kwargs):
-        self.user = kwargs.pop('user', None)
+        self.user = kwargs.pop("user", None)
         super(CreateAlertForm, self).__init__(*args, **kwargs)
 
     def clean_rate(self):
-        rate = self.cleaned_data['rate']
-        not_donated_enough = self.user.profile.total_donated_last_year < \
-            settings.MIN_DONATION['rt_alerts']
-        if rate == 'rt' and not_donated_enough:
+        rate = self.cleaned_data["rate"]
+        not_donated_enough = (
+            self.user.profile.total_donated_last_year
+            < settings.MIN_DONATION["rt_alerts"]
+        )
+        if rate == "rt" and not_donated_enough:
             # Somebody is trying to hack past the JS/HTML block on the front
             # end. Don't let them create the alert until they've donated.
             raise ValidationError(
-                u'You must donate more than $10 per year to create Real Time '
-                u'alerts.'
+                u"You must donate more than $10 per year to create Real Time "
+                u"alerts."
             )
         else:
             return rate
 
     class Meta:
         model = Alert
-        exclude = ('user', 'secret_key')
+        exclude = ("user", "secret_key")
         fields = (
-            'name',
-            'query',
-            'rate',
+            "name",
+            "query",
+            "rate",
         )
         widgets = {
-            'query': HiddenInput(),
-            'name': TextInput(
-                attrs={
-                    'class': 'form-control',
-                }
-            ),
-            'rate': Select(
-                attrs={
-                    'class': 'form-control',
-                }
-            ),
+            "query": HiddenInput(),
+            "name": TextInput(attrs={"class": "form-control",}),
+            "rate": Select(attrs={"class": "form-control",}),
         }

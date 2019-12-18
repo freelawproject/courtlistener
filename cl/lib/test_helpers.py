@@ -33,18 +33,26 @@ class EmptySolrTestCase(TestCase):
         self.core_name_recap = settings.SOLR_RECAP_TEST_CORE_NAME
 
         self.si_opinion = sunburnt.SolrInterface(
-            settings.SOLR_OPINION_URL, mode='rw')
+            settings.SOLR_OPINION_URL, mode="rw"
+        )
         self.si_audio = sunburnt.SolrInterface(
-            settings.SOLR_AUDIO_URL, mode='rw')
+            settings.SOLR_AUDIO_URL, mode="rw"
+        )
         self.si_people = sunburnt.SolrInterface(
-            settings.SOLR_PEOPLE_URL, mode='rw')
+            settings.SOLR_PEOPLE_URL, mode="rw"
+        )
         # This will cause headaches, but it follows in the mission to slowly
         # migrate off of sunburnt. This was added after the items above, and so
         # uses scorched, not sunburnt.
         self.si_recap = scorched.SolrInterface(
-            settings.SOLR_RECAP_URL, mode='rw')
-        self.all_sis = [self.si_opinion, self.si_audio, self.si_people,
-                        self.si_recap]
+            settings.SOLR_RECAP_URL, mode="rw"
+        )
+        self.all_sis = [
+            self.si_opinion,
+            self.si_audio,
+            self.si_people,
+            self.si_recap,
+        ]
 
     def tearDown(self):
         for si in self.all_sis:
@@ -56,15 +64,20 @@ class SolrTestCase(EmptySolrTestCase):
     """A standard Solr test case with content included in the database,  but not
     yet indexed into the database.
     """
-    fixtures = ['test_court.json', 'judge_judy.json',
-                'test_objects_search.json', 'test_objects_audio.json',
-                'authtest_data.json']
+
+    fixtures = [
+        "test_court.json",
+        "judge_judy.json",
+        "test_objects_search.json",
+        "test_objects_audio.json",
+        "authtest_data.json",
+    ]
 
     def setUp(self):
         # Set up some handy variables
         super(SolrTestCase, self).setUp()
 
-        self.court = Court.objects.get(pk='test')
+        self.court = Court.objects.get(pk="test")
         self.expected_num_results_opinion = 6
         self.expected_num_results_audio = 2
 
@@ -75,25 +88,27 @@ class IndexedSolrTestCase(SolrTestCase):
     def setUp(self):
         super(IndexedSolrTestCase, self).setUp()
         cores = {
-            'audio.Audio': self.core_name_audio,
-            'search.Opinion': self.core_name_opinion,
-            'people_db.Person': self.core_name_people,
+            "audio.Audio": self.core_name_audio,
+            "search.Opinion": self.core_name_opinion,
+            "people_db.Person": self.core_name_people,
         }
         for obj_type, core_name in cores.items():
             args = [
-                '--type', obj_type,
-                '--solr-url', '%s/solr/%s' % (settings.SOLR_HOST, core_name),
-                '--update',
-                '--everything',
-                '--do-commit',
-                '--noinput',
+                "--type",
+                obj_type,
+                "--solr-url",
+                "%s/solr/%s" % (settings.SOLR_HOST, core_name),
+                "--update",
+                "--everything",
+                "--do-commit",
+                "--noinput",
             ]
-            call_command('cl_update_index', *args)
+            call_command("cl_update_index", *args)
 
 
 class SitemapTest(IndexedSolrTestCase):
     def __init__(self, *args, **kwargs):
-        super(SitemapTest, self).__init__(*args, ** kwargs)
+        super(SitemapTest, self).__init__(*args, **kwargs)
         self.expected_item_count = None
         self.sitemap_url = None
 
@@ -101,19 +116,21 @@ class SitemapTest(IndexedSolrTestCase):
         """Does content get into the sitemap?"""
         response = self.client.get(self.sitemap_url)
         self.assertEqual(
-            200,
-            response.status_code,
-            msg="Did not get a 200 OK status code."
+            200, response.status_code, msg="Did not get a 200 OK status code."
         )
         xml_tree = etree.fromstring(response.content)
-        node_count = len(xml_tree.xpath(
-            '//s:url',
-            namespaces={'s': 'http://www.sitemaps.org/schemas/sitemap/0.9'},
-        ))
+        node_count = len(
+            xml_tree.xpath(
+                "//s:url",
+                namespaces={
+                    "s": "http://www.sitemaps.org/schemas/sitemap/0.9"
+                },
+            )
+        )
         self.assertEqual(
             node_count,
             self.expected_item_count,
             msg="Did not get the right number of items in the sitemap.\n"
-                "\tCounted:\t%s\n"
-                "\tExpected:\t%s" % (node_count, self.expected_item_count)
+            "\tCounted:\t%s\n"
+            "\tExpected:\t%s" % (node_count, self.expected_item_count),
         )

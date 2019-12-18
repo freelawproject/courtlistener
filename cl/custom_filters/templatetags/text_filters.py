@@ -10,7 +10,7 @@ register = Library()
 
 
 @register.filter(is_safe=True, needs_autoescape=True)
-def oxford_join(items, conjunction="and", separator=',', autoescape=True):
+def oxford_join(items, conjunction="and", separator=",", autoescape=True):
     """Join together items in a human-readable list
 
     Also works for django querysets due to not using negative indexing.
@@ -27,11 +27,11 @@ def oxford_join(items, conjunction="and", separator=',', autoescape=True):
 
     num_items = len(items)
     if num_items == 0:
-        s = ''
+        s = ""
     elif num_items == 1:
         s = items[0]
     elif num_items == 2:
-        s = '%s %s %s' % (items[0], conjunction, items[1])
+        s = "%s %s %s" % (items[0], conjunction, items[1])
     elif num_items > 2:
         # Don't use negative indexing here, even though they'd make this
         # easier. Instead use enumeration to figure out when we're close to the
@@ -42,10 +42,10 @@ def oxford_join(items, conjunction="and", separator=',', autoescape=True):
                 s = item
             elif i == (num_items - 1):
                 # Last item.
-                s += '%s %s %s' % (separator, conjunction, item)
+                s += "%s %s %s" % (separator, conjunction, item)
             else:
                 # Items in the middle
-                s += '%s ' % separator + item
+                s += "%s " % separator + item
 
     return mark_safe(s)
 
@@ -65,7 +65,7 @@ def nbsp(text, autoescape=None):
         # This is an anonymous python identity function. Simply returns the
         # value of x when x is given.
         esc = lambda x: x
-    return mark_safe(re.sub('\s', '&nbsp;', esc(text.strip())))
+    return mark_safe(re.sub("\s", "&nbsp;", esc(text.strip())))
 
 
 @register.filter(needs_autoescape=True)
@@ -77,7 +77,8 @@ def v_wrapper(text, autoescape=None):
     else:
         esc = lambda x: x
     return mark_safe(
-        re.sub(' v\. ', '<span class="alt"> v. </span>', esc(text)))
+        re.sub(" v\. ", '<span class="alt"> v. </span>', esc(text))
+    )
 
 
 @register.filter(needs_autoescape=True)
@@ -88,7 +89,7 @@ def underscore_to_space(text, autoescape=None):
         esc = conditional_escape
     else:
         esc = lambda x: x
-    return mark_safe(re.sub('_', ' ', esc(text)))
+    return mark_safe(re.sub("_", " ", esc(text)))
 
 
 @register.filter(needs_autoescape=True)
@@ -109,7 +110,7 @@ def compress_whitespace(text, autoescape=None):
     else:
         esc = lambda x: x
     text = esc(text)
-    return mark_safe(' '.join(text.split()))
+    return mark_safe(" ".join(text.split()))
 
 
 @register.filter(needs_autoescape=True)
@@ -140,17 +141,17 @@ def naturalduration(seconds, autoescape=None, as_dict=False):
 
     if as_dict:
         return {
-            'd': trunc_d,
-            'h': trunc_h,
-            'm': trunc_m,
-            's': trunc_s,
+            "d": trunc_d,
+            "h": trunc_h,
+            "m": trunc_m,
+            "s": trunc_s,
         }
     else:
-        duration = '%02d:%02d:%02d:%02d' % (trunc_d, trunc_h, trunc_m, trunc_s)
-        trimmed_duration = duration.lstrip('0:')
+        duration = "%02d:%02d:%02d:%02d" % (trunc_d, trunc_h, trunc_m, trunc_s)
+        trimmed_duration = duration.lstrip("0:")
         if len(trimmed_duration) == 0:
             # It was ALL trimmed away.
-            trimmed_duration = '0'
+            trimmed_duration = "0"
 
         return mark_safe(trimmed_duration)
 
@@ -161,7 +162,7 @@ def OR_join(queryset):
 
     This is a one-liner, but you can't do this kind of thing in a template.
     """
-    return ' OR '.join([str(item.pk) for item in queryset])
+    return " OR ".join([str(item.pk) for item in queryset])
 
 
 @register.filter(is_safe=True)
@@ -213,13 +214,13 @@ def read_more(s, show_words, autoescape=True):
         '<span class="read-more">&hellip;'
         '    <a href="#">'
         '        <i class="fa fa-plus-square gray" title="Show All"></i>'
-        '    </a>'
-        '</span>'
+        "    </a>"
+        "</span>"
         # The call to hide the rest...
         '<span class="more hidden">'
     )
 
     # wrap the more part
     words.insert(show_words, insertion)
-    words.append('</span>')
-    return mark_safe(' '.join(words))
+    words.append("</span>")
+    return mark_safe(" ".join(words))

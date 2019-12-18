@@ -16,7 +16,7 @@ from cl.stats.utils import tally_stat
 
 def make_title_str(person):
     """Make a nice title for somebody."""
-    locations = ', '.join(
+    locations = ", ".join(
         {p.court.short_name for p in person.positions.all() if p.court}
     )
     title = person.name_full
@@ -30,12 +30,14 @@ def make_img_path(person):
 
     img_path = None
     if person.has_photo:
-        p = slugify(('%s-%s' % (person.name_last, person.name_first)).lower())
+        p = slugify(("%s-%s" % (person.name_last, person.name_first)).lower())
         if person.date_dob:
-            img_path = static('judge_pics/%s-%s.jpeg'
-                   % (p, granular_date(person, 'date_dob', iso=True, default='')))
+            img_path = static(
+                "judge_pics/%s-%s.jpeg"
+                % (p, granular_date(person, "date_dob", iso=True, default=""))
+            )
         else:
-            img_path = static('judge_pics/%s.jpeg' % p)
+            img_path = static("judge_pics/%s.jpeg" % p)
 
     return img_path
 
@@ -45,9 +47,12 @@ def view_person(request, pk, slug):
 
     # Redirect the user if they're trying to check out an alias.
     if person.is_alias:
-        return HttpResponseRedirect(reverse('view_person', args=[
-            person.is_alias_of.pk, person.is_alias_of.slug
-        ]))
+        return HttpResponseRedirect(
+            reverse(
+                "view_person",
+                args=[person.is_alias_of.pk, person.is_alias_of.slug],
+            )
+        )
 
     # Make the title string.
     title = "Judge %s" % make_title_str(person)
@@ -59,7 +64,7 @@ def view_person(request, pk, slug):
     # template.
     judicial_positions = []
     other_positions = []
-    for p in person.positions.all().order_by('-date_start'):
+    for p in person.positions.all().order_by("-date_start"):
         if p.is_judicial_position:
             judicial_positions.append(p)
         else:
@@ -67,46 +72,68 @@ def view_person(request, pk, slug):
     positions = judicial_positions + other_positions
 
     # Use Solr to get relevant opinions that the person wrote
-    conn = SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+    conn = SolrInterface(settings.SOLR_OPINION_URL, mode="r")
     q = {
-        'q': 'author_id:{p} OR panel_ids:{p}'.format(p=person.pk),
-        'fl': ['id', 'court_id', 'caseName', 'absolute_url', 'court',
-               'court_citation_string', 'dateFiled', 'docketNumber',
-               'citeCount', 'status', 'citation'],
-        'rows': 5,
-        'start': 0,
-        'sort': 'score desc',
-        'caller': 'view_person',
+        "q": "author_id:{p} OR panel_ids:{p}".format(p=person.pk),
+        "fl": [
+            "id",
+            "court_id",
+            "caseName",
+            "absolute_url",
+            "court",
+            "court_citation_string",
+            "dateFiled",
+            "docketNumber",
+            "citeCount",
+            "status",
+            "citation",
+        ],
+        "rows": 5,
+        "start": 0,
+        "sort": "score desc",
+        "caller": "view_person",
     }
     authored_opinions = conn.raw_query(**q).execute()
 
     # Use Solr to get the oral arguments for the judge
-    conn = SolrInterface(settings.SOLR_AUDIO_URL, mode='r')
+    conn = SolrInterface(settings.SOLR_AUDIO_URL, mode="r")
     q = {
-        'q': 'panel_ids:{p}'.format(p=person.pk),
-        'fl': ['id', 'absolute_url', 'caseName', 'court_id', 'dateArgued',
-               'docketNumber', 'court_citation_string'],
-        'rows': 5,
-        'start': 0,
-        'sort': 'dateArgued desc',
-        'caller': 'view_person',
+        "q": "panel_ids:{p}".format(p=person.pk),
+        "fl": [
+            "id",
+            "absolute_url",
+            "caseName",
+            "court_id",
+            "dateArgued",
+            "docketNumber",
+            "court_citation_string",
+        ],
+        "rows": 5,
+        "start": 0,
+        "sort": "dateArgued desc",
+        "caller": "view_person",
     }
     oral_arguments_heard = conn.raw_query(**q).execute()
 
-    return render(request, 'view_person.html', {
-        'person': person,
-        'title': title,
-        'img_path': img_path,
-        'aba_ratings': person.aba_ratings.all().order_by('-year_rated'),
-        'political_affiliations': (person.political_affiliations.all()
-                                   .order_by('-date_start')),
-        'positions': positions,
-        'educations': person.educations.all().order_by('-degree_year'),
-        'authored_opinions': authored_opinions,
-        'oral_arguments_heard': oral_arguments_heard,
-        'ftm_last_updated': settings.FTM_LAST_UPDATED,
-        'private': False
-    })
+    return render(
+        request,
+        "view_person.html",
+        {
+            "person": person,
+            "title": title,
+            "img_path": img_path,
+            "aba_ratings": person.aba_ratings.all().order_by("-year_rated"),
+            "political_affiliations": (
+                person.political_affiliations.all().order_by("-date_start")
+            ),
+            "positions": positions,
+            "educations": person.educations.all().order_by("-degree_year"),
+            "authored_opinions": authored_opinions,
+            "oral_arguments_heard": oral_arguments_heard,
+            "ftm_last_updated": settings.FTM_LAST_UPDATED,
+            "private": False,
+        },
+    )
 
 
 def financial_disclosures_home(request):
@@ -122,41 +149,43 @@ def financial_disclosures_home(request):
     ).distinct()
     disclosure_count = FinancialDisclosure.objects.all().count()
     people_count = people_with_disclosures.count()
-    return render(request, 'financial_disclosures_home.html', {
-        'people': people_with_disclosures,
-        'disclosure_count': disclosure_count,
-        'people_count': people_count,
-        'private': False,
-    })
+    return render(
+        request,
+        "financial_disclosures_home.html",
+        {
+            "people": people_with_disclosures,
+            "disclosure_count": disclosure_count,
+            "people_count": people_count,
+            "private": False,
+        },
+    )
 
 
 def financial_disclosures_for_somebody(request, pk, slug):
     """Show the financial disclosures for a particular person"""
     person = get_object_or_404(Person, pk=pk)
     title = make_title_str(person)
-    return render(request, 'financial_disclosures_for_somebody.html', {
-        'person': person,
-        'title': title,
-        'private': False,
-    })
+    return render(
+        request,
+        "financial_disclosures_for_somebody.html",
+        {"person": person, "title": title, "private": False,},
+    )
 
 
 def financial_disclosures_fileserver(request, pk, slug, filepath):
     """Serve up the financial disclosure files."""
     response = HttpResponse()
-    file_loc = os.path.join(settings.MEDIA_ROOT, filepath.encode('utf-8'))
+    file_loc = os.path.join(settings.MEDIA_ROOT, filepath.encode("utf-8"))
     if settings.DEVELOPMENT:
         # X-Sendfile will only confuse you in a dev env.
-        response.content = open(file_loc, 'r').read()
+        response.content = open(file_loc, "r").read()
     else:
-        response['X-Sendfile'] = file_loc
-    filename = filepath.split('/')[-1]
-    response['Content-Disposition'] = 'inline; filename="%s"' % \
-                                      filename.encode('utf-8')
-    response['Content-Type'] = magic.from_file(file_loc, mime=True)
+        response["X-Sendfile"] = file_loc
+    filename = filepath.split("/")[-1]
+    response[
+        "Content-Disposition"
+    ] = 'inline; filename="%s"' % filename.encode("utf-8")
+    response["Content-Type"] = magic.from_file(file_loc, mime=True)
     if not is_bot(request):
-        tally_stat('financial_reports.static_file.served')
+        tally_stat("financial_reports.static_file.served")
     return response
-
-
-

@@ -1,7 +1,7 @@
 import os
 import sys
 
-execfile('/etc/courtlistener')
+execfile("/etc/courtlistener")
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -16,15 +16,15 @@ from optparse import OptionParser
 def cleaner(simulate=False, verbose=False):
     """Find items that are in californiad and change them to be in caed by using an updated set of regexes.
     """
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
-    q = {'fq': ['court_exact:%s' % 'californiad']}
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="rw")
+    q = {"fq": ["court_exact:%s" % "californiad"]}
 
     results = conn.raw_query(**q)
     for r in results:
         if verbose:
-            print "Running tests on item %s" % r['id']
+            print "Running tests on item %s" % r["id"]
 
-        doc = Document.objects.get(pk=r['id'])
+        doc = Document.objects.get(pk=r["id"])
 
         # Make the HTML element, then figure out the court
         clean_html_tree = html.fromstring(doc.html_lawbox)
@@ -40,7 +40,7 @@ def cleaner(simulate=False, verbose=False):
             if verbose:
                 print "  - Proceeding to next item: Values are equal."
             continue
-        elif correct_court != 'caed':
+        elif correct_court != "caed":
             # Attempting to change to an unexpected value.
             if verbose:
                 print "  - Proceeding to next item: New value is not what we expected."
@@ -60,20 +60,20 @@ def main():
     usage = "usage: %prog [--verbose] [---simulate]"
     parser = OptionParser(usage)
     parser.add_option(
-        '-v',
-        '--verbose',
+        "-v",
+        "--verbose",
         action="store_true",
-        dest='verbose',
+        dest="verbose",
         default=False,
-        help="Display log during execution"
+        help="Display log during execution",
     )
     parser.add_option(
-        '-s',
-        '--simulate',
+        "-s",
+        "--simulate",
         action="store_true",
-        dest='simulate',
+        dest="simulate",
         default=False,
-        help="Simulate the corrections without actually making them."
+        help="Simulate the corrections without actually making them.",
     )
     (options, args) = parser.parse_args()
 
@@ -88,7 +88,5 @@ def main():
     return cleaner(simulate, verbose)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-

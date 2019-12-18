@@ -59,8 +59,9 @@ def get_document_citations(opinion):
     elif opinion.html:
         citations = find_citations.get_citations(opinion.html)
     elif opinion.plain_text:
-        citations = find_citations.get_citations(opinion.plain_text,
-                                                 html=False)
+        citations = find_citations.get_citations(
+            opinion.plain_text, html=False
+        )
     else:
         citations = []
     return citations
@@ -70,15 +71,16 @@ def create_cited_html(opinion, citations):
     if any([opinion.html_columbia, opinion.html_lawbox, opinion.html]):
         new_html = opinion.html_columbia or opinion.html_lawbox or opinion.html
         for citation in citations:
-            new_html = re.sub(citation.as_regex(), citation.as_html(),
-                              new_html)
+            new_html = re.sub(
+                citation.as_regex(), citation.as_html(), new_html
+            )
     elif opinion.plain_text:
         inner_html = opinion.plain_text
         for citation in citations:
             repl = u'</pre>%s<pre class="inline">' % citation.as_html()
             inner_html = re.sub(citation.as_regex(), repl, inner_html)
         new_html = u'<pre class="inline">%s</pre>' % inner_html
-    return new_html.encode('utf-8')
+    return new_html.encode("utf-8")
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
@@ -98,14 +100,15 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
         for citation in citations:
             try:
                 matches = match_citations.match_citation(
-                    citation, citing_doc=opinion)
+                    citation, citing_doc=opinion
+                )
             except ResponseNotReady as e:
                 # Threading problem in httplib, which is used in the Solr query.
                 raise self.retry(exc=e, countdown=2)
 
             # TODO: Figure out what to do if there's more than one
             if len(matches) == 1:
-                match_id = matches[0]['id']
+                match_id = matches[0]["id"]
                 try:
                     matched_opinion = Opinion.objects.get(pk=match_id)
 
@@ -122,7 +125,9 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
 
                     # URL field will be used for generating inline citation
                     # html
-                    citation.match_url = matched_opinion.cluster.get_absolute_url()
+                    citation.match_url = (
+                        matched_opinion.cluster.get_absolute_url()
+                    )
                     citation.match_id = matched_opinion.pk
                 except Opinion.DoesNotExist:
                     # No Opinions returned. Press on.
@@ -143,11 +148,14 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
             OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
 
             # Create the new ones.
-            OpinionsCited.objects.bulk_create([
-                OpinionsCited(citing_opinion_id=opinion.pk,
-                              cited_opinion_id=pk) for
-                pk in opinions_cited
-            ])
+            OpinionsCited.objects.bulk_create(
+                [
+                    OpinionsCited(
+                        citing_opinion_id=opinion.pk, cited_opinion_id=pk
+                    )
+                    for pk in opinions_cited
+                ]
+            )
 
         # Update Solr if requested. In some cases we do it at the end for
         # performance reasons.

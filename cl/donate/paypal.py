@@ -24,23 +24,19 @@ def get_paypal_access_token():
     caching the token and detecting when it is expired.
     """
     r = requests.post(
-        '%s/v1/oauth2/token' % settings.PAYPAL_ENDPOINT,
-        headers={
-            'Accept': 'application/json',
-            'Accept-Language': 'en_US'
-        },
-        auth=(
-            settings.PAYPAL_CLIENT_ID,
-            settings.PAYPAL_SECRET_KEY,
-        ),
-        data={'grant_type': 'client_credentials'}
+        "%s/v1/oauth2/token" % settings.PAYPAL_ENDPOINT,
+        headers={"Accept": "application/json", "Accept-Language": "en_US"},
+        auth=(settings.PAYPAL_CLIENT_ID, settings.PAYPAL_SECRET_KEY,),
+        data={"grant_type": "client_credentials"},
     )
     if r.status_code == HTTP_200_OK:
         logger.info("Got paypal token successfully.")
     else:
-        logger.critical("Problem getting paypal token status_code was: %s, "
-                        "with content: %s" % (r.status_code, r.content))
-    return json.loads(r.content).get('access_token')
+        logger.critical(
+            "Problem getting paypal token status_code was: %s, "
+            "with content: %s" % (r.status_code, r.content)
+        )
+    return json.loads(r.content).get("access_token")
 
 
 @csrf_exempt
@@ -57,17 +53,15 @@ def process_paypal_callback(request):
     this one is a bit of an oddball.
     """
     access_token = get_paypal_access_token()
-    d = Donation.objects.get(transaction_id=request.GET['token'])
+    d = Donation.objects.get(transaction_id=request.GET["token"])
     r = requests.post(
-        '%s/v1/payments/payment/%s/execute/' % (
-            settings.PAYPAL_ENDPOINT,
-            d.payment_id
-        ),
+        "%s/v1/payments/payment/%s/execute/"
+        % (settings.PAYPAL_ENDPOINT, d.payment_id),
         headers={
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer %s' % access_token
+            "Content-Type": "application/json",
+            "Authorization": "Bearer %s" % access_token,
         },
-        data=json.dumps({'payer_id': request.GET['PayerID']}),
+        data=json.dumps({"payer_id": request.GET["PayerID"]}),
     )
     if r.status_code == HTTP_200_OK:
         d.clearing_date = now()
@@ -80,46 +74,45 @@ def process_paypal_callback(request):
         d.save()
         send_thank_you_email(d, payment_type=PAYMENT_TYPES.DONATION)
     else:
-        logger.critical("Unable to execute PayPal transaction. Status code %s "
-                        "with data: %s" % (r.status_code, r.content))
+        logger.critical(
+            "Unable to execute PayPal transaction. Status code %s "
+            "with data: %s" % (r.status_code, r.content)
+        )
         d.status = Donation.UNKNOWN_ERROR
         d.save()
     # Finally, show them the thank you page
-    return HttpResponseRedirect(reverse('donate_complete'))
+    return HttpResponseRedirect(reverse("donate_complete"))
 
 
 def process_paypal_payment(cd_donation_form):
     # https://developer.paypal.com/webapps/developer/docs/integration/web/accept-paypal-payment/
     access_token = get_paypal_access_token()
     if not access_token:
-        raise PaymentFailureException('NO_ACCESS_TOKEN')
+        raise PaymentFailureException("NO_ACCESS_TOKEN")
 
-    return_url = 'https://www.courtlistener.com%s' % reverse('paypal_callback')
-    cancel_url = 'https://www.courtlistener.com%s' % reverse('paypal_cancel')
+    return_url = "https://www.courtlistener.com%s" % reverse("paypal_callback")
+    cancel_url = "https://www.courtlistener.com%s" % reverse("paypal_cancel")
     data = {
-        'intent': 'sale',
-        'redirect_urls': {
-            'return_url': return_url,
-            'cancel_url': cancel_url,
-        },
-        'payer': {'payment_method': 'paypal'},
-        'transactions': [
+        "intent": "sale",
+        "redirect_urls": {"return_url": return_url, "cancel_url": cancel_url,},
+        "payer": {"payment_method": "paypal"},
+        "transactions": [
             {
-                'amount': {
-                    'total': cd_donation_form['amount'],
-                    'currency': 'USD',
+                "amount": {
+                    "total": cd_donation_form["amount"],
+                    "currency": "USD",
                 },
-                'description': 'Donation to Free Law Project',
+                "description": "Donation to Free Law Project",
             }
-        ]
+        ],
     }
     r = requests.post(
-        '%s/v1/payments/payment' % settings.PAYPAL_ENDPOINT,
+        "%s/v1/payments/payment" % settings.PAYPAL_ENDPOINT,
         headers={
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer %s' % access_token
+            "Content-Type": "application/json",
+            "Authorization": "Bearer %s" % access_token,
         },
-        data=json.dumps(data)
+        data=json.dumps(data),
     )
 
     if r.status_code == HTTP_201_CREATED:
@@ -135,15 +128,18 @@ def process_paypal_payment(cd_donation_form):
         #     u'method': u'POST',
         #     u'rel': u'execute'}
         #   ]
-        redirect = [link for link in r_content_as_dict['links'] if
-                    link['rel'].lower() == 'approval_url'][0]['href']
+        redirect = [
+            link
+            for link in r_content_as_dict["links"]
+            if link["rel"].lower() == "approval_url"
+        ][0]["href"]
         parsed_redirect = urlparse(redirect)
-        token = parse_qs(parsed_redirect.query)['token'][0]
+        token = parse_qs(parsed_redirect.query)["token"][0]
         response = {
-            'status': Donation.AWAITING_PAYMENT,
-            'payment_id': r_content_as_dict.get('id'),
-            'transaction_id': token,
-            'redirect': redirect,
+            "status": Donation.AWAITING_PAYMENT,
+            "payment_id": r_content_as_dict.get("id"),
+            "transaction_id": token,
+            "redirect": redirect,
         }
         logger.info("Created payment in paypal with response: %s", response)
         return response
@@ -152,11 +148,12 @@ def process_paypal_payment(cd_donation_form):
 
 
 def donate_paypal_cancel(request):
-    d = Donation.objects.get(transaction_id=request.GET['token'])
+    d = Donation.objects.get(transaction_id=request.GET["token"])
     d.status = Donation.CANCELLED
     d.save()
 
-    return render(request, 'donate_complete.html', {
-        'error': 'User Cancelled',
-        'private': False,
-    })
+    return render(
+        request,
+        "donate_complete.html",
+        {"error": "User Cancelled", "private": False,},
+    )

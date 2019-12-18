@@ -15,27 +15,31 @@ def swap_solr_core(current_core, desired_core, url=settings.SOLR_HOST):
     @desired_core is the core you intend to make live which will be swapped IN.
     """
     params = {
-        'wt': 'json',
-        'action': 'SWAP',
-        'core': current_core,
-        'other': desired_core,
+        "wt": "json",
+        "action": "SWAP",
+        "core": current_core,
+        "other": desired_core,
     }
-    r = requests.get('%s/solr/admin/cores' % url, params=params)
+    r = requests.get("%s/solr/admin/cores" % url, params=params)
     if r.status_code != 200:
-        print("Problem swapping cores. Got status_code of %s. "
-              "Check the Solr logs for details." % r.status_code)
+        print(
+            "Problem swapping cores. Got status_code of %s. "
+            "Check the Solr logs for details." % r.status_code
+        )
 
 
-def get_solr_core_status(core='all', url=settings.SOLR_HOST):
+def get_solr_core_status(core="all", url=settings.SOLR_HOST):
     """Get the status for the solr core as an XML document."""
-    if core == 'all':
-        core_query = ''
+    if core == "all":
+        core_query = ""
     else:
-        core_query = '&core=%s' % core
-    r = requests.get('%s/solr/admin/cores?action=STATUS%s' % (url, core_query))
+        core_query = "&core=%s" % core
+    r = requests.get("%s/solr/admin/cores?action=STATUS%s" % (url, core_query))
     if r.status_code != 200:
-        print("Problem getting the core status. Got status_code of %s. "
-              "Check the Solr logs for details." % r.status_code)
+        print(
+            "Problem getting the core status. Got status_code of %s. "
+            "Check the Solr logs for details." % r.status_code
+        )
 
     try:
         solr_config = lxml.etree.parse(StringIO.StringIO(r.content))
@@ -45,36 +49,37 @@ def get_solr_core_status(core='all', url=settings.SOLR_HOST):
     return solr_config
 
 
-def get_term_frequency(count=500, result_type='dict', field='text',
-                       url=settings.SOLR_HOST):
+def get_term_frequency(
+    count=500, result_type="dict", field="text", url=settings.SOLR_HOST
+):
     """Get the term frequency in the index.
 
     result_type can be json, list or dict.
     """
     params = {
-        'fl': field,
-        'numTerms': str(count),
-        'wt': 'json',
+        "fl": field,
+        "numTerms": str(count),
+        "wt": "json",
     }
-    r = requests.get('%s/solr/admin/luke' % url, params=params)
+    r = requests.get("%s/solr/admin/luke" % url, params=params)
     content_as_json = json.loads(r.content)
-    if result_type == 'list':
-        if len(content_as_json['fields']) == 0:
+    if result_type == "list":
+        if len(content_as_json["fields"]) == 0:
             return []
         else:
             top_terms = []
-            for result in content_as_json['fields']['text']['topTerms']:
+            for result in content_as_json["fields"]["text"]["topTerms"]:
                 # Top terms is a list of alternating terms and counts. Their
                 # types are different, so we'll use that.
                 if isinstance(result, basestring):
                     top_terms.append(result)
             return top_terms
-    elif result_type == 'dict':
-        if len(content_as_json['fields']) == 0:
+    elif result_type == "dict":
+        if len(content_as_json["fields"]) == 0:
             return {}
         else:
             top_terms = {}
-            for result in content_as_json['fields']['text']['topTerms']:
+            for result in content_as_json["fields"]["text"]["topTerms"]:
                 # We set aside the term until we reach its count, then we add
                 # them as a k,v pair
                 if isinstance(result, basestring):
@@ -93,5 +98,8 @@ def get_data_dir(core, url=settings.SOLR_HOST):
     Useful when writing the external_pagerank file or when reading it.
     """
     status_doc = get_solr_core_status(url=url)
-    return str(status_doc.xpath(
-            '//*[@name="%s"]//*[@name="dataDir"]/text()' % core)[0])
+    return str(
+        status_doc.xpath('//*[@name="%s"]//*[@name="dataDir"]/text()' % core)[
+            0
+        ]
+    )
