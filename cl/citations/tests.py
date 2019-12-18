@@ -162,12 +162,11 @@ class CiteTest(TestCase):
                 cites_found,
                 a,
                 msg="%s\n%s\n\n    !=\n\n%s"
-                    % (
-                        q,
-                        ",\n".join(
-                            [str(cite.__dict__) for cite in cites_found]),
-                        ",\n".join([str(cite.__dict__) for cite in a]),
-                    ),
+                % (
+                    q,
+                    ",\n".join([str(cite.__dict__) for cite in cites_found]),
+                    ",\n".join([str(cite.__dict__) for cite in a]),
+                ),
             )
             print "✓"
 
@@ -224,12 +223,11 @@ class CiteTest(TestCase):
                 cites_found,
                 a,
                 msg="%s\n%s\n\n    !=\n\n%s"
-                    % (
-                        q,
-                        ",\n".join(
-                            [str(cite.__dict__) for cite in cites_found]),
-                        ",\n".join([str(cite.__dict__) for cite in a]),
-                    ),
+                % (
+                    q,
+                    ",\n".join([str(cite.__dict__) for cite in cites_found]),
+                    ",\n".join([str(cite.__dict__) for cite in a]),
+                ),
             )
             print "✓"
 
@@ -251,8 +249,8 @@ class CiteTest(TestCase):
                 date_in_reporter,
                 pair[2],
                 msg='is_date_in_reporter(REPORTERS[%s][0]["editions"], %s) != '
-                    "%s\nIt's equal to: %s"
-                    % (pair[0], pair[1], pair[2], date_in_reporter),
+                "%s\nIt's equal to: %s"
+                % (pair[0], pair[1], pair[2], date_in_reporter),
             )
 
     def test_disambiguate_citations(self):
@@ -340,11 +338,11 @@ class CiteTest(TestCase):
                 citations,
                 pair[1],
                 msg="%s\n%s != \n%s"
-                    % (
-                        pair[0],
-                        [cite.__dict__ for cite in citations],
-                        [cite.__dict__ for cite in pair[1]],
-                    ),
+                % (
+                    pair[0],
+                    [cite.__dict__ for cite in citations],
+                    [cite.__dict__ for cite in pair[1]],
+                ),
             )
             print "✓"
 
@@ -394,8 +392,8 @@ class MatchingTest(IndexedSolrTestCase):
             cited.cluster.citation_count,
             expected_count,
             msg=u"'cited' was not updated by a citation found in 'citing', or "
-                u"the citation was not found. Count was: %s instead of %s"
-                % (cited.cluster.citation_count, expected_count),
+            u"the citation was not found. Count was: %s instead of %s"
+            % (cited.cluster.citation_count, expected_count),
         )
 
     def test_citation_matching_issue621(self):
@@ -459,8 +457,8 @@ class CitationCommandTest(IndexedSolrTestCase):
             cited.cluster.citation_count,
             expected_count,
             msg=u"'cited' was not updated by a citation found in 'citing', or "
-                u"the citation was not found. Count was: %s instead of %s"
-                % (cited.cluster.citation_count, expected_count),
+            u"the citation was not found. Count was: %s instead of %s"
+            % (cited.cluster.citation_count, expected_count),
         )
 
     def test_index_by_doc_id(self):
@@ -538,8 +536,8 @@ class ParallelCitationTest(SimpleTestCase):
                 computed_num_citation_groups,
                 citation_group_count,
                 msg="Did not have correct number of citation groups. Got %s, "
-                    "not %s."
-                    % (computed_num_citation_groups, citation_group_count),
+                "not %s."
+                % (computed_num_citation_groups, citation_group_count),
             )
             if not citation_groups:
                 # Add an empty list to make testing easier.
@@ -549,11 +547,11 @@ class ParallelCitationTest(SimpleTestCase):
                 computed_num_parallel_citation,
                 expected_num_parallel_citations,
                 msg="Did not identify correct number of parallel citations in "
-                    "the group. Got %s, not %s"
-                    % (
-                        computed_num_parallel_citation,
-                        expected_num_parallel_citations,
-                    ),
+                "the group. Got %s, not %s"
+                % (
+                    computed_num_parallel_citation,
+                    expected_num_parallel_citations,
+                ),
             )
             print "✓"
 

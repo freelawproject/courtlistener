@@ -305,7 +305,8 @@ with Virginia Historic Tax Credit Fund""",
         """Find Tax Court Citations """
 
         test_pairs = (
-            ("""  1 UNITED STATES TAX COURT REPORT (2018)    
+            (
+                """  1 UNITED STATES TAX COURT REPORT (2018)    
 
 
 
@@ -325,24 +326,34 @@ with Virginia Historic Tax Credit Fund""",
 
 
      Nancy Ortmeyer Kuhn, for petitioner.
-        """, {'reporter_index': 1,
-              'canonical_reporter': u'T.C.',
-              'match_id': None,
-              'extra': None,
-              'plaintiff': None,
-              'reporter': u'T.C.',
-              'year': None,
-              'volume': 1,
-              'reporter_found': 'UNITED STATES TAX COURT REPORT',
-              'cite_type': 4, 'lookup_index': 0,
-              'court': None,
-              'equality_attributes': ['reporter', 'volume', 'page',
-                                      'canonical_reporter', 'lookup_index'],
-              'match_url': None,
-              'page': 2018,
-              'defendant': None}),
-
-                ("""  T.C. Memo. 2003-150
+        """,
+                {
+                    "reporter_index": 1,
+                    "canonical_reporter": u"T.C.",
+                    "match_id": None,
+                    "extra": None,
+                    "plaintiff": None,
+                    "reporter": u"T.C.",
+                    "year": None,
+                    "volume": 1,
+                    "reporter_found": "UNITED STATES TAX COURT REPORT",
+                    "cite_type": 4,
+                    "lookup_index": 0,
+                    "court": None,
+                    "equality_attributes": [
+                        "reporter",
+                        "volume",
+                        "page",
+                        "canonical_reporter",
+                        "lookup_index",
+                    ],
+                    "match_url": None,
+                    "page": 2018,
+                    "defendant": None,
+                },
+            ),
+            (
+                """  T.C. Memo. 2003-150
 
 
 
@@ -358,33 +369,36 @@ with Virginia Historic Tax Credit Fund""",
                                    TAX MATTERS PARTNER,
 
 
-                """, {'reporter_index': 0,
-                      'canonical_reporter': u'T.C. Memo.',
-                      'match_id': None,
-                      'extra': None,
-                      'plaintiff': None,
-                      'reporter': 'T.C. Memo.',
-                      'year': None,
-                      'volume': 2003,
-                      'reporter_found': 'T.C. Memo.',
-                      'cite_type': 8,
-                      'lookup_index': 0,
-                      'court': None,
-                      'equality_attributes': ['reporter', 'volume', 'page',
-                                              'canonical_reporter',
-                                              'lookup_index'],
-                      'match_url': None,
-                      'page': 150,
-                      'defendant': None}
-)
+                """,
+                {
+                    "reporter_index": 0,
+                    "canonical_reporter": u"T.C. Memo.",
+                    "match_id": None,
+                    "extra": None,
+                    "plaintiff": None,
+                    "reporter": "T.C. Memo.",
+                    "year": None,
+                    "volume": 2003,
+                    "reporter_found": "T.C. Memo.",
+                    "cite_type": 8,
+                    "lookup_index": 0,
+                    "court": None,
+                    "equality_attributes": [
+                        "reporter",
+                        "volume",
+                        "page",
+                        "canonical_reporter",
+                        "lookup_index",
+                    ],
+                    "match_url": None,
+                    "page": 150,
+                    "defendant": None,
+                },
+            ),
         )
         for q, a in test_pairs:
             cite = generate_citation(q, 111)
             print cite
             print "Searching for %s" % a
-            self.assertEqual(
-                cite,
-                a,
-                msg="Success"
-            )
+            self.assertEqual(cite, a, msg="Success")
             print "✓"
