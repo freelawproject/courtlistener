@@ -61,9 +61,8 @@ def generate_citation(opinion_text, cluster_id):
         cites = find_citations.get_citations(line_of_text, html=False)
         if not cites:
             return
-
         for cite in cites:
-            if "T.C." not in cite.reporter or "T. C." not in cite.reporter:
+            if "T.C." not in cite.reporter and "T. C." not in cite.reporter:
                 continue
 
             if "T.C." == cite.reporter:
