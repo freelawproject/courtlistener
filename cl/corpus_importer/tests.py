@@ -294,7 +294,7 @@ class PacerDocketParserTest(TestCase):
         )
         if count > 1:
             raise Exception(
-                "Should not get more than one docket during this test!"
+                "Should not get more than one docket during " "this test!"
             )
         process_docket_data(
             self.docket, self.DOCKET_PATH, UPLOAD_TYPE.IA_XML_FILE
@@ -453,27 +453,15 @@ class HarvardTests(TestCase):
     This is the start of tests for the Harvard import.  Need to flush out
     what I want to test.
     """
+
     def test_cite_split(self):
         """Test various aspects of harvard import."""
-        tests = ((
-                     "1 Mass. 245",
-                     "Mass.",
-                 ),
-                 (
-                     "115 Mich. App. 647",
-                     "Mich. App.",
-                 ),
-                 (
-                     "10 T.C. 1233",
-                     "T.C."
-                 ),
-                 (
-                     "702 F.2d 1234",
-                     "F.2d"
-                 ),
-                 (
-                     "702 F. 2d 1234",
-                     "F. 2d")
-                )
+        tests = (
+            ("1 Mass. 245", "Mass.",),
+            ("115 Mich. App. 647", "Mich. App.",),
+            ("10 T.C. 1233", "T.C."),
+            ("702 F.2d 1234", "F.2d"),
+            ("702 F. 2d 1234", "F. 2d"),
+        )
         for q, a in tests:
             self.assertEqual(q.split(" ", 1)[1].rsplit(" ", 1)[0], a)

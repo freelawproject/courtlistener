@@ -58,8 +58,8 @@ SOURCES = (
     ("ZR", "columbia merged with resource.org"),
     ("ZCR", "columbia merged with court and resource.org"),
     ("ZL", "columbia merged with lawbox"),
-    ('U', 'Harvard, Library Innovation Lab Case Law Access Project'),
-    ('CU', 'court website merged with Harvard'),
+    ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
+    ("CU", "court website merged with Harvard"),
 )
 
 
@@ -209,7 +209,7 @@ class Docket(models.Model):
         (COLUMBIA, "Columbia"),
         (COLUMBIA_AND_SCRAPER, "Columbia and Scraper"),
         (COLUMBIA_AND_RECAP, "Columbia and RECAP"),
-        (COLUMBIA_AND_RECAP_AND_SCRAPER, "Columbia, RECAP and Scraper"),
+        (COLUMBIA_AND_RECAP_AND_SCRAPER, "Columbia, RECAP, and Scraper"),
         (IDB, "Integrated Database"),
         (RECAP_AND_IDB, "RECAP and IDB"),
         (SCRAPER_AND_IDB, "Scraper and IDB"),
@@ -222,7 +222,7 @@ class Docket(models.Model):
             "Columbia, RECAP, Scraper, and IDB",
         ),
         (HARVARD, "Harvard"),
-        (SCRAPER_AND_HARVARD, "Scraper and Harvard")
+        (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
     )
     RECAP_SOURCES = [
         RECAP,
@@ -1903,69 +1903,69 @@ class OpinionCluster(models.Model):
         blank=True,
     )
     headnotes = models.TextField(
-        help_text='Headnotes are summary descriptions of the legal '
-                  'issues discussed by the court in the particular case. '
-                  'They appear at the beginning of each case just after '
-                  'the summary and disposition. '
-                  'They are short paragraphs with a heading in bold face type.'
-                  ' From Wikipedia - A headnote is a brief summary of a '
-                  'particular point of law that is added to the text of a court'
-                  'decision to aid readers in locating discussion of a legal'
-                  'issue in an opinion. As the term implies, headnotes appear'
-                  'at the beginning of the published opinion. Frequently, '
-                  'headnotes are value-added components appended to '
-                  'decisions by the publisher who compiles the '
-                  'decisions of a court for resale. As handed down by '
-                  'the court, a decision or written opinion does not contain '
-                  'headnotes. These are added later by an editor not '
-                  'connected to the court, but who instead works for a '
-                  'legal publishing house. ',
+        help_text="Headnotes are summary descriptions of the legal "
+        "issues discussed by the court in the particular case. "
+        "They appear at the beginning of each case just after "
+        "the summary and disposition. "
+        "They are short paragraphs with a heading in bold face type."
+        " From Wikipedia - A headnote is a brief summary of a "
+        "particular point of law that is added to the text of a court"
+        "decision to aid readers in locating discussion of a legal"
+        "issue in an opinion. As the term implies, headnotes appear"
+        "at the beginning of the published opinion. Frequently, "
+        "headnotes are value-added components appended to "
+        "decisions by the publisher who compiles the "
+        "decisions of a court for resale. As handed down by "
+        "the court, a decision or written opinion does not contain "
+        "headnotes. These are added later by an editor not "
+        "connected to the court, but who instead works for a "
+        "legal publishing house. ",
         blank=True,
     )
     summary = models.TextField(
         help_text="A summary of what happened in the case. "
-                  "Appears at the beginning of the case just "
-                  "after the title of the case and court "
-                  "information. Not identified as such.",
+        "Appears at the beginning of the case just "
+        "after the title of the case and court "
+        "information. Not identified as such.",
         blank=True,
     )
     disposition = models.TextField(
         help_text="Description of the procedural outcome of the case, "
-                  "e.g. Reversed, dismissed etc. "
-                  "Generally a short paragraph that appears "
-                  "just after the summary or synopsis",
+        "e.g. Reversed, dismissed etc. "
+        "Generally a short paragraph that appears "
+        "just after the summary or synopsis",
         blank=True,
     )
     history = models.TextField(
         help_text="History of the case (similar to the summary, "
-                  "but focused on past events related to this case). "
-                  "Appears at the beginning of the case just after "
-                  "the title of the case and court information",
+        "but focused on past events related to this case). "
+        "Appears at the beginning of the case just after "
+        "the title of the case and court information",
         blank=True,
     )
     other_date = models.TextField(
         help_text="Other date(s) as specified in the text "
-                  "(case header). This may include follow-up dates.",
+        "(case header). This may include follow-up dates.",
         blank=True,
     )
     cross_reference = models.TextField(
         help_text="Cross-reference citation "
-                  "(often to a past or future similar case). "
-                  "It does NOT identify this case.",
+        "(often to a past or future similar case). "
+        "It does NOT identify this case.",
         blank=True,
     )
     correction = models.TextField(
         help_text="Publisher's correction to the case text. "
-                  "Example: Replace last paragraph on page 476 "
-                  "with this text: blah blah blah. This is basically an"
-                  " unstructured text that can be used to manually "
-                  "correct case content according to publisher's "
-                  "instructions. No footnotes is expected within it.",
+        "Example: Replace last paragraph on page 476 "
+        "with this text: blah blah blah. This is basically an"
+        " unstructured text that can be used to manually "
+        "correct case content according to publisher's "
+        "instructions. No footnotes is expected within it.",
         blank=True,
     )
     html_harvard = models.TextField(
         help_text="Casebody XML stores structure of "
-                  "a legal case document body from Harvard Case Law Project.",
+        "a legal case document body from Harvard Case Law Project.",
         blank=True,
     )
     citation_count = models.IntegerField(
@@ -2002,7 +2002,7 @@ class OpinionCluster(models.Model):
     )
     sha1 = models.CharField(
         help_text="unique ID for the document, as generated via SHA1 of the "
-                  "binary file or text data",
+        "binary file or text data",
         max_length=40,
         db_index=True,
     )
@@ -2424,7 +2424,7 @@ class Opinion(models.Model):
     )
     joined_by_str = models.TextField(
         help_text="Other judges that joined the primary author "
-                  "in this opinion str",
+        "in this opinion str",
         blank=True,
     )
     date_created = models.DateTimeField(
@@ -2485,7 +2485,7 @@ class Opinion(models.Model):
         help_text="HTML of Columbia archive", blank=True, null=True,
     )
     html_harvard = models.TextField(
-        help_text='HTML of Harvard CaseLaw Access Project',
+        help_text="HTML of Harvard CaseLaw Access Project",
         blank=True,
         null=True,
     )
