@@ -1,13 +1,13 @@
 BEGIN;
 --
--- Add field html_harvard to opinion
---
-ALTER TABLE "search_opinion" ADD COLUMN "html_harvard" text NULL;
---
 -- Add field joined_by_str to opinion
 --
 ALTER TABLE "search_opinion" ADD COLUMN "joined_by_str" text DEFAULT '' NOT NULL;
 ALTER TABLE "search_opinion" ALTER COLUMN "joined_by_str" DROP DEFAULT;
+--
+-- Add field xml_harvard to opinion
+--
+ALTER TABLE "search_opinion" ADD COLUMN "xml_harvard" text NULL;
 --
 -- Add field correction to opinioncluster
 --
@@ -39,20 +39,15 @@ ALTER TABLE "search_opinioncluster" ALTER COLUMN "headnotes" DROP DEFAULT;
 ALTER TABLE "search_opinioncluster" ADD COLUMN "history" text DEFAULT '' NOT NULL;
 ALTER TABLE "search_opinioncluster" ALTER COLUMN "history" DROP DEFAULT;
 --
--- Add field html_harvard to opinioncluster
---
-ALTER TABLE "search_opinioncluster" ADD COLUMN "html_harvard" text DEFAULT '' NOT NULL;
-ALTER TABLE "search_opinioncluster" ALTER COLUMN "html_harvard" DROP DEFAULT;
---
 -- Add field image_missing to opinioncluster
 --
 ALTER TABLE "search_opinioncluster" ADD COLUMN "image_missing" boolean DEFAULT false NOT NULL;
 ALTER TABLE "search_opinioncluster" ALTER COLUMN "image_missing" DROP DEFAULT;
 --
--- Add field other_date to opinioncluster
+-- Add field other_dates to opinioncluster
 --
-ALTER TABLE "search_opinioncluster" ADD COLUMN "other_date" text DEFAULT '' NOT NULL;
-ALTER TABLE "search_opinioncluster" ALTER COLUMN "other_date" DROP DEFAULT;
+ALTER TABLE "search_opinioncluster" ADD COLUMN "other_dates" text DEFAULT '' NOT NULL;
+ALTER TABLE "search_opinioncluster" ALTER COLUMN "other_dates" DROP DEFAULT;
 --
 -- Add field page_count to opinioncluster
 --
@@ -60,13 +55,18 @@ ALTER TABLE "search_opinioncluster" ADD COLUMN "page_count" integer NULL;
 --
 -- Add field sha1 to opinioncluster
 --
-ALTER TABLE "search_opinioncluster" ADD COLUMN "sha1" varchar(40) DEFAULT '' NOT NULL;
+ALTER TABLE "search_opinioncluster" ADD COLUMN "sha1" varchar(40) DEFAULT 'empty' NOT NULL;
 ALTER TABLE "search_opinioncluster" ALTER COLUMN "sha1" DROP DEFAULT;
 --
 -- Add field summary to opinioncluster
 --
 ALTER TABLE "search_opinioncluster" ADD COLUMN "summary" text DEFAULT '' NOT NULL;
 ALTER TABLE "search_opinioncluster" ALTER COLUMN "summary" DROP DEFAULT;
+--
+-- Add field xml_harvard to opinioncluster
+--
+ALTER TABLE "search_opinioncluster" ADD COLUMN "xml_harvard" text DEFAULT '' NOT NULL;
+ALTER TABLE "search_opinioncluster" ALTER COLUMN "xml_harvard" DROP DEFAULT;
 --
 -- Alter field claim on claimhistory
 --
