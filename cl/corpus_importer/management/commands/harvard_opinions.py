@@ -20,6 +20,8 @@ from django.conf import settings
 from django.db import transaction
 from django.utils.text import slugify
 
+from juriscraper.lib.string_utils import titlecase
+
 from reporters_db import REPORTERS
 
 
@@ -188,6 +190,7 @@ def parse_harvard_opinions(reporter, volume):
         author_list = [
             find_judge_names(x.text) for x in soup.find_all("author")
         ]
+        # Need to flatten and dedupe list of judges here
         judges = ", ".join(
             list(set(itertools.chain.from_iterable(judge_list + author_list)))
         )
@@ -332,6 +335,7 @@ def parse_harvard_opinions(reporter, volume):
             Opinion.objects.create(**opinion_data)
             list(set(itertools.chain.from_iterable(judge_list +
                                                    author_list))))
+        judges = titlecase(judges)
         docket_string = data['docket_number']. \
             replace("Docket No.", ""). \
             replace("Docket Nos.", "")
