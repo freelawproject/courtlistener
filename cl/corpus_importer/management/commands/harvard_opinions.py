@@ -134,7 +134,7 @@ def parse_harvard_opinions(reporter, volume):
         )
 
         # Handle duplicate citations.  By comparing date filed and page count
-        # I find it unlikely two cases would both start and also stop on the
+        # It is unlikely two cases would both start and also stop on the
         # same page.  So we use page count as a proxy for it.
         pg_count = 1 + int(data["last_page"]) - int(data["first_page"])
         if cite_search.count() > 0:
