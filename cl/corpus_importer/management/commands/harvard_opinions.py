@@ -99,8 +99,8 @@ def parse_harvard_opinions(reporter, volume):
             continue
 
         try:
-            with open(file_path) as json_data:
-                data = json.load(json_data)
+            with open(file_path) as f:
+                data = json.load(f)
         except ValueError:
             logger.warning("Empty json: missing case at: %s" % ia_download_url)
             continue
@@ -110,17 +110,17 @@ def parse_harvard_opinions(reporter, volume):
         vol = data["volume"]["volume_number"]
         cite = data["citations"][0]["cite"]
         page = cite.split(" ")[-1]
-        rep = cite.split(" ", 1)[1].rsplit(" ", 1)[0]
+        reporter = cite.split(" ", 1)[1].rsplit(" ", 1)[0]
 
-        if rep not in REPORTERS.keys():
-            logger.info("Court (%s) not found in reporter db" % rep)
+        if reporter not in REPORTERS.keys():
+            logger.info("Reporter '%s' not found in reporter db" % reporter)
             continue
 
-        cite_type = REPORTERS[rep][0]["cite_type"]
+        cite_type = REPORTERS[reporter][0]["cite_type"]
         try:
-            assert " ".join([vol, rep, page]) == cite, (
+            assert " ".join([vol, reporter, page]) == cite, (
                 "Reporter extraction failed for %s != %s"
-                % (cite, " ".join([vol, rep, page]))
+                % (cite, " ".join([vol, reporter, page]))
             )
         except (ValueError, Exception):
             logger.info("Case: %s failed to resolve correctly" % cite)
@@ -128,19 +128,17 @@ def parse_harvard_opinions(reporter, volume):
 
         cite_search = (
             Citation.objects.all()
-            .filter(reporter=rep)
+            .filter(reporter=reporter)
             .filter(page=page)
             .filter(volume=vol)
         )
 
-        pg_count = 1 + int(data["last_page"]) - int(data["first_page"])
-
         # Handle duplicate citations.  By comparing date filed and page count
         # I find it unlikely two cases would both start and also stop on the
         # same page.  So we use page count as a proxy for it.
+        pg_count = 1 + int(data["last_page"]) - int(data["first_page"])
         if cite_search.count() > 0:
-            cluster_id = cite_search[0].cluster_id
-            cluster = OpinionCluster.objects.filter(id=cluster_id)[0]
+            cluster = cite_search[0].cluster
             if cluster.date_filed is not None:
                 date_filed, is_approximate = validate_dt(data["decision_date"])
                 if str(cluster.date_filed) != str(date_filed):
@@ -151,7 +149,8 @@ def parse_harvard_opinions(reporter, volume):
                     logger.info("%s Already in CL." % cite)
                     continue
 
-        court = match_court_string(
+        # TODO: Generalize this to handle all court types somehow.
+        court_id = match_court_string(
             data["court"]["name"],
             state=True,
             federal_appeals=True,
@@ -181,7 +180,7 @@ def parse_harvard_opinions(reporter, volume):
         docket_dictionary = {
             "case_name": data["name"],
             "docket_number": docket_string,
-            "court_id": court,
+            "court_id": court_id,
             "source": Docket.HARVARD,
             "ia_needs_upload": False,
             "slug": slugify(data["name"]),
@@ -267,7 +266,7 @@ def parse_harvard_opinions(reporter, volume):
         Citation.objects.create(
             **{
                 "volume": vol,
-                "reporter": rep,
+                "reporter": reporter,
                 "page": page,
                 "type": model_cite_type,
                 "cluster_id": cluster.id,
