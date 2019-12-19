@@ -140,8 +140,9 @@ def parse_harvard_opinions(reporter, volume):
         if cite_search.count() > 0:
             cluster = cite_search[0].cluster
             if cluster.date_filed is not None:
-                date_filed, is_approximate = validate_dt(data["decision_date"])
-                if str(cluster.date_filed) != str(date_filed):
+                date_filed, is_approximate = validate_dt(
+                    data['decision_date'])
+                if cluster.date_filed != date_filed:
                     logger.info("Duplicate cite string different date filed")
                 elif cluster.page_count != pg_count:
                     logger.info("Duplicate cite string but diff page count")
