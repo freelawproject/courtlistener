@@ -159,17 +159,14 @@ def parse_harvard_opinions(reporter, volume):
         # same page.  So we use page count as a proxy for it.
         pg_count = 1 + int(data["last_page"]) - int(data["first_page"])
         if cite_search.count() > 0:
-            cluster = cite_search[0].cluster
-            if cluster.date_filed is not None:
-                date_filed, is_approximate = validate_dt(
-                    data['decision_date'])
-                if cluster.date_filed != date_filed:
-                    logger.info("Duplicate cite string different date filed")
-                elif cluster.page_count != pg_count:
-                    logger.info("Duplicate cite string but diff page count")
-                else:
-                    logger.info("%s Already in CL." % cite)
-                    continue
+            cluster_ids = cite_search.values_list("cluster_id")
+            objects = OpinionCluster.objects.filter(
+                id__in=cluster_ids).values_list('case_name')
+            possibilites = [case_obj[0] for case_obj in objects]
+            if check_for_match(data['name'], possibilites) is not None:
+                logger.info("Looks like we already have %s." % data['name'])
+                continue
+            logger.info("Duplicate cite string but appears to be a new case")
 
         # TODO: Generalize this to handle all court types somehow.
         court_id = match_court_string(
