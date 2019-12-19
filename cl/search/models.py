@@ -1924,9 +1924,9 @@ class OpinionCluster(models.Model):
     )
     summary = models.TextField(
         help_text="A summary of what happened in the case. "
-        "Appears at the beginning of the case just "
-        "after the title of the case and court "
-        "information. Not identified as such.",
+                  "Appears at the beginning of the case just "
+                  "after the title of the case and court "
+                  "information.",
         blank=True,
     )
     disposition = models.TextField(
@@ -1943,7 +1943,7 @@ class OpinionCluster(models.Model):
         "the title of the case and court information",
         blank=True,
     )
-    other_date = models.TextField(
+    other_dates = models.TextField(
         help_text="Other date(s) as specified in the text "
         "(case header). This may include follow-up dates.",
         blank=True,
@@ -1963,7 +1963,7 @@ class OpinionCluster(models.Model):
         "instructions. No footnotes is expected within it.",
         blank=True,
     )
-    html_harvard = models.TextField(
+    xml_harvard = models.TextField(
         help_text="Casebody XML stores structure of "
         "a legal case document body from Harvard Case Law Project.",
         blank=True,
@@ -1996,7 +1996,9 @@ class OpinionCluster(models.Model):
         default=False,
     )
     filepath_local = models.FileField(
-        help_text="Path to Harvard json local storage.",
+        help_text="Path to local storage of JSON collected from Harvard Case "
+                  "Law project containing available metadata, opinion "
+                  "and opinion cluster.",
         max_length=1000,
         blank=True,
     )
@@ -2484,7 +2486,7 @@ class Opinion(models.Model):
     html_columbia = models.TextField(
         help_text="HTML of Columbia archive", blank=True, null=True,
     )
-    html_harvard = models.TextField(
+    xml_harvard = models.TextField(
         help_text="HTML of Harvard CaseLaw Access Project",
         blank=True,
         null=True,
