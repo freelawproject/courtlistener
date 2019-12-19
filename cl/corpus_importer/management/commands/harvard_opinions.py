@@ -26,11 +26,9 @@ def validate_dt(date_text):
     Check if the date string is only year-month. If partial date string, make
     date string the first of the month and mark the date as an estimate.
 
-    date_text is the date string we receive from the harvard corpus
-
-    :param date_text:
-    :returns: Date or date estimate and
-    boolean indicating estimated date or actual date
+    :param date_text: a date string we receive from the harvard corpus
+    :returns: Tuple of date or date estimate and boolean indicating estimated
+    date or actual date
     """
     try:
         datetime.strptime(date_text, "%Y-%m-%d")
@@ -87,8 +85,8 @@ def parse_harvard_opinions(reporter, volume):
     :param reporter: Reporter string as slugify'd (optional) (tc) for T.C.
     :return: None
     """
-
     if not reporter and volume:
+        logger.error("You provided a volume but no reporter. Exiting.")
         return
 
     for file_path in filepath_list(reporter, volume):
