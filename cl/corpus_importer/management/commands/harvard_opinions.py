@@ -5,7 +5,7 @@ import os
 import json
 import itertools
 
-from glob import iglob
+from glob import glob
 from datetime import datetime
 from bs4 import BeautifulSoup
 
@@ -39,6 +39,38 @@ def validate_dt(date_text):
         return date_text + "-01", True
 
 
+def filepath_list(reporter, volume):
+    """Given a reporter and volume, return a sorted list of files to process
+
+    Make a list of file paths accordingly:
+     - If neither a reporter nor a volume are given, do all cases from all
+       volumes of all reporters.
+     - If a only reporter is given, do all cases in all volumes for that
+       reporter.
+     - If a reporter and volume are both given, only do cases from that volume
+       of that reporter.
+
+    :param reporter: The reporter to filter to (optional)
+    :param volume: The volume of the reporter to filter to (optional)
+    :return: A sorted list of file paths
+    """
+    if reporter and volume:
+        reporter_key = ".".join(["law.free.cap", reporter, volume])
+        glob_path = os.path.join(
+            settings.MEDIA_ROOT, "harvard_corpus", "%s/*" % reporter_key
+        )
+    elif reporter:
+        reporter_key = ".".join(["law.free.cap", reporter])
+        glob_path = os.path.join(
+            settings.MEDIA_ROOT, "harvard_corpus", "%s.*/*" % reporter_key
+        )
+    else:
+        glob_path = os.path.join(
+            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*"
+        )
+    return sorted(glob(glob_path))
+
+
 def parse_harvard_opinions(reporter, volume):
     """
     Parse downloaded CaseLaw Corpus from internet archive and add them to our
@@ -59,30 +91,7 @@ def parse_harvard_opinions(reporter, volume):
     if not reporter and volume:
         return
 
-    if reporter and volume:
-        reporter_key = ".".join(["law.free.cap", reporter, volume])
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "%s/*" % reporter_key
-        )
-
-    elif reporter:
-        reporter_key = ".".join(["law.free.cap", reporter])
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "%s.*/*" % reporter_key
-        )
-
-    elif volume:
-        reporter_key = ".".join(["law.free.cap", reporter, volume])
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "%s/*" % reporter_key
-        )
-
-    else:
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*"
-        )
-
-    for file_path in iglob(glob_path):
+    for file_path in filepath_list(reporter, volume):
         ia_download_url = "/".join(
             ["https://archive.org/download", file_path.split("/", 9)[-1]]
         )
