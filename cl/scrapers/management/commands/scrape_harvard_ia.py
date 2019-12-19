@@ -44,27 +44,26 @@ def get_from_ia(reporter, volume):
             if "json.json" in item.name:
                 continue
 
-            if "json" in item.name:
-                url = "https://archive.org/download/%s/%s" % (
-                    ia_key,
-                    item.name,
-                )
-                file_path = os.path.join(
-                    settings.MEDIA_ROOT,
-                    "harvard_corpus",
-                    "%s" % ia_key,
-                    "%s" % item.name,
-                )
-                directory = file_path.rsplit("/", 1)[0]
-                if os.path.exists(file_path):
-                    logger.info("Already captured: %s", url)
-                    continue
+            if "json" not in item.name:
+                continue
 
-                logger.info("Capturing: %s", url)
-                mkdir_p(directory)
-                data = requests.get(url, timeout=10).json()
-                with open(file_path, "w") as outfile:
-                    json.dump(data, outfile, indent=2)
+            url = "https://archive.org/download/%s/%s" % (ia_key, item.name,)
+            file_path = os.path.join(
+                settings.MEDIA_ROOT,
+                "harvard_corpus",
+                "%s" % ia_key,
+                "%s" % item.name,
+            )
+            directory = file_path.rsplit("/", 1)[0]
+            if os.path.exists(file_path):
+                logger.info("Already captured: %s", url)
+                continue
+
+            logger.info("Capturing: %s", url)
+            mkdir_p(directory)
+            data = requests.get(url, timeout=10).json()
+            with open(file_path, "w") as outfile:
+                json.dump(data, outfile, indent=2)
 
 
 class Command(VerboseCommand):
