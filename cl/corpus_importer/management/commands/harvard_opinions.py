@@ -16,6 +16,7 @@ from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.corpus_importer.court_regexes import match_court_string
 
 from django.conf import settings
+from django.db import transaction
 from django.utils.text import slugify
 
 from reporters_db import REPORTERS
@@ -312,6 +313,12 @@ def parse_harvard_opinions(reporter, volume):
             }
             logger.info("Adding opinion for: %s", cite)
             Opinion.objects.create(**opinion_data)
+            list(set(itertools.chain.from_iterable(judge_list +
+                                                   author_list))))
+        docket_string = data['docket_number']. \
+            replace("Docket No.", ""). \
+            replace("Docket Nos.", "")
+        with transaction.atomic():
 
         logger.info("Finished: %s", cite)
 
