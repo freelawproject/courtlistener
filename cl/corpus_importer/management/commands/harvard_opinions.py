@@ -3,6 +3,7 @@
 
 import os
 import json
+import difflib
 import itertools
 
 from glob import glob
@@ -68,6 +69,25 @@ def filepath_list(reporter, volume):
             settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*"
         )
     return sorted(glob(glob_path))
+
+
+def check_for_match(new_case, possibilities):
+    """
+    This code is a variation of find_closest_match used in juriscraper.
+    It checks if the case name we are trying to add matches any duplicate
+    citation cases already in the system.
+    :param new_case: The importing case name
+    :param possibilities: The array of cases already in the
+    system with the same citation
+    :return: Returns the match if any, otherwise returns None.
+    """
+    try:
+        match = difflib.get_close_matches(new_case, possibilities, n=1,
+                                          cutoff=0.7)[0]
+        return match
+    except IndexError:
+        # No good matches.
+        return None
 
 
 def parse_harvard_opinions(reporter, volume):
