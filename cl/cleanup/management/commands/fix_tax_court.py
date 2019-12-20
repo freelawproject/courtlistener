@@ -81,6 +81,8 @@ def generate_citation(opinion_text, cluster_id):
             ):
                 cite.type = cite_type
                 return cite
+            else:
+                logger.info("Citation already in the system. Return None.")
 
 
 def update_tax_opinions():
@@ -123,7 +125,7 @@ def update_tax_opinions():
 
             if cite is None:
                 logger.info(
-                    "No cite found for opinion %s on cluster %s"
+                    "No cite to add for opinion %s on cluster %s"
                     % (opinion.id, oc.id)
                 )
                 continue
