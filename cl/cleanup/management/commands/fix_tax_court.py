@@ -106,7 +106,7 @@ def update_tax_opinions():
         op_objs = oc.sub_opinions.all()
         for opinion in op_objs:
             if opinion.plain_text == "":
-                # logger.info('Nothing to parse.')
+                logger.info('No plain text to parse.')
                 continue
             if opinion.download_url == bad_url:
                 logger.info("Failed scrape, nothing to parse.")
@@ -131,7 +131,7 @@ def update_tax_opinions():
                 continue
 
             logger.info(
-                "Citation saved %s %s %s"
+                "Saving citation %s %s %s"
                 % (cite.volume, cite.reporter, cite.page)
             )
 
