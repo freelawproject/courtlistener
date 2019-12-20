@@ -84,8 +84,9 @@ def check_for_match(new_case, possibilities):
     :return: Returns the match if any, otherwise returns None.
     """
     try:
-        match = difflib.get_close_matches(new_case, possibilities, n=1,
-                                          cutoff=0.7)[0]
+        match = difflib.get_close_matches(
+            new_case, possibilities, n=1, cutoff=0.7
+        )[0]
         return match
     except IndexError:
         # No good matches.
@@ -159,14 +160,16 @@ def parse_harvard_opinions(reporter, volume):
         # Handle duplicate citations.  By comparing date filed and page count
         # It is unlikely two cases would both start and also stop on the
         # same page.  So we use page count as a proxy for it.
+
         pg_count = 1 + int(data["last_page"]) - int(data["first_page"])
         if cite_search.count() > 0:
             cluster_ids = cite_search.values_list("cluster_id")
             objects = OpinionCluster.objects.filter(
-                id__in=cluster_ids).values_list('case_name')
+                id__in=cluster_ids
+            ).values_list("case_name")
             possibilites = [case_obj[0] for case_obj in objects]
-            if check_for_match(data['name'], possibilites) is not None:
-                logger.info("Looks like we already have %s." % data['name'])
+            if check_for_match(data["name"], possibilites) is not None:
+                logger.info("Looks like we already have %s." % data["name"])
                 continue
             logger.info("Duplicate cite string but appears to be a new case")
 
@@ -192,57 +195,70 @@ def parse_harvard_opinions(reporter, volume):
         ]
         # Need to flatten and dedupe list of judges here
         judges = ", ".join(
-            list(set(itertools.chain.from_iterable(judge_list +
-                                                   author_list))))
+            list(set(itertools.chain.from_iterable(judge_list + author_list)))
+        )
         judges = titlecase(judges)
-        docket_string = data['docket_number']. \
-            replace("Docket No.", ""). \
-            replace("Docket Nos.", "")
+        docket_string = (
+            data["docket_number"]
+            .replace("Docket No.", "")
+            .replace("Docket Nos.", "")
+        )
         with transaction.atomic():
             logger.info("Adding docket for: %s", cite)
-            docket = Docket.objects.create(case_name=data['name'],
-                                           docket_number=docket_string,
-                                           court_id=court_id,
-                                           source=Docket.HARVARD,
-                                           ia_needs_upload=False,
-                                           slug=slugify(data['name']))
+            docket = Docket.objects.create(
+                case_name=data["name"],
+                docket_number=docket_string,
+                court_id=court_id,
+                source=Docket.HARVARD,
+                ia_needs_upload=False,
+                slug=slugify(data["name"]),
+            )
             # Iterate over other xml fields in Harvard data set
             # and save as string list   for further processing at a later date.
-            json_fields = ['attorneys', 'disposition', 'syllabus',
-                           'summary', 'history', 'otherdate', 'seealso',
-                           'headnotes', 'correction']
+            json_fields = [
+                "attorneys",
+                "disposition",
+                "syllabus",
+                "summary",
+                "history",
+                "otherdate",
+                "seealso",
+                "headnotes",
+                "correction",
+            ]
             data_set = {}
             while json_fields:
                 key = json_fields.pop(0)
                 data_set[key] = "|".join([x.text for x in soup.find_all(key)])
 
             # Handle partial dates by adding -01v to YYYY-MM dates
-            date_filed, is_approximate = validate_dt(data['decision_date'])
+            date_filed, is_approximate = validate_dt(data["decision_date"])
 
             logger.info("Adding cluster for: %s", cite)
             cluster = OpinionCluster.objects.create(
-                case_name=data['name'],
+                case_name=data["name"],
                 precedential_status="Published",
                 docket_id=docket.id,
                 source="U",
-                slug=slugify(data['name']),
+                slug=slugify(data["name"]),
                 date_filed=date_filed,
                 date_filed_is_approximate=is_approximate,
-                attorneys=data_set['attorneys'],
-                disposition=data_set['disposition'],
-                syllabus=data_set['syllabus'],
-                summary=data_set['summary'],
-                history=data_set['history'],
-                other_dates=data_set['otherdate'],
-                cross_reference=data_set['seealso'],
-                headnotes=data_set['headnotes'],
-                correction=data_set['correction'],
+                attorneys=data_set["attorneys"],
+                disposition=data_set["disposition"],
+                syllabus=data_set["syllabus"],
+                summary=data_set["summary"],
+                history=data_set["history"],
+                other_dates=data_set["otherdate"],
+                cross_reference=data_set["seealso"],
+                headnotes=data_set["headnotes"],
+                correction=data_set["correction"],
                 judges=judges,
                 xml_harvard=str(soup),
                 sha1=sha1_of_json_data(json.dumps(data)),
                 page_count=pg_count,
                 image_missing=missing_images,
-                filepath_local=file_path)
+                filepath_local=file_path,
+            )
 
             if cite_type == "specialty":
                 model_cite_type = Citation.SPECIALTY
@@ -264,47 +280,60 @@ def parse_harvard_opinions(reporter, volume):
                 model_cite_type = None
 
             logger.info("Adding citation for: %s", cite)
-            Citation.objects.create(volume=vol,
-                                    reporter=reporter,
-                                    page=page,
-                                    type=model_cite_type,
-                                    cluster_id=cluster.id)
-            for op in soup.find_all('opinion'):
-                joined_by_str = titlecase(" ".join(
-                    list(set(itertools.chain.from_iterable(judge_list)))))
-                author_str = titlecase(" ".join(
-                    list(set(itertools.chain.from_iterable(author_list)))))
+            Citation.objects.create(
+                volume=vol,
+                reporter=reporter,
+                page=page,
+                type=model_cite_type,
+                cluster_id=cluster.id,
+            )
+            for op in soup.find_all("opinion"):
+                joined_by_str = titlecase(
+                    " ".join(
+                        list(set(itertools.chain.from_iterable(judge_list)))
+                    )
+                )
+                author_str = titlecase(
+                    " ".join(
+                        list(set(itertools.chain.from_iterable(author_list)))
+                    )
+                )
 
-                if op.get('type') == "unanimous":
+                if op.get("type") == "unanimous":
                     op_type = "015unamimous"
-                elif op.get('type') == "majority":
+                elif op.get("type") == "majority":
                     op_type = "020lead"
-                elif op.get('type') == "plurality":
+                elif op.get("type") == "plurality":
                     op_type = "025plurality"
-                elif op.get('type') == "concurrence":
+                elif op.get("type") == "concurrence":
                     op_type = "030concurrence"
-                elif op.get('type') == "concurring-in-part-and-dissenting-in" \
-                                       "-part":
+                elif (
+                    op.get("type") == "concurring-in-part-and-dissenting-in"
+                    "-part"
+                ):
                     op_type = "035concurrenceinpart"
-                elif op.get('type') == "dissent":
+                elif op.get("type") == "dissent":
                     op_type = "040dissent"
-                elif op.get('type') == "remittitur":
+                elif op.get("type") == "remittitur":
                     op_type = "060remittitur"
-                elif op.get('type') == "rehearing":
+                elif op.get("type") == "rehearing":
                     op_type = "070rehearing"
-                elif op.get('type') == "on-the-merits":
+                elif op.get("type") == "on-the-merits":
                     op_type = "080onthemerits"
-                elif op.get('type') == "on-motion-to-strike-cost-bill":
+                elif op.get("type") == "on-motion-to-strike-cost-bill":
                     op_type = "090onmotiontostrike"
                 else:
                     op_type = "010combined"
                 opinion_xml = str(op)
                 logger.info("Adding opinion for: %s", cite)
-                Opinion.objects.create(type=op_type, cluster_id=cluster.id,
-                                       author_str=author_str,
-                                       download_url=ia_download_url,
-                                       xml_harvard=opinion_xml,
-                                       joined_by_str=joined_by_str)
+                Opinion.objects.create(
+                    type=op_type,
+                    cluster_id=cluster.id,
+                    author_str=author_str,
+                    download_url=ia_download_url,
+                    xml_harvard=opinion_xml,
+                    joined_by_str=joined_by_str,
+                )
 
         logger.info("Finished: %s", cite)
 
