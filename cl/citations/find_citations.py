@@ -409,7 +409,7 @@ def extract_base_citation(words, reporter_index):
     reporter = words[reporter_index]
     neutral_tc_reporter = is_neutral_tc_reporter(reporter)
     if neutral_tc_reporter:
-        volume, page = words[reporter_index + 1].split("-")
+        volume, page = words[reporter_index + 1].replace("–", "-").split("-")
     else:
         # "Normal" reporter: XX F.2d YY
         if reporter_index == 0:
