@@ -192,147 +192,6 @@ def parse_harvard_opinions(reporter, volume):
         ]
         # Need to flatten and dedupe list of judges here
         judges = ", ".join(
-            list(set(itertools.chain.from_iterable(judge_list + author_list)))
-        )
-        docket_string = (
-            data["docket_number"]
-            .replace("Docket No.", "")
-            .replace("Docket Nos.", "")
-        )
-        docket_dictionary = {
-            "case_name": data["name"],
-            "docket_number": docket_string,
-            "court_id": court_id,
-            "source": Docket.HARVARD,
-            "ia_needs_upload": False,
-            "slug": slugify(data["name"]),
-        }
-        logger.info("Adding docket for: %s", cite)
-        docket = Docket.objects.create(**docket_dictionary)
-        data_set = {}
-
-        # Iterate over other xml fields in Harvard data set
-        # and save for further processing at a later date.
-        json_fields = [
-            "attorneys",
-            "disposition",
-            "syllabus",
-            "summary",
-            "history",
-            "otherdate",
-            "seealso",
-            "headnotes",
-            "correction",
-        ]
-        while json_fields:
-            cd = {}
-            key = json_fields.pop(0)
-            iterations = 0
-            for item in [x.text for x in soup.find_all(key)]:
-                cd[str(iterations)] = item
-                iterations += 1
-            if cd == {}:
-                cd = ""
-            data_set[key] = cd
-
-        # Handle partial dates by adding -01 to YYYY-MM dates
-        date_filed, is_approximate = validate_dt(data["decision_date"])
-
-        cluster = {
-            "case_name": data["name"],
-            "precedential_status": "Published",
-            "docket_id": docket.id,
-            "source": "U",  # Key for Harvard
-            "slug": slugify(data["name"]),
-            "date_filed": date_filed,
-            "date_filed_is_approximate": is_approximate,
-            "attorneys": data_set["attorneys"],
-            "disposition": data_set["disposition"],
-            "syllabus": data_set["syllabus"],
-            "summary": data_set["summary"],
-            "history": data_set["history"],
-            "other_date": data_set["otherdate"],
-            "cross_reference": data_set["seealso"],
-            "headnotes": data_set["headnotes"],
-            "correction": data_set["correction"],
-            "judges": judges,
-            "html_harvard": str(soup),
-            "sha1": sha1_of_json_data(json.dumps(data)),
-            "page_count": pg_count,
-            "image_missing": missing_images,
-            "filepath_local": file_path,
-        }
-        logger.info("Adding cluster for: %s", cite)
-        cluster = OpinionCluster.objects.create(**cluster)
-
-        if cite_type == "specialty":
-            model_cite_type = Citation.SPECIALTY
-        elif cite_type == "federal":
-            model_cite_type = Citation.FEDERAL
-        elif cite_type == "state":
-            model_cite_type = Citation.STATE
-        elif cite_type == "state_regional":
-            model_cite_type = Citation.STATE_REGIONAL
-        elif cite_type == "neutral":
-            model_cite_type = Citation.NEUTRAL
-        elif cite_type == "lexis":
-            model_cite_type = Citation.LEXIS
-        elif cite_type == "west":
-            model_cite_type = Citation.WEST
-        elif cite_type == "scotus_early":
-            model_cite_type = Citation.SCOTUS_EARLY
-        else:
-            model_cite_type = None
-
-        logger.info("Adding citation for: %s", cite)
-        Citation.objects.create(
-            **{
-                "volume": vol,
-                "reporter": reporter,
-                "page": page,
-                "type": model_cite_type,
-                "cluster_id": cluster.id,
-            }
-        )
-        for op in soup.find_all("opinion"):
-            joined_by_str = " ".join(
-                list(set(itertools.chain.from_iterable(judge_list)))
-            )
-            author_str = " ".join(
-                list(set(itertools.chain.from_iterable(author_list)))
-            )
-            if op.get("type") == "unanimous":
-                op_type = "015unamimous"
-            elif op.get("type") == "majority":
-                op_type = "020lead"
-            elif op.get("type") == "plurality":
-                op_type = "025plurality"
-            elif op.get("type") == "concurrence":
-                op_type = "030concurrence"
-            elif op.get("type") == "concurring-in-part-and-dissenting-in-part":
-                op_type = "035concurrenceinpart"
-            elif op.get("type") == "dissent":
-                op_type = "040dissent"
-            elif op.get("type") == "remittitur":
-                op_type = "060remittitur"
-            elif op.get("type") == "rehearing":
-                op_type = "070rehearing"
-            elif op.get("type") == "on-the-merits":
-                op_type = "080onthemerits"
-            elif op.get("type") == "on-motion-to-strike-cost-bill":
-                op_type = "090onmotiontostrike"
-            else:
-                op_type = "010combined"
-            opinion_data = {
-                "type": op_type,
-                "cluster_id": cluster.id,
-                "author_str": author_str,
-                "download_url": ia_download_url,
-                "html_harvard": str(op),
-                "joined_by_str": joined_by_str,
-            }
-            logger.info("Adding opinion for: %s", cite)
-            Opinion.objects.create(**opinion_data)
             list(set(itertools.chain.from_iterable(judge_list +
                                                    author_list))))
         judges = titlecase(judges)
@@ -343,7 +202,7 @@ def parse_harvard_opinions(reporter, volume):
             logger.info("Adding docket for: %s", cite)
             docket = Docket.objects.create(case_name=data['name'],
                                            docket_number=docket_string,
-                                           court_id=court,
+                                           court_id=court_id,
                                            source=Docket.HARVARD,
                                            ia_needs_upload=False,
                                            slug=slugify(data['name']))
@@ -405,7 +264,9 @@ def parse_harvard_opinions(reporter, volume):
                 model_cite_type = None
 
             logger.info("Adding citation for: %s", cite)
-            Citation.objects.create(volume=vol, reporter=rep, page=page,
+            Citation.objects.create(volume=vol,
+                                    reporter=reporter,
+                                    page=page,
                                     type=model_cite_type,
                                     cluster_id=cluster.id)
             for op in soup.find_all('opinion'):
