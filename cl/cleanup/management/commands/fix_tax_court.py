@@ -122,6 +122,10 @@ def update_tax_opinions():
             cite = generate_citation(opinion.plain_text, oc.id)
 
             if cite is None:
+                logger.info(
+                    "No cite found for opinion %s on cluster %s"
+                    % (opinion.id, oc.id)
+                )
                 continue
 
             logger.info(
