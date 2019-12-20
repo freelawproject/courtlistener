@@ -225,30 +225,7 @@ with Virginia Historic Tax Credit Fund""",
 
      Nancy Ortmeyer Kuhn, for petitioner.
         """,
-                {
-                    "reporter_index": 1,
-                    "canonical_reporter": u"T.C.",
-                    "match_id": None,
-                    "extra": None,
-                    "plaintiff": None,
-                    "reporter": u"T.C.",
-                    "year": None,
-                    "volume": 1,
-                    "reporter_found": "UNITED STATES TAX COURT REPORT",
-                    "cite_type": 4,
-                    "lookup_index": 0,
-                    "court": None,
-                    "equality_attributes": [
-                        "reporter",
-                        "volume",
-                        "page",
-                        "canonical_reporter",
-                        "lookup_index",
-                    ],
-                    "match_url": None,
-                    "page": 2018,
-                    "defendant": None,
-                },
+                "1 T.C. 2018",
             ),
             (
                 """  T.C. Memo. 2003-150
@@ -268,35 +245,11 @@ with Virginia Historic Tax Credit Fund""",
 
 
                 """,
-                {
-                    "reporter_index": 0,
-                    "canonical_reporter": u"T.C. Memo.",
-                    "match_id": None,
-                    "extra": None,
-                    "plaintiff": None,
-                    "reporter": "T.C. Memo.",
-                    "year": None,
-                    "volume": 2003,
-                    "reporter_found": "T.C. Memo.",
-                    "cite_type": 8,
-                    "lookup_index": 0,
-                    "court": None,
-                    "equality_attributes": [
-                        "reporter",
-                        "volume",
-                        "page",
-                        "canonical_reporter",
-                        "lookup_index",
-                    ],
-                    "match_url": None,
-                    "page": 150,
-                    "defendant": None,
-                },
+                "2003 T.C. Memo. 150",
             ),
         )
         for q, a in test_pairs:
             cite = generate_citation(q, 111)
-            print cite
-            print "Searching for %s" % a
-            self.assertEqual(cite, a, msg="Success")
+            qx = " ".join([str(cite.volume), cite.reporter, str(cite.page)])
+            self.assertEqual(qx, a, msg="Success")
             print "✓"
