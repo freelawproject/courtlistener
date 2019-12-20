@@ -311,7 +311,7 @@ with Virginia Historic Tax Credit Fund""",
                 """,
                 {
                     "reporter_index": 0,
-                    "canonical_reporter": u"T.C. Memo.",
+                    "canonical_reporter": u"T.C. Summary Opinion",
                     "match_id": None,
                     "extra": None,
                     "plaintiff": None,
@@ -337,7 +337,5 @@ with Virginia Historic Tax Credit Fund""",
         )
         for q, a in test_pairs:
             cite = generate_citation(q, 111)
-            print cite.__dict__
-            print "%s" % a
             self.assertEqual(cite.__dict__, a, msg="Success")
             print "✓"
