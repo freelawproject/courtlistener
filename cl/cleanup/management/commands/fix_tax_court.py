@@ -63,7 +63,7 @@ def generate_citation(opinion_text, cluster_id):
             return
 
         for cite in cites:
-            if "T.C." not in cite.reporter or "T. C." not in cite.reporter:
+            if "T.C." not in cite.reporter and "T. C." not in cite.reporter:
                 continue
 
             if "T.C." == cite.reporter:
@@ -81,6 +81,8 @@ def generate_citation(opinion_text, cluster_id):
             ):
                 cite.type = cite_type
                 return cite
+            else:
+                logger.info("Citation already in the system. Return None.")
 
 
 def update_tax_opinions():
@@ -122,6 +124,10 @@ def update_tax_opinions():
             cite = generate_citation(opinion.plain_text, oc.id)
 
             if cite is None:
+                logger.info(
+                    "No cite to add for opinion %s on cluster %s"
+                    % (opinion.id, oc.id)
+                )
                 continue
 
             logger.info(
@@ -130,13 +136,11 @@ def update_tax_opinions():
             )
 
             Citation.objects.get_or_create(
-                **{
-                    "volume": cite.volume,
-                    "reporter": cite.reporter,
-                    "page": cite.page,
-                    "type": cite.type,
-                    "cluster_id": oc.id,
-                }
+                volume=cite.volume,
+                reporter=cite.reporter,
+                page=cite.page,
+                type=cite.type,
+                cluster_id=oc.id,
             )
 
 

@@ -212,7 +212,6 @@ with Virginia Historic Tax Credit Fund""",
 
 
 
-
  BENTLEY COURT II LIMITED PARTNERSHIP, B.F. BENTLEY, INC., TAX
                  MATTERS PARTNER, Petitioner v.
           COMMISSIONER OF INTERNAL REVENUE, Respondent
@@ -235,7 +234,7 @@ with Virginia Historic Tax Credit Fund""",
                     "year": None,
                     "volume": 1,
                     "reporter_found": "UNITED STATES TAX COURT REPORT",
-                    "cite_type": 4,
+                    "type": 4,
                     "lookup_index": 0,
                     "court": None,
                     "equality_attributes": [
@@ -278,7 +277,50 @@ with Virginia Historic Tax Credit Fund""",
                     "year": None,
                     "volume": 2003,
                     "reporter_found": "T.C. Memo.",
-                    "cite_type": 8,
+                    "type": 8,
+                    "lookup_index": 0,
+                    "court": None,
+                    "equality_attributes": [
+                        "reporter",
+                        "volume",
+                        "page",
+                        "canonical_reporter",
+                        "lookup_index",
+                    ],
+                    "match_url": None,
+                    "page": 150,
+                    "defendant": None,
+                },
+            ),
+            (
+                """  T.C. Summary Opinion 2003-150
+
+
+
+                                  UNITED STATES TAX COURT
+
+
+
+                       RIVER CITY RANCHES #1 LTD., LEON SHEPARD,
+                                  TAX MATTERS PARTNER,
+                       RIVER CITY RANCHES #2 LTD., LEON SHEPARD,
+                                   TAX MATTERS PARTNER,
+                        RIVER CITY RANCHES #3 LTD., LEON SHEPARD,
+                                   TAX MATTERS PARTNER,
+
+
+                """,
+                {
+                    "reporter_index": 0,
+                    "canonical_reporter": u"T.C. Summary Opinion",
+                    "match_id": None,
+                    "extra": None,
+                    "plaintiff": None,
+                    "reporter": "T.C. Summary Opinion",
+                    "year": None,
+                    "volume": 2003,
+                    "reporter_found": "T.C. Summary Opinion",
+                    "type": 8,
                     "lookup_index": 0,
                     "court": None,
                     "equality_attributes": [
@@ -296,7 +338,5 @@ with Virginia Historic Tax Credit Fund""",
         )
         for q, a in test_pairs:
             cite = generate_citation(q, 111)
-            print cite
-            print "Searching for %s" % a
-            self.assertEqual(cite, a, msg="Success")
+            self.assertEqual(cite.__dict__, a, msg="Success")
             print "✓"
