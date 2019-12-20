@@ -291,7 +291,8 @@ with Virginia Historic Tax Credit Fund""",
                     "page": 150,
                     "defendant": None,
                 },
-            ),(
+            ),
+            (
                 """  T.C. Summary Opinion 2003-150
 
 
@@ -333,7 +334,7 @@ with Virginia Historic Tax Credit Fund""",
                     "page": 150,
                     "defendant": None,
                 },
-            )
+            ),
         )
         for q, a in test_pairs:
             cite = generate_citation(q, 111)
