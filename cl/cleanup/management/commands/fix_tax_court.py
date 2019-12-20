@@ -134,13 +134,11 @@ def update_tax_opinions():
             )
 
             Citation.objects.get_or_create(
-                **{
-                    "volume": cite.volume,
-                    "reporter": cite.reporter,
-                    "page": cite.page,
-                    "type": cite.type,
-                    "cluster_id": oc.id,
-                }
+                volume=cite.volume,
+                reporter=cite.reporter,
+                page=cite.page,
+                type=cite.type,
+                cluster_id=oc.id,
             )
 
 
