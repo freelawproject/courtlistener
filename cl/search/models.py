@@ -1924,9 +1924,9 @@ class OpinionCluster(models.Model):
     )
     summary = models.TextField(
         help_text="A summary of what happened in the case. "
-                  "Appears at the beginning of the case just "
-                  "after the title of the case and court "
-                  "information.",
+        "Appears at the beginning of the case just "
+        "after the title of the case and court "
+        "information.",
         blank=True,
     )
     disposition = models.TextField(
@@ -1997,8 +1997,8 @@ class OpinionCluster(models.Model):
     )
     filepath_local = models.FileField(
         help_text="Path to local storage of JSON collected from Harvard Case "
-                  "Law project containing available metadata, opinion "
-                  "and opinion cluster.",
+        "Law project containing available metadata, opinion "
+        "and opinion cluster.",
         max_length=1000,
         blank=True,
     )
