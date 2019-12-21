@@ -93,6 +93,37 @@ def check_for_match(new_case, possibilities):
         return None
 
 
+def map_opinion_type(harvard_opinion_type):
+    """Map Harvard opinion types to CL ones
+
+    :param harvard_opinion_type: The type field of the Harvard opinion
+    :return: The type field from our schema
+    """
+    if harvard_opinion_type == "unanimous":
+        op_type = "015unamimous"
+    elif harvard_opinion_type == "majority":
+        op_type = "020lead"
+    elif harvard_opinion_type == "plurality":
+        op_type = "025plurality"
+    elif harvard_opinion_type == "concurrence":
+        op_type = "030concurrence"
+    elif harvard_opinion_type == "concurring-in-part-and-dissenting-in-part":
+        op_type = "035concurrenceinpart"
+    elif harvard_opinion_type == "dissent":
+        op_type = "040dissent"
+    elif harvard_opinion_type == "remittitur":
+        op_type = "060remittitur"
+    elif harvard_opinion_type == "rehearing":
+        op_type = "070rehearing"
+    elif harvard_opinion_type == "on-the-merits":
+        op_type = "080onthemerits"
+    elif harvard_opinion_type == "on-motion-to-strike-cost-bill":
+        op_type = "090onmotiontostrike"
+    else:
+        op_type = "010combined"
+    return op_type
+
+
 def parse_harvard_opinions(reporter, volume):
     """
     Parse downloaded CaseLaw Corpus from internet archive and add them to our
@@ -295,31 +326,7 @@ def parse_harvard_opinions(reporter, volume):
                     )
                 )
 
-                if op.get("type") == "unanimous":
-                    op_type = "015unamimous"
-                elif op.get("type") == "majority":
-                    op_type = "020lead"
-                elif op.get("type") == "plurality":
-                    op_type = "025plurality"
-                elif op.get("type") == "concurrence":
-                    op_type = "030concurrence"
-                elif (
-                    op.get("type") == "concurring-in-part-and-dissenting-in"
-                    "-part"
-                ):
-                    op_type = "035concurrenceinpart"
-                elif op.get("type") == "dissent":
-                    op_type = "040dissent"
-                elif op.get("type") == "remittitur":
-                    op_type = "060remittitur"
-                elif op.get("type") == "rehearing":
-                    op_type = "070rehearing"
-                elif op.get("type") == "on-the-merits":
-                    op_type = "080onthemerits"
-                elif op.get("type") == "on-motion-to-strike-cost-bill":
-                    op_type = "090onmotiontostrike"
-                else:
-                    op_type = "010combined"
+                op_type = map_opinion_type(op.get("type"))
                 opinion_xml = str(op)
                 logger.info("Adding opinion for: %s", cite)
                 Opinion.objects.create(
