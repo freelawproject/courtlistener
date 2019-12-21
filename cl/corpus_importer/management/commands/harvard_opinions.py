@@ -97,6 +97,52 @@ def check_for_match(new_case, possibilities):
         return None
 
 
+def skip_processing(volume, reporter, page, cite, case_name):
+    """Run checks for whether to skip the item from being added to the DB
+
+    Cheks include:
+     - Is the reporter one we know about in the reporter DB?
+     - Can we properly extract the reporter?
+     - Can we find a duplicate of the item already in CL?
+
+    :param volume: The volume of the citation
+    :param reporter: The reporter abbreviation of the citation
+    :param page: The page of the citation
+    :param cite: The unprocessed citation string, e.g.: "1 U.S. 1"
+    :param case_name: The name of the case
+    :return: True if the item should be skipped; else False
+    """
+    if reporter not in REPORTERS.keys():
+        logger.info("Reporter '%s' not found in reporter db" % reporter)
+        return True
+
+    try:
+        assert " ".join([volume, reporter, page]) == cite, (
+            "Reporter extraction failed for %s != %s"
+            % (cite, " ".join([volume, reporter, page]))
+        )
+    except (ValueError, Exception):
+        logger.info("Case: %s failed to resolve correctly" % cite)
+        return True
+
+    # Handle duplicate citations by checking for identical citations and
+    # overly similar case names
+    cite_search = Citation.objects.filter(
+        reporter=reporter, page=page, volume=volume
+    )
+    if cite_search.count() > 0:
+        case_names = OpinionCluster.objects.filter(
+            citations=cite_search
+        ).values_list("case_name", flat=True)
+        case_names = [s.replace("commissioner", "") for s in case_names]
+        if check_for_match(case_name, case_names) is not None:
+            logger.info("Looks like we already have %s." % case_name)
+            return True
+        logger.info("Duplicate cite string but appears to be a new case")
+
+    return False
+
+
 def map_opinion_type(harvard_opinion_type):
     """Map Harvard opinion types to CL ones
 
@@ -161,34 +207,8 @@ def parse_harvard_opinions(reporter, volume):
         page = cite.split(" ")[-1]
         reporter = cite.split(" ", 1)[1].rsplit(" ", 1)[0]
 
-        if reporter not in REPORTERS.keys():
-            logger.info("Reporter '%s' not found in reporter db" % reporter)
+        if skip_processing(vol, reporter, page, cite, data["name"]):
             continue
-
-        try:
-            assert " ".join([vol, reporter, page]) == cite, (
-                "Reporter extraction failed for %s != %s"
-                % (cite, " ".join([vol, reporter, page]))
-            )
-        except (ValueError, Exception):
-            logger.info("Case: %s failed to resolve correctly" % cite)
-            continue
-
-        cite_search = Citation.objects.filter(
-            reporter=reporter, page=page, volume=vol
-        )
-
-        # Handle duplicate citations.  By comparing date filed and page count
-        # It is unlikely two cases would both start and also stop on the
-        # same page.  So we use page count as a proxy for it.
-        if cite_search.count() > 0:
-            cluster_case_names = OpinionCluster.objects.filter(
-                citations=cite_search
-            ).values_list("case_name", flat=True)
-            if check_for_match(data["name"], cluster_case_names) is not None:
-                logger.info("Looks like we already have %s." % data["name"])
-                continue
-            logger.info("Duplicate cite string but appears to be a new case")
 
         # TODO: Generalize this to handle all court types somehow.
         court_id = match_court_string(
