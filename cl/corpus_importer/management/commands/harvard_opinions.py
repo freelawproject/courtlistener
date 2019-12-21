@@ -10,6 +10,7 @@ from glob import glob
 from datetime import datetime
 from bs4 import BeautifulSoup
 
+from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.crypto import sha1_of_json_data
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Opinion, OpinionCluster, Docket, Citation
@@ -161,7 +162,6 @@ def parse_harvard_opinions(reporter, volume):
             logger.info("Reporter '%s' not found in reporter db" % reporter)
             continue
 
-        cite_type = REPORTERS[reporter][0]["cite_type"]
         try:
             assert " ".join([vol, reporter, page]) == cite, (
                 "Reporter extraction failed for %s != %s"
@@ -277,31 +277,14 @@ def parse_harvard_opinions(reporter, volume):
                 filepath_local=file_path,
             )
 
-            if cite_type == "specialty":
-                model_cite_type = Citation.SPECIALTY
-            elif cite_type == "federal":
-                model_cite_type = Citation.FEDERAL
-            elif cite_type == "state":
-                model_cite_type = Citation.STATE
-            elif cite_type == "state_regional":
-                model_cite_type = Citation.STATE_REGIONAL
-            elif cite_type == "neutral":
-                model_cite_type = Citation.NEUTRAL
-            elif cite_type == "lexis":
-                model_cite_type = Citation.LEXIS
-            elif cite_type == "west":
-                model_cite_type = Citation.WEST
-            elif cite_type == "scotus_early":
-                model_cite_type = Citation.SCOTUS_EARLY
-            else:
-                model_cite_type = None
-
             logger.info("Adding citation for: %s", cite)
             Citation.objects.create(
                 volume=vol,
                 reporter=reporter,
                 page=page,
-                type=model_cite_type,
+                type=map_reporter_db_cite_type(
+                    REPORTERS[reporter][0]["cite_type"]
+                ),
                 cluster_id=cluster.id,
             )
             for op in soup.find_all("opinion"):
