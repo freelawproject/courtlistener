@@ -9,6 +9,7 @@ import itertools
 from glob import glob
 from datetime import datetime
 from bs4 import BeautifulSoup
+from juriscraper.lib.diff_tools import normalize_phrase
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.crypto import sha1_of_json_data
@@ -76,7 +77,7 @@ def filepath_list(reporter, volume):
 
 def check_for_match(new_case, possibilities):
     """
-    This code is a variation of find_closest_match used in juriscraper.
+    This code is a variation of get_closest_match_index used in juriscraper.
     It checks if the case name we are trying to add matches any duplicate
     citation cases already in the system.
     :param new_case: The importing case name
@@ -84,6 +85,8 @@ def check_for_match(new_case, possibilities):
     system with the same citation
     :return: Returns the match if any, otherwise returns None.
     """
+    new_case = normalize_phrase(new_case)
+    possibilities = [normalize_phrase(x) for x in possibilities]
     try:
         match = difflib.get_close_matches(
             new_case, possibilities, n=1, cutoff=0.7
