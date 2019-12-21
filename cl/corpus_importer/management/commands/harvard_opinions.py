@@ -99,29 +99,19 @@ def map_opinion_type(harvard_opinion_type):
     :param harvard_opinion_type: The type field of the Harvard opinion
     :return: The type field from our schema
     """
-    if harvard_opinion_type == "unanimous":
-        op_type = "015unamimous"
-    elif harvard_opinion_type == "majority":
-        op_type = "020lead"
-    elif harvard_opinion_type == "plurality":
-        op_type = "025plurality"
-    elif harvard_opinion_type == "concurrence":
-        op_type = "030concurrence"
-    elif harvard_opinion_type == "concurring-in-part-and-dissenting-in-part":
-        op_type = "035concurrenceinpart"
-    elif harvard_opinion_type == "dissent":
-        op_type = "040dissent"
-    elif harvard_opinion_type == "remittitur":
-        op_type = "060remittitur"
-    elif harvard_opinion_type == "rehearing":
-        op_type = "070rehearing"
-    elif harvard_opinion_type == "on-the-merits":
-        op_type = "080onthemerits"
-    elif harvard_opinion_type == "on-motion-to-strike-cost-bill":
-        op_type = "090onmotiontostrike"
-    else:
-        op_type = "010combined"
-    return op_type
+    type_map = {
+        "unanimous": "015unamimous",
+        "majority": "020lead",
+        "plurality": "025plurality",
+        "concurrence": "030concurrence",
+        "concurring-in-part-and-dissenting-in-part": "035concurrenceinpart",
+        "dissent": "040dissent",
+        "remittitur": "060remittitur",
+        "rehearing": "070rehearing",
+        "on-the-merits": "080onthemerits",
+        "on-motion-to-strike-cost-bill": "090onmotiontostrike",
+    }
+    return type_map.get(harvard_opinion_type, "010combined")
 
 
 def parse_harvard_opinions(reporter, volume):
