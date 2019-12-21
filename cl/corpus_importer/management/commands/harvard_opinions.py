@@ -157,8 +157,6 @@ def parse_harvard_opinions(reporter, volume):
         # Handle duplicate citations.  By comparing date filed and page count
         # It is unlikely two cases would both start and also stop on the
         # same page.  So we use page count as a proxy for it.
-
-        pg_count = 1 + int(data["last_page"]) - int(data["first_page"])
         if cite_search.count() > 0:
             cluster_case_names = OpinionCluster.objects.filter(
                 citations=cite_search
@@ -228,6 +226,9 @@ def parse_harvard_opinions(reporter, volume):
 
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
+
+            # Calculate the page count
+            pg_count = 1 + int(data["last_page"]) - int(data["first_page"])
 
             logger.info("Adding cluster for: %s", cite)
             cluster = OpinionCluster.objects.create(
