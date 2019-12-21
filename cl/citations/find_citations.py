@@ -8,6 +8,7 @@ from juriscraper.lib.html_utils import get_visible_text
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 
 from cl.citations import reporter_tokenizer
+from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.roman import isroman
 from cl.search.models import Citation as ModelCitation
 from cl.search.models import Court
@@ -139,27 +140,6 @@ class Citation(object):
             inner_html,
         )
 
-    def _get_cite_type(self):
-        """Figure out the Citation.type value."""
-        canon = REPORTERS[self.canonical_reporter]
-        cite_type = canon[self.lookup_index]["cite_type"]
-        if cite_type == "federal":
-            return ModelCitation.FEDERAL
-        elif cite_type == "state":
-            return ModelCitation.STATE
-        elif cite_type == "state_regional":
-            return ModelCitation.STATE_REGIONAL
-        elif cite_type == "specialty":
-            return ModelCitation.SPECIALTY
-        elif cite_type == "specialty_lexis":
-            return ModelCitation.LEXIS
-        elif cite_type == "specialty_west":
-            return ModelCitation.WEST
-        elif cite_type == "scotus_early":
-            return ModelCitation.SCOTUS_EARLY
-        elif cite_type == "neutral_citation":
-            return ModelCitation.NEUTRAL
-
     def to_model(self):
         # Create a citation object as in our models. Eventually, the version in
         # our models should probably be the only object named "Citation". Until
@@ -172,7 +152,9 @@ class Citation(object):
                 if key in ModelCitation._meta.get_all_field_names()
             }
         )
-        c.type = self._get_cite_type()
+        canon = REPORTERS[self.canonical_reporter]
+        cite_type = canon[self.lookup_index]["cite_type"]
+        c.type = map_reporter_db_cite_type(cite_type)
         return c
 
     def __repr__(self):
