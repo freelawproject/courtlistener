@@ -100,18 +100,18 @@ def map_opinion_type(harvard_opinion_type):
     :return: The type field from our schema
     """
     type_map = {
-        "unanimous": "015unamimous",
-        "majority": "020lead",
-        "plurality": "025plurality",
-        "concurrence": "030concurrence",
-        "concurring-in-part-and-dissenting-in-part": "035concurrenceinpart",
-        "dissent": "040dissent",
-        "remittitur": "060remittitur",
-        "rehearing": "070rehearing",
-        "on-the-merits": "080onthemerits",
-        "on-motion-to-strike-cost-bill": "090onmotiontostrike",
+        "unanimous": Opinion.UNANIMOUS,
+        "majority": Opinion.LEAD,
+        "plurality": Opinion.PLURALITY,
+        "concurrence": Opinion.CONCURRENCE,
+        "concurring-in-part-and-dissenting-in-part": Opinion.CONCUR_IN_PART,
+        "dissent": Opinion.DISSENT,
+        "remittitur": Opinion.REMITTUR,
+        "rehearing": Opinion.REHEARING,
+        "on-the-merits": Opinion.ON_THE_MERITS,
+        "on-motion-to-strike-cost-bill": Opinion.ON_MOTION_TO_STRIKE,
     }
-    return type_map.get(harvard_opinion_type, "010combined")
+    return type_map.get(harvard_opinion_type, Opinion.COMBINED)
 
 
 def parse_harvard_opinions(reporter, volume):

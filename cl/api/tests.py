@@ -714,10 +714,10 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         self.assertCountInResults(1)
 
         self.q = dict()
-        types = ["010combined"]
+        types = [Opinion.COMBINED]
         self.q["type"] = types
         self.assertCountInResults(5)
-        types.append("020lead")
+        types.append(Opinion.LEAD)
         self.assertCountInResults(6)
 
     def test_docket_filters(self):
