@@ -150,11 +150,8 @@ def parse_harvard_opinions(reporter, volume):
             logger.info("Case: %s failed to resolve correctly" % cite)
             continue
 
-        cite_search = (
-            Citation.objects.all()
-            .filter(reporter=reporter)
-            .filter(page=page)
-            .filter(volume=vol)
+        cite_search = Citation.objects.filter(
+            reporter=reporter, page=page, volume=vol
         )
 
         # Handle duplicate citations.  By comparing date filed and page count
@@ -163,12 +160,10 @@ def parse_harvard_opinions(reporter, volume):
 
         pg_count = 1 + int(data["last_page"]) - int(data["first_page"])
         if cite_search.count() > 0:
-            cluster_ids = cite_search.values_list("cluster_id")
-            objects = OpinionCluster.objects.filter(
-                id__in=cluster_ids
-            ).values_list("case_name")
-            possibilites = [case_obj[0] for case_obj in objects]
-            if check_for_match(data["name"], possibilites) is not None:
+            cluster_case_names = OpinionCluster.objects.filter(
+                citations=cite_search
+            ).values_list("case_name", flat=True)
+            if check_for_match(data["name"], cluster_case_names) is not None:
                 logger.info("Looks like we already have %s." % data["name"])
                 continue
             logger.info("Duplicate cite string but appears to be a new case")
@@ -193,7 +188,7 @@ def parse_harvard_opinions(reporter, volume):
         author_list = [
             find_judge_names(x.text) for x in soup.find_all("author")
         ]
-        # Need to flatten and dedupe list of judges here
+        # Flatten and dedupe list of judges
         judges = ", ".join(
             list(set(itertools.chain.from_iterable(judge_list + author_list)))
         )
