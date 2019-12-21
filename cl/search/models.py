@@ -2370,19 +2370,31 @@ def sort_cites(c):
 
 
 class Opinion(models.Model):
+    COMBINED = "010combined"
+    UNANIMOUS = "015unamimous"
+    LEAD = "020lead"
+    PLURALITY = "025plurality"
+    CONCURRENCE = "030concurrence"
+    CONCUR_IN_PART = "035concurrenceinpart"
+    DISSENT = "040dissent"
+    ADDENDUM = "050addendum"
+    REMITTUR = "060remittitur"
+    REHEARING = "070rehearing"
+    ON_THE_MERITS = "080onthemerits"
+    ON_MOTION_TO_STRIKE = "090onmotiontostrike"
     OPINION_TYPES = (
-        ("010combined", "Combined Opinion"),
-        ("015unamimous", "Unanimous Opinion"),
-        ("020lead", "Lead Opinion"),
-        ("025plurality", "Plurality Opinion"),
-        ("030concurrence", "Concurrence Opinion"),
-        ("035concurrenceinpart", "In Part Opinion"),
-        ("040dissent", "Dissent"),
-        ("050addendum", "Addendum"),
-        ("060remittitur", "Remittitur"),
-        ("070rehearing", "Rehearing"),
-        ("080onthemerits", "On the Merits"),
-        ("090onmotiontostrike", "On Motion to Strike Cost Bill"),
+        (COMBINED, "Combined Opinion"),
+        (UNANIMOUS, "Unanimous Opinion"),
+        (LEAD, "Lead Opinion"),
+        (PLURALITY, "Plurality Opinion"),
+        (CONCURRENCE, "Concurrence Opinion"),
+        (CONCUR_IN_PART, "In Part Opinion"),
+        (DISSENT, "Dissent"),
+        (ADDENDUM, "Addendum"),
+        (REMITTUR, "Remittitur"),
+        (REHEARING, "Rehearing"),
+        (ON_THE_MERITS, "On the Merits"),
+        (ON_MOTION_TO_STRIKE, "On Motion to Strike Cost Bill"),
     )
     cluster = models.ForeignKey(
         OpinionCluster,
