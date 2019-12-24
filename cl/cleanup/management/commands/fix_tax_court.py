@@ -106,7 +106,7 @@ def update_tax_opinions():
         op_objs = oc.sub_opinions.all()
         for opinion in op_objs:
             if opinion.plain_text == "":
-                logger.info('No plain text to parse.')
+                logger.info("No plain text to parse.")
                 continue
             if opinion.download_url == bad_url:
                 logger.info("Failed scrape, nothing to parse.")
