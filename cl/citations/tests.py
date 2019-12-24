@@ -14,6 +14,7 @@ from cl.citations.models import (
     IdCitation,
     ShortformCitation,
     SupraCitation,
+    NonopinionCitation,
 )
 from cl.citations.management.commands.cl_add_parallel_citations import (
     identify_parallel_citations,
@@ -223,6 +224,9 @@ class CiteTest(TestCase):
                            reporter_found='U.S.', court='scotus'),
               IdCitation(id_token='Id.,',
                          after_tokens=['at', '123.', 'foo'])]),
+            # Test non-opinion citation
+            (u'lorem ipsum see §99 of the U.S. code.',
+             [NonopinionCitation(match_token=u'§99')]),
         )
         # fmt: on
         for q, a in test_pairs:
@@ -709,6 +713,20 @@ class MatchingTest(IndexedSolrTestCase):
                              canonical_reporter=u'U.S.', lookup_index=0,
                              court='scotus', reporter_index=1,
                              reporter_found='U.S.'),
+                IdCitation(id_token='id.', after_tokens=['a', 'b', 'c'])
+            ], [
+                Opinion.objects.get(pk=7)
+            ]),
+
+            # Test resolving an Id. citation when the previous citation is to a
+            # non-opinion document. Since we can't match those documents (yet),
+            # we expect the Id. citation to also not be matched.
+            ([
+                FullCitation(volume=1, reporter='U.S.', page=1,
+                             canonical_reporter=u'U.S.', lookup_index=0,
+                             court='scotus', reporter_index=1,
+                             reporter_found='U.S.'),
+                NonopinionCitation(match_token=u'§'),
                 IdCitation(id_token='id.', after_tokens=['a', 'b', 'c'])
             ], [
                 Opinion.objects.get(pk=7)
