@@ -392,6 +392,5 @@ VerDate Nov 24 2008   10:59 Jul 11, 2014   Jkt 372897   PO 20012   Frm 00002   F
             cite_string = " ".join(
                 [str(cite.volume), cite.reporter, str(cite.page)]
             )
-            print cite_string
             self.assertEqual(cite_string, a, msg="Success")
             print "✓"
