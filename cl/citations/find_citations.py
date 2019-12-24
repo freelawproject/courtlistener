@@ -15,6 +15,7 @@ from cl.citations.models import (
     IdCitation,
     SupraCitation,
     ShortformCitation,
+    NonopinionCitation,
 )
 
 
@@ -423,8 +424,10 @@ def disambiguate_reporters(citations):
     unambiguous_citations = []
     for citation in citations:
         # Only disambiguate citations with a reporter
-        if isinstance(citation, SupraCitation) or isinstance(
-            citation, IdCitation
+        if (
+            isinstance(citation, SupraCitation)
+            or isinstance(citation, IdCitation)
+            or isinstance(citation, NonopinionCitation)
         ):
             unambiguous_citations.append(citation)
             continue
@@ -590,7 +593,14 @@ def get_citations(
         elif strip_punct(citation_token.lower()) == "supra":
             citation = extract_supra_citation(words, i)
 
-        # CASE 4: The token is not a citation.
+        # CASE 4: Citation token is a section marker.
+        # In this case, it's likely that this is a reference to a non-
+        # opinion document. So we record this marker in order to keep
+        # an accurate list of the possible antecedents for id citations.
+        elif u"§" in citation_token:
+            citation = NonopinionCitation(match_token=citation_token)
+
+        # CASE 5: The token is not a citation.
         else:
             continue
 

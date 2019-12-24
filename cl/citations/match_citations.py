@@ -7,7 +7,12 @@ from django.conf import settings
 from reporters_db import REPORTERS
 
 from cl.citations.find_citations import strip_punct
-from cl.citations.models import SupraCitation, ShortformCitation, IdCitation
+from cl.citations.models import (
+    SupraCitation,
+    ShortformCitation,
+    IdCitation,
+    NonopinionCitation,
+)
 from cl.lib import sunburnt
 from cl.search.models import Opinion
 
@@ -211,6 +216,11 @@ def get_citation_matches(opinion, citations):
         elif isinstance(citation, IdCitation):
             if was_matched:
                 matched_opinion = citation_matches[-1]
+
+        # If the citation is to a non-opinion document, we currently cannot
+        # match these.
+        elif isinstance(citation, NonopinionCitation):
+            pass
 
         # Otherwise, the citation is just a regular citation, so try to match
         # it directly to an opinion

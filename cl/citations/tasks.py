@@ -5,6 +5,7 @@ from collections import Counter
 from cl.celery import app
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited
+from cl.citations.models import NonopinionCitation
 
 # This is the distance two reporter abbreviations can be from each other if they
 # are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
@@ -72,14 +73,16 @@ def create_cited_html(opinion, citations):
     if any([opinion.html_columbia, opinion.html_lawbox, opinion.html]):
         new_html = opinion.html_columbia or opinion.html_lawbox or opinion.html
         for citation in citations:
-            new_html = re.sub(
-                citation.as_regex(), citation.as_html(), new_html
-            )
+            if not isinstance(citation, NonopinionCitation):
+                new_html = re.sub(
+                    citation.as_regex(), citation.as_html(), new_html
+                )
     elif opinion.plain_text:
         inner_html = opinion.plain_text
         for citation in citations:
-            repl = u'</pre>%s<pre class="inline">' % citation.as_html()
-            inner_html = re.sub(citation.as_regex(), repl, inner_html)
+            if not isinstance(citation, NonopinionCitation):
+                repl = u'</pre>%s<pre class="inline">' % citation.as_html()
+                inner_html = re.sub(citation.as_regex(), repl, inner_html)
         new_html = u'<pre class="inline">%s</pre>' % inner_html
     return new_html.encode("utf-8")
 
@@ -111,7 +114,7 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
 
         # Consolidate duplicate matches, keeping a counter of how often each
         # match appears (so we know how many times an opinion cites another).
-        # keys = opinion
+        # keys = cited opinion
         # values = number of times that opinion is cited
         grouped_matches = Counter(citation_matches)
 
