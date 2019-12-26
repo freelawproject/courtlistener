@@ -228,7 +228,7 @@ def parse_harvard_opinions(reporter, volume):
             .replace("Docket Nos.", "")
         )
         with transaction.atomic():
-            logger.info("Adding docket for: %s", cite)
+            logger.info("Adding docket for: %s", citation.base_citation())
             docket = Docket.objects.create(
                 case_name=data["name"],
                 docket_number=docket_string,
@@ -258,10 +258,7 @@ def parse_harvard_opinions(reporter, volume):
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
 
-            # Calculate the page count
-            pg_count = 1 + int(data["last_page"]) - int(data["first_page"])
-
-            logger.info("Adding cluster for: %s", cite)
+            logger.info("Adding cluster for: %s", citation.base_citation())
             cluster = OpinionCluster.objects.create(
                 case_name=data["name"],
                 precedential_status="Published",
@@ -284,11 +281,11 @@ def parse_harvard_opinions(reporter, volume):
                 json_harvard=file_path,
             )
 
-            logger.info("Adding citation for: %s", cite)
+            logger.info("Adding citation for: %s", citation.base_citation())
             Citation.objects.create(
-                volume=vol,
-                reporter=reporter,
-                page=page,
+                volume=citation.volume,
+                reporter=citation.reporter,
+                page=citation.page,
                 type=map_reporter_db_cite_type(
                     REPORTERS[reporter][0]["cite_type"]
                 ),
@@ -308,7 +305,7 @@ def parse_harvard_opinions(reporter, volume):
 
                 op_type = map_opinion_type(op.get("type"))
                 opinion_xml = str(op)
-                logger.info("Adding opinion for: %s", cite)
+                logger.info("Adding opinion for: %s", citation.base_citation())
                 Opinion.objects.create(
                     type=op_type,
                     cluster_id=cluster.id,
@@ -317,7 +314,7 @@ def parse_harvard_opinions(reporter, volume):
                     joined_by_str=joined_by_str,
                 )
 
-        logger.info("Finished: %s", cite)
+        logger.info("Finished: %s", citation.base_citation())
 
 
 class MissingDocumentError(Exception):
