@@ -97,7 +97,7 @@ def check_for_match(new_case, possibilities):
         return None
 
 
-def skip_processing(volume, reporter, page, cite, case_name):
+def skip_processing(citation, case_name):
     """Run checks for whether to skip the item from being added to the DB
 
     Cheks include:
@@ -105,30 +105,15 @@ def skip_processing(volume, reporter, page, cite, case_name):
      - Can we properly extract the reporter?
      - Can we find a duplicate of the item already in CL?
 
-    :param volume: The volume of the citation
-    :param reporter: The reporter abbreviation of the citation
-    :param page: The page of the citation
-    :param cite: The unprocessed citation string, e.g.: "1 U.S. 1"
+    :param citation: CL citation object
     :param case_name: The name of the case
     :return: True if the item should be skipped; else False
     """
-    if reporter not in REPORTERS.keys():
-        logger.info("Reporter '%s' not found in reporter db" % reporter)
-        return True
-
-    try:
-        assert " ".join([volume, reporter, page]) == cite, (
-            "Reporter extraction failed for %s != %s"
-            % (cite, " ".join([volume, reporter, page]))
-        )
-    except (ValueError, Exception):
-        logger.info("Case: %s failed to resolve correctly" % cite)
-        return True
 
     # Handle duplicate citations by checking for identical citations and
     # overly similar case names
     cite_search = Citation.objects.filter(
-        reporter=reporter, page=page, volume=volume
+        reporter=citation.reporter, page=citation.page, volume=citation.volume
     )
     if cite_search.count() > 0:
         case_names = OpinionCluster.objects.filter(
@@ -202,12 +187,15 @@ def parse_harvard_opinions(reporter, volume):
         except Exception as e:
             logger.warning("Unknown error %s for: %s" % (e, ia_download_url))
 
-        vol = data["volume"]["volume_number"]
-        cite = data["citations"][0]["cite"]
-        page = cite.split(" ")[-1]
-        reporter = cite.split(" ", 1)[1].rsplit(" ", 1)[0]
+        cites = get_citations(data["citations"][0]["cite"], html=False)
+        if not cites:
+            logger.info(
+                "No citation found for %s." % data["citations"][0]["cite"]
+            )
 
-        if skip_processing(vol, reporter, page, cite, data["name"]):
+        citation = cites[0]
+
+        if skip_processing(citation, data["name"]):
             continue
 
         # TODO: Generalize this to handle all court types somehow.
