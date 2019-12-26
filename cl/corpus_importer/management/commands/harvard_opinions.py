@@ -174,7 +174,9 @@ def parse_harvard_opinions(reporter, volume):
             ["https://archive.org/download", file_path.split("/", 9)[-1]]
         )
 
-        if OpinionCluster.objects.filter(filepath_local=file_path).exists():
+        if OpinionCluster.objects.filter(
+            filepath_json_harvard=file_path
+        ).exists():
             logger.info("Skipping - already in system %s" % ia_download_url)
             continue
 
