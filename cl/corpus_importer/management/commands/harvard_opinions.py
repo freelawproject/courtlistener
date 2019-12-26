@@ -165,6 +165,7 @@ def parse_harvard_opinions(reporter, volume):
     :param reporter: Reporter string as slugify'd (optional) (tc) for T.C.
     :return: None
     """
+
     if not reporter and volume:
         logger.error("You provided a volume but no reporter. Exiting.")
         return
@@ -209,7 +210,6 @@ def parse_harvard_opinions(reporter, volume):
         )
 
         soup = BeautifulSoup(data["casebody"]["data"], "lxml")
-        content = data["casebody"]["data"]
 
         # Some documents contain images in the HTML
         # Flag them for a later crawl by using the placeholder '[[Image]]'
