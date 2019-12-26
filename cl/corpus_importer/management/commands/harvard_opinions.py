@@ -12,11 +12,11 @@ from bs4 import BeautifulSoup
 from juriscraper.lib.diff_tools import normalize_phrase
 
 from cl.citations.utils import map_reporter_db_cite_type
-from cl.lib.crypto import sha1_of_json_data
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Opinion, OpinionCluster, Docket, Citation
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.corpus_importer.court_regexes import match_court_string
+from cl.citations.find_citations import get_citations
 
 from django.conf import settings
 from django.db import transaction
@@ -97,7 +97,7 @@ def check_for_match(new_case, possibilities):
         return None
 
 
-def skip_processing(volume, reporter, page, cite, case_name):
+def skip_processing(citation, case_name):
     """Run checks for whether to skip the item from being added to the DB
 
     Cheks include:
@@ -105,30 +105,15 @@ def skip_processing(volume, reporter, page, cite, case_name):
      - Can we properly extract the reporter?
      - Can we find a duplicate of the item already in CL?
 
-    :param volume: The volume of the citation
-    :param reporter: The reporter abbreviation of the citation
-    :param page: The page of the citation
-    :param cite: The unprocessed citation string, e.g.: "1 U.S. 1"
+    :param citation: CL citation object
     :param case_name: The name of the case
     :return: True if the item should be skipped; else False
     """
-    if reporter not in REPORTERS.keys():
-        logger.info("Reporter '%s' not found in reporter db" % reporter)
-        return True
-
-    try:
-        assert " ".join([volume, reporter, page]) == cite, (
-            "Reporter extraction failed for %s != %s"
-            % (cite, " ".join([volume, reporter, page]))
-        )
-    except (ValueError, Exception):
-        logger.info("Case: %s failed to resolve correctly" % cite)
-        return True
 
     # Handle duplicate citations by checking for identical citations and
     # overly similar case names
     cite_search = Citation.objects.filter(
-        reporter=reporter, page=page, volume=volume
+        reporter=citation.reporter, page=citation.page, volume=citation.volume
     )
     if cite_search.count() > 0:
         case_names = OpinionCluster.objects.filter(
@@ -189,7 +174,9 @@ def parse_harvard_opinions(reporter, volume):
             ["https://archive.org/download", file_path.split("/", 9)[-1]]
         )
 
-        if OpinionCluster.objects.filter(filepath_local=file_path).exists():
+        if OpinionCluster.objects.filter(
+            filepath_json_harvard=file_path
+        ).exists():
             logger.info("Skipping - already in system %s" % ia_download_url)
             continue
 
@@ -202,12 +189,15 @@ def parse_harvard_opinions(reporter, volume):
         except Exception as e:
             logger.warning("Unknown error %s for: %s" % (e, ia_download_url))
 
-        vol = data["volume"]["volume_number"]
-        cite = data["citations"][0]["cite"]
-        page = cite.split(" ")[-1]
-        reporter = cite.split(" ", 1)[1].rsplit(" ", 1)[0]
+        cites = get_citations(data["citations"][0]["cite"], html=False)
+        if not cites:
+            logger.info(
+                "No citation found for %s." % data["citations"][0]["cite"]
+            )
 
-        if skip_processing(vol, reporter, page, cite, data["name"]):
+        citation = cites[0]
+
+        if skip_processing(citation, data["name"]):
             continue
 
         # TODO: Generalize this to handle all court types somehow.
@@ -219,11 +209,9 @@ def parse_harvard_opinions(reporter, volume):
         )
 
         soup = BeautifulSoup(data["casebody"]["data"], "lxml")
-        content = data["casebody"]["data"]
 
         # Some documents contain images in the HTML
         # Flag them for a later crawl by using the placeholder '[[Image]]'
-        missing_images = True if content.find("[[Image here]]") > -1 else False
         judge_list = [
             find_judge_names(x.text) for x in soup.find_all("judges")
         ]
@@ -241,7 +229,7 @@ def parse_harvard_opinions(reporter, volume):
             .replace("Docket Nos.", "")
         )
         with transaction.atomic():
-            logger.info("Adding docket for: %s", cite)
+            logger.info("Adding docket for: %s", citation.base_citation())
             docket = Docket.objects.create(
                 case_name=data["name"],
                 docket_number=docket_string,
@@ -271,10 +259,7 @@ def parse_harvard_opinions(reporter, volume):
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
 
-            # Calculate the page count
-            pg_count = 1 + int(data["last_page"]) - int(data["first_page"])
-
-            logger.info("Adding cluster for: %s", cite)
+            logger.info("Adding cluster for: %s", citation.base_citation())
             cluster = OpinionCluster.objects.create(
                 case_name=data["name"],
                 precedential_status="Published",
@@ -294,17 +279,14 @@ def parse_harvard_opinions(reporter, volume):
                 correction=data_set["correction"],
                 judges=judges,
                 xml_harvard=str(soup),
-                sha1=sha1_of_json_data(json.dumps(data)),
-                page_count=pg_count,
-                image_missing=missing_images,
-                filepath_local=file_path,
+                json_harvard=file_path,
             )
 
-            logger.info("Adding citation for: %s", cite)
+            logger.info("Adding citation for: %s", citation.base_citation())
             Citation.objects.create(
-                volume=vol,
-                reporter=reporter,
-                page=page,
+                volume=citation.volume,
+                reporter=citation.reporter,
+                page=citation.page,
                 type=map_reporter_db_cite_type(
                     REPORTERS[reporter][0]["cite_type"]
                 ),
@@ -324,17 +306,16 @@ def parse_harvard_opinions(reporter, volume):
 
                 op_type = map_opinion_type(op.get("type"))
                 opinion_xml = str(op)
-                logger.info("Adding opinion for: %s", cite)
+                logger.info("Adding opinion for: %s", citation.base_citation())
                 Opinion.objects.create(
                     type=op_type,
                     cluster_id=cluster.id,
                     author_str=author_str,
-                    download_url=ia_download_url,
                     xml_harvard=opinion_xml,
                     joined_by_str=joined_by_str,
                 )
 
-        logger.info("Finished: %s", cite)
+        logger.info("Finished: %s", citation.base_citation())
 
 
 class MissingDocumentError(Exception):
