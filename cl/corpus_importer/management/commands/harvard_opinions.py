@@ -223,7 +223,6 @@ def parse_harvard_opinions(reporter, volume):
 
         # Some documents contain images in the HTML
         # Flag them for a later crawl by using the placeholder '[[Image]]'
-        missing_images = True if content.find("[[Image here]]") > -1 else False
         judge_list = [
             find_judge_names(x.text) for x in soup.find_all("judges")
         ]
@@ -294,10 +293,7 @@ def parse_harvard_opinions(reporter, volume):
                 correction=data_set["correction"],
                 judges=judges,
                 xml_harvard=str(soup),
-                sha1=sha1_of_json_data(json.dumps(data)),
-                page_count=pg_count,
-                image_missing=missing_images,
-                filepath_local=file_path,
+                json_harvard=file_path,
             )
 
             logger.info("Adding citation for: %s", cite)
@@ -329,7 +325,6 @@ def parse_harvard_opinions(reporter, volume):
                     type=op_type,
                     cluster_id=cluster.id,
                     author_str=author_str,
-                    download_url=ia_download_url,
                     xml_harvard=opinion_xml,
                     joined_by_str=joined_by_str,
                 )
