@@ -12,7 +12,6 @@ from bs4 import BeautifulSoup
 from juriscraper.lib.diff_tools import normalize_phrase
 
 from cl.citations.utils import map_reporter_db_cite_type
-from cl.lib.crypto import sha1_of_json_data
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Opinion, OpinionCluster, Docket, Citation
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
