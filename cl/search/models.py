@@ -2001,22 +2001,6 @@ class OpinionCluster(models.Model):
         max_length=1000,
         blank=True,
     )
-    sha1 = models.CharField(
-        help_text="unique ID for the document, as generated via SHA1 of the "
-        "binary file or text data",
-        max_length=40,
-        db_index=True,
-    )
-    page_count = models.IntegerField(
-        help_text="The number of pages in the opinion cluster.",
-        blank=True,
-        null=True,
-    )
-    image_missing = models.BooleanField(
-        help_text="Whether case is missing document image.",
-        db_index=True,
-        default=False,
-    )
 
     objects = ClusterCitationQuerySet.as_manager()
 
