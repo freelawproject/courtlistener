@@ -2473,13 +2473,12 @@ class Opinion(models.Model):
     html = models.TextField(
         help_text="HTML of the document, if available in the original",
         blank=True,
-        null=True,
     )
     html_lawbox = models.TextField(
-        help_text="HTML of Lawbox documents", blank=True, null=True,
+        help_text="HTML of Lawbox documents", blank=True
     )
     html_columbia = models.TextField(
-        help_text="HTML of Columbia archive", blank=True, null=True,
+        help_text="HTML of Columbia archive", blank=True,
     )
     xml_harvard = models.TextField(
         help_text="XML of Harvard CaseLaw Access Project opinion", blank=True,
