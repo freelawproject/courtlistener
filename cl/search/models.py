@@ -2499,9 +2499,7 @@ class Opinion(models.Model):
         help_text="HTML of Columbia archive", blank=True, null=True,
     )
     xml_harvard = models.TextField(
-        help_text="HTML of Harvard CaseLaw Access Project",
-        blank=True,
-        null=True,
+        help_text="XML of Harvard CaseLaw Access Project opinion", blank=True,
     )
     html_with_citations = models.TextField(
         help_text="HTML of the document with citation links and other "
