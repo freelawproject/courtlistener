@@ -1955,17 +1955,14 @@ class OpinionCluster(models.Model):
         blank=True,
     )
     correction = models.TextField(
-        help_text="Publisher's correction to the case text. "
-        "Example: Replace last paragraph on page 476 "
-        "with this text: blah blah blah. This is basically an"
-        " unstructured text that can be used to manually "
-        "correct case content according to publisher's "
-        "instructions. No footnotes is expected within it.",
-        blank=True,
-    )
-    xml_harvard = models.TextField(
-        help_text="Casebody XML stores structure of "
-        "a legal case document body from Harvard Case Law Project.",
+        help_text=(
+            "Publisher's correction to the case text. "
+            "Example: Replace last paragraph on page 476 "
+            "with this text: blah blah blah. This is basically an"
+            " unstructured text that can be used to manually "
+            "correct case content according to publisher's "
+            "instructions. No footnotes is expected within it."
+        ),
         blank=True,
     )
     citation_count = models.IntegerField(
