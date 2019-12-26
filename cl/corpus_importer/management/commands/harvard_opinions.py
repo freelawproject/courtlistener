@@ -194,9 +194,9 @@ def parse_harvard_opinions(reporter, volume):
             logger.info(
                 "No citation found for %s." % data["citations"][0]["cite"]
             )
+            continue
 
         citation = cites[0]
-
         if skip_processing(citation, data["name"]):
             continue
 
