@@ -207,6 +207,13 @@ class CiteTest(TestCase):
                        lookup_index=0,
                        reporter_index=4,
                        reporter_found='UNITED STATES TAX COURT REPORT')]),
+            # Added this after failing in production
+            ('     202                 140 UNITED STATES TAX COURT REPORTS                                   (200)',
+             [Citation(volume=140, reporter='T.C.', page=200,
+                       canonical_reporter=u'T.C.',
+                       lookup_index=0,
+                       reporter_index=2,
+                       reporter_found='UNITED STATES TAX COURT REPORTS')]),
             ('U.S. 1234 1 U.S. 1',
              [Citation(volume=1, reporter='U.S.', page=1,
                        canonical_reporter=u'U.S.',
