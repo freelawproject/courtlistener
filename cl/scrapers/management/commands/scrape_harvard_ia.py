@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import os
+import internetarchive as ia
 import json
 import requests
-from internetarchive import get_files, search_items
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.utils import mkdir_p
@@ -24,11 +24,19 @@ def get_from_ia(reporter, volume):
     :return: None
     """
 
+    logger.info("Creating IA session...")
+    access_key = settings.IA_ACCESS_KEY
+    secret_key = settings.IA_SECRET_KEY
+    ia_session = ia.get_session(
+        {"s3": {"access": access_key, "secret": secret_key,}}
+    )
+
     reporter_key = ".".join(["law.free.cap", reporter])
 
     # Checks that the returned reporter is the requested one.
     # Ex. searching for Mich will return both Mich-app. and Mich.
-    for ia_identifier in search_items(reporter_key):
+    for ia_identifier in ia_session.search_items(reporter_key):
+        logger.info("Got ia identifier: %s" % ia_identifier)
         ia_key = ia_identifier["identifier"]
         if ia_key.split(".")[3] != reporter:
             continue
@@ -40,31 +48,32 @@ def get_from_ia(reporter, volume):
             if volume != ia_volume:
                 continue
 
-        for item in get_files(ia_key):
+        ia_item = ia_session.get_item(ia_key)
+        for item in ia_item.get_files():
+            logger.info("Got item with name: %s" % item.name)
             if "json.json" in item.name:
                 continue
 
-            if "json" in item.name:
-                url = "https://archive.org/download/%s/%s" % (
-                    ia_key,
-                    item.name,
-                )
-                file_path = os.path.join(
-                    settings.MEDIA_ROOT,
-                    "harvard_corpus",
-                    "%s" % ia_key,
-                    "%s" % item.name,
-                )
-                directory = file_path.rsplit("/", 1)[0]
-                if os.path.exists(file_path):
-                    logger.info("Already captured: %s", url)
-                    continue
+            if "json" not in item.name:
+                continue
 
-                logger.info("Capturing: %s", url)
-                mkdir_p(directory)
-                data = requests.get(url, timeout=10).json()
-                with open(file_path, "w") as outfile:
-                    json.dump(data, outfile, indent=2)
+            url = "https://archive.org/download/%s/%s" % (ia_key, item.name,)
+            file_path = os.path.join(
+                settings.MEDIA_ROOT,
+                "harvard_corpus",
+                "%s" % ia_key,
+                "%s" % item.name,
+            )
+            directory = file_path.rsplit("/", 1)[0]
+            if os.path.exists(file_path):
+                logger.info("Already captured: %s", url)
+                continue
+
+            logger.info("Capturing: %s", url)
+            mkdir_p(directory)
+            data = requests.get(url, timeout=10).json()
+            with open(file_path, "w") as outfile:
+                json.dump(data, outfile, indent=2)
 
 
 class Command(VerboseCommand):

@@ -22,7 +22,7 @@ def get_tax_docket_numbers(opinion_text):
     parsed_text = None
     docket_no_re = r"Docket No.*Filed|Docket No.*(, [0-9]{4}.)"
     matches = re.finditer(docket_no_re, opinion_text)
-    r = r"[0-9]{3,5}-[\w]{2,4}(\.)( [A-Z](\.))?"
+    r = r"[0-9]{3,5}(-|–)[\w]{2,4}(\.)( [A-Z](\.))?"
     for matchNum, match in enumerate(matches, start=1):
         xst = opinion_text[match.start() :]
         second_matches = re.finditer(r, opinion_text[match.start() :])
@@ -33,7 +33,7 @@ def get_tax_docket_numbers(opinion_text):
     if parsed_text is None:
         return None
 
-    docket_end_re = r"[0-9]{3,5}-[\w]{2,4}([A-Z])?(\,|\.)"
+    docket_end_re = r"[0-9]{3,5}(-|–)[\w]{2,4}([A-Z])?(\,|\.)"
 
     matches = re.finditer(docket_end_re, parsed_text, re.MULTILINE)
     hits = []
@@ -60,7 +60,7 @@ def generate_citation(opinion_text, cluster_id):
     for line_of_text in opinion_text.split("\n")[:250]:
         cites = find_citations.get_citations(line_of_text, html=False)
         if not cites:
-            return
+            continue
 
         for cite in cites:
             if "T.C." not in cite.reporter and "T. C." not in cite.reporter:
@@ -81,6 +81,8 @@ def generate_citation(opinion_text, cluster_id):
             ):
                 cite.type = cite_type
                 return cite
+            else:
+                logger.info("Citation already in the system. Return None.")
 
 
 def update_tax_opinions():
@@ -104,7 +106,7 @@ def update_tax_opinions():
         op_objs = oc.sub_opinions.all()
         for opinion in op_objs:
             if opinion.plain_text == "":
-                # logger.info('Nothing to parse.')
+                logger.info("No plain text to parse.")
                 continue
             if opinion.download_url == bad_url:
                 logger.info("Failed scrape, nothing to parse.")
@@ -122,21 +124,23 @@ def update_tax_opinions():
             cite = generate_citation(opinion.plain_text, oc.id)
 
             if cite is None:
+                logger.info(
+                    "No cite to add for opinion %s on cluster %s"
+                    % (opinion.id, oc.id)
+                )
                 continue
 
             logger.info(
-                "Citation saved %s %s %s"
+                "Saving citation %s %s %s"
                 % (cite.volume, cite.reporter, cite.page)
             )
 
             Citation.objects.get_or_create(
-                **{
-                    "volume": cite.volume,
-                    "reporter": cite.reporter,
-                    "page": cite.page,
-                    "type": cite.type,
-                    "cluster_id": oc.id,
-                }
+                volume=cite.volume,
+                reporter=cite.reporter,
+                page=cite.page,
+                type=cite.type,
+                cluster_id=oc.id,
             )
 
 
