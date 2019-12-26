@@ -1992,10 +1992,12 @@ class OpinionCluster(models.Model):
         db_index=True,
         default=False,
     )
-    filepath_local = models.FileField(
-        help_text="Path to local storage of JSON collected from Harvard Case "
-        "Law project containing available metadata, opinion "
-        "and opinion cluster.",
+    filepath_json_harvard = models.FileField(
+        help_text=(
+            "Path to local storage of JSON collected from Harvard Case "
+            "Law project containing available metadata, opinion "
+            "and opinion cluster."
+        ),
         max_length=1000,
         blank=True,
     )
