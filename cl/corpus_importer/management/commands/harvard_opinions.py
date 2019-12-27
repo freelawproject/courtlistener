@@ -124,7 +124,6 @@ def skip_processing(citation, case_name):
             logger.info("Looks like we already have %s." % case_name)
             return True
         logger.info("Duplicate cite string but appears to be a new case")
-
     return False
 
 
@@ -194,9 +193,9 @@ def parse_harvard_opinions(reporter, volume):
             logger.info(
                 "No citation found for %s." % data["citations"][0]["cite"]
             )
+            continue
 
         citation = cites[0]
-
         if skip_processing(citation, data["name"]):
             continue
 
@@ -278,8 +277,7 @@ def parse_harvard_opinions(reporter, volume):
                 headnotes=data_set["headnotes"],
                 correction=data_set["correction"],
                 judges=judges,
-                xml_harvard=str(soup),
-                json_harvard=file_path,
+                filepath_json_harvard=file_path,
             )
 
             logger.info("Adding citation for: %s", citation.base_citation())
@@ -288,7 +286,7 @@ def parse_harvard_opinions(reporter, volume):
                 reporter=citation.reporter,
                 page=citation.page,
                 type=map_reporter_db_cite_type(
-                    REPORTERS[reporter][0]["cite_type"]
+                    REPORTERS[citation.reporter][0]["cite_type"]
                 ),
                 cluster_id=cluster.id,
             )

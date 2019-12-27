@@ -3,6 +3,8 @@ import json
 import os
 import unittest
 from datetime import date
+import mock
+from glob import iglob
 
 import pytest
 from django.conf import settings
@@ -15,12 +17,17 @@ from cl.corpus_importer.import_columbia.parse_opinions import (
 )
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
+from cl.corpus_importer.management.commands.harvard_opinions import (
+    parse_harvard_opinions,
+)
+
 from cl.lib.pacer import process_docket_data
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
 from cl.recap.mergers import find_docket_object
-from cl.search.models import Docket, RECAPDocument
+from cl.search.models import Docket, RECAPDocument, OpinionCluster
 
+from cl.citations.find_citations import get_citations
 
 class JudgeExtractionTest(unittest.TestCase):
     def test_get_judge_from_string_columbia(self):
@@ -52,7 +59,8 @@ class CourtMatchingTest(unittest.TestCase):
                 "args": (
                     "California Superior Court  "
                     "Appellate Division, Kern County.",
-                    "california/supreme_court_opinions/documents/0dc538c63bd07a28.xml",  # noqa
+                    "california/supreme_court_opinions/documents/0dc538c63bd07a28.xml",
+                    # noqa
                 ),
                 "answer": "calappdeptsuperct",
             },
@@ -60,56 +68,64 @@ class CourtMatchingTest(unittest.TestCase):
                 "args": (
                     "California Superior Court  "
                     "Appellate Department, Sacramento.",
-                    "california/supreme_court_opinions/documents/0dc538c63bd07a28.xml",  # noqa
+                    "california/supreme_court_opinions/documents/0dc538c63bd07a28.xml",
+                    # noqa
                 ),
                 "answer": "calappdeptsuperct",
             },
             {
                 "args": (
                     "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents/0412a06c60a7c2a2.xml",  # noqa
+                    "connecticut/appellate_court_opinions/documents/0412a06c60a7c2a2.xml",
+                    # noqa
                 ),
                 "answer": "connsuperct",
             },
             {
                 "args": (
                     "Court of Errors and Appeals.",
-                    "new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml",  # noqa
+                    "new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml",
+                    # noqa
                 ),
                 "answer": "nj",
             },
             {
                 "args": (
                     "Court of Chancery",
-                    "new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml",  # noqa
+                    "new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml",
+                    # noqa
                 ),
                 "answer": "njch",
             },
             {
                 "args": (
                     "Workers' Compensation Commission",
-                    "connecticut/workers_compensation_commission/documents/0902142af68ef9df.xml",  # noqa
+                    "connecticut/workers_compensation_commission/documents/0902142af68ef9df.xml",
+                    # noqa
                 ),
                 "answer": "connworkcompcom",
             },
             {
                 "args": (
                     "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents/00ea30ce0e26a5fd.xml",  # noqa
+                    "connecticut/appellate_court_opinions/documents/00ea30ce0e26a5fd.xml",
+                    # noqa
                 ),
                 "answer": "connsuperct",
             },
             {
                 "args": (
                     "Superior Court  New Haven County",
-                    "connecticut/superior_court_opinions/documents/0218655b78d2135b.xml",  # noqa
+                    "connecticut/superior_court_opinions/documents/0218655b78d2135b.xml",
+                    # noqa
                 ),
                 "answer": "connsuperct",
             },
             {
                 "args": (
                     "Superior Court, Hartford County",
-                    "connecticut/superior_court_opinions/documents/0218655b78d2135b.xml",  # noqa
+                    "connecticut/superior_court_opinions/documents/0218655b78d2135b.xml",
+                    # noqa
                 ),
                 "answer": "connsuperct",
             },
@@ -117,14 +133,16 @@ class CourtMatchingTest(unittest.TestCase):
                 "args": (
                     "Compensation Review Board  "
                     "WORKERS' COMPENSATION COMMISSION",
-                    "connecticut/workers_compensation_commission/documents/00397336451f6659.xml",  # noqa
+                    "connecticut/workers_compensation_commission/documents/00397336451f6659.xml",
+                    # noqa
                 ),
                 "answer": "connworkcompcom",
             },
             {
                 "args": (
                     "Appellate Division Of The Circuit Court",
-                    "connecticut/superior_court_opinions/documents/03dd9ec415bf5bf4.xml",  # noqa
+                    "connecticut/superior_court_opinions/documents/03dd9ec415bf5bf4.xml",
+                    # noqa
                 ),
                 "answer": "connsuperct",
             },
@@ -203,14 +221,16 @@ class CourtMatchingTest(unittest.TestCase):
             {
                 "args": (
                     "District Court of Appeal of Florida, Second District.",
-                    "/data/dumps/florida/court_opinions/documents/25ce1e2a128df7ff.xml",  # noqa
+                    "/data/dumps/florida/court_opinions/documents/25ce1e2a128df7ff.xml",
+                    # noqa
                 ),
                 "answer": "fladistctapp",
             },
             {
                 "args": (
                     "U.S. Circuit Court",
-                    "north_carolina/court_opinions/documents/fa5b96d590ae8d48.xml",  # noqa
+                    "north_carolina/court_opinions/documents/fa5b96d590ae8d48.xml",
+                    # noqa
                 ),
                 "answer": "circtnc",
             },
@@ -250,7 +270,7 @@ class CourtMatchingTest(unittest.TestCase):
             {"q": "M.D. of Pennsylvania", "a": "pamd",},
         )
         for test in pairs:
-            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            print ("Testing: %s, expecting: %s" % (test["q"], test["a"]))
             got = match_court_string(test["q"], federal_district=True)
             self.assertEqual(
                 test["a"], got,
@@ -270,7 +290,7 @@ class CourtMatchingTest(unittest.TestCase):
             {"q": "U.S. Circuit Court for the Ninth Circuit", "a": "ca9",},
         )
         for test in pairs:
-            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            print ("Testing: %s, expecting: %s" % (test["q"], test["a"]))
             got = match_court_string(test["q"], federal_appeals=True)
             self.assertEqual(test["a"], got)
 
@@ -288,7 +308,6 @@ class PacerDocketParserTest(TestCase):
     )
 
     def setUp(self):
-
         self.docket, count = find_docket_object(
             "akd", "41664", "3:11-cv-00064"
         )
@@ -450,18 +469,95 @@ class IAUploaderTest(TestCase):
 
 class HarvardTests(TestCase):
     """
-    This is the start of tests for the Harvard import.  Need to flush out
-    what I want to test.
+    Testing for cl.corpus_importer.management.commands.harvard_opinions
     """
 
-    def test_cite_split(self):
-        """Test various aspects of harvard import."""
-        tests = (
-            ("1 Mass. 245", "Mass.",),
-            ("115 Mich. App. 647", "Mich. App.",),
-            ("10 T.C. 1233", "T.C."),
-            ("702 F.2d 1234", "F.2d"),
-            ("702 F. 2d 1234", "F. 2d"),
+    fixtures = [
+                "tax_court_asset.json",
+    ]
+
+    def setUp(self):
+        self.test_dir = os.path.join(
+            settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
         )
+
+    def tearDown(self):
+        Docket.objects.all().delete()
+
+    def test_import_case(self):
+        """Can we properly extract ....
+    """
+        tests = (("tax_court_duplicate.json", "1 T.C. 19",),)
         for q, a in tests:
-            self.assertEqual(q.split(" ", 1)[1].rsplit(" ", 1)[0], a)
+            filepath = os.path.join(self.test_dir, q)
+            with open(filepath, "r") as f:
+                data = json.loads(f.read())
+            cites = get_citations(data["citations"][0]["cite"], html=False)
+            self.assertEqual(cites[0].base_citation(), a)
+            print a, "✓"
+
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[
+            iglob(
+                os.path.join(
+                    settings.INSTALL_ROOT,
+                    "cl",
+                    "corpus_importer",
+                    "test_assets",
+                    "tax_court_similar*",
+                )
+            )
+        ],
+    )
+    def test_duplicate_cite_different_case(self, mock):
+        pre_install_count = OpinionCluster.objects.all().count()
+        parse_harvard_opinions(volume=None, reporter=None)
+        post_install_count = OpinionCluster.objects.all().count()
+        self.assertEqual(1, post_install_count - pre_install_count)
+        print post_install_count - pre_install_count, "✓"
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[
+            iglob(
+                os.path.join(
+                    settings.INSTALL_ROOT,
+                    "cl",
+                    "corpus_importer",
+                    "test_assets",
+                    "tax_court_sample*",
+                )
+            )
+        ],
+    )
+    def test_duplicate_cite_same_case(self, mock):
+        pre_install_count = OpinionCluster.objects.all().count()
+        parse_harvard_opinions(volume=None, reporter=None)
+        post_install_count = OpinionCluster.objects.all().count()
+        self.assertEqual(0, post_install_count - pre_install_count)
+        print post_install_count - pre_install_count, "✓"
+
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[
+            iglob(
+                os.path.join(
+                    settings.INSTALL_ROOT,
+                    "cl",
+                    "corpus_importer",
+                    "test_assets",
+                    "mass*",
+                )
+            )
+        ],
+    )
+    def test_new_case(self, mock):
+        "Can we install new cases to the system"
+        pre_install_count = OpinionCluster.objects.all().count()
+        parse_harvard_opinions(volume=None, reporter=None)
+        post_install_count = OpinionCluster.objects.all().count()
+        self.assertEqual(1, post_install_count - pre_install_count)
+        print post_install_count - pre_install_count, "✓"
