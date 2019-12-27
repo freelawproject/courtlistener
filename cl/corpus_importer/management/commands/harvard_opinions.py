@@ -20,11 +20,12 @@ from cl.citations.find_citations import get_citations
 
 from django.conf import settings
 from django.db import transaction
-from django.utils.text import slugify
 
-from juriscraper.lib.string_utils import titlecase
+from juriscraper.lib.string_utils import titlecase, CaseNameTweaker, harmonize
 
 from reporters_db import REPORTERS
+
+cnt = CaseNameTweaker()
 
 
 def validate_dt(date_text):
@@ -187,6 +188,7 @@ def parse_harvard_opinions(reporter, volume):
             continue
         except Exception as e:
             logger.warning("Unknown error %s for: %s" % (e, ia_download_url))
+            continue
 
         cites = get_citations(data["citations"][0]["cite"], html=False)
         if not cites:
@@ -195,8 +197,12 @@ def parse_harvard_opinions(reporter, volume):
             )
             continue
 
+        case_name = harmonize(data["name_abbreviation"])
+        case_name_short = cnt.make_case_name_short(case_name)
+        case_name_full = harmonize(data["name"])
+
         citation = cites[0]
-        if skip_processing(citation, data["name"]):
+        if skip_processing(citation, case_name):
             continue
 
         # TODO: Generalize this to handle all court types somehow.
@@ -226,16 +232,19 @@ def parse_harvard_opinions(reporter, volume):
             data["docket_number"]
             .replace("Docket No.", "")
             .replace("Docket Nos.", "")
+            .strip()
         )
+
         with transaction.atomic():
             logger.info("Adding docket for: %s", citation.base_citation())
             docket = Docket.objects.create(
-                case_name=data["name"],
+                case_name=case_name,
+                case_name_short=case_name_short,
+                case_name_full=case_name_full,
                 docket_number=docket_string,
                 court_id=court_id,
                 source=Docket.HARVARD,
                 ia_needs_upload=False,
-                slug=slugify(data["name"]),
             )
             # Iterate over other xml fields in Harvard data set
             # and save as string list   for further processing at a later date.
@@ -260,11 +269,12 @@ def parse_harvard_opinions(reporter, volume):
 
             logger.info("Adding cluster for: %s", citation.base_citation())
             cluster = OpinionCluster.objects.create(
-                case_name=data["name"],
+                case_name=case_name,
+                case_name_short=case_name_short,
+                case_name_full=case_name_full,
                 precedential_status="Published",
                 docket_id=docket.id,
                 source="U",
-                slug=slugify(data["name"]),
                 date_filed=date_filed,
                 date_filed_is_approximate=is_approximate,
                 attorneys=data_set["attorneys"],
@@ -306,11 +316,12 @@ def parse_harvard_opinions(reporter, volume):
                 opinion_xml = str(op)
                 logger.info("Adding opinion for: %s", citation.base_citation())
                 Opinion.objects.create(
-                    type=op_type,
                     cluster_id=cluster.id,
+                    type=op_type,
                     author_str=author_str,
                     xml_harvard=opinion_xml,
                     joined_by_str=joined_by_str,
+                    extracted_by_ocr=True,
                 )
 
         logger.info("Finished: %s", citation.base_citation())
