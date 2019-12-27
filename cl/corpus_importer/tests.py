@@ -1,4 +1,5 @@
 # coding=utf-8
+from __future__ import print_function
 import json
 import os
 import unittest
@@ -25,9 +26,16 @@ from cl.lib.pacer import process_docket_data
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
 from cl.recap.mergers import find_docket_object
-from cl.search.models import Docket, RECAPDocument, OpinionCluster
+from cl.search.models import (
+    Docket,
+    RECAPDocument,
+    OpinionCluster,
+    Citation,
+    Opinion,
+)
 
 from cl.citations.find_citations import get_citations
+
 
 class JudgeExtractionTest(unittest.TestCase):
     def test_get_judge_from_string_columbia(self):
@@ -270,7 +278,7 @@ class CourtMatchingTest(unittest.TestCase):
             {"q": "M.D. of Pennsylvania", "a": "pamd",},
         )
         for test in pairs:
-            print ("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
             got = match_court_string(test["q"], federal_district=True)
             self.assertEqual(
                 test["a"], got,
@@ -290,7 +298,7 @@ class CourtMatchingTest(unittest.TestCase):
             {"q": "U.S. Circuit Court for the Ninth Circuit", "a": "ca9",},
         )
         for test in pairs:
-            print ("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
             got = match_court_string(test["q"], federal_appeals=True)
             self.assertEqual(test["a"], got)
 
@@ -472,92 +480,78 @@ class HarvardTests(TestCase):
     Testing for cl.corpus_importer.management.commands.harvard_opinions
     """
 
-    fixtures = [
-                "tax_court_asset.json",
-    ]
-
-    def setUp(self):
-        self.test_dir = os.path.join(
-            settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
-        )
+    fixtures = ["court_test_asset.json"]
+    test_dir = os.path.join(
+        settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
+    )
 
     def tearDown(self):
         Docket.objects.all().delete()
 
-    def test_import_case(self):
-        """Can we properly extract ....
-    """
-        tests = (("tax_court_duplicate.json", "1 T.C. 19",),)
-        for q, a in tests:
-            filepath = os.path.join(self.test_dir, q)
-            with open(filepath, "r") as f:
-                data = json.loads(f.read())
-            cites = get_citations(data["citations"][0]["cite"], html=False)
-            self.assertEqual(cites[0].base_citation(), a)
-            print a, "✓"
-
-
-    @mock.patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[
-            iglob(
-                os.path.join(
-                    settings.INSTALL_ROOT,
-                    "cl",
-                    "corpus_importer",
-                    "test_assets",
-                    "tax_court_similar*",
-                )
-            )
-        ],
-    )
-    def test_duplicate_cite_different_case(self, mock):
+    def assertSuccessfulParse(self, expected_count_diff):
         pre_install_count = OpinionCluster.objects.all().count()
         parse_harvard_opinions(volume=None, reporter=None)
         post_install_count = OpinionCluster.objects.all().count()
-        self.assertEqual(1, post_install_count - pre_install_count)
-        print post_install_count - pre_install_count, "✓"
+        self.assertEqual(
+            expected_count_diff, post_install_count - pre_install_count
+        )
+        print(post_install_count - pre_install_count, "✓")
 
     @mock.patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[
-            iglob(
-                os.path.join(
-                    settings.INSTALL_ROOT,
-                    "cl",
-                    "corpus_importer",
-                    "test_assets",
-                    "tax_court_sample*",
-                )
-            )
-        ],
-    )
-    def test_duplicate_cite_same_case(self, mock):
-        pre_install_count = OpinionCluster.objects.all().count()
-        parse_harvard_opinions(volume=None, reporter=None)
-        post_install_count = OpinionCluster.objects.all().count()
-        self.assertEqual(0, post_install_count - pre_install_count)
-        print post_install_count - pre_install_count, "✓"
-
-
-    @mock.patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[
-            iglob(
-                os.path.join(
-                    settings.INSTALL_ROOT,
-                    "cl",
-                    "corpus_importer",
-                    "test_assets",
-                    "mass*",
-                )
-            )
-        ],
+        side_effect=[[os.path.join(test_dir, "mass_court_new.json")]],
     )
     def test_new_case(self, mock):
-        "Can we install new cases to the system"
-        pre_install_count = OpinionCluster.objects.all().count()
-        parse_harvard_opinions(volume=None, reporter=None)
-        post_install_count = OpinionCluster.objects.all().count()
-        self.assertEqual(1, post_install_count - pre_install_count)
-        print post_install_count - pre_install_count, "✓"
+        """Simple case: Can we install a case from JSON?"""
+        self.assertSuccessfulParse(1)
+        cite = Citation.objects.get(volume=454, reporter="Mass.", page=101)
+
+        # Test some opinion attributes
+        ops = cite.cluster.sub_opinions.all()
+        expected_opinion_count = 1
+        self.assertEqual(ops.count(), expected_opinion_count)
+
+        op = ops[0]
+        expected_op_type = Opinion.LEAD
+        self.assertEqual(op.type, expected_op_type)
+
+        expected_author_str = "Cowin"
+        self.assertEqual(op.author_str, expected_author_str)
+
+        # Test some cluster attributes
+        cluster = cite.cluster
+        expected_judges = "Cowin"
+        self.assertEqual(cluster.judges, expected_judges)
+
+        expected_date_filed = date(2009, 6, 12)
+        self.assertEqual(cluster.date_filed, expected_date_filed)
+
+        expected_case_name_full = "Commonwealth v. Willie Furr"
+        self.assertEqual(cluster.case_name_full, expected_case_name_full)
+
+        expected_other_dates = "March 3, 2009."
+        self.assertEqual(cluster.other_dates, expected_other_dates)
+
+        # Test some docket attributes
+        docket = cite.cluster.docket
+
+        expected_docket_number = "105739"
+        self.assertEqual(docket.docket_number, expected_docket_number)
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "tax_court_similar*"))],
+    )
+    def test_duplicate_cite_different_case(self, mock):
+        """Will we add a case with the same citation but a different case
+        name?
+        """
+        self.assertSuccessfulParse(1)
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "tax_court_duplicate*"))],
+    )
+    def test_duplicate_cite_same_case(self, mock):
+        """Will a duplicate case be skipped?"""
+        self.assertSuccessfulParse(1)
