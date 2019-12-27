@@ -59,7 +59,8 @@ class CourtMatchingTest(unittest.TestCase):
                 "args": (
                     "California Superior Court  "
                     "Appellate Division, Kern County.",
-                    "california/supreme_court_opinions/documents/0dc538c63bd07a28.xml",  # noqa
+                    "california/supreme_court_opinions/documents/0dc538c63bd07a28.xml",
+                    # noqa
                 ),
                 "answer": "calappdeptsuperct",
             },
@@ -67,56 +68,64 @@ class CourtMatchingTest(unittest.TestCase):
                 "args": (
                     "California Superior Court  "
                     "Appellate Department, Sacramento.",
-                    "california/supreme_court_opinions/documents/0dc538c63bd07a28.xml",  # noqa
+                    "california/supreme_court_opinions/documents/0dc538c63bd07a28.xml",
+                    # noqa
                 ),
                 "answer": "calappdeptsuperct",
             },
             {
                 "args": (
                     "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents/0412a06c60a7c2a2.xml",  # noqa
+                    "connecticut/appellate_court_opinions/documents/0412a06c60a7c2a2.xml",
+                    # noqa
                 ),
                 "answer": "connsuperct",
             },
             {
                 "args": (
                     "Court of Errors and Appeals.",
-                    "new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml",  # noqa
+                    "new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml",
+                    # noqa
                 ),
                 "answer": "nj",
             },
             {
                 "args": (
                     "Court of Chancery",
-                    "new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml",  # noqa
+                    "new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml",
+                    # noqa
                 ),
                 "answer": "njch",
             },
             {
                 "args": (
                     "Workers' Compensation Commission",
-                    "connecticut/workers_compensation_commission/documents/0902142af68ef9df.xml",  # noqa
+                    "connecticut/workers_compensation_commission/documents/0902142af68ef9df.xml",
+                    # noqa
                 ),
                 "answer": "connworkcompcom",
             },
             {
                 "args": (
                     "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents/00ea30ce0e26a5fd.xml",  # noqa
+                    "connecticut/appellate_court_opinions/documents/00ea30ce0e26a5fd.xml",
+                    # noqa
                 ),
                 "answer": "connsuperct",
             },
             {
                 "args": (
                     "Superior Court  New Haven County",
-                    "connecticut/superior_court_opinions/documents/0218655b78d2135b.xml",  # noqa
+                    "connecticut/superior_court_opinions/documents/0218655b78d2135b.xml",
+                    # noqa
                 ),
                 "answer": "connsuperct",
             },
             {
                 "args": (
                     "Superior Court, Hartford County",
-                    "connecticut/superior_court_opinions/documents/0218655b78d2135b.xml",  # noqa
+                    "connecticut/superior_court_opinions/documents/0218655b78d2135b.xml",
+                    # noqa
                 ),
                 "answer": "connsuperct",
             },
@@ -124,14 +133,16 @@ class CourtMatchingTest(unittest.TestCase):
                 "args": (
                     "Compensation Review Board  "
                     "WORKERS' COMPENSATION COMMISSION",
-                    "connecticut/workers_compensation_commission/documents/00397336451f6659.xml",  # noqa
+                    "connecticut/workers_compensation_commission/documents/00397336451f6659.xml",
+                    # noqa
                 ),
                 "answer": "connworkcompcom",
             },
             {
                 "args": (
                     "Appellate Division Of The Circuit Court",
-                    "connecticut/superior_court_opinions/documents/03dd9ec415bf5bf4.xml",  # noqa
+                    "connecticut/superior_court_opinions/documents/03dd9ec415bf5bf4.xml",
+                    # noqa
                 ),
                 "answer": "connsuperct",
             },
@@ -210,14 +221,16 @@ class CourtMatchingTest(unittest.TestCase):
             {
                 "args": (
                     "District Court of Appeal of Florida, Second District.",
-                    "/data/dumps/florida/court_opinions/documents/25ce1e2a128df7ff.xml",  # noqa
+                    "/data/dumps/florida/court_opinions/documents/25ce1e2a128df7ff.xml",
+                    # noqa
                 ),
                 "answer": "fladistctapp",
             },
             {
                 "args": (
                     "U.S. Circuit Court",
-                    "north_carolina/court_opinions/documents/fa5b96d590ae8d48.xml",  # noqa
+                    "north_carolina/court_opinions/documents/fa5b96d590ae8d48.xml",
+                    # noqa
                 ),
                 "answer": "circtnc",
             },
@@ -257,7 +270,7 @@ class CourtMatchingTest(unittest.TestCase):
             {"q": "M.D. of Pennsylvania", "a": "pamd",},
         )
         for test in pairs:
-            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            print ("Testing: %s, expecting: %s" % (test["q"], test["a"]))
             got = match_court_string(test["q"], federal_district=True)
             self.assertEqual(
                 test["a"], got,
@@ -277,7 +290,7 @@ class CourtMatchingTest(unittest.TestCase):
             {"q": "U.S. Circuit Court for the Ninth Circuit", "a": "ca9",},
         )
         for test in pairs:
-            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            print ("Testing: %s, expecting: %s" % (test["q"], test["a"]))
             got = match_court_string(test["q"], federal_appeals=True)
             self.assertEqual(test["a"], got)
 
@@ -295,7 +308,6 @@ class PacerDocketParserTest(TestCase):
     )
 
     def setUp(self):
-
         self.docket, count = find_docket_object(
             "akd", "41664", "3:11-cv-00064"
         )
