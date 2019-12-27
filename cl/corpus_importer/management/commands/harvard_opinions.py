@@ -278,8 +278,7 @@ def parse_harvard_opinions(reporter, volume):
                 headnotes=data_set["headnotes"],
                 correction=data_set["correction"],
                 judges=judges,
-                xml_harvard=str(soup),
-                json_harvard=file_path,
+                filepath_json_harvard=file_path,
             )
 
             logger.info("Adding citation for: %s", citation.base_citation())
