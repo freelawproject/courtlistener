@@ -124,7 +124,6 @@ def skip_processing(citation, case_name):
             logger.info("Looks like we already have %s." % case_name)
             return True
         logger.info("Duplicate cite string but appears to be a new case")
-
     return False
 
 
@@ -287,7 +286,7 @@ def parse_harvard_opinions(reporter, volume):
                 reporter=citation.reporter,
                 page=citation.page,
                 type=map_reporter_db_cite_type(
-                    REPORTERS[reporter][0]["cite_type"]
+                    REPORTERS[citation.reporter][0]["cite_type"]
                 ),
                 cluster_id=cluster.id,
             )
