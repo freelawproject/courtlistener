@@ -37,9 +37,18 @@
           type="application/rss+xml"
           title="Podcast For All Oral Arguments"
           href="/podcast/court/all/">
+  {% if DEBUG %}
+    <link rel="stylesheet"
+          href="{{ STATIC_URL }}css/bootstrap-datepicker3.css"/>
+  {% else %}
+    <link rel="stylesheet"
+          href="{{ STATIC_URL }}css/bootstrap-datepicker3.min.css"/>
+  {% endif %}
 {% endblock %}
 
-{% block footer-scripts %}{% endblock %}
+{% block footer-scripts %}
+  {% include "includes/date_picker.html" %}
+{% endblock %}
 
 {% block navbar-o %}
     {% if search_form.type.value == "o" %}active{% else %}{{ block.super }}{% endif %}
