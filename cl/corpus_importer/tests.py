@@ -3,6 +3,8 @@ import json
 import os
 import unittest
 from datetime import date
+import mock
+from glob import iglob
 
 import pytest
 from django.conf import settings
@@ -15,12 +17,17 @@ from cl.corpus_importer.import_columbia.parse_opinions import (
 )
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
+from cl.corpus_importer.management.commands.harvard_opinions import (
+    parse_harvard_opinions,
+)
+
 from cl.lib.pacer import process_docket_data
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
 from cl.recap.mergers import find_docket_object
-from cl.search.models import Docket, RECAPDocument
+from cl.search.models import Docket, RECAPDocument, OpinionCluster
 
+from cl.citations.find_citations import get_citations
 
 class JudgeExtractionTest(unittest.TestCase):
     def test_get_judge_from_string_columbia(self):
