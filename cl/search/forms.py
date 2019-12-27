@@ -262,7 +262,7 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -274,7 +274,7 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -290,7 +290,7 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -302,7 +302,7 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -375,7 +375,7 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -387,7 +387,7 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
