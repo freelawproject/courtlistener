@@ -7,7 +7,8 @@ ALTER TABLE "search_opinion" ALTER COLUMN "joined_by_str" DROP DEFAULT;
 --
 -- Add field xml_harvard to opinion
 --
-ALTER TABLE "search_opinion" ADD COLUMN "xml_harvard" text NULL;
+ALTER TABLE "search_opinion" ADD COLUMN "xml_harvard" text DEFAULT '' NOT NULL;
+ALTER TABLE "search_opinion" ALTER COLUMN "xml_harvard" DROP DEFAULT;
 --
 -- Add field correction to opinioncluster
 --
@@ -24,10 +25,10 @@ ALTER TABLE "search_opinioncluster" ALTER COLUMN "cross_reference" DROP DEFAULT;
 ALTER TABLE "search_opinioncluster" ADD COLUMN "disposition" text DEFAULT '' NOT NULL;
 ALTER TABLE "search_opinioncluster" ALTER COLUMN "disposition" DROP DEFAULT;
 --
--- Add field filepath_local to opinioncluster
+-- Add field filepath_json_harvard to opinioncluster
 --
-ALTER TABLE "search_opinioncluster" ADD COLUMN "filepath_local" varchar(1000) DEFAULT '' NOT NULL;
-ALTER TABLE "search_opinioncluster" ALTER COLUMN "filepath_local" DROP DEFAULT;
+ALTER TABLE "search_opinioncluster" ADD COLUMN "filepath_json_harvard" varchar(1000) DEFAULT '' NOT NULL;
+ALTER TABLE "search_opinioncluster" ALTER COLUMN "filepath_json_harvard" DROP DEFAULT;
 --
 -- Add field headnotes to opinioncluster
 --
@@ -39,34 +40,15 @@ ALTER TABLE "search_opinioncluster" ALTER COLUMN "headnotes" DROP DEFAULT;
 ALTER TABLE "search_opinioncluster" ADD COLUMN "history" text DEFAULT '' NOT NULL;
 ALTER TABLE "search_opinioncluster" ALTER COLUMN "history" DROP DEFAULT;
 --
--- Add field image_missing to opinioncluster
---
-ALTER TABLE "search_opinioncluster" ADD COLUMN "image_missing" boolean DEFAULT false NOT NULL;
-ALTER TABLE "search_opinioncluster" ALTER COLUMN "image_missing" DROP DEFAULT;
---
 -- Add field other_dates to opinioncluster
 --
 ALTER TABLE "search_opinioncluster" ADD COLUMN "other_dates" text DEFAULT '' NOT NULL;
 ALTER TABLE "search_opinioncluster" ALTER COLUMN "other_dates" DROP DEFAULT;
 --
--- Add field page_count to opinioncluster
---
-ALTER TABLE "search_opinioncluster" ADD COLUMN "page_count" integer NULL;
---
--- Add field sha1 to opinioncluster
---
-ALTER TABLE "search_opinioncluster" ADD COLUMN "sha1" varchar(40) DEFAULT 'empty' NOT NULL;
-ALTER TABLE "search_opinioncluster" ALTER COLUMN "sha1" DROP DEFAULT;
---
 -- Add field summary to opinioncluster
 --
 ALTER TABLE "search_opinioncluster" ADD COLUMN "summary" text DEFAULT '' NOT NULL;
 ALTER TABLE "search_opinioncluster" ALTER COLUMN "summary" DROP DEFAULT;
---
--- Add field xml_harvard to opinioncluster
---
-ALTER TABLE "search_opinioncluster" ADD COLUMN "xml_harvard" text DEFAULT '' NOT NULL;
-ALTER TABLE "search_opinioncluster" ALTER COLUMN "xml_harvard" DROP DEFAULT;
 --
 -- Alter field claim on claimhistory
 --
@@ -76,12 +58,30 @@ ALTER TABLE "search_claimhistory" ADD CONSTRAINT "search_claimhistory_claim_id_e
 -- Alter field source on docket
 --
 --
+-- Alter field html on opinion
+--
+ALTER TABLE "search_opinion" ALTER COLUMN "html" SET DEFAULT '';
+UPDATE "search_opinion" SET "html" = '' WHERE "html" IS NULL;
+ALTER TABLE "search_opinion" ALTER COLUMN "html" SET NOT NULL;
+ALTER TABLE "search_opinion" ALTER COLUMN "html" DROP DEFAULT;
+--
+-- Alter field html_columbia on opinion
+--
+ALTER TABLE "search_opinion" ALTER COLUMN "html_columbia" SET DEFAULT '';
+UPDATE "search_opinion" SET "html_columbia" = '' WHERE "html_columbia" IS NULL;
+ALTER TABLE "search_opinion" ALTER COLUMN "html_columbia" SET NOT NULL;
+ALTER TABLE "search_opinion" ALTER COLUMN "html_columbia" DROP DEFAULT;
+--
+-- Alter field html_lawbox on opinion
+--
+ALTER TABLE "search_opinion" ALTER COLUMN "html_lawbox" SET DEFAULT '';
+UPDATE "search_opinion" SET "html_lawbox" = '' WHERE "html_lawbox" IS NULL;
+ALTER TABLE "search_opinion" ALTER COLUMN "html_lawbox" SET NOT NULL;
+ALTER TABLE "search_opinion" ALTER COLUMN "html_lawbox" DROP DEFAULT;
+--
 -- Alter field type on opinion
 --
 --
 -- Alter field source on opinioncluster
 --
-CREATE INDEX "search_opinioncluster_image_missing_55ffb4ef" ON "search_opinioncluster" ("image_missing");
-CREATE INDEX "search_opinioncluster_sha1_00b4d27d" ON "search_opinioncluster" ("sha1");
-CREATE INDEX "search_opinioncluster_sha1_00b4d27d_like" ON "search_opinioncluster" ("sha1" varchar_pattern_ops);
 COMMIT;
