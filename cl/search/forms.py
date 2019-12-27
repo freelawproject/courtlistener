@@ -261,7 +261,7 @@ class SearchForm(forms.Form):
         label="Argued After",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
+                "placeholder": "MM/DD/YYYY",
                 "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
@@ -273,7 +273,7 @@ class SearchForm(forms.Form):
         label="Argued Before",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
+                "placeholder": "MM/DD/YYYY",
                 "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
@@ -289,7 +289,7 @@ class SearchForm(forms.Form):
         label="Filed After",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
+                "placeholder": "MM/DD/YYYY",
                 "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
@@ -301,7 +301,7 @@ class SearchForm(forms.Form):
         label="Filed Before",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
+                "placeholder": "MM/DD/YYYY",
                 "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
@@ -374,7 +374,7 @@ class SearchForm(forms.Form):
         label="Born After",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
+                "placeholder": "MM/DD/YYYY",
                 "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
@@ -386,7 +386,7 @@ class SearchForm(forms.Form):
         label="Born Before",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
+                "placeholder": "MM/DD/YYYY",
                 "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
