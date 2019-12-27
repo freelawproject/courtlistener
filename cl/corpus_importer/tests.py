@@ -457,18 +457,95 @@ class IAUploaderTest(TestCase):
 
 class HarvardTests(TestCase):
     """
-    This is the start of tests for the Harvard import.  Need to flush out
-    what I want to test.
+    Testing for cl.corpus_importer.management.commands.harvard_opinions
     """
 
-    def test_cite_split(self):
-        """Test various aspects of harvard import."""
-        tests = (
-            ("1 Mass. 245", "Mass.",),
-            ("115 Mich. App. 647", "Mich. App.",),
-            ("10 T.C. 1233", "T.C."),
-            ("702 F.2d 1234", "F.2d"),
-            ("702 F. 2d 1234", "F. 2d"),
+    fixtures = [
+                "tax_court_asset.json",
+    ]
+
+    def setUp(self):
+        self.test_dir = os.path.join(
+            settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
         )
+
+    def tearDown(self):
+        Docket.objects.all().delete()
+
+    def test_import_case(self):
+        """Can we properly extract ....
+    """
+        tests = (("tax_court_duplicate.json", "1 T.C. 19",),)
         for q, a in tests:
-            self.assertEqual(q.split(" ", 1)[1].rsplit(" ", 1)[0], a)
+            filepath = os.path.join(self.test_dir, q)
+            with open(filepath, "r") as f:
+                data = json.loads(f.read())
+            cites = get_citations(data["citations"][0]["cite"], html=False)
+            self.assertEqual(cites[0].base_citation(), a)
+            print a, "✓"
+
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[
+            iglob(
+                os.path.join(
+                    settings.INSTALL_ROOT,
+                    "cl",
+                    "corpus_importer",
+                    "test_assets",
+                    "tax_court_similar*",
+                )
+            )
+        ],
+    )
+    def test_duplicate_cite_different_case(self, mock):
+        pre_install_count = OpinionCluster.objects.all().count()
+        parse_harvard_opinions(volume=None, reporter=None)
+        post_install_count = OpinionCluster.objects.all().count()
+        self.assertEqual(1, post_install_count - pre_install_count)
+        print post_install_count - pre_install_count, "✓"
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[
+            iglob(
+                os.path.join(
+                    settings.INSTALL_ROOT,
+                    "cl",
+                    "corpus_importer",
+                    "test_assets",
+                    "tax_court_sample*",
+                )
+            )
+        ],
+    )
+    def test_duplicate_cite_same_case(self, mock):
+        pre_install_count = OpinionCluster.objects.all().count()
+        parse_harvard_opinions(volume=None, reporter=None)
+        post_install_count = OpinionCluster.objects.all().count()
+        self.assertEqual(0, post_install_count - pre_install_count)
+        print post_install_count - pre_install_count, "✓"
+
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[
+            iglob(
+                os.path.join(
+                    settings.INSTALL_ROOT,
+                    "cl",
+                    "corpus_importer",
+                    "test_assets",
+                    "mass*",
+                )
+            )
+        ],
+    )
+    def test_new_case(self, mock):
+        "Can we install new cases to the system"
+        pre_install_count = OpinionCluster.objects.all().count()
+        parse_harvard_opinions(volume=None, reporter=None)
+        post_install_count = OpinionCluster.objects.all().count()
+        self.assertEqual(1, post_install_count - pre_install_count)
+        print post_install_count - pre_install_count, "✓"
