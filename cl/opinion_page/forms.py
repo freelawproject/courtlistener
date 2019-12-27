@@ -55,7 +55,7 @@ class DocketEntryFilterForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "placeholder": "YYYY-MM-DD",
-                "class": "form-control",
+                "class": "form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -66,7 +66,7 @@ class DocketEntryFilterForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "placeholder": "YYYY-MM-DD",
-                "class": "form-control",
+                "class": "form-control datepicker",
                 "autocomplete": "off",
             }
         ),
