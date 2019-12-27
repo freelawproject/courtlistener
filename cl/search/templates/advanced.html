@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% load humanize %}
 
+{% block head %}
+  {% if DEBUG %}
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/bootstrap-datepicker3.css"/>
+  {% else %}
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/bootstrap-datepicker3.min.css"/>
+  {% endif %}
+{% endblock %}
+
 {% block title %}
     {% if search_form.type.value == 'o' %}
         Advanced Legal Opinion Search – CourtListener.com
@@ -26,6 +34,7 @@
 {% endblock %}
 
 {% block footer-scripts %}
+  {% include "includes/date_picker.html" %}
   <script type="text/javascript">
     $(document).ready(function () {
       $('#start-scroll').click(function () {
