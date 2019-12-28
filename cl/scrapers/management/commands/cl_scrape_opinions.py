@@ -146,7 +146,7 @@ class Command(VerboseCommand):
             if cite_str:
                 citations.append(make_citation(cite_str, cluster, cite_type))
         opinion = Opinion(
-            type="010combined",
+            type=Opinion.COMBINED,
             sha1=sha1_hash,
             download_url=item["download_urls"],
         )

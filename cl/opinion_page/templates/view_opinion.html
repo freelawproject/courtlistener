@@ -369,11 +369,11 @@
                             <div class="col-sm-12 alert-warning alert v-offset-above-2">
                                 <p class="bottom">The text of this document was
                                     obtained by analyzing a scanned document
-                                    provided by the court. As a result it may have
-                                    typos, and you may prefer <a
-                                            href="{{ sub_opinion.download_url }}"
-                                            class="visitable">reading the
-                                        original</a>.
+                                    provided by the court and may have typos.
+                                  {% if sub_opinion.download_url %}
+                                    You may prefer <a href="{{ sub_opinion.download_url }}"
+                                                      class="visitable">reading the original</a>.
+                                  {% endif %}
                                 </p>
                             </div>
                             <div class="clearfix"></div>
@@ -394,6 +394,8 @@
                                     {{ sub_opinion.html_columbia|safe }}
                                 {% elif sub_opinion.html_lawbox %}
                                     {{ sub_opinion.html_lawbox|safe }}
+                                {% elif sub_opinion.xml_harvard %}
+                                    {{ sub_opinion.xml_harvard|safe }}
                                 {% elif sub_opinion.html %}
                                     {{sub_opinion.html|safe}}
                                 {% else %}
