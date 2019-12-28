@@ -65,6 +65,7 @@ We usually use Ansible for this, but at the moment it's a bit of a mess due to o
 
 The process now is:
 
+ - Check MIGRATIONS.md for potentially critical optimizations to database migrations.
  - Celery:
     - Simple updates to the docker image can be done with (though you usually want to stop it, then get the latest code, then start it as described next):
         - sudo docker pull freelawproject/task-server
