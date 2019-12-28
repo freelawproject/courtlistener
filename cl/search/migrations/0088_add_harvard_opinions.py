@@ -64,11 +64,6 @@ class Migration(migrations.Migration):
             field=models.TextField(blank=True, help_text=b'A summary of what happened in the case. Appears at the beginning of the case just after the title of the case and court information.'),
         ),
         migrations.AlterField(
-            model_name='claimhistory',
-            name='claim',
-            field=models.ForeignKey(help_text=b'The claim that the history row is associated with.', on_delete=django.db.models.deletion.CASCADE, related_name='claim_history_entries', to='search.Claim'),
-        ),
-        migrations.AlterField(
             model_name='docket',
             name='source',
             field=models.SmallIntegerField(choices=[(0, b'Default'), (1, b'RECAP'), (2, b'Scraper'), (3, b'RECAP and Scraper'), (4, b'Columbia'), (6, b'Columbia and Scraper'), (5, b'Columbia and RECAP'), (7, b'Columbia, RECAP, and Scraper'), (8, b'Integrated Database'), (9, b'RECAP and IDB'), (10, b'Scraper and IDB'), (11, b'RECAP, Scraper, and IDB'), (12, b'Columbia and IDB'), (13, b'Columbia, RECAP, and IDB'), (14, b'Columbia, Scraper, and IDB'), (15, b'Columbia, RECAP, Scraper, and IDB'), (16, b'Harvard'), (17, b'Scraper and Harvard')], help_text=b'contains the source of the Docket.'),
