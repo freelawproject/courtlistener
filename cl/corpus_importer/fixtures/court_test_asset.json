@@ -1,0 +1,46 @@
+[
+    {
+      "model": "search.court",
+      "pk": "tax",
+      "fields": {
+          "pacer_court_id": null,
+          "pacer_has_rss_feed": null,
+          "fjc_court_id": "",
+          "date_modified": "2013-08-14T16:46:30Z",
+          "in_use": true,
+          "has_opinion_scraper": true,
+          "has_oral_argument_scraper": false,
+          "position": 114.2,
+          "citation_string": "T.C.",
+          "short_name": "Tax Court",
+          "full_name": "United States Tax Court",
+          "url": "",
+          "start_date": "1941-01-01",
+          "end_date": null,
+          "jurisdiction": "FS",
+          "notes": ""
+      }
+  },
+  {
+    "model": "search.court",
+    "pk": "mass",
+    "fields": {
+      "pacer_court_id": null,
+      "pacer_has_rss_feed": null,
+      "fjc_court_id": "",
+      "date_modified": "2013-08-14T16:46:30Z",
+      "in_use": true,
+      "has_opinion_scraper": true,
+      "has_oral_argument_scraper": false,
+      "position": 114.3,
+      "citation_string": "Mass.",
+      "short_name": "Mass test Court",
+      "full_name": "United States Mass test Court",
+      "url": "",
+      "start_date": null,
+      "end_date": null,
+      "jurisdiction": "S",
+      "notes": ""
+    }
+  }
+]
