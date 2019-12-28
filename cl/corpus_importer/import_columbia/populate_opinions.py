@@ -217,9 +217,9 @@ TRIVIAL_CITE_WORDS = (
 # used to map the parsed opinion types to their tags in the populated opinion
 # objects
 OPINION_TYPE_MAPPING = {
-    "opinion": "020lead",
-    "dissent": "040dissent",
-    "concurrence": "030concurrence",
+    "opinion": Opinion.LEAD,
+    "dissent": Opinion.DISSENT,
+    "concurrence": Opinion.CONCUR_IN_PART,
 }
 
 
@@ -403,8 +403,8 @@ def make_and_save(
             )
         converted_text = convert_columbia_html(opinion_info["opinion"])
         opinion_type = OPINION_TYPE_MAPPING[opinion_info["type"]]
-        if opinion_type == "020lead" and i > 0:
-            opinion_type = "050addendum"
+        if opinion_type == Opinion.LEAD and i > 0:
+            opinion_type = Opinion.ADDENDUM
 
         opinion = Opinion(
             author=author,

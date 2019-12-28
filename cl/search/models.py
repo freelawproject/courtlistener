@@ -58,6 +58,8 @@ SOURCES = (
     ("ZR", "columbia merged with resource.org"),
     ("ZCR", "columbia merged with court and resource.org"),
     ("ZL", "columbia merged with lawbox"),
+    ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
+    ("CU", "court website merged with Harvard"),
 )
 
 
@@ -123,8 +125,10 @@ class OriginatingCourtInformation(models.Model):
         blank=True,
     )
     ordering_judge_str = models.TextField(
-        help_text="The judge that issued the final order in the case, as a "
-        "string.",
+        help_text=(
+            "The judge that issued the final order in the case, as a "
+            "string."
+        ),
         blank=True,
     )
     court_reporter = models.TextField(
@@ -146,8 +150,10 @@ class OriginatingCourtInformation(models.Model):
         null=True,
     )
     date_judgment_eod = models.DateField(
-        help_text="The date the judgment was Entered On the Docket at the "
-        "lower court.",
+        help_text=(
+            "The date the judgment was Entered On the Docket at the "
+            "lower court."
+        ),
         blank=True,
         null=True,
     )
@@ -197,6 +203,8 @@ class Docket(models.Model):
     COLUMBIA_AND_RECAP_AND_IDB = 13
     COLUMBIA_AND_SCRAPER_AND_IDB = 14
     COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB = 15
+    HARVARD = 16
+    SCRAPER_AND_HARVARD = 17
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -205,7 +213,7 @@ class Docket(models.Model):
         (COLUMBIA, "Columbia"),
         (COLUMBIA_AND_SCRAPER, "Columbia and Scraper"),
         (COLUMBIA_AND_RECAP, "Columbia and RECAP"),
-        (COLUMBIA_AND_RECAP_AND_SCRAPER, "Columbia, RECAP and Scraper"),
+        (COLUMBIA_AND_RECAP_AND_SCRAPER, "Columbia, RECAP, and Scraper"),
         (IDB, "Integrated Database"),
         (RECAP_AND_IDB, "RECAP and IDB"),
         (SCRAPER_AND_IDB, "Scraper and IDB"),
@@ -217,6 +225,8 @@ class Docket(models.Model):
             COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
             "Columbia, RECAP, Scraper, and IDB",
         ),
+        (HARVARD, "Harvard"),
+        (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
     )
     RECAP_SOURCES = [
         RECAP,
@@ -251,23 +261,27 @@ class Docket(models.Model):
     )
     appeal_from = models.ForeignKey(
         "Court",
-        help_text="In appellate cases, this is the lower court or "
-        "administrative body where this case was originally heard. "
-        "This field is frequently blank due to it not being "
-        "populated historically or due to our inability to "
-        "normalize the value in appeal_from_str.",
+        help_text=(
+            "In appellate cases, this is the lower court or "
+            "administrative body where this case was originally heard. "
+            "This field is frequently blank due to it not being "
+            "populated historically or due to our inability to "
+            "normalize the value in appeal_from_str."
+        ),
         related_name="+",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
     appeal_from_str = models.TextField(
-        help_text="In appellate cases, this is the lower court or "
-        "administrative body where this case was originally heard. "
-        "This field is frequently blank due to it not being "
-        "populated historically. This field may have values when "
-        "the appeal_from field does not. That can happen if we are "
-        "unable to normalize the value in this field.",
+        help_text=(
+            "In appellate cases, this is the lower court or "
+            "administrative body where this case was originally heard. "
+            "This field is frequently blank due to it not being "
+            "populated historically. This field may have values when "
+            "the appeal_from field does not. That can happen if we are "
+            "unable to normalize the value in this field."
+        ),
         blank=True,
     )
     originating_court_information = models.OneToOneField(
@@ -280,8 +294,10 @@ class Docket(models.Model):
     )
     idb_data = models.OneToOneField(
         "recap.FjcIntegratedDatabase",
-        help_text="Data from the FJC Integrated Database associated with this "
-        "case.",
+        help_text=(
+            "Data from the FJC Integrated Database associated with this "
+            "case."
+        ),
         related_name="docket",
         on_delete=models.CASCADE,
         blank=True,
@@ -326,18 +342,22 @@ class Docket(models.Model):
     )
     panel = models.ManyToManyField(
         "people_db.Person",
-        help_text="The empaneled judges for the case. Currently an unused "
-        "field but planned to be used in conjunction with the "
-        "panel_str field.",
+        help_text=(
+            "The empaneled judges for the case. Currently an unused "
+            "field but planned to be used in conjunction with the "
+            "panel_str field."
+        ),
         related_name="empanelled_dockets",
         blank=True,
     )
     panel_str = models.TextField(
-        help_text="The initials of the judges on the panel that heard this "
-        "case. This field is similar to the 'judges' field on "
-        "the cluster, but contains initials instead of full judge "
-        "names, and applies to the case on the whole instead of "
-        "only to a specific decision.",
+        help_text=(
+            "The initials of the judges on the panel that heard this "
+            "case. This field is similar to the 'judges' field on "
+            "the cluster, but contains initials instead of full judge "
+            "names, and applies to the case on the whole instead of "
+            "only to a specific decision."
+        ),
         blank=True,
     )
     parties = models.ManyToManyField(
@@ -353,8 +373,10 @@ class Docket(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value in "
-        "year 1750 indicates the value is unknown",
+        help_text=(
+            "The last moment when the item was modified. A value in "
+            "year 1750 indicates the value is unknown"
+        ),
         auto_now=True,
         db_index=True,
     )
@@ -400,8 +422,10 @@ class Docket(models.Model):
         help_text="The date the case was terminated.", blank=True, null=True,
     )
     date_last_filing = models.DateField(
-        help_text="The date the case was last updated in the docket, as shown "
-        "in PACER's Docket History report.",
+        help_text=(
+            "The date the case was last updated in the docket, as shown "
+            "in PACER's Docket History report."
+        ),
         blank=True,
         null=True,
     )
@@ -431,15 +455,17 @@ class Docket(models.Model):
         db_index=True,
     )
     docket_number_core = models.CharField(
-        help_text="For federal district court dockets, this is the most "
-        "distilled docket number available. In this field, the "
-        "docket number is stripped down to only the year and serial "
-        "digits, eliminating the office at the beginning, letters "
-        "in the middle, and the judge at the end. Thus, a docket "
-        "number like 2:07-cv-34911-MJL becomes simply 0734911. This "
-        "is the format that is provided by the IDB and is useful "
-        "for de-duplication types of activities which otherwise get "
-        "messy. We use a char field here to preserve leading zeros.",
+        help_text=(
+            "For federal district court dockets, this is the most "
+            "distilled docket number available. In this field, the "
+            "docket number is stripped down to only the year and serial "
+            "digits, eliminating the office at the beginning, letters "
+            "in the middle, and the judge at the end. Thus, a docket "
+            "number like 2:07-cv-34911-MJL becomes simply 0734911. This "
+            "is the format that is provided by the IDB and is useful "
+            "for de-duplication types of activities which otherwise get "
+            "messy. We use a char field here to preserve leading zeros."
+        ),
         # PACER doesn't do consolidated case numbers, so this can be small.
         max_length=20,
         blank=True,
@@ -467,20 +493,26 @@ class Docket(models.Model):
         help_text="The compensation demand.", max_length=500, blank=True,
     )
     jurisdiction_type = models.CharField(
-        help_text="Stands for jurisdiction in RECAP XML docket. For example, "
-        "'Diversity', 'U.S. Government Defendant'.",
+        help_text=(
+            "Stands for jurisdiction in RECAP XML docket. For example, "
+            "'Diversity', 'U.S. Government Defendant'."
+        ),
         max_length=100,
         blank=True,
     )
     appellate_fee_status = models.TextField(
-        help_text="The status of the fee in the appellate court. Can be used "
-        "as a hint as to whether the government is the appellant "
-        "(in which case the fee is waived).",
+        help_text=(
+            "The status of the fee in the appellate court. Can be used "
+            "as a hint as to whether the government is the appellant "
+            "(in which case the fee is waived)."
+        ),
         blank=True,
     )
     appellate_case_type_information = models.TextField(
-        help_text="Information about a case from the appellate docket in "
-        "PACER. For example, 'civil, private, bankruptcy'.",
+        help_text=(
+            "Information about a case from the appellate docket in "
+            "PACER. For example, 'civil, private, bankruptcy'."
+        ),
         blank=True,
     )
     mdl_status = models.CharField(
@@ -512,19 +544,23 @@ class Docket(models.Model):
         blank=True,
     )
     ia_needs_upload = models.NullBooleanField(
-        help_text="Does this item need to be uploaded to the Internet "
-        "Archive? I.e., has it changed? This field is important "
-        "because it keeps track of the status of all the related "
-        "objects to the docket. For example, if a related docket "
-        "entry changes, we need to upload the item to IA, but we "
-        "can't easily check that.",
+        help_text=(
+            "Does this item need to be uploaded to the Internet "
+            "Archive? I.e., has it changed? This field is important "
+            "because it keeps track of the status of all the related "
+            "objects to the docket. For example, if a related docket "
+            "entry changes, we need to upload the item to IA, but we "
+            "can't easily check that."
+        ),
         blank=True,
         db_index=True,
     )
     ia_date_first_change = models.DateTimeField(
-        help_text="The moment when this item first changed and was marked as "
-        "needing an upload. Used for determining when to upload an "
-        "item.",
+        help_text=(
+            "The moment when this item first changed and was marked as "
+            "needing an upload. Used for determining when to upload an "
+            "item."
+        ),
         null=True,
         blank=True,
         db_index=True,
@@ -533,15 +569,19 @@ class Docket(models.Model):
         help_text="The number of times the docket has been seen.", default=0,
     )
     date_blocked = models.DateField(
-        help_text="The date that this opinion was blocked from indexing by "
-        "search engines",
+        help_text=(
+            "The date that this opinion was blocked from indexing by "
+            "search engines"
+        ),
         blank=True,
         null=True,
         db_index=True,
     )
     blocked = models.BooleanField(
-        help_text="Whether a document should be blocked from indexing by "
-        "search engines",
+        help_text=(
+            "Whether a document should be blocked from indexing by "
+            "search engines"
+        ),
         db_index=True,
         default=False,
     )
@@ -830,9 +870,11 @@ class DocketEntry(models.Model):
 
     docket = models.ForeignKey(
         Docket,
-        help_text="Foreign key as a relation to the corresponding Docket "
-        "object. Specifies which docket the docket entry "
-        "belongs to.",
+        help_text=(
+            "Foreign key as a relation to the corresponding Docket "
+            "object. Specifies which docket the docket entry "
+            "belongs to."
+        ),
         related_name="docket_entries",
         on_delete=models.CASCADE,
     )
@@ -865,41 +907,49 @@ class DocketEntry(models.Model):
         blank=True,
     )
     entry_number = models.BigIntegerField(
-        help_text="# on the PACER docket page. For appellate cases, this may "
-        "be the internal PACER ID for the document, when an entry "
-        "ID is otherwise unavailable.",
+        help_text=(
+            "# on the PACER docket page. For appellate cases, this may "
+            "be the internal PACER ID for the document, when an entry "
+            "ID is otherwise unavailable."
+        ),
         null=True,
         blank=True,
     )
     recap_sequence_number = models.CharField(
-        help_text="A field used for ordering the docket entries on a docket. "
-        'You might wonder, "Why not use the docket entry '
-        "numbers?\" That's a reasonable question, and prior to late "
-        "2018, this was the method we used. However, dockets often "
-        'have "unnumbered" docket entries, and so knowing where '
-        "to put those was only possible if you had another "
-        "sequencing field, since they lacked an entry number. This "
-        "field is populated by a combination of the date for the "
-        "entry and a sequence number indicating the order that the "
-        "unnumbered entries occur.",
+        help_text=(
+            "A field used for ordering the docket entries on a docket. "
+            'You might wonder, "Why not use the docket entry '
+            "numbers?\" That's a reasonable question, and prior to late "
+            "2018, this was the method we used. However, dockets often "
+            'have "unnumbered" docket entries, and so knowing where '
+            "to put those was only possible if you had another "
+            "sequencing field, since they lacked an entry number. This "
+            "field is populated by a combination of the date for the "
+            "entry and a sequence number indicating the order that the "
+            "unnumbered entries occur."
+        ),
         db_index=True,
         max_length=50,
         blank=True,
     )
     pacer_sequence_number = models.IntegerField(
-        help_text="The de_seqno value pulled out of dockets, RSS feeds, and "
-        "sundry other pages in PACER. The place to find this is "
-        "currently in the onclick attribute of the links in PACER. "
-        "Because we do not have this value for all items in the DB, "
-        "we do not use this value for anything. Still, we collect "
-        "it for good measure.",
+        help_text=(
+            "The de_seqno value pulled out of dockets, RSS feeds, and "
+            "sundry other pages in PACER. The place to find this is "
+            "currently in the onclick attribute of the links in PACER. "
+            "Because we do not have this value for all items in the DB, "
+            "we do not use this value for anything. Still, we collect "
+            "it for good measure."
+        ),
         db_index=True,
         null=True,
         blank=True,
     )
     description = models.TextField(
-        help_text="The text content of the docket entry that appears in the "
-        "PACER docket page.",
+        help_text=(
+            "The text content of the docket entry that appears in the "
+            "PACER docket page."
+        ),
         blank=True,
     )
 
@@ -918,27 +968,35 @@ class DocketEntry(models.Model):
 
 class AbstractPacerDocument(models.Model):
     date_upload = models.DateTimeField(
-        help_text="upload_date in RECAP. The date the file was uploaded to "
-        "RECAP. This information is provided by RECAP.",
+        help_text=(
+            "upload_date in RECAP. The date the file was uploaded to "
+            "RECAP. This information is provided by RECAP."
+        ),
         blank=True,
         null=True,
     )
     document_number = models.CharField(
-        help_text="If the file is a document, the number is the "
-        "document_number in RECAP docket.",
+        help_text=(
+            "If the file is a document, the number is the "
+            "document_number in RECAP docket."
+        ),
         max_length=32,
         db_index=True,
         blank=True,  # To support unnumbered minute entries
     )
     attachment_number = models.SmallIntegerField(
-        help_text="If the file is an attachment, the number is the attachment "
-        "number in RECAP docket.",
+        help_text=(
+            "If the file is an attachment, the number is the attachment "
+            "number in RECAP docket."
+        ),
         blank=True,
         null=True,
     )
     pacer_doc_id = models.CharField(
-        help_text="The ID of the document in PACER. This information is "
-        "provided by RECAP.",
+        help_text=(
+            "The ID of the document in PACER. This information is "
+            "provided by RECAP."
+        ),
         max_length=32,  # Same as in RECAP
         blank=True,
     )
@@ -974,9 +1032,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
     )
     docket_entry = models.ForeignKey(
         DocketEntry,
-        help_text="Foreign Key to the DocketEntry object to which it belongs. "
-        "Multiple documents can belong to a DocketEntry. "
-        "(Attachments and Documents together)",
+        help_text=(
+            "Foreign Key to the DocketEntry object to which it belongs. "
+            "Multiple documents can belong to a DocketEntry. "
+            "(Attachments and Documents together)"
+        ),
         related_name="recap_documents",
         on_delete=models.CASCADE,
     )
@@ -992,8 +1052,10 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
         choices=DOCUMENT_TYPES,
     )
     description = models.TextField(
-        help_text="The short description of the docket entry that appears on "
-        "the attachments page.",
+        help_text=(
+            "The short description of the docket entry that appears on "
+            "the attachments page."
+        ),
         blank=True,
     )
 
@@ -1319,8 +1381,10 @@ class BankruptcyInformation(models.Model):
         help_text="Timestamp of last update.", auto_now=True, db_index=True,
     )
     date_converted = models.DateTimeField(
-        help_text="The date when the bankruptcy was converted from one "
-        "chapter to another.",
+        help_text=(
+            "The date when the bankruptcy was converted from one "
+            "chapter to another."
+        ),
         blank=True,
         null=True,
     )
@@ -1402,13 +1466,17 @@ class Claim(models.Model):
         db_index=True,
     )
     creditor_details = models.TextField(
-        help_text="The details of the creditor from the claims register; "
-        "typically their address.",
+        help_text=(
+            "The details of the creditor from the claims register; "
+            "typically their address."
+        ),
         blank=True,
     )
     creditor_id = models.CharField(
-        help_text="The ID of the creditor from the claims register; "
-        "typically a seven digit number",
+        help_text=(
+            "The ID of the creditor from the claims register; "
+            "typically a seven digit number"
+        ),
         max_length=50,
         blank=True,
     )
@@ -1448,13 +1516,16 @@ class Claim(models.Model):
         blank=True,
     )
     description = models.TextField(
-        help_text="The description of the claim that appears on the claim "
-        "register.",
+        help_text=(
+            "The description of the claim that appears on the claim "
+            "register."
+        ),
         blank=True,
     )
     remarks = models.TextField(
-        help_text="The remarks of the claim that appear on the claim "
-        "register.",
+        help_text=(
+            "The remarks of the claim that appear on the claim " "register."
+        ),
         blank=True,
     )
 
@@ -1483,14 +1554,18 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF):
         help_text="The created date of the claim.", null=True, blank=True,
     )
     claim_document_type = models.IntegerField(
-        help_text="The type of document that is used in the history row for "
-        "the claim. One of: %s"
+        help_text=(
+            "The type of document that is used in the history row for "
+            "the claim. One of: %s"
+        )
         % ", ".join(["%s (%s)" % (t[0], t[1]) for t in CLAIM_TYPES]),
         choices=CLAIM_TYPES,
     )
     description = models.TextField(
-        help_text="The text content of the docket entry that appears in the "
-        "docket or claims registry page.",
+        help_text=(
+            "The text content of the docket entry that appears in the "
+            "docket or claims registry page."
+        ),
         blank=True,
     )
     # Items should either have a claim_doc_id or a pacer_doc_id, depending on
@@ -1501,15 +1576,19 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF):
         blank=True,
     )
     pacer_dm_id = models.IntegerField(
-        help_text="The dm_id value pulled out of links and possibly other "
-        "pages in PACER. Collected but not currently used.",
+        help_text=(
+            "The dm_id value pulled out of links and possibly other "
+            "pages in PACER. Collected but not currently used."
+        ),
         null=True,
         blank=True,
     )
     pacer_case_id = models.CharField(
-        help_text="The cased ID provided by PACER. Noted in this case on a "
-        "per-document-level, since we've learned that some "
-        "documents from other cases can appear in curious places.",
+        help_text=(
+            "The cased ID provided by PACER. Noted in this case on a "
+            "per-document-level, since we've learned that some "
+            "documents from other cases can appear in curious places."
+        ),
         max_length=100,
         blank=True,
     )
@@ -1576,15 +1655,19 @@ class Court(models.Model):
         primary_key=True,
     )
     pacer_court_id = models.PositiveSmallIntegerField(
-        help_text="The numeric ID for the court in PACER. "
-        "This can be found by looking at the first three "
-        "digits of any doc1 URL in PACER.",
+        help_text=(
+            "The numeric ID for the court in PACER. "
+            "This can be found by looking at the first three "
+            "digits of any doc1 URL in PACER."
+        ),
         null=True,
         blank=True,
     )
     pacer_has_rss_feed = models.NullBooleanField(
-        help_text="Whether the court has a PACER RSS feed. If null, this "
-        "doesn't apply to the given court.",
+        help_text=(
+            "Whether the court has a PACER RSS feed. If null, this "
+            "doesn't apply to the given court."
+        ),
         blank=True,
     )
     fjc_court_id = models.CharField(
@@ -1598,23 +1681,31 @@ class Court(models.Model):
         db_index=True,
     )
     in_use = models.BooleanField(
-        help_text="Whether this jurisdiction is in use in CourtListener -- "
-        "increasingly True",
+        help_text=(
+            "Whether this jurisdiction is in use in CourtListener -- "
+            "increasingly True"
+        ),
         default=False,
     )
     has_opinion_scraper = models.BooleanField(
-        help_text="Whether the jurisdiction has a scraper that obtains "
-        "opinions automatically.",
+        help_text=(
+            "Whether the jurisdiction has a scraper that obtains "
+            "opinions automatically."
+        ),
         default=False,
     )
     has_oral_argument_scraper = models.BooleanField(
-        help_text="Whether the jurisdiction has a scraper that obtains oral "
-        "arguments automatically.",
+        help_text=(
+            "Whether the jurisdiction has a scraper that obtains oral "
+            "arguments automatically."
+        ),
         default=False,
     )
     position = models.FloatField(
-        help_text="A dewey-decimal-style numeral indicating a hierarchical "
-        "ordering of jurisdictions",
+        help_text=(
+            "A dewey-decimal-style numeral indicating a hierarchical "
+            "ordering of jurisdictions"
+        ),
         db_index=True,
         unique=True,
     )
@@ -1746,9 +1837,11 @@ class OpinionCluster(models.Model):
         blank=True,
     )
     judges = models.TextField(
-        help_text="The judges that participated in the opinion as a simple "
-        "text string. This field is used when normalized judges "
-        "cannot be placed into the panel field.",
+        help_text=(
+            "The judges that participated in the opinion as a simple "
+            "text string. This field is used when normalized judges "
+            "cannot be placed into the panel field."
+        ),
         blank=True,
     )
     date_created = models.DateTimeField(
@@ -1757,8 +1850,10 @@ class OpinionCluster(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value in "
-        "year 1750 indicates the value is unknown",
+        help_text=(
+            "The last moment when the item was modified. A value in "
+            "year 1750 indicates the value is unknown"
+        ),
         auto_now=True,
         db_index=True,
     )
@@ -1767,9 +1862,11 @@ class OpinionCluster(models.Model):
         db_index=True,
     )
     date_filed_is_approximate = models.BooleanField(
-        help_text="For a variety of opinions getting the correct date filed is"
-        "very difficult. For these, we have used heuristics to "
-        "approximate the date.",
+        help_text=(
+            "For a variety of opinions getting the correct date filed is"
+            "very difficult. For these, we have used heuristics to "
+            "approximate the date."
+        ),
         default=False,
     )
     slug = models.SlugField(
@@ -1847,24 +1944,30 @@ class OpinionCluster(models.Model):
         blank=True,
     )
     scdb_decision_direction = models.IntegerField(
-        help_text='the ideological "direction" of a decision in the Supreme '
-        "Court database. More details at: http://scdb.wustl.edu/"
-        "documentation.php?var=decisionDirection",
+        help_text=(
+            'the ideological "direction" of a decision in the Supreme '
+            "Court database. More details at: http://scdb.wustl.edu/"
+            "documentation.php?var=decisionDirection"
+        ),
         choices=SCDB_DECISION_DIRECTIONS,
         blank=True,
         null=True,
     )
     scdb_votes_majority = models.IntegerField(
-        help_text="the number of justices voting in the majority in a Supreme "
-        "Court decision. More details at: http://scdb.wustl.edu/"
-        "documentation.php?var=majVotes",
+        help_text=(
+            "the number of justices voting in the majority in a Supreme "
+            "Court decision. More details at: http://scdb.wustl.edu/"
+            "documentation.php?var=majVotes"
+        ),
         blank=True,
         null=True,
     )
     scdb_votes_minority = models.IntegerField(
-        help_text="the number of justices voting in the minority in a Supreme "
-        "Court decision. More details at: http://scdb.wustl.edu/"
-        "documentation.php?var=minVotes",
+        help_text=(
+            "the number of justices voting in the minority in a Supreme "
+            "Court decision. More details at: http://scdb.wustl.edu/"
+            "documentation.php?var=minVotes"
+        ),
         blank=True,
         null=True,
     )
@@ -1884,21 +1987,100 @@ class OpinionCluster(models.Model):
         blank=True,
     )
     nature_of_suit = models.TextField(
-        help_text="The nature of the suit. For the moment can be codes or "
-        "laws or whatever",
+        help_text=(
+            "The nature of the suit. For the moment can be codes or "
+            "laws or whatever"
+        ),
         blank=True,
     )
     posture = models.TextField(
         help_text="The procedural posture of the case.", blank=True,
     )
     syllabus = models.TextField(
-        help_text="A summary of the issues presented in the case and the "
-        "outcome.",
+        help_text=(
+            "A summary of the issues presented in the case and the " "outcome."
+        ),
+        blank=True,
+    )
+    headnotes = models.TextField(
+        help_text=(
+            "Headnotes are summary descriptions of the legal "
+            "issues discussed by the court in the particular case. "
+            "They appear at the beginning of each case just after "
+            "the summary and disposition. "
+            "They are short paragraphs with a heading in bold face type."
+            " From Wikipedia - A headnote is a brief summary of a "
+            "particular point of law that is added to the text of a court"
+            "decision to aid readers in locating discussion of a legal"
+            "issue in an opinion. As the term implies, headnotes appear"
+            "at the beginning of the published opinion. Frequently, "
+            "headnotes are value-added components appended to "
+            "decisions by the publisher who compiles the "
+            "decisions of a court for resale. As handed down by "
+            "the court, a decision or written opinion does not contain "
+            "headnotes. These are added later by an editor not "
+            "connected to the court, but who instead works for a "
+            "legal publishing house."
+        ),
+        blank=True,
+    )
+    summary = models.TextField(
+        help_text=(
+            "A summary of what happened in the case. "
+            "Appears at the beginning of the case just "
+            "after the title of the case and court "
+            "information."
+        ),
+        blank=True,
+    )
+    disposition = models.TextField(
+        help_text=(
+            "Description of the procedural outcome of the case, "
+            "e.g. Reversed, dismissed etc. "
+            "Generally a short paragraph that appears "
+            "just after the summary or synopsis"
+        ),
+        blank=True,
+    )
+    history = models.TextField(
+        help_text=(
+            "History of the case (similar to the summary, "
+            "but focused on past events related to this case). "
+            "Appears at the beginning of the case just after "
+            "the title of the case and court information"
+        ),
+        blank=True,
+    )
+    other_dates = models.TextField(
+        help_text=(
+            "Other date(s) as specified in the text "
+            "(case header). This may include follow-up dates."
+        ),
+        blank=True,
+    )
+    cross_reference = models.TextField(
+        help_text=(
+            "Cross-reference citation "
+            "(often to a past or future similar case). "
+            "It does NOT identify this case."
+        ),
+        blank=True,
+    )
+    correction = models.TextField(
+        help_text=(
+            "Publisher's correction to the case text. "
+            "Example: Replace last paragraph on page 476 "
+            "with this text: blah blah blah. This is basically an"
+            " unstructured text that can be used to manually "
+            "correct case content according to publisher's "
+            "instructions. No footnotes is expected within it."
+        ),
         blank=True,
     )
     citation_count = models.IntegerField(
-        help_text="The number of times this document is cited by other "
-        "opinion",
+        help_text=(
+            "The number of times this document is cited by other " "opinion"
+        ),
         default=0,
         db_index=True,
     )
@@ -1911,17 +2093,30 @@ class OpinionCluster(models.Model):
         db_index=True,
     )
     date_blocked = models.DateField(
-        help_text="The date that this opinion was blocked from indexing by "
-        "search engines",
+        help_text=(
+            "The date that this opinion was blocked from indexing by "
+            "search engines"
+        ),
         blank=True,
         null=True,
         db_index=True,
     )
     blocked = models.BooleanField(
-        help_text="Whether a document should be blocked from indexing by "
-        "search engines",
+        help_text=(
+            "Whether a document should be blocked from indexing by "
+            "search engines"
+        ),
         db_index=True,
         default=False,
+    )
+    filepath_json_harvard = models.FileField(
+        help_text=(
+            "Path to local storage of JSON collected from Harvard Case "
+            "Law project containing available metadata, opinion "
+            "and opinion cluster."
+        ),
+        max_length=1000,
+        blank=True,
     )
 
     objects = ClusterCitationQuerySet.as_manager()
@@ -2203,11 +2398,13 @@ class Citation(models.Model):
         db_index=True,
     )
     page = models.TextField(
-        help_text="The 'page' of the citation in the reporter. Unfortunately, "
-        "this is not an integer, but is a string-type because "
-        "several jurisdictions do funny things with the so-called "
-        "'page'. For example, we have seen Roman numerals in "
-        "Nebraska, 13301-M in Connecticut, and 144M in Montana.",
+        help_text=(
+            "The 'page' of the citation in the reporter. Unfortunately, "
+            "this is not an integer, but is a string-type because "
+            "several jurisdictions do funny things with the so-called "
+            "'page'. For example, we have seen Roman numerals in "
+            "Nebraska, 13301-M in Connecticut, and 144M in Montana."
+        ),
     )
     type = models.SmallIntegerField(
         help_text="The type of citation that this is.", choices=CITATION_TYPES,
@@ -2275,12 +2472,31 @@ def sort_cites(c):
 
 
 class Opinion(models.Model):
+    COMBINED = "010combined"
+    UNANIMOUS = "015unamimous"
+    LEAD = "020lead"
+    PLURALITY = "025plurality"
+    CONCURRENCE = "030concurrence"
+    CONCUR_IN_PART = "035concurrenceinpart"
+    DISSENT = "040dissent"
+    ADDENDUM = "050addendum"
+    REMITTUR = "060remittitur"
+    REHEARING = "070rehearing"
+    ON_THE_MERITS = "080onthemerits"
+    ON_MOTION_TO_STRIKE = "090onmotiontostrike"
     OPINION_TYPES = (
-        ("010combined", "Combined Opinion"),
-        ("020lead", "Lead Opinion"),
-        ("030concurrence", "Concurrence"),
-        ("040dissent", "Dissent"),
-        ("050addendum", "Addendum"),
+        (COMBINED, "Combined Opinion"),
+        (UNANIMOUS, "Unanimous Opinion"),
+        (LEAD, "Lead Opinion"),
+        (PLURALITY, "Plurality Opinion"),
+        (CONCURRENCE, "Concurrence Opinion"),
+        (CONCUR_IN_PART, "In Part Opinion"),
+        (DISSENT, "Dissent"),
+        (ADDENDUM, "Addendum"),
+        (REMITTUR, "Remittitur"),
+        (REHEARING, "Rehearing"),
+        (ON_THE_MERITS, "On the Merits"),
+        (ON_MOTION_TO_STRIKE, "On Motion to Strike Cost Bill"),
     )
     cluster = models.ForeignKey(
         OpinionCluster,
@@ -2306,9 +2522,11 @@ class Opinion(models.Model):
         null=True,
     )
     author_str = models.TextField(
-        help_text="The primary author of this opinion, as a simple text "
-        "string. This field is used when normalized judges cannot "
-        "be placed into the author field.",
+        help_text=(
+            "The primary author of this opinion, as a simple text "
+            "string. This field is used when normalized judges cannot "
+            "be placed into the author field."
+        ),
         blank=True,
     )
     per_curiam = models.BooleanField(
@@ -2318,8 +2536,16 @@ class Opinion(models.Model):
     joined_by = models.ManyToManyField(
         "people_db.Person",
         related_name="opinions_joined",
-        help_text="Other judges that joined the primary author "
-        "in this opinion",
+        help_text=(
+            "Other judges that joined the primary author " "in this opinion"
+        ),
+        blank=True,
+    )
+    joined_by_str = models.TextField(
+        help_text=(
+            "Other judges that joined the primary author "
+            "in this opinion str"
+        ),
         blank=True,
     )
     date_created = models.DateTimeField(
@@ -2328,15 +2554,19 @@ class Opinion(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value in "
-        "year 1750 indicates the value is unknown",
+        help_text=(
+            "The last moment when the item was modified. A value in "
+            "year 1750 indicates the value is unknown"
+        ),
         auto_now=True,
         db_index=True,
     )
     type = models.CharField(max_length=20, choices=OPINION_TYPES,)
     sha1 = models.CharField(
-        help_text="unique ID for the document, as generated via SHA1 of the "
-        "binary file or text data",
+        help_text=(
+            "unique ID for the document, as generated via SHA1 of the "
+            "binary file or text data"
+        ),
         max_length=40,
         db_index=True,
     )
@@ -2346,42 +2576,52 @@ class Opinion(models.Model):
         null=True,
     )
     download_url = models.URLField(
-        help_text="The URL where the item was originally scraped. Note that "
-        "these URLs may often be dead due to the court or the bulk "
-        "provider changing their website. We keep the original link "
-        "here given that it often contains valuable metadata.",
+        help_text=(
+            "The URL where the item was originally scraped. Note that "
+            "these URLs may often be dead due to the court or the bulk "
+            "provider changing their website. We keep the original link "
+            "here given that it often contains valuable metadata."
+        ),
         max_length=500,
         db_index=True,
         null=True,
         blank=True,
     )
     local_path = models.FileField(
-        help_text="The location, relative to MEDIA_ROOT on the CourtListener "
-        "server, where files are stored",
+        help_text=(
+            "The location, relative to MEDIA_ROOT on the CourtListener "
+            "server, where files are stored"
+        ),
         upload_to=make_upload_path,
         storage=IncrementingFileSystemStorage(),
         blank=True,
         db_index=True,
     )
     plain_text = models.TextField(
-        help_text="Plain text of the document after extraction using "
-        "pdftotext, wpd2txt, etc.",
+        help_text=(
+            "Plain text of the document after extraction using "
+            "pdftotext, wpd2txt, etc."
+        ),
         blank=True,
     )
     html = models.TextField(
         help_text="HTML of the document, if available in the original",
         blank=True,
-        null=True,
     )
     html_lawbox = models.TextField(
-        help_text="HTML of Lawbox documents", blank=True, null=True,
+        help_text="HTML of Lawbox documents", blank=True
     )
     html_columbia = models.TextField(
-        help_text="HTML of Columbia archive", blank=True, null=True,
+        help_text="HTML of Columbia archive", blank=True,
+    )
+    xml_harvard = models.TextField(
+        help_text="XML of Harvard CaseLaw Access Project opinion", blank=True,
     )
     html_with_citations = models.TextField(
-        help_text="HTML of the document with citation links and other "
-        "post-processed markup added",
+        help_text=(
+            "HTML of the document with citation links and other "
+            "post-processed markup added"
+        ),
         blank=True,
     )
     extracted_by_ocr = models.BooleanField(
@@ -2560,8 +2800,10 @@ class Tag(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value in "
-        "year 1750 indicates the value is unknown",
+        help_text=(
+            "The last moment when the item was modified. A value in "
+            "year 1750 indicates the value is unknown"
+        ),
         auto_now=True,
         db_index=True,
     )

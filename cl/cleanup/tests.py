@@ -230,7 +230,7 @@ with Virginia Historic Tax Credit Fund""",
 
         test_pairs = (
             (
-                """  1 UNITED STATES TAX COURT REPORT (2018)    
+                """  1 UNITED STATES TAX COURT REPORT (2018)
 
 
 
