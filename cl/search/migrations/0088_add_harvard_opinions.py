@@ -9,7 +9,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('search', '0085_add_index_to_claim_number'),
+        ('search', '0087_set_values_to_empty'),
     ]
 
     operations = [
