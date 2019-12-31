@@ -83,7 +83,6 @@ class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
             "view_count",
             "parties",
             "originating_court_information",
-            "filepath_local",
         )
 
 
@@ -156,7 +155,7 @@ class OpinionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
     class Meta:
         model = Opinion
-        exclude = ("local_path",)
+        fields = "__all__"
 
 
 class OpinionsCitedSerializer(
