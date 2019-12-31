@@ -83,6 +83,7 @@ class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
             "view_count",
             "parties",
             "originating_court_information",
+            "filepath_local",
         )
 
 
