@@ -79,7 +79,12 @@ class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
     class Meta:
         model = Docket
-        exclude = ("view_count", "parties", "originating_court_information")
+        exclude = (
+            "view_count",
+            "parties",
+            "originating_court_information",
+            "filepath_local",
+        )
 
 
 class RECAPDocumentSerializer(
@@ -221,7 +226,7 @@ class OpinionClusterSerializer(
 
     class Meta:
         model = OpinionCluster
-        fields = "__all__"
+        exclude = ("filepath_json_harvard",)
 
 
 class TagSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
