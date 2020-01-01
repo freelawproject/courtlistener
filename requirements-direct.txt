@@ -16,7 +16,7 @@ certifi
 coreapi~=2.3.0
 # Unfortunately, higher versions emit an insane Python 2.7 error EVERYWHERE.
 # Once we have py3, we can upgrade: https://stackoverflow.com/q/51778764/64911
-cryptography==2.2.2
+cryptography==2.3
 defusedxml~=0.6.0
 disposable-email-domains
 Django~=1.11.0
