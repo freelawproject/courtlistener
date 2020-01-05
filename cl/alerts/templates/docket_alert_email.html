@@ -72,7 +72,7 @@
                 <a href="https://www.courtlistener.com/{{ rd.filepath_local }}">For free from RECAP
                 </a>
               {% else %}
-                <a href="https://www.courtlistener.com/docket/{{ docket.docketNumber }}/{{ rd.document_number }}/{{ rd.attachment_number }}/{{ docket.slug }}/ ">Check RECAP
+                <a href="https://www.courtlistener.com/{{ rd.get_absolute_url }}?redirectToDownload=True">Check RECAP
                 </a>
               {% endif %}
               {% if rd.pacer_url %}

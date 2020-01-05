@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.db.models import F, Prefetch
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponse, HttpResponseNotAllowed
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
 from django.template import loader
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
@@ -214,12 +214,26 @@ def view_recap_document(request, docket_id=None, doc_num=None,  att_num=None,
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
     """
+
     item = get_object_or_404(
         RECAPDocument,
         docket_entry__docket__id=docket_id,
         document_number=doc_num,
         attachment_number=att_num,
     )
+
+    # Check if the user has requested automatic redirection to the document
+    redirectToDownload = request.GET.get('redirectToDownload', False)
+    if redirectToDownload:
+        # Check if the document is available from Court Listener and
+        # if it is, redirect the user to that
+        # if it isn't, redirect the user to PACER
+        if item.is_available: 
+            response = redirect(item.filepath_local)
+        else:
+            response = redirect(item.pacer_url)
+        return response
+
     title = make_rd_title(item)
     if is_og_bot(request):
         make_thumb_if_needed(item)
