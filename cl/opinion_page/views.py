@@ -245,7 +245,6 @@ def view_recap_document(
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
     """
-
     item = get_object_or_404(
         RECAPDocument,
         docket_entry__docket__id=docket_id,
@@ -254,12 +253,12 @@ def view_recap_document(
     )
 
     # Check if the user has requested automatic redirection to the document
-    redirectToDownload = request.GET.get('redirectToDownload', False)
+    redirectToDownload = request.GET.get("redirectToDownload", False)
     if redirectToDownload:
         # Check if the document is available from Court Listener and
         # if it is, redirect the user to that
         # if it isn't, redirect the user to PACER
-        if item.is_available: 
+        if item.is_available:
             response = redirect(item.filepath_local)
         else:
             response = redirect(item.pacer_url)
