@@ -14,11 +14,13 @@ def make_and_populate_nx_graph():
     This pulls all of the inter-opinion citations into memory then passes all of
     them to igraph as a directed graph.
     """
-    g = igraph.Graph(directed=True, edges=list(
-        OpinionsCited.objects.values_list(
-            'citing_opinion',
-            'cited_opinion',
-        ))
+    g = igraph.Graph(
+        directed=True,
+        edges=list(
+            OpinionsCited.objects.values_list(
+                "citing_opinion", "cited_opinion",
+            )
+        ),
     )
     return g
 
@@ -36,34 +38,33 @@ def make_sorted_pr_file(pr_results, result_file_path):
     function takes the pagerank results and converts them into a file like this,
     using the os's `sort` executable for fastest sorting.
     """
-    temp_extension = '.tmp'
+    temp_extension = ".tmp"
     min_value = min(pr_results)
-    with open(result_file_path + temp_extension, 'w') as f:
+    with open(result_file_path + temp_extension, "w") as f:
         # pr_results has a score for every value between 0 and our highest
         # opinion id that has citations. Write a file that only contains values
         # matching valid Opinions.
-        for pk in Opinion.objects.values_list('pk', flat=True):
+        for pk in Opinion.objects.values_list("pk", flat=True):
             try:
                 score = pr_results[pk]
             except IndexError:
                 # Happens because some items don't have citations, thus aren't
                 # in network.
                 score = min_value
-            f.write('{}={}\n'.format(pk, score))
+            f.write("{}={}\n".format(pk, score))
 
     # For improved Solr performance, sort the temp file, creating a new file
     # without the temp_extension value.
-    os.system('sort -n %s%s > %s' % (
-        result_file_path,
-        temp_extension,
-        result_file_path,
-    ))
+    os.system(
+        "sort -n %s%s > %s"
+        % (result_file_path, temp_extension, result_file_path,)
+    )
     os.remove(result_file_path + temp_extension)
 
 
 class Command(VerboseCommand):
-    args = '<args>'
-    help = 'Calculate pagerank value for every case'
+    args = "<args>"
+    help = "Calculate pagerank value for every case"
 
     @staticmethod
     def do_pagerank():
@@ -76,7 +77,9 @@ class Command(VerboseCommand):
         pr_results = self.do_pagerank()
         pr_dest_dir = settings.SOLR_PAGERANK_DEST_DIR
         make_sorted_pr_file(pr_results, pr_dest_dir)
-        normal_dest_dir = get_data_dir('collection1') + "external_pagerank"
-        print("Pagerank file created at %s. Because of distributed servers, "
-              "you may need to copy it to its final destination. Somewhere "
-              "like: %s." % (pr_dest_dir, normal_dest_dir))
+        normal_dest_dir = get_data_dir("collection1") + "external_pagerank"
+        print(
+            "Pagerank file created at %s. Because of distributed servers, "
+            "you may need to copy it to its final destination. Somewhere "
+            "like: %s." % (pr_dest_dir, normal_dest_dir)
+        )

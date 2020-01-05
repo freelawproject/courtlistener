@@ -12,8 +12,8 @@ from reporters_db import EDITIONS, VARIATIONS_ONLY
 # order from longest to shortest.
 REGEX_LIST = EDITIONS.keys() + VARIATIONS_ONLY.keys()
 REGEX_LIST.sort(key=len, reverse=True)
-REGEX_STR = '|'.join(map(re.escape, REGEX_LIST))
-REPORTER_RE = re.compile("\s(%s)\s" % REGEX_STR)
+REGEX_STR = "|".join(map(re.escape, REGEX_LIST))
+REPORTER_RE = re.compile("(^|\s)(%s)\s" % REGEX_STR)
 
 
 def normalize_variation(string):
@@ -49,12 +49,12 @@ def tokenize(text):
 
        Example:
        >>>tokenize('See Roe v. Wade, 410 U. S. 113 (1973)')
-       ['See', 'Roe', 'v.', 'Wade,', '410', 'U.S.', '113', '(1973)']
+       ['See', 'Roe', 'v.', 'Wade,', '410', 'U. S.', '113', '(1973)']
     """
     # if the text looks likes the corner-case 'digit-REPORTER-digit', splitting
     # by spaces doesn't work
-    if re.match('\d+\-[A-Za-z]+\-\d+', text):
-        return text.split('-')
+    if re.match("\d+\-[A-Za-z]+\-\d+", text):
+        return text.split("-")
     # otherwise, we just split on spaces to find words
     strings = REPORTER_RE.split(text)
     words = []

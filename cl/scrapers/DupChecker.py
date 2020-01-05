@@ -4,8 +4,9 @@ from juriscraper.AbstractSite import logger
 
 
 class DupChecker(dict):
-    def __init__(self, court, full_crawl=False, dup_threshold=5,
-                 *args, **kwargs):
+    def __init__(
+        self, court, full_crawl=False, dup_threshold=5, *args, **kwargs
+    ):
         self.full_crawl = full_crawl
         self.court = court
         self.dup_threshold = dup_threshold
@@ -67,8 +68,14 @@ class DupChecker(dict):
             # no matter what.
             return False
 
-    def press_on(self, object_type, current_date, next_date, lookup_value,
-                 lookup_by='sha1'):
+    def press_on(
+        self,
+        object_type,
+        current_date,
+        next_date,
+        lookup_value,
+        lookup_by="sha1",
+    ):
         """Checks if a we have an `object_type` with identical content in the CL
         corpus by looking up `lookup_value` in the `lookup_by` field. Depending
         on the result of that, we either return True or False. True represents
@@ -94,38 +101,47 @@ class DupChecker(dict):
             return False
 
         # check for a duplicate in the db.
-        if lookup_by == 'sha1':
+        if lookup_by == "sha1":
             exists = object_type.objects.filter(sha1=lookup_value).exists()
-        elif lookup_by == 'download_url':
-            exists = object_type.objects.filter(download_url=lookup_value).exists()
+        elif lookup_by == "download_url":
+            exists = object_type.objects.filter(
+                download_url=lookup_value
+            ).exists()
         else:
-            raise NotImplementedError('Unknown lookup_by parameter.')
+            raise NotImplementedError("Unknown lookup_by parameter.")
 
         if exists:
-            logger.info('Duplicate found on date: %s, with lookup value: %s' %
-                        (current_date, lookup_value))
+            logger.info(
+                "Duplicate found on date: %s, with lookup value: %s"
+                % (current_date, lookup_value)
+            )
             self._increment(current_date)
 
             # If the next date in the Site object is less than (before) the
             # current date, we needn't continue because we should already have
             # that item.
             if next_date:
-                already_scraped_next_date = (next_date < current_date)
+                already_scraped_next_date = next_date < current_date
             else:
                 already_scraped_next_date = True
             if not self.full_crawl:
                 if already_scraped_next_date:
-                    if self.court.pk == 'mich':
+                    if self.court.pk == "mich":
                         # Michigan sometimes has multiple occurrences of the
                         # same case with different dates on a page.
                         return False
                     else:
-                        logger.info('Next case occurs prior to when we found a '
-                                    'duplicate. Court is up to date.')
+                        logger.info(
+                            "Next case occurs prior to when we found a "
+                            "duplicate. Court is up to date."
+                        )
                         self.emulate_break = True
                         return False
                 elif self.dup_count >= self.dup_threshold:
-                    logger.info('Found %s duplicates in a row. Court is up to date.' % self.dup_count)
+                    logger.info(
+                        "Found %s duplicates in a row. Court is up to date."
+                        % self.dup_count
+                    )
                     self.emulate_break = True
                     return False
             else:

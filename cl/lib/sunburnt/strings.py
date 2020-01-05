@@ -6,16 +6,17 @@ class SolrString(unicode):
     # than Text fields - most queryparsers will strip these characters out
     # for a text field anyway.
     lucene_special_chars = '+-&|!(){}[]^"~*?: \t\v\\'
+
     def escape_for_lqs_term(self):
         if self in ["AND", "OR", "NOT", ""]:
             return u'"%s"' % self
         chars = []
         for c in self.chars:
             if isinstance(c, basestring) and c in self.lucene_special_chars:
-                chars.append(u'\%s'%c)
+                chars.append(u"\%s" % c)
             else:
-                chars.append(u'%s'%c)
-        return u''.join(chars)
+                chars.append(u"%s" % c)
+        return u"".join(chars)
 
 
 class RawString(SolrString):
@@ -30,10 +31,12 @@ class WildcardString(SolrString):
     class SpecialChar(object):
         def __unicode__(self):
             return unicode(self.char)
+
     class Asterisk(SpecialChar):
-        char = u'*'
+        char = u"*"
+
     class QuestionMark(SpecialChar):
-        char = u'?'
+        char = u"?"
 
     def get_wildcards(self, s):
         backslash = False
@@ -45,14 +48,14 @@ class WildcardString(SolrString):
                 chars.append(c)
                 continue
             i += 1
-            if c == u'\\':
+            if c == u"\\":
                 backslash = True
-            elif c == u'*':
+            elif c == u"*":
                 chars.append(self.Asterisk())
-            elif c == u'?':
+            elif c == u"?":
                 chars.append(self.QuestionMark())
             else:
                 chars.append(c)
         if backslash:
-            chars.append(u'\\')
+            chars.append(u"\\")
         return chars

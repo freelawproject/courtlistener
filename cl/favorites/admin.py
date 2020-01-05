@@ -7,7 +7,7 @@ class FavoriteInline(admin.TabularInline):
     model = Favorite
     extra = 1
     raw_id_fields = (
-        'user',
+        "user",
         "cluster_id",
         "audio_id",
         "docket_id",
@@ -18,14 +18,14 @@ class FavoriteInline(admin.TabularInline):
 @admin.register(Favorite)
 class FavoriteAdmin(admin.ModelAdmin):
     list_display = (
-        'id',
-        'user',
-        'cluster_id',
+        "id",
+        "user",
+        "cluster_id",
     )
     raw_id_fields = (
-        'user',
-        'cluster_id',
-        'audio_id',
-        'docket_id',
-        'recap_doc_id',
+        "user",
+        "cluster_id",
+        "audio_id",
+        "docket_id",
+        "recap_doc_id",
     )

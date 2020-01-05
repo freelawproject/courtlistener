@@ -11,11 +11,15 @@ from cl.users.models import UserProfile, BarMembership
 
 def get_email_confirmed(obj):
     return obj.profile.email_confirmed
+
+
 get_email_confirmed.short_description = "Email Confirmed?"
 
 
 def get_stub_account(obj):
     return obj.profile.stub_account
+
+
 get_stub_account.short_description = "Stub Account?"
 
 
@@ -38,15 +42,15 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         TokenInline,
     )
     list_display = (
-        'username',
+        "username",
         get_email_confirmed,
         get_stub_account,
     )
     search_fields = (
-        'username',
-        'first_name',
-        'last_name',
-        'email',
+        "username",
+        "first_name",
+        "last_name",
+        "email",
     )
 
 

@@ -1,7 +1,7 @@
 import os
 import sys
 
-execfile('/etc/courtlistener')
+execfile("/etc/courtlistener")
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -24,17 +24,20 @@ def db_corrector(simulate, verbose):
     citations, we don't care particularly about errors, and can carelessly
     punt them.
     """
-    docs = queryset_generator(Document.objects.filter(source = 'R'))
+    docs = queryset_generator(Document.objects.filter(source="R"))
     for doc in docs:
         if verbose:
-            print "Assigning %s to west_cite on doc %s" % (doc.citation.docket_number, doc.pk)
+            print "Assigning %s to west_cite on doc %s" % (
+                doc.citation.docket_number,
+                doc.pk,
+            )
         doc.citation.west_cite = doc.citation.docket_number
 
         # Gather the docket number
         try:
             htmlTree = fromstring(doc.html)
             docket = htmlTree.xpath('//p[@class = "docket"]')[0].text
-            docket = docket.replace('No. ', '').strip('.')
+            docket = docket.replace("No. ", "").strip(".")
             doc.citation.docket_number = docket
         except IndexError:
             if verbose:
@@ -49,11 +52,22 @@ def db_corrector(simulate, verbose):
 def main():
     usage = "usage: %prog [--verbose] [---simulate]"
     parser = OptionParser(usage)
-    parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
-        default=False, help="Display log during execution")
-    parser.add_option('-s', '--simulate', action="store_true",
-        dest='simulate', default=False, help="Simulate the corrections without " + \
-        "actually making them.")
+    parser.add_option(
+        "-v",
+        "--verbose",
+        action="store_true",
+        dest="verbose",
+        default=False,
+        help="Display log during execution",
+    )
+    parser.add_option(
+        "-s",
+        "--simulate",
+        action="store_true",
+        dest="simulate",
+        default=False,
+        help="Simulate the corrections without " + "actually making them.",
+    )
     (options, args) = parser.parse_args()
 
     verbose = options.verbose
@@ -69,5 +83,5 @@ def main():
     return db_corrector(simulate, verbose)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -4,16 +4,25 @@ from datetime import date
 from django.core.management import call_command
 from django.urls import reverse
 from django.test import TestCase, SimpleTestCase
+from django.utils.timezone import now
 from lxml import etree
 from reporters_db import REPORTERS
 
-from cl.citations.find_citations import get_citations, is_date_in_reporter, \
-    Citation
-from cl.citations.management.commands.cl_add_parallel_citations import \
-    identify_parallel_citations, make_edge_list
+from cl.citations.find_citations import (
+    get_citations,
+    is_date_in_reporter,
+    Citation,
+)
+from cl.citations.management.commands.cl_add_parallel_citations import (
+    identify_parallel_citations,
+    make_edge_list,
+)
 from cl.citations.match_citations import match_citation
 from cl.citations.reporter_tokenizer import tokenize
-from cl.citations.tasks import find_citations_for_opinion_by_pks, create_cited_html
+from cl.citations.tasks import (
+    find_citations_for_opinion_by_pks,
+    create_cited_html,
+)
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 
@@ -27,24 +36,27 @@ def remove_citations_from_imported_fixtures():
 
 
 class CiteTest(TestCase):
-
     def test_reporter_tokenizer(self):
         """Do we tokenize correctly?"""
-        self.assertEqual(tokenize('See Roe v. Wade, 410 U. S. 113 (1973)'),
-                         ['See', 'Roe', 'v.', 'Wade,', '410', 'U. S.', '113',
-                          '(1973)'])
-        self.assertEqual(tokenize('Foo bar eats grue, 232 Vet. App. (2003)'),
-                         ['Foo', 'bar', 'eats', 'grue,', '232', 'Vet. App.',
-                          '(2003)'])
+        self.assertEqual(
+            tokenize("See Roe v. Wade, 410 U. S. 113 (1973)"),
+            ["See", "Roe", "v.", "Wade,", "410", "U. S.", "113", "(1973)"],
+        )
+        self.assertEqual(
+            tokenize("Foo bar eats grue, 232 Vet. App. (2003)"),
+            ["Foo", "bar", "eats", "grue,", "232", "Vet. App.", "(2003)"],
+        )
         # Tests that the tokenizer handles whitespace well. In the past, the
         # capital letter P in 5243-P matched the abbreviation for the Pacific
         # reporter ("P"), and the tokenizing would be wrong.
-        self.assertEqual(tokenize('Failed to recognize 1993 Ct. Sup. 5243-P'),
-                         ['Failed', 'to', 'recognize', '1993', 'Ct. Sup.',
-                          '5243-P'])
+        self.assertEqual(
+            tokenize("Failed to recognize 1993 Ct. Sup. 5243-P"),
+            ["Failed", "to", "recognize", "1993", "Ct. Sup.", "5243-P"],
+        )
 
     def test_find_citations(self):
         """Can we find and make Citation objects from strings?"""
+        # fmt: off
         test_pairs = (
             # Basic test
             ('1 U.S. 1',
@@ -94,6 +106,11 @@ class CiteTest(TestCase):
              [Citation(volume=22, reporter='A.2d', page=332,
                        canonical_reporter=u'A.', lookup_index=0,
                        reporter_index=2, reporter_found='A.2d')]),
+            # Test if reporter in string will find proper citation string
+            ('A.2d 332 11 A.2d 333',
+             [Citation(volume=11, reporter='A.2d', page=333,
+                       canonical_reporter=u'A.', lookup_index=0,
+                       reporter_index=3, reporter_found='A.2d')]),
             # Test finding a variant second edition reporter
             ('asdf 22 A. 2d 332 asdf',
              [Citation(volume=22, reporter='A.2d', page=332,
@@ -109,20 +126,22 @@ class CiteTest(TestCase):
             ('2 U.S. 3, 4-5 (3 Atl. 33)',
              [Citation(volume=2, reporter="U.S.", page=3, extra=u'4-5',
                        canonical_reporter=u"U.S.", lookup_index=0,
-                       reporter_index=1, reporter_found="U.S.", court='scotus'),
+                       reporter_index=1, reporter_found="U.S.",
+                       court='scotus'),
               Citation(volume=3, reporter="A.", page=33,
                        canonical_reporter=u"A.", lookup_index=0,
                        reporter_index=5, reporter_found="Atl.")]),
             # Test with the page number as a Roman numeral
             ('12 Neb. App. lxiv (2004)',
-             [Citation(volume=12, reporter='Neb. Ct. App.', page='lxiv', year=2004,
-                      canonical_reporter=u'Neb. Ct. App.', lookup_index=0,
-                      reporter_index=1, reporter_found='Neb. App.')]),
+             [Citation(volume=12, reporter='Neb. Ct. App.', page='lxiv',
+                       year=2004, canonical_reporter=u'Neb. Ct. App.',
+                       lookup_index=0, reporter_index=1,
+                       reporter_found='Neb. App.')]),
             # Test with the 'digit-REPORTER-digit' corner-case formatting
             ('2007-NMCERT-008',
              [Citation(volume=2007, reporter='NMCERT', page=8,
-                      canonical_reporter=u'NMCERT', lookup_index=0,
-                      reporter_index=1, reporter_found='NMCERT')]),
+                       canonical_reporter=u'NMCERT', lookup_index=0,
+                       reporter_index=1, reporter_found='NMCERT')]),
             ('2006-Ohio-2095',
              [Citation(volume=2006, reporter='Ohio', page=2095,
                        canonical_reporter=u'Ohio', lookup_index=0,
@@ -134,42 +153,116 @@ class CiteTest(TestCase):
             ('2017 IL App (1st) 143684-B',
              [Citation(volume=2017, reporter='IL App (1st)', page='143684-B',
                        canonical_reporter=u'IL App (1st)', lookup_index=0,
-                       reporter_index=1, reporter_found='IL App (1st)')])
+                       reporter_index=1, reporter_found='IL App (1st)')]),
         )
+        # fmt: on
         for q, a in test_pairs:
             print "Testing citation extraction for %s..." % q,
             cites_found = get_citations(q)
             self.assertEqual(
                 cites_found,
                 a,
-                msg='%s\n%s\n\n    !=\n\n%s' % (
+                msg="%s\n%s\n\n    !=\n\n%s"
+                % (
                     q,
                     ",\n".join([str(cite.__dict__) for cite in cites_found]),
                     ",\n".join([str(cite.__dict__) for cite in a]),
-                )
+                ),
+            )
+            print "✓"
+
+    def test_find_tc_citations(self):
+        """Can we parse tax court citations properly?"""
+        # fmt: off
+        test_pairs = (
+            # Test with atypical formatting for Tax Court Memos
+            ('the 1 T.C. No. 233',
+             [Citation(volume=1, reporter='T.C. No.', page=233,
+                       canonical_reporter=u'T.C. No.', lookup_index=0,
+                       reporter_index=2, reporter_found='T.C. No.')]),
+            ('word T.C. Memo. 2019-233',
+             [Citation(volume=2019, reporter='T.C. Memo.', page=233,
+                       canonical_reporter=u'T.C. Memo.', lookup_index=0,
+                       reporter_index=1, reporter_found='T.C. Memo.')]),
+            ('something T.C. Summary Opinion 2019-233',
+             [Citation(volume=2019, reporter='T.C. Summary Opinion', page=233,
+                       canonical_reporter=u'T.C. Summary Opinion',
+                       lookup_index=0,
+                       reporter_index=1,
+                       reporter_found='T.C. Summary Opinion')]),
+            ('T.C. Summary Opinion 2018-133',
+             [Citation(volume=2018, reporter='T.C. Summary Opinion', page=133,
+                       canonical_reporter=u'T.C. Summary Opinion',
+                       lookup_index=0,
+                       reporter_index=0,
+                       reporter_found='T.C. Summary Opinion')]),
+            ('1     UNITED STATES TAX COURT REPORT   (2018)',
+             [Citation(volume=1, reporter='T.C.', page=2018,
+                       canonical_reporter=u'T.C.',
+                       lookup_index=0,
+                       reporter_index=1,
+                       reporter_found='UNITED STATES TAX COURT REPORT')]),
+            ('U.S. of A. 1     UNITED STATES TAX COURT REPORT   (2018)',
+             [Citation(volume=1, reporter='T.C.', page=2018,
+                       canonical_reporter=u'T.C.',
+                       lookup_index=0,
+                       reporter_index=4,
+                       reporter_found='UNITED STATES TAX COURT REPORT')]),
+            # Added this after failing in production
+            ('     202                 140 UNITED STATES TAX COURT REPORTS                                   (200)',
+             [Citation(volume=140, reporter='T.C.', page=200,
+                       canonical_reporter=u'T.C.',
+                       lookup_index=0,
+                       reporter_index=2,
+                       reporter_found='UNITED STATES TAX COURT REPORTS')]),
+            ('U.S. 1234 1 U.S. 1',
+             [Citation(volume=1, reporter='U.S.', page=1,
+                       canonical_reporter=u'U.S.',
+                       lookup_index=0,
+                       reporter_index=3,
+                       court='scotus',
+                       reporter_found='U.S.')]),
+        )
+        # fmt: on
+        for q, a in test_pairs:
+            print "Testing citation extraction for %s..." % q,
+            cites_found = get_citations(q)
+            self.assertEqual(
+                cites_found,
+                a,
+                msg="%s\n%s\n\n    !=\n\n%s"
+                % (
+                    q,
+                    ",\n".join([str(cite.__dict__) for cite in cites_found]),
+                    ",\n".join([str(cite.__dict__) for cite in a]),
+                ),
             )
             print "✓"
 
     def test_date_in_editions(self):
         test_pairs = [
-            ('S.E.', 1886, False),
-            ('S.E.', 1887, True),
-            ('S.E.', 1939, True),
-            ('S.E.', 2012, True),
-            ('T.C.M.', 1950, True),
-            ('T.C.M.', 1940, False),
-            ('T.C.M.', date.today().year + 1, False),
+            ("S.E.", 1886, False),
+            ("S.E.", 1887, True),
+            ("S.E.", 1939, True),
+            ("S.E.", 2012, True),
+            ("T.C.M.", 1950, True),
+            ("T.C.M.", 1940, False),
+            ("T.C.M.", now().year + 1, False),
         ]
         for pair in test_pairs:
             date_in_reporter = is_date_in_reporter(
-                    REPORTERS[pair[0]][0]['editions'], pair[1])
+                REPORTERS[pair[0]][0]["editions"], pair[1]
+            )
             self.assertEqual(
-                    date_in_reporter, pair[2],
-                    msg='is_date_in_reporter(REPORTERS[%s][0]["editions"], %s) != '
-                        '%s\nIt\'s equal to: %s' %
-                        (pair[0], pair[1], pair[2], date_in_reporter))
+                date_in_reporter,
+                pair[2],
+                msg='is_date_in_reporter(REPORTERS[%s][0]["editions"], %s) != '
+                "%s\nIt's equal to: %s"
+                % (pair[0], pair[1], pair[2], date_in_reporter),
+            )
 
     def test_disambiguate_citations(self):
+        # fmt: off
         test_pairs = [
             # 1. P.R.R --> Correct abbreviation for a reporter.
             ('1 P.R.R. 1',
@@ -245,45 +338,47 @@ class CiteTest(TestCase):
             #                          canonical_reporter='La.',
             #                          lookup_index=0)]),
         ]
+        # fmt: on
         for pair in test_pairs:
             print "Testing disambiguation for %s..." % pair[0],
             citations = get_citations(pair[0], html=False)
             self.assertEqual(
-                citations, pair[1],
-                msg='%s\n%s != \n%s' %
-                    (
-                        pair[0],
-                        [cite.__dict__ for cite in citations],
-                        [cite.__dict__ for cite in pair[1]]
-                    )
+                citations,
+                pair[1],
+                msg="%s\n%s != \n%s"
+                % (
+                    pair[0],
+                    [cite.__dict__ for cite in citations],
+                    [cite.__dict__ for cite in pair[1]],
+                ),
             )
             print "✓"
 
     def test_make_html(self):
         """Can we make basic HTML conversions properly?"""
-        good_html = ('<pre class="inline">asdf </pre><span class="citation '
-                     'no-link"><span class="volume">22</span> <span '
-                     'class="reporter">U.S.</span> <span class="page">33</span>'
-                     '</span><pre class="inline"> asdf</pre>')
+        good_html = (
+            '<pre class="inline">asdf </pre><span class="citation '
+            'no-link"><span class="volume">22</span> <span '
+            'class="reporter">U.S.</span> <span class="page">33</span>'
+            '</span><pre class="inline"> asdf</pre>'
+        )
 
         # Simple example
-        s = 'asdf 22 U.S. 33 asdf'
+        s = "asdf 22 U.S. 33 asdf"
         opinion = Opinion(plain_text=s)
         citations = get_citations(s)
         new_html = create_cited_html(opinion, citations)
         self.assertEqual(
-            good_html,
-            new_html,
+            good_html, new_html,
         )
 
         # Using a variant format for U.S. (Issue #409)
-        s = 'asdf 22 U. S. 33 asdf'
+        s = "asdf 22 U. S. 33 asdf"
         opinion = Opinion(plain_text=s)
         citations = get_citations(s)
         new_html = create_cited_html(opinion, citations)
         self.assertEqual(
-            good_html,
-            new_html,
+            good_html, new_html,
         )
 
 
@@ -305,37 +400,35 @@ class MatchingTest(IndexedSolrTestCase):
             cited.cluster.citation_count,
             expected_count,
             msg=u"'cited' was not updated by a citation found in 'citing', or "
-                u"the citation was not found. Count was: %s instead of %s"
-                % (cited.cluster.citation_count, expected_count)
+            u"the citation was not found. Count was: %s instead of %s"
+            % (cited.cluster.citation_count, expected_count),
         )
 
     def test_citation_matching_issue621(self):
         """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
         # The fixture contains a reference to 9 F. 1, so we expect no results.
-        citation_str = '1 F. 9 (1795)'
+        citation_str = "1 F. 9 (1795)"
         citation = get_citations(citation_str)[0]
         results = match_citation(citation)
         self.assertEqual([], results)
 
 
 class CitationFeedTest(IndexedSolrTestCase):
-
     def _tree_has_content(self, content, expected_count):
         xml_tree = etree.fromstring(content)
-        count = len(xml_tree.xpath(
-            '//a:entry',
-            namespaces={'a': 'http://www.w3.org/2005/Atom'})
+        count = len(
+            xml_tree.xpath(
+                "//a:entry", namespaces={"a": "http://www.w3.org/2005/Atom"}
+            )
         )
         self.assertEqual(
-            count,
-            expected_count,
+            count, expected_count,
         )
 
     def test_basic_cited_by_feed(self):
         """Can we load the cited-by feed and does it have content?"""
         r = self.client.get(
-            reverse('search_feed', args=['search']),
-            {'q': 'cites:1'}
+            reverse("search_feed", args=["search"]), {"q": "cites:1"}
         )
         self.assertEqual(r.status_code, 200)
 
@@ -346,13 +439,13 @@ class CitationFeedTest(IndexedSolrTestCase):
         """Does the citation feed continue working even when we have a unicode
         case name?
         """
-        new_case_name = u'MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & ' \
-                        u'CO., \u2014'
+        new_case_name = (
+            u"MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & " u"CO., \u2014"
+        )
         OpinionCluster.objects.filter(pk=1).update(case_name=new_case_name)
 
         r = self.client.get(
-            reverse('search_feed', args=['search']),
-            {'q': 'cites:1'},
+            reverse("search_feed", args=["search"]), {"q": "cites:1"},
         )
         self.assertEqual(r.status_code, 200)
 
@@ -365,50 +458,62 @@ class CitationCommandTest(IndexedSolrTestCase):
 
     def call_command_and_test_it(self, args):
         remove_citations_from_imported_fixtures()
-        call_command('cl_find_citations', *args)
+        call_command("cl_find_citations", *args)
         cited = Opinion.objects.get(pk=2)
         expected_count = 1
         self.assertEqual(
             cited.cluster.citation_count,
             expected_count,
             msg=u"'cited' was not updated by a citation found in 'citing', or "
-                u"the citation was not found. Count was: %s instead of %s"
-                % (cited.cluster.citation_count, expected_count)
+            u"the citation was not found. Count was: %s instead of %s"
+            % (cited.cluster.citation_count, expected_count),
         )
 
     def test_index_by_doc_id(self):
         args = [
-            '--doc_id', '3',
-            '--index', 'concurrently',
+            "--doc_id",
+            "3",
+            "--index",
+            "concurrently",
         ]
         self.call_command_and_test_it(args)
 
     def test_index_by_doc_ids(self):
         args = [
-            '--doc_id', '3', '2',
-            '--index', 'concurrently',
+            "--doc_id",
+            "3",
+            "2",
+            "--index",
+            "concurrently",
         ]
         self.call_command_and_test_it(args)
 
     def test_index_by_start_only(self):
         args = [
-            '--start_id', '0',
-            '--index', 'concurrently',
+            "--start_id",
+            "0",
+            "--index",
+            "concurrently",
         ]
         self.call_command_and_test_it(args)
 
     def test_index_by_start_and_end(self):
         args = [
-            '--start_id', '0',
-            '--end_id', '5',
-            '--index', 'concurrently',
+            "--start_id",
+            "0",
+            "--end_id",
+            "5",
+            "--index",
+            "concurrently",
         ]
         self.call_command_and_test_it(args)
 
     def test_filed_after(self):
         args = [
-            '--filed_after', '2015-06-09',
-            '--index', 'concurrently',
+            "--filed_after",
+            "2015-06-09",
+            "--index",
+            "concurrently",
         ]
         self.call_command_and_test_it(args)
 
@@ -439,8 +544,8 @@ class ParallelCitationTest(SimpleTestCase):
                 computed_num_citation_groups,
                 citation_group_count,
                 msg="Did not have correct number of citation groups. Got %s, "
-                    "not %s." % (computed_num_citation_groups,
-                                 citation_group_count)
+                "not %s."
+                % (computed_num_citation_groups, citation_group_count),
             )
             if not citation_groups:
                 # Add an empty list to make testing easier.
@@ -450,12 +555,13 @@ class ParallelCitationTest(SimpleTestCase):
                 computed_num_parallel_citation,
                 expected_num_parallel_citations,
                 msg="Did not identify correct number of parallel citations in "
-                    "the group. Got %s, not %s" % (
-                        computed_num_parallel_citation,
-                        expected_num_parallel_citations,
-                    )
+                "the group. Got %s, not %s"
+                % (
+                    computed_num_parallel_citation,
+                    expected_num_parallel_citations,
+                ),
             )
-            print '✓'
+            print "✓"
 
     def test_making_edge_list(self):
         """Can we make networkx-friendly edge lists?"""
@@ -466,8 +572,7 @@ class ParallelCitationTest(SimpleTestCase):
         ]
         for q, a in tests:
             self.assertEqual(
-                make_edge_list(q),
-                a,
+                make_edge_list(q), a,
             )
 
     def test_hash(self):
@@ -478,8 +583,6 @@ class ParallelCitationTest(SimpleTestCase):
             Citation(reporter=2, volume="U.S.", page="2", reporter_index=2),
         ]
         self.assertEqual(
-            hash(citations[0]),
-            hash(citations[1]),
+            hash(citations[0]), hash(citations[1]),
         )
         Citation.fuzzy_hash = Citation.__hash__
-

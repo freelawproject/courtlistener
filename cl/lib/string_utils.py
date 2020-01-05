@@ -16,9 +16,9 @@ def anonymize(s):
     details, see:
       http://rion.io/2013/09/10/validating-social-security-numbers-through-regular-expressions-2/
     """
-    ssn_re = re.compile(r'\b(\d{3}-\d{2}-\d{4})\b', flags=re.VERBOSE)
-    ein_re = re.compile(r'\b(\d{2}-\d{7})\b')
-    a_number_re = re.compile(r'\b(A\d{8,9})\b')
+    ssn_re = re.compile(r"\b(\d{3}-\d{2}-\d{4})\b", flags=re.VERBOSE)
+    ein_re = re.compile(r"\b(\d{2}-\d{7})\b")
+    a_number_re = re.compile(r"\b(A\d{8,9})\b")
     s, ssn_count = re.subn(ssn_re, r"XXX-XX-XXXX", s)
     s, ien_count = re.subn(ein_re, r"XX-XXXXXXX", s)
     s, a_number_count = re.subn(a_number_re, r"AXXXXXXXX", s)
@@ -47,13 +47,13 @@ def trunc(s, length, ellipsis=None):
         # find the rightmost space using a zero-indexed (+1) length minus the
         # length of the ellipsis.
         rightmost_space_index = length - ellipsis_length + 1
-        end = s.rfind(' ', 0, rightmost_space_index)
+        end = s.rfind(" ", 0, rightmost_space_index)
         if end == -1:
             # no spaces found, just use max position
             end = length - ellipsis_length
         s = s[0:end]
         if ellipsis:
-            s = '%s%s' % (s, ellipsis)
+            s = "%s%s" % (s, ellipsis)
         return s
 
 
@@ -68,8 +68,12 @@ def filter_invalid_XML_chars(input):
     """
     if isinstance(input, basestring):
         # Only do str, unicode, etc.
-        return re.sub(u'[^\u0020-\uD7FF\u0009\u000A\u000D\uE000-\uFFFD'
-                      u'\U00010000-\U0010FFFF]+', u'', input)
+        return re.sub(
+            u"[^\u0020-\uD7FF\u0009\u000A\u000D\uE000-\uFFFD"
+            u"\U00010000-\U0010FFFF]+",
+            u"",
+            input,
+        )
     else:
         return input
 
@@ -82,11 +86,11 @@ def removeLeftMargin(s):
     should not be used in the general case, but can be used in cases where a
     left-hand margin is known to exist.
     """
-    lines = s.split('\n')
+    lines = s.split("\n")
     marginSizes = []
     for line in lines:
         if len(line) > 0:
-            if line[0] == ' ':
+            if line[0] == " ":
                 # if the line has length and starts with a space
                 newlength = len(line.lstrip())
                 oldlength = len(line)
@@ -107,17 +111,17 @@ def removeLeftMargin(s):
 
         lines_out.append(line_out)
 
-    return '\n'.join(lines_out)
+    return "\n".join(lines_out)
 
 
 def removeDuplicateLines(s):
     """Remove duplicate lines next to each other."""
-    lines = s.split('\n')
+    lines = s.split("\n")
     lines_out = []
-    previous_line = ''
+    previous_line = ""
     for line in lines:
         if line != previous_line:
             lines_out.append(line)
             previous_line = line
 
-    return '\n'.join(lines_out)
+    return "\n".join(lines_out)

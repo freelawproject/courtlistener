@@ -8,22 +8,24 @@ from collections import Counter
 
 def remove_words(phrase):
     # Removes words and punctuation that don't help the diff comparison.
-    stop_words = 'a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via' + \
-        '|vs\.?|united|states?|et|al|appellants?|defendants?|administrator|plaintiffs?|error' + \
-        '|others|against|ex|parte|complainants?|original|claimants?|devisee' + \
-        '|executrix|executor'
-    stop_words_reg = re.compile(r'^(%s)$' % stop_words, re.IGNORECASE)
+    stop_words = (
+        "a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via"
+        + "|vs\.?|united|states?|et|al|appellants?|defendants?|administrator|plaintiffs?|error"
+        + "|others|against|ex|parte|complainants?|original|claimants?|devisee"
+        + "|executrix|executor"
+    )
+    stop_words_reg = re.compile(r"^(%s)$" % stop_words, re.IGNORECASE)
 
     # strips punctuation
     exclude = set(string.punctuation)
-    phrase = ''.join(ch for ch in phrase if ch not in exclude)
+    phrase = "".join(ch for ch in phrase if ch not in exclude)
 
-    words = re.split('[\t ]', phrase)
+    words = re.split("[\t ]", phrase)
     result = []
     for word in words:
-        word = stop_words_reg.sub('', word)
+        word = stop_words_reg.sub("", word)
         result.append(word)
-    return ''.join(result)
+    return "".join(result)
 
 
 def gen_diff_ratio(left, right):
@@ -70,9 +72,9 @@ def find_best_match(items, s, case_sensitive=True):
     max_ratio = max(diff_ratios)
     i = diff_ratios.index(max_ratio)
     return {
-        'match_index': i,
-        'match_str': items[i],
-        'ratio': max_ratio,
+        "match_index": i,
+        "match_str": items[i],
+        "ratio": max_ratio,
     }
 
 
@@ -85,7 +87,7 @@ def find_confidences(results, case_name):
     diff_ratios = []
     for result in results:
         # Calculate its diff_ratio, and add it to an array
-        candidate_case_name = result['caseName']
+        candidate_case_name = result["caseName"]
         diff = gen_diff_ratio(candidate_case_name, case_name)
         diff_ratios.append(diff)
 
@@ -93,7 +95,7 @@ def find_confidences(results, case_name):
 
 
 def string_to_vector(text):
-    WORD = re.compile(r'\w+')
+    WORD = re.compile(r"\w+")
     words = WORD.findall(text)
     return Counter(words)
 

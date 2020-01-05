@@ -29,13 +29,13 @@ def make_docket_number_core(docket_number):
     because that'd strip leading zeroes, which we need.
     """
     if docket_number is None:
-        return ''
+        return ""
 
-    m = re.search(r'(?:\d:)?(\d\d)-..-(\d+)', docket_number)
+    m = re.search(r"(?:\d:)?(\d\d)-..-(\d+)", docket_number)
     if m:
         return m.group(1) + "{:05d}".format(int(m.group(2)))
     else:
-        return ''
+        return ""
 
 
 def make_path(root, filename):
@@ -45,12 +45,9 @@ def make_path(root, filename):
     """
     d = now()
     return os.path.join(
-        root,
-        '%s' % d.year,
-        '%02d' % d.month,
-        '%02d' % d.day,
-        filename,
+        root, "%s" % d.year, "%02d" % d.month, "%02d" % d.day, filename,
     )
+
 
 def make_lasc_path(instance, filename):
     """Make a simple path for uploaded files.
@@ -58,9 +55,7 @@ def make_lasc_path(instance, filename):
     Start with the `root` node, and use the current date as the subdirectories.
     """
     return os.path.join(
-        "lasc-data",
-        '%s' % instance.sha1[0:2],
-        '%s.json' % instance.sha1[2:],
+        "lasc-data", "%s" % instance.sha1[0:2], "%s.json" % instance.sha1[2:],
     )
 
 
@@ -91,42 +86,48 @@ def base_recap_path(instance, filename, base_dir):
 def make_pdf_path(instance, filename, thumbs=False):
     from cl.search.models import ClaimHistory, RECAPDocument
     from cl.lasc.models import LASCPDF
+
     if type(instance) == RECAPDocument:
-        root = 'recap'
+        root = "recap"
         court_id = instance.docket_entry.docket.court_id
         pacer_case_id = instance.docket_entry.docket.pacer_case_id
     elif type(instance) == ClaimHistory:
-        root = 'claim'
+        root = "claim"
         court_id = instance.claim.docket.court_id
         pacer_case_id = instance.pacer_case_id
     elif type(instance) == LASCPDF:
         slug = slugify(trunc(filename, 40))
         root = "/us/state/ca/lasc/%s/" % instance.docket_number
-        file_name = "gov.ca.lasc.%s.%s.%s.pdf" \
-                    % (instance.docket_number,
-                       instance.document_id,
-                       slug)
+        file_name = "gov.ca.lasc.%s.%s.%s.pdf" % (
+            instance.docket_number,
+            instance.document_id,
+            slug,
+        )
 
         return os.path.join(root, file_name)
     else:
-        raise ValueError("Unknown model type in make_pdf_path "
-                         "function: %s" % type(instance))
+        raise ValueError(
+            "Unknown model type in make_pdf_path "
+            "function: %s" % type(instance)
+        )
 
     if thumbs:
-        root = root + '-thumbnails'
-    return os.path.join(root, get_bucket_name(court_id, pacer_case_id),
-                        filename)
+        root = root + "-thumbnails"
+    return os.path.join(
+        root, get_bucket_name(court_id, pacer_case_id), filename
+    )
+
 
 def make_json_path(instance, filename):
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
-    return make_path('json-data', filename)
+    return make_path("json-data", filename)
+
 
 def make_lasc_json_path(instance, filename):
     # As additional types are needed, this will need to mirror the format of
     # make_pdf_path, by doing type checking.
     return make_lasc_path(instance, filename)
-
 
 
 def make_pdf_thumb_path(instance, filename):
@@ -145,15 +146,17 @@ def make_upload_path(instance, filename):
         # problems when importing Audio, Document, etc.
         d = instance.file_with_date
     except AttributeError:
-        raise NotImplementedError("This function cannot be used without a "
-                                  "file_with_date attribute.")
+        raise NotImplementedError(
+            "This function cannot be used without a "
+            "file_with_date attribute."
+        )
 
-    return '%s/%s/%02d/%02d/%s' % (
-        filename.split('.')[-1],
+    return "%s/%s/%02d/%02d/%s" % (
+        filename.split(".")[-1],
         d.year,
         d.month,
         d.day,
-        get_valid_filename(filename)
+        get_valid_filename(filename),
     )
 
 
@@ -166,16 +169,20 @@ def validate_partial_date(instance, fields):
      - If a partial date, the day/month is/are set to 01.
     """
     from cl.people_db.models import GRANULARITY_MONTH, GRANULARITY_YEAR
+
     for field in fields:
-        d = getattr(instance, 'date_%s' % field)
-        granularity = getattr(instance, 'date_granularity_%s' % field)
+        d = getattr(instance, "date_%s" % field)
+        granularity = getattr(instance, "date_granularity_%s" % field)
 
         if any([d, granularity]) and not all([d, granularity]):
-            raise ValidationError({
-                'date_%s' % field: 'Date and granularity must both be complete '
-                                   'or blank. Hint: The values are: date: %s, '
-                                   'granularity: %s' % (d, granularity)
-            })
+            raise ValidationError(
+                {
+                    "date_%s"
+                    % field: "Date and granularity must both be complete "
+                    "or blank. Hint: The values are: date: %s, "
+                    "granularity: %s" % (d, granularity)
+                }
+            )
 
         # If a partial date, are days/month set to 1?
         bad_date = False
@@ -186,10 +193,13 @@ def validate_partial_date(instance, fields):
             if d.day != 1:
                 bad_date = True
         if bad_date:
-            raise ValidationError({
-                'date_%s' % field: 'Granularity was set as partial, but date '
-                                   'appears to include month/day other than 1.'
-            })
+            raise ValidationError(
+                {
+                    "date_%s"
+                    % field: "Granularity was set as partial, but date "
+                    "appears to include month/day other than 1."
+                }
+            )
 
 
 def validate_is_not_alias(instance, fields):
@@ -201,15 +211,18 @@ def validate_is_not_alias(instance, fields):
     for field in fields:
         referenced_object = getattr(instance, field)
         if referenced_object is not None and referenced_object.is_alias:
-            raise ValidationError({
-                field: 'Cannot set "%s" field to an alias of a "%s". Hint: '
-                       '"%s" is an alias of "%s"' % (
-                    field,
-                    type(referenced_object).__name__,
-                    referenced_object,
-                    referenced_object.is_alias_of
-                )
-            })
+            raise ValidationError(
+                {
+                    field: 'Cannot set "%s" field to an alias of a "%s". Hint: '
+                    '"%s" is an alias of "%s"'
+                    % (
+                        field,
+                        type(referenced_object).__name__,
+                        referenced_object,
+                        referenced_object.is_alias_of,
+                    )
+                }
+            )
 
 
 def validate_has_full_name(instance):
@@ -218,9 +231,7 @@ def validate_has_full_name(instance):
     pass blank strings through, and this blocks even that.
     """
     if not all([instance.name_first, instance.name_last]):
-        raise ValidationError(
-            "Both first and last names are required."
-        )
+        raise ValidationError("Both first and last names are required.")
 
 
 def validate_nomination_fields_ok(instance):
@@ -234,13 +245,15 @@ def validate_nomination_fields_ok(instance):
         )
 
     if instance.how_selected:
-        selection_type_group = instance.SELECTION_METHOD_GROUPS[instance.how_selected]
-        if selection_type_group == 'Election' and instance.date_nominated:
+        selection_type_group = instance.SELECTION_METHOD_GROUPS[
+            instance.how_selected
+        ]
+        if selection_type_group == "Election" and instance.date_nominated:
             raise ValidationError(
                 "Cannot have a nomination date for a position with how_selected of "
                 "%s" % instance.get_how_selected_display()
             )
-        if selection_type_group == 'Appointment' and instance.date_elected:
+        if selection_type_group == "Appointment" and instance.date_elected:
             raise ValidationError(
                 "Cannot have an election date for a position with how_selected of "
                 "%s" % instance.get_how_selected_display()
@@ -258,36 +271,33 @@ def validate_supervisor(instance):
     if sup:
         if not sup.is_judge:
             raise ValidationError(
-                {'supervisor': "The supervisor field can only be set to a "
-                               "judge, but '%s' does not appear to have ever "
-                               "been a judge." % sup.name_full
-                 }
+                {
+                    "supervisor": "The supervisor field can only be set to a "
+                    "judge, but '%s' does not appear to have ever "
+                    "been a judge." % sup.name_full
+                }
             )
 
     if sup and not instance.is_clerkship:
         raise ValidationError(
             "You have configured a supervisor for this field ('%s'), but it "
-            "the position_type is not a clerkship. Instead it's: '%s'" % (
-                sup.name_full,
-                instance.position_type,
-            )
+            "the position_type is not a clerkship. Instead it's: '%s'"
+            % (sup.name_full, instance.position_type,)
         )
 
 
 def validate_all_or_none(instance, fields):
     """Ensure that all fields are complete or that none are complete"""
     num_fields = len(fields)
-    completed_fields = sum(1 for f in fields if
-                           getattr(instance, f) or
-                           getattr(instance, f) == 0)
+    completed_fields = sum(
+        1 for f in fields if getattr(instance, f) or getattr(instance, f) == 0
+    )
     all_complete = completed_fields == num_fields
     none_complete = completed_fields == 0
     if not any([all_complete, none_complete]):
         raise ValidationError(
-            "%s of the following fields are complete, but either all of them need to be, or none of them need to be: %s" % (
-                completed_fields,
-                ", ".join(fields),
-            )
+            "%s of the following fields are complete, but either all of them need to be, or none of them need to be: %s"
+            % (completed_fields, ", ".join(fields),)
         )
 
 
@@ -306,8 +316,8 @@ def validate_at_most_n(instance, n, fields):
     completed_fields = sum(1 for f in fields if getattr(instance, f))
     if completed_fields > n:
         raise ValidationError(
-                "Exactly %s of the following fields can be completed (currently "
-                "%s are): %s" % (n, completed_fields, ", ".join(fields))
+            "Exactly %s of the following fields can be completed (currently "
+            "%s are): %s" % (n, completed_fields, ", ".join(fields))
         )
 
 
@@ -318,8 +328,8 @@ def validate_not_all(instance, fields):
     if num_completed_fields == num_fields:
         # They're all completed. Boo!
         raise ValidationError(
-            "All of the following fields cannot be completed: %s" %
-            ', '.join(fields)
+            "All of the following fields cannot be completed: %s"
+            % ", ".join(fields)
         )
 
 
@@ -363,7 +373,7 @@ def choices_to_csv(obj, field_name):
     flat_choices = flatten_choices(field)
     # Get the second value in the choices tuple
     choice_values = [t for s, t in flat_choices]
-    return oxford_join(choice_values, conjunction='or', separator=";")
+    return oxford_join(choice_values, conjunction="or", separator=";")
 
 
 def disable_auto_now_fields(*models):
@@ -375,9 +385,9 @@ def disable_auto_now_fields(*models):
     for model in models:
         # noinspection PyProtectedMember
         for field in model._meta.local_fields:
-            if hasattr(field, 'auto_now'):
+            if hasattr(field, "auto_now"):
                 field.auto_now = False
-            if hasattr(field, 'auto_now_add'):
+            if hasattr(field, "auto_now_add"):
                 field.auto_now_add = False
 
 
@@ -393,8 +403,8 @@ def suppress_autotime(model, fields):
     for field in model._meta.local_fields:
         if field.name in fields:
             _original_values[field.name] = {
-                'auto_now': field.auto_now,
-                'auto_now_add': field.auto_now_add,
+                "auto_now": field.auto_now,
+                "auto_now_add": field.auto_now_add,
             }
             field.auto_now = False
             field.auto_now_add = False
@@ -403,6 +413,7 @@ def suppress_autotime(model, fields):
     finally:
         for field in model._meta.local_fields:
             if field.name in fields:
-                field.auto_now = _original_values[field.name]['auto_now']
+                field.auto_now = _original_values[field.name]["auto_now"]
                 field.auto_now_add = _original_values[field.name][
-                    'auto_now_add']
+                    "auto_now_add"
+                ]

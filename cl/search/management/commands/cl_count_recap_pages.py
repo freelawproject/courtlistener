@@ -7,7 +7,7 @@ from cl.search.models import RECAPDocument
 
 
 class Command(VerboseCommand):
-    help = 'Calculate page counts for items in RECAP'
+    help = "Calculate page counts for items in RECAP"
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
@@ -21,14 +21,14 @@ class Command(VerboseCommand):
             try:
                 path = rd.filepath_local.path
             except ValueError:
-                cnt['no_file'] += 1
+                cnt["no_file"] += 1
             else:
-                extension = path.split('.')[-1]
+                extension = path.split(".")[-1]
                 count = get_page_count(path, extension)
                 rd.page_count = count
                 rd.save(do_extraction=False, index=False)
-                cnt['successes'] += 1
+                cnt["successes"] += 1
                 if count is not None:
-                    cnt['total_pages'] += count
+                    cnt["total_pages"] += count
 
         logger.info(cnt)

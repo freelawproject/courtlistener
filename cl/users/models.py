@@ -17,106 +17,76 @@ donation_exclusion_codes = [
 
 class BarMembership(models.Model):
     barMembership = local_models.USStateField(
-        'the two letter state abbreviation of a bar membership'
+        "the two letter state abbreviation of a bar membership"
     )
 
     def __unicode__(self):
         return self.get_barMembership_display()
 
     class Meta:
-        verbose_name = 'bar membership'
-        ordering = ['barMembership']
+        verbose_name = "bar membership"
+        ordering = ["barMembership"]
 
 
 class UserProfile(models.Model):
     user = models.OneToOneField(
         User,
-        related_name='profile',
-        verbose_name='the user this model extends',
+        related_name="profile",
+        verbose_name="the user this model extends",
         on_delete=models.CASCADE,
         unique=True,
     )
     barmembership = models.ManyToManyField(
         BarMembership,
-        verbose_name='the bar memberships held by the user',
+        verbose_name="the bar memberships held by the user",
         blank=True,
     )
-    stub_account = models.BooleanField(
-        default=False,
-    )
+    stub_account = models.BooleanField(default=False,)
     employer = models.CharField(
-        help_text="the user's employer",
-        max_length=100,
-        blank=True,
-        null=True,
+        help_text="the user's employer", max_length=100, blank=True, null=True,
     )
-    address1 = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-    )
-    address2 = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-    )
-    city = models.CharField(
-        max_length=50,
-        blank=True,
-        null=True,
-    )
-    state = models.CharField(
-        max_length=2,
-        blank=True,
-        null=True,
-    )
-    zip_code = models.CharField(
-        max_length=10,
-        blank=True,
-        null=True,
-    )
+    address1 = models.CharField(max_length=100, blank=True, null=True,)
+    address2 = models.CharField(max_length=100, blank=True, null=True,)
+    city = models.CharField(max_length=50, blank=True, null=True,)
+    state = models.CharField(max_length=2, blank=True, null=True,)
+    zip_code = models.CharField(max_length=10, blank=True, null=True,)
     avatar = models.ImageField(
         help_text="the user's avatar",
-        upload_to='avatars/%Y/%m/%d',
+        upload_to="avatars/%Y/%m/%d",
         blank=True,
     )
     wants_newsletter = models.BooleanField(
-        help_text='This user wants newsletters',
-        default=False,
+        help_text="This user wants newsletters", default=False,
     )
     unlimited_docket_alerts = models.BooleanField(
-        help_text='Should the user get unlimited docket alerts?',
+        help_text="Should the user get unlimited docket alerts?",
         default=False,
     )
     plaintext_preferred = models.BooleanField(
-        help_text='should the alert should be sent in plaintext',
+        help_text="should the alert should be sent in plaintext",
         default=False,
     )
-    activation_key = models.CharField(
-        max_length=40,
-    )
+    activation_key = models.CharField(max_length=40,)
     key_expires = models.DateTimeField(
-        help_text='The time and date when the user\'s activation_key expires',
+        help_text="The time and date when the user's activation_key expires",
         blank=True,
         null=True,
     )
     email_confirmed = models.BooleanField(
-        help_text='The user has confirmed their email address',
-        default=False,
+        help_text="The user has confirmed their email address", default=False,
     )
     notes = models.TextField(
-        help_text="Any notes about the user.",
-        blank=True,
+        help_text="Any notes about the user.", blank=True,
     )
 
     @property
     def total_donated_last_year(self):
         one_year_ago = now() - timedelta(days=365)
-        total = self.user.donations.filter(
-            date_created__gte=one_year_ago,
-        ).exclude(
-            status__in=donation_exclusion_codes,
-        ).aggregate(Sum('amount'))['amount__sum']
+        total = (
+            self.user.donations.filter(date_created__gte=one_year_ago,)
+            .exclude(status__in=donation_exclusion_codes,)
+            .aggregate(Sum("amount"))["amount__sum"]
+        )
         if total is None:
             total = Decimal(0.0)
         return total
@@ -125,7 +95,7 @@ class UserProfile(models.Model):
     def total_donated(self):
         total = self.user.donations.exclude(
             status__in=donation_exclusion_codes
-        ).aggregate(Sum('amount'))['amount__sum']
+        ).aggregate(Sum("amount"))["amount__sum"]
         if total is None:
             total = Decimal(0.0)
         return total
@@ -142,5 +112,5 @@ class UserProfile(models.Model):
         return u"{name}".format(name=self.user.username)
 
     class Meta:
-        verbose_name = 'user profile'
-        verbose_name_plural = 'user profiles'
+        verbose_name = "user profile"
+        verbose_name_plural = "user profiles"

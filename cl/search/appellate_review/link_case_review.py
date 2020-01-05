@@ -11,20 +11,18 @@ opinion_list = []
 
 
 for opinion in opinion_list:
-    
-    # get list of cited opinions from reviewed courts
-    cited = OpinionsCited.objects.filter(citing_opinion=opinion,
-                                         cited_opinion__court__in = citing_opinion__court__lower_courts_reviewed
-                                         )
-    # if any of them have the same party names, set link.
-    
-    # if no matches, run search of lower courts in last 4 years
-    
-    # check party names
-    
-    # if unique match, set link
-    
-    # otherwise, skip
-    
 
-    
+    # get list of cited opinions from reviewed courts
+    cited = OpinionsCited.objects.filter(
+        citing_opinion=opinion,
+        cited_opinion__court__in=citing_opinion__court__lower_courts_reviewed,
+    )
+    # if any of them have the same party names, set link.
+
+    # if no matches, run search of lower courts in last 4 years
+
+    # check party names
+
+    # if unique match, set link
+
+    # otherwise, skip

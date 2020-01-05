@@ -1,6 +1,6 @@
-'''
+"""
     Hopefully this makes slicing out production data simpler.
-'''
+"""
 import calendar
 import random
 import time
@@ -11,47 +11,39 @@ from django.db.models.query_utils import Q
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Docket, OpinionCluster, Opinion, OpinionsCited
 
-SUPPORTED_MODELS = (
-    Docket,
-    OpinionCluster,
-    Opinion,
-    OpinionsCited
-)
+SUPPORTED_MODELS = (Docket, OpinionCluster, Opinion, OpinionsCited)
 
 
 class Command(VerboseCommand):
-    help = ('CL-specific data dumper for making fixtures from production')
+    help = "CL-specific data dumper for making fixtures from production"
 
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '-n',
-            type=int,
-            default=10,
-            help='Number of items in the export'
+            "-n", type=int, default=10, help="Number of items in the export"
         )
         parser.add_argument(
-            '--format',
+            "--format",
             type=str,
-            default='json',
-            help='Serialization format [json, xml, yaml]'
+            default="json",
+            help="Serialization format [json, xml, yaml]",
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        n = options['n']
-        fmt = options['format']
+        n = options["n"]
+        fmt = options["format"]
 
         self.stdout.write(
-            'Generating dump of up to %s randomly selected Opinions...' % n
+            "Generating dump of up to %s randomly selected Opinions..." % n
         )
 
         pks, cluster_pks = self._select_pks(n)
         if n > len(pks):
             self.stdout.write(
-                ' n > number of Opinions, serializing all (n=%s)' % len(pks)
+                " n > number of Opinions, serializing all (n=%s)" % len(pks)
             )
 
         try:
@@ -60,17 +52,17 @@ class Command(VerboseCommand):
             self._serialize(
                 OpinionsCited,
                 fmt,
-                Q(citing_opinion__in=pks) | Q(cited_opinion__in=pks)
+                Q(citing_opinion__in=pks) | Q(cited_opinion__in=pks),
             )
 
             self._serialize(OpinionCluster, fmt, Q(id__in=cluster_pks))
             self._serialize(Docket, fmt, Q(clusters__in=cluster_pks))
 
-            self.stdout.write('Done!')
+            self.stdout.write("Done!")
 
         except Exception as e:
-            self.stderr.write('Failed to serialize: %s' % (e,))
-            if options['traceback']:
+            self.stderr.write("Failed to serialize: %s" % (e,))
+            if options["traceback"]:
                 traceback.print_exc()
 
     @staticmethod
@@ -82,14 +74,15 @@ class Command(VerboseCommand):
             sample_size -- number of Opinions to sample
         """
         n = sample_size
-        pk_qs = Opinion.objects.values_list('id', flat=True)
+        pk_qs = Opinion.objects.values_list("id", flat=True)
         if pk_qs.count() < sample_size:
             n = pk_qs.count()
 
         random.seed(calendar.timegm(time.gmtime()))
         pks = random.sample(pk_qs, n)
-        cluster_pks = OpinionCluster.objects.filter(sub_opinions__in=pks) \
-                                    .values_list('id', flat=True)
+        cluster_pks = OpinionCluster.objects.filter(
+            sub_opinions__in=pks
+        ).values_list("id", flat=True)
 
         return pks, cluster_pks
 
@@ -106,14 +99,12 @@ class Command(VerboseCommand):
             raise ModelTypeError(model)
 
         modelname = model.__name__
-        filename = '%s.%s' % (modelname, format)
-        self.stdout.write(' writing %ss to %s...' % (modelname, filename))
+        filename = "%s.%s" % (modelname, format)
+        self.stdout.write(" writing %ss to %s..." % (modelname, filename))
 
-        with open(filename, 'w') as stream:
+        with open(filename, "w") as stream:
             serializers.serialize(
-                format,
-                model.objects.filter(filter),
-                stream=stream
+                format, model.objects.filter(filter), stream=stream
             )
 
 
@@ -126,4 +117,4 @@ class ModelTypeError(TypeError):
         self.model = model
 
     def __str__(self):
-        return '%s is not a valid CourtListnener model' % (self.model,)
+        return "%s is not a valid CourtListnener model" % (self.model,)
