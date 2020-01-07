@@ -1,0 +1,46 @@
+[
+  {
+    "model": "search.court",
+    "pk": "tennworkcompapp",
+    "fields": {
+      "pacer_court_id": null,
+      "pacer_has_rss_feed": null,
+      "fjc_court_id": "",
+      "date_modified": "2020-01-07T00:22:05.671Z",
+      "in_use": true,
+      "has_opinion_scraper": false,
+      "has_oral_argument_scraper": false,
+      "position": 367.851,
+      "citation_string": "",
+      "short_name": "Tennessee Workers' Comp. Appeals Board",
+      "full_name": "Tennessee Workers' Compensation Appeals Board",
+      "url": "https://www.tn.gov/workforce/injuries-at-work/bureau-services/bureau-services/appeals-board.html",
+      "start_date": "2013-01-01",
+      "end_date": null,
+      "jurisdiction": "SS",
+      "notes": ""
+    }
+  },
+  {
+    "model": "search.court",
+    "pk": "tennworkcompcl",
+    "fields": {
+      "pacer_court_id": null,
+      "pacer_has_rss_feed": null,
+      "fjc_court_id": "",
+      "date_modified": "2020-01-07T00:22:01.984Z",
+      "in_use": true,
+      "has_opinion_scraper": false,
+      "has_oral_argument_scraper": false,
+      "position": 367.85,
+      "citation_string": "",
+      "short_name": "Tennessee Court of Workers' Comp. Claims",
+      "full_name": "Tennessee Court of Workers' Compensation Claims",
+      "url": "https://www.tn.gov/workforce/injuries-at-work/bureau-services/bureau-services/court-of-wc-claims.html",
+      "start_date": "2013-01-01",
+      "end_date": null,
+      "jurisdiction": "SS",
+      "notes": ""
+    }
+  }
+]
