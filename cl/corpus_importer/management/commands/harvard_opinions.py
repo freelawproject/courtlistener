@@ -311,7 +311,7 @@ def parse_harvard_opinions(reporter, volume):
                 reporter=citation.reporter,
                 page=citation.page,
                 type=map_reporter_db_cite_type(
-                    REPORTERS[citation.reporter][0]["cite_type"]
+                    REPORTERS[citation.canonical_reporter][0]["cite_type"]
                 ),
                 cluster_id=cluster.id,
             )
