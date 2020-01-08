@@ -1,0 +1,45 @@
+{
+  "id": 7974769,
+  "url": "https://api.case.law/v1/cases/7974769/",
+  "frontend_url": "https://cite.case.law/a2d/381/3/",
+  "name": "Willard W. GRIER, Appellant, v. UNITED STATES, Appellee",
+  "name_abbreviation": "Grier v. United States",
+  "decision_date": "1977-12-15",
+  "docket_number": "No. 11629",
+  "first_page": "3",
+  "last_page": "5",
+  "citations": [
+    {
+      "type": "official",
+      "cite": "381 A.2d 3"
+    }
+  ],
+  "volume": {
+    "url": "https://api.case.law/v1/volumes/32044109581876/",
+    "volume_number": "381"
+  },
+  "reporter": {
+    "url": "https://api.case.law/v1/reporters/210/",
+    "full_name": "West's Atlantic Reporter, Second Series"
+  },
+  "court": {
+    "url": "https://api.case.law/v1/courts/dc/",
+    "id": 11933,
+    "slug": "dc",
+    "name": "District of Columbia Court of Appeals",
+    "name_abbreviation": "D.C."
+  },
+  "jurisdiction": {
+    "url": "https://api.case.law/v1/jurisdictions/dc/",
+    "id": 56,
+    "slug": "dc",
+    "name": "D.C.",
+    "name_long": "District of Columbia",
+    "whitelisted": false
+  },
+  "updated_ts": "2019-11-29T16:30:01.301000",
+  "casebody": {
+    "data": "<casebody firstpage=\"3\" lastpage=\"5\" xmlns=\"http://nrs.harvard.edu/urn-3:HLS.Libr.US_Case_Law.Schema.Case_Body:v1\">\n  <parties id=\"b55-5\">Willard W. GRIER, Appellant, v. UNITED STATES, Appellee.</parties>\n  <docketnumber id=\"b55-8\">No. 11629.</docketnumber>\n  <court id=\"b55-9\">District of Columbia Court of Appeals.</court>\n  <otherdate id=\"b55-10\">Submitted Oct. 19, 1977.</otherdate>\n  <decisiondate id=\"b55-11\">Decided Dec. 15, 1977.</decisiondate>\n  <attorneys id=\"b55-25\">Bernard W. Kemp, Washington, D. C., appointed by this court, was on the brief for appellant.</attorneys>\n  <attorneys id=\"b55-26\">Earl J. Silbert, U. S. Atty., and John A. Terry, William D. Pease, Stephen R. Spi-vack and' Iraline G. Barnes, Asst. U. S. Attys., Washington, D. C., were on the brief, for appellee.</attorneys>\n  <judges id=\"b55-27\">Before NEBEKER, YEAGLEY and MACK, Associate Judges.</judges>\n  <opinion type=\"majority\">\n    <author id=\"b56-3\"><page-number citation-index=\"1\" label=\"4\">*4</page-number>PER CURIAM:</author>\n    <p id=\"b56-4\">In this case, appellant Grier asks us to reverse his conviction for robbery. Appellant contends first that the government’s identification evidence was insufficient as a matter of law, and second that the trial court erred in excluding certain defense exhibits as evidence. We affirm.</p>\n    <p id=\"b56-5\">As to identification, although one of the witnesses to the robbery was unable to identify defendant as the perpetrator, two other witnesses made positive identifications. Giving full play to the right of the jury to determine credibility, we think that the two positive identifications constituted sufficient evidence to support a finding of guilty beyond a reasonable doubt. <em>Crawford v. United States, </em>126 U.S.App.D.C. 156, 375 F.2d 332 (1967); <em>Curley v. United States, </em>81 U.S.App.D.C. 389, 160 F.2d 229, <em>cert. denied, </em>331 U.S. 837, 67 S.Ct. 1511, 91 L.Ed. 1850 (1947).</p>\n    <p id=\"b56-6\">Appellant’s contention that two of his exhibits were erroneously excluded as evidence is also without merit. The first exhibit consisted of a written statement by witness Gooding concerning a pretrial confrontation with appellant. At trial, Good-ing described the confrontation, and indicated that he had given a statement about it to Detective Good of the Robbery Squad. Gooding also mentioned that the statement had been witnessed out of his presence by Officer Johnson. Officer Johnson, in contrast, claimed that the statement had been witnessed in Gooding’s presence. Appellant argues that the written statement was admissible to impeach Gooding’s testimony that he was absent when the statement was witnessed. Since the document itself would have thrown no light on absence or presence, the trial court was entitled to exclude it as irrelevant. <em>Cf. Hardy v. United States, </em>118 U.S.App.D.C. 253, 254, 335 F.2d 288, 289 (1964).</p>\n    <p id=\"b56-7\">The other exhibit which appellant sought to introduce into evidence consisted of the transcripts of certain police tapes. These tapes contained communications between Officer Hussey and other police cruisers shortly after the robbery. We think that in the narrow context of this case, the tapes were properly excluded.</p>\n    <p id=\"b56-9\">Officer Hussey was called at trial as a witness for the government. He testified that, on the date of the crime, he received a radio run describing the robber and went to the scene of the robbery to investigate. On cross-examination, Officer Hussey identified the transcripts in question as official police records and read out loud from these transcripts as follows:</p>\n    <blockquote id=\"b56-10\">This is me talking again. “If you have an pictures with you — the description that they’re giving over here, it’s either James Jones or Reese Blakely.”</blockquote>\n    <p id=\"b56-11\">The government argues in its brief that the record of this communication was properly excluded as a prior consistent statement. It is true that prior consistent statements which are not otherwise excludable as hearsay, may yet be excluded as “unnecessary and valueless.” Wigmore on Evidence § 1124 (Chadbourn rev. 1972). However, previously written or recorded evidence is not unnecessary and valueless, though it be entirely consistent with oral testimony offered at trial. Rather, the courts have recognized that such documentary proof is essentially different from oral testimony, as it is both more reliable and more emphatic. <em>Gordon v. United States, </em>344 U.S. 414, 420-21, 73 S.Ct. 369, 97 L.Ed. 447 (1953). <em>See also Jefferson v. United States, </em>D.C.App., 328 A.2d 85 (1974); <em>United States v. Smith, </em>172 U.S.App.D.C. 297, 305, 521 F.2d 957, 965 (1975); <em>Williams v. United States, </em>131 U.S.App.D.C. 153, 155-56, 403 F.2d 175, 178-79 (1968).</p>\n    <p id=\"b56-12\">We nevertheless agree that the transcripts here were not erroneously excluded. The sole purpose for which the transcripts were sought was to corroborate Officer Hussey’s testimony regarding the opinion he had formed as to who committed the robbery. We fail to see what possible probative value Officer Hussey’s opinion had in this case.</p>\n    <p id=\"b56-13\">In upholding the trial court’s exclusion of this exhibit, we emphasize that there was <page-number citation-index=\"1\" label=\"5\">*5</page-number>no suggestion that the description contained in the tapes differed in any respect from the descriptions later given by the government’s eyewitnesses. Had there been any such discrepancy this would be a very different case. <em>See United States v. Smith, supra.</em></p>\n    <p id=\"b57-4\">\n      <em>Affirmed.</em>\n    </p>\n  </opinion>\n</casebody>\n",
+    "status": "ok"
+  }
+}
