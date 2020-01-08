@@ -149,6 +149,40 @@ def map_opinion_type(harvard_opinion_type):
     return type_map.get(harvard_opinion_type, Opinion.COMBINED)
 
 
+def parse_extra_fields(soup):
+    """
+    Parse the remaining extra fields into long or short strings
+
+    Long fields (1) are wrapped in <p> tags.  Short fields (0) are simple
+    commas separated strings
+    :param soup: The bs4 representaion of the case data xml
+    :return: Returns dictionary of data for saving.
+    """
+    extra_fields = {
+        "attorneys": 0,
+        "disposition": 0,
+        "otherdate": 0,
+        "seealso": 0,
+        "syllabus": 1,
+        "summary": 1,
+        "history": 1,
+        "headnotes": 1,
+        "correction": 1,
+    }
+
+    data_set = {}
+    for key, value in extra_fields.items():
+        elements = []
+        for elem in soup.find_all(key):
+            [x.extract() for x in elem.find_all("page-number")]
+            if value == 1:
+                elements.append("<p>%s</p>" % elem.text)
+            else:
+                elements.append(elem.text)
+        data_set[key] = ", ".join(elements)
+    return data_set
+
+
 def parse_harvard_opinions(reporter, volume):
     """
     Parse downloaded CaseLaw Corpus from internet archive and add them to our
@@ -247,37 +281,8 @@ def parse_harvard_opinions(reporter, volume):
                 ia_needs_upload=False,
             )
             # Iterate over other xml fields in Harvard data set
-            # and save as string list   for further processing at a later date.
-            short_fields = [
-                "attorneys",
-                "disposition",
-                "otherdate",
-                "seealso",
-            ]
-            long_fields = [
-                "syllabus",
-                "summary",
-                "history",
-                "headnotes",
-                "correction",
-            ]
-            data_set = {}
-
-            while long_fields:
-                elements = []
-                key = long_fields.pop(0)
-                for elem in soup.find_all(key):
-                    [x.extract() for x in elem.find_all("page-number")]
-                    elements.append("<p>%s</p>" % elem.text)
-                data_set[key] = ", ".join(elements)
-
-            while short_fields:
-                elements = []
-                key = short_fields.pop(0)
-                for elem in soup.find_all(key):
-                    [x.extract() for x in elem.find_all("page-number")]
-                    elements.append(elem.text)
-                data_set[key] = ", ".join(elements)
+            # and save as string list for further processing at a later date.
+            extra_fields = parse_extra_fields(soup)
 
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
@@ -292,15 +297,15 @@ def parse_harvard_opinions(reporter, volume):
                 source="U",
                 date_filed=date_filed,
                 date_filed_is_approximate=is_approximate,
-                attorneys=data_set["attorneys"],
-                disposition=data_set["disposition"],
-                syllabus=data_set["syllabus"],
-                summary=data_set["summary"],
-                history=data_set["history"],
-                other_dates=data_set["otherdate"],
-                cross_reference=data_set["seealso"],
-                headnotes=data_set["headnotes"],
-                correction=data_set["correction"],
+                attorneys=extra_fields["attorneys"],
+                disposition=extra_fields["disposition"],
+                syllabus=extra_fields["syllabus"],
+                summary=extra_fields["summary"],
+                history=extra_fields["history"],
+                other_dates=extra_fields["otherdate"],
+                cross_reference=extra_fields["seealso"],
+                headnotes=extra_fields["headnotes"],
+                correction=extra_fields["correction"],
                 judges=judges,
                 filepath_json_harvard=file_path,
             )
