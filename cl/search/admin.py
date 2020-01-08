@@ -18,25 +18,6 @@ from cl.search.models import (
 
 @admin.register(Opinion)
 class OpinionAdmin(admin.ModelAdmin):
-    fields = (
-        "cluster",
-        "author",
-        "author_str",
-        "per_curiam",
-        "joined_by",
-        "type",
-        "sha1",
-        "download_url",
-        "local_path",
-        "extracted_by_ocr",
-        "plain_text",
-        "html",
-        "html_lawbox",
-        "html_columbia",
-        "html_with_citations",
-        "date_created",
-        "date_modified",
-    )
     raw_id_fields = (
         "cluster",
         "author",
