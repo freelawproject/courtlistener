@@ -316,11 +316,9 @@ def parse_harvard_opinions(reporter, volume):
                 cluster_id=cluster.id,
             )
             for op in soup.find_all("opinion"):
-                joined_by_str = titlecase(
-                    " ".join(
-                        list(set(itertools.chain.from_iterable(judge_list)))
-                    )
-                )
+                for elem in [op.find("author")]:
+                    [x.extract() for x in elem.find_all("page-number")]
+
                 author_str = titlecase(
                     "".join(find_judge_names(op.find("author").text))
                 )
