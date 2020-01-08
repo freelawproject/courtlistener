@@ -248,21 +248,36 @@ def parse_harvard_opinions(reporter, volume):
             )
             # Iterate over other xml fields in Harvard data set
             # and save as string list   for further processing at a later date.
-            json_fields = [
+            short_fields = [
                 "attorneys",
                 "disposition",
+                "otherdate",
+                "seealso",
+            ]
+            long_fields = [
                 "syllabus",
                 "summary",
                 "history",
-                "otherdate",
-                "seealso",
                 "headnotes",
                 "correction",
             ]
             data_set = {}
-            while json_fields:
-                key = json_fields.pop(0)
-                data_set[key] = "|".join([x.text for x in soup.find_all(key)])
+
+            while long_fields:
+                elements = []
+                key = long_fields.pop(0)
+                for elem in soup.find_all(key):
+                    [x.extract() for x in elem.find_all("page-number")]
+                    elements.append("<p>%s</p>" % elem.text)
+                data_set[key] = ", ".join(elements)
+
+            while short_fields:
+                elements = []
+                key = short_fields.pop(0)
+                for elem in soup.find_all(key):
+                    [x.extract() for x in elem.find_all("page-number")]
+                    elements.append(elem.text)
+                data_set[key] = ", ".join(elements)
 
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
