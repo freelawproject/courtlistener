@@ -322,10 +322,13 @@ def parse_harvard_opinions(reporter, volume):
                     )
                 )
                 author_str = titlecase(
-                    " ".join(
-                        list(set(itertools.chain.from_iterable(author_list)))
-                    )
+                    "".join(find_judge_names(op.find("author").text))
                 )
+                per_cur_test = titlecase(op.find("author").text.strip(":"))
+                per_curiam = True if per_cur_test == "Per Curiam" else False
+                if per_curiam:
+                    # If Per Curiam is True set Per Curiam as Author
+                    author_str = per_cur_test
 
                 op_type = map_opinion_type(op.get("type"))
                 opinion_xml = str(op)
@@ -335,7 +338,7 @@ def parse_harvard_opinions(reporter, volume):
                     type=op_type,
                     author_str=author_str,
                     xml_harvard=opinion_xml,
-                    joined_by_str=joined_by_str,
+                    per_curiam=per_curiam,
                     extracted_by_ocr=True,
                 )
 
