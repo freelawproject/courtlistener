@@ -327,7 +327,9 @@ def parse_harvard_opinions(reporter, volume):
                     [x.extract() for x in elem.find_all("page-number")]
 
                 author_tag_str = titlecase(op.find("author").text.strip(":"))
-                author_str = titlecase("".join(find_judge_names(author_tag_str)))
+                author_str = titlecase(
+                    "".join(find_judge_names(author_tag_str))
+                )
                 per_curiam = True if author_tag_str == "Per Curiam" else False
                 # If Per Curiam is True set author string to Per Curiam
                 if per_curiam:
