@@ -321,17 +321,17 @@ def parse_harvard_opinions(reporter, volume):
                 cluster_id=cluster.id,
             )
             for op in soup.find_all("opinion"):
+                # This code cleans author tags for processing.
+                # It is particularly useful for identifiying Per Curiam
                 for elem in [op.find("author")]:
                     [x.extract() for x in elem.find_all("page-number")]
 
-                author_str = titlecase(
-                    "".join(find_judge_names(op.find("author").text))
-                )
-                per_cur_test = titlecase(op.find("author").text.strip(":"))
-                per_curiam = True if per_cur_test == "Per Curiam" else False
+                author_tag_str = op.find("author").text.strip(":")
+                author_str = titlecase("".join(find_judge_names(author_tag_str)))
+                per_curiam = True if author_tag_str == "Per Curiam" else False
+                # If Per Curiam is True set author string to Per Curiam
                 if per_curiam:
-                    # If Per Curiam is True set Per Curiam as Author
-                    author_str = per_cur_test
+                    author_str = "Per Curiam"
 
                 op_type = map_opinion_type(op.get("type"))
                 opinion_xml = str(op)
