@@ -2569,6 +2569,7 @@ class Opinion(models.Model):
         ),
         max_length=40,
         db_index=True,
+        blank=True,
     )
     page_count = models.IntegerField(
         help_text="The number of pages in the document, if known",
