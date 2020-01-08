@@ -576,7 +576,10 @@ class HarvardTests(TestCase):
         self.assertSuccessfulParse(1)
         cite = Citation.objects.get(volume=4, reporter="Kan.", page=283)
         print(cite.cluster.attorneys)
-        self.assertEqual(cite.cluster.attorneys, "M. V. Voss, for plaintiff in error., W. O. Webb, for defendant in error., Voss, for plaintiff in error,, Webb, for defendant in error,")
+        self.assertEqual(
+            cite.cluster.attorneys,
+            "M. V. Voss, for plaintiff in error., W. O. Webb, for defendant in error., Voss, for plaintiff in error,, Webb, for defendant in error,",
+        )
         print("✓")
 
     @mock.patch(
@@ -605,5 +608,8 @@ class HarvardTests(TestCase):
         self.assertEqual(ops[0].author_str, "Stevens")
         self.assertEqual(ops[1].author_str, "Thomas")
 
-        self.assertEqual(cite.cluster.judges, "Thomas, Kennedy, Auto, Stevens, Scaua, Breyer, Roberts, Sotjter, Ginsbtjrg")
+        self.assertEqual(
+            cite.cluster.judges,
+            "Thomas, Kennedy, Auto, Stevens, Scaua, Breyer, Roberts, Sotjter, Ginsbtjrg",
+        )
         print("Success ✓")
