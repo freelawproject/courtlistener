@@ -73,6 +73,10 @@ def faq(request):
     )
 
 
+def help_home(request):
+    return render(request, "help/index.html", {"private": False})
+
+
 def alert_help(request):
     no_feeds = Court.objects.filter(
         jurisdiction__in=[Court.FEDERAL_BANKRUPTCY, Court.FEDERAL_DISTRICT,],
