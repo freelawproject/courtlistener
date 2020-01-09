@@ -149,37 +149,32 @@ def map_opinion_type(harvard_opinion_type):
     return type_map.get(harvard_opinion_type, Opinion.COMBINED)
 
 
-def parse_extra_fields(soup):
+def parse_extra_fields(soup, fields, long_field=False):
     """
     Parse the remaining extra fields into long or short strings
+    returned as dict
 
-    Long fields (1) are wrapped in <p> tags.  Short fields (0) are simple
-    commas separated strings
     :param soup: The bs4 representaion of the case data xml
-    :return: Returns dictionary of data for saving.
+    :param fields: An array of strings names for fields to parse
+    :param long_field: A boolean decides to parse the field into <p> or simple
+    text.
+    :return: Returns dictionary of string values to be stored in opinion
     """
-    extra_fields = {
-        "attorneys": 0,
-        "disposition": 0,
-        "otherdate": 0,
-        "seealso": 0,
-        "syllabus": 1,
-        "summary": 1,
-        "history": 1,
-        "headnotes": 1,
-        "correction": 1,
-    }
 
     data_set = {}
-    for key, value in extra_fields.items():
+    for field in fields:
         elements = []
-        for elem in soup.find_all(key):
+        for elem in soup.find_all(field):
             [x.extract() for x in elem.find_all("page-number")]
-            if value == 1:
+            if long_field:
                 elements.append("<p>%s</p>" % elem.text)
             else:
                 elements.append(elem.text)
-        data_set[key] = ", ".join(elements)
+        if long_field:
+            data_set[field] = " ".join(elements)
+        else:
+            data_set[field] = ", ".join(elements)
+
     return data_set
 
 
@@ -282,7 +277,18 @@ def parse_harvard_opinions(reporter, volume):
             )
             # Iterate over other xml fields in Harvard data set
             # and save as string list for further processing at a later date.
-            extra_fields = parse_extra_fields(soup)
+            short_fields = ["attorneys", "disposition", "otherdate", "seealso"]
+
+            long_fields = [
+                "syllabus",
+                "summary",
+                "history",
+                "headnotes",
+                "correction",
+            ]
+
+            short_data = parse_extra_fields(soup, short_fields, False)
+            long_data = parse_extra_fields(soup, long_fields, True)
 
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
@@ -297,15 +303,15 @@ def parse_harvard_opinions(reporter, volume):
                 source="U",
                 date_filed=date_filed,
                 date_filed_is_approximate=is_approximate,
-                attorneys=extra_fields["attorneys"],
-                disposition=extra_fields["disposition"],
-                syllabus=extra_fields["syllabus"],
-                summary=extra_fields["summary"],
-                history=extra_fields["history"],
-                other_dates=extra_fields["otherdate"],
-                cross_reference=extra_fields["seealso"],
-                headnotes=extra_fields["headnotes"],
-                correction=extra_fields["correction"],
+                attorneys=short_data["attorneys"],
+                disposition=short_data["disposition"],
+                syllabus=long_data["syllabus"],
+                summary=long_data["summary"],
+                history=long_data["history"],
+                other_dates=short_data["otherdate"],
+                cross_reference=short_data["seealso"],
+                headnotes=long_data["headnotes"],
+                correction=long_data["correction"],
                 judges=judges,
                 filepath_json_harvard=file_path,
             )
