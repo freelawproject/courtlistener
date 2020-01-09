@@ -9,19 +9,31 @@ Please, before you do an automated migration, check the SQL that it will run by
 using `sqlmigrate`, and be sure that the SQL doesn't run afoul of the major
 problems listed in those bug report or below.
 
+
 # Known Problems
+
+## Migrations that do literally nothing
+
+This isn't the worst crime, but sometimes Django can be pretty dumb. For 
+example, if you convert a text field to be `blank=True`, that'll create a 
+migration that sets `DEFAULT=''`, followed immediately by `DROP DEFAULT`. That
+doesn't do anything except confuse things, so the first rule of good migrations
+is: "Migrations should do something."
+
 
 ## New columns With DEFAULT values in Postgresql < v11 
 
-The main problem listed there is creating new columns with DEFAULT values, 
-which the standard migrations *do*. Those can be fine in regular environments,
-but in ours, where we have huge tables, it can be a big deal. In Postgresql 11
-this is finally fixed.
+The biggest issue we run into is that creating new columns with DEFAULT values, 
+can be fine in regular environments, but cause a crisis in huge tables like the
+ones we have. Django does this kind of migration by default when you create a 
+new text column with `blank=True`. That's very bad and until we upgrade to 
+Postgresql 11 we will have to contend with this issue.
+
 
 # Making data changes in same transaction as schema changes
 
-The second problem you can run into is that you cannot make data changes in the 
-same transaction as schema changes. Doing so can raise an error like:
+You cannot make data changes in the same transaction as schema changes. Doing 
+so can raise an error like:
 
     ERROR:  cannot ALTER TABLE "search_opinion" because it has pending trigger events
 

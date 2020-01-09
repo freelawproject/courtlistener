@@ -46,17 +46,20 @@ def _clean_form(request, cd, courts):
     # Send the user the cleaned up query
     mutable_GET["q"] = cd["q"]
 
-    # Clean up the date formats
+    # Clean up the date formats. This is probably no longer needed since we do
+    # date cleanup on the client side via our datepickers, but it's probably
+    # fine to leave it here until there's a reason to remove it. It could be
+    # helpful if somebody finds a way not to use the datepickers (js off, say)
     for date_field in SearchForm().get_date_field_names():
         for time in ("before", "after"):
             field = "%s_%s" % (date_field, time)
             if mutable_GET.get(field) and cd.get(field) is not None:
                 # Don't use strftime. It'll fail before 1900
                 before = cd[field]
-                mutable_GET[field] = "%s-%02d-%02d" % (
-                    before.year,
+                mutable_GET[field] = "%02d/%02d/%s" % (
                     before.month,
                     before.day,
+                    before.year,
                 )
 
     mutable_GET["order_by"] = cd["order_by"]
@@ -261,8 +264,8 @@ class SearchForm(forms.Form):
         label="Argued After",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -273,8 +276,8 @@ class SearchForm(forms.Form):
         label="Argued Before",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -289,8 +292,8 @@ class SearchForm(forms.Form):
         label="Filed After",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -301,8 +304,8 @@ class SearchForm(forms.Form):
         label="Filed Before",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -374,8 +377,8 @@ class SearchForm(forms.Form):
         label="Born After",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -386,8 +389,8 @@ class SearchForm(forms.Form):
         label="Born Before",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
-                "class": "external-input form-control",
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
                 "autocomplete": "off",
             }
         ),

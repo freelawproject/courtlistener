@@ -40,7 +40,7 @@ class FloorDateField(DateField):
         Validates that the input can be converted to a date. Returns a Python
         datetime.date object.
         """
-        if value in validators.EMPTY_VALUES or value == "YYYY-MM-DD":
+        if value in validators.EMPTY_VALUES or value == "MM/DD/YYYY":
             return None
         if isinstance(value, datetime.datetime):
             return value.date()
@@ -102,7 +102,7 @@ class CeilingDateField(DateField):
         Validates that the input can be converted to a date. Returns a
         Python datetime.datetime object.
         """
-        if value in validators.EMPTY_VALUES or value == "YYYY-MM-DD":
+        if value in validators.EMPTY_VALUES or value == "MM/DD/YYYY":
             return None
         if isinstance(value, datetime.datetime):
             return value.date()
