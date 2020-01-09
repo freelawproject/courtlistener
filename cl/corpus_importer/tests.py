@@ -592,7 +592,7 @@ class HarvardTests(TestCase):
         cite = Citation.objects.get(volume=381, reporter="A.2d", page=3)
         ops = cite.cluster.sub_opinions.all()
         self.assertEqual(ops[0].author_str, "Per Curiam")
-        self.assertEqual(ops[0].per_curiam, True)
+        self.assertTrue(ops[0].per_curiam)
         print("Success ✓")
 
     @mock.patch(
