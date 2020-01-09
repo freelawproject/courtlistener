@@ -149,6 +149,7 @@ NOT_JUDGE = [
     "participation",
     "petition",
     "per",
+    "post",
     "prepared",
     "preparation",
     "present",

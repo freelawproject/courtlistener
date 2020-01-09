@@ -149,6 +149,35 @@ def map_opinion_type(harvard_opinion_type):
     return type_map.get(harvard_opinion_type, Opinion.COMBINED)
 
 
+def parse_extra_fields(soup, fields, long_field=False):
+    """
+    Parse the remaining extra fields into long or short strings
+    returned as dict
+
+    :param soup: The bs4 representaion of the case data xml
+    :param fields: An array of strings names for fields to parse
+    :param long_field: A boolean decides to parse the field into <p> or simple
+    text.
+    :return: Returns dictionary of string values to be stored in opinion
+    """
+
+    data_set = {}
+    for field in fields:
+        elements = []
+        for elem in soup.find_all(field):
+            [x.extract() for x in elem.find_all("page-number")]
+            if long_field:
+                elements.append("<p>%s</p>" % elem.text)
+            else:
+                elements.append(elem.text)
+        if long_field:
+            data_set[field] = " ".join(elements)
+        else:
+            data_set[field] = ", ".join(elements)
+
+    return data_set
+
+
 def parse_harvard_opinions(reporter, volume):
     """
     Parse downloaded CaseLaw Corpus from internet archive and add them to our
@@ -247,22 +276,19 @@ def parse_harvard_opinions(reporter, volume):
                 ia_needs_upload=False,
             )
             # Iterate over other xml fields in Harvard data set
-            # and save as string list   for further processing at a later date.
-            json_fields = [
-                "attorneys",
-                "disposition",
+            # and save as string list for further processing at a later date.
+            short_fields = ["attorneys", "disposition", "otherdate", "seealso"]
+
+            long_fields = [
                 "syllabus",
                 "summary",
                 "history",
-                "otherdate",
-                "seealso",
                 "headnotes",
                 "correction",
             ]
-            data_set = {}
-            while json_fields:
-                key = json_fields.pop(0)
-                data_set[key] = "|".join([x.text for x in soup.find_all(key)])
+
+            short_data = parse_extra_fields(soup, short_fields, False)
+            long_data = parse_extra_fields(soup, long_fields, True)
 
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
@@ -277,15 +303,15 @@ def parse_harvard_opinions(reporter, volume):
                 source="U",
                 date_filed=date_filed,
                 date_filed_is_approximate=is_approximate,
-                attorneys=data_set["attorneys"],
-                disposition=data_set["disposition"],
-                syllabus=data_set["syllabus"],
-                summary=data_set["summary"],
-                history=data_set["history"],
-                other_dates=data_set["otherdate"],
-                cross_reference=data_set["seealso"],
-                headnotes=data_set["headnotes"],
-                correction=data_set["correction"],
+                attorneys=short_data["attorneys"],
+                disposition=short_data["disposition"],
+                syllabus=long_data["syllabus"],
+                summary=long_data["summary"],
+                history=long_data["history"],
+                other_dates=short_data["otherdate"],
+                cross_reference=short_data["seealso"],
+                headnotes=long_data["headnotes"],
+                correction=long_data["correction"],
                 judges=judges,
                 filepath_json_harvard=file_path,
             )
@@ -296,21 +322,24 @@ def parse_harvard_opinions(reporter, volume):
                 reporter=citation.reporter,
                 page=citation.page,
                 type=map_reporter_db_cite_type(
-                    REPORTERS[citation.reporter][0]["cite_type"]
+                    REPORTERS[citation.canonical_reporter][0]["cite_type"]
                 ),
                 cluster_id=cluster.id,
             )
             for op in soup.find_all("opinion"):
-                joined_by_str = titlecase(
-                    " ".join(
-                        list(set(itertools.chain.from_iterable(judge_list)))
-                    )
-                )
+                # This code cleans author tags for processing.
+                # It is particularly useful for identifiying Per Curiam
+                for elem in [op.find("author")]:
+                    [x.extract() for x in elem.find_all("page-number")]
+
+                author_tag_str = titlecase(op.find("author").text.strip(":"))
                 author_str = titlecase(
-                    " ".join(
-                        list(set(itertools.chain.from_iterable(author_list)))
-                    )
+                    "".join(find_judge_names(author_tag_str))
                 )
+                per_curiam = True if author_tag_str == "Per Curiam" else False
+                # If Per Curiam is True set author string to Per Curiam
+                if per_curiam:
+                    author_str = "Per Curiam"
 
                 op_type = map_opinion_type(op.get("type"))
                 opinion_xml = str(op)
@@ -320,7 +349,7 @@ def parse_harvard_opinions(reporter, volume):
                     type=op_type,
                     author_str=author_str,
                     xml_harvard=opinion_xml,
-                    joined_by_str=joined_by_str,
+                    per_curiam=per_curiam,
                     extracted_by_ocr=True,
                 )
 
