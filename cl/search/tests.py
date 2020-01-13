@@ -1204,7 +1204,6 @@ class CaptionTest(TestCase):
             case_name="foo",
             docket=d,
             date_filed=date(1984, 1, 1),
-            federal_cite_one="22 F.2d 44",
         )
         Citation.objects.create(
             cluster=cluster,
@@ -1226,7 +1225,6 @@ class CaptionTest(TestCase):
             case_name="foo",
             docket=d,
             date_filed=date(1984, 1, 1),
-            federal_cite_one="22 U.S. 44",
         )
         Citation.objects.create(
             cluster=cluster,
@@ -1246,7 +1244,6 @@ class CaptionTest(TestCase):
             case_name="foo",
             docket=d,
             date_filed=date(1984, 1, 1),
-            federal_cite_one="22 U.S. 44",
         )
         Citation.objects.create(
             cluster=cluster,
