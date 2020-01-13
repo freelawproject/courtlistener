@@ -1201,9 +1201,7 @@ class CaptionTest(TestCase):
         c, _ = Court.objects.get_or_create(pk="ca1", defaults={"position": 1})
         d = Docket.objects.create(source=0, court=c)
         cluster = OpinionCluster.objects.create(
-            case_name="foo",
-            docket=d,
-            date_filed=date(1984, 1, 1),
+            case_name="foo", docket=d, date_filed=date(1984, 1, 1),
         )
         Citation.objects.create(
             cluster=cluster,
@@ -1222,9 +1220,7 @@ class CaptionTest(TestCase):
         )
         d = Docket.objects.create(source=0, court=c)
         cluster = OpinionCluster.objects.create(
-            case_name="foo",
-            docket=d,
-            date_filed=date(1984, 1, 1),
+            case_name="foo", docket=d, date_filed=date(1984, 1, 1),
         )
         Citation.objects.create(
             cluster=cluster,
@@ -1241,9 +1237,7 @@ class CaptionTest(TestCase):
         c, _ = Court.objects.get_or_create(pk="ca1", defaults={"position": 1})
         d = Docket.objects.create(source=0, court=c)
         cluster = OpinionCluster.objects.create(
-            case_name="foo",
-            docket=d,
-            date_filed=date(1984, 1, 1),
+            case_name="foo", docket=d, date_filed=date(1984, 1, 1),
         )
         Citation.objects.create(
             cluster=cluster,
