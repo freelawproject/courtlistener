@@ -130,10 +130,6 @@ class Command(VerboseCommand):
             nature_of_suit=item.get("nature_of_suit", ""),
             blocked=blocked,
             date_blocked=date_blocked,
-            # These three fields are replaced below.
-            federal_cite_one=west_cite_str,
-            state_cite_one=state_cite_str,
-            neutral_cite=neutral_cite_str,
             syllabus=item.get("summaries", ""),
         )
         citations = []
