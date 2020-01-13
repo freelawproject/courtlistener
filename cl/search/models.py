@@ -2117,6 +2117,7 @@ class OpinionCluster(models.Model):
         ),
         max_length=1000,
         blank=True,
+        db_index=True,
     )
 
     objects = ClusterCitationQuerySet.as_manager()
