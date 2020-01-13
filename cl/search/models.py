@@ -1886,57 +1886,6 @@ class OpinionCluster(models.Model):
     case_name_full = models.TextField(
         help_text="The full name of the case", blank=True
     )
-    federal_cite_one = models.CharField(
-        help_text="Primary federal citation",
-        db_index=True,
-        max_length=50,
-        blank=True,
-    )
-    federal_cite_two = models.CharField(
-        help_text="Secondary federal citation",
-        db_index=True,
-        max_length=50,
-        blank=True,
-    )
-    federal_cite_three = models.CharField(
-        help_text="Tertiary federal citation",
-        db_index=True,
-        max_length=50,
-        blank=True,
-    )
-    state_cite_one = models.CharField(
-        help_text="Primary state citation", max_length=50, blank=True,
-    )
-    state_cite_two = models.CharField(
-        help_text="Secondary state citation", max_length=50, blank=True,
-    )
-    state_cite_three = models.CharField(
-        help_text="Tertiary state citation", max_length=50, blank=True,
-    )
-    state_cite_regional = models.CharField(
-        help_text="Regional citation", max_length=50, blank=True,
-    )
-    specialty_cite_one = models.CharField(
-        help_text="Specialty citation", max_length=50, blank=True,
-    )
-    scotus_early_cite = models.CharField(
-        help_text="Early SCOTUS citation such as How., Black, Cranch., etc.",
-        max_length=50,
-        blank=True,
-    )
-    lexis_cite = models.CharField(
-        help_text="LexisNexis citation (e.g. 1 LEXIS 38237)",
-        max_length=50,
-        blank=True,
-    )
-    westlaw_cite = models.CharField(
-        help_text="WestLaw citation (e.g. 22 WL 238)",
-        max_length=50,
-        blank=True,
-    )
-    neutral_cite = models.CharField(
-        help_text="Neutral citation", max_length=50, blank=True,
-    )
     scdb_id = models.CharField(
         help_text="The ID of the item in the Supreme Court Database",
         max_length=10,
