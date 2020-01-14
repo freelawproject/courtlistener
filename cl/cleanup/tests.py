@@ -1,9 +1,49 @@
-# coding=utf-8
+# -*- coding: utf-8 -*-
+import os
+import mock
+from glob import iglob
+import json
+
 from django.test import TestCase
+from django.conf import settings
+
 from cl.cleanup.management.commands.fix_tax_court import (
     generate_citation,
     get_tax_docket_numbers,
 )
+
+class CitationTaxCleanup(TestCase):
+    test_dir = os.path.join(
+        settings.INSTALL_ROOT, "cl", "cleanup", "test_assets"
+    )
+
+    @mock.patch(
+        "cl.cleanup.management.commands.fix_tax_court.generate_citation",
+        side_effect=[iglob(os.path.join(test_dir, "working*"))],
+    )
+    def working_examples(self, mock):
+        paths = mock()
+        for path in paths:
+            with open(path) as f:
+                data = json.loads(f.read())
+            cite = generate_citation(data['html'], 111)
+            self.assertEqual(cite.base_citation(), data['cite'])
+            print("Success ✓")
+            print(data['notes'])
+
+
+    @mock.patch(
+        "cl.cleanup.management.commands.fix_tax_court.generate_citation",
+        side_effect=[iglob(os.path.join(test_dir, "failing*"))],
+    )
+    def failing_examples(self, mock):
+        paths = mock()
+        for path in paths:
+            with open(path) as f:
+                data = json.loads(f.read())
+            cite = generate_citation(data['html'], 111)
+            self.assertFalse(cite)
+            print("Success ✓")
 
 
 class CleanupTest(TestCase):
