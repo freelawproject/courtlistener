@@ -52,6 +52,10 @@ def handle_xero_payment(charge):
                 "wants_newsletter": False,
             },
         )
+    if Donation.objects.filter(payment_id=charge["id"]).exists():
+        # Don't create a payment if we already have one.
+        return
+
     Donation.objects.create(
         donor=user,
         amount=float(charge["amount"]) / 100,  # Stripe does pennies.
