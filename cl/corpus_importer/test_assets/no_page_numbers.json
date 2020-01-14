@@ -3,6 +3,8 @@
     "url": "https://api.case.law/v1/cases/6084257/",
     "frontend_url": "https://cite.case.law/tc/105/126/",
     "name": "Clyde L. Fincher and Catherine Fincher, Petitioners v. Commissioner of Internal Revenue, Respondent",
+    "name_abbreviation": "Fincher v. Commissioner",
+    "decision_date": "1995-08-24",
     "docket_number": "Docket No. 25727-92",
     "first_page": "126",
     "last_page": "141",
