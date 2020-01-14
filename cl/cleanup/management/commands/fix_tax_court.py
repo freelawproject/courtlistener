@@ -64,7 +64,19 @@ def generate_citation(opinion_text, cluster_id):
 
         for cite in cites:
             if "T.C." not in cite.reporter and "T. C." not in cite.reporter:
-                continue
+                # If not the first cite - Skip
+                return None
+
+            if cite.reporter_index > 2:
+                # If reporter not in first or second position bail
+                return None
+
+            alt_cite = line_of_text.replace(cite.reporter_found, "").strip()
+            other_words = alt_cite.split(" ")
+
+            if len([x for x in other_words if x != ""]) > 3:
+                # If line has more than three components bail
+                return None
 
             if "T.C." == cite.reporter:
                 cite_type = Citation.SPECIALTY
@@ -83,7 +95,7 @@ def generate_citation(opinion_text, cluster_id):
                 return cite
             else:
                 logger.info("Citation already in the system. Return None.")
-
+                return None
 
 def update_tax_opinions():
     """
