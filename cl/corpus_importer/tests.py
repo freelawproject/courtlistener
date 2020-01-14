@@ -629,7 +629,7 @@ class HarvardTests(TestCase):
 
     @mock.patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "no_page_numbers*"))],
+        side_effect=[iglob(os.path.join(test_dir, "no_author_tag*"))],
     )
     def test_missing_page_numbers(self, mock):
         """Can we parse a case without an author or author tag?"""
