@@ -6,15 +6,36 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    atomic = False
 
     dependencies = [
         ('search', '0090_update_opinion_sha1'),
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name='opinioncluster',
-            name='filepath_json_harvard',
-            field=models.FileField(blank=True, db_index=True, help_text=b'Path to local storage of JSON collected from Harvard Case Law project containing available metadata, opinion and opinion cluster.', max_length=1000, upload_to=b''),
+        migrations.RunSQL(
+            """CREATE INDEX CONCURRENTLY "search_opinioncluster_filepath_json_harvard_4b8057d0"
+               ON "search_opinioncluster" ("filepath_json_harvard");""",
+
+            reverse_sql='DROP INDEX "search_opinioncluster_filepath_json_harvard_4b8057d0";',
+
+        ),
+
+        migrations.RunSQL(
+            """CREATE INDEX CONCURRENTLY "search_opinioncluster_filepath_json_harvard_4b8057d0_like" 
+               ON "search_opinioncluster" ("filepath_json_harvard" varchar_pattern_ops);""",
+
+            reverse_sql='DROP INDEX "search_opinioncluster_filepath_json_harvard_4b8057d0_like";',
+            state_operations=[
+                migrations.AlterField(
+                    model_name='opinioncluster',
+                    name='filepath_json_harvard',
+                    field=models.FileField(blank=True,
+                                           db_index=True,
+                                           help_text=b'Path to local storage of JSON collected from Harvard Case Law project containing available metadata, opinion and opinion cluster.',
+                                           max_length=1000,
+                                           upload_to=b''),
+                ),
+            ]
         ),
     ]
