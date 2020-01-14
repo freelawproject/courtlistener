@@ -3,11 +3,19 @@ how to do migrations without any particular issues, but for the moment it's
 just a pointer to bugs that highlight the most grievous types of problems:
 
 https://github.com/freelawproject/courtlistener/issues/1106
+
 https://github.com/freelawproject/courtlistener/issues/1109
 
 Please, before you do an automated migration, check the SQL that it will run by
 using `sqlmigrate`, and be sure that the SQL doesn't run afoul of the major
 problems listed in those bug report or below.
+
+It's also worth reviewing these references, which point to problems that can 
+occur on high-volume PostgreSQL instances like ours:
+
+https://www.braintreepayments.com/blog/safe-operations-for-high-volume-postgresql/
+
+https://github.com/ankane/strong_migrations
 
 
 # Known Problems
@@ -30,7 +38,7 @@ new text column with `blank=True`. That's very bad and until we upgrade to
 Postgresql 11 we will have to contend with this issue.
 
 
-# Making data changes in same transaction as schema changes
+## Making data changes in same transaction as schema changes
 
 You cannot make data changes in the same transaction as schema changes. Doing 
 so can raise an error like:
