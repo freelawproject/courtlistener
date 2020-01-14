@@ -626,3 +626,12 @@ class HarvardTests(TestCase):
         opinions = cite.cluster.sub_opinions.all()
         self.assertEqual(opinions[0].xml_harvard.count("</page-number>"), 2)
         print("Success ✓")
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "no_page_numbers*"))],
+    )
+    def test_missing_page_numbers(self, mock):
+        """Can we parse a case without an author or author tag?"""
+        self.assertSuccessfulParse(1)
+        print("Success ✓")
