@@ -330,12 +330,19 @@ def parse_harvard_opinions(reporter, volume):
                 # This code cleans author tags for processing.
                 # It is particularly useful for identifiying Per Curiam
                 for elem in [op.find("author")]:
-                    [x.extract() for x in elem.find_all("page-number")]
+                    if elem is not None:
+                        [x.extract() for x in elem.find_all("page-number")]
 
-                author_tag_str = titlecase(op.find("author").text.strip(":"))
-                author_str = titlecase(
-                    "".join(find_judge_names(author_tag_str))
-                )
+                auth = op.find("author")
+                if auth is not None:
+                    author_tag_str = titlecase(auth.text.strip(":"))
+                    author_str = titlecase(
+                        "".join(find_judge_names(author_tag_str))
+                    )
+                else:
+                    author_str = ""
+                    author_tag_str = ""
+
                 per_curiam = True if author_tag_str == "Per Curiam" else False
                 # If Per Curiam is True set author string to Per Curiam
                 if per_curiam:
