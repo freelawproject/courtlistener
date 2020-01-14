@@ -38,6 +38,16 @@ new text column with `blank=True`. That's very bad and until we upgrade to
 Postgresql 11 we will have to contend with this issue.
 
 
+## Adding an index to a column doesn't use CONCURRENTLY
+
+Until [Django issue 21039][concur] is merged, Django creates indexes without using 
+the `CONCURRENTLY` statement. This locks the table for the duration of the index 
+creation. It takes more work, but this can be avoided by tweaking the Python and SQL
+migration files [as described in this excellent blog post][concur-blog].
+
+[concur]: https://code.djangoproject.com/ticket/21039
+[concur-blog]: https://realpython.com/create-django-index-without-downtime/
+
 ## Making data changes in same transaction as schema changes
 
 You cannot make data changes in the same transaction as schema changes. Doing 
