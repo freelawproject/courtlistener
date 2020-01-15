@@ -93,7 +93,7 @@ def find_tax_court_citation(opinion_text):
             return cite
 
 
-def update_tax_opinions():
+def update_tax_opinions(options):
     """
     This code identifies tax opinions without
     docket numbers or citations and attempts to parse them out
@@ -136,6 +136,15 @@ def update_tax_opinions():
                     "No cite to add for opinion %s on cluster %s"
                     % (opinion.id, oc.id)
                 )
+                continue
+
+            if Citation.objects.filter(
+                volume=cite.volume,
+                reporter=cite.reporter,
+                page=cite.page,
+                cluster_id=oc.id,
+            ).exists():
+                logger.info("Citation already in the system. Return None.")
                 continue
 
             logger.info(
