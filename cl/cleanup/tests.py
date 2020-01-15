@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 import mock
 from glob import iglob
 import json
@@ -26,11 +27,10 @@ class CitationTaxCleanup(TestCase):
         for path in paths:
             with open(path) as f:
                 data = json.loads(f.read())
-            cite = generate_citation(data['html'], 111)
-            self.assertEqual(cite.base_citation(), data['cite'])
-            print("Success ✓")
-            print(data['notes'])
-
+            cite = generate_citation(data["html"], 111)
+            self.assertEqual(cite.base_citation(), data["cite"])
+            print ("Success ✓")
+            print (data["notes"])
 
     @mock.patch(
         "cl.cleanup.management.commands.fix_tax_court.generate_citation",
@@ -41,9 +41,30 @@ class CitationTaxCleanup(TestCase):
         for path in paths:
             with open(path) as f:
                 data = json.loads(f.read())
-            cite = generate_citation(data['html'], 111)
+            cite = generate_citation(data["html"], 111)
             self.assertFalse(cite)
-            print("Success ✓")
+            print ("Success ✓")
+
+    @mock.patch(
+        "cl.cleanup.management.commands.fix_tax_court.get_tax_docket_numbers",
+        side_effect=[iglob(os.path.join(test_dir, "docket*"))],
+    )
+    def docket_parsing(self, mock):
+        paths = mock()
+        for path in paths:
+            with open(path) as f:
+                data = json.loads(f.read())
+            for case in data:
+                answer = re.sub(u"–", "-", case["answer"])
+                answer = re.sub(u"—", "-", answer)
+                answer = re.sub(u"–", "-", answer)
+                print (answer)
+                self.assertEqual(get_tax_docket_numbers(case["text"]), answer)
+                print ("Success ✓")
+
+            # cite = generate_citation(data['html'], 111)
+            # self.assertFalse(cite)
+            # print("Success ✓")
 
 
 class CleanupTest(TestCase):
