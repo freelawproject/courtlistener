@@ -22,7 +22,7 @@ class CitationTaxCleanup(TestCase):
         "cl.cleanup.management.commands.fix_tax_court.generate_citation",
         side_effect=[iglob(os.path.join(test_dir, "working*"))],
     )
-    def working_examples(self, mock):
+    def test_working_examples(self, mock):
         paths = mock()
         for path in paths:
             with open(path) as f:
@@ -36,7 +36,7 @@ class CitationTaxCleanup(TestCase):
         "cl.cleanup.management.commands.fix_tax_court.generate_citation",
         side_effect=[iglob(os.path.join(test_dir, "failing*"))],
     )
-    def failing_examples(self, mock):
+    def test_failing_examples(self, mock):
         paths = mock()
         for path in paths:
             with open(path) as f:
@@ -49,7 +49,7 @@ class CitationTaxCleanup(TestCase):
         "cl.cleanup.management.commands.fix_tax_court.get_tax_docket_numbers",
         side_effect=[iglob(os.path.join(test_dir, "docket*"))],
     )
-    def docket_parsing(self, mock):
+    def test_docket_parsing(self, mock):
         paths = mock()
         for path in paths:
             with open(path) as f:
