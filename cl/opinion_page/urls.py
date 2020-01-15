@@ -25,8 +25,16 @@ urlpatterns = [
         cluster_visualizations,
         name="cluster_visualizations",
     ),
-    url(r"^opinion/(\d*)/([^/]*)/?(?P<slug>[^/]*)$", view_opinion, name="view_case"),
-    url(r"^docket/(\d*)/([^/]*)/?$", view_docket, name="view_docket"),
+    url(
+        r"^opinion/(\d*)/([^/]*)/?(?P<slug>[^/]*)$",
+        view_opinion,
+        name="view_case",
+    ),
+    url(
+        r"^docket/(\d*)/([^/]*)/?(?P<slug>[^/]*)$",
+        view_docket,
+        name="view_docket",
+    ),
     url(
         r"^recap/gov.uscourts"
         r"\.(?P<court>[^\./]+)"

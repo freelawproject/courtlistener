@@ -137,6 +137,9 @@ def view_docket(request, pk, slug):
             "get_string": search_utils.make_get_string(request),
         }
     )
+    if slug != docket.slug:
+        return HttpResponseRedirect(docket.get_absolute_url())
+
     return render(request, "view_docket.html", context)
 
 
