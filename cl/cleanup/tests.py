@@ -13,6 +13,7 @@ from cl.cleanup.management.commands.fix_tax_court import (
     get_tax_docket_numbers,
 )
 
+
 class CitationTaxCleanup(TestCase):
     test_dir = os.path.join(
         settings.INSTALL_ROOT, "cl", "cleanup", "test_assets"
@@ -41,7 +42,7 @@ class CitationTaxCleanup(TestCase):
         for path in paths:
             with open(path) as f:
                 data = json.loads(f.read())
-            cite = generate_citation(data["html"], 111)
+            cite = find_tax_court_citation(data["html"])
             self.assertFalse(cite)
             print ("Success ✓")
 
@@ -61,10 +62,6 @@ class CitationTaxCleanup(TestCase):
                 print (answer)
                 self.assertEqual(get_tax_docket_numbers(case["text"]), answer)
                 print ("Success ✓")
-
-            # cite = generate_citation(data['html'], 111)
-            # self.assertFalse(cite)
-            # print("Success ✓")
 
 
 class CleanupTest(TestCase):
