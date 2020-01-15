@@ -282,7 +282,7 @@ def view_recap_document(
 
 @never_cache
 @ratelimit_if_not_whitelisted
-def view_opinion(request, pk, _):
+def view_opinion(request, pk, slug):
     """Using the cluster ID, return the cluster of opinions.
 
     We also test if the cluster ID is a favorite for the user, and send data
@@ -345,6 +345,9 @@ def view_opinion(request, pk, _):
         citing_clusters = conn.raw_query(**q).execute()
     else:
         citing_clusters = None
+
+    if slug != cluster.slug:
+        return HttpResponseRedirect(cluster.get_absolute_url())
 
     return render(
         request,
