@@ -231,6 +231,60 @@ def find_missing_or_incorrect_citations(options):
         logger.info("https://www.courtlistener.com/opinion/%s/x", c)
 
 
+def find_missing_or_incorrect_docket_numbers(options):
+    """Iterate over tax cases to verify which docket numbers are correct.
+
+    :param options:
+    :return: Nothing
+    """
+    ocs = OpinionCluster.objects.filter(docket__court="tax").exclude(
+        sub_opinions__plain_text=""
+    )
+
+    logger.info("%s clusters found", ocs.count())
+
+    for oc in ocs:
+        logger.info("Analyzing cluster %s", oc.id)
+        ops = oc.sub_opinions.all()
+        assert ops.count() == 1
+        for op in ops:
+            logger.info(
+                "Reference url: https://www.courtlistener.com/opinion/%s/x",
+                oc.id,
+            )
+            # Only loop over the first opinion because these
+            # cases should only one have one
+            # because they were extracted from the tax courts
+            dockets_in_db = oc.docket.docket_number.strip()
+            found_dockets = get_tax_docket_numbers(op.plain_text)
+            if found_dockets == dockets_in_db:
+                if (
+                    oc.docket.docket_number.strip() == ""
+                    and dockets_in_db == ""
+                ):
+                    logger.info("No docket numbers found in db or text")
+                else:
+                    logger.info("Docket numbers appear correct")
+                continue
+            else:
+                if dockets_in_db == "":
+                    logger.info(
+                        "Docket No(s). found for the first time: %s",
+                        found_dockets,
+                    )
+                elif found_dockets == "":
+                    logger.info(
+                        "Dockets not found in text but Docket No(s). %s in db",
+                        dockets_in_db,
+                    )
+                else:
+                    logger.info(
+                        "Dockets in db (%s) != (%s) docket parsed from text",
+                        dockets_in_db,
+                        found_dockets,
+                    )
+
+
 class Command(VerboseCommand):
     help = (
         "Update scraped Tax Court opinions. "
@@ -261,4 +315,5 @@ class Command(VerboseCommand):
     VALID_ACTIONS = {
         "update-tax-opinions": update_tax_opinions,
         "find-failures": find_missing_or_incorrect_citations,
+        "find-docket-numbers": find_missing_or_incorrect_docket_numbers,
     }
