@@ -8,6 +8,13 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Opinion, OpinionCluster, Docket, Citation
 
 
+def remove_en_em_dash(opinion_text):
+    opinion_text = re.sub(u"–", "-", opinion_text)
+    opinion_text = re.sub(u"—", "-", opinion_text)
+    opinion_text = re.sub(u"–", "-", opinion_text)
+    return opinion_text
+
+
 def get_tax_docket_numbers(opinion_text):
     """
     Parse opinon plain text for docket numbers.
@@ -19,8 +26,9 @@ def get_tax_docket_numbers(opinion_text):
     :param opinion_text: is the opinions plain_text
     :return docket_string: as string of docket numbers Ex. (18710-94, 12321-95)
     """
-    parsed_text = None
-    docket_no_re = r"Docket No.*Filed|Docket No.*(, [0-9]{4}.)"
+    opinion_text = remove_en_em_dash(opinion_text)
+    parsed_text = ""
+    docket_no_re = r"Docket.? Nos?.? .*[0-9]{3,5}"
     matches = re.finditer(docket_no_re, opinion_text)
     r = r"[0-9]{3,5}(-|–)[\w]{2,4}(\.)( [A-Z](\.))?"
     for matchNum, match in enumerate(matches, start=1):
