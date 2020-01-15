@@ -165,6 +165,76 @@ def update_tax_opinions():
             )
 
 
+def find_missing_or_incorrect_citations(options):
+    """Iterate over tax cases to verify which citations are correctly parsed
+
+    This code should pull back all the cases with plaintext tax courts to parse.
+    Iterate over those cases extracting the citation if any
+
+    :param options:
+    :return:
+    """
+
+    ocs = OpinionCluster.objects.filter(docket__court="tax").exclude(
+        sub_opinions__plain_text=""
+    )
+    logger.info("%s clusters found", ocs.count())
+
+    clusters_with_errors = []
+
+    for oc in ocs:
+        logger.info("Analyzing cluster %s", oc.id)
+        ops = oc.sub_opinions.all()
+        assert ops.count() == 1
+        for op in ops:
+            # Only loop over the first opinion because these cases should only one have one
+            # because they were extracted from the tax courts
+            gen_cite = ""
+            found_cite = find_tax_court_citation(op.plain_text)
+            if found_cite is not None:
+                gen_cite = found_cite.base_citation()
+                logger.info("Found citation in plain text as %s", gen_cite)
+            else:
+                logger.info(
+                    "No citation found in plain text for cluster: %s", oc.id
+                )
+
+        logger.info("Reviewing citations for cluster %s", oc.id)
+
+        cites = oc.citations.all()
+
+        cite_list = [str(cite) for cite in cites]
+        cite_count = cites.count()
+
+        if cite_count > 0:
+            logger.info("Found %s citations in cluster %s", cite_count, oc.id)
+            for cite in cite_list:
+                if cite != gen_cite:
+                    logger.info(
+                        "Citation %s appears incorrect on cluster %s.",
+                        cite,
+                        oc.id,
+                    )
+                    clusters_with_errors.append(oc.id)
+        else:
+            if gen_cite != "":
+                logger.info(
+                    "Citation missing for cluster %s found as %s",
+                    oc.id,
+                    gen_cite,
+                )
+                clusters_with_errors.append(oc.id)
+            else:
+                logger.info("No citation in db or found in plain text")
+
+    logger.info(
+        "\n\nTo review:\nWrong or missing citations total = %s",
+        len(clusters_with_errors),
+    )
+    for c in clusters_with_errors:
+        logger.info("https://www.courtlistener.com/opinion/%s/x", c)
+
+
 class Command(VerboseCommand):
     help = (
         "Update scraped Tax Court opinions. "
