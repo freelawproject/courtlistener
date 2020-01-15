@@ -48,7 +48,7 @@ def get_tax_docket_numbers(opinion_text):
     for matchNum, match in enumerate(matches, start=1):
         hits.append(match.group())
     docket_string = ", ".join(hits).replace(",,", ",").replace(".", "")
-    return docket_string
+    return docket_string.strip()
 
 
 def find_tax_court_citation(opinion_text):
