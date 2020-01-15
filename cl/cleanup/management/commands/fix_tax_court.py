@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import re
+import argparse
 
 from cl.citations import find_citations
 from cl.lib.command_utils import VerboseCommand, logger
@@ -170,5 +171,28 @@ class Command(VerboseCommand):
         "Add citation and docket numbers."
     )
 
+    def valid_actions(self, s):
+        if s.lower() not in self.VALID_ACTIONS:
+            raise argparse.ArgumentTypeError(
+                "Unable to parse action. Valid actions are: %s"
+                % (", ".join(self.VALID_ACTIONS.keys()))
+            )
+        return self.VALID_ACTIONS[s]
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--action",
+            type=self.valid_actions,
+            required=True,
+            help="The action you wish to take. Valid choices are: %s"
+            % (", ".join(self.VALID_ACTIONS.keys())),
+        )
+
     def handle(self, *args, **options):
-        update_tax_opinions()
+        super(Command, self).handle(*args, **options)
+        options["action"](options)
+
+    VALID_ACTIONS = {
+        "update-tax-opinions": update_tax_opinions,
+        "find-failures": find_missing_or_incorrect_citations,
+    }
