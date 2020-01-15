@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.conf import settings
 
 from cl.cleanup.management.commands.fix_tax_court import (
-    generate_citation,
+    find_tax_court_citation,
     get_tax_docket_numbers,
 )
 
@@ -19,7 +19,7 @@ class CitationTaxCleanup(TestCase):
     )
 
     @mock.patch(
-        "cl.cleanup.management.commands.fix_tax_court.generate_citation",
+        "cl.cleanup.management.commands.fix_tax_court.find_tax_court_citation",
         side_effect=[iglob(os.path.join(test_dir, "working*"))],
     )
     def test_working_examples(self, mock):
@@ -27,13 +27,13 @@ class CitationTaxCleanup(TestCase):
         for path in paths:
             with open(path) as f:
                 data = json.loads(f.read())
-            cite = generate_citation(data["html"], 111)
+            cite = find_tax_court_citation(data["html"])
             self.assertEqual(cite.base_citation(), data["cite"])
             print ("Success ✓")
             print (data["notes"])
 
     @mock.patch(
-        "cl.cleanup.management.commands.fix_tax_court.generate_citation",
+        "cl.cleanup.management.commands.fix_tax_court.find_tax_court_citation",
         side_effect=[iglob(os.path.join(test_dir, "failing*"))],
     )
     def test_failing_examples(self, mock):
@@ -449,7 +449,7 @@ VerDate Nov 24 2008   10:59 Jul 11, 2014   Jkt 372897   PO 20012   Frm 00002   F
             ),
         )
         for q, a in test_pairs:
-            cite = generate_citation(q, 111)
+            cite = find_tax_court_citation(q)
             cite_string = " ".join(
                 [str(cite.volume), cite.reporter, str(cite.page)]
             )

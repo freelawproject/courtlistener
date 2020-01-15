@@ -50,7 +50,7 @@ def get_tax_docket_numbers(opinion_text):
     return docket_string
 
 
-def generate_citation(opinion_text, cluster_id):
+def find_tax_court_citation(opinion_text):
     """
     Returns a dictionary representation of our
     Citation object.
@@ -141,7 +141,7 @@ def update_tax_opinions():
                 oc.docket.docket_number = docket_numbers
                 oc.docket.save()
 
-            cite = generate_citation(opinion.plain_text, oc.id)
+            cite = find_tax_court_citation(opinion.plain_text)
 
             if cite is None:
                 logger.info(
