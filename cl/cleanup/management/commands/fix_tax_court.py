@@ -56,14 +56,10 @@ def find_tax_court_citation(opinion_text):
     Returns a dictionary representation of our
     Citation object.
 
-    This data will only be returned if found, otherwise none is returned and
-    no Citation object is added to the system.  It could be a failed parse
-    or the data could simply not be available.
+    Return the citation object or nothing.
 
     :param opinion_text: The plain_text of our opinion from the scrape.
-    :param cluster_id: The id of the associated Opinion_Cluster related
-                        to this opinion
-    :return: cite_dict => Returns dictionary of the citation data
+    :return: citation object or None
     """
     for line_of_text in opinion_text.split("\n")[:250]:
         cites = find_citations.get_citations(line_of_text, html=False)
@@ -76,14 +72,14 @@ def find_tax_court_citation(opinion_text):
                 return None
 
             if cite.reporter_index > 2:
-                # If reporter not in first or second position bail
+                # If reporter not in first or second term in the line we skip.
                 return None
 
             alt_cite = line_of_text.replace(cite.reporter_found, "").strip()
             other_words = alt_cite.split(" ")
 
             if len([x for x in other_words if x != ""]) > 3:
-                # If line has more than three components bail
+                # If line has more than three non reporter components skip.
                 return None
 
             if "T.C." == cite.reporter:
@@ -93,17 +89,8 @@ def find_tax_court_citation(opinion_text):
             else:
                 cite_type = Citation.NEUTRAL
 
-            if not Citation.objects.filter(
-                volume=cite.volume,
-                reporter=cite.reporter,
-                page=cite.page,
-                cluster_id=cluster_id,
-            ):
-                cite.type = cite_type
-                return cite
-            else:
-                logger.info("Citation already in the system. Return None.")
-                return None
+            cite.type = cite_type
+            return cite
 
 
 def update_tax_opinions():
