@@ -68,31 +68,37 @@ def find_tax_court_citation(opinion_text):
         if not cites:
             continue
 
-        for cite in cites:
-            if "T.C." not in cite.reporter and "T. C." not in cite.reporter:
-                # If not the first cite - Skip
-                return None
+        if "UNITED STATES TAX COURT REPORT" in opinion_text:
+            for cite in cites:
+                if "UNITED STATES TAX COURT REPORT" in cite.reporter_found:
+                    cite.type = Citation.SPECIALTY
+                    return cite
+        else:
+            for cite in cites:
+                if "T.C." not in cite.reporter and "T. C." not in cite.reporter:
+                    # If not the first cite - Skip
+                    return None
 
-            if cite.reporter_index > 2:
-                # If reporter not in first or second term in the line we skip.
-                return None
+                if cite.reporter_index > 2:
+                    # If reporter not in first or second term in the line we skip.
+                    return None
 
-            alt_cite = line_of_text.replace(cite.reporter_found, "").strip()
-            other_words = alt_cite.split(" ")
+                alt_cite = line_of_text.replace(cite.reporter_found, "").strip()
+                other_words = alt_cite.split(" ")
 
-            if len([x for x in other_words if x != ""]) > 3:
-                # If line has more than three non reporter components skip.
-                return None
+                if len([x for x in other_words if x != ""]) > 3:
+                    # If line has more than three non reporter components skip.
+                    return None
 
-            if "T.C." == cite.reporter:
-                cite_type = Citation.SPECIALTY
-            elif "T.C. No." == cite.reporter:
-                cite_type = Citation.SPECIALTY
-            else:
-                cite_type = Citation.NEUTRAL
+                if "T.C." == cite.reporter:
+                    cite_type = Citation.SPECIALTY
+                elif "T.C. No." == cite.reporter:
+                    cite_type = Citation.SPECIALTY
+                else:
+                    cite_type = Citation.NEUTRAL
 
-            cite.type = cite_type
-            return cite
+                cite.type = cite_type
+                return cite
 
 
 def update_tax_opinions(options):
