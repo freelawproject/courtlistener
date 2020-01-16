@@ -184,7 +184,7 @@ def find_missing_or_incorrect_citations(options):
     :param options:
     :return:
     """
-    should_fix = False if options["fix"] is False else True
+    should_fix = options["fix"]
 
     ocs = OpinionCluster.objects.filter(docket__court="tax").exclude(
         sub_opinions__plain_text=""
@@ -232,7 +232,7 @@ def find_missing_or_incorrect_docket_numbers(options):
     :return: Nothing
     """
 
-    should_fix = False if options["fix"] is False else True
+    should_fix = options["fix"]
     ocs = OpinionCluster.objects.filter(docket__court="tax").exclude(
         sub_opinions__plain_text=""
     )
@@ -307,7 +307,8 @@ class Command(VerboseCommand):
             % (", ".join(self.VALID_ACTIONS.keys())),
         )
         parser.add_argument(
-            "--fix", default=False, required=False,
+            "--fix",
+            action="store_true"
         )
 
     def handle(self, *args, **options):
