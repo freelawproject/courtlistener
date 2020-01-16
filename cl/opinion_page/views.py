@@ -285,7 +285,7 @@ def view_recap_document(
 
 @never_cache
 @ratelimit_if_not_whitelisted
-def view_opinion(request, pk, slug):
+def view_opinion(request, pk, slug=""):
     """Using the cluster ID, return the cluster of opinions.
 
     We also test if the cluster ID is a favorite for the user, and send data
