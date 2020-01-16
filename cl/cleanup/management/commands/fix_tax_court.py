@@ -220,7 +220,7 @@ def find_missing_or_incorrect_citations(options):
             logger.info("Found %s citations in cluster %s", cite_count, oc.id)
             for cite in cite_list:
                 if cite != gen_cite:
-                    logger.info(
+                    logger.warn(
                         "Citation %s appears incorrect on cluster %s.",
                         cite,
                         oc.id,
@@ -238,7 +238,7 @@ def find_missing_or_incorrect_citations(options):
 
         else:
             if gen_cite != "":
-                logger.info(
+                logger.warn(
                     "Citation missing for cluster %s found as %s",
                     oc.id,
                     gen_cite,
@@ -256,12 +256,12 @@ def find_missing_or_incorrect_citations(options):
             else:
                 logger.info("No citation in db or found in plain text")
 
-    logger.info(
+    logger.warn(
         "\n\nTo review:\nWrong or missing citations total = %s",
         len(clusters_with_errors),
     )
     for c in clusters_with_errors:
-        logger.info("https://www.courtlistener.com/opinion/%s/x", c)
+        logger.warn("https://www.courtlistener.com/opinion/%s/x", c)
 
 
 def find_missing_or_incorrect_docket_numbers(options):
@@ -283,7 +283,7 @@ def find_missing_or_incorrect_docket_numbers(options):
         ops = oc.sub_opinions.all()
         assert ops.count() == 1
         for op in ops:
-            logger.info(
+            logger.warn(
                 "Reference url: https://www.courtlistener.com/opinion/%s/x",
                 oc.id,
             )
@@ -297,23 +297,23 @@ def find_missing_or_incorrect_docket_numbers(options):
                     oc.docket.docket_number.strip() == ""
                     and dockets_in_db == ""
                 ):
-                    logger.info("No docket numbers found in db or text")
+                    logger.info("No docket numbers found in db or text √")
                 else:
-                    logger.info("Docket numbers appear correct")
+                    logger.info("Docket numbers appear correct √")
                 continue
             else:
                 if dockets_in_db == "":
-                    logger.info(
+                    logger.warn(
                         "Docket No(s). found for the first time: %s",
                         found_dockets,
                     )
                 elif found_dockets == "":
-                    logger.info(
-                        "Dockets not found in text but Docket No(s). %s in db",
+                    logger.warn(
+                        "Docket No(s). not found in text but Docket No(s). %s in db",
                         dockets_in_db,
                     )
                 else:
-                    logger.info(
+                    logger.warn(
                         "Dockets in db (%s) != (%s) docket parsed from text",
                         dockets_in_db,
                         found_dockets,
