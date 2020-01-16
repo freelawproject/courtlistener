@@ -62,16 +62,16 @@ def filepath_list(reporter, volume):
     if reporter and volume:
         reporter_key = ".".join(["law.free.cap", reporter, volume])
         glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "%s/*" % reporter_key
+            settings.MEDIA_ROOT, "harvard_corpus", "%s/*.json" % reporter_key
         )
     elif reporter:
         reporter_key = ".".join(["law.free.cap", reporter])
         glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "%s.*/*" % reporter_key
+            settings.MEDIA_ROOT, "harvard_corpus", "%s.*/*.json" % reporter_key
         )
     else:
         glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*"
+            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
         )
     return sorted(glob(glob_path))
 
