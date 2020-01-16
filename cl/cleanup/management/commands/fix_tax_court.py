@@ -183,6 +183,7 @@ def find_missing_or_incorrect_citations(options):
     :param options:
     :return:
     """
+    fixYN = options["fix"]
 
     ocs = OpinionCluster.objects.filter(docket__court="tax").exclude(
         sub_opinions__plain_text=""
@@ -225,6 +226,16 @@ def find_missing_or_incorrect_citations(options):
                         oc.id,
                     )
                     clusters_with_errors.append(oc.id)
+                    if fixYN:
+                        oc.citations.all().delete()
+                        Citation.objects.get_or_create(
+                            volume=found_cite.volume,
+                            reporter=found_cite.reporter,
+                            page=found_cite.page,
+                            type=found_cite.type,
+                            cluster_id=oc.id,
+                        )
+
         else:
             if gen_cite != "":
                 logger.info(
@@ -233,6 +244,15 @@ def find_missing_or_incorrect_citations(options):
                     gen_cite,
                 )
                 clusters_with_errors.append(oc.id)
+                if fixYN:
+                    Citation.objects.get_or_create(
+                        volume=found_cite.volume,
+                        reporter=found_cite.reporter,
+                        page=found_cite.page,
+                        type=found_cite.type,
+                        cluster_id=oc.id,
+                    )
+
             else:
                 logger.info("No citation in db or found in plain text")
 
@@ -250,6 +270,8 @@ def find_missing_or_incorrect_docket_numbers(options):
     :param options:
     :return: Nothing
     """
+
+    fixYN = options["fix"]
     ocs = OpinionCluster.objects.filter(docket__court="tax").exclude(
         sub_opinions__plain_text=""
     )
@@ -296,6 +318,9 @@ def find_missing_or_incorrect_docket_numbers(options):
                         dockets_in_db,
                         found_dockets,
                     )
+                if fixYN:
+                    oc.docket.docket_number = found_dockets
+                    oc.docket.save()
 
 
 class Command(VerboseCommand):
@@ -319,6 +344,9 @@ class Command(VerboseCommand):
             required=True,
             help="The action you wish to take. Valid choices are: %s"
             % (", ".join(self.VALID_ACTIONS.keys())),
+        )
+        parser.add_argument(
+            "--fix", default=False, required=False,
         )
 
     def handle(self, *args, **options):
