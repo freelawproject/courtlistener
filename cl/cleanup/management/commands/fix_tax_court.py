@@ -192,10 +192,14 @@ def find_missing_or_incorrect_citations(options):
     logger.info("%s clusters found", ocs.count())
 
     for oc in ocs:
+        logger.warn(
+            "Reference url: https://www.courtlistener.com/opinion/%s/x", oc.id,
+        )
         cites = oc.citations.all()
-        logger.info("Found %s cites", cites.count())
+
+        logger.info("Found %s cite(s) for case in db", cites.count())
+
         if cites.count() > 0:
-            logger.info("Found cites in cluster %s", oc.id)
             if should_fix:
                 logger.warn("Deleting cites in cluster %s", oc.id)
                 cites.delete()
@@ -220,10 +224,25 @@ def find_missing_or_incorrect_citations(options):
                         type=found_cite.type,
                         cluster_id=oc.id,
                     )
+                else:
+                    if cites.count() > 0:
+                        for cite in cites:
+                            if str(cite) != found_cite_str:
+                                logger.warn(
+                                    "Have (%s), Expect (%s)",
+                                    cite,
+                                    found_cite_str,
+                                )
+                    else:
+                        logger.warn("Add %s to db", found_cite_str)
+
             else:
-                logger.info(
-                    "No citation found in plain text for cluster: %s", oc.id
-                )
+                if cites.count() > 0:
+                    for cite in cites:
+                        logger.warn("Have (%s), Expect None", cite)
+                        logger.warn("%s should be removed", cite)
+                else:
+                    logger.info("No citation in db or text: %s", oc.id)
 
 
 def find_missing_or_incorrect_docket_numbers(options):
