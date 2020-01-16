@@ -232,7 +232,7 @@ def find_missing_or_incorrect_docket_numbers(options):
     :return: Nothing
     """
 
-    fixYN = options["fix"]
+    should_fix = False if options["fix"] is False else True
     ocs = OpinionCluster.objects.filter(docket__court="tax").exclude(
         sub_opinions__plain_text=""
     )
@@ -258,9 +258,9 @@ def find_missing_or_incorrect_docket_numbers(options):
                     oc.docket.docket_number.strip() == ""
                     and dockets_in_db == ""
                 ):
-                    logger.info("No docket numbers found in db or text √")
+                    logger.info("No docket numbers found in db or text.")
                 else:
-                    logger.info("Docket numbers appear correct √")
+                    logger.info("Docket numbers appear correct.")
                 continue
             else:
                 if dockets_in_db == "":
@@ -279,7 +279,7 @@ def find_missing_or_incorrect_docket_numbers(options):
                         dockets_in_db,
                         found_dockets,
                     )
-                if fixYN:
+                if should_fix:
                     oc.docket.docket_number = found_dockets
                     oc.docket.save()
 
