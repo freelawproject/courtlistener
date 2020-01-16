@@ -36,7 +36,9 @@ def get_tax_docket_numbers(opinion_text):
         parsed_text = opinion_text[match.start() :]
         break
 
-    matches2 = re.finditer(r"([0-9]{3,5})(-|–)([0-9]{1,2})(\.)", parsed_text)
+    matches2 = re.finditer(
+        r"[0-9]{3,5}(-|–)[\w]{2,4}([A-Z])?(\.)", parsed_text
+    )
     for m2, match2 in enumerate(matches2, start=0):
         parsed_text = parsed_text[: match2.end()]
         break
@@ -57,6 +59,7 @@ def find_tax_court_citation(opinion_text):
     Citation object.
 
     Return the citation object or nothing.
+    Iterates over lines of text beacuse we assume our citations won't wrap.
 
     :param opinion_text: The plain_text of our opinion from the scrape.
     :return: citation object or None
@@ -66,31 +69,42 @@ def find_tax_court_citation(opinion_text):
         if not cites:
             continue
 
-        for cite in cites:
-            if "T.C." not in cite.reporter and "T. C." not in cite.reporter:
-                # If not the first cite - Skip
-                return None
+        if "UNITED STATES TAX COURT REPORT" in opinion_text:
+            for cite in cites:
+                if "UNITED STATES TAX COURT REPORT" in cite.reporter_found:
+                    cite.type = Citation.SPECIALTY
+                    return cite
+        else:
+            for cite in cites:
+                if (
+                    "T.C." not in cite.reporter
+                    and "T. C." not in cite.reporter
+                ):
+                    # If not the first cite - Skip
+                    return None
 
-            if cite.reporter_index > 2:
-                # If reporter not in first or second term in the line we skip.
-                return None
+                if cite.reporter_index > 2:
+                    # If reporter not in first or second term in the line we skip.
+                    return None
 
-            alt_cite = line_of_text.replace(cite.reporter_found, "").strip()
-            other_words = alt_cite.split(" ")
+                alt_cite = line_of_text.replace(
+                    cite.reporter_found, ""
+                ).strip()
+                other_words = alt_cite.split(" ")
 
-            if len([x for x in other_words if x != ""]) > 3:
-                # If line has more than three non reporter components skip.
-                return None
+                if len([x for x in other_words if x != ""]) > 3:
+                    # If line has more than three non reporter components skip.
+                    return None
 
-            if "T.C." == cite.reporter:
-                cite_type = Citation.SPECIALTY
-            elif "T.C. No." == cite.reporter:
-                cite_type = Citation.SPECIALTY
-            else:
-                cite_type = Citation.NEUTRAL
+                if "T.C." == cite.reporter:
+                    cite_type = Citation.SPECIALTY
+                elif "T.C. No." == cite.reporter:
+                    cite_type = Citation.SPECIALTY
+                else:
+                    cite_type = Citation.NEUTRAL
 
-            cite.type = cite_type
-            return cite
+                cite.type = cite_type
+                return cite
 
 
 def update_tax_opinions(options):
@@ -170,65 +184,46 @@ def find_missing_or_incorrect_citations(options):
     :param options:
     :return:
     """
+    should_fix = options["fix"]
 
     ocs = OpinionCluster.objects.filter(docket__court="tax").exclude(
         sub_opinions__plain_text=""
     )
     logger.info("%s clusters found", ocs.count())
 
-    clusters_with_errors = []
-
     for oc in ocs:
-        logger.info("Analyzing cluster %s", oc.id)
+        cites = oc.citations.all()
+        logger.info("Found %s cites", cites.count())
+        if cites.count() > 0:
+            logger.info("Found cites in cluster %s", oc.id)
+            if should_fix:
+                logger.warn("Deleting cites in cluster %s", oc.id)
+                cites.delete()
+
         ops = oc.sub_opinions.all()
         assert ops.count() == 1
         for op in ops:
-            # Only loop over the first opinion because these cases should only one have one
-            # because they were extracted from the tax courts
-            gen_cite = ""
+            # Only loop over the first opinion because
+            # these cases should only one have one opinion
             found_cite = find_tax_court_citation(op.plain_text)
             if found_cite is not None:
-                gen_cite = found_cite.base_citation()
-                logger.info("Found citation in plain text as %s", gen_cite)
+                found_cite_str = found_cite.base_citation()
+                logger.info(
+                    "Found citation in plain text as %s", found_cite_str
+                )
+                if should_fix:
+                    logger.warn("Creating citation: %s", found_cite_str)
+                    Citation.objects.create(
+                        volume=found_cite.volume,
+                        reporter=found_cite.reporter,
+                        page=found_cite.page,
+                        type=found_cite.type,
+                        cluster_id=oc.id,
+                    )
             else:
                 logger.info(
                     "No citation found in plain text for cluster: %s", oc.id
                 )
-
-        logger.info("Reviewing citations for cluster %s", oc.id)
-
-        cites = oc.citations.all()
-
-        cite_list = [str(cite) for cite in cites]
-        cite_count = cites.count()
-
-        if cite_count > 0:
-            logger.info("Found %s citations in cluster %s", cite_count, oc.id)
-            for cite in cite_list:
-                if cite != gen_cite:
-                    logger.info(
-                        "Citation %s appears incorrect on cluster %s.",
-                        cite,
-                        oc.id,
-                    )
-                    clusters_with_errors.append(oc.id)
-        else:
-            if gen_cite != "":
-                logger.info(
-                    "Citation missing for cluster %s found as %s",
-                    oc.id,
-                    gen_cite,
-                )
-                clusters_with_errors.append(oc.id)
-            else:
-                logger.info("No citation in db or found in plain text")
-
-    logger.info(
-        "\n\nTo review:\nWrong or missing citations total = %s",
-        len(clusters_with_errors),
-    )
-    for c in clusters_with_errors:
-        logger.info("https://www.courtlistener.com/opinion/%s/x", c)
 
 
 def find_missing_or_incorrect_docket_numbers(options):
@@ -237,6 +232,8 @@ def find_missing_or_incorrect_docket_numbers(options):
     :param options:
     :return: Nothing
     """
+
+    should_fix = options["fix"]
     ocs = OpinionCluster.objects.filter(docket__court="tax").exclude(
         sub_opinions__plain_text=""
     )
@@ -248,7 +245,7 @@ def find_missing_or_incorrect_docket_numbers(options):
         ops = oc.sub_opinions.all()
         assert ops.count() == 1
         for op in ops:
-            logger.info(
+            logger.warn(
                 "Reference url: https://www.courtlistener.com/opinion/%s/x",
                 oc.id,
             )
@@ -262,27 +259,30 @@ def find_missing_or_incorrect_docket_numbers(options):
                     oc.docket.docket_number.strip() == ""
                     and dockets_in_db == ""
                 ):
-                    logger.info("No docket numbers found in db or text")
+                    logger.info("No docket numbers found in db or text.")
                 else:
-                    logger.info("Docket numbers appear correct")
+                    logger.info("Docket numbers appear correct.")
                 continue
             else:
                 if dockets_in_db == "":
-                    logger.info(
+                    logger.warn(
                         "Docket No(s). found for the first time: %s",
                         found_dockets,
                     )
                 elif found_dockets == "":
-                    logger.info(
-                        "Dockets not found in text but Docket No(s). %s in db",
+                    logger.warn(
+                        "Docket No(s). not found in text but Docket No(s). %s in db",
                         dockets_in_db,
                     )
                 else:
-                    logger.info(
+                    logger.warn(
                         "Dockets in db (%s) != (%s) docket parsed from text",
                         dockets_in_db,
                         found_dockets,
                     )
+                if should_fix:
+                    oc.docket.docket_number = found_dockets
+                    oc.docket.save()
 
 
 class Command(VerboseCommand):
@@ -307,6 +307,7 @@ class Command(VerboseCommand):
             help="The action you wish to take. Valid choices are: %s"
             % (", ".join(self.VALID_ACTIONS.keys())),
         )
+        parser.add_argument("--fix", action="store_true")
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
