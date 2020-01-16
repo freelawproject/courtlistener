@@ -36,7 +36,9 @@ def get_tax_docket_numbers(opinion_text):
         parsed_text = opinion_text[match.start() :]
         break
 
-    matches2 = re.finditer(r"([0-9]{3,5})(-|–)([0-9]{1,2})(\.)", parsed_text)
+    matches2 = re.finditer(
+        r"[0-9]{3,5}(-|–)[\w]{2,4}([A-Z])?(\.)", parsed_text
+    )
     for m2, match2 in enumerate(matches2, start=0):
         parsed_text = parsed_text[: match2.end()]
         break
