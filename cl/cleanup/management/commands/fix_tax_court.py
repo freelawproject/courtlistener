@@ -75,7 +75,10 @@ def find_tax_court_citation(opinion_text):
                     return cite
         else:
             for cite in cites:
-                if "T.C." not in cite.reporter and "T. C." not in cite.reporter:
+                if (
+                    "T.C." not in cite.reporter
+                    and "T. C." not in cite.reporter
+                ):
                     # If not the first cite - Skip
                     return None
 
@@ -83,7 +86,9 @@ def find_tax_court_citation(opinion_text):
                     # If reporter not in first or second term in the line we skip.
                     return None
 
-                alt_cite = line_of_text.replace(cite.reporter_found, "").strip()
+                alt_cite = line_of_text.replace(
+                    cite.reporter_found, ""
+                ).strip()
                 other_words = alt_cite.split(" ")
 
                 if len([x for x in other_words if x != ""]) > 3:
