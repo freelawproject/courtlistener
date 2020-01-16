@@ -37,13 +37,13 @@ def get_tax_docket_numbers(opinion_text):
         break
 
     matches2 = re.finditer(
-        r"[0-9]{3,5}(-|–)[\w]{2,4}([A-Z])?(\.)", parsed_text
+        r"[0-9]{3,5}(-|–)[\w]{2,4}([A-Z])?((\.)| [A-Z]\.)", parsed_text
     )
     for m2, match2 in enumerate(matches2, start=0):
         parsed_text = parsed_text[: match2.end()]
         break
 
-    docket_end_re = r"[0-9]{3,5}(-|–)[\w]{2,4}([A-Z])?(\,|\.)"
+    docket_end_re = r"[0-9]{3,5}(-|–)[\w]{2,4}([A-Z])?((\,|\.)| [A-Z]\.)"
 
     matches = re.finditer(docket_end_re, parsed_text, re.MULTILINE)
     hits = []
