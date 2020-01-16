@@ -59,6 +59,7 @@ def find_tax_court_citation(opinion_text):
     Citation object.
 
     Return the citation object or nothing.
+    Iterates over lines of text beacuse we assume our citations won't wrap.
 
     :param opinion_text: The plain_text of our opinion from the scrape.
     :return: citation object or None
@@ -183,68 +184,35 @@ def find_missing_or_incorrect_citations(options):
     :param options:
     :return:
     """
-    fixYN = options["fix"]
+    should_fix = False if options["fix"] is False else True
 
     ocs = OpinionCluster.objects.filter(docket__court="tax").exclude(
         sub_opinions__plain_text=""
     )
     logger.info("%s clusters found", ocs.count())
 
-    clusters_with_errors = []
-
     for oc in ocs:
+        cites = oc.citations.all()
+        for cite in cites:
+            if should_fix:
+                logger.info("Deleting %s cite in cluster %s", str(cite), oc.id)
+                cite.delete()
+
         logger.info("Analyzing cluster %s", oc.id)
         ops = oc.sub_opinions.all()
         assert ops.count() == 1
         for op in ops:
-            # Only loop over the first opinion because these cases should only one have one
-            # because they were extracted from the tax courts
-            gen_cite = ""
+            # Only loop over the first opinion because
+            # these cases should only one have one opinion
             found_cite = find_tax_court_citation(op.plain_text)
             if found_cite is not None:
-                gen_cite = found_cite.base_citation()
-                logger.info("Found citation in plain text as %s", gen_cite)
-            else:
-                logger.info(
-                    "No citation found in plain text for cluster: %s", oc.id
-                )
-
-        logger.info("Reviewing citations for cluster %s", oc.id)
-
-        cites = oc.citations.all()
-
-        cite_list = [str(cite) for cite in cites]
-        cite_count = cites.count()
-
-        if cite_count > 0:
-            logger.info("Found %s citations in cluster %s", cite_count, oc.id)
-            for cite in cite_list:
-                if cite != gen_cite:
+                found_cite_str = found_cite.base_citation()
+                logger.info("Found citation in plain text as %s", found_cite_str)
+                if should_fix:
                     logger.warn(
-                        "Citation %s appears incorrect on cluster %s.",
-                        cite,
-                        oc.id,
+                        "Creating citation: %s",
+                        found_cite_str
                     )
-                    clusters_with_errors.append(oc.id)
-                    if fixYN:
-                        oc.citations.all().delete()
-                        Citation.objects.get_or_create(
-                            volume=found_cite.volume,
-                            reporter=found_cite.reporter,
-                            page=found_cite.page,
-                            type=found_cite.type,
-                            cluster_id=oc.id,
-                        )
-
-        else:
-            if gen_cite != "":
-                logger.warn(
-                    "Citation missing for cluster %s found as %s",
-                    oc.id,
-                    gen_cite,
-                )
-                clusters_with_errors.append(oc.id)
-                if fixYN:
                     Citation.objects.get_or_create(
                         volume=found_cite.volume,
                         reporter=found_cite.reporter,
@@ -252,16 +220,10 @@ def find_missing_or_incorrect_citations(options):
                         type=found_cite.type,
                         cluster_id=oc.id,
                     )
-
             else:
-                logger.info("No citation in db or found in plain text")
-
-    logger.warn(
-        "\n\nTo review:\nWrong or missing citations total = %s",
-        len(clusters_with_errors),
-    )
-    for c in clusters_with_errors:
-        logger.warn("https://www.courtlistener.com/opinion/%s/x", c)
+                logger.info(
+                    "No citation found in plain text for cluster: %s", oc.id
+                )
 
 
 def find_missing_or_incorrect_docket_numbers(options):
