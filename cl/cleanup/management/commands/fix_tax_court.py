@@ -193,12 +193,13 @@ def find_missing_or_incorrect_citations(options):
 
     for oc in ocs:
         cites = oc.citations.all()
-        for cite in cites:
+        logger.info("Found %s cites", cites.count())
+        if cites.count() > 0:
+            logger.info("Found cites in cluster %s", oc.id)
             if should_fix:
-                logger.info("Deleting %s cite in cluster %s", str(cite), oc.id)
-                cite.delete()
+                logger.warn("Deleting cites in cluster %s", oc.id)
+                cites.delete()
 
-        logger.info("Analyzing cluster %s", oc.id)
         ops = oc.sub_opinions.all()
         assert ops.count() == 1
         for op in ops:
@@ -212,7 +213,7 @@ def find_missing_or_incorrect_citations(options):
                 )
                 if should_fix:
                     logger.warn("Creating citation: %s", found_cite_str)
-                    Citation.objects.get_or_create(
+                    Citation.objects.create(
                         volume=found_cite.volume,
                         reporter=found_cite.reporter,
                         page=found_cite.page,
@@ -306,10 +307,7 @@ class Command(VerboseCommand):
             help="The action you wish to take. Valid choices are: %s"
             % (", ".join(self.VALID_ACTIONS.keys())),
         )
-        parser.add_argument(
-            "--fix",
-            action="store_true"
-        )
+        parser.add_argument("--fix", action="store_true")
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
