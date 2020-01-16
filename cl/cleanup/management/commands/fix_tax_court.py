@@ -207,12 +207,11 @@ def find_missing_or_incorrect_citations(options):
             found_cite = find_tax_court_citation(op.plain_text)
             if found_cite is not None:
                 found_cite_str = found_cite.base_citation()
-                logger.info("Found citation in plain text as %s", found_cite_str)
+                logger.info(
+                    "Found citation in plain text as %s", found_cite_str
+                )
                 if should_fix:
-                    logger.warn(
-                        "Creating citation: %s",
-                        found_cite_str
-                    )
+                    logger.warn("Creating citation: %s", found_cite_str)
                     Citation.objects.get_or_create(
                         volume=found_cite.volume,
                         reporter=found_cite.reporter,
