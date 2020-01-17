@@ -14,6 +14,7 @@ from juriscraper.lib.diff_tools import normalize_phrase
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Opinion, OpinionCluster, Docket, Citation
+from cl.search.tasks import add_items_to_solr
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.citations.find_citations import get_citations
@@ -178,7 +179,7 @@ def parse_extra_fields(soup, fields, long_field=False):
     return data_set
 
 
-def parse_harvard_opinions(reporter, volume):
+def parse_harvard_opinions(reporter, volume, make_searchable):
     """
     Parse downloaded CaseLaw Corpus from internet archive and add them to our
     database.
@@ -192,6 +193,7 @@ def parse_harvard_opinions(reporter, volume):
 
     :param volume: The volume (int) of the reporters (optional) (ex 10)
     :param reporter: Reporter string as slugify'd (optional) (tc) for T.C.
+    :param make_searchable: Boolean to indicate saving to solr
     :return: None
     """
     if not reporter and volume:
@@ -351,7 +353,7 @@ def parse_harvard_opinions(reporter, volume):
                 op_type = map_opinion_type(op.get("type"))
                 opinion_xml = str(op)
                 logger.info("Adding opinion for: %s", citation.base_citation())
-                Opinion.objects.create(
+                op = Opinion.objects.create(
                     cluster_id=cluster.id,
                     type=op_type,
                     author_str=author_str,
@@ -359,6 +361,8 @@ def parse_harvard_opinions(reporter, volume):
                     per_curiam=per_curiam,
                     extracted_by_ocr=True,
                 )
+                if make_searchable:
+                    add_items_to_solr.delay([op.pk], "search.Opinion")
 
         logger.info("Finished: %s", citation.base_citation())
 
@@ -392,7 +396,15 @@ class Command(VerboseCommand):
             required=False,
         )
 
+        parser.add_argument(
+            "--make-searchable",
+            action="store_true",
+            help="Add items to solr as we create opinions. "
+            "Items are not searchable unless flag is raised.",
+        )
+
     def handle(self, *args, **options):
         reporter = options["reporter"]
         volume = options["volume"]
-        parse_harvard_opinions(reporter, volume)
+        make_searchable = options["make-searchable"]
+        parse_harvard_opinions(reporter, volume, make_searchable)
