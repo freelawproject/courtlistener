@@ -490,7 +490,9 @@ class HarvardTests(TestCase):
 
     def assertSuccessfulParse(self, expected_count_diff):
         pre_install_count = OpinionCluster.objects.all().count()
-        parse_harvard_opinions(volume=None, reporter=None)
+        parse_harvard_opinions(
+            reporter=None, volume=None, make_searchable=False
+        )
         post_install_count = OpinionCluster.objects.all().count()
         self.assertEqual(
             expected_count_diff, post_install_count - pre_install_count
