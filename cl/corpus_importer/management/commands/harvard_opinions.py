@@ -406,5 +406,5 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         reporter = options["reporter"]
         volume = options["volume"]
-        make_searchable = options["make-searchable"]
+        make_searchable = options["make_searchable"]
         parse_harvard_opinions(reporter, volume, make_searchable)
