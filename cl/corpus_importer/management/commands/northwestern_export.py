@@ -20,6 +20,7 @@ def do_bulk_export(options):
     d_pks = (
         Docket.objects.filter(
             court__jurisdiction=Court.FEDERAL_DISTRICT, pk__gt=offset,
+            source__in=Docket.RECAP_SOURCES,
         )
         .order_by("pk")
         .values_list("pk", flat=True)
