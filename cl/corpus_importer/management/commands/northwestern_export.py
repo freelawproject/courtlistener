@@ -22,6 +22,8 @@ def do_bulk_export(options):
             court__jurisdiction=Court.FEDERAL_DISTRICT,
             pk__gt=offset,
             source__in=Docket.RECAP_SOURCES,
+            date_filed__gte="2016-01-01",
+            date_filed__lte="2016-12-31",
         )
         .order_by("pk")
         .values_list("pk", flat=True)
