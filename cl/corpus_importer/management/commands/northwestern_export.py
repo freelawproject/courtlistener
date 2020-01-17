@@ -58,6 +58,12 @@ class Command(VerboseCommand):
             help="After doing this number, stop. Do all of them by default.",
         )
         parser.add_argument(
+            "--task",
+            type=str,
+            help="The task to perform. One of %s" % ", ".join(self.tasks),
+            required=True,
+        )
+        parser.add_argument(
             "--output-directory",
             type=str,
             help="Where the bulk data will be output to. Note that if Docker "
