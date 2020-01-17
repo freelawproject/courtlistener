@@ -19,7 +19,8 @@ def do_bulk_export(options):
         logger.info("Skipping dockets with PK less than than %s", offset)
     d_pks = (
         Docket.objects.filter(
-            court__jurisdiction=Court.FEDERAL_DISTRICT, pk__gt=offset,
+            court__jurisdiction=Court.FEDERAL_DISTRICT,
+            pk__gt=offset,
             source__in=Docket.RECAP_SOURCES,
         )
         .order_by("pk")
