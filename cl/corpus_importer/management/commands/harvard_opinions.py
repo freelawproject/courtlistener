@@ -29,7 +29,7 @@ from reporters_db import REPORTERS
 cnt = CaseNameTweaker()
 
 
-def validate_dt(date_text):
+def validate_dt(date_str):
     """
     Check if the date string is only year-month or year.
     If partial date string, make date string the first of the month
@@ -37,27 +37,20 @@ def validate_dt(date_text):
 
     If unable to validate date return an empty string, True tuple.
 
-    :param date_text: a date string we receive from the harvard corpus
-    :returns: Tuple of date or date estimate and boolean indicating estimated
-    date or actual date
+    :param date_str: a date string we receive from the harvard corpus
+    :returns: Tuple of date obj or date obj estimate
+    and boolean indicating estimated date or actual date.
     """
-    try:
-        datetime.strptime(date_text, "%Y-%m-%d")
-        return date_text, False
-    except ValueError:
-        pass
-
-    try:
-        datetime.strptime(date_text, "%Y-%m")
-        return date_text + "-01", True
-    except ValueError:
-        pass
-
-    try:
-        datetime.strptime(date_text, "%Y")
-        return date_text + "-01-01", True
-    except ValueError:
-        return "", True
+    date_approx = False
+    add_ons = ["", "-15", "-07-01"]
+    for add_on in add_ons:
+        try:
+            date_obj = datetime.strptime(date_str + add_on, "%Y-%m-%d").date()
+            break
+        except ValueError:
+            # Failed parsing at least once, ∴ an approximate date
+            date_approx = True
+    return date_obj, date_approx
 
 
 def filepath_list(reporter, volume):
