@@ -651,6 +651,6 @@ class HarvardTests(TestCase):
         for test in pairs:
             print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
             got = validate_dt(test["q"])
-            dt_obj = datetime.strptime(test['a'][0], "%Y-%m-%d").date()
+            dt_obj = datetime.strptime(test["a"][0], "%Y-%m-%d").date()
             self.assertEqual(dt_obj, got[0])
             print("Success ✓")
