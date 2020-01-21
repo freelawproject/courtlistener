@@ -20,6 +20,7 @@ from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.corpus_importer.management.commands.harvard_opinions import (
     parse_harvard_opinions,
+    validate_dt,
 )
 
 from cl.lib.pacer import process_docket_data
@@ -637,3 +638,19 @@ class HarvardTests(TestCase):
         """Can we parse a case without an author or author tag?"""
         self.assertSuccessfulParse(1)
         print("Success ✓")
+
+    def test_partial_dates(self):
+        """Can we validate partial dates?"""
+        pairs = (
+            {"q": "2019-01-01", "a": ("2019-01-01", False),},
+            {"q": "2019-01", "a": ("2019-01-01", True),},
+            {"q": "2019-05", "a": ("2019-05-01", True),},
+            {"q": "1870-05", "a": ("1870-05-01", True),},
+            {"q": "2019", "a": ("2019-01-01", True),},
+            {"q": "", "a": ("", True),},
+        )
+        for test in pairs:
+            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            got = validate_dt(test["q"])
+            self.assertEqual(test["a"], got)
+            print("Success ✓")
