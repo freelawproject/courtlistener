@@ -3,7 +3,7 @@ from __future__ import print_function
 import json
 import os
 import unittest
-from datetime import date
+from datetime import date, datetime
 import mock
 from glob import iglob
 
@@ -643,14 +643,14 @@ class HarvardTests(TestCase):
         """Can we validate partial dates?"""
         pairs = (
             {"q": "2019-01-01", "a": ("2019-01-01", False),},
-            {"q": "2019-01", "a": ("2019-01-01", True),},
-            {"q": "2019-05", "a": ("2019-05-01", True),},
-            {"q": "1870-05", "a": ("1870-05-01", True),},
-            {"q": "2019", "a": ("2019-01-01", True),},
-            {"q": "", "a": ("", True),},
+            {"q": "2019-01", "a": ("2019-01-15", True),},
+            {"q": "2019-05", "a": ("2019-05-15", True),},
+            {"q": "1870-05", "a": ("1870-05-15", True),},
+            {"q": "2019", "a": ("2019-07-01", True),},
         )
         for test in pairs:
             print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
             got = validate_dt(test["q"])
-            self.assertEqual(test["a"], got)
+            dt_obj = datetime.strptime(test['a'][0], "%Y-%m-%d").date()
+            self.assertEqual(dt_obj, got[0])
             print("Success ✓")
