@@ -31,8 +31,11 @@ cnt = CaseNameTweaker()
 
 def validate_dt(date_text):
     """
-    Check if the date string is only year-month. If partial date string, make
-    date string the first of the month and mark the date as an estimate.
+    Check if the date string is only year-month or year.
+    If partial date string, make date string the first of the month
+    and mark the date as an estimate.
+
+    If unable to validate date return an empty string, True tuple.
 
     :param date_text: a date string we receive from the harvard corpus
     :returns: Tuple of date or date estimate and boolean indicating estimated
@@ -42,7 +45,19 @@ def validate_dt(date_text):
         datetime.strptime(date_text, "%Y-%m-%d")
         return date_text, False
     except ValueError:
+        pass
+
+    try:
+        datetime.strptime(date_text, "%Y-%m")
         return date_text + "-01", True
+    except ValueError:
+        pass
+
+    try:
+        datetime.strptime(date_text, "%Y")
+        return date_text + "-01-01", True
+    except ValueError:
+        return "", True
 
 
 def filepath_list(reporter, volume):
