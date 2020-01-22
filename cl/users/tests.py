@@ -43,20 +43,41 @@ class UserTest(LiveServerTestCase):
             host=self.live_server_url,
         )
 
-    def test_no_open_redirect(self):
-        """Prevent open redirects, which can cause spoofing attacks"""
-        response = self.client.get(
-            "{host}{path}".format(
+    def test_redirects(self):
+        """Do we allow good redirects while banning bad ones?"""
+        next_params = [
+            # No open redirects (to a domain outside CL)
+            ("https://evil.com&email=e%40e.net", True),
+            # No javascript (!)
+            ("javascript:confirm(document.domain)", True),
+            # No spaces
+            ("/test test", True),
+            # A safe redirect
+            (reverse("about"), False),
+        ]
+        for next_param, is_evil in next_params:
+            bad_url = "{host}{path}?next={next}".format(
                 host=self.live_server_url,
-                path="/register/success/?next=https://evil.com&email=e%40e.net",
+                path=reverse("register_success"),
+                next=next_param,
             )
-        )
-        self.assertNotIn(
-            "evil.com",
-            response.content,
-            msg="evil.com found in HTML of response. This suggests it was not"
-            "cleaned by the sanitize_redirection function.",
-        )
+            print("Checking redirect on %s" % bad_url)
+            response = self.client.get(bad_url)
+            if is_evil:
+                self.assertNotIn(
+                    next_param,
+                    response.content.decode("utf-8"),
+                    msg="'%s' found in HTML of response. This suggests it was "
+                    "not cleaned by the sanitize_redirection function."
+                    % next_param,
+                )
+            else:
+                self.assertIn(
+                    next_param,
+                    response.content.decode("utf-8"),
+                    msg="'%s' not found in HTML of response. This suggests it "
+                    "was sanitized when it should not have been." % next_param,
+                )
 
     def test_signing_in(self):
         """Can we create a user on the backend then sign them in"""
