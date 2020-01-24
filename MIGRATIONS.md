@@ -17,6 +17,8 @@ https://www.braintreepayments.com/blog/safe-operations-for-high-volume-postgresq
 
 https://github.com/ankane/strong_migrations
 
+https://leopard.in.ua/2016/09/20/safe-and-unsafe-operations-postgresql
+
 
 # Known Problems
 
