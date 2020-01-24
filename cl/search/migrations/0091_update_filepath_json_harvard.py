@@ -13,6 +13,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Note! It's unclear why this was done with multiple operations instead
+        # of just one that created both indexes.
         migrations.RunSQL(
             """CREATE INDEX CONCURRENTLY "search_opinioncluster_filepath_json_harvard_4b8057d0"
                ON "search_opinioncluster" ("filepath_json_harvard");""",
@@ -22,7 +24,7 @@ class Migration(migrations.Migration):
         ),
 
         migrations.RunSQL(
-            """CREATE INDEX CONCURRENTLY "search_opinioncluster_filepath_json_harvard_4b8057d0_like" 
+            """CREATE INDEX CONCURRENTLY "search_opinioncluster_filepath_json_harvard_4b8057d0_like"
                ON "search_opinioncluster" ("filepath_json_harvard" varchar_pattern_ops);""",
 
             reverse_sql='DROP INDEX "search_opinioncluster_filepath_json_harvard_4b8057d0_like";',
