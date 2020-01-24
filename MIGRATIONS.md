@@ -46,7 +46,8 @@ Until [Django issue 21039][concur] is merged, Django creates indexes without usi
 the `CONCURRENTLY` statement. This locks the table for the duration of the index 
 creation. It takes more work, but this can be avoided by tweaking the Python and SQL
 migration files [as described in this excellent blog post][concur-blog]. You can see
-an example of this in CourtListener [too][ex].
+an example of this in CourtListener [too][ex]. Note that `CONCURRENTLY` can't 
+be used in a transaction block.
 
 [concur]: https://code.djangoproject.com/ticket/21039
 [concur-blog]: https://realpython.com/create-django-index-without-downtime/
