@@ -446,10 +446,9 @@ class Docket(models.Model):
         db_index=False,
         blank=True,
     )
-    docket_number = fields.CharNullField(
+    docket_number = models.TextField(
         help_text="The docket numbers of a case, can be consolidated and "
         "quite long",
-        max_length=5000,  # was 50, 100, 300, 1000
         blank=True,
         null=True,
         db_index=True,
