@@ -86,9 +86,7 @@ class RecapUploadsTest(TestCase):
 
     def test_uploading_a_zip(self, mock):
         """Can we upload a zip?"""
-        self.data.update(
-            {"upload_type": UPLOAD_TYPE.DOCUMENT_ZIP}
-        )
+        self.data.update({"upload_type": UPLOAD_TYPE.DOCUMENT_ZIP})
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         mock.assert_called()
