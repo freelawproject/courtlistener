@@ -109,7 +109,7 @@ class DonationForm(ModelForm):
         widget=forms.RadioSelect,
         choices=FREQUENCIES.NAMES,
         required=False,
-        initial="once",
+        initial="monthly",
     )
     amount = DecimalOrOtherChoiceField(
         widget=forms.RadioSelect, choices=AMOUNTS, initial="50",
