@@ -107,6 +107,18 @@ def find_tax_court_citation(opinion_text):
                 return cite
 
 
+def fix_precedential_status(options):
+    logger.info("Starting cleanup \n")
+    ocs = OpinionCluster.objects.filter(docket__court="tax")
+    for oc in ocs:
+        if len(oc.citations.all()) > 0:
+            if oc.citations.all()[0].type == Citation.NEUTRAL:
+                if oc.precedential_status == "Published":
+                    logger.info("Changing precedential status for %s", oc)
+                    oc.precedential_status = "Unpublished"
+                    oc.save()
+
+
 def update_tax_opinions(options):
     """
     This code identifies tax opinions without
@@ -336,4 +348,5 @@ class Command(VerboseCommand):
         "update-tax-opinions": update_tax_opinions,
         "find-failures": find_missing_or_incorrect_citations,
         "find-docket-numbers": find_missing_or_incorrect_docket_numbers,
+        "fix-p-status": fix_precedential_status,
     }
