@@ -1,9 +1,67 @@
-# coding=utf-8
+# -*- coding: utf-8 -*-
+import os
+import re
+import mock
+from glob import iglob
+import json
+
 from django.test import TestCase
+from django.conf import settings
+
 from cl.cleanup.management.commands.fix_tax_court import (
-    generate_citation,
+    find_tax_court_citation,
     get_tax_docket_numbers,
 )
+
+
+class CitationTaxCleanup(TestCase):
+    test_dir = os.path.join(
+        settings.INSTALL_ROOT, "cl", "cleanup", "test_assets"
+    )
+
+    @mock.patch(
+        "cl.cleanup.management.commands.fix_tax_court.find_tax_court_citation",
+        side_effect=[iglob(os.path.join(test_dir, "working*"))],
+    )
+    def test_working_examples(self, mock):
+        paths = mock()
+        for path in paths:
+            with open(path) as f:
+                data = json.loads(f.read())
+            cite = find_tax_court_citation(data["html"])
+            self.assertEqual(cite.base_citation(), data["cite"])
+            print ("Success ✓")
+            print (data["notes"])
+
+    @mock.patch(
+        "cl.cleanup.management.commands.fix_tax_court.find_tax_court_citation",
+        side_effect=[iglob(os.path.join(test_dir, "failing*"))],
+    )
+    def test_failing_examples(self, mock):
+        paths = mock()
+        for path in paths:
+            with open(path) as f:
+                data = json.loads(f.read())
+            cite = find_tax_court_citation(data["html"])
+            self.assertFalse(cite)
+            print ("Success ✓")
+
+    @mock.patch(
+        "cl.cleanup.management.commands.fix_tax_court.get_tax_docket_numbers",
+        side_effect=[iglob(os.path.join(test_dir, "docket*"))],
+    )
+    def test_docket_parsing(self, mock):
+        paths = mock()
+        for path in paths:
+            with open(path) as f:
+                data = json.loads(f.read())
+            for case in data:
+                answer = re.sub(u"–", "-", case["answer"])
+                answer = re.sub(u"—", "-", answer)
+                answer = re.sub(u"–", "-", answer)
+                print (answer)
+                self.assertEqual(get_tax_docket_numbers(case["text"]), answer)
+                print ("Success ✓")
 
 
 class CleanupTest(TestCase):
@@ -388,7 +446,7 @@ VerDate Nov 24 2008   10:59 Jul 11, 2014   Jkt 372897   PO 20012   Frm 00002   F
             ),
         )
         for q, a in test_pairs:
-            cite = generate_citation(q, 111)
+            cite = find_tax_court_citation(q)
             cite_string = " ".join(
                 [str(cite.volume), cite.reporter, str(cite.page)]
             )

@@ -25,6 +25,7 @@ from cl.simple_pages.views import (
     validate_for_google,
     validate_for_google2,
     validate_for_wot,
+    help_home,
 )
 
 urlpatterns = [
@@ -38,6 +39,7 @@ urlpatterns = [
     url(r"^contact/$", contact, name="contact"),
     url(r"^contact/thanks/$", contact_thanks, name="contact_thanks"),
     # Help pages
+    url(r"^help/$", help_home, name="help_home"),
     url(r"^help/markdown/$", markdown_help, name="markdown_help"),
     url(r"^help/alerts/$", alert_help, name="alert_help"),
     url(r"^help/donations/$", donation_help, name="donation_help"),

@@ -446,10 +446,9 @@ class Docket(models.Model):
         db_index=False,
         blank=True,
     )
-    docket_number = fields.CharNullField(
+    docket_number = models.TextField(
         help_text="The docket numbers of a case, can be consolidated and "
         "quite long",
-        max_length=5000,  # was 50, 100, 300, 1000
         blank=True,
         null=True,
         db_index=True,
@@ -1886,57 +1885,6 @@ class OpinionCluster(models.Model):
     case_name_full = models.TextField(
         help_text="The full name of the case", blank=True
     )
-    federal_cite_one = models.CharField(
-        help_text="Primary federal citation",
-        db_index=True,
-        max_length=50,
-        blank=True,
-    )
-    federal_cite_two = models.CharField(
-        help_text="Secondary federal citation",
-        db_index=True,
-        max_length=50,
-        blank=True,
-    )
-    federal_cite_three = models.CharField(
-        help_text="Tertiary federal citation",
-        db_index=True,
-        max_length=50,
-        blank=True,
-    )
-    state_cite_one = models.CharField(
-        help_text="Primary state citation", max_length=50, blank=True,
-    )
-    state_cite_two = models.CharField(
-        help_text="Secondary state citation", max_length=50, blank=True,
-    )
-    state_cite_three = models.CharField(
-        help_text="Tertiary state citation", max_length=50, blank=True,
-    )
-    state_cite_regional = models.CharField(
-        help_text="Regional citation", max_length=50, blank=True,
-    )
-    specialty_cite_one = models.CharField(
-        help_text="Specialty citation", max_length=50, blank=True,
-    )
-    scotus_early_cite = models.CharField(
-        help_text="Early SCOTUS citation such as How., Black, Cranch., etc.",
-        max_length=50,
-        blank=True,
-    )
-    lexis_cite = models.CharField(
-        help_text="LexisNexis citation (e.g. 1 LEXIS 38237)",
-        max_length=50,
-        blank=True,
-    )
-    westlaw_cite = models.CharField(
-        help_text="WestLaw citation (e.g. 22 WL 238)",
-        max_length=50,
-        blank=True,
-    )
-    neutral_cite = models.CharField(
-        help_text="Neutral citation", max_length=50, blank=True,
-    )
     scdb_id = models.CharField(
         help_text="The ID of the item in the Supreme Court Database",
         max_length=10,
@@ -2117,6 +2065,7 @@ class OpinionCluster(models.Model):
         ),
         max_length=1000,
         blank=True,
+        db_index=True,
     )
 
     objects = ClusterCitationQuerySet.as_manager()
@@ -2569,6 +2518,7 @@ class Opinion(models.Model):
         ),
         max_length=40,
         db_index=True,
+        blank=True,
     )
     page_count = models.IntegerField(
         help_text="The number of pages in the document, if known",
@@ -2768,12 +2718,12 @@ class OpinionsCited(models.Model):
     cited_opinion = models.ForeignKey(
         Opinion, related_name="citing_opinions", on_delete=models.CASCADE,
     )
-    #  depth = models.IntegerField(
-    #      help_text='The number of times the cited opinion was cited '
-    #                'in the citing opinion',
-    #      default=1,
-    #      db_index=True,
-    #  )
+    depth = models.IntegerField(
+        help_text="The number of times the cited opinion was cited "
+        "in the citing opinion",
+        default=1,
+        db_index=True,
+    )
     #  quoted = models.BooleanField(
     #      help_text='Equals true if previous case was quoted directly',
     #      default=False,

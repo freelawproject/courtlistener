@@ -84,6 +84,13 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(j["pacer_case_id"], "asdf")
         mock.assert_called()
 
+    def test_uploading_a_zip(self, mock):
+        """Can we upload a zip?"""
+        self.data.update({"upload_type": UPLOAD_TYPE.DOCUMENT_ZIP})
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        mock.assert_called()
+
     def test_uploading_a_docket(self, mock):
         """Can we upload a docket and have it be saved correctly?
 

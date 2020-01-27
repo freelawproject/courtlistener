@@ -3,7 +3,7 @@ from __future__ import print_function
 import json
 import os
 import unittest
-from datetime import date
+from datetime import date, datetime
 import mock
 from glob import iglob
 
@@ -20,6 +20,7 @@ from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.corpus_importer.management.commands.harvard_opinions import (
     parse_harvard_opinions,
+    validate_dt,
 )
 
 from cl.lib.pacer import process_docket_data
@@ -490,7 +491,9 @@ class HarvardTests(TestCase):
 
     def assertSuccessfulParse(self, expected_count_diff):
         pre_install_count = OpinionCluster.objects.all().count()
-        parse_harvard_opinions(volume=None, reporter=None)
+        parse_harvard_opinions(
+            reporter=None, volume=None, make_searchable=False
+        )
         post_install_count = OpinionCluster.objects.all().count()
         self.assertEqual(
             expected_count_diff, post_install_count - pre_install_count
@@ -555,3 +558,99 @@ class HarvardTests(TestCase):
     def test_duplicate_cite_same_case(self, mock):
         """Will a duplicate case be skipped?"""
         self.assertSuccessfulParse(1)
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "syllabus*"))],
+    )
+    def test_syllabus_and_summary_wrapping(self, mock):
+        """Did we properly parse three syllabi?"""
+        self.assertSuccessfulParse(1)
+        cite = Citation.objects.get(volume=4, reporter="Kan.", page=283)
+        self.assertEqual(cite.cluster.syllabus.count("<p>"), 3)
+        self.assertEqual(cite.cluster.summary.count("<p>"), 32)
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "syllabus*"))],
+    )
+    def test_attorney_extraction(self, mock):
+        """Did we properly parse attorneys?"""
+        self.assertSuccessfulParse(1)
+        cite = Citation.objects.get(volume=4, reporter="Kan.", page=283)
+        print(cite.cluster.attorneys)
+        self.assertEqual(
+            cite.cluster.attorneys,
+            "M. V. Voss, for plaintiff in error., W. O. Webb, for defendant in error., Voss, for plaintiff in error,, Webb, for defendant in error,",
+        )
+        print("✓")
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "per_curiam*"))],
+    )
+    def test_per_curiam(self, mock):
+        """Did we identify the per curiam case."""
+        self.assertSuccessfulParse(1)
+        cite = Citation.objects.get(volume=381, reporter="A.2d", page=3)
+        ops = cite.cluster.sub_opinions.all()
+        self.assertEqual(ops[0].author_str, "Per Curiam")
+        self.assertTrue(ops[0].per_curiam)
+        print("Success ✓")
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "joined_by*"))],
+    )
+    def test_authors(self, mock):
+        """Did we find the authors and the list of judges."""
+        self.assertSuccessfulParse(1)
+        cite = Citation.objects.get(volume=551, reporter="U.S.", page=193)
+        ops = cite.cluster.sub_opinions.all()
+
+        self.assertEqual(ops[0].author_str, "Stevens")
+        self.assertEqual(ops[1].author_str, "Thomas")
+
+        self.assertEqual(
+            cite.cluster.judges,
+            "Thomas, Kennedy, Auto, Stevens, Scaua, Breyer, Roberts, Sotjter, Ginsbtjrg",
+        )
+        print("Success ✓")
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "joined_by*"))],
+    )
+    def test_xml_harvard_extraction(self, mock):
+        """Did we succesfully not remove page citations while
+        processing other elements?"""
+        self.assertSuccessfulParse(1)
+        cite = Citation.objects.get(volume=551, reporter="U.S.", page=193)
+        opinions = cite.cluster.sub_opinions.all()
+        self.assertEqual(opinions[0].xml_harvard.count("</page-number>"), 2)
+        print("Success ✓")
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "no_author_tag*"))],
+    )
+    def test_missing_page_numbers(self, mock):
+        """Can we parse a case without an author or author tag?"""
+        self.assertSuccessfulParse(1)
+        print("Success ✓")
+
+    def test_partial_dates(self):
+        """Can we validate partial dates?"""
+        pairs = (
+            {"q": "2019-01-01", "a": ("2019-01-01", False),},
+            {"q": "2019-01", "a": ("2019-01-15", True),},
+            {"q": "2019-05", "a": ("2019-05-15", True),},
+            {"q": "1870-05", "a": ("1870-05-15", True),},
+            {"q": "2019", "a": ("2019-07-01", True),},
+        )
+        for test in pairs:
+            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            got = validate_dt(test["q"])
+            dt_obj = datetime.strptime(test["a"][0], "%Y-%m-%d").date()
+            self.assertEqual(dt_obj, got[0])
+            print("Success ✓")
