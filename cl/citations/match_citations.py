@@ -15,6 +15,7 @@ from cl.citations.models import (
 )
 from cl.lib import sunburnt
 from cl.search.models import Opinion
+from cl.custom_filters.templatetags.text_filters import best_case_name
 
 DEBUG = True
 
@@ -148,31 +149,53 @@ def match_citation(citation, citing_doc=None):
     return []
 
 
-def get_citation_matches(opinion, citations):
-    # A list of opinions, as matched to citations
-    citation_matches = []
-    was_matched = False
+def get_citation_matches(citing_opinion, citations):
+    """For a list of Citation objects (e.g., FullCitations, SupraCitations,
+    IdCitations, etc.), try to match them to Opinion objects in in the database
+    using a variety of heuristics.
+
+    Returns:
+      - a list of Opinion objects, as matched to citations
+    """
+    citation_matches = []  # List of matches to return
+    was_matched = False  # Whether the previous citation match was successful
 
     for citation in citations:
         matched_opinion = None
 
+        # If the citation is to a non-opinion document, we currently cannot
+        # match these.
+        if isinstance(citation, NonopinionCitation):
+            pass
+
+        # If the citation is an id citation, just resolve it to the opinion
+        # that was matched immediately prior (so long as the previous match
+        # was successful).
+        elif isinstance(citation, IdCitation):
+            if was_matched:
+                matched_opinion = citation_matches[-1]
+
         # If the citation is a supra citation, try to resolve it to one of
         # the citations that has already been matched
-        if isinstance(citation, SupraCitation):
+        elif isinstance(citation, SupraCitation):
+            candidates = []
             for cm in citation_matches:
                 # The only clue we have to help us with resolution is the guess
                 # of what the supra citation's antecedent is, so we try to
                 # match that string to one of the known case names of the
-                # already matched opinions.
-                if (
-                    strip_punct(citation.antecedent_guess)
-                    in cm.cluster.case_name_full
+                # already matched opinions. However, because case names might
+                # look alike, matches using this heuristic may not be unique.
+                # If no match, or more than one match, is found, then the supra
+                # reference is effectively dropped.
+                if strip_punct(citation.antecedent_guess) in best_case_name(
+                    cm.cluster
                 ):
-                    # Just use the first one found, since the candidates should
-                    # all be identical. If nothing is found, then the supra
-                    # reference is effectively dropped.
-                    matched_opinion = cm
-                    break
+                    candidates.append(cm)
+
+            candidates = list(set(candidates))  # Remove duplicate matches
+            if len(candidates) == 1:
+                # Accept the match!
+                matched_opinion = candidates[0]
 
         # Likewise, if the citation is a short form citation, try to resolve it
         # to one of the citations that has already been matched
@@ -195,37 +218,25 @@ def get_citation_matches(opinion, citations):
 
             candidates = list(set(candidates))  # Remove duplicate matches
             if len(candidates) == 1:
-                matched_opinion = candidates[0]  # Accept the match!
+                # Accept the match!
+                matched_opinion = candidates[0]
             else:
                 refined_candidates = []
                 for cm in candidates:
-                    if (
-                        strip_punct(citation.antecedent_guess)
-                        in cm.cluster.case_name_full
-                    ):
+                    if strip_punct(
+                        citation.antecedent_guess
+                    ) in best_case_name(cm.cluster):
                         refined_candidates.append(cm)
 
+                refined_candidates = list(set(refined_candidates))
                 if len(refined_candidates) == 1:
-                    matched_opinion = refined_candidates[
-                        0
-                    ]  # Accept the match!
-
-        # If the citation is an id citation, just resolve it to the opinion
-        # that was matched immediately prior (so long as the previous match
-        # was successful).
-        elif isinstance(citation, IdCitation):
-            if was_matched:
-                matched_opinion = citation_matches[-1]
-
-        # If the citation is to a non-opinion document, we currently cannot
-        # match these.
-        elif isinstance(citation, NonopinionCitation):
-            pass
+                    # Accept the match!
+                    matched_opinion = refined_candidates[0]
 
         # Otherwise, the citation is just a regular citation, so try to match
         # it directly to an opinion
         else:
-            matches = match_citation(citation, citing_doc=opinion)
+            matches = match_citation(citation, citing_doc=citing_opinion)
 
             if len(matches) == 1:
                 match_id = matches[0]["id"]
