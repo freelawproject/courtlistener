@@ -569,6 +569,7 @@ class MatchingTest(IndexedSolrTestCase):
         # pk=7 is mocked with name 'Foo v. Bar' and citation '1 U.S. 1'
         # pk=8 is mocked with name 'Qwerty v. Uiop' and citation '2 F.3d 2'
         # pk=9 is mocked with name 'Lorem v. Ipsum' and citation '1 U.S. 50'
+        # pk=11 is mocked with name 'Abcdef v. Ipsum' and citation '1 U.S. 999'
 
         test_pairs = [
             # Simple test for matching a single, full citation
@@ -606,6 +607,24 @@ class MatchingTest(IndexedSolrTestCase):
                 ], [
                 Opinion.objects.get(pk=7),
                 Opinion.objects.get(pk=7)
+            ]),
+
+            # Test resolving a supra citation when its antecedent guess matches
+            # two possible candidates. We expect the supra citation to not
+            # be matched.
+            ([
+                FullCitation(volume=1, reporter='U.S.', page=50,
+                             canonical_reporter=u'U.S.', lookup_index=0,
+                             court='scotus', reporter_index=1,
+                             reporter_found='U.S.'),
+                FullCitation(volume=1, reporter='U.S.', page=999,
+                             canonical_reporter=u'U.S.', lookup_index=0,
+                             court='scotus', reporter_index=1,
+                             reporter_found='U.S.'),
+                SupraCitation(antecedent_guess='Ipsum', page=99, volume=1)
+                ], [
+                Opinion.objects.get(pk=9),
+                Opinion.objects.get(pk=11)
             ]),
 
             # Test resolving a short form citation with a meaningful antecedent
@@ -659,6 +678,26 @@ class MatchingTest(IndexedSolrTestCase):
             ], [
                 Opinion.objects.get(pk=7),
                 Opinion.objects.get(pk=9)
+            ]),
+
+            # Test resolving a short form citation when its reporter and
+            # volume match two possible candidates, and when its antecedent
+            # guess also matches multiple possibilities.
+            # We expect the short form citation to not be matched.
+            ([
+                FullCitation(volume=1, reporter='U.S.', page=50,
+                             canonical_reporter=u'U.S.', lookup_index=0,
+                             court='scotus', reporter_index=1,
+                             reporter_found='U.S.'),
+                FullCitation(volume=1, reporter='U.S.', page=999,
+                             canonical_reporter=u'U.S.', lookup_index=0,
+                             court='scotus', reporter_index=1,
+                             reporter_found='U.S.'),
+                ShortformCitation(reporter='U.S.', page=99, volume=1,
+                                  antecedent_guess='Ipsum')
+            ], [
+                Opinion.objects.get(pk=9),
+                Opinion.objects.get(pk=11)
             ]),
 
             # Test resolving a short form citation when its reporter and
@@ -731,7 +770,14 @@ class MatchingTest(IndexedSolrTestCase):
                 IdCitation(id_token='id.', after_tokens=['a', 'b', 'c'])
             ], [
                 Opinion.objects.get(pk=7)
-            ])
+            ]),
+
+            # Test resolving an Id. citation when it is the first citation
+            # found. Since there is nothing before it, we expect no matches to
+            # be returned.
+            ([
+                IdCitation(id_token='id.', after_tokens=['a', 'b', 'c'])
+            ], [])
         ]
 
         # fmt: on
