@@ -1,14 +1,11 @@
-import os
-
 from django.conf import settings
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from rest_framework import status
 
-from cl.lib import magic, sunburnt
+from cl.lib import sunburnt
 from cl.lib.search_utils import build_coverage_query, build_court_count_query
 from cl.search.models import Court
-from cl.stats.utils import tally_stat
 
 
 def annotate_courts_with_counts(courts, court_count_tuples):

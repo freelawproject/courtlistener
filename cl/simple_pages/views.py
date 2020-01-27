@@ -14,7 +14,7 @@ from django.http import HttpResponse
 from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render, get_object_or_404
 from django.template import loader
-from django.utils.timezone import now, localdate
+from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
