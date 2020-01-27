@@ -14,6 +14,7 @@ from juriscraper.lib.diff_tools import normalize_phrase
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Opinion, OpinionCluster, Docket, Citation
+from cl.search.tasks import add_items_to_solr
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.citations.find_citations import get_citations
@@ -28,20 +29,28 @@ from reporters_db import REPORTERS
 cnt = CaseNameTweaker()
 
 
-def validate_dt(date_text):
+def validate_dt(date_str):
     """
-    Check if the date string is only year-month. If partial date string, make
-    date string the first of the month and mark the date as an estimate.
+    Check if the date string is only year-month or year.
+    If partial date string, make date string the first of the month
+    and mark the date as an estimate.
 
-    :param date_text: a date string we receive from the harvard corpus
-    :returns: Tuple of date or date estimate and boolean indicating estimated
-    date or actual date
+    If unable to validate date return an empty string, True tuple.
+
+    :param date_str: a date string we receive from the harvard corpus
+    :returns: Tuple of date obj or date obj estimate
+    and boolean indicating estimated date or actual date.
     """
-    try:
-        datetime.strptime(date_text, "%Y-%m-%d")
-        return date_text, False
-    except ValueError:
-        return date_text + "-01", True
+    date_approx = False
+    add_ons = ["", "-15", "-07-01"]
+    for add_on in add_ons:
+        try:
+            date_obj = datetime.strptime(date_str + add_on, "%Y-%m-%d").date()
+            break
+        except ValueError:
+            # Failed parsing at least once, ∴ an approximate date
+            date_approx = True
+    return date_obj, date_approx
 
 
 def filepath_list(reporter, volume):
@@ -62,16 +71,16 @@ def filepath_list(reporter, volume):
     if reporter and volume:
         reporter_key = ".".join(["law.free.cap", reporter, volume])
         glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "%s/*" % reporter_key
+            settings.MEDIA_ROOT, "harvard_corpus", "%s/*.json" % reporter_key
         )
     elif reporter:
         reporter_key = ".".join(["law.free.cap", reporter])
         glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "%s.*/*" % reporter_key
+            settings.MEDIA_ROOT, "harvard_corpus", "%s.*/*.json" % reporter_key
         )
     else:
         glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*"
+            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
         )
     return sorted(glob(glob_path))
 
@@ -149,7 +158,36 @@ def map_opinion_type(harvard_opinion_type):
     return type_map.get(harvard_opinion_type, Opinion.COMBINED)
 
 
-def parse_harvard_opinions(reporter, volume):
+def parse_extra_fields(soup, fields, long_field=False):
+    """
+    Parse the remaining extra fields into long or short strings
+    returned as dict
+
+    :param soup: The bs4 representaion of the case data xml
+    :param fields: An array of strings names for fields to parse
+    :param long_field: A boolean decides to parse the field into <p> or simple
+    text.
+    :return: Returns dictionary of string values to be stored in opinion
+    """
+
+    data_set = {}
+    for field in fields:
+        elements = []
+        for elem in soup.find_all(field):
+            [x.extract() for x in elem.find_all("page-number")]
+            if long_field:
+                elements.append("<p>%s</p>" % elem.text)
+            else:
+                elements.append(elem.text)
+        if long_field:
+            data_set[field] = " ".join(elements)
+        else:
+            data_set[field] = ", ".join(elements)
+
+    return data_set
+
+
+def parse_harvard_opinions(reporter, volume, make_searchable):
     """
     Parse downloaded CaseLaw Corpus from internet archive and add them to our
     database.
@@ -163,6 +201,7 @@ def parse_harvard_opinions(reporter, volume):
 
     :param volume: The volume (int) of the reporters (optional) (ex 10)
     :param reporter: Reporter string as slugify'd (optional) (tc) for T.C.
+    :param make_searchable: Boolean to indicate saving to solr
     :return: None
     """
     if not reporter and volume:
@@ -247,22 +286,19 @@ def parse_harvard_opinions(reporter, volume):
                 ia_needs_upload=False,
             )
             # Iterate over other xml fields in Harvard data set
-            # and save as string list   for further processing at a later date.
-            json_fields = [
-                "attorneys",
-                "disposition",
+            # and save as string list for further processing at a later date.
+            short_fields = ["attorneys", "disposition", "otherdate", "seealso"]
+
+            long_fields = [
                 "syllabus",
                 "summary",
                 "history",
-                "otherdate",
-                "seealso",
                 "headnotes",
                 "correction",
             ]
-            data_set = {}
-            while json_fields:
-                key = json_fields.pop(0)
-                data_set[key] = "|".join([x.text for x in soup.find_all(key)])
+
+            short_data = parse_extra_fields(soup, short_fields, False)
+            long_data = parse_extra_fields(soup, long_fields, True)
 
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
@@ -277,15 +313,15 @@ def parse_harvard_opinions(reporter, volume):
                 source="U",
                 date_filed=date_filed,
                 date_filed_is_approximate=is_approximate,
-                attorneys=data_set["attorneys"],
-                disposition=data_set["disposition"],
-                syllabus=data_set["syllabus"],
-                summary=data_set["summary"],
-                history=data_set["history"],
-                other_dates=data_set["otherdate"],
-                cross_reference=data_set["seealso"],
-                headnotes=data_set["headnotes"],
-                correction=data_set["correction"],
+                attorneys=short_data["attorneys"],
+                disposition=short_data["disposition"],
+                syllabus=long_data["syllabus"],
+                summary=long_data["summary"],
+                history=long_data["history"],
+                other_dates=short_data["otherdate"],
+                cross_reference=short_data["seealso"],
+                headnotes=long_data["headnotes"],
+                correction=long_data["correction"],
                 judges=judges,
                 filepath_json_harvard=file_path,
             )
@@ -296,33 +332,45 @@ def parse_harvard_opinions(reporter, volume):
                 reporter=citation.reporter,
                 page=citation.page,
                 type=map_reporter_db_cite_type(
-                    REPORTERS[citation.reporter][0]["cite_type"]
+                    REPORTERS[citation.canonical_reporter][0]["cite_type"]
                 ),
                 cluster_id=cluster.id,
             )
             for op in soup.find_all("opinion"):
-                joined_by_str = titlecase(
-                    " ".join(
-                        list(set(itertools.chain.from_iterable(judge_list)))
+                # This code cleans author tags for processing.
+                # It is particularly useful for identifiying Per Curiam
+                for elem in [op.find("author")]:
+                    if elem is not None:
+                        [x.extract() for x in elem.find_all("page-number")]
+
+                auth = op.find("author")
+                if auth is not None:
+                    author_tag_str = titlecase(auth.text.strip(":"))
+                    author_str = titlecase(
+                        "".join(find_judge_names(author_tag_str))
                     )
-                )
-                author_str = titlecase(
-                    " ".join(
-                        list(set(itertools.chain.from_iterable(author_list)))
-                    )
-                )
+                else:
+                    author_str = ""
+                    author_tag_str = ""
+
+                per_curiam = True if author_tag_str == "Per Curiam" else False
+                # If Per Curiam is True set author string to Per Curiam
+                if per_curiam:
+                    author_str = "Per Curiam"
 
                 op_type = map_opinion_type(op.get("type"))
                 opinion_xml = str(op)
                 logger.info("Adding opinion for: %s", citation.base_citation())
-                Opinion.objects.create(
+                op = Opinion.objects.create(
                     cluster_id=cluster.id,
                     type=op_type,
                     author_str=author_str,
                     xml_harvard=opinion_xml,
-                    joined_by_str=joined_by_str,
+                    per_curiam=per_curiam,
                     extracted_by_ocr=True,
                 )
+                if make_searchable:
+                    add_items_to_solr.delay([op.pk], "search.Opinion")
 
         logger.info("Finished: %s", citation.base_citation())
 
@@ -356,7 +404,15 @@ class Command(VerboseCommand):
             required=False,
         )
 
+        parser.add_argument(
+            "--make-searchable",
+            action="store_true",
+            help="Add items to solr as we create opinions. "
+            "Items are not searchable unless flag is raised.",
+        )
+
     def handle(self, *args, **options):
         reporter = options["reporter"]
         volume = options["volume"]
-        parse_harvard_opinions(reporter, volume)
+        make_searchable = options["make_searchable"]
+        parse_harvard_opinions(reporter, volume, make_searchable)

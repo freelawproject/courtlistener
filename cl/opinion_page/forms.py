@@ -54,8 +54,8 @@ class DocketEntryFilterForm(forms.Form):
         label="Filed After",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
-                "class": "form-control",
+                "placeholder": "MM/DD/YYYY",
+                "class": "form-control datepicker",
                 "autocomplete": "off",
             }
         ),
@@ -65,8 +65,8 @@ class DocketEntryFilterForm(forms.Form):
         label="Filed Before",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "YYYY-MM-DD",
-                "class": "form-control",
+                "placeholder": "MM/DD/YYYY",
+                "class": "form-control datepicker",
                 "autocomplete": "off",
             }
         ),

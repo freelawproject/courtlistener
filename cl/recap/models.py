@@ -18,6 +18,7 @@ class UPLOAD_TYPE:
     IA_XML_FILE = 7
     CASE_REPORT_PAGE = 8
     CLAIMS_REGISTER = 9
+    DOCUMENT_ZIP = 10
 
     NAMES = (
         (DOCKET, "HTML Docket"),
@@ -29,6 +30,7 @@ class UPLOAD_TYPE:
         (IA_XML_FILE, "Internet Archive XML docket"),
         (CASE_REPORT_PAGE, "Case report (iquery.pl) page"),
         (CLAIMS_REGISTER, "Claims register page"),
+        (DOCUMENT_ZIP, "Zip archive of RECAP Documents"),
     )
 
 

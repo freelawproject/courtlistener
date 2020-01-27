@@ -4,6 +4,7 @@ from datetime import date
 from django.core.management import call_command
 from django.urls import reverse
 from django.test import TestCase, SimpleTestCase
+from django.utils.timezone import now
 from lxml import etree
 from reporters_db import REPORTERS
 
@@ -320,7 +321,7 @@ class CiteTest(TestCase):
             ("S.E.", 2012, True),
             ("T.C.M.", 1950, True),
             ("T.C.M.", 1940, False),
-            ("T.C.M.", date.today().year + 1, False),
+            ("T.C.M.", now().year + 1, False),
         ]
         for pair in test_pairs:
             date_in_reporter = is_date_in_reporter(

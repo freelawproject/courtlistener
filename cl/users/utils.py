@@ -5,15 +5,19 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.urls import reverse
 
 from cl.lib.crypto import md5
 from cl.users.models import UserProfile
+
+from django.utils.http import is_safe_url
 
 
 def sanitize_redirection(request):
     """Security and sanity checks on redirections.
 
-    Much of this code was grabbed from Django. The basic idea here is to:
+    Much of this code was grabbed from Django:
+
     1. Prevent open redirect attacks. Imagine getting an email:
 
       Subject: Your CourtListener account is conformed
@@ -22,28 +26,28 @@ def sanitize_redirection(request):
     Without proper redirect sanitation, a user might click that link, and get
     redirected to cortlistener.com, which could be a spoof of the real thing.
 
-    2. Prevent illogical redirects. Like, don't let people redirect back to
-    the sign-in page, for example.
+    1. Prevent illogical redirects. Like, don't let people redirect back to
+    the sign-in or register page.
+
+    1. Prevent garbage URLs (like empty ones or ones with spaces)
+
+    1. Prevent dangerous URLs (like JavaScript)
 
     :return: Either the value requested or the default LOGIN_REDIRECT_URL, if
     a sanity or security check failed.
     """
     redirect_to = request.GET.get("next", "")
-    if "sign-in" in redirect_to:
-        # thus, we don't redirect people back to the sign-in form
-        redirect_to = ""
-
-    # Light security check -- make sure redirect_to isn't garbage.
-    if not redirect_to or " " in redirect_to:
-        redirect_to = settings.LOGIN_REDIRECT_URL
-
-    # Heavier security check -- redirects to http://example.com should
-    # not be allowed, but things like /view/?param=http://example.com
-    # should be allowed. This regex checks if there is a '//' *before* a
-    # question mark.
-    elif "//" in redirect_to and re.match(r"[^?]*//", redirect_to):
-        redirect_to = settings.LOGIN_REDIRECT_URL
-
+    sign_in_url = reverse("sign-in") in redirect_to
+    register_in_url = reverse("register") in redirect_to
+    garbage_url = " " in redirect_to
+    no_url = not redirect_to
+    not_safe_url = not is_safe_url(
+        redirect_to,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    )
+    if any([sign_in_url, register_in_url, garbage_url, no_url, not_safe_url]):
+        return settings.LOGIN_REDIRECT_URL
     return redirect_to
 
 

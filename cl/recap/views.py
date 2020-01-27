@@ -1,3 +1,4 @@
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.utils import (
@@ -46,6 +47,7 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
     queryset = PacerFetchQueue.objects.all().order_by("-id")
     serializer_class = PacerFetchQueueSerializer
     filter_class = PacerFetchQueueFilter
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     ordering_fields = (
         "date_created",
         "date_modified",
