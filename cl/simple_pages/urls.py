@@ -6,7 +6,6 @@ from cl.simple_pages.views import (
     about,
     advanced_search,
     alert_help,
-    browser_warning,
     contact,
     contact_thanks,
     contribute,
@@ -52,8 +51,7 @@ urlpatterns = [
     ),
     url(r"^terms/v/(\d{1,2})/$", old_terms, name="old_terms"),
     url(r"^terms/$", latest_terms, name="terms"),
-    # Randoms
-    url(r"^bad-browser/$", browser_warning, name="bad_browser",),
+
     # Robots & Humans
     url(r"^robots\.txt$", robots, name="robots"),
     url(r"^humans\.txt$", humans, name="humans",),

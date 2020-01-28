@@ -364,10 +364,6 @@ def validate_for_wot(request):
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
 
 
-def browser_warning(request):
-    return render(request, "browser_warning.html", {"private": True})
-
-
 def ratelimited(request, exception):
     return render(
         request,
