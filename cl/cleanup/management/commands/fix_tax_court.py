@@ -107,6 +107,29 @@ def find_tax_court_citation(opinion_text):
                 return cite
 
 
+def fix_precedential_status(options):
+    """
+    This code corrects an on-going issues with scraping cases from tax court.
+
+    T.C. Memo(randum) cases are all being set to precedential when they should
+    not be. We can identify those cases by checking the citation type.
+
+    :param options:
+    :return: None
+    """
+    logger.info("Starting cleanup.")
+    ocs = OpinionCluster.objects.filter(
+        docket__court="tax", precedential_status="Published"
+    )
+    for oc in ocs:
+        if oc.citations.filter(type=Citation.NEUTRAL).exists():
+            logger.info("Updating cluster %s ", oc)
+            oc.precedential_status = "Unpublished"
+            oc.save()
+
+    logger.info("Finished cleanup.")
+
+
 def update_tax_opinions(options):
     """
     This code identifies tax opinions without
@@ -336,4 +359,5 @@ class Command(VerboseCommand):
         "update-tax-opinions": update_tax_opinions,
         "find-failures": find_missing_or_incorrect_citations,
         "find-docket-numbers": find_missing_or_incorrect_docket_numbers,
+        "fix-p-status": fix_precedential_status,
     }
