@@ -108,15 +108,26 @@ def find_tax_court_citation(opinion_text):
 
 
 def fix_precedential_status(options):
-    logger.info("Starting cleanup \n")
-    ocs = OpinionCluster.objects.filter(docket__court="tax")
+    """
+    This code corrects an on-going issues with scraping cases from tax court.
+
+    T.C. Memo(randum) cases are all being set to precedential when they should
+    not be. We can identify those cases by checking the citation type.
+
+    :param options:
+    :return: None
+    """
+    logger.info("Starting cleanup.")
+    ocs = OpinionCluster.objects.filter(
+        docket__court="tax", precedential_status="Published"
+    )
     for oc in ocs:
-        if len(oc.citations.all()) > 0:
-            if oc.citations.all()[0].type == Citation.NEUTRAL:
-                if oc.precedential_status == "Published":
-                    logger.info("Changing precedential status for %s", oc)
-                    oc.precedential_status = "Unpublished"
-                    oc.save()
+        if oc.citations.filter(type=Citation.NEUTRAL).exists():
+            logger.info("Updating cluster %s ", oc)
+            oc.precedential_status = "Unpublished"
+            oc.save()
+
+    logger.info("Finished cleanup.")
 
 
 def update_tax_opinions(options):
