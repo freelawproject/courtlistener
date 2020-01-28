@@ -198,16 +198,16 @@ class CiteTest(TestCase):
                                 canonical_reporter=u'U.S.', lookup_index=0,
                                 reporter_found='U. S.', reporter_index=2)]),
             # Test first kind of supra citation (standard kind)
-            ('asdf, supra, at 2',
+            ('before asdf, supra, at 2',
              [SupraCitation(antecedent_guess='asdf,', page=2, volume=None)]),
             # Test second kind of supra citation (with volume)
-            ('asdf, 123 supra, at 2',
+            ('before asdf, 123 supra, at 2',
              [SupraCitation(antecedent_guess='asdf,', page=2, volume=123)]),
             # Test third kind of supra citation (sans page)
-            ('asdf, supra, foo bar',
+            ('before asdf, supra, foo bar',
              [SupraCitation(antecedent_guess='asdf,', page=None, volume=None)]),
             # Test third kind of supra citation (with period)
-            ('asdf, supra. foo bar',
+            ('before asdf, supra. foo bar',
              [SupraCitation(antecedent_guess='asdf,', page=None, volume=None)]),
             # Test Ibid. citation
             ('foo v. bar 1 U.S. 12. asdf. Ibid. foo bar lorem ipsum.',

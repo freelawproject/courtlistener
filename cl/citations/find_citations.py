@@ -274,8 +274,10 @@ def extract_full_citation(words, reporter_index):
             .replace("–", "-")
             .split("-")
         )
+
+    # Handle "normal" citations, e.g., XX F.2d YY
     else:
-        # Is a "normal" citation, e.g., XX F.2d YY
+        # Don't check if we are at the beginning of a string
         if reporter_index == 0:
             return None
         volume = strip_punct(words[reporter_index - 1])
@@ -311,7 +313,7 @@ def extract_shortform_citation(words, reporter_index):
     Shortform 1: Adarand, 515 U.S., at 241
     Shortform 2: 515 U.S., at 241
     """
-    # Don't check if we are the beginning of a string
+    # Don't check if we are at the beginning of a string
     if reporter_index == 0:
         return None
 
@@ -361,6 +363,10 @@ def extract_supra_citation(words, supra_index):
     Supra 3: Adarand, supra, somethingelse
     Supra 4: Adrand, supra. somethingelse
     """
+    # Don't check if we are at the beginning of a string
+    if supra_index <= 1:
+        return None
+
     # Get volume
     volume = None
 
