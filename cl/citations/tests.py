@@ -451,91 +451,79 @@ class CiteTest(TestCase):
              '"reporter">U.S.</span> <span class="page">456</span></span><pre'
              ' class="inline">, upholding foo bar</pre>'),
 
-            # First kind of short form citation (meaningless antecedent)
-            ('asdf. 515 U.S., at 240. foobar',
-             '<pre class="inline"></pre><span class="citation no-link"><span '
-             'class="antecedent">asdf. </span><span class="volume">515</span> '
-             '<span class="reporter">U.S.</span>, at <span class="page">240'
-             '</span></span><pre class="inline">. foobar</pre>'),
-
-            # Second kind of short form citation (meaningful antecedent)
-            ('asdf, 1 U. S., at 2. foobar',
-             '<pre class="inline"></pre><span class="citation no-link"><span '
-             'class="antecedent">asdf, </span><span class="volume">1</span> '
-             '<span class="reporter">U.S.</span>, at <span class="page">2'
-             '</span></span><pre class="inline">. foobar</pre>'),
+            # Basic short form citation
+            ('existing text asdf, 515 U.S., at 240. foobar',
+             '<pre class="inline">existing text </pre><span class="citation '
+             'no-link"><span class="antecedent_guess">asdf,</span> <span '
+             'class="volume">515</span> <span class="reporter">U.S.</span>, '
+             'at <span class="page">240</span></span><pre class="inline">. '
+             'foobar</pre>'),
 
             # Short form citation with no comma after reporter in original
-            ('asdf, 1 U. S. at 2. foobar',
-             '<pre class="inline"></pre><span class="citation no-link"><span '
-             'class="antecedent">asdf, </span><span class="volume">1</span> '
-             '<span class="reporter">U.S.</span>, at <span class="page">2'
-             '</span></span><pre class="inline">. foobar</pre>'),
+            ('existing text asdf, 1 U. S. at 2. foobar',
+             '<pre class="inline">existing text </pre><span class="citation '
+             'no-link"><span class="antecedent_guess">asdf,</span> <span class'
+             '="volume">1</span> <span class="reporter">U.S.</span> at <span '
+             'class="page">2</span></span><pre class="inline">. foobar</pre>'),
 
             # Short form citation across line break
             (u'asdf.’ ” 123 \n U.S., at 456. Foo bar foobar',
-             '<pre class="inline">asdf.’ </pre><span class="citation no-link">'
-             '<span class="antecedent">” </span><span class="volume">123'
-             '</span> \n <span class="reporter">U.S.</span>, at <span class='
-             '"page">456</span></span><pre class="inline">. Foo bar foobar'
-             '</pre>'),
+             '<pre class="inline">asdf.\xe2\x80\x99 </pre><span class="'
+             'citation no-link"><span class="antecedent_guess">\xe2\x80\x9d'
+             '</span> <span class="volume">123</span> \n <span class='
+             '"reporter">U.S.</span>, at <span class="page">456</span></span>'
+             '<pre class="inline">. Foo bar foobar</pre>'),
 
             # First kind of supra citation (standard kind)
-            ('asdf, supra, at 2. foobar',
-             '<pre class="inline"></pre><span class="citation no-link"><span '
-             'class="antecedent">asdf,</span><span> supra</span><span>, at '
-             '</span><span class="page">2</span></span><pre class="inline">'
-             '. foobar</pre>'),
+            ('existing text asdf, supra, at 2. foobar',
+             '<pre class="inline">existing text </pre><span class="citation '
+             'no-link"><span class="antecedent_guess">asdf,</span> supra, at '
+             '<span class="page">2</span></span><pre class="inline">. foobar'
+             '</pre>'),
 
             # Second kind of supra citation (with volume)
-            ('asdf, 123 supra, at 2. foo bar',
-             '<pre class="inline"></pre><span class="citation no-link"><span '
-             'class="antecedent">asdf,</span> <span class="volume">123</span>'
-             '<span> supra</span><span>, at </span><span class="page">2</span>'
+            ('existing text asdf, 123 supra, at 2. foo bar',
+             '<pre class="inline">existing text </pre><span class="citation '
+             'no-link"><span class="antecedent_guess">asdf,</span> <span '
+             'class="volume">123</span> supra, at <span class="page">2</span>'
              '</span><pre class="inline">. foo bar</pre>'),
 
             # Third kind of supra citation (sans page)
-            ('asdf, supra, foo bar',
-             '<pre class="inline"></pre><span class="citation no-link"><span '
-             'class="antecedent">asdf,</span><span> supra</span></span><pre '
-             'class="inline">, foo bar</pre>'),
+            ('existing text asdf, supra, foo bar',
+             '<pre class="inline">existing text </pre><span class="citation '
+             'no-link"><span class="antecedent_guess">asdf,</span> supra'
+             '</span><pre class="inline">, foo bar</pre>'),
 
             # Fourth kind of supra citation (with period)
-            ('asdf, supra. foo bar',
-             '<pre class="inline"></pre><span class="citation no-link"><span '
-             'class="antecedent">asdf,</span><span> supra</span></span><pre '
-             'class="inline">. foo bar</pre>'),
+            ('existing text asdf, supra. foo bar',
+             '<pre class="inline">existing text </pre><span class="citation '
+             'no-link"><span class="antecedent_guess">asdf,</span> supra'
+             '</span><pre class="inline">. foo bar</pre>'),
 
             # Supra citation across line break
-            ('asdf, supra, at\n99 (quoting foo)',
-             '<pre class="inline"></pre><span class="citation no-link"><span'
-             ' class="antecedent">asdf,</span><span> supra</span><span>, at\n'
-             '</span><span class="page">99</span> </span><pre class="inline">'
+            ('existing text asdf, supra, at\n99 (quoting foo)',
+             '<pre class="inline">existing text </pre><span class="citation '
+             'no-link"><span class="antecedent_guess">asdf,</span> supra, '
+             'at\n<span class="page">99</span> </span><pre class="inline">'
              '(quoting foo)</pre>'),
 
             # First kind of id. citation ("Id., at 123")
             ('asdf, id., at 123. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation no-link">'
-             'id.,<span class="after_tokens"> <span class="after_token">at'
-             '</span> <span class="after_token">123.</span> <span class="'
-             'after_token">Lorem</span> </span></span><pre class="inline">'
-             'ipsum dolor sit amet</pre>'),
+             'id., at 123. Lorem </span><pre class="inline">ipsum dolor sit '
+             'amet</pre>'),
 
             # Second kind of id. citation ("Ibid.")
             ('asdf, Ibid. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation no-link">'
-             'Ibid.<span class="after_tokens"> <span class="after_token">Lorem'
-             '</span> <span class="after_token">ipsum</span> <span class="'
-             'after_token">dolor</span> </span></span><pre class="inline">'
-             'sit amet</pre>'),
+             'Ibid. Lorem ipsum dolor </span><pre class="inline">sit amet'
+             '</pre>'),
 
             # Id. citation across line break
             ('asdf." Id., at 315.\n       Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf." </pre><span class="citation no-link">'
-             'Id.,<span class="after_tokens"> <span class="after_token">at'
-             '</span> <span class="after_token">315.</span>\n       <span'
-             ' class="after_token">Lorem</span> </span></span><pre class="'
-             'inline">ipsum dolor sit amet</pre>')
+             '<pre class="inline">asdf." </pre><span class="citation '
+             'no-link">Id., at 315.\n       Lorem </span><pre class="inline">'
+             'ipsum dolor sit amet</pre>')
         ]
 
         # fmt: on
