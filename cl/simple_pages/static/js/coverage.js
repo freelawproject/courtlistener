@@ -159,8 +159,6 @@ function addNavigation() {
     if (hash === '') {
         hash = 'all';
     }
-    $('#nav select').val(hash)
-        .chosen(); //trigger the "chosen" plugin
 }
 $('#nav select').change(function(){
     // Update the hash whenever the select is changed.
@@ -177,5 +175,4 @@ $(document).ready(function() {
     hashCheck();
     drawGraph();
     $(window).trigger('hashchange');
-    $('#nav select').chosen();  // Initialize the chosen drop down.
 });
