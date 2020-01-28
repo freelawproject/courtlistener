@@ -754,7 +754,7 @@ class MatchingTest(IndexedSolrTestCase):
                              canonical_reporter=u'U.S.', lookup_index=0,
                              court='scotus', reporter_index=1,
                              reporter_found='U.S.'),
-                NonopinionCitation(match_token=u'§'),
+                NonopinionCitation(match_token=u'§99'),
                 IdCitation(id_token='id.', after_tokens=['a', 'b', 'c'])
             ], [
                 Opinion.objects.get(pk=7)

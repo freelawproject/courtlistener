@@ -11,6 +11,7 @@ from cl.citations import reporter_tokenizer
 from cl.lib.roman import isroman
 from cl.search.models import Court
 from cl.citations.models import (
+    Citation,
     FullCitation,
     IdCitation,
     SupraCitation,
@@ -430,10 +431,9 @@ def disambiguate_reporters(citations):
     unambiguous_citations = []
     for citation in citations:
         # Only disambiguate citations with a reporter
-        if (
-            isinstance(citation, SupraCitation)
-            or isinstance(citation, IdCitation)
-            or isinstance(citation, NonopinionCitation)
+        if not (
+            isinstance(citation, FullCitation)
+            or isinstance(citation, ShortformCitation)
         ):
             unambiguous_citations.append(citation)
             continue
@@ -612,12 +612,17 @@ def get_citations(
 
         citations.append(citation)
 
+    # Disambiguate each citation's reporter
     if disambiguate:
-        # Disambiguate each citation's reporter
         citations = disambiguate_reporters(citations)
 
+    # Set each citation's court property to "scotus" by default
     for citation in citations:
-        if not citation.court and is_scotus_reporter(citation):
+        if (
+            isinstance(citation, Citation)
+            and not citation.court
+            and is_scotus_reporter(citation)
+        ):
             citation.court = "scotus"
 
     # Returns a list of citations ordered in the sequence that they appear in
