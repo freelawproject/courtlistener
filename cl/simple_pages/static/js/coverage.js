@@ -160,7 +160,7 @@ function addNavigation() {
         hash = 'all';
     }
 }
-$('#nav select').change(function(){
+$('#nav select').on("change", function(){
     // Update the hash whenever the select is changed.
     var id = $('#nav select option:selected')[0].value;
     window.location.hash = id;

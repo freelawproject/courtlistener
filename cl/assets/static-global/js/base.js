@@ -91,7 +91,7 @@ $(document).ready(function () {
   }
 
   // Statuses
-  $('#show-all-statuses').click(function (event) {
+  $('#show-all-statuses').on("click", function (event) {
     event.preventDefault();
     $('.status-item').removeClass('hidden');
     $('#show-all-statuses').addClass('hidden');
@@ -102,26 +102,26 @@ $(document).ready(function () {
   ///////////////////////
   $('#search-form, ' +
     '#sidebar-search-form, ' +
-    '.search-page #court-picker-search-form').submit(function (e) {
+    '.search-page #court-picker-search-form').on("submit", function (e) {
     e.preventDefault();
     submitSearchForm();
   });
 
-  $('.search-page #id_order_by').change(function () {
+  $('.search-page #id_order_by').on("change", function () {
     submitSearchForm();
   });
 
   // Make the enter key work in the search form
-  $('.external-input').bind('keypress', function (e) {
+  $('.external-input').on('keypress', function (e) {
     if (e.keyCode == 13) {
-      $('#search-form').submit();
+      $('#search-form').trigger("submit");
     }
   });
-  $('#search-button-secondary').click(function (e) {
-    $('#search-form').submit();
+  $('#search-button-secondary').on("click", function (e) {
+    $('#search-form').trigger("submit");
   });
 
-  $('#advanced-page #court-picker-search-form').submit(function (e) {
+  $('#advanced-page #court-picker-search-form').on("submit", function (e) {
     e.preventDefault();
 
     // Indicate the count of selected jurisdictions when switching to
@@ -145,19 +145,19 @@ $(document).ready(function () {
     matches.find('input').prop('checked', true);
   }
 
-  $('#court-filter').keyup(courtFilter).change(courtFilter);
+  $('#court-filter').on("keyup", courtFilter).on("change", courtFilter);
 
   // Check/clear the tab/everything
-  $('#check-all').click(function () {
+  $('#check-all').on("click", function () {
     $('#modal-court-picker .tab-pane input').prop('checked', true);
   });
-  $('#clear-all').click(function () {
+  $('#clear-all').on("click", function () {
     $('#modal-court-picker .tab-pane input').prop('checked', false);
   });
-  $('#check-current').click(function () {
+  $('#check-current').on("click", function () {
     $('#modal-court-picker .tab-pane.active input').prop('checked', true);
   });
-  $('#clear-current').click(function () {
+  $('#clear-current').on("click", function () {
     $('#modal-court-picker .tab-pane.active input').prop('checked', false);
   });
 
@@ -165,12 +165,12 @@ $(document).ready(function () {
   ////////////
   // Alerts //
   ////////////
-  $('#save-alert-button').click(function (e) {
+  $('#save-alert-button').on("click", function (e) {
     e.preventDefault();
-    $('#alert-sidebar form').submit();
+    $('#alert-sidebar form').trigger("submit");
   });
 
-  $('#id_rate').change(function () {
+  $('#id_rate').on("change", function () {
     if ($(this).val() === 'rt' && totalDonatedLastYear < priceRtAlerts) {
       $('#donate-for-rt').removeClass('hidden');
       $('#alertSave').prop("disabled", true);
@@ -184,7 +184,7 @@ $(document).ready(function () {
   ///////////////
   // Show More //
   ///////////////
-  $(".read-more").click(function (e) {
+  $(".read-more").on("click", function (e) {
     e.preventDefault();
     var t = $(this);
     t.parent().find('.more').removeClass('hidden');
@@ -194,14 +194,14 @@ $(document).ready(function () {
   ///////////////////
   // Docket page: Change sort order when the asc/desc buttons are clicked.
   ///////////////////
-  $("#sort-buttons :input").change(function () {
-    this.closest("form").submit();
+  $("#sort-buttons :input").on("change", function () {
+    this.closest("form").trigger("submit");
   });
 
   //////////////////////////
   // Popup Cookie Handling//
   //////////////////////////
-  $('.alert-dismissible button').click(function () {
+  $('.alert-dismissible button').on("click", function () {
     let that = $(this);
     let duration = parseInt(that.data('duration'), 10);
     let cookie_name = that.data('cookie-name');

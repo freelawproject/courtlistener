@@ -434,13 +434,14 @@
 </div>
 {% endblock %}
 
+{% if DEBUG %}
 <script type="text/javascript"
-        src="{{ STATIC_PREFIX }}js/jquery-1.11.1.min.js"></script>
-<script>
-    window.jQuery || document.write(
-            '<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.js"><\/script>'
-    );
-</script>
+        src="{{ STATIC_PREFIX }}js/jquery/jquery-3.4.1.js"></script>
+{% else %}
+<script type="text/javascript"
+        src="{{ STATIC_PREFIX }}js/jquery/jquery-3.4.1.min.js"></script>
+{% endif %}
+
 {% if DEBUG %}
   <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.js"></script>
 {% else %}
