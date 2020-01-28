@@ -168,9 +168,9 @@ class FullCitation(Citation):
         # against accidentally updating things like docket number 22 Cr. 1 as
         # 22 Cranch 1, which is totally wrong.
         template = (
-            u'<span class="volume">%(volume)d</span>\\1'
-            u'<span class="reporter">%(reporter)s</span>\\2'
-            u'<span class="page">%(page)s</span>\\3'
+            u'<span class="volume">%(volume)d</span>\\g<1>'
+            u'<span class="reporter">%(reporter)s</span>\\g<2>'
+            u'<span class="page">%(page)s</span>\\g<3>'
         )
         inner_html = template % self.__dict__
         span_class = "citation"
@@ -196,7 +196,8 @@ class ShortformCitation(Citation):
     full citations.
 
     Example 1: Adarand, 515 U.S., at 241
-    Example 2: 515 U.S., at 241
+    Example 2: Adarand, 515 U.S. at 241
+    Example 3: 515 U.S., at 241
     """
 
     def __init__(self, reporter, page, volume, antecedent_guess, **kwargs):
@@ -218,7 +219,7 @@ class ShortformCitation(Citation):
         return print_string.encode("utf-8")
 
     def as_regex(self):
-        return r"%s(\s+)%d(\s+)%s,?(\s+)at(\s+)%s(\s?)" % (
+        return r"%s(\s+)%d(\s+)%s(,?)(\s+)at(\s+)%s(\s?)" % (
             re.escape(self.antecedent_guess),
             self.volume,
             re.escape(self.reporter_found),
@@ -229,9 +230,9 @@ class ShortformCitation(Citation):
         # Don't include the antecedent guess in the HTML link, since the guess
         # might be horribly wrong.
         inner_html = (
-            u'<span class="volume">%d</span>\\2'
-            + u'<span class="reporter">%s</span>,\\3at\\4'
-            + u'<span class="page">%s</span>\\5'
+            u'<span class="volume">%d</span>\\g<2>'
+            + u'<span class="reporter">%s</span>\\g<3>\\g<4>at\\g<5>'
+            + u'<span class="page">%s</span>\\g<6>'
         )
         inner_html = inner_html % (self.volume, self.reporter, self.page)
         span_class = "citation"
@@ -242,8 +243,8 @@ class ShortformCitation(Citation):
             span_class += " no-link"
             data_attr = ""
         return (
-            u'<span class="%s"%s><span class="antecedent">%s\\1</span>%s</span>'
-            % (span_class, data_attr, self.antecedent_guess, inner_html)
+            u'<span class="%s"%s><span class="antecedent_guess">%s</span>\\g<1>%s</span>'
+            % (span_class, data_attr, self.antecedent_guess, inner_html,)
         )
 
 
@@ -288,29 +289,29 @@ class SupraCitation(Citation):
 
     def as_html(self):
         inner_html = (
-            u'<span class="antecedent">%s</span>' % self.antecedent_guess
+            u'<span class="antecedent_guess">%s</span>' % self.antecedent_guess
         )
         if self.volume:
             inner_html += (
-                u'\\1<span class="volume">%d</span><span>\\2supra</span>'
+                u'\\g<1><span class="volume">%d</span>\\g<2>supra'
                 % self.volume
             )
             if self.page:
                 inner_html += (
-                    u'<span>,\\3at\\4</span><span class="page">%s</span>\\5'
+                    u',\\g<3>at\\g<4><span class="page">%s</span>\\g<5>'
                     % self.page
                 )
             else:
-                inner_html += u"\\3"
+                inner_html += u"\\g<3>"
         else:
-            inner_html += u"<span>\\1supra</span>"
+            inner_html += u"\\g<1>supra"
             if self.page:
                 inner_html += (
-                    u'<span>,\\2at\\3</span><span class="page">%s</span>\\4'
+                    u',\\g<2>at\\g<3><span class="page">%s</span>\\g<4>'
                     % self.page
                 )
             else:
-                inner_html += u"\\2"
+                inner_html += u"\\g<2>"
 
         span_class = "citation"
         if self.match_url:
@@ -366,25 +367,19 @@ class IdCitation(Citation):
             id_token = u"%s" % self.id_token
             span_class += " no-link"
             data_attr = ""
-        return (
-            u'<span class="%s"%s>%s<span class="after_tokens">%s</span></span>'
-            % (
-                span_class,
-                data_attr,
-                id_token,
-                "".join(
-                    [  # Backreferences must be dynamically generated
-                        "\\"
-                        + str(i + 1)
-                        + '<span class="after_token">'
-                        + t
-                        + "</span>"
-                        for i, t in enumerate(self.after_tokens)
-                    ]
-                )
-                + "\\"
-                + str(len(self.after_tokens) + 1),
+        return u'<span class="%s"%s>%s%s</span>' % (
+            span_class,
+            data_attr,
+            id_token,
+            "".join(
+                [  # Backreferences must be dynamically generated based on the number of after tokens
+                    "\\g<" + str(i + 1) + ">" + t
+                    for i, t in enumerate(self.after_tokens)
+                ]
             )
+            + "\\g<"
+            + str(len(self.after_tokens) + 1)
+            + ">",
         )
 
 
