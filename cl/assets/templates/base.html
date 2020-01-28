@@ -85,8 +85,6 @@
     <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.min.css"
           type="text/css">
   {% endif %}
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/hopscotch.css" type="text/css"
-        media="screen, projection">
   <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css?v=20180917" type="text/css"
         media="screen, projection">
 </head>
@@ -190,8 +188,6 @@
               <ul class="nav navbar-nav navbar-right">
                 <li><a href="{% url "about" %}" tabindex="200">About</a></li>
                 <li><a href="{% url "faq" %}" tabindex="201">FAQ</a></li>
-                <li class="hidden-xs"><a href="" class="tour-link"
-                                         tabindex="202">Tour</a></li>
                 <li class="visible-xs">
                   <a href="{% url "donate" %}?referrer=navbar"
                      tabindex="203">Donate</a>
@@ -341,9 +337,6 @@
             <div class="footer-item">
               <a href="{% url "faq" %}">FAQ</a>
             </div>
-            <div class="footer-item hidden-xs">
-              <a href="" class="tour-link">Tour</a>
-            </div>
             <div class="footer-item">
               <a href="{% url "donate" %}?referrer=footer-link">Donate</a>
             </div>
@@ -450,12 +443,8 @@
 </script>
 {% if DEBUG %}
   <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.js"></script>
-  <script type="text/javascript"
-          src="{{ STATIC_URL }}js/hopscotch.js"></script>
 {% else %}
   <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.min.js"></script>
-  <script type="text/javascript"
-          src="{{ STATIC_URL }}js/hopscotch.min.js"></script>
 {% endif %}
 <script type="text/javascript" src="{{ STATIC_URL }}js/base.js"></script>
 <script type="text/javascript">
