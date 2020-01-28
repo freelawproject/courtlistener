@@ -5,7 +5,7 @@ from collections import Counter
 from cl.celery import app
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited
-from cl.citations.models import NonopinionCitation
+from cl.citations.models import Citation
 
 # This is the distance two reporter abbreviations can be from each other if they
 # are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
@@ -73,14 +73,14 @@ def create_cited_html(opinion, citations):
     if any([opinion.html_columbia, opinion.html_lawbox, opinion.html]):
         new_html = opinion.html_columbia or opinion.html_lawbox or opinion.html
         for citation in citations:
-            if not isinstance(citation, NonopinionCitation):
+            if isinstance(citation, Citation):
                 new_html = re.sub(
                     citation.as_regex(), citation.as_html(), new_html
                 )
     elif opinion.plain_text:
         inner_html = opinion.plain_text
         for citation in citations:
-            if not isinstance(citation, NonopinionCitation):
+            if isinstance(citation, Citation):
                 repl = u'</pre>%s<pre class="inline">' % citation.as_html()
                 inner_html = re.sub(citation.as_regex(), repl, inner_html)
         new_html = u'<pre class="inline">%s</pre>' % inner_html

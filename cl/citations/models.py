@@ -383,7 +383,7 @@ class IdCitation(Citation):
         )
 
 
-class NonopinionCitation(Citation):
+class NonopinionCitation(object):
     """Convenience class which represents a citation to something that we know
     is not an opinion. This could be a citation to a statute, to the U.S. code,
     the U.S. Constitution, etc.
@@ -392,10 +392,7 @@ class NonopinionCitation(Citation):
     Example 2: U. S. Const., Art. I, §8
     """
 
-    def __init__(self, match_token, **kwargs):
-        super(NonopinionCitation, self).__init__(None, None, None, **kwargs)
-
-        # Extracted string of the citation
+    def __init__(self, match_token):
         # TODO: Do something meaningful with this (e.g., extract the strings
         # surrounding the token to grab the full citation; linkify this
         # citation to an external source; etc.)
@@ -403,3 +400,9 @@ class NonopinionCitation(Citation):
 
     def __repr__(self):
         return "NonopinionCitation".encode("utf-8")
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
