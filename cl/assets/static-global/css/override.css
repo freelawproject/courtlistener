@@ -303,10 +303,6 @@ a.button:active {
   color: #6683b7;
 }
 
-div.hopscotch-bubble .hopscotch-bubble-content {
-  margin: 0;
-}
-
 /* General class shortcuts */
 .inline {
   display: inline;
@@ -977,20 +973,6 @@ body.embed .caseHoverText {
 }
 .twitter-typeahead, .tt-hint, .tt-input, .tt-menu {
   width: 100%;
-}
-
-
-/* Hide hopscotch number in tour */
-div.hopscotch-bubble .hopscotch-bubble-number {
-  display: none;
-  padding: 0;
-}
-
-div.hopscotch-bubble .hopscotch-nav-button.next,
-div.hopscotch-bubble .hopscotch-nav-button.next:hover,
-div.hopscotch-bubble .hopscotch-nav-button.prev,
-div.hopscotch-bubble .hopscotch-nav-button.prev:hover {
-  background-image: none;
 }
 
 #notes.markdown img {
