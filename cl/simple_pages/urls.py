@@ -14,7 +14,6 @@ from cl.simple_pages.views import (
     donation_help,
     faq,
     feeds,
-    humans,
     latest_terms,
     markdown_help,
     old_terms,
@@ -52,9 +51,8 @@ urlpatterns = [
     url(r"^terms/v/(\d{1,2})/$", old_terms, name="old_terms"),
     url(r"^terms/$", latest_terms, name="terms"),
 
-    # Robots & Humans
+    # Robots
     url(r"^robots\.txt$", robots, name="robots"),
-    url(r"^humans\.txt$", humans, name="humans",),
     # Sitemap:
     url(
         r"^sitemap-simple-pages\.xml$",
