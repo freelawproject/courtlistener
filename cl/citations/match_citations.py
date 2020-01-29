@@ -151,7 +151,7 @@ def match_citation(citation, citing_doc=None):
 
 def get_citation_matches(citing_opinion, citations):
     """For a list of Citation objects (e.g., FullCitations, SupraCitations,
-    IdCitations, etc.), try to match them to Opinion objects in in the database
+    IdCitations, etc.), try to match them to Opinion objects in the database
     using a variety of heuristics.
 
     Returns:
@@ -187,9 +187,9 @@ def get_citation_matches(citing_opinion, citations):
                 # look alike, matches using this heuristic may not be unique.
                 # If no match, or more than one match, is found, then the supra
                 # reference is effectively dropped.
-                if strip_punct(citation.antecedent_guess) in best_case_name(
-                    cm.cluster
-                ):
+                antecedent_guess = strip_punct(citation.antecedent_guess)
+                cm_case_name = best_case_name(cm.cluster)
+                if antecedent_guess in cm_case_name:
                     candidates.append(cm)
 
             candidates = list(set(candidates))  # Remove duplicate matches
@@ -223,9 +223,9 @@ def get_citation_matches(citing_opinion, citations):
             else:
                 refined_candidates = []
                 for cm in candidates:
-                    if strip_punct(
-                        citation.antecedent_guess
-                    ) in best_case_name(cm.cluster):
+                    antecedent_guess = strip_punct(citation.antecedent_guess)
+                    cm_case_name = best_case_name(cm.cluster)
+                    if antecedent_guess in cm_case_name:
                         refined_candidates.append(cm)
 
                 refined_candidates = list(set(refined_candidates))
