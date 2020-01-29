@@ -107,16 +107,19 @@ def check_for_match(new_case, possibilities):
         return None
 
 
-def skip_processing(citation, case_name):
+def skip_processing(citation, case_name, file_path):
     """Run checks for whether to skip the item from being added to the DB
 
-    Cheks include:
+    Checks include:
      - Is the reporter one we know about in the reporter DB?
      - Can we properly extract the reporter?
      - Can we find a duplicate of the item already in CL?
+     - If we think we have a match - check if all matches are harvard cases
+       and compare against filepaths.
 
     :param citation: CL citation object
     :param case_name: The name of the case
+    :param file_path: The file_path of our case
     :return: True if the item should be skipped; else False
     """
 
@@ -126,13 +129,21 @@ def skip_processing(citation, case_name):
         reporter=citation.reporter, page=citation.page, volume=citation.volume
     )
     if cite_search.count() > 0:
-        case_names = OpinionCluster.objects.filter(
+        case_data = OpinionCluster.objects.filter(
             citations=cite_search
-        ).values_list("case_name", flat=True)
-        case_names = [s.replace("commissioner", "") for s in case_names]
+        ).values_list("case_name", "filepath_json_harvard")
+        case_names = [s[0] for s in case_data]
+        found_filepaths = [s[1] for s in case_data]
         if check_for_match(case_name, case_names) is not None:
-            logger.info("Looks like we already have %s." % case_name)
-            return True
+
+            for found_filepath in found_filepaths:
+                if found_filepath == file_path or found_filepath == "":
+                    # Check if all same citations are Harvard imports
+                    # If all Harvard data - match on file_path
+                    # If no match assume different case
+                    logger.info("Looks like we already have %s." % case_name)
+                    return True
+
         logger.info("Duplicate cite string but appears to be a new case")
     return False
 
@@ -241,7 +252,7 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
         case_name_full = harmonize(data["name"])
 
         citation = cites[0]
-        if skip_processing(citation, case_name):
+        if skip_processing(citation, case_name, file_path):
             continue
 
         # TODO: Generalize this to handle all court types somehow.
