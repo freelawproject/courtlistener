@@ -116,7 +116,6 @@ class SimplePagesTest(TestCase):
     def test_simple_pages(self):
         """Do all the simple pages load properly?"""
         reverse_params = [
-            {"viewname": "about"},
             {"viewname": "faq"},
             {"viewname": "coverage"},
             {"viewname": "feeds_info"},

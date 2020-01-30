@@ -3,7 +3,6 @@ from django.views.generic import RedirectView
 
 from cl.simple_pages.sitemap import sitemap_maker
 from cl.simple_pages.views import (
-    about,
     advanced_search,
     alert_help,
     contact,
@@ -28,7 +27,6 @@ from cl.simple_pages.views import (
 
 urlpatterns = [
     # Footer stuff
-    url(r"^about/$", about, name="about"),
     url(r"^faq/$", faq, name="faq"),
     url(r"^coverage/$", coverage_graph, name="coverage"),
     url(r"^feeds/$", feeds, name="feeds_info"),
