@@ -129,7 +129,6 @@ class SimplePagesTest(TestCase):
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
             {"viewname": "terms"},
-            {"viewname": "bad_browser"},
             {"viewname": "robots"},
         ]
         for reverse_param in reverse_params:
