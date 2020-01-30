@@ -154,6 +154,10 @@ class CiteTest(TestCase):
              [Citation(volume=2017, reporter='IL App (1st)', page='143684-B',
                        canonical_reporter=u'IL App (1st)', lookup_index=0,
                        reporter_index=1, reporter_found='IL App (1st)')]),
+             ('2014 T.C. Summary Opinion 63',
+              [Citation(volume=2014, reporter='T.C. Summary Opinion', page=63,
+                        canonical_reporter=u'T.C. Summary Opinion', lookup_index=0,
+                        reporter_index=1, reporter_found='T.C. Summary Opinion')]),
         )
         # fmt: on
         for q, a in test_pairs:
