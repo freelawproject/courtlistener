@@ -14,11 +14,11 @@ class AudioFilter(FilterSet):
     class Meta:
         model = Audio
         fields = {
-            'id': ['exact'],
-            'date_modified': DATETIME_LOOKUPS,
-            'date_created': DATETIME_LOOKUPS,
-            'sha1': ['exact'],
-            'blocked': ['exact'],
-            'date_blocked': DATE_LOOKUPS,
-            'processing_complete': ['exact'],
+            "id": ["exact"],
+            "date_modified": DATETIME_LOOKUPS,
+            "date_created": DATETIME_LOOKUPS,
+            "sha1": ["exact"],
+            "blocked": ["exact"],
+            "date_blocked": DATE_LOOKUPS,
+            "processing_complete": ["exact"],
         }

@@ -10,45 +10,47 @@ from cl.users.utils import emails
 
 
 class Command(VerboseCommand):
-    help = ('Notify users of unconfirmed accounts and delete accounts that '
-            'were never confirmed')
+    help = (
+        "Notify users of unconfirmed accounts and delete accounts that "
+        "were never confirmed"
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--notify',
-            action='store_true',
+            "--notify",
+            action="store_true",
             default=False,
-            help='Notify users with unconfirmed accounts older than five days, '
-                 'and delete orphaned profiles.'
+            help="Notify users with unconfirmed accounts older than five days, "
+            "and delete orphaned profiles.",
         )
         parser.add_argument(
-            '--delete',
-            action='store_true',
+            "--delete",
+            action="store_true",
             default=False,
-            help='Delete unconfirmed accounts older than two months'
+            help="Delete unconfirmed accounts older than two months",
         )
         parser.add_argument(
-            '--simulate',
-            action='store_true',
+            "--simulate",
+            action="store_true",
             default=False,
-            help='Simulate the emails that would be sent, using the console '
-                 'backend. Do not delete accounts.'
+            help="Simulate the emails that would be sent, using the console "
+            "backend. Do not delete accounts.",
         )
         parser.add_argument(
-            '--verbose',
-            action='store_true',
+            "--verbose",
+            action="store_true",
             default=False,
-            help="Create more output."
+            help="Create more output.",
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         self.options = options
-        if options['delete']:
+        if options["delete"]:
             self.delete_old_accounts()
-        if options['notify']:
+        if options["notify"]:
             self.notify_unconfirmed_accounts()
-        if options['simulate']:
+        if options["simulate"]:
             print "**************************************"
             print "* NO EMAILS SENT OR ACCOUNTS DELETED *"
             print "**************************************"
@@ -65,9 +67,9 @@ class Command(VerboseCommand):
         )
 
         for up in unconfirmed_ups:
-            if self.options['verbose']:
+            if self.options["verbose"]:
                 print "User %s deleted" % up.user.username
-            if not self.options['simulate']:
+            if not self.options["simulate"]:
                 # Gather their foreign keys, delete those
                 up.user.alerts.all().delete()
                 up.user.donations.all().delete()
@@ -99,14 +101,14 @@ class Command(VerboseCommand):
         unconfirmed_ups = UserProfile.objects.filter(
             email_confirmed=False,
             key_expires__lte=a_week_ago,
-            stub_account=False
+            stub_account=False,
         )
 
         for up in unconfirmed_ups:
-            if self.options['verbose']:
+            if self.options["verbose"]:
                 print "User %s will be notified" % up.user
 
-            if not self.options['simulate']:
+            if not self.options["simulate"]:
                 # Build and save a new activation key for the account.
                 activation_key = sha1_activation_key(up.user.username)
                 key_expires = now() + datetime.timedelta(5)
@@ -116,10 +118,10 @@ class Command(VerboseCommand):
 
                 # Send the email.
                 current_site = Site.objects.get_current()
-                email = emails['email_not_confirmed']
+                email = emails["email_not_confirmed"]
                 send_mail(
-                    email['subject'] % current_site.name,
-                    email['body'] % (up.user.username, up.activation_key),
-                    email['from'],
-                    [up.user.email]
+                    email["subject"] % current_site.name,
+                    email["body"] % (up.user.username, up.activation_key),
+                    email["from"],
+                    [up.user.email],
                 )

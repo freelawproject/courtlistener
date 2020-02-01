@@ -11,7 +11,7 @@
   {% if no_reporters %}
     Reporter '{{ reporter }}' Not Found (404) – CourtListener.com
   {% elif no_volumes or no_cases %}
-    No Cases Found for {{ volumes_names.0 }} (404) – CourtListener.com
+    No Cases Found for {{ volume_names.0 }} (404) – CourtListener.com
   {% elif volumes %}
     {{ reporter }}, {{ volume_names.0 }} – CourtListener.com
   {% elif cases.paginator.count %}

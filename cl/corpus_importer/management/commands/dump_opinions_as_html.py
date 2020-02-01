@@ -15,32 +15,32 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--output-directory',
+            "--output-directory",
             type=readable_dir,
             required=True,
-            help='A directory to place the generated data.',
+            help="A directory to place the generated data.",
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
 
-        ops = queryset_generator(Opinion.objects.exclude(
-            Q(html='') | Q(html=None),
-            Q(html_lawbox='') | Q(html_lawbox=None),
-            Q(html_columbia='') | Q(html_columbia=None),
-        ))
+        ops = queryset_generator(
+            Opinion.objects.exclude(
+                Q(html="") | Q(html=None),
+                Q(html_lawbox="") | Q(html_lawbox=None),
+                Q(html_columbia="") | Q(html_columbia=None),
+            )
+        )
 
         for op in ops:
-            content = render_to_string('simple_opinion.html', {
-                'o': op,
-            })
+            content = render_to_string("simple_opinion.html", {"o": op,})
             output_dir = os.path.join(
-                options['output_directory'],
+                options["output_directory"],
                 str(op.cluster.date_filed.year),
                 str(op.cluster.date_filed.month),
                 str(op.cluster.date_filed.day),
             )
             mkdir_p(output_dir)
-            output_path = os.path.join(output_dir, '%s.html' % op.pk)
-            with open(output_path, 'w') as f:
-                f.write(content.encode('utf-8'))
+            output_path = os.path.join(output_dir, "%s.html" % op.pk)
+            with open(output_path, "w") as f:
+                f.write(content.encode("utf-8"))

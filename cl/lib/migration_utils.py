@@ -34,14 +34,15 @@ def load_migration_fixture(apps, schema_editor, fixture, app_label):
             return apps.get_model(model_identifier)
         except (LookupError, TypeError):
             raise base.DeserializationError(
-                "Invalid model identifier: '%s'" % model_identifier)
+                "Invalid model identifier: '%s'" % model_identifier
+            )
 
     # Replace the _get_model() function on the module so loaddata can utilize it
     python._get_model = _get_model
 
     try:
         # Call loaddata command
-        call_command('loaddata', fixture, app_label=app_label)
+        call_command("loaddata", fixture, app_label=app_label)
     finally:
         # Restore old _get_model() function
         python._get_model = old_get_model

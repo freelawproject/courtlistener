@@ -30,13 +30,31 @@ from cl.lib.utils import mkdir_p
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
 
-DATETIME_LOOKUPS = ['exact', 'gte', 'gt', 'lte', 'lt', 'range', 'year',
-                    'month', 'day', 'hour', 'minute', 'second']
+DATETIME_LOOKUPS = [
+    "exact",
+    "gte",
+    "gt",
+    "lte",
+    "lt",
+    "range",
+    "year",
+    "month",
+    "day",
+    "hour",
+    "minute",
+    "second",
+]
 DATE_LOOKUPS = DATETIME_LOOKUPS[:-3]
-INTEGER_LOOKUPS = ['exact', 'gte', 'gt', 'lte', 'lt', 'range']
-BASIC_TEXT_LOOKUPS = ['exact', 'iexact', 'startswith', 'istartswith',
-                      'endswith', 'iendswith']
-ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ['contains', 'icontains']
+INTEGER_LOOKUPS = ["exact", "gte", "gt", "lte", "lt", "range"]
+BASIC_TEXT_LOOKUPS = [
+    "exact",
+    "iexact",
+    "startswith",
+    "istartswith",
+    "endswith",
+    "iendswith",
+]
+ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ["contains", "icontains"]
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +63,7 @@ class HyperlinkedModelSerializerWithId(serializers.HyperlinkedModelSerializer):
     """Extend the HyperlinkedModelSerializer to add IDs as well for the best of
     both worlds.
     """
+
     id = serializers.ReadOnlyField()
 
 
@@ -55,26 +74,28 @@ class DisabledHTMLFilterBackend(DjangoFilterBackend):
     objects this loads every object into the HTML and it loads them from the DB
     one query at a time. It's insanity, so it's gotta be disabled globally.
     """
+
     def to_html(self, request, queryset, view):
         return ""
 
 
 class SimpleMetadataWithFilters(SimpleMetadata):
-
     def determine_metadata(self, request, view):
-        metadata = super(SimpleMetadataWithFilters, self).determine_metadata(request, view)
+        metadata = super(SimpleMetadataWithFilters, self).determine_metadata(
+            request, view
+        )
         filters = OrderedDict()
-        if not hasattr(view, 'filter_class'):
+        if not hasattr(view, "filter_class"):
             # This is the API Root, which is not filtered.
             return metadata
 
         for filter_name, filter_type in view.filter_class.base_filters.items():
-            filter_parts = filter_name.split('__')
+            filter_parts = filter_name.split("__")
             filter_name = filter_parts[0]
             attrs = OrderedDict()
 
             # Type
-            attrs['type'] = filter_type.__class__.__name__
+            attrs["type"] = filter_type.__class__.__name__
 
             # Lookup fields
             if len(filter_parts) > 1:
@@ -83,27 +104,33 @@ class SimpleMetadataWithFilters(SimpleMetadata):
                 if filters.get(filter_name) is not None:
                     # We've done a filter with this name previously, just
                     # append the value.
-                    attrs['lookup_types'] = filters[filter_name]['lookup_types']
-                    attrs['lookup_types'].append(lookup_type)
+                    attrs["lookup_types"] = filters[filter_name][
+                        "lookup_types"
+                    ]
+                    attrs["lookup_types"].append(lookup_type)
                 else:
-                    attrs['lookup_types'] = [lookup_type]
+                    attrs["lookup_types"] = [lookup_type]
             else:
                 # Exact match or RelatedFilter
                 if isinstance(filter_type, RelatedFilter):
-                    model_name = (filter_type.filterset.Meta.model.
-                                  _meta.verbose_name_plural.title())
-                    attrs['lookup_types'] = "See available filters for '%s'" % \
-                                            model_name
+                    model_name = (
+                        filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
+                    )
+                    attrs["lookup_types"] = (
+                        "See available filters for '%s'" % model_name
+                    )
                 else:
-                    attrs['lookup_types'] = ['exact']
+                    attrs["lookup_types"] = ["exact"]
 
             # Do choices
-            choices = filter_type.extra.get('choices', False)
+            choices = filter_type.extra.get("choices", False)
             if choices:
-                attrs['choices'] = [
+                attrs["choices"] = [
                     {
-                        'value': choice_value,
-                        'display_name': force_text(choice_name, strings_only=True)
+                        "value": choice_value,
+                        "display_name": force_text(
+                            choice_name, strings_only=True
+                        ),
                     }
                     for choice_value, choice_name in choices
                 ]
@@ -111,10 +138,10 @@ class SimpleMetadataWithFilters(SimpleMetadata):
             # Wrap up.
             filters[filter_name] = attrs
 
-        metadata['filters'] = filters
+        metadata["filters"] = filters
 
-        if hasattr(view, 'ordering_fields'):
-            metadata['ordering'] = view.ordering_fields
+        if hasattr(view, "ordering_fields"):
+            metadata["ordering"] = view.ordering_fields
         return metadata
 
     def determine_actions(self, request, view):
@@ -124,9 +151,9 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         Fixes issue #732.
         """
         actions = {}
-        for method in {'PUT', 'POST'} & set(view.allowed_methods):
+        for method in {"PUT", "POST"} & set(view.allowed_methods):
             view.request = clone_request(request, method)
-            if method == 'PUT' and hasattr(view, 'get_object'):
+            if method == "PUT" and hasattr(view, "get_object"):
                 view.get_object()
             serializer = view.get_serializer()
             actions[method] = self.get_serializer_info(serializer)
@@ -153,7 +180,8 @@ class LoggingMixin(object):
      - How many queries total made by user X?
      - How many queries per day made by user X?
     """
-    milestones = get_milestone_range('SM', 'XXXL')
+
+    milestones = get_milestone_range("SM", "XXXL")
 
     def initial(self, request, *args, **kwargs):
         super(LoggingMixin, self).initial(request, *args, **kwargs)
@@ -163,7 +191,8 @@ class LoggingMixin(object):
 
     def finalize_response(self, request, response, *args, **kwargs):
         response = super(LoggingMixin, self).finalize_response(
-            request, response, *args, **kwargs)
+            request, response, *args, **kwargs
+        )
 
         if not response.exception:
             # Don't log things like 401, 403, etc.,
@@ -172,8 +201,9 @@ class LoggingMixin(object):
                 results = self._log_request(request)
                 self._handle_events(results, request.user)
             except Exception as e:
-                logger.exception("Unable to log API response timing info: %s",
-                                 e.message)
+                logger.exception(
+                    "Unable to log API response timing info: %s", e.message
+                )
         return response
 
     def _get_response_ms(self):
@@ -192,31 +222,31 @@ class LoggingMixin(object):
         endpoint = resolve(request.path_info).url_name
         response_ms = self._get_response_ms()
 
-        r = make_redis_interface('STATS')
+        r = make_redis_interface("STATS")
         pipe = r.pipeline()
 
         # Global and daily tallies for all URLs.
-        pipe.incr('api:v3.count')
-        pipe.incr('api:v3.d:%s.count' % d)
-        pipe.incr('api:v3.timing', response_ms)
-        pipe.incr('api:v3.d:%s.timing' % d, response_ms)
+        pipe.incr("api:v3.count")
+        pipe.incr("api:v3.d:%s.count" % d)
+        pipe.incr("api:v3.timing", response_ms)
+        pipe.incr("api:v3.d:%s.timing" % d, response_ms)
 
         # Use a sorted set to store the user stats, with the score representing
         # the number of queries the user made total or on a given day.
-        user_pk = user.pk or 'AnonymousUser'
-        pipe.zincrby('api:v3.user.counts', 1, user_pk)
-        pipe.zincrby('api:v3.user.d:%s.counts' % d, 1, user_pk)
+        user_pk = user.pk or "AnonymousUser"
+        pipe.zincrby("api:v3.user.counts", 1, user_pk)
+        pipe.zincrby("api:v3.user.d:%s.counts" % d, 1, user_pk)
 
         # Use a sorted set to store all the endpoints with score representing
         # the number of queries the endpoint received total or on a given day.
-        pipe.zincrby('api:v3.endpoint.counts', 1, endpoint)
-        pipe.zincrby('api:v3.endpoint.d:%s.counts' % d, 1, endpoint)
+        pipe.zincrby("api:v3.endpoint.counts", 1, endpoint)
+        pipe.zincrby("api:v3.endpoint.d:%s.counts" % d, 1, endpoint)
 
         # We create a per-day key in redis for timings. Inside the key we have
         # members for every endpoint, with score of the total time. So to get
         # the average for an endpoint you need to get the number of requests
         # and the total time for the endpoint and divide.
-        timing_key = 'api:v3.endpoint.d:%s.timings' % d
+        timing_key = "api:v3.endpoint.d:%s.timings" % d
         pipe.zincrby(timing_key, response_ms, endpoint)
 
         results = pipe.execute()
@@ -227,21 +257,22 @@ class LoggingMixin(object):
         user_count = results[4]
 
         if total_count in MILESTONES_FLAT:
-            Event.objects.create(description="API has logged %s total requests."
-                                             % total_count)
+            Event.objects.create(
+                description="API has logged %s total requests." % total_count
+            )
         if user.is_authenticated:
             if user_count in self.milestones:
                 Event.objects.create(
-                    description="User '%s' has placed their %s API request." %
-                                (user.username, intcomma(ordinal(user_count))),
+                    description="User '%s' has placed their %s API request."
+                    % (user.username, intcomma(ordinal(user_count))),
                     user=user,
                 )
             if user_count == SEND_API_WELCOME_EMAIL_COUNT:
-                email = emails['new_api_user']
+                email = emails["new_api_user"]
                 send_mail(
-                    email['subject'],
-                    email['body'] % user.first_name or 'there',
-                    email['from'],
+                    email["subject"],
+                    email["body"] % user.first_name or "there",
+                    email["from"],
                     [user.email],
                 )
 
@@ -251,7 +282,7 @@ class CacheListMixin(object):
 
     @method_decorator(cache_page(60))
     # Ensure that permissions are maintained and not cached!
-    @method_decorator(vary_on_headers('Cookie', 'Authorization'))
+    @method_decorator(vary_on_headers("Cookie", "Authorization"))
     def list(self, *args, **kwargs):
         return super(CacheListMixin, self).list(*args, **kwargs)
 
@@ -274,9 +305,8 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         self.now = self.timer()
 
         # Adjust if user has special privileges.
-        override_rate = settings.REST_FRAMEWORK['OVERRIDE_THROTTLE_RATES'].get(
-            request.user.username,
-            None,
+        override_rate = settings.REST_FRAMEWORK["OVERRIDE_THROTTLE_RATES"].get(
+            request.user.username, None,
         )
         if override_rate is not None:
             self.num_requests, self.duration = self.parse_rate(override_rate)
@@ -296,14 +326,15 @@ class RECAPUsersReadOnly(DjangoModelPermissions):
     Such users must have the has_recap_api_access flag set on their account for
     this object type.
     """
+
     perms_map = {
-        'GET': ['%(app_label)s.has_recap_api_access'],
-        'OPTIONS': ['%(app_label)s.has_recap_api_access'],
-        'HEAD': ['%(app_label)s.has_recap_api_access'],
-        'POST': ['%(app_label)s.add_%(model_name)s'],
-        'PUT': ['%(app_label)s.change_%(model_name)s'],
-        'PATCH': ['%(app_label)s.change_%(model_name)s'],
-        'DELETE': ['%(app_label)s.delete_%(model_name)s'],
+        "GET": ["%(app_label)s.has_recap_api_access"],
+        "OPTIONS": ["%(app_label)s.has_recap_api_access"],
+        "HEAD": ["%(app_label)s.has_recap_api_access"],
+        "POST": ["%(app_label)s.add_%(model_name)s"],
+        "PUT": ["%(app_label)s.change_%(model_name)s"],
+        "PATCH": ["%(app_label)s.change_%(model_name)s"],
+        "DELETE": ["%(app_label)s.delete_%(model_name)s"],
     }
 
 
@@ -312,14 +343,15 @@ class RECAPUploaders(DjangoModelPermissions):
 
     Such users must have the has_recap_upload_access flag set on their account
     """
+
     perms_map = {
-        'GET': ['%(app_label)s.has_recap_upload_access'],
-        'OPTIONS': ['%(app_label)s.has_recap_upload_access'],
-        'HEAD': ['%(app_label)s.has_recap_upload_access'],
-        'POST': ['%(app_label)s.has_recap_upload_access'],
-        'PUT': ['%(app_label)s.has_recap_upload_access'],
-        'PATCH': ['%(app_label)s.has_recap_upload_access'],
-        'DELETE': ['%(app_label)s.delete_%(model_name)s'],
+        "GET": ["%(app_label)s.has_recap_upload_access"],
+        "OPTIONS": ["%(app_label)s.has_recap_upload_access"],
+        "HEAD": ["%(app_label)s.has_recap_upload_access"],
+        "POST": ["%(app_label)s.has_recap_upload_access"],
+        "PUT": ["%(app_label)s.has_recap_upload_access"],
+        "PATCH": ["%(app_label)s.has_recap_upload_access"],
+        "DELETE": ["%(app_label)s.delete_%(model_name)s"],
     }
 
 
@@ -342,14 +374,14 @@ class BulkJsonHistory(object):
 
     def __init__(self, obj_type_str, bulk_dir):
         self.obj_type_str = obj_type_str
-        self.path = os.path.join(bulk_dir, obj_type_str, 'info.json')
+        self.path = os.path.join(bulk_dir, obj_type_str, "info.json")
         self.json = self.load_json_file()
         super(BulkJsonHistory, self).__init__()
 
     def load_json_file(self):
         """Get the history file from disk and return it as data."""
         try:
-            with open(self.path, 'r') as f:
+            with open(self.path, "r") as f:
                 try:
                     return json.load(f)
                 except ValueError:
@@ -360,8 +392,8 @@ class BulkJsonHistory(object):
             return {}
 
     def save_to_disk(self):
-        mkdir_p(self.path.rsplit('/', 1)[0])
-        with open(self.path, 'w') as f:
+        mkdir_p(self.path.rsplit("/", 1)[0])
+        with open(self.path, "w") as f:
             json.dump(self.json, f, indent=2)
 
     def delete_from_disk(self):
@@ -374,7 +406,7 @@ class BulkJsonHistory(object):
 
     def get_last_good_date(self):
         """Get the last good date from the file, or return None."""
-        d = self.json.get('last_good_date', None)
+        d = self.json.get("last_good_date", None)
         if d is None:
             return d
         else:
@@ -382,7 +414,7 @@ class BulkJsonHistory(object):
 
     def get_last_attempt(self):
         """Get the last attempt from the file, or return None."""
-        d = self.json.get('last_attempt', None)
+        d = self.json.get("last_attempt", None)
         if d is None:
             return d
         else:
@@ -390,19 +422,19 @@ class BulkJsonHistory(object):
 
     def add_current_attempt_and_save(self):
         """Add an attempt as the current attempt."""
-        self.json['last_attempt'] = now().isoformat()
+        self.json["last_attempt"] = now().isoformat()
         self.save_to_disk()
 
     def mark_success_and_save(self):
         """Note a successful run."""
         n = now()
-        self.json['last_good_date'] = n.isoformat()
+        self.json["last_good_date"] = n.isoformat()
         try:
-            duration = n - parser.parse(self.json['last_attempt'])
-            self.json['duration'] = int(duration.total_seconds())
+            duration = n - parser.parse(self.json["last_attempt"])
+            self.json["duration"] = int(duration.total_seconds())
         except KeyError:
             # last_attempt wasn't set ahead of time.
-            self.json['duration'] = "Unknown"
+            self.json["duration"] = "Unknown"
         self.save_to_disk()
 
 
@@ -428,18 +460,25 @@ def invert_user_logs(start, end):
                 total: 33,
             }
         }
+    :param start: The beginning date (inclusive) you want the results for. A
+    string to be interpreted by dateparser
+    :param end: The end date (inclusive) you want the results for. A string to
+    be interpreted by dateparser.
+    :return The inverted dictionary
     """
-    r = make_redis_interface('STATS')
+    r = make_redis_interface("STATS")
     pipe = r.pipeline()
 
-    dates = [d.date().isoformat() for d in rrule(
-        DAILY,
-        dtstart=parser.parse(start, fuzzy=False),
-        until=parser.parse(end, fuzzy=False),
-    )]
+    dates = [
+        d.date().isoformat()
+        for d in rrule(
+            DAILY,
+            dtstart=parser.parse(start, fuzzy=False),
+            until=parser.parse(end, fuzzy=False),
+        )
+    ]
     for d in dates:
-        pipe.zrange('api:v3.user.d:%s.counts' % d, 0, -1,
-                    withscores=True)
+        pipe.zrange("api:v3.user.d:%s.counts" % d, 0, -1, withscores=True)
     results = pipe.execute()
 
     # results is a list of results for each of the zrange queries above. Zip
@@ -447,16 +486,16 @@ def invert_user_logs(start, end):
     out = defaultdict(dict)
     for d, result in zip(dates, results):
         for user_id, count in result:
-            if user_id == 'None' or user_id == 'AnonymousUser':
-                user_id = 'AnonymousUser'
+            if user_id == "None" or user_id == "AnonymousUser":
+                user_id = "AnonymousUser"
             else:
                 user_id = int(user_id)
             count = int(count)
             if out.get(user_id):
                 out[user_id][d] = count
-                out[user_id]['total'] += count
+                out[user_id]["total"] += count
             else:
-                out[user_id] = {d: count, 'total': count}
+                out[user_id] = {d: count, "total": count}
 
     # Sort the values
     for k, v in out.items():
@@ -474,6 +513,34 @@ def invert_user_logs(start, end):
     return out
 
 
+def get_count_for_endpoint(endpoint, start, end):
+    """Get the count of hits for an endpoint by name, during a date range
+
+    :param endpoint: The endpoint to get the count for. Typically something
+    like 'docket-list' or 'docket-detail'
+    :param start: The beginning date (inclusive) you want the results for. A
+    string to be interpreted by dateparser
+    :param end: The end date (inclusive) you want the results for. A string to
+    be interpreted by dateparser.
+    :return int: The count for that endpoint
+    """
+    r = make_redis_interface("STATS")
+    pipe = r.pipeline()
+
+    dates = [
+        d.date().isoformat()
+        for d in rrule(
+            DAILY,
+            dtstart=parser.parse(start, fuzzy=False),
+            until=parser.parse(end, fuzzy=False),
+        )
+    ]
+    for d in dates:
+        pipe.zscore("api:v3.endpoint.d:%s.counts" % d, endpoint)
+    results = pipe.execute()
+    return sum(r for r in results if r)
+
+
 def get_avg_ms_for_endpoint(endpoint, d):
     """
 
@@ -484,36 +551,38 @@ def get_avg_ms_for_endpoint(endpoint, d):
     that day.
     """
     d_str = d.isoformat()
-    r = make_redis_interface('STATS')
+    r = make_redis_interface("STATS")
     pipe = r.pipeline()
-    pipe.zscore('api:v3.endpoint.d:%s.timings' % d_str, endpoint)
-    pipe.zscore('api:v3.endpoint.d:%s.counts' % d_str, endpoint)
+    pipe.zscore("api:v3.endpoint.d:%s.timings" % d_str, endpoint)
+    pipe.zscore("api:v3.endpoint.d:%s.counts" % d_str, endpoint)
     results = pipe.execute()
 
     return results[0] / results[1]
 
 
 emails = {
-    'new_api_user': {
-        'subject': "Welcome to the CourtListener API from Free Law Project",
-        'body': ("Hi %s,\n\n"
-                 "I'm Mike Lissner, the main guy behind CourtListener and Free "
-                 "Law Project, the non-profit that runs it. I noticed that you "
-                 "started using the API a bit today (we watch our logs closely "
-                 "when it comes to the API!) and I just wanted to reach out, "
-                 "say hello, and make sure that everything is working properly "
-                 "and making sense.\n\n"
-                 "We've found that the API can be a bit complicated at first, "
-                 "and that sometimes it helps to get a quick conversation "
-                 "going when people are first exploring the APIs.\n\n"
-                 "Feel free to respond to this email with any questions that "
-                 "come up or comments that occur to you about the API, and I "
-                 "can usually respond pretty quickly to help out or address "
-                 "issues.\n\n"
-                 "Enjoy the API and thanks for giving it a try!\n\n"
-                 "Mike Lissner\n"
-                 "Founder, Free Law Project\n"
-                 "https://www.courtlistener.com/donate/\n"),
-        'from': "Mike Lissner <mlissner@courtlistener.com>",
+    "new_api_user": {
+        "subject": "Welcome to the CourtListener API from Free Law Project",
+        "body": (
+            "Hi %s,\n\n"
+            "I'm Mike Lissner, the main guy behind CourtListener and Free "
+            "Law Project, the non-profit that runs it. I noticed that you "
+            "started using the API a bit today (we watch our logs closely "
+            "when it comes to the API!) and I just wanted to reach out, "
+            "say hello, and make sure that everything is working properly "
+            "and making sense.\n\n"
+            "We've found that the API can be a bit complicated at first, "
+            "and that sometimes it helps to get a quick conversation "
+            "going when people are first exploring the APIs.\n\n"
+            "Feel free to respond to this email with any questions that "
+            "come up or comments that occur to you about the API, and I "
+            "can usually respond pretty quickly to help out or address "
+            "issues.\n\n"
+            "Enjoy the API and thanks for giving it a try!\n\n"
+            "Mike Lissner\n"
+            "Founder, Free Law Project\n"
+            "https://www.courtlistener.com/donate/\n"
+        ),
+        "from": "Mike Lissner <mlissner@courtlistener.com>",
     },
 }
