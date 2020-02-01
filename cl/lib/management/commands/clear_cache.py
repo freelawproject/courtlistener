@@ -7,4 +7,4 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         cache.clear()
-        logger.info('Cleared cache')
+        logger.info("Cleared cache")

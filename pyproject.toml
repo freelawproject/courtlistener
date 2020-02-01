@@ -1,0 +1,11 @@
+[tool.black]
+line-length = 79
+include = '''
+(
+    cl         # Just include a few directories for now
+  | OCR
+)*\.pyi?$
+'''
+exclude = '.*migrations.*'
+
+

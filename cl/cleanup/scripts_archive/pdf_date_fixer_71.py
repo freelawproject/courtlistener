@@ -1,7 +1,7 @@
 import os
 import sys
 
-execfile('/etc/courtlistener')
+execfile("/etc/courtlistener")
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 from django.conf import settings
@@ -24,8 +24,8 @@ def queryset_generator(queryset, chunksize=100):
     Note that the implementation of the iterator does not support ordered query sets.
     """
     pk = 0
-    last_pk = queryset.order_by('-pk')[0].pk
-    queryset = queryset.order_by('pk')
+    last_pk = queryset.order_by("-pk")[0].pk
+    queryset = queryset.order_by("pk")
     while pk < last_pk:
         for row in queryset.filter(pk__gt=pk)[:chunksize]:
             pk = row.pk
@@ -33,15 +33,15 @@ def queryset_generator(queryset, chunksize=100):
         gc.collect()
 
 
-
 def mkdir_p(path):
     # make a directory and its parents, if it doesn't exist
     try:
         os.makedirs(path)
-    except OSError as exc: # Python >2.5
+    except OSError as exc:  # Python >2.5
         if exc.errno == errno.EEXIST:
             pass
-        else: raise
+        else:
+            raise
 
 
 def update_date(doc, simulate):
@@ -52,12 +52,16 @@ def update_date(doc, simulate):
         date_filed = doc.date_filed
     else:
         # break from this function.
-        print "\n***No date_filed value for doc: " + str(doc.pk) + ". Punting.***\n"
+        print "\n***No date_filed value for doc: " + str(
+            doc.pk
+        ) + ". Punting.***\n"
         return 1
     if doc.local_path != "":
         local_path = doc.local_path
     else:
-        print "\n***No local_path value for doc: " + str(doc.pk) + ". Punting.***\n"
+        print "\n***No local_path value for doc: " + str(
+            doc.pk
+        ) + ". Punting.***\n"
         return 2
     root = settings.MEDIA_ROOT
 
@@ -79,38 +83,70 @@ def update_date(doc, simulate):
                 if exc.errno == 17:
                     # Error 17: File exists. Append "2", and move on.
                     print "Duplicate file found, appending 2"
-                    filename = filename[0:string.rfind(filename, ".")] + "2" \
-                        + filename[string.rfind(filename, "."):]
-		    new = os.path.join(root, "pdf", year, month, day, filename)
+                    filename = (
+                        filename[0 : string.rfind(filename, ".")]
+                        + "2"
+                        + filename[string.rfind(filename, ".") :]
+                    )
+                    new = os.path.join(root, "pdf", year, month, day, filename)
                     try:
-			os.link(old, new)
-		    except OSError as exc:
-		        if exc.errno == 17:
-			    print "Duplicate file found again, appending 3"
-			    filename = filename[0:string.rfind(filename, ".")] + "3" \
-			        + filename[string.rfind(filename, "."):]
-		            new = os.path.join(root, "pdf", year, month, day, filename)
-			    os.link(old, new)
+                        os.link(old, new)
+                    except OSError as exc:
+                        if exc.errno == 17:
+                            print "Duplicate file found again, appending 3"
+                            filename = (
+                                filename[0 : string.rfind(filename, ".")]
+                                + "3"
+                                + filename[string.rfind(filename, ".") :]
+                            )
+                            new = os.path.join(
+                                root, "pdf", year, month, day, filename
+                            )
+                            os.link(old, new)
 
             doc.local_path = os.path.join("pdf", year, month, day, filename)
             doc.save()
-        print "***Created new hard link to " + new + " for doc: " + str(doc.pk) + " ***"
+        print "***Created new hard link to " + new + " for doc: " + str(
+            doc.pk
+        ) + " ***"
     else:
-        print 'Same. Not updating link for ' + str(doc.pk)
+        print "Same. Not updating link for " + str(doc.pk)
 
 
 def main():
     usage = "usage: %prog (-b BEGIN -e END) | -a [-s]"
     parser = OptionParser(usage)
-    parser.add_option('-b', '--begin', dest='begin', metavar="BEGIN",
-        help="The ID in the database where fixing should begin (inclusive).")
-    parser.add_option('-e', '--end', dest='end', metavar="END",
-        help="The ID in the database where fixing should end (inclusive).")
-    parser.add_option('-a', '--all', action="store_true", dest='all',
-        default=False, help='Run the script across the entire database ' + \
-        '(use caution, as this is a resource intensive operation).')
-    parser.add_option('-s', '--simulate', action="store_true", dest="simulate",
-        default=False, help='Run the script in simulate mode. No changes will be made.')
+    parser.add_option(
+        "-b",
+        "--begin",
+        dest="begin",
+        metavar="BEGIN",
+        help="The ID in the database where fixing should begin (inclusive).",
+    )
+    parser.add_option(
+        "-e",
+        "--end",
+        dest="end",
+        metavar="END",
+        help="The ID in the database where fixing should end (inclusive).",
+    )
+    parser.add_option(
+        "-a",
+        "--all",
+        action="store_true",
+        dest="all",
+        default=False,
+        help="Run the script across the entire database "
+        + "(use caution, as this is a resource intensive operation).",
+    )
+    parser.add_option(
+        "-s",
+        "--simulate",
+        action="store_true",
+        dest="simulate",
+        default=False,
+        help="Run the script in simulate mode. No changes will be made.",
+    )
     (options, args) = parser.parse_args()
 
     begin = options.begin
@@ -120,12 +156,14 @@ def main():
 
     if not all:
         if not begin and not end:
-            parser.error("You must specify either to parse all of the DB, or a starting and end point.")
+            parser.error(
+                "You must specify either to parse all of the DB, or a starting and end point."
+            )
 
     if simulate:
-        print '\n*****************************'
-        print '* Running in simulate mode! *'
-        print '*****************************\n'
+        print "\n*****************************"
+        print "* Running in simulate mode! *"
+        print "*****************************\n"
         time.sleep(1)
 
     if all:
@@ -136,11 +174,13 @@ def main():
         exit(0)
     else:
         # run the script for the start and end points
-        queryset = queryset_generator(Document.objects.filter(pk__gte=begin, pk__lte=end))
+        queryset = queryset_generator(
+            Document.objects.filter(pk__gte=begin, pk__lte=end)
+        )
         for doc in queryset:
             update_date(doc, simulate)
         exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

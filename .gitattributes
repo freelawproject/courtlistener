@@ -30,7 +30,3 @@
 *.pdf binary
 *.xls binary
 *.wpd binary
-
-# Other
-*.traineddata binary
-

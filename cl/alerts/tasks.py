@@ -14,7 +14,7 @@ from cl.stats.utils import tally_stat
 
 
 def make_alert_key(d_pk):
-    return 'docket.alert.enqueued:%s' % d_pk
+    return "docket.alert.enqueued:%s" % d_pk
 
 
 def enqueue_docket_alert(d_pk):
@@ -25,7 +25,7 @@ def enqueue_docket_alert(d_pk):
     """
     # Create an expiring semaphor in redis or check if there's already one
     # there.
-    r = make_redis_interface('ALERTS')
+    r = make_redis_interface("ALERTS")
     key = make_alert_key(d_pk)
     # Set to True if not already set. Redis doesn't do bools anymore, so use 1.
     currently_enqueued = bool(r.getset(key, 1))
@@ -50,27 +50,32 @@ def send_docket_alert(d_pk, since):
     :param since: If we run alerts, notify users about items *since* this time.
     :return: None
     """
-    email_addresses = User.objects.filter(
-        docket_alerts__docket_id=d_pk,
-    ).distinct().values_list('email', flat=True)
+    email_addresses = (
+        User.objects.filter(docket_alerts__docket_id=d_pk,)
+        .distinct()
+        .values_list("email", flat=True)
+    )
     if email_addresses:
         # We have an alert for this docket. Proceed.
         docket = Docket.objects.get(pk=d_pk)
-        new_des = DocketEntry.objects.filter(date_created__gte=since,
-                                             docket=docket)
+        new_des = DocketEntry.objects.filter(
+            date_created__gte=since, docket=docket
+        )
 
         if new_des.count() > 0:
             # Notify every user that's subscribed to this alert.
-            case_name = trunc(best_case_name(docket), 100, ellipsis='...')
-            subject_template = loader.get_template('docket_alert_subject.txt')
-            subject = subject_template.render({
-                'docket': docket,
-                'count': new_des.count(),
-                'case_name': case_name,
-            }).strip()  # Remove newlines that editors can insist on adding.
-            email_context = {'new_des': new_des, 'docket': docket}
-            txt_template = loader.get_template('docket_alert_email.txt')
-            html_template = loader.get_template('docket_alert_email.html')
+            case_name = trunc(best_case_name(docket), 100, ellipsis="...")
+            subject_template = loader.get_template("docket_alert_subject.txt")
+            subject = subject_template.render(
+                {
+                    "docket": docket,
+                    "count": new_des.count(),
+                    "case_name": case_name,
+                }
+            ).strip()  # Remove newlines that editors can insist on adding.
+            email_context = {"new_des": new_des, "docket": docket}
+            txt_template = loader.get_template("docket_alert_email.txt")
+            html_template = loader.get_template("docket_alert_email.html")
             messages = []
             for email_address in email_addresses:
                 msg = EmailMultiAlternatives(
@@ -78,22 +83,22 @@ def send_docket_alert(d_pk, since):
                     body=txt_template.render(email_context),
                     from_email=settings.DEFAULT_ALERTS_EMAIL,
                     to=[email_address],
-                    headers={'X-Entity-Ref-ID': 'docket.alert:%s' % d_pk}
+                    headers={"X-Entity-Ref-ID": "docket.alert:%s" % d_pk},
                 )
                 html = html_template.render(email_context)
                 msg.attach_alternative(html, "text/html")
                 messages.append(msg)
 
             # Add a bcc to the first message in the list so that we get a copy.
-            messages[0].bcc = ['docket-alert-testing@free.law']
+            messages[0].bcc = ["docket-alert-testing@free.law"]
             connection = get_connection()
             connection.send_messages(messages)
-            tally_stat('alerts.docket.alerts.sent', inc=len(email_addresses))
+            tally_stat("alerts.docket.alerts.sent", inc=len(email_addresses))
 
         DocketAlert.objects.filter(docket=docket).update(date_last_hit=now())
 
     # Work completed, clear the semaphore
-    r = make_redis_interface('ALERTS')
+    r = make_redis_interface("ALERTS")
     r.delete(make_alert_key(d_pk))
 
 
@@ -113,7 +118,7 @@ def send_docket_alerts(data):
     consumed by the next task. If rds_for_solr is not provided, returns an
     empty list.
     """
-    for args in data['d_pks_to_alert']:
+    for args in data["d_pks_to_alert"]:
         send_docket_alert(*args)
 
-    return data.get('rds_for_solr', [])
+    return data.get("rds_for_solr", [])

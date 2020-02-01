@@ -29,11 +29,24 @@ from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import ParsingException
 from juriscraper.lib.string_utils import harmonize
-from juriscraper.pacer import AppellateDocketReport, AttachmentPage, \
-    CaseQuery, DocketReport, FreeOpinionReport, PacerSession, \
-    PossibleCaseNumberApi, ShowCaseDocApi, ClaimsRegister
-from requests.exceptions import ChunkedEncodingError, HTTPError, \
-    ConnectionError, ReadTimeout, ConnectTimeout
+from juriscraper.pacer import (
+    AppellateDocketReport,
+    AttachmentPage,
+    CaseQuery,
+    DocketReport,
+    FreeOpinionReport,
+    PacerSession,
+    PossibleCaseNumberApi,
+    ShowCaseDocApi,
+    ClaimsRegister,
+)
+from requests.exceptions import (
+    ChunkedEncodingError,
+    HTTPError,
+    ConnectionError,
+    ReadTimeout,
+    ConnectTimeout,
+)
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.status import (
@@ -46,21 +59,42 @@ from rest_framework.status import (
 from cl.celery import app
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.pacer import lookup_and_save, get_blocked_status, \
-    map_pacer_to_cl_id, map_cl_to_pacer_id, get_first_missing_de_date
+from cl.lib.pacer import (
+    lookup_and_save,
+    get_blocked_status,
+    map_pacer_to_cl_id,
+    map_cl_to_pacer_id,
+    get_first_missing_de_date,
+)
 from cl.lib.pacer_session import get_pacer_cookie_from_cache
-from cl.lib.recap_utils import get_document_filename, get_bucket_name, \
-    get_docket_filename
+from cl.lib.recap_utils import (
+    get_document_filename,
+    get_bucket_name,
+    get_docket_filename,
+)
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
-from cl.recap.mergers import find_docket_object, update_docket_metadata, \
-    update_docket_appellate_metadata, make_recap_sequence_number, \
-    add_docket_entries, add_parties_and_attorneys, process_orphan_documents, \
-    add_claims_to_docket, add_bankruptcy_data_to_docket
+from cl.recap.mergers import (
+    find_docket_object,
+    update_docket_metadata,
+    update_docket_appellate_metadata,
+    make_recap_sequence_number,
+    add_docket_entries,
+    add_parties_and_attorneys,
+    process_orphan_documents,
+    add_claims_to_docket,
+    add_bankruptcy_data_to_docket,
+)
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
-from cl.search.models import DocketEntry, RECAPDocument, Court, Docket, Tag, \
-    ClaimHistory
+from cl.search.models import (
+    DocketEntry,
+    RECAPDocument,
+    Court,
+    Docket,
+    Tag,
+    ClaimHistory,
+)
 from cl.search.tasks import add_items_to_solr
 
 logger = logging.getLogger(__name__)
@@ -74,7 +108,7 @@ def increment_failure_count(obj):
     obj.save()
 
 
-def generate_ia_json(d_pk, database='default'):
+def generate_ia_json(d_pk, database="default"):
     """Generate JSON for upload to Internet Archive
 
     :param d_pk: The PK of the docket to generate JSON for
@@ -85,26 +119,31 @@ def generate_ia_json(d_pk, database='default'):
     # This is a pretty highly optimized query that minimizes the hits to the DB
     # when generating a docket JSON rendering, regardless of how many related
     # objects the docket has such as docket entries, parties, etc.
-    ds = Docket.objects.filter(pk=d_pk).select_related(
-        'originating_court_information',
-        'bankruptcy_information',
-        'idb_data',
-    ).prefetch_related(
-        'panel',
-        'parties',
-        # Django appears to have a bug where you can't defer a field on a
-        # queryset where you prefetch the values. If you try to, it crashes.
-        # We should be able to just do the prefetch below like the ones above
-        # and then do the defer statement at the end, but that throws an error.
-        Prefetch(
-            'docket_entries__recap_documents',
-            queryset=RECAPDocument.objects.all().defer('plain_text')
-        ),
-        Prefetch(
-            'claims__claim_history_entries',
-            queryset=ClaimHistory.objects.all().defer('plain_text')
-        ),
-    ).using(database)
+    ds = (
+        Docket.objects.filter(pk=d_pk)
+        .select_related(
+            "originating_court_information",
+            "bankruptcy_information",
+            "idb_data",
+        )
+        .prefetch_related(
+            "panel",
+            "parties",
+            # Django appears to have a bug where you can't defer a field on a
+            # queryset where you prefetch the values. If you try to, it crashes.
+            # We should be able to just do the prefetch below like the ones above
+            # and then do the defer statement at the end, but that throws an error.
+            Prefetch(
+                "docket_entries__recap_documents",
+                queryset=RECAPDocument.objects.all().defer("plain_text"),
+            ),
+            Prefetch(
+                "claims__claim_history_entries",
+                queryset=ClaimHistory.objects.all().defer("plain_text"),
+            ),
+        )
+        .using(database)
+    )
     d = ds[0]
 
     # Prefetching attorneys needs to be done in a second pass where we can
@@ -117,28 +156,32 @@ def generate_ia_json(d_pk, database='default'):
     # query to be run. I think this is a Django bug.
     party_ids = [p.pk for p in d.parties.all()]
     attorney_prefetch = Prefetch(
-        'parties__attorneys',
+        "parties__attorneys",
         queryset=Attorney.objects.filter(
-            roles__docket_id=d_pk,
-            parties__id__in=party_ids,
-        ).distinct().prefetch_related(
+            roles__docket_id=d_pk, parties__id__in=party_ids,
+        )
+        .distinct()
+        .prefetch_related(
             Prefetch(
                 # Only roles for those attorneys in the docket.
-                'roles',
-                queryset=Role.objects.filter(docket_id=d_pk)
+                "roles",
+                queryset=Role.objects.filter(docket_id=d_pk),
             )
         ),
     )
-    prefetch_related_objects([d], *[
-        'parties__party_types__criminal_complaints',
-        'parties__party_types__criminal_counts',
-        attorney_prefetch
-    ])
+    prefetch_related_objects(
+        [d],
+        *[
+            "parties__party_types__criminal_complaints",
+            "parties__party_types__criminal_counts",
+            attorney_prefetch,
+        ]
+    )
 
     renderer = JSONRenderer()
     json_str = renderer.render(
         IADocketSerializer(d).data,
-        accepted_media_type='application/json; indent=2',
+        accepted_media_type="application/json; indent=2",
     )
     return d, json_str
 
@@ -151,16 +194,16 @@ def save_ia_docket_to_disk(self, d_pk, output_directory):
     :param output_directory: The location to save the docket's JSON
     """
     _, j = generate_ia_json(d_pk)
-    with open(os.path.join(output_directory, '%s.json' % d_pk), 'w') as f:
+    with open(os.path.join(output_directory, "%s.json" % d_pk), "w") as f:
         f.write(j)
 
 
 @app.task(bind=True, ignore_result=True)
-def upload_recap_json(self, pk, database='default'):
+def upload_recap_json(self, pk, database="default"):
     """Make a JSON object for a RECAP docket and upload it to IA"""
     d, json_str = generate_ia_json(pk, database=database)
 
-    file_name = get_docket_filename(d.court_id, d.pacer_case_id, 'json')
+    file_name = get_docket_filename(d.court_id, d.pacer_case_id, "json")
     bucket_name = get_bucket_name(d.court_id, d.pacer_case_id)
     responses = upload_to_ia(
         self,
@@ -169,14 +212,14 @@ def upload_recap_json(self, pk, database='default'):
         title=best_case_name(d),
         collection=settings.IA_COLLECTIONS,
         court_id=d.court_id,
-        source_url='https://www.courtlistener.com%s' % d.get_absolute_url(),
-        media_type='texts',
+        source_url="https://www.courtlistener.com%s" % d.get_absolute_url(),
+        media_type="texts",
         description="This item represents a case in PACER, the U.S. "
-                    "Government's website for federal case data. This "
-                    "information is uploaded quarterly. To see our most "
-                    "recent version please use the source url parameter, "
-                    "linked below. To see the canonical source for this data, "
-                    "please consult PACER directly.",
+        "Government's website for federal case data. This "
+        "information is uploaded quarterly. To see our most "
+        "recent version please use the source url parameter, "
+        "linked below. To see the canonical source for this data, "
+        "please consult PACER directly.",
     )
     if responses is None:
         increment_failure_count(d)
@@ -187,7 +230,9 @@ def upload_recap_json(self, pk, database='default'):
         d.ia_date_first_changed = None
         d.ia_needs_upload = False
         d.filepath_ia_json = "https://archive.org/download/%s/%s" % (
-            bucket_name, file_name)
+            bucket_name,
+            file_name,
+        )
         d.save()
     else:
         increment_failure_count(d)
@@ -196,7 +241,7 @@ def upload_recap_json(self, pk, database='default'):
 @app.task(bind=True, max_retries=5)
 def download_recap_item(self, url, filename, clobber=False):
     logger.info("  Getting item at: %s" % url)
-    location = os.path.join(settings.MEDIA_ROOT, 'recap', filename)
+    location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
     try:
         if os.path.isfile(location) and not clobber:
             raise IOError("    IOError: File already exists at %s" % location)
@@ -204,7 +249,7 @@ def download_recap_item(self, url, filename, clobber=False):
             url,
             stream=True,
             timeout=60,
-            headers={'User-Agent': "Free Law Project"},
+            headers={"User-Agent": "Free Law Project"},
         )
         r.raise_for_status()
     except requests.Timeout as e:
@@ -215,7 +260,7 @@ def download_recap_item(self, url, filename, clobber=False):
     except IOError as e:
         logger.warning("    %s" % e)
     else:
-        with NamedTemporaryFile(prefix='recap_download_') as tmp:
+        with NamedTemporaryFile(prefix="recap_download_") as tmp:
             r.raw.decode_content = True
             try:
                 shutil.copyfileobj(r.raw, tmp)
@@ -241,21 +286,34 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
     logged-in PACER user.
     :return: None
     """
-    s = PacerSession(cookies=cookies, username=settings.PACER_USERNAME,
-                     password=settings.PACER_PASSWORD)
+    s = PacerSession(
+        cookies=cookies,
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
     report = FreeOpinionReport(court_id, s)
     try:
-        report.query(start, end, sort='case_number')
-    except (ConnectionError, ChunkedEncodingError, ReadTimeoutError,
-            ReadTimeout, ConnectTimeout) as exc:
-        logger.warning("Unable to get free document report results from %s "
-                       "(%s to %s). Trying again." % (court_id, start, end))
+        report.query(start, end, sort="case_number")
+    except (
+        ConnectionError,
+        ChunkedEncodingError,
+        ReadTimeoutError,
+        ReadTimeout,
+        ConnectTimeout,
+    ) as exc:
+        logger.warning(
+            "Unable to get free document report results from %s "
+            "(%s to %s). Trying again." % (court_id, start, end)
+        )
         if self.request.retries == self.max_retries:
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
     except SoftTimeLimitExceeded as exc:
-        logger.warning("Soft time limit exceeded at %s. %s retries remain.",
-                       court_id, (self.max_retries - self.request.retries))
+        logger.warning(
+            "Soft time limit exceeded at %s. %s retries remain.",
+            court_id,
+            (self.max_retries - self.request.retries),
+        )
         if self.request.retries == self.max_retries:
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
@@ -297,11 +355,11 @@ def process_free_opinion_result(self, row_pk, cnt):
     row_copy = copy.copy(result)
     # If we don't do this, the doc's date_filed becomes the docket's
     # date_filed. Bad.
-    delattr(row_copy, 'date_filed')
+    delattr(row_copy, "date_filed")
     # If we don't do this, we get the PACER court id and it crashes
-    delattr(row_copy, 'court_id')
+    delattr(row_copy, "court_id")
     # If we don't do this, the id of result tries to smash that of the docket.
-    delattr(row_copy, 'id')
+    delattr(row_copy, "id")
     start_time = now()
     try:
         with transaction.atomic():
@@ -321,23 +379,24 @@ def process_free_opinion_result(self, row_pk, cnt):
                 docket=d,
                 entry_number=result.document_number,
                 defaults={
-                    'date_filed': result.date_filed,
-                    'description': result.description,
-                }
+                    "date_filed": result.date_filed,
+                    "description": result.description,
+                },
             )
             # Update the psn if we have a new value
-            de.pacer_sequence_number = result.pacer_seq_no or \
-                de.pacer_sequence_number
+            de.pacer_sequence_number = (
+                result.pacer_seq_no or de.pacer_sequence_number
+            )
             # When rsn is generated by the free opinion report, it's poor
             # quality (these entries come in isolation). When it is generated
             # by a docket or other source, it tends to be better. Prefer an
             # existing rsn if we have it.
-            recap_sequence_number = make_recap_sequence_number({
-                'date_filed': result.date_filed,
-                'recap_sequence_index': 1,
-            })
-            de.recap_sequence_number = de.recap_sequence_number or \
-                recap_sequence_number
+            recap_sequence_number = make_recap_sequence_number(
+                {"date_filed": result.date_filed, "recap_sequence_index": 1,}
+            )
+            de.recap_sequence_number = (
+                de.recap_sequence_number or recap_sequence_number
+            )
             de.save()
             rds = RECAPDocument.objects.filter(
                 docket_entry=de,
@@ -358,7 +417,7 @@ def process_free_opinion_result(self, row_pk, cnt):
             elif rd_count > 0:
                 # Could be one item (great!) or more than one (not great).
                 # Choose the earliest item and upgrade it.
-                rd = rds.earliest('date_created')
+                rd = rds.earliest("date_created")
                 rd.pacer_doc_id = result.pacer_doc_id
                 rd.document_type = RECAPDocument.PACER_DOCUMENT
                 rd.is_free_on_pacer = True
@@ -394,12 +453,20 @@ def process_free_opinion_result(self, row_pk, cnt):
         if newly_enqueued:
             send_docket_alert(d.pk, start_time)
 
-    return {'result': result, 'rd_pk': rd.pk,
-            'pacer_court_id': result.court_id}
+    return {
+        "result": result,
+        "rd_pk": rd.pk,
+        "pacer_court_id": result.court_id,
+    }
 
 
-@app.task(bind=True, max_retries=15, interval_start=5, interval_step=5,
-          ignore_result=True)
+@app.task(
+    bind=True,
+    max_retries=15,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
 def get_and_process_pdf(self, data, cookies, row_pk):
     """Get a PDF from a PACERFreeDocumentRow object
 
@@ -415,14 +482,22 @@ def get_and_process_pdf(self, data, cookies, row_pk):
     """
     if data is None:
         return
-    result = data['result']
-    rd = RECAPDocument.objects.get(pk=data['rd_pk'])
-    r = download_pacer_pdf_by_rd(rd.pk, result.pacer_case_id,
-                                 result.pacer_doc_id, cookies)
+    result = data["result"]
+    rd = RECAPDocument.objects.get(pk=data["rd_pk"])
+    r = download_pacer_pdf_by_rd(
+        rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
+    )
     attachment_number = 0  # Always zero for free opinions
     success, msg = update_rd_metadata(
-        self, rd.pk, r, result.court_id, result.pacer_case_id,
-        result.pacer_doc_id, result.document_number, attachment_number)
+        self,
+        rd.pk,
+        r,
+        result.court_id,
+        result.pacer_case_id,
+        result.pacer_doc_id,
+        result.document_number,
+        attachment_number,
+    )
 
     if success is False:
         PACERFreeDocumentRow.objects.filter(pk=row_pk).update(error_msg=msg)
@@ -435,7 +510,7 @@ def get_and_process_pdf(self, data, cookies, row_pk):
     # Get the data temporarily. OCR is done for all nightly free
     # docs in a separate batch, but may as well do the easy ones.
     extract_recap_pdf(rd.pk, skip_ocr=True, check_if_needed=False)
-    return {'result': result, 'rd_pk': rd.pk}
+    return {"result": result, "rd_pk": rd.pk}
 
 
 class OverloadedException(Exception):
@@ -460,11 +535,11 @@ def upload_pdf_to_ia(self, rd_pk):
         title=best_case_name(d),
         collection=settings.IA_COLLECTIONS,
         court_id=d.court_id,
-        source_url='https://www.courtlistener.com%s' % rd.get_absolute_url(),
-        media_type='texts',
+        source_url="https://www.courtlistener.com%s" % rd.get_absolute_url(),
+        media_type="texts",
         description="This item represents a case in PACER, the U.S. "
-                    "Government's website for federal case data. If you wish "
-                    "to see the entire case, please consult PACER directly.",
+        "Government's website for federal case data. If you wish "
+        "to see the entire case, please consult PACER directly.",
     )
     if responses is None:
         increment_failure_count(rd)
@@ -473,7 +548,9 @@ def upload_pdf_to_ia(self, rd_pk):
     if all(r.ok for r in responses):
         rd.ia_upload_failure_count = None
         rd.filepath_ia = "https://archive.org/download/%s/%s" % (
-            bucket_name, file_name)
+            bucket_name,
+            file_name,
+        )
         rd.save()
     else:
         increment_failure_count(rd)
@@ -481,14 +558,22 @@ def upload_pdf_to_ia(self, rd_pk):
 
 access_key = settings.IA_ACCESS_KEY
 secret_key = settings.IA_SECRET_KEY
-ia_session = ia.get_session({'s3': {
-    'access': access_key,
-    'secret': secret_key,
-}})
+ia_session = ia.get_session(
+    {"s3": {"access": access_key, "secret": secret_key,}}
+)
 
 
-def upload_to_ia(self, identifier, files, title, collection, court_id,
-                 source_url, media_type, description):
+def upload_to_ia(
+    self,
+    identifier,
+    files,
+    title,
+    collection,
+    court_id,
+    source_url,
+    media_type,
+    description,
+):
     """Upload an item and its files to the Internet Archive
 
     On the Internet Archive there are Items and files. Items have a global
@@ -531,23 +616,26 @@ def upload_to_ia(self, identifier, files, title, collection, court_id,
             # Give up for now. It'll get done next time cron is run.
             return
         raise self.retry(exc=exc)
-    logger.info("Uploading file to Internet Archive with identifier: %s and "
-                "files %s", identifier, files)
+    logger.info(
+        "Uploading file to Internet Archive with identifier: %s and "
+        "files %s",
+        identifier,
+        files,
+    )
     try:
         item = ia_session.get_item(identifier)
         responses = item.upload(
             files=files,
             metadata={
-                'title': title,
-                'collection': collection,
-                'contributor':
-                    '<a href="https://free.law">Free Law Project</a>',
-                'court': court_id,
-                'source_url': source_url,
-                'language': 'eng',
-                'mediatype': media_type,
-                'description': description,
-                'licenseurl': 'https://www.usa.gov/government-works',
+                "title": title,
+                "collection": collection,
+                "contributor": '<a href="https://free.law">Free Law Project</a>',
+                "court": court_id,
+                "source_url": source_url,
+                "language": "eng",
+                "mediatype": media_type,
+                "description": description,
+                "licenseurl": "https://www.usa.gov/government-works",
             },
             queue_derive=False,
             verify=True,
@@ -573,15 +661,19 @@ def upload_to_ia(self, identifier, files, title, collection, court_id,
             return
         raise self.retry(exc=exc)
     except (requests.Timeout, requests.RequestException) as exc:
-        logger.warning("Timeout or unknown RequestException. Unable to upload "
-                       "to IA. Trying again if retries not exceeded: %s",
-                       identifier)
+        logger.warning(
+            "Timeout or unknown RequestException. Unable to upload "
+            "to IA. Trying again if retries not exceeded: %s",
+            identifier,
+        )
         if self.request.retries == self.max_retries:
             # Give up for now. It'll get done next time cron is run.
             return
         raise self.retry(exc=exc)
-    logger.info("Item uploaded to IA with responses %s" %
-                [r.status_code for r in responses])
+    logger.info(
+        "Item uploaded to IA with responses %s"
+        % [r.status_code for r in responses]
+    )
     return responses
 
 
@@ -590,9 +682,8 @@ def mark_court_done_on_date(status, court_id, d):
     court_id = map_pacer_to_cl_id(court_id)
     try:
         doc_log = PACERFreeDocumentLog.objects.filter(
-            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
-            court_id=court_id,
-        ).latest('date_queried')
+            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS, court_id=court_id,
+        ).latest("date_queried")
     except PACERFreeDocumentLog.DoesNotExist:
         return
     else:
@@ -607,7 +698,7 @@ def mark_court_done_on_date(status, court_id, d):
 @app.task(ignore_result=True)
 def delete_pacer_row(data, pk):
     PACERFreeDocumentRow.objects.get(pk=pk).delete()
-    return [data['rd_pk']]
+    return [data["rd_pk"]]
 
 
 def make_fjc_idb_lookup_params(item):
@@ -618,7 +709,7 @@ def make_fjc_idb_lookup_params(item):
     :returns: A dict with params you can pass to get_pacer_case_id_and_title.
     """
     params = {
-        'office_number': item.office if item.office else None,
+        "office_number": item.office if item.office else None,
     }
     if item.plaintiff or item.defendant:
         # Note that criminal data lacks plaintiff or defendant info in IDB. We
@@ -627,23 +718,36 @@ def make_fjc_idb_lookup_params(item):
         # Luenig". For a random sample, see:
         # https://www.courtlistener.com/?q=docketNumber%3Acr+AND+-case_name%3Aunited&type=r&order_by=random_123+desc.
         # ∴ not much we can do here for criminal cases
-        params['case_name'] = '%s v. %s' % (item.plaintiff, item.defendant)
+        params["case_name"] = "%s v. %s" % (item.plaintiff, item.defendant)
 
     if item.dataset_source in [CR_2017, CR_OLD]:
         if item.multidistrict_litigation_docket_number:
-            params['docket_number_letters'] = 'md'
+            params["docket_number_letters"] = "md"
         else:
-            params['docket_number_letters'] = 'cr'
+            params["docket_number_letters"] = "cr"
     elif item.dataset_source in [CV_2017, CV_OLD]:
-        params['docket_number_letters'] = 'cv'
+        params["docket_number_letters"] = "cv"
     return params
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60,
-          interval_step=10 * 60, ignore_results=True)
+@app.task(
+    bind=True,
+    max_retries=5,
+    interval_start=5 * 60,
+    interval_step=10 * 60,
+    ignore_results=True,
+)
 def get_pacer_case_id_and_title(
-    self, pass_through, docket_number, court_id, cookies=None, user_pk=None,
-    case_name=None, office_number=None, docket_number_letters=None):
+    self,
+    pass_through,
+    docket_number,
+    court_id,
+    cookies=None,
+    user_pk=None,
+    case_name=None,
+    office_number=None,
+    docket_number_letters=None,
+):
     """Get the pacer_case_id and title values for a district court docket. Use
     heuristics to disambiguate the results.
 
@@ -682,8 +786,11 @@ def get_pacer_case_id_and_title(
             u'pass_through': pass_through,
         }
     """
-    logger.info("Getting pacer_case_id for docket_number %s in court %s",
-                docket_number, court_id)
+    logger.info(
+        "Getting pacer_case_id for docket_number %s in court %s",
+        docket_number,
+        court_id,
+    )
     if not cookies:
         # Get cookies from Redis if not provided
         cookies = get_pacer_cookie_from_cache(user_pk)
@@ -692,28 +799,40 @@ def get_pacer_case_id_and_title(
     try:
         report.query(docket_number)
     except requests.RequestException as exc:
-        logger.warning("RequestException while running possible case number "
-                       "query. Trying again if retries not exceeded: %s.%s",
-                       court_id, docket_number)
+        logger.warning(
+            "RequestException while running possible case number "
+            "query. Trying again if retries not exceeded: %s.%s",
+            court_id,
+            docket_number,
+        )
         if self.request.retries == self.max_retries:
             self.request.chain = None
             return None
         raise self.retry(exc=exc)
 
     try:
-        result = report.data(case_name=case_name, office_number=office_number,
-                             docket_number_letters=docket_number_letters)
+        result = report.data(
+            case_name=case_name,
+            office_number=office_number,
+            docket_number_letters=docket_number_letters,
+        )
         if result is not None:
-            result['pass_through'] = pass_through
+            result["pass_through"] = pass_through
         return result
     except ParsingException:
         return None
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60,
-          interval_step=10 * 60, ignore_result=True)
-def do_case_query_by_pacer_case_id(self, data, court_id, cookies,
-                                   tag_names=None):
+@app.task(
+    bind=True,
+    max_retries=5,
+    interval_start=5 * 60,
+    interval_step=10 * 60,
+    ignore_result=True,
+)
+def do_case_query_by_pacer_case_id(
+    self, data, court_id, cookies, tag_names=None
+):
     """Run a case query (iquery.pl) query on a case and save the data
 
     :param data: A dict containing at least the following: {
@@ -728,19 +847,15 @@ def do_case_query_by_pacer_case_id(self, data, court_id, cookies,
     """
     s = PacerSession(cookies=cookies)
     if data is None:
-        logger.info("Empty data argument. Terminating "
-                    "chains and exiting.")
+        logger.info("Empty data argument. Terminating chains and exiting.")
         self.request.chain = None
         return
 
-    pacer_case_id = data.get('pacer_case_id')
+    pacer_case_id = data.get("pacer_case_id")
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
     try:
-        d = Docket.objects.get(
-            pacer_case_id=pacer_case_id,
-            court_id=court_id,
-        )
+        d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id,)
     except Docket.DoesNotExist:
         d = None
     except Docket.MultipleObjectsReturned:
@@ -748,8 +863,9 @@ def do_case_query_by_pacer_case_id(self, data, court_id, cookies,
 
     report.query(pacer_case_id)
     docket_data = report.data
-    logger.info("Querying and parsing complete for %s.%s" % (court_id,
-                                                             pacer_case_id))
+    logger.info(
+        "Querying and parsing complete for %s.%s" % (court_id, pacer_case_id)
+    )
 
     if not docket_data:
         logger.info("No valid docket data for %s.%s", court_id, pacer_case_id)
@@ -758,10 +874,11 @@ def do_case_query_by_pacer_case_id(self, data, court_id, cookies,
 
     # Merge the contents into CL.
     if d is None:
-        d, count = find_docket_object(court_id, pacer_case_id,
-                                      docket_data['docket_number'])
+        d, count = find_docket_object(
+            court_id, pacer_case_id, docket_data["docket_number"]
+        )
         if count > 1:
-            d = d.earliest('date_created')
+            d = d.earliest("date_created")
 
     d.add_recap_source()
     update_docket_metadata(d, docket_data)
@@ -775,17 +892,18 @@ def do_case_query_by_pacer_case_id(self, data, court_id, cookies,
             tags.append(tag)
 
     # Add the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(content_object=d,
-                                upload_type=UPLOAD_TYPE.CASE_REPORT_PAGE)
+    pacer_file = PacerHtmlFiles(
+        content_object=d, upload_type=UPLOAD_TYPE.CASE_REPORT_PAGE
+    )
     pacer_file.filepath.save(
-        'case_report.html',  # We only care about the ext w/UUIDFileSystemStorage
+        "case_report.html",  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(report.response.text),
     )
 
     logger.info("Created/updated docket: %s" % d)
     return {
-        'pacer_case_id': pacer_case_id,
-        'docket_pk': d.pk,
+        "pacer_case_id": pacer_case_id,
+        "docket_pk": d.pk,
     }
 
 
@@ -808,27 +926,43 @@ def filter_docket_by_tags(self, data, tags, court_id):
         return
 
     ds = Docket.objects.filter(
-        pacer_case_id=data['pacer_case_id'],
+        pacer_case_id=data["pacer_case_id"],
         court_id=court_id,
         tags__name__in=tags,
     ).distinct()
 
     count = ds.count()
     if count > 0:
-        logger.info("Found %s dockets that were already tagged for "
-                    "pacer_case_id '%s', court_id '%s'. Aborting chain",
-                    count, data['pacer_case_id'], court_id)
+        logger.info(
+            "Found %s dockets that were already tagged for "
+            "pacer_case_id '%s', court_id '%s'. Aborting chain",
+            count,
+            data["pacer_case_id"],
+            court_id,
+        )
         self.request.chain = None
         return None
     return data
 
 
 # Retry 10 times. First one after 1m, then again every 5 minutes.
-@app.task(bind=True, max_retries=10, interval_start=1 * 60,
-          interval_step=5 * 60, ignore_result=True)
-def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
-                                user_pk=None, docket_pk=None, tag_names=None,
-                                **kwargs):
+@app.task(
+    bind=True,
+    max_retries=10,
+    interval_start=1 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
+def get_docket_by_pacer_case_id(
+    self,
+    data,
+    court_id,
+    cookies=None,
+    user_pk=None,
+    docket_pk=None,
+    tag_names=None,
+    **kwargs
+):
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -860,18 +994,17 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
         self.request.chain = None
         return
 
-    pacer_case_id = data.get('pacer_case_id')
+    pacer_case_id = data.get("pacer_case_id")
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
 
     if docket_pk:
         d = Docket.objects.get(pk=docket_pk)
-    elif data.get('docket_pk') is not None:
-        d = Docket.objects.get(pk=data['docket_pk'])
+    elif data.get("docket_pk") is not None:
+        d = Docket.objects.get(pk=data["docket_pk"])
     else:
         try:
             d = Docket.objects.get(
-                pacer_case_id=pacer_case_id,
-                court_id=court_id,
+                pacer_case_id=pacer_case_id, court_id=court_id,
             )
         except Docket.DoesNotExist:
             d = None
@@ -880,18 +1013,22 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
 
     if d is not None:
         first_missing_date = get_first_missing_de_date(d)
-        kwargs.setdefault('date_start', first_missing_date)
+        kwargs.setdefault("date_start", first_missing_date)
 
-    logging_id = '%s.%s' % (court_id, pacer_case_id)
+    logging_id = "%s.%s" % (court_id, pacer_case_id)
     logger.info("Querying docket report %s", logging_id)
     try:
         report.query(pacer_case_id, **kwargs)
     except ConnectionError as exc:
-        logger.warning("Ran into ConnectionError while getting docket "
-                       "for %s. Retrying.", logging_id)
+        logger.warning(
+            "Ran into ConnectionError while getting docket "
+            "for %s. Retrying.",
+            logging_id,
+        )
         if self.request.retries == self.max_retries:
-            logger.error("Max retries exceeded for %s. Aborting chain.",
-                         logging_id)
+            logger.error(
+                "Max retries exceeded for %s. Aborting chain.", logging_id
+            )
             self.request.chain = None
             return None
         raise self.retry(exc)
@@ -905,10 +1042,11 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
 
     # Merge the contents into CL.
     if d is None:
-        d, count = find_docket_object(court_id, pacer_case_id,
-                                      docket_data['docket_number'])
+        d, count = find_docket_object(
+            court_id, pacer_case_id, docket_data["docket_number"]
+        )
         if count > 1:
-            d = d.earliest('date_created')
+            d = d.earliest("date_created")
 
     # Ensure that we set the case ID. This is needed on dockets that have
     # matching docket numbers, but that never got PACER data before. This was
@@ -927,28 +1065,36 @@ def get_docket_by_pacer_case_id(self, data, court_id, cookies=None,
             tags.append(tag)
 
     # Add the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(content_object=d,
-                                upload_type=UPLOAD_TYPE.DOCKET)
+    pacer_file = PacerHtmlFiles(
+        content_object=d, upload_type=UPLOAD_TYPE.DOCKET
+    )
     pacer_file.filepath.save(
-        'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
+        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(report.response.text),
     )
 
     rds_created, content_updated = add_docket_entries(
-        d, docket_data['docket_entries'], tags=tags)
-    add_parties_and_attorneys(d, docket_data['parties'])
+        d, docket_data["docket_entries"], tags=tags
+    )
+    add_parties_and_attorneys(d, docket_data["parties"])
     process_orphan_documents(rds_created, d.court_id, d.date_filed)
     logger.info("Created/updated docket: %s" % d)
     return {
-        'docket_pk': d.pk,
-        'content_updated': bool(rds_created or content_updated),
+        "docket_pk": d.pk,
+        "content_updated": bool(rds_created or content_updated),
     }
 
 
-@app.task(bind=True, max_retries=2, interval_start=5 * 60,
-          interval_step=10 * 60, ignore_result=True)
-def get_appellate_docket_by_docket_number(self, docket_number, court_id,
-                                          cookies, tag_names=None, **kwargs):
+@app.task(
+    bind=True,
+    max_retries=2,
+    interval_start=5 * 60,
+    interval_step=10 * 60,
+    ignore_result=True,
+)
+def get_appellate_docket_by_docket_number(
+    self, docket_number, court_id, cookies, tag_names=None, **kwargs
+):
     """Get a docket by docket number, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -977,7 +1123,7 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
         raise self.retry(exc=e)
 
     docket_data = report.data
-    logger.info('Querying and parsing complete for %s', logging_id)
+    logger.info("Querying and parsing complete for %s", logging_id)
 
     if docket_data == {}:
         logger.info("Unable to find docket: %s", logging_id)
@@ -985,20 +1131,16 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
         return None
 
     try:
-        d = Docket.objects.get(
-            docket_number=docket_number,
-            court_id=court_id,
-        )
+        d = Docket.objects.get(docket_number=docket_number, court_id=court_id,)
     except Docket.DoesNotExist:
         d = None
     except Docket.MultipleObjectsReturned:
         d = None
 
     if d is None:
-        d, count = find_docket_object(court_id, docket_number,
-                                      docket_number)
+        d, count = find_docket_object(court_id, docket_number, docket_number)
         if count > 1:
-            d = d.earliest('date_created')
+            d = d.earliest("date_created")
 
     d.add_recap_source()
     update_docket_metadata(d, docket_data)
@@ -1018,26 +1160,33 @@ def get_appellate_docket_by_docket_number(self, docket_number, court_id,
             tags.append(tag)
 
     # Save the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(content_object=d,
-                                upload_type=UPLOAD_TYPE.APPELLATE_DOCKET)
+    pacer_file = PacerHtmlFiles(
+        content_object=d, upload_type=UPLOAD_TYPE.APPELLATE_DOCKET
+    )
     pacer_file.filepath.save(
-        'docket.html',  # We only care about the ext w/UUIDFileSystemStorage
+        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(report.response.text),
     )
 
     rds_created, content_updated = add_docket_entries(
-        d, docket_data['docket_entries'], tags=tags)
-    add_parties_and_attorneys(d, docket_data['parties'])
+        d, docket_data["docket_entries"], tags=tags
+    )
+    add_parties_and_attorneys(d, docket_data["parties"])
     process_orphan_documents(rds_created, d.court_id, d.date_filed)
     logger.info("Created/updated docket: %s" % d)
     return {
-        'docket_pk': d.pk,
-        'content_updated': bool(rds_created or content_updated),
+        "docket_pk": d.pk,
+        "content_updated": bool(rds_created or content_updated),
     }
 
 
-@app.task(bind=True, max_retries=5, interval_start=5,
-          interval_step=5, ignore_result=True)
+@app.task(
+    bind=True,
+    max_retries=5,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
 def get_attachment_page_by_rd(self, rd_pk, cookies):
     """Get the attachment page for the item in PACER.
 
@@ -1058,10 +1207,13 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
     try:
         att_report.query(rd.pacer_doc_id)
     except HTTPError as exc:
-        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
-                                        HTTP_504_GATEWAY_TIMEOUT]:
-            logger.warning("Ran into HTTPError: %s. Retrying.",
-                           exc.response.status_code)
+        if exc.response.status_code in [
+            HTTP_500_INTERNAL_SERVER_ERROR,
+            HTTP_504_GATEWAY_TIMEOUT,
+        ]:
+            logger.warning(
+                "Ran into HTTPError: %s. Retrying.", exc.response.status_code
+            )
             raise self.retry(exc)
         else:
             msg = "Ran into unknown HTTPError. %s. Aborting."
@@ -1075,8 +1227,13 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
 
 
 # Retry 10 times. First one after 1m, then again every 5 minutes.
-@app.task(bind=True, max_retries=10, interval_start=1 * 60,
-          interval_step=5 * 60, ignore_result=True)
+@app.task(
+    bind=True,
+    max_retries=10,
+    interval_start=1 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
 def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     """Get the bankruptcy claims registry for a docket
 
@@ -1089,36 +1246,45 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     registry information in the DB.
     """
     s = PacerSession(cookies=cookies)
-    if data is None or data.get('docket_pk') is None:
-        logger.warning("Empty data argument or parameter. Terminating chains "
-                       "and exiting.")
+    if data is None or data.get("docket_pk") is None:
+        logger.warning(
+            "Empty data argument or parameter. Terminating chains "
+            "and exiting."
+        )
         self.request.chain = None
         return
 
-    d = Docket.objects.get(pk=data['docket_pk'])
+    d = Docket.objects.get(pk=data["docket_pk"])
     logging_id = "docket %s with pacer_case_id %s" % (d.pk, d.pacer_case_id)
     logger.info("Querying claims information for %s", logging_id)
     report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
     try:
         report.query(d.pacer_case_id, d.docket_number)
     except ConnectionError as exc:
-        logger.warning("Ran into ConnectionError while getting claims "
-                       "report for %s. Retrying.", logging_id)
+        logger.warning(
+            "Ran into ConnectionError while getting claims "
+            "report for %s. Retrying.",
+            logging_id,
+        )
         if self.request.retries == self.max_retries:
             self.request.chain = None
-            logger.error("Max retries completed for %s. Unable to get "
-                         "claims data. Aborting task, but allowing next task "
-                         "to run.", logging_id)
+            logger.error(
+                "Max retries completed for %s. Unable to get "
+                "claims data. Aborting task, but allowing next task "
+                "to run.",
+                logging_id,
+            )
             return data
         raise self.retry(exc)
     claims_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
 
     # Save the HTML
-    pacer_file = PacerHtmlFiles(content_object=d,
-                                upload_type=UPLOAD_TYPE.CLAIMS_REGISTER)
+    pacer_file = PacerHtmlFiles(
+        content_object=d, upload_type=UPLOAD_TYPE.CLAIMS_REGISTER
+    )
     pacer_file.filepath.save(
-        'random.html',  # We only care about the ext w/UUIDFileSystemStorage
+        "random.html",  # We only care about the ext w/UUIDFileSystemStorage
         ContentFile(report.response.text),
     )
 
@@ -1128,13 +1294,18 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
 
     # Merge the contents into CL
     add_bankruptcy_data_to_docket(d, claims_data)
-    add_claims_to_docket(d, claims_data['claims'], tag_names)
+    add_claims_to_docket(d, claims_data["claims"], tag_names)
     logger.info("Created/updated claims data for %s", logging_id)
     return data
 
 
-@app.task(bind=True, max_retries=15, interval_start=5,
-          interval_step=5, ignore_result=True)
+@app.task(
+    bind=True,
+    max_retries=15,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
 def make_attachment_pq_object(self, attachment_report, rd_pk, user_pk):
     """Create an item in the processing queue for an attachment page.
 
@@ -1158,15 +1329,22 @@ def make_attachment_pq_object(self, attachment_report, rd_pk, user_pk):
         pacer_case_id=rd.docket_entry.docket.pacer_case_id,
     )
     pq.filepath_local.save(
-        'attachment_page.html', ContentFile(attachment_report.response.text))
+        "attachment_page.html", ContentFile(attachment_report.response.text)
+    )
 
     return pq.pk
 
 
-@app.task(bind=True, max_retries=15, interval_start=5,
-          interval_step=5, ignore_result=True)
-def download_pacer_pdf_by_rd(self, rd_pk, pacer_case_id, pacer_doc_id,
-                             cookies):
+@app.task(
+    bind=True,
+    max_retries=15,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
+def download_pacer_pdf_by_rd(
+    self, rd_pk, pacer_case_id, pacer_doc_id, cookies
+):
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
 
@@ -1185,22 +1363,30 @@ def download_pacer_pdf_by_rd(self, rd_pk, pacer_case_id, pacer_doc_id,
     try:
         r = report.download_pdf(pacer_case_id, pacer_doc_id)
     except HTTPError as exc:
-        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
-                                        HTTP_504_GATEWAY_TIMEOUT]:
-            logger.warning("Ran into HTTPError while getting PDF: %s. "
-                           "Retrying.", exc.response.status_code)
+        if exc.response.status_code in [
+            HTTP_500_INTERNAL_SERVER_ERROR,
+            HTTP_504_GATEWAY_TIMEOUT,
+        ]:
+            logger.warning(
+                "Ran into HTTPError while getting PDF: %s. Retrying.",
+                exc.response.status_code,
+            )
             if self.request.retries == self.max_retries:
                 self.request.chain = None
                 return
             raise self.retry(exc)
         else:
-            logger.error("Ran into unknown HTTPError while getting PDF: %s. "
-                         "Aborting.", exc.response.status_code)
+            logger.error(
+                "Ran into unknown HTTPError while getting PDF: %s. "
+                "Aborting.",
+                exc.response.status_code,
+            )
             self.request.chain = None
             return
     except requests.RequestException as exc:
-        logger.warning("Unable to get PDF for %s in %s", pacer_doc_id,
-                       pacer_case_id)
+        logger.warning(
+            "Unable to get PDF for %s in %s", pacer_doc_id, pacer_case_id
+        )
         if self.request.retries == self.max_retries:
             self.request.chain = None
             return
@@ -1208,8 +1394,16 @@ def download_pacer_pdf_by_rd(self, rd_pk, pacer_case_id, pacer_doc_id,
     return r
 
 
-def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
-                       pacer_doc_id, document_number, attachment_number):
+def update_rd_metadata(
+    self,
+    rd_pk,
+    response,
+    court_id,
+    pacer_case_id,
+    pacer_doc_id,
+    document_number,
+    attachment_number,
+):
     """After querying PACER and downloading a document, save it to the DB.
 
     :param rd_pk: The primary key of the RECAPDocument to work on
@@ -1225,14 +1419,17 @@ def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if response is None:
-        msg = "Unable to get PDF for RECAP Document '%s' " \
-              "at '%s' with doc id '%s'" % (rd_pk, court_id, pacer_doc_id)
+        msg = (
+            "Unable to get PDF for RECAP Document '%s' "
+            "at '%s' with doc id '%s'" % (rd_pk, court_id, pacer_doc_id)
+        )
         logger.error(msg)
         self.request.chain = None
         return False, msg
 
-    file_name = get_document_filename(court_id, pacer_case_id, document_number,
-                                      attachment_number)
+    file_name = get_document_filename(
+        court_id, pacer_case_id, document_number, attachment_number
+    )
     cf = ContentFile(response.content)
     rd.filepath_local.save(file_name, cf, save=False)
     rd.file_size = rd.filepath_local.size
@@ -1241,7 +1438,7 @@ def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
     rd.sha1 = sha1(force_bytes(response.content))
-    rd.page_count = get_page_count(rd.filepath_local.path, 'pdf')
+    rd.page_count = get_page_count(rd.filepath_local.path, "pdf")
 
     # Save and extract, skipping OCR.
     rd.save()
@@ -1251,7 +1448,7 @@ def update_rd_metadata(self, rd_pk, response, court_id, pacer_case_id,
     if changed:
         rd.docket_entry.docket.save()
 
-    return True, 'Saved item successfully'
+    return True, "Saved item successfully"
 
 
 def add_tags(rd, tag_name):
@@ -1269,8 +1466,13 @@ def add_tags(rd, tag_name):
         tag.tag_object(rd)
 
 
-@app.task(bind=True, max_retries=3, interval_start=5,
-          interval_step=5, ignore_result=True)
+@app.task(
+    bind=True,
+    max_retries=3,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
 @transaction.atomic
 def get_pacer_doc_by_rd(self, rd_pk, cookies, tag=None):
     """A simple method for getting the PDF associated with a RECAPDocument.
@@ -1289,12 +1491,20 @@ def get_pacer_doc_by_rd(self, rd_pk, cookies, tag=None):
         return
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
-    r = download_pacer_pdf_by_rd(rd.pk, pacer_case_id,
-                                 rd.pacer_doc_id, cookies)
+    r = download_pacer_pdf_by_rd(
+        rd.pk, pacer_case_id, rd.pacer_doc_id, cookies
+    )
     court_id = rd.docket_entry.docket.court_id
     success, msg = update_rd_metadata(
-        self, rd_pk, r, court_id, pacer_case_id, rd.pacer_doc_id,
-        rd.document_number, rd.attachment_number)
+        self,
+        rd_pk,
+        r,
+        court_id,
+        pacer_case_id,
+        rd.pacer_doc_id,
+        rd.document_number,
+        rd.attachment_number,
+    )
 
     if success is False:
         self.request.chain = None
@@ -1304,10 +1514,16 @@ def get_pacer_doc_by_rd(self, rd_pk, cookies, tag=None):
     return rd.pk
 
 
-@app.task(bind=True, max_retries=15, interval_start=5,
-          interval_step=5, ignore_result=True)
-def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
-                                        fallback_to_main_doc=False, tag=None):
+@app.task(
+    bind=True,
+    max_retries=15,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
+def get_pacer_doc_by_rd_and_description(
+    self, rd_pk, description_re, cookies, fallback_to_main_doc=False, tag=None
+):
     """Using a RECAPDocument object ID and a description of a document, get the
     document from PACER.
 
@@ -1328,16 +1544,18 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
     att_report = get_attachment_page_by_rd(self, rd_pk, cookies)
 
     att_found = None
-    for attachment in att_report.data.get('attachments', []):
-        if description_re.search(attachment['description']):
+    for attachment in att_report.data.get("attachments", []):
+        if description_re.search(attachment["description"]):
             att_found = attachment.copy()
             document_type = RECAPDocument.ATTACHMENT
             break
 
     if not att_found:
         if fallback_to_main_doc:
-            logger.info("Falling back to main document for pacer_doc_id: %s" %
-                        rd.pacer_doc_id)
+            logger.info(
+                "Falling back to main document for pacer_doc_id: %s"
+                % rd.pacer_doc_id
+            )
             att_found = att_report.data
             document_type = RECAPDocument.PACER_DOCUMENT
         else:
@@ -1346,7 +1564,7 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
             self.request.chain = None
             return
 
-    if not att_found.get('pacer_doc_id'):
+    if not att_found.get("pacer_doc_id"):
         logger.warn("No pacer_doc_id for document (is it sealed?)")
         self.request.chain = None
         return
@@ -1354,17 +1572,15 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
     # Try to find the attachment already in the collection
     rd, _ = RECAPDocument.objects.get_or_create(
         docket_entry=rd.docket_entry,
-        attachment_number=att_found.get('attachment_number'),
+        attachment_number=att_found.get("attachment_number"),
         document_number=rd.document_number,
-        pacer_doc_id=att_found['pacer_doc_id'],
+        pacer_doc_id=att_found["pacer_doc_id"],
         document_type=document_type,
-        defaults={
-            'date_upload': now(),
-        },
+        defaults={"date_upload": now(),},
     )
     # Replace the description if we have description data.
     # Else fallback on old.
-    rd.description = att_found.get('description', '') or rd.description
+    rd.description = att_found.get("description", "") or rd.description
     if tag is not None:
         tag, _ = Tag.objects.get_or_create(name=tag)
         tag.tag_object(rd)
@@ -1375,23 +1591,36 @@ def get_pacer_doc_by_rd_and_description(self, rd_pk, description_re, cookies,
         return
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
-    r = download_pacer_pdf_by_rd(rd.pk, pacer_case_id,
-                                 att_found['pacer_doc_id'], cookies)
+    r = download_pacer_pdf_by_rd(
+        rd.pk, pacer_case_id, att_found["pacer_doc_id"], cookies
+    )
     court_id = rd.docket_entry.docket.court_id
     success, msg = update_rd_metadata(
-        self, rd_pk, r, court_id, pacer_case_id, rd.pacer_doc_id,
-        rd.document_number, rd.attachment_number)
+        self,
+        rd_pk,
+        r,
+        court_id,
+        pacer_case_id,
+        rd.pacer_doc_id,
+        rd.document_number,
+        rd.attachment_number,
+    )
 
     if success is False:
         return
 
     # Skip OCR for now. It'll happen in a second step.
     extract_recap_pdf(rd.pk, skip_ocr=True)
-    add_items_to_solr([rd.pk], 'search.RECAPDocument')
+    add_items_to_solr([rd.pk], "search.RECAPDocument")
 
 
-@app.task(bind=True, max_retries=15, interval_start=5,
-          interval_step=5, ignore_result=True)
+@app.task(
+    bind=True,
+    max_retries=15,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
 def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, cookies):
     """use the show_case_doc URL to get pacer_doc_id values.
 
@@ -1404,34 +1633,48 @@ def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, cookies):
     s = PacerSession(cookies=cookies)
     pacer_court_id = map_cl_to_pacer_id(d.court_id)
     report = ShowCaseDocApi(pacer_court_id, s)
-    last_try = (self.request.retries == self.max_retries)
+    last_try = self.request.retries == self.max_retries
     try:
         if rd.document_type == rd.ATTACHMENT:
-            report.query(d.pacer_case_id, rd.document_number,
-                         rd.attachment_number)
+            report.query(
+                d.pacer_case_id, rd.document_number, rd.attachment_number
+            )
         else:
             report.query(d.pacer_case_id, rd.document_number)
-    except (ConnectTimeout, ConnectionError, ReadTimeout, ReadTimeoutError,
-            ChunkedEncodingError) as exc:
+    except (
+        ConnectTimeout,
+        ConnectionError,
+        ReadTimeout,
+        ReadTimeoutError,
+        ChunkedEncodingError,
+    ) as exc:
         logger.warning("Unable to get PDF for %s" % rd)
         if last_try:
             return
         else:
             raise self.retry(exc=exc)
     except HTTPError as exc:
-        if exc.response.status_code in [HTTP_500_INTERNAL_SERVER_ERROR,
-                                        HTTP_504_GATEWAY_TIMEOUT]:
+        if exc.response.status_code in [
+            HTTP_500_INTERNAL_SERVER_ERROR,
+            HTTP_504_GATEWAY_TIMEOUT,
+        ]:
             if last_try:
-                logger.error("Ran into repeated HTTPErrors. No more retries. "
-                             "Aborting.")
+                logger.error(
+                    "Ran into repeated HTTPErrors. No more retries. "
+                    "Aborting."
+                )
                 return
             else:
-                logger.warning("Ran into HTTPError: %s. Retrying." %
-                               exc.response.status_code)
+                logger.warning(
+                    "Ran into HTTPError: %s. Retrying."
+                    % exc.response.status_code
+                )
                 raise self.retry(exc)
         else:
-            msg = "Ran into unknown HTTPError. %s. Aborting." % \
-                  exc.response.status_code
+            msg = (
+                "Ran into unknown HTTPError. %s. Aborting."
+                % exc.response.status_code
+            )
             logger.error(msg)
             return
     try:

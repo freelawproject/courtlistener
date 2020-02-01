@@ -61,11 +61,54 @@ If you installed from the Wiki, you should watch for upgrades coming into these 
 
 ## Upgrading Production
 
-This has gotten easy:
+We usually use Ansible for this, but at the moment it's a bit of a mess due to our ongoing dockerization.
 
-    ansible-playbook ansible/upgrade.yml --ask-become-pass
+The process now is:
 
-And also run any special ones in any version of Vagrant, just like for Wiki installations.
+ - Check MIGRATIONS.md for potentially critical optimizations to database migrations.
+ - Celery:
+    - Simple updates to the docker image can be done with (though you usually want to stop it, then get the latest code, then start it as described next):
+        - sudo docker pull freelawproject/task-server
+        - sudo docker service update task-server_celery_prefork_bulk --image freelawproject/task-server:latest
+        - sudo docker service update task-server_celery_prefork --image freelawproject/task-server:latest
+        - sudo docker service update task-server_celery_gevent --image freelawproject/task-server:latest
+    - Pull latest docker image
+        - sudo docker pull freelawproject/task-server
+    - Stop celery:
+        - sudo docker service scale task-server_celery_prefork=0
+        - sudo docker service scale task-server_celery_prefork_bulk=0
+        - sudo docker service scale task-server_celery_gevent=0
+    - Pull latest code (git):
+        - cd /opt/tasks && sudo git pull
+ - Solr:
+    - Pull latest docker image
+    - Pull latest code (git)
+    - Restart solr:
+        - sudo docker restart solr
+ - Web:
+    - Run ansible scripts (they still work)
+ - Database:
+    - default is migrated by ansible
+    - migrate replicated database on old CL via SQL 
+    psql -h localhost -U django --dbname courtlistener -p 5432 <  /var/www/courtlistener/cl/lasc/migrations/0002_auto_20191004_1431.sql 
+    - migrate replicated database on AWS via SQL
+    psql -h cl-replica.c3q1wkj3stig.us-west-2.rds.amazonaws.com -U django --dbname courtlistener -p 5432 <  /var/www/courtlistener/cl/lasc/migrations/0002_auto_20191004_1431.sql
+ - Celery:
+    - Start:
+        - sudo docker service scale task-server_celery_prefork=5
+        - sudo docker service scale task-server_celery_prefork_bulk=5
+
+    - Monitor: 
+        - sudo docker service logs -f --since 1 task-server_celery_prefork
+    
+
+These things should happen by way of the above, I think:
+ - git pull on all hosts
+ - update python dependencies on all hosts
+ - update seals if needed
+ - collectstatic on any web hosts
+
+### Update
 
 
 ## Copyright

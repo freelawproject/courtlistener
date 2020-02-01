@@ -7,103 +7,130 @@ from random import shuffle
 from cl.corpus_importer.import_columbia.parse_opinions import parse_file
 from cl.corpus_importer.import_columbia.populate_opinions import make_and_save
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.import_lib import get_min_dates, get_path_list, get_min_nocite, get_courtdates
+from cl.lib.import_lib import (
+    get_min_dates,
+    get_path_list,
+    get_min_nocite,
+    get_courtdates,
+)
 
 
 class Command(VerboseCommand):
-    help = ('Parses the xml files in the specified directory into opinion '
-            'objects that are saved.')
+    help = (
+        "Parses the xml files in the specified directory into opinion "
+        "objects that are saved."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
-            'dir',
-            nargs='+',
+            "dir",
+            nargs="+",
             type=str,
-            help='The directory that will be recursively searched for xml '
-                 'files.'
+            help="The directory that will be recursively searched for xml "
+            "files.",
         )
         parser.add_argument(
-            '--limit',
+            "--limit",
             type=int,
             default=None,
-            help='Limit on how many files to run through. By default will run '
-                 'through all (or if `--random`, forever).'
+            help="Limit on how many files to run through. By default will run "
+            "through all (or if `--random`, forever).",
         )
         parser.add_argument(
-            '--random',
-            action='store_true',
+            "--random",
+            action="store_true",
             default=False,
-            help='If set, will run through the directories and files in random '
-                 'order.'
+            help="If set, will run through the directories and files in random "
+            "order.",
         )
         parser.add_argument(
-            '--status',
+            "--status",
             type=int,
             default=100,
-            help='How often a status update will be given. By default, every '
-                 '100 files.'
+            help="How often a status update will be given. By default, every "
+            "100 files.",
         )
         parser.add_argument(
-            '--newcases',
-            action='store_true',
+            "--newcases",
+            action="store_true",
             default=False,
-            help='If set, will skip court-years that already have data.'
+            help="If set, will skip court-years that already have data.",
         )
         parser.add_argument(
-            '--skipdupes',
-            action='store_true',
+            "--skipdupes",
+            action="store_true",
             default=False,
-            help='If set, will skip duplicates.'
+            help="If set, will skip duplicates.",
         )
         parser.add_argument(
-            '--skipnewcases',
-            action='store_true',
+            "--skipnewcases",
+            action="store_true",
             default=False,
-            help='If set, will skip cases from initial columbia import.'
+            help="If set, will skip cases from initial columbia import.",
         )
         parser.add_argument(
-            '--avoid_nocites',
-            action='store_true',
+            "--avoid_nocites",
+            action="store_true",
             default=False,
-            help='If set, will not import dates after the earliest case without a citation.'
+            help="If set, will not import dates after the earliest case without a citation.",
         )
         parser.add_argument(
-            '--courtdates',
-            action='store_true',
+            "--courtdates",
+            action="store_true",
             default=False,
-            help='If set, will throw exception for cases before court was founded.'
+            help="If set, will throw exception for cases before court was founded.",
         )
         parser.add_argument(
-            '--startfolder',
+            "--startfolder",
             type=str,
             default=None,
-            help='The folder (state name) to start on.'
+            help="The folder (state name) to start on.",
         )
         parser.add_argument(
-            '--startfile',
+            "--startfile",
             type=str,
             default=None,
-            help='The file name to start on (if resuming).'
+            help="The file name to start on (if resuming).",
         )
         parser.add_argument(
-            '--debug',
-            action='store_true',
+            "--debug",
+            action="store_true",
             default=False,
-            help="Don't change the data."
+            help="Don't change the data.",
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        do_many(options['dir'][0], options['limit'], options['random'],
-                options['status'], options['newcases'], options['skipdupes'],
-                options['skipnewcases'], options['avoid_nocites'],
-                options['courtdates'], options['startfolder'],
-                options['startfile'], options['debug'])
+        do_many(
+            options["dir"][0],
+            options["limit"],
+            options["random"],
+            options["status"],
+            options["newcases"],
+            options["skipdupes"],
+            options["skipnewcases"],
+            options["avoid_nocites"],
+            options["courtdates"],
+            options["startfolder"],
+            options["startfile"],
+            options["debug"],
+        )
 
 
-def do_many(dir_path, limit, random_order, status_interval,
-            newcases, skipdupes, skip_newcases, avoid_nocites, courtdates,
-            startfolder, startfile, debug):
+def do_many(
+    dir_path,
+    limit,
+    random_order,
+    status_interval,
+    newcases,
+    skipdupes,
+    skip_newcases,
+    avoid_nocites,
+    courtdates,
+    startfolder,
+    startfile,
+    debug,
+):
     """Runs through a directory of the form /data/[state]/[sub]/.../[folders]/[.xml documents].
     Parses each .xml document, instantiates the associated model object, and
     saves the object. Prints/logs status updates and tracebacks instead of
@@ -129,27 +156,31 @@ def do_many(dir_path, limit, random_order, status_interval,
         logger.info("Getting an initial file count...")
         total = 0
         for _, _, file_names in os.walk(dir_path):
-            total += len(fnmatch.filter(file_names, '*.xml'))
+            total += len(fnmatch.filter(file_names, "*.xml"))
     else:
         total = None
     # go through the files, yielding parsed files and printing status updates as
     # we go
-    folders = glob(dir_path+'/*')
+    folders = glob(dir_path + "/*")
     folders.sort()
     count = 0
 
     # get earliest dates for each court
     if newcases:
-        logger.info('Only new cases: getting earliest dates by court.')
+        logger.info("Only new cases: getting earliest dates by court.")
         min_dates = get_min_dates()
     else:
         min_dates = None
 
     if avoid_nocites:
         if newcases:
-            raise Exception("Cannot use both avoid_nocites and newcases options.")
-        logger.info('Avoiding no cites: getting earliest dates by court with '
-                    'no citation.')
+            raise Exception(
+                "Cannot use both avoid_nocites and newcases options."
+            )
+        logger.info(
+            "Avoiding no cites: getting earliest dates by court with "
+            "no citation."
+        )
         min_dates = get_min_nocite()
 
     if courtdates:
@@ -177,7 +208,7 @@ def do_many(dir_path, limit, random_order, status_interval,
     for folder in folders:
         if skipfolder:
             if startfolder is not None:
-                checkfolder = folder.split('/')[-1]
+                checkfolder = folder.split("/")[-1]
                 if checkfolder == startfolder:
                     skipfolder = False
                 else:
@@ -188,7 +219,7 @@ def do_many(dir_path, limit, random_order, status_interval,
 
             if skipfile:
                 if startfile is not None:
-                    checkfile = path.split('/')[-1]
+                    checkfile = path.split("/")[-1]
                     if checkfile == startfile:
                         skipfile = False
                     else:
@@ -199,7 +230,7 @@ def do_many(dir_path, limit, random_order, status_interval,
 
             # skip cases in 'misc*' folders -- they are relatively different
             # than the other cases, so we'll deal with them later
-            if 'miscellaneous_court_opinions' in path:
+            if "miscellaneous_court_opinions" in path:
                 continue
 
             logger.debug(path)
@@ -213,9 +244,11 @@ def do_many(dir_path, limit, random_order, status_interval,
                 logger.info(path)
                 # show simple exception summaries for known problems
                 known = [
-                    'mismatched tag', 'Failed to get a citation',
-                    'Failed to find a court ID',
-                    'null value in column "date_filed"', 'duplicate(s)'
+                    "mismatched tag",
+                    "Failed to get a citation",
+                    "Failed to find a court ID",
+                    'null value in column "date_filed"',
+                    "duplicate(s)",
                 ]
                 if any(k in str(e) for k in known):
                     logger.info("Known exception in file '%s':" % path)
@@ -245,18 +278,18 @@ def file_generator(dir_path, random_order=False, limit=None):
     if not random_order:
         for root, dir_names, file_names in os.walk(dir_path):
             file_names.sort()
-            for file_name in fnmatch.filter(file_names, '*.xml'):
-                yield os.path.join(root, file_name).replace('\\', '/')
+            for file_name in fnmatch.filter(file_names, "*.xml"):
+                yield os.path.join(root, file_name).replace("\\", "/")
                 count += 1
                 if count == limit:
                     return
     else:
         for root, dir_names, file_names in os.walk(dir_path):
             shuffle(dir_names)
-            names = fnmatch.filter(file_names, '*.xml')
+            names = fnmatch.filter(file_names, "*.xml")
             if names:
                 shuffle(names)
-                yield os.path.join(root, names[0]).replace('\\', '/')
+                yield os.path.join(root, names[0]).replace("\\", "/")
                 break
         count += 1
         if count == limit:

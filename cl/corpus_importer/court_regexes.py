@@ -5,16 +5,34 @@ from math import ceil
 
 from django.conf import settings
 
-conn_counties = ')|('.join([
-    'Fairfield', 'Hartford', 'Litchfield', 'Middlesex', 'New Haven',
-    'New London', 'Tolland', 'Windham',
-])
-ny_counties = ')|('.join([
-    'Albany County', 'New York County', 'Kings County', 'Oneida County','Queens County',
-    'Schenectady County', 'Westchester County',
-])
+conn_counties = ")|(".join(
+    [
+        "Fairfield",
+        "Hartford",
+        "Litchfield",
+        "Middlesex",
+        "New Haven",
+        "New London",
+        "Tolland",
+        "Windham",
+    ]
+)
+ny_counties = ")|(".join(
+    [
+        "Albany County",
+        "New York County",
+        "Kings County",
+        "Oneida County",
+        "Queens County",
+        "Schenectady County",
+        "Westchester County",
+    ]
+)
 
+# In this file, it's better to have longer lines and weird indentation. Disable
+# auto-formatting and PyPep8 alerts for most of the file.
 # noinspection PyPep8
+# fmt: off
 fd_pairs = (
     (re.compile('(^|\s)D(\.|:|,|(ist(\.|(rict))))?,? (court )?(of )?Colu(m|(in))bia', re.I), 'dcd'),
     # 1820-1824 --> ALD
@@ -236,19 +254,19 @@ fd_pairs = (
 ca_pairs = (
     (re.compile(u'Supreme Court of the United States', re.I), 'scotus'),
 
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Second Circuit', re.I), 'ca2'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Third Circuit', re.I), 'ca3'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Fourth Circuit', re.I), 'ca4'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Fifth Circuit', re.I), 'ca5'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Sixth Circuit', re.I), 'ca6'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Seventh Circuit', re.I), 'ca7'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Eighth Circuit', re.I), 'ca8'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Ninth Circuit', re.I), 'ca9'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Tenth Circuit', re.I), 'ca10'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) ((Circuit Courts?)|(Court of Appeals)) for the Eleventh Circuit', re.I), 'ca11'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) Court of Appeals for the District of Columbia Circuit', re.I), 'cadc'),
-    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) Court of Appeals for the Federal Circuit', re.I), 'cafc'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the Second Circuit', re.I), 'ca2'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the Third Circuit', re.I), 'ca3'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the Fourth Circuit', re.I), 'ca4'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the Fifth Circuit', re.I), 'ca5'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the Sixth Circuit', re.I), 'ca6'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the Seventh Circuit', re.I), 'ca7'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the Eighth Circuit', re.I), 'ca8'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the Ninth Circuit', re.I), 'ca9'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the Tenth Circuit', re.I), 'ca10'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the Eleventh Circuit', re.I), 'ca11'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) Court of Appeals for the District of Columbia Circuit', re.I), 'cadc'),
+    (re.compile(u'(^|\s)((U\. ?S\.)|(United States)) Court of Appeals for the Federal Circuit', re.I), 'cafc'),
 )
 
 # noinspection PyPep8
@@ -679,11 +697,18 @@ state_ag_pairs = (
 international_pairs = (
     (re.compile("Court of King's Bench", re.I), 'kingsbench'),
 )
+# fmt: on
 
 
-def match_court_string(court_str, federal_appeals=False,
-                       federal_district=False, bankruptcy=False, state=False,
-                       state_ag=False, international=False):
+def match_court_string(
+    court_str,
+    federal_appeals=False,
+    federal_district=False,
+    bankruptcy=False,
+    state=False,
+    state_ag=False,
+    international=False,
+):
     """Look up a court string and return a CourtListener ID.
 
     Note you cannot use bankruptcy and federal_district together due to
@@ -701,8 +726,9 @@ def match_court_string(court_str, federal_appeals=False,
     :param international: Whether it might be an international court.
     :returns The abbreviation for the court, if possible. Else, returns None
     """
-    assert not (federal_district and bankruptcy), \
-        "federal_district and bankruptcy cannot be used in conjunction"
+    assert not (
+        federal_district and bankruptcy
+    ), "federal_district and bankruptcy cannot be used in conjunction"
 
     # Generally, we test these from most specific regex to least specific. The
     # order of the tests below should not be changed.

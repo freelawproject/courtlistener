@@ -1,0 +1,23 @@
+{% if DEBUG %}
+  <script defer type="application/javascript"
+          src="{{ STATIC_URL }}js/bootstrap-datepicker.js"></script>
+{% else %}
+  <script defer type="application/javascript"
+          src="{{ STATIC_URL }}js/bootstrap-datepicker.min.js"></script>
+{% endif %}
+<script type="text/javascript">
+  $(document).ready(function () {
+    $('.datepicker').datepicker({
+      autoclose: true,
+      maxViewMode: "decades",
+      startDate: "01/01/1600",
+      endDate: "0d",
+      disableTouchKeyboard: true,
+      templates: {
+        leftArrow: '<i class="fa fa-long-arrow-left"></i>',
+        rightArrow: '<i class="fa fa-long-arrow-right"></i>'
+      },
+      todayHighlight: true,
+    });
+  });
+</script>

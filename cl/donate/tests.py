@@ -19,17 +19,13 @@ from cl.donate.models import Donation, FREQUENCIES, PROVIDERS, MonthlyDonation
 from cl.donate.utils import emails
 
 stripe_test_numbers = {
-    'good': {
-        'visa': '4242424242424242',
-    },
-    'bad': {
-        'cvc_fail': '4000000000000127',
-    }
+    "good": {"visa": "4242424242424242",},
+    "bad": {"cvc_fail": "4000000000000127",},
 }
 
 
 class EmailCommandTest(TestCase):
-    fixtures = ['donate_test_data.json']
+    fixtures = ["donate_test_data.json"]
 
     def test_sending_an_email(self):
         """Do we send emails correctly?"""
@@ -45,52 +41,45 @@ class EmailCommandTest(TestCase):
         comm.handle()
 
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn('you donated $1', mail.outbox[0].body)
-        self.assertIn('you donated $1', mail.outbox[0].alternatives[0][0])
+        self.assertIn("you donated $1", mail.outbox[0].body)
+        self.assertIn("you donated $1", mail.outbox[0].alternatives[0][0])
 
 
-@skipIf(settings.PAYPAL_SECRET_KEY is None or settings.PAYPAL_SECRET_KEY == '',
-        'Only run PayPal tests if we have an API key available.')
+@skipIf(
+    settings.PAYPAL_SECRET_KEY is None or settings.PAYPAL_SECRET_KEY == "",
+    "Only run PayPal tests if we have an API key available.",
+)
 class DonationFormSubmissionTest(TestCase):
     def setUp(self):
         self.client = Client()
         self.params = {
-            'address1': "123 Sesame St.",
-            'city': 'New York',
-            'state': 'NY',
-            'zip_code': '12345',
-            'wants_newsletter': True,
-            'first_name': 'Elmo',
-            'last_name': 'Muppet',
-            'email': 'pandora@courtlistener.com',
-            'send_annual_reminder': True,
-            'payment_provider': 'paypal',
-            'frequency': 'once',
+            "address1": "123 Sesame St.",
+            "city": "New York",
+            "state": "NY",
+            "zip_code": "12345",
+            "wants_newsletter": True,
+            "first_name": "Elmo",
+            "last_name": "Muppet",
+            "email": "pandora@courtlistener.com",
+            "send_annual_reminder": True,
+            "payment_provider": "paypal",
+            "frequency": "once",
         }
 
     def test_paypal_with_other_value_as_anonymous(self):
         """Can a paypal donation go through using the "Other" field?"""
-        self.params.update({
-            'amount': 'other',
-            'amount_other': '5',
-        })
-        r = self.client.post(
-            reverse('donate'),
-            self.params,
-            follow=True,
+        self.params.update(
+            {"amount": "other", "amount_other": "5",}
         )
+        r = self.client.post(reverse("donate"), self.params, follow=True,)
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
     def test_paypal_with_regular_value_as_anonymous(self):
         """Can a stripe donation go through using the "Other" field?"""
-        self.params.update({
-            'amount': '25',
-        })
-        r = self.client.post(
-            reverse('donate'),
-            self.params,
-            follow=True,
+        self.params.update(
+            {"amount": "25",}
         )
+        r = self.client.post(reverse("donate"), self.params, follow=True,)
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
 
@@ -109,14 +98,17 @@ def get_stripe_event(fingerprint):
     return event
 
 
-@skipIf(settings.STRIPE_SECRET_KEY is None or settings.STRIPE_SECRET_KEY == '',
-        'Only run Stripe tests if we have an API key available.')
+@skipIf(
+    settings.STRIPE_SECRET_KEY is None or settings.STRIPE_SECRET_KEY == "",
+    "Only run Stripe tests if we have an API key available.",
+)
 class StripeTest(TestCase):
     def setUp(self):
         self.client = Client()
 
-    def make_a_donation(self, cc_number, amount, amount_other='',
-                        param_overrides=None):
+    def make_a_donation(
+        self, cc_number, amount, amount_other="", param_overrides=None
+    ):
         if param_overrides is None:
             param_overrides = {}
 
@@ -125,33 +117,33 @@ class StripeTest(TestCase):
         # the front end when the submit button was pressed)
         token = stripe.Token.create(
             card={
-                'number': cc_number,
-                'exp_month': '6',
-                'exp_year': str(datetime.today().year + 1),
-                'cvc': '123',
+                "number": cc_number,
+                "exp_month": "6",
+                "exp_year": str(datetime.today().year + 1),
+                "cvc": "123",
             }
         )
 
         # Place a donation as an anonymous (not logged in) person using the
         # token we just got
         params = {
-            'amount': amount,
-            'amount_other': amount_other,
-            'payment_provider': 'cc',
-            'first_name': 'Barack',
-            'last_name': 'Obama',
-            'address1': '1600 Pennsylvania Ave.',
-            'address2': 'The Whitehouse',
-            'city': 'DC',
-            'state': 'DC',
-            'zip_code': '20500',
-            'email': 'barack@freelawproject.org',
-            'referrer': 'tests.py',
-            'stripeToken': token.id,
-            'frequency': 'once',
+            "amount": amount,
+            "amount_other": amount_other,
+            "payment_provider": "cc",
+            "first_name": "Barack",
+            "last_name": "Obama",
+            "address1": "1600 Pennsylvania Ave.",
+            "address2": "The Whitehouse",
+            "city": "DC",
+            "state": "DC",
+            "zip_code": "20500",
+            "email": "barack@freelawproject.org",
+            "referrer": "tests.py",
+            "stripeToken": token.id,
+            "frequency": "once",
         }
         params.update(param_overrides)
-        r = self.client.post(reverse('donate'), data=params)
+        r = self.client.post(reverse("donate"), data=params)
         return token, r
 
     def assertEventPostsCorrectly(self, token):
@@ -159,12 +151,14 @@ class StripeTest(TestCase):
         self.assertIsNotNone(
             event,
             msg="Unable to find correct event for token: %s"
-                % token.card.fingerprint
+            % token.card.fingerprint,
         )
 
-        r = self.client.post(reverse('stripe_callback'),
-                             data=json.dumps(event),
-                             content_type='application/json')
+        r = self.client.post(
+            reverse("stripe_callback"),
+            data=json.dumps(event),
+            content_type="application/json",
+        )
 
         # Does it return properly?
         self.assertEqual(r.status_code, HTTP_200_OK)
@@ -177,12 +171,12 @@ class StripeTest(TestCase):
         callback to our webhook, to make sure it accepts it properly.
         """
         token, r = self.make_a_donation(
-            stripe_test_numbers['good']['visa'],
-            amount='25',
+            stripe_test_numbers["good"]["visa"], amount="25",
         )
 
-        self.assertEqual(r.status_code,
-                         HTTP_302_FOUND)  # redirect after a post
+        self.assertEqual(
+            r.status_code, HTTP_302_FOUND
+        )  # redirect after a post
         self.assertEventPostsCorrectly(token)
 
     def test_making_a_donation_with_a_bad_card(self):
@@ -191,8 +185,7 @@ class StripeTest(TestCase):
         # Create a stripe token (this would normally be done via javascript in
         # the front end when the submit button was pressed)
         token, r = self.make_a_donation(
-            stripe_test_numbers['bad']['cvc_fail'],
-            amount='25',
+            stripe_test_numbers["bad"]["cvc_fail"], amount="25",
         )
         self.assertIn("Your card's security code is incorrect.", r.content)
         self.assertEventPostsCorrectly(token)
@@ -203,21 +196,22 @@ class StripeTest(TestCase):
         """
         stripe.api_key = settings.STRIPE_SECRET_KEY
         token, r = self.make_a_donation(
-            stripe_test_numbers['good']['visa'],
-            amount='other',
-            amount_other='10.00',
+            stripe_test_numbers["good"]["visa"],
+            amount="other",
+            amount_other="10.00",
         )
-        self.assertEqual(r.status_code,
-                         HTTP_302_FOUND)  # redirect after a post
+        self.assertEqual(
+            r.status_code, HTTP_302_FOUND
+        )  # redirect after a post
         self.assertEventPostsCorrectly(token)
 
     def test_making_a_donation_that_is_too_small(self):
         """Donations less than $5 are no good."""
         stripe.api_key = settings.STRIPE_SECRET_KEY
         token, r = self.make_a_donation(
-            stripe_test_numbers['good']['visa'],
-            amount='other',
-            amount_other='0.40',
+            stripe_test_numbers["good"]["visa"],
+            amount="other",
+            amount_other="0.40",
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
 
@@ -225,29 +219,34 @@ class StripeTest(TestCase):
         """Can we make a monthly donation correctly?"""
         stripe.api_key = settings.STRIPE_SECRET_KEY
         token, r = self.make_a_donation(
-            stripe_test_numbers['good']['visa'],
-            amount='25',
-            param_overrides={'frequency': FREQUENCIES.MONTHLY}
+            stripe_test_numbers["good"]["visa"],
+            amount="25",
+            param_overrides={"frequency": FREQUENCIES.MONTHLY},
         )
         # Redirect after a successful POST?
         self.assertEqual(r.status_code, HTTP_302_FOUND)
         self.assertEventPostsCorrectly(token)
 
 
-@skipIf(settings.STRIPE_SECRET_KEY is None or settings.STRIPE_SECRET_KEY == '',
-        'Only run Stripe tests if we have an API key available.')
-@skipIf(settings.PAYPAL_SECRET_KEY is None or settings.PAYPAL_SECRET_KEY == '',
-        'Only run PayPal tests if we have an API key available.')
+@skipIf(
+    settings.STRIPE_SECRET_KEY is None or settings.STRIPE_SECRET_KEY == "",
+    "Only run Stripe tests if we have an API key available.",
+)
+@skipIf(
+    settings.PAYPAL_SECRET_KEY is None or settings.PAYPAL_SECRET_KEY == "",
+    "Only run PayPal tests if we have an API key available.",
+)
 class DonationIntegrationTest(TestCase):
     """Attempt to handle all types/rates/providers/etc of payments
 
     See discussion in: https://github.com/freelawproject/courtlistener/issues/928
     """
-    fixtures = ['authtest_data.json']
+
+    fixtures = ["authtest_data.json"]
 
     credentials = {
-        'username': 'pandora',
-        'password': 'password',
+        "username": "pandora",
+        "password": "password",
     }
 
     def setUp(self):
@@ -255,25 +254,23 @@ class DonationIntegrationTest(TestCase):
 
         self.params = {
             # Donation info
-            'frequency': FREQUENCIES.ONCE,
-            'payment_provider': PROVIDERS.PAYPAL,
-            'amount': '25',
-
+            "frequency": FREQUENCIES.ONCE,
+            "payment_provider": PROVIDERS.PAYPAL,
+            "amount": "25",
             # Personal info
-            'first_name': 'Elmo',
-            'last_name': 'Muppet',
-            'email': 'pandora@courtlistener.com',
-            'address1': "123 Sesame St.",
-            'city': 'New York',
-            'state': 'NY',
-            'zip_code': '12345',
-
+            "first_name": "Elmo",
+            "last_name": "Muppet",
+            "email": "pandora@courtlistener.com",
+            "address1": "123 Sesame St.",
+            "city": "New York",
+            "state": "NY",
+            "zip_code": "12345",
             # Tailing checkboxes
-            'wants_newsletter': True,
-            'send_annual_reminder': True,
+            "wants_newsletter": True,
+            "send_annual_reminder": True,
         }
 
-        self.new_email = 'some-user@free.law'
+        self.new_email = "some-user@free.law"
 
     def tearDown(self):
         Donation.objects.all().delete()
@@ -294,75 +291,77 @@ class DonationIntegrationTest(TestCase):
         stripe.api_key = settings.STRIPE_SECRET_KEY
         self.token = stripe.Token.create(
             card={
-                'number': stripe_test_numbers['good']['visa'],
-                'exp_month': '6',
-                'exp_year': str(datetime.today().year + 1),
-                'cvc': '123',
+                "number": stripe_test_numbers["good"]["visa"],
+                "exp_month": "6",
+                "exp_year": str(datetime.today().year + 1),
+                "cvc": "123",
             }
         )
 
     def set_stripe_params(self):
-        self.params['payment_provider'] = PROVIDERS.CREDIT_CARD
+        self.params["payment_provider"] = PROVIDERS.CREDIT_CARD
         self.make_stripe_token()
-        self.params['stripeToken'] = self.token.id
+        self.params["stripeToken"] = self.token.id
 
     def set_new_stub_params(self):
-        self.params['email'] = self.new_email
+        self.params["email"] = self.new_email
 
     def set_monthly_params(self):
-        self.params['frequency'] = FREQUENCIES.MONTHLY
+        self.params["frequency"] = FREQUENCIES.MONTHLY
 
     def check_monthly_donation_created(self):
         self.assertEqual(MonthlyDonation.objects.count(), 1)
 
     def do_stripe_callback(self):
         event = get_stripe_event(self.token.card.fingerprint)
-        self.client.post(reverse('stripe_callback'),
-                         data=json.dumps(event),
-                         content_type='application/json')
+        self.client.post(
+            reverse("stripe_callback"),
+            data=json.dumps(event),
+            content_type="application/json",
+        )
 
     def test_one_time_paypal_logged_in_donation(self):
         self.assertTrue(self.client.login(**self.credentials))
-        self.do_post_and_assert(reverse('donate'))
+        self.do_post_and_assert(reverse("donate"))
 
     def test_one_time_paypal_logged_out_donation_existing_account(self):
         self.client.logout()
-        self.do_post_and_assert(reverse('donate'))
+        self.do_post_and_assert(reverse("donate"))
 
     def test_one_time_paypal_logged_out_donation_new_stub(self):
         self.set_new_stub_params()
-        self.do_post_and_assert(reverse('donate'))
+        self.do_post_and_assert(reverse("donate"))
         # Did we create an account?
         self.assertTrue(User.objects.filter(email=self.new_email).exists())
 
     def test_one_time_stripe_logged_in_donation(self):
         self.set_stripe_params()
         self.assertTrue(self.client.login(**self.credentials))
-        self.do_post_and_assert(reverse('donate'))
+        self.do_post_and_assert(reverse("donate"))
 
     def test_one_time_stripe_logged_out_donation_existing_account(self):
         self.set_stripe_params()
         self.client.logout()
-        self.do_post_and_assert(reverse('donate'))
+        self.do_post_and_assert(reverse("donate"))
 
     def test_one_time_stripe_logged_out_donation_new_stub(self):
         self.set_stripe_params()
         self.client.logout()
         self.set_new_stub_params()
-        self.do_post_and_assert(reverse('donate'))
+        self.do_post_and_assert(reverse("donate"))
 
     def test_monthly_stripe_logged_in_donation(self):
         self.set_monthly_params()
         self.set_stripe_params()
         self.assertTrue(self.client.login(**self.credentials))
-        self.do_post_and_assert(reverse('donate'))
+        self.do_post_and_assert(reverse("donate"))
         self.check_monthly_donation_created()
 
     def test_monthly_stripe_logged_out_donation_existing_account(self):
         self.set_monthly_params()
         self.set_stripe_params()
         self.client.logout()
-        self.do_post_and_assert(reverse('donate'))
+        self.do_post_and_assert(reverse("donate"))
         self.check_monthly_donation_created()
 
     def test_monthly_stripe_logged_out_donation_new_stub(self):
@@ -370,24 +369,24 @@ class DonationIntegrationTest(TestCase):
         self.set_stripe_params()
         self.client.logout()
         self.set_new_stub_params()
-        self.do_post_and_assert(reverse('donate'))
+        self.do_post_and_assert(reverse("donate"))
         self.check_monthly_donation_created()
 
     def test_one_time_stripe_logged_in_payment(self):
         self.set_stripe_params()
         self.assertTrue(self.client.login(**self.credentials))
-        self.do_post_and_assert(reverse('cc_payment'))
+        self.do_post_and_assert(reverse("cc_payment"))
 
     def test_one_time_stripe_logged_out_payment_existing_account(self):
         self.set_stripe_params()
         self.client.logout()
-        self.do_post_and_assert(reverse('cc_payment'))
+        self.do_post_and_assert(reverse("cc_payment"))
 
     def test_one_time_stripe_logged_out_payment_new_stub(self):
         self.set_stripe_params()
         self.client.logout()
         self.set_new_stub_params()
-        self.do_post_and_assert(reverse('cc_payment'))
+        self.do_post_and_assert(reverse("cc_payment"))
 
     #
     # Test redirection and emails
@@ -399,26 +398,28 @@ class DonationIntegrationTest(TestCase):
     def test_email_and_redirection_regular_donation_stripe(self):
         self.set_stripe_params()
         self.client.logout()
-        self.do_post_and_assert(reverse('donate'),
-                                target=reverse('donate_complete'))
+        self.do_post_and_assert(
+            reverse("donate"), target=reverse("donate_complete")
+        )
         self.do_stripe_callback()
-        self.assertEmailSubject(emails['donation_thanks']['subject'])
+        self.assertEmailSubject(emails["donation_thanks"]["subject"])
 
     def test_email_and_redirection_monthly_donation(self):
         self.client.logout()
         self.set_stripe_params()
         self.set_monthly_params()
-        self.do_post_and_assert(reverse('donate'),
-                                target=reverse('donate_complete'))
+        self.do_post_and_assert(
+            reverse("donate"), target=reverse("donate_complete")
+        )
         self.check_monthly_donation_created()
         self.do_stripe_callback()
-        self.assertEmailSubject(emails['donation_thanks_recurring']['subject'])
+        self.assertEmailSubject(emails["donation_thanks_recurring"]["subject"])
 
     def test_email_and_redirection_one_time_payment(self):
         self.client.logout()
         self.set_stripe_params()
-        self.do_post_and_assert(reverse('cc_payment'),
-                                target=reverse('payment_complete'))
+        self.do_post_and_assert(
+            reverse("cc_payment"), target=reverse("payment_complete")
+        )
         self.do_stripe_callback()
-        self.assertEmailSubject(emails['payment_thanks']['subject'])
-
+        self.assertEmailSubject(emails["payment_thanks"]["subject"])

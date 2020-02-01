@@ -13,16 +13,36 @@ from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.import_lib import get_candidate_judges
 from cl.lib.model_helpers import make_docket_number_core
-from cl.lib.pacer import get_blocked_status, map_pacer_to_cl_id, \
-    normalize_attorney_contact, normalize_attorney_role
+from cl.lib.pacer import (
+    get_blocked_status,
+    map_pacer_to_cl_id,
+    normalize_attorney_contact,
+    normalize_attorney_role,
+)
 from cl.lib.string_utils import anonymize
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
-from cl.people_db.models import Attorney, AttorneyOrganization, \
-    AttorneyOrganizationAssociation, CriminalComplaint, CriminalCount, Party, \
-    PartyType, Role
+from cl.people_db.models import (
+    Attorney,
+    AttorneyOrganization,
+    AttorneyOrganizationAssociation,
+    CriminalComplaint,
+    CriminalCount,
+    Party,
+    PartyType,
+    Role,
+)
 from cl.recap.models import ProcessingQueue, UPLOAD_TYPE, PROCESSING_STATUS
-from cl.search.models import BankruptcyInformation, Claim, ClaimHistory, Court, \
-    DocketEntry, OriginatingCourtInformation, RECAPDocument, Tag, Docket
+from cl.search.models import (
+    BankruptcyInformation,
+    Claim,
+    ClaimHistory,
+    Court,
+    DocketEntry,
+    OriginatingCourtInformation,
+    RECAPDocument,
+    Tag,
+    Docket,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +65,14 @@ def find_docket_object(court_id, pacer_case_id, docket_number):
     # pacer_case_id is required for Docket and Docket History uploads.
     d = None
     docket_number_core = make_docket_number_core(docket_number)
-    for kwargs in [{'pacer_case_id': pacer_case_id,
-                    'docket_number_core': docket_number_core},
-                   {'pacer_case_id': pacer_case_id},
-                   {'pacer_case_id': None,
-                    'docket_number_core': docket_number_core}]:
+    for kwargs in [
+        {
+            "pacer_case_id": pacer_case_id,
+            "docket_number_core": docket_number_core,
+        },
+        {"pacer_case_id": pacer_case_id},
+        {"pacer_case_id": None, "docket_number_core": docket_number_core},
+    ]:
         ds = Docket.objects.filter(court_id=court_id, **kwargs)
         count = ds.count()
         if count == 0:
@@ -85,35 +108,35 @@ def add_attorney(atty, p, d):
     :return: None if there's an error, or an Attorney ID if not.
     """
     atty_org_info, atty_info = normalize_attorney_contact(
-        atty['contact'],
-        fallback_name=atty['name'],
+        atty["contact"], fallback_name=atty["name"],
     )
 
     # Try lookup by atty name in the docket.
-    attys = Attorney.objects.filter(name=atty['name'],
-                                    roles__docket=d).distinct()
+    attys = Attorney.objects.filter(
+        name=atty["name"], roles__docket=d
+    ).distinct()
     count = attys.count()
     if count == 0:
         # Couldn't find the attorney. Make one.
         a = Attorney.objects.create(
-            name=atty['name'],
-            contact_raw=atty['contact'],
+            name=atty["name"], contact_raw=atty["contact"],
         )
     elif count == 1:
         # Nailed it.
         a = attys[0]
     elif count >= 2:
         # Too many found, choose the most recent attorney.
-        logger.info("Got too many results for atty: '%s'. Picking earliest." %
-                    atty)
-        a = attys.earliest('date_created')
+        logger.info(
+            "Got too many results for atty: '%s'. Picking earliest." % atty
+        )
+        a = attys.earliest("date_created")
 
     # Associate the attorney with an org and update their contact info.
-    if atty['contact']:
+    if atty["contact"]:
         if atty_org_info:
             try:
                 org = AttorneyOrganization.objects.get(
-                    lookup_key=atty_org_info['lookup_key'],
+                    lookup_key=atty_org_info["lookup_key"],
                 )
             except AttorneyOrganization.DoesNotExist:
                 try:
@@ -121,34 +144,34 @@ def add_attorney(atty, p, d):
                 except IntegrityError:
                     # Race condition. Item was created after get. Try again.
                     org = AttorneyOrganization.objects.get(
-                        lookup_key=atty_org_info['lookup_key'],
+                        lookup_key=atty_org_info["lookup_key"],
                     )
 
             # Add the attorney to the organization
             AttorneyOrganizationAssociation.objects.get_or_create(
-                attorney=a,
-                attorney_organization=org,
-                docket=d,
+                attorney=a, attorney_organization=org, docket=d,
             )
 
         if atty_info:
-            a.contact_raw = atty['contact']
-            a.email = atty_info['email']
-            a.phone = atty_info['phone']
-            a.fax = atty_info['fax']
+            a.contact_raw = atty["contact"]
+            a.email = atty_info["email"]
+            a.phone = atty_info["phone"]
+            a.fax = atty_info["fax"]
             a.save()
 
     # Do roles
-    roles = atty['roles']
+    roles = atty["roles"]
     if len(roles) == 0:
-        roles = [{'role': Role.UNKNOWN, 'date_action': None}]
+        roles = [{"role": Role.UNKNOWN, "date_action": None}]
 
     # Delete the old roles, replace with new.
     Role.objects.filter(attorney=a, party=p, docket=d).delete()
-    Role.objects.bulk_create([
-        Role(attorney=a, party=p, docket=d, **atty_role) for
-        atty_role in roles
-    ])
+    Role.objects.bulk_create(
+        [
+            Role(attorney=a, party=p, docket=d, **atty_role)
+            for atty_role in roles
+        ]
+    )
     return a.pk
 
 
@@ -197,29 +220,37 @@ def update_docket_metadata(d, docket_data):
     Works on either docket history report or docket report (appellate
     or district) results.
     """
-    d = update_case_names(d, docket_data['case_name'])
+    d = update_case_names(d, docket_data["case_name"])
     mark_ia_upload_needed(d)
-    d.docket_number = docket_data['docket_number'] or d.docket_number
-    d.date_filed = docket_data['date_filed'] or d.date_filed
-    d.date_last_filing = docket_data.get(
-        'date_last_filing') or d.date_last_filing
-    d.date_terminated = docket_data.get('date_terminated') or d.date_terminated
-    d.cause = docket_data.get('cause') or d.cause
-    d.nature_of_suit = docket_data.get('nature_of_suit') or d.nature_of_suit
-    d.jury_demand = docket_data.get('jury_demand') or d.jury_demand
-    d.jurisdiction_type = docket_data.get(
-        'jurisdiction') or d.jurisdiction_type
-    d.mdl_status = docket_data.get('mdl_status') or d.mdl_status
-    judges = get_candidate_judges(docket_data.get('assigned_to_str'),
-                                  d.court_id, docket_data['date_filed'])
+    d.docket_number = docket_data["docket_number"] or d.docket_number
+    d.date_filed = docket_data["date_filed"] or d.date_filed
+    d.date_last_filing = (
+        docket_data.get("date_last_filing") or d.date_last_filing
+    )
+    d.date_terminated = docket_data.get("date_terminated") or d.date_terminated
+    d.cause = docket_data.get("cause") or d.cause
+    d.nature_of_suit = docket_data.get("nature_of_suit") or d.nature_of_suit
+    d.jury_demand = docket_data.get("jury_demand") or d.jury_demand
+    d.jurisdiction_type = (
+        docket_data.get("jurisdiction") or d.jurisdiction_type
+    )
+    d.mdl_status = docket_data.get("mdl_status") or d.mdl_status
+    judges = get_candidate_judges(
+        docket_data.get("assigned_to_str"),
+        d.court_id,
+        docket_data["date_filed"],
+    )
     if judges is not None and len(judges) == 1:
         d.assigned_to = judges[0]
-    d.assigned_to_str = docket_data.get('assigned_to_str') or ''
-    judges = get_candidate_judges(docket_data.get('referred_to_str'),
-                                  d.court_id, docket_data['date_filed'])
+    d.assigned_to_str = docket_data.get("assigned_to_str") or ""
+    judges = get_candidate_judges(
+        docket_data.get("referred_to_str"),
+        d.court_id,
+        docket_data["date_filed"],
+    )
     if judges is not None and len(judges) == 1:
         d.referred_to = judges[0]
-    d.referred_to_str = docket_data.get('referred_to_str') or ''
+    d.referred_to_str = docket_data.get("referred_to_str") or ""
     d.blocked, d.date_blocked = get_blocked_status(d)
 
     return d
@@ -227,28 +258,33 @@ def update_docket_metadata(d, docket_data):
 
 def update_docket_appellate_metadata(d, docket_data):
     """Update the metadata specific to appellate cases."""
-    if not any([docket_data.get('originating_court_information'),
-                docket_data.get('appeal_from'),
-                docket_data.get('panel')]):
+    if not any(
+        [
+            docket_data.get("originating_court_information"),
+            docket_data.get("appeal_from"),
+            docket_data.get("panel"),
+        ]
+    ):
         # Probably not appellate.
         return d, None
 
-    d.panel_str = ', '.join(docket_data.get(
-        'panel', [])) or d.panel_str
-    d.appellate_fee_status = docket_data.get(
-        'fee_status', '') or d.appellate_fee_status
-    d.appellate_case_type_information = docket_data.get(
-        'case_type_information', '') or d.appellate_case_type_information
-    d.appeal_from_str = docket_data.get(
-        'appeal_from', '') or d.appeal_from_str
+    d.panel_str = ", ".join(docket_data.get("panel", [])) or d.panel_str
+    d.appellate_fee_status = (
+        docket_data.get("fee_status", "") or d.appellate_fee_status
+    )
+    d.appellate_case_type_information = (
+        docket_data.get("case_type_information", "")
+        or d.appellate_case_type_information
+    )
+    d.appeal_from_str = docket_data.get("appeal_from", "") or d.appeal_from_str
 
     # Do originating court information dict
-    og_info = docket_data.get('originating_court_information')
+    og_info = docket_data.get("originating_court_information")
     if not og_info:
         return d, None
 
-    if og_info.get('court_id'):
-        cl_id = map_pacer_to_cl_id(og_info['court_id'])
+    if og_info.get("court_id"):
+        cl_id = map_pacer_to_cl_id(og_info["court_id"])
         if Court.objects.filter(pk=cl_id).exists():
             # Ensure the court exists. Sometimes PACER does weird things,
             # like in 14-1743 in CA3, where it says the court_id is 'uspci'.
@@ -263,41 +299,50 @@ def update_docket_appellate_metadata(d, docket_data):
 
     # Ensure we don't share A-Numbers, which can sometimes be in the docket
     # number field.
-    docket_number = og_info.get('docket_number', '') or d_og_info.docket_number
+    docket_number = og_info.get("docket_number", "") or d_og_info.docket_number
     docket_number, _ = anonymize(docket_number)
     d_og_info.docket_number = docket_number
-    d_og_info.court_reporter = og_info.get(
-        'court_reporter', '') or d_og_info.court_reporter
-    d_og_info.date_disposed = og_info.get(
-        'date_disposed') or d_og_info.date_disposed
-    d_og_info.date_filed = og_info.get(
-        'date_filed') or d_og_info.date_filed
-    d_og_info.date_judgment = og_info.get(
-        'date_judgment') or d_og_info.date_judgment
-    d_og_info.date_judgment_eod = og_info.get(
-        'date_judgment_eod') or d_og_info.date_judgment_eod
-    d_og_info.date_filed_noa = og_info.get(
-        'date_filed_noa') or d_og_info.date_filed_noa
-    d_og_info.date_received_coa = og_info.get(
-        'date_received_coa') or d_og_info.date_received_coa
-    d_og_info.assigned_to_str = og_info.get(
-        'assigned_to') or d_og_info.assigned_to_str
-    d_og_info.ordering_judge_str = og_info.get(
-        'ordering_judge') or d_og_info.ordering_judge_str
+    d_og_info.court_reporter = (
+        og_info.get("court_reporter", "") or d_og_info.court_reporter
+    )
+    d_og_info.date_disposed = (
+        og_info.get("date_disposed") or d_og_info.date_disposed
+    )
+    d_og_info.date_filed = og_info.get("date_filed") or d_og_info.date_filed
+    d_og_info.date_judgment = (
+        og_info.get("date_judgment") or d_og_info.date_judgment
+    )
+    d_og_info.date_judgment_eod = (
+        og_info.get("date_judgment_eod") or d_og_info.date_judgment_eod
+    )
+    d_og_info.date_filed_noa = (
+        og_info.get("date_filed_noa") or d_og_info.date_filed_noa
+    )
+    d_og_info.date_received_coa = (
+        og_info.get("date_received_coa") or d_og_info.date_received_coa
+    )
+    d_og_info.assigned_to_str = (
+        og_info.get("assigned_to") or d_og_info.assigned_to_str
+    )
+    d_og_info.ordering_judge_str = (
+        og_info.get("ordering_judge") or d_og_info.ordering_judge_str
+    )
 
     if not all([d.appeal_from_id, d_og_info.date_filed]):
         # Can't do judge lookups. Call it quits.
         return d, d_og_info
 
-    if og_info.get('assigned_to'):
-        judges = get_candidate_judges(og_info['assigned_to'], d.appeal_from_id,
-                                      d_og_info.date_filed)
+    if og_info.get("assigned_to"):
+        judges = get_candidate_judges(
+            og_info["assigned_to"], d.appeal_from_id, d_og_info.date_filed
+        )
         if judges is not None and len(judges) == 1:
             d_og_info.assigned_to = judges[0]
 
-    if og_info.get('ordering_judge'):
-        judges = get_candidate_judges(og_info['ordering_judge'], d.appeal_from_id,
-                                      d_og_info.date_filed)
+    if og_info.get("ordering_judge"):
+        judges = get_candidate_judges(
+            og_info["ordering_judge"], d.appeal_from_id, d_og_info.date_filed
+        )
         if judges is not None and len(judges) == 1:
             d_og_info.ordering_judge = judges[0]
 
@@ -311,8 +356,8 @@ def get_order_of_docket(docket_entries):
     order = None
     for _, de, nxt in previous_and_next(docket_entries):
         try:
-            current_num = int(de['document_number'])
-            nxt_num = int(de['document_number'])
+            current_num = int(de["document_number"])
+            nxt_num = int(de["document_number"])
         except (TypeError, ValueError):
             # One or the other can't be cast to an int. Continue until we have
             # two consecutive ints we can compare.
@@ -322,9 +367,9 @@ def get_order_of_docket(docket_entries):
             # Not sure if this is possible. No known instances in the wild.
             continue
         elif current_num < nxt_num:
-            order = 'asc'
+            order = "asc"
         elif current_num > nxt_num:
-            order = 'desc'
+            order = "desc"
         break
     return order
 
@@ -340,11 +385,12 @@ def make_recap_sequence_number(de):
     """
     template = "%s.%03d"
     if type(de) == dict:
-        return template % (de['date_filed'].isoformat(),
-                           de['recap_sequence_index'])
+        return template % (
+            de["date_filed"].isoformat(),
+            de["recap_sequence_index"],
+        )
     elif isinstance(de, DocketEntry):
-        return template % (de.date_filed.isoformat(),
-                           de.recap_sequence_index)
+        return template % (de.date_filed.isoformat(), de.recap_sequence_index)
 
 
 def calculate_recap_sequence_numbers(docket_entries):
@@ -373,26 +419,26 @@ def calculate_recap_sequence_numbers(docket_entries):
     """
     # Determine the sort order of the docket entries and normalize it
     order = get_order_of_docket(docket_entries)
-    if order == 'desc':
+    if order == "desc":
         docket_entries.reverse()
 
     # Assign sequence numbers
     for prev, de, _ in previous_and_next(docket_entries):
-        if prev is not None and de['date_filed'] == prev['date_filed']:
+        if prev is not None and de["date_filed"] == prev["date_filed"]:
             # Previous item has same date. Increment the sequence number.
-            de['recap_sequence_index'] = prev['recap_sequence_index'] + 1
-            de['recap_sequence_number'] = make_recap_sequence_number(de)
+            de["recap_sequence_index"] = prev["recap_sequence_index"] + 1
+            de["recap_sequence_number"] = make_recap_sequence_number(de)
             continue
         else:
             # prev is None --> First item on the list; OR
             # current is different than previous --> Changed date.
             # Take same action: Reset the index & assign it.
-            de['recap_sequence_index'] = 1
-            de['recap_sequence_number'] = make_recap_sequence_number(de)
+            de["recap_sequence_index"] = 1
+            de["recap_sequence_number"] = make_recap_sequence_number(de)
             continue
 
     # Cleanup
-    [de.pop('recap_sequence_index', None) for de in docket_entries]
+    [de.pop("recap_sequence_index", None) for de in docket_entries]
 
 
 def normalize_long_description(docket_entry):
@@ -408,18 +454,18 @@ def normalize_long_description(docket_entry):
     entry.
     :return None (the item is modified in place)
     """
-    if not docket_entry.get('description'):
+    if not docket_entry.get("description"):
         return
 
     # Remove the entry info from the end of the long descriptions
-    desc = docket_entry['description']
-    desc = re.sub(r'(.*) \(Entered: .*\)$', r'\1', desc)
+    desc = docket_entry["description"]
+    desc = re.sub(r"(.*) \(Entered: .*\)$", r"\1", desc)
 
     # Remove any brackets around numbers (this happens on the DHR long
     # descriptions).
-    desc = re.sub(r'\[(\d+)\]', r'\1', desc)
+    desc = re.sub(r"\[(\d+)\]", r"\1", desc)
 
-    docket_entry['description'] = desc
+    docket_entry["description"] = desc
 
 
 def merge_unnumbered_docket_entries(des):
@@ -433,7 +479,7 @@ def merge_unnumbered_docket_entries(des):
     :return The winning DocketEntry
     """
     # Choose the earliest as the winner; delete the rest
-    winner = des.earliest('date_created')
+    winner = des.earliest("date_created")
     des.exclude(pk=winner.pk).delete()
     return winner
 
@@ -449,39 +495,41 @@ def get_or_make_docket_entry(d, docket_entry):
      - de_created is a boolean stating whether de was created or not
      - None is returned when things fail.
     """
-    if docket_entry['document_number']:
+    if docket_entry["document_number"]:
         try:
             de, de_created = DocketEntry.objects.get_or_create(
-                docket=d,
-                entry_number=docket_entry['document_number'],
+                docket=d, entry_number=docket_entry["document_number"],
             )
         except DocketEntry.MultipleObjectsReturned:
-            logger.error("Multiple docket entries found for document "
-                         "entry number '%s' while processing '%s'",
-                         docket_entry['document_number'], d)
+            logger.error(
+                "Multiple docket entries found for document "
+                "entry number '%s' while processing '%s'",
+                docket_entry["document_number"],
+                d,
+            )
             return None
     else:
         # Unnumbered entry. The only thing we can be sure we have is a
         # date. Try to find it by date and description (short or long)
         normalize_long_description(docket_entry)
         query = Q()
-        if docket_entry.get('description'):
-            query |= Q(description=docket_entry['description'])
-        if docket_entry.get('short_description'):
-            query |= Q(recap_documents__description=
-                       docket_entry['short_description'])
+        if docket_entry.get("description"):
+            query |= Q(description=docket_entry["description"])
+        if docket_entry.get("short_description"):
+            query |= Q(
+                recap_documents__description=docket_entry["short_description"]
+            )
 
         des = DocketEntry.objects.filter(
             query,
             docket=d,
-            date_filed=docket_entry['date_filed'],
-            entry_number=docket_entry['document_number'],
+            date_filed=docket_entry["date_filed"],
+            entry_number=docket_entry["document_number"],
         )
         count = des.count()
         if count == 0:
             de = DocketEntry(
-                docket=d,
-                entry_number=docket_entry['document_number'],
+                docket=d, entry_number=docket_entry["document_number"],
             )
             de_created = True
         elif count == 1:
@@ -491,7 +539,8 @@ def get_or_make_docket_entry(d, docket_entry):
             logger.warning(
                 "Multiple docket entries returned for unnumbered docket "
                 "entry on date: %s while processing %s. Attempting merge",
-                docket_entry['date_filed'], d,
+                docket_entry["date_filed"],
+                d,
             )
             # There's so little metadata with unnumbered des that if there's
             # more than one match, we can just select the oldest as canonical.
@@ -511,7 +560,7 @@ def add_docket_entries(d, docket_entries, tags=None):
     any docket entry was created.
     """
     # Remove items without a date filed value.
-    docket_entries = [de for de in docket_entries if de.get('date_filed')]
+    docket_entries = [de for de in docket_entries if de.get("date_filed")]
 
     rds_created = []
     content_updated = False
@@ -523,11 +572,12 @@ def add_docket_entries(d, docket_entries, tags=None):
         else:
             de, de_created = response[0], response[1]
 
-        de.description = docket_entry['description'] or de.description
-        de.date_filed = docket_entry['date_filed'] or de.date_filed
-        de.pacer_sequence_number = docket_entry.get('pacer_seq_no') or \
-            de.pacer_sequence_number
-        de.recap_sequence_number = docket_entry['recap_sequence_number']
+        de.description = docket_entry["description"] or de.description
+        de.date_filed = docket_entry["date_filed"] or de.date_filed
+        de.pacer_sequence_number = (
+            docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
+        )
+        de.recap_sequence_number = docket_entry["recap_sequence_number"]
         de.save()
         if tags:
             for tag in tags:
@@ -540,28 +590,29 @@ def add_docket_entries(d, docket_entries, tags=None):
         # the pacer_doc_id field if it's blank. If we can't find it, create it
         # or throw an error.
         params = {
-            'docket_entry': de,
+            "docket_entry": de,
             # Normalize to "" here. Unsure why, but RECAPDocuments have a
             # char field for this field while DocketEntries have a integer
             # field.
-            'document_number': docket_entry['document_number'] or '',
+            "document_number": docket_entry["document_number"] or "",
         }
-        if not docket_entry['document_number'] and \
-                docket_entry.get('short_description'):
-            params['description'] = docket_entry['short_description']
+        if not docket_entry["document_number"] and docket_entry.get(
+            "short_description"
+        ):
+            params["description"] = docket_entry["short_description"]
 
-        if docket_entry.get('attachment_number'):
-            params['document_type'] = RECAPDocument.ATTACHMENT
-            params['attachment_number'] = docket_entry['attachment_number']
+        if docket_entry.get("attachment_number"):
+            params["document_type"] = RECAPDocument.ATTACHMENT
+            params["attachment_number"] = docket_entry["attachment_number"]
         else:
-            params['document_type'] = RECAPDocument.PACER_DOCUMENT
+            params["document_type"] = RECAPDocument.PACER_DOCUMENT
 
         try:
             rd = RECAPDocument.objects.get(**params)
         except RECAPDocument.DoesNotExist:
             try:
                 rd = RECAPDocument.objects.create(
-                    pacer_doc_id=docket_entry['pacer_doc_id'],
+                    pacer_doc_id=docket_entry["pacer_doc_id"],
                     is_available=False,
                     **params
                 )
@@ -572,13 +623,14 @@ def add_docket_entries(d, docket_entries, tags=None):
         except RECAPDocument.MultipleObjectsReturned:
             logger.error(
                 "Multiple recap documents found for document entry number'%s' "
-                "while processing '%s'" % (docket_entry['document_number'], d)
+                "while processing '%s'" % (docket_entry["document_number"], d)
             )
             continue
 
-        rd.pacer_doc_id = rd.pacer_doc_id or docket_entry['pacer_doc_id']
-        rd.description = docket_entry.get(
-            'short_description') or rd.description
+        rd.pacer_doc_id = rd.pacer_doc_id or docket_entry["pacer_doc_id"]
+        rd.description = (
+            docket_entry.get("short_description") or rd.description
+        )
         try:
             rd.save()
         except ValidationError:
@@ -601,11 +653,13 @@ def check_json_for_terminated_entities(parties):
     :returns boolean indicating whether any parties had termination dates.
     """
     for party in parties:
-        if party.get('date_terminated'):
+        if party.get("date_terminated"):
             return True
-        for atty in party.get('attorneys', []):
-            terminated_role = {a['role'] for a in atty['roles']} & \
-                                  {Role.TERMINATED, Role.SELF_TERMINATED}
+        for atty in party.get("attorneys", []):
+            terminated_role = {a["role"] for a in atty["roles"]} & {
+                Role.TERMINATED,
+                Role.SELF_TERMINATED,
+            }
             if terminated_role:
                 return True
     return False
@@ -621,27 +675,36 @@ def get_terminated_entities(d):
     """
     # This will do five queries at most rather than doing potentially hundreds
     # on cases with many parties.
-    parties = d.parties.prefetch_related(
-        Prefetch('party_types',
-                 queryset=PartyType.objects.filter(
-                     docket=d,
-                 ).exclude(
-                     date_terminated=None,
-                 ).distinct().only('pk'),
-                 to_attr='party_types_for_d'),
-        Prefetch('attorneys',
-                 queryset=Attorney.objects.filter(
-                     roles__docket=d,
-                 ).distinct().only('pk'),
-                 to_attr='attys_in_d'),
-        Prefetch('attys_in_d__roles',
-                 queryset=Role.objects.filter(
-                     docket=d,
-                     role__in=[Role.SELF_TERMINATED,
-                               Role.TERMINATED],
-                 ).distinct().only('pk'),
-                 to_attr='roles_for_atty'),
-    ).distinct().only('pk')
+    parties = (
+        d.parties.prefetch_related(
+            Prefetch(
+                "party_types",
+                queryset=PartyType.objects.filter(docket=d,)
+                .exclude(date_terminated=None,)
+                .distinct()
+                .only("pk"),
+                to_attr="party_types_for_d",
+            ),
+            Prefetch(
+                "attorneys",
+                queryset=Attorney.objects.filter(roles__docket=d,)
+                .distinct()
+                .only("pk"),
+                to_attr="attys_in_d",
+            ),
+            Prefetch(
+                "attys_in_d__roles",
+                queryset=Role.objects.filter(
+                    docket=d, role__in=[Role.SELF_TERMINATED, Role.TERMINATED],
+                )
+                .distinct()
+                .only("pk"),
+                to_attr="roles_for_atty",
+            ),
+        )
+        .distinct()
+        .only("pk")
+    )
     terminated_party_ids = set()
     terminated_attorney_ids = set()
     for party in parties:
@@ -699,14 +762,15 @@ def normalize_attorney_roles(parties):
 
     """
     for party in parties:
-        for atty in party.get('attorneys', []):
-            roles = [normalize_attorney_role(r) for r in atty['roles']]
+        for atty in party.get("attorneys", []):
+            roles = [normalize_attorney_role(r) for r in atty["roles"]]
             roles = remove_duplicate_dicts(roles)
-            atty['roles'] = roles
+            atty["roles"] = roles
 
 
-def disassociate_extraneous_entities(d, parties, parties_to_preserve,
-                                     attorneys_to_preserve):
+def disassociate_extraneous_entities(
+    d, parties, parties_to_preserve, attorneys_to_preserve
+):
     """Disassociate any parties or attorneys no longer in the latest info.
 
      - Do not delete parties or attorneys, just allow them to be orphaned.
@@ -739,24 +803,21 @@ def disassociate_extraneous_entities(d, parties, parties_to_preserve,
             # any entities that weren't just created/updated and that aren't in
             # the list of terminated entities.
             parties_to_preserve = parties_to_preserve | terminated_parties
-            attorneys_to_preserve = \
+            attorneys_to_preserve = (
                 attorneys_to_preserve | terminated_attorneys
+            )
     else:
         # The terminated parties are already included in the entities to
         # preserve, so just create an empty variable for this.
         terminated_parties = set()
 
     # Disassociate extraneous parties from the docket.
-    PartyType.objects.filter(
-        docket=d,
-    ).exclude(
+    PartyType.objects.filter(docket=d,).exclude(
         party_id__in=parties_to_preserve,
     ).delete()
 
     # Disassociate extraneous attorneys from the docket and parties.
-    Role.objects.filter(
-        docket=d,
-    ).exclude(
+    Role.objects.filter(docket=d,).exclude(
         # Don't delete attorney roles for attorneys we're preserving.
         attorney_id__in=attorneys_to_preserve,
     ).exclude(
@@ -784,70 +845,85 @@ def add_parties_and_attorneys(d, parties):
     updated_parties = set()
     updated_attorneys = set()
     for party in parties:
-        ps = Party.objects.filter(name=party['name'],
-                                  party_types__docket=d).distinct()
+        ps = Party.objects.filter(
+            name=party["name"], party_types__docket=d
+        ).distinct()
         count = ps.count()
         if count == 0:
             try:
-                p = Party.objects.create(name=party['name'])
+                p = Party.objects.create(name=party["name"])
             except IntegrityError:
                 # Race condition. Object was created after our get and before
                 # our create. Try to get it again.
-                ps = Party.objects.filter(name=party['name'],
-                                          party_types__docket=d).distinct()
+                ps = Party.objects.filter(
+                    name=party["name"], party_types__docket=d
+                ).distinct()
                 count = ps.count()
         if count == 1:
             p = ps[0]
         elif count >= 2:
-            p = ps.earliest('date_created')
+            p = ps.earliest("date_created")
         updated_parties.add(p.pk)
 
         # If the party type doesn't exist, make a new one.
-        pts = p.party_types.filter(docket=d, name=party['type'])
-        criminal_data = party.get('criminal_data')
+        pts = p.party_types.filter(docket=d, name=party["type"])
+        criminal_data = party.get("criminal_data")
         update_dict = {
-            'extra_info': party.get('extra_info', ''),
-            'date_terminated': party.get('date_terminated'),
+            "extra_info": party.get("extra_info", ""),
+            "date_terminated": party.get("date_terminated"),
         }
         if criminal_data:
-            update_dict['highest_offense_level_opening'] = criminal_data[
-                'highest_offense_level_opening']
-            update_dict['highest_offense_level_terminated'] = criminal_data[
-                'highest_offense_level_terminated']
+            update_dict["highest_offense_level_opening"] = criminal_data[
+                "highest_offense_level_opening"
+            ]
+            update_dict["highest_offense_level_terminated"] = criminal_data[
+                "highest_offense_level_terminated"
+            ]
         if pts.exists():
             pts.update(**update_dict)
             pt = pts[0]
         else:
-            pt = PartyType.objects.create(docket=d, party=p,
-                                          name=party['type'], **update_dict)
+            pt = PartyType.objects.create(
+                docket=d, party=p, name=party["type"], **update_dict
+            )
 
         # Criminal counts and complaints
-        if criminal_data and criminal_data['counts']:
+        if criminal_data and criminal_data["counts"]:
             CriminalCount.objects.filter(party_type=pt).delete()
-            CriminalCount.objects.bulk_create([
-                CriminalCount(
-                    party_type=pt, name=criminal_count['name'],
-                    disposition=criminal_count['disposition'],
-                    status=CriminalCount.normalize_status(
-                        criminal_count['status'])
-                ) for criminal_count in criminal_data['counts']
-            ])
+            CriminalCount.objects.bulk_create(
+                [
+                    CriminalCount(
+                        party_type=pt,
+                        name=criminal_count["name"],
+                        disposition=criminal_count["disposition"],
+                        status=CriminalCount.normalize_status(
+                            criminal_count["status"]
+                        ),
+                    )
+                    for criminal_count in criminal_data["counts"]
+                ]
+            )
 
-        if criminal_data and criminal_data['complaints']:
+        if criminal_data and criminal_data["complaints"]:
             CriminalComplaint.objects.filter(party_type=pt).delete()
-            CriminalComplaint.objects.bulk_create([
-                CriminalComplaint(
-                    party_type=pt, name=complaint['name'],
-                    disposition=complaint['disposition'],
-                ) for complaint in criminal_data['complaints']
-            ])
+            CriminalComplaint.objects.bulk_create(
+                [
+                    CriminalComplaint(
+                        party_type=pt,
+                        name=complaint["name"],
+                        disposition=complaint["disposition"],
+                    )
+                    for complaint in criminal_data["complaints"]
+                ]
+            )
 
         # Attorneys
-        for atty in party.get('attorneys', []):
+        for atty in party.get("attorneys", []):
             updated_attorneys.add(add_attorney(atty, p, d))
 
-    disassociate_extraneous_entities(d, parties, updated_parties,
-                                     updated_attorneys)
+    disassociate_extraneous_entities(
+        d, parties, updated_parties, updated_attorneys
+    )
 
 
 @transaction.atomic
@@ -858,18 +934,25 @@ def add_bankruptcy_data_to_docket(d, claims_data):
     except BankruptcyInformation.DoesNotExist:
         bankr_data = BankruptcyInformation(docket=d)
 
-    bankr_data.date_converted = claims_data.get(
-        'date_converted') or bankr_data.date_converted
-    bankr_data.date_last_to_file_claims = claims_data.get(
-        'date_last_to_file_claims') or bankr_data.date_last_to_file_claims
-    bankr_data.date_last_to_file_govt = claims_data.get(
-        'date_last_to_file_govt') or bankr_data.date_last_to_file_govt
-    bankr_data.date_debtor_dismissed = claims_data.get(
-        'date_debtor_dismissed') or bankr_data.date_debtor_dismissed
-    bankr_data.chapter = claims_data.get(
-        'chapter') or bankr_data.chapter
-    bankr_data.trustee_str = claims_data.get(
-        'trustee_str') or bankr_data.trustee_str
+    bankr_data.date_converted = (
+        claims_data.get("date_converted") or bankr_data.date_converted
+    )
+    bankr_data.date_last_to_file_claims = (
+        claims_data.get("date_last_to_file_claims")
+        or bankr_data.date_last_to_file_claims
+    )
+    bankr_data.date_last_to_file_govt = (
+        claims_data.get("date_last_to_file_govt")
+        or bankr_data.date_last_to_file_govt
+    )
+    bankr_data.date_debtor_dismissed = (
+        claims_data.get("date_debtor_dismissed")
+        or bankr_data.date_debtor_dismissed
+    )
+    bankr_data.chapter = claims_data.get("chapter") or bankr_data.chapter
+    bankr_data.trustee_str = (
+        claims_data.get("trustee_str") or bankr_data.trustee_str
+    )
     bankr_data.save()
 
 
@@ -889,40 +972,43 @@ def add_claim_history_entry(new_history, claim):
     :param claim: The claim in the database the history is associated with.
     :return None
     """
-    if new_history['document_number'] is None:
+    if new_history["document_number"] is None:
         # Punt on unnumbered claims.
         return
 
-    history_type = new_history['type']
+    history_type = new_history["type"]
     common_lookup_params = {
-        'claim': claim,
-        'date_filed': new_history['date_filed'],
+        "claim": claim,
+        "date_filed": new_history["date_filed"],
         # Sometimes missing when a docket entry type
         # doesn't have a link for some reason.
-        'pacer_case_id': new_history.get('pacer_case_id', ''),
-        'document_number': new_history['document_number'],
+        "pacer_case_id": new_history.get("pacer_case_id", ""),
+        "document_number": new_history["document_number"],
     }
 
-    if history_type == 'docket_entry':
+    if history_type == "docket_entry":
         db_history, _ = ClaimHistory.objects.get_or_create(
             claim_document_type=ClaimHistory.DOCKET_ENTRY,
-            pacer_doc_id=new_history.get('pacer_doc_id', ''),
+            pacer_doc_id=new_history.get("pacer_doc_id", ""),
             **common_lookup_params
         )
-        db_history.pacer_dm_id = new_history.get(
-            'pacer_dm_id') or db_history.pacer_dm_id
-        db_history.pacer_seq_no = new_history.get(
-            'pacer_seq_no') or db_history.pacer_seq_no
+        db_history.pacer_dm_id = (
+            new_history.get("pacer_dm_id") or db_history.pacer_dm_id
+        )
+        db_history.pacer_seq_no = (
+            new_history.get("pacer_seq_no") or db_history.pacer_seq_no
+        )
     else:
         db_history, _ = ClaimHistory.objects.get_or_create(
             claim_document_type=ClaimHistory.CLAIM_ENTRY,
-            claim_doc_id=new_history['id'],
-            attachment_number=new_history['attachment_number'],
+            claim_doc_id=new_history["id"],
+            attachment_number=new_history["attachment_number"],
             **common_lookup_params
         )
 
-    db_history.description = new_history.get(
-        'description') or db_history.description
+    db_history.description = (
+        new_history.get("description") or db_history.description
+    )
     db_history.save()
 
 
@@ -936,41 +1022,55 @@ def add_claims_to_docket(d, new_claims, tag_names):
     """
     for new_claim in new_claims:
         db_claim, _ = Claim.objects.get_or_create(
-            docket=d,
-            claim_number=new_claim['claim_number']
+            docket=d, claim_number=new_claim["claim_number"]
         )
-        db_claim.date_claim_modified = new_claim.get(
-            'date_claim_modified') or db_claim.date_claim_modified
-        db_claim.date_original_entered = new_claim.get(
-            'date_original_entered') or db_claim.date_original_entered
-        db_claim.date_original_filed = new_claim.get(
-            'date_original_filed') or db_claim.date_original_filed
-        db_claim.date_last_amendment_entered = new_claim.get(
-            'date_last_amendment_entered') or db_claim.date_last_amendment_entered
-        db_claim.date_last_amendment_filed = new_claim.get(
-            'date_last_amendment_filed') or db_claim.date_last_amendment_filed
-        db_claim.creditor_details = new_claim.get(
-            'creditor_details') or db_claim.creditor_details
-        db_claim.creditor_id = new_claim.get(
-            'creditor_id') or db_claim.creditor_id
-        db_claim.status = new_claim.get(
-            'status') or db_claim.status
-        db_claim.entered_by = new_claim.get(
-            'entered_by') or db_claim.entered_by
-        db_claim.filed_by = new_claim.get(
-            'filed_by') or db_claim.filed_by
-        db_claim.amount_claimed = new_claim.get(
-            'amount_claimed') or db_claim.amount_claimed
-        db_claim.unsecured_claimed = new_claim.get(
-            'unsecured_claimed') or db_claim.unsecured_claimed
-        db_claim.secured_claimed = new_claim.get(
-            'secured_claimed') or db_claim.secured_claimed
-        db_claim.priority_claimed = new_claim.get(
-            'priority_claimed') or db_claim.priority_claimed
-        db_claim.description = new_claim.get(
-            'description') or db_claim.description
-        db_claim.remarks = new_claim.get(
-            'remarks') or db_claim.remarks
+        db_claim.date_claim_modified = (
+            new_claim.get("date_claim_modified")
+            or db_claim.date_claim_modified
+        )
+        db_claim.date_original_entered = (
+            new_claim.get("date_original_entered")
+            or db_claim.date_original_entered
+        )
+        db_claim.date_original_filed = (
+            new_claim.get("date_original_filed")
+            or db_claim.date_original_filed
+        )
+        db_claim.date_last_amendment_entered = (
+            new_claim.get("date_last_amendment_entered")
+            or db_claim.date_last_amendment_entered
+        )
+        db_claim.date_last_amendment_filed = (
+            new_claim.get("date_last_amendment_filed")
+            or db_claim.date_last_amendment_filed
+        )
+        db_claim.creditor_details = (
+            new_claim.get("creditor_details") or db_claim.creditor_details
+        )
+        db_claim.creditor_id = (
+            new_claim.get("creditor_id") or db_claim.creditor_id
+        )
+        db_claim.status = new_claim.get("status") or db_claim.status
+        db_claim.entered_by = (
+            new_claim.get("entered_by") or db_claim.entered_by
+        )
+        db_claim.filed_by = new_claim.get("filed_by") or db_claim.filed_by
+        db_claim.amount_claimed = (
+            new_claim.get("amount_claimed") or db_claim.amount_claimed
+        )
+        db_claim.unsecured_claimed = (
+            new_claim.get("unsecured_claimed") or db_claim.unsecured_claimed
+        )
+        db_claim.secured_claimed = (
+            new_claim.get("secured_claimed") or db_claim.secured_claimed
+        )
+        db_claim.priority_claimed = (
+            new_claim.get("priority_claimed") or db_claim.priority_claimed
+        )
+        db_claim.description = (
+            new_claim.get("description") or db_claim.description
+        )
+        db_claim.remarks = new_claim.get("remarks") or db_claim.remarks
         db_claim.save()
 
         # Add tags to claim
@@ -981,7 +1081,7 @@ def add_claims_to_docket(d, new_claims, tag_names):
                 tag.tag_object(db_claim)
                 tags.append(tag)
 
-        for new_history in new_claim['history']:
+        for new_history in new_claim["history"]:
             add_claim_history_entry(new_history, db_claim)
 
 
@@ -1007,10 +1107,11 @@ def process_orphan_documents(rds_created, court_id, docket_date):
         upload_type=UPLOAD_TYPE.PDF,
         debug=False,
         date_modified__gt=cutoff_date,
-    ).values_list('pk', flat=True)
+    ).values_list("pk", flat=True)
     for pq in pqs:
         try:
             from cl.recap.tasks import process_recap_pdf
+
             process_recap_pdf(pq)
         except:
             # We can ignore this. If we don't, we get all of the
