@@ -109,15 +109,14 @@ def paginate_cached_solr_results(request, cd, results, rows, cache_key):
 
 
 def do_search(
-    request, rows=20, order_by=None, type=None, facet=True, cache_key=None
+    request, rows=20, search_params=None, facet=True, cache_key=None,
 ):
     """Do all the difficult solr work.
 
     :param request: The request made by the user
     :param rows: The number of solr results to request
-    :param order_by: An opportunity to override the ordering of the search
-    results
-    :param type: An opportunity to override the type
+    :param search_params: A dict with additional search params to be sent to
+    solr.
     :param facet: Whether to complete faceting in the query
     :param cache_key: A cache key with which to save the results. Note that it
     does not do anything clever with the actual query, so if you use this, your
@@ -129,16 +128,16 @@ def do_search(
     query_citation = None
     error = False
     paged_results = None
-    search_form = SearchForm(request.GET)
     courts = Court.objects.filter(in_use=True)
+
+    # Add additional or overridden GET parameters
+    request.GET = request.GET.copy()  # Makes it mutable
+    if search_params:
+        request.GET.update(search_params)
+    search_form = SearchForm(request.GET)
 
     if search_form.is_valid():
         cd = search_form.cleaned_data
-        # Allows an override by calling methods.
-        if order_by is not None:
-            cd["order_by"] = order_by
-        if type is not None:
-            cd["type"] = type
 
         # Do the query, hitting the cache if desired
         try:
@@ -328,7 +327,7 @@ def show_results(request):
                 do_search(
                     request,
                     rows=5,
-                    order_by="dateFiled desc",
+                    search_params={"order_by": "dateFiled desc"},
                     facet=False,
                     cache_key="homepage-data-o",
                 )
@@ -339,8 +338,10 @@ def show_results(request):
                     "results_oa": do_search(
                         request,
                         rows=5,
-                        order_by="dateArgued desc",
-                        type="oa",
+                        search_params={
+                            "order_by": "dateArgued desc",
+                            "type": "oa",
+                        },
                         facet=False,
                         cache_key="homepage-data-oa",
                     )["results"]
@@ -411,7 +412,7 @@ def advanced(request):
         o_results = do_search(
             request,
             rows=1,
-            type=obj_type,
+            search_params={"type": obj_type,},
             facet=True,
             cache_key="opinion-homepage-results",
         )
