@@ -131,10 +131,10 @@ def do_search(
     courts = Court.objects.filter(in_use=True)
 
     # Add additional or overridden GET parameters
-    request.GET = request.GET.copy()  # Makes it mutable
+    mutable_GET = request.GET.copy()  # Makes it mutable
     if search_params:
-        request.GET.update(search_params)
-    search_form = SearchForm(request.GET)
+        mutable_GET.update(search_params)
+    search_form = SearchForm(mutable_GET)
 
     if search_form.is_valid():
         cd = search_form.cleaned_data
