@@ -7,7 +7,7 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.urls import reverse
 from django.db.models import F, Prefetch
 from django.http import HttpResponseRedirect
-from django.http.response import HttpResponse, HttpResponseNotAllowed
+from django.http.response import HttpResponse, HttpResponseNotAllowed, Http404
 from django.shortcuts import get_object_or_404, render
 from django.template import loader
 from django.utils.timezone import now
@@ -36,6 +36,37 @@ from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import Citation, Docket, OpinionCluster, RECAPDocument
+from cl.search.views import do_search
+
+
+def court_homepage(request, pk):
+    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
+        raise Http404("Court pages only implemented for Tennessee so far.")
+
+    render_dict = {
+        # Load the render_dict with good results that can be shown in the
+        # "Latest Cases" sections
+        "results_compcl": do_search(
+            request,
+            rows=5,
+            search_params={
+                "order_by": "dateFiled desc",
+                "court": "tennworkcompcl",
+            },
+            facet=False,
+        )["results"],
+        "results_compapp": do_search(
+            request,
+            rows=5,
+            search_params={
+                "order_by": "dateFiled desc",
+                "court": "tennworkcompapp",
+            },
+            facet=False,
+        )["results"],
+        "private": False,
+    }
+    return render(request, "court.html", render_dict)
 
 
 def redirect_docket_recap(request, court, pacer_case_id):
