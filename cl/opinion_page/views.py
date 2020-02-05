@@ -47,7 +47,7 @@ def court_homepage(request, pk):
         # Load the render_dict with good results that can be shown in the
         # "Latest Cases" sections
         "results_compcl": do_search(
-            request,
+            request.GET.copy(),
             rows=5,
             override_params={
                 "order_by": "dateFiled desc",
@@ -56,7 +56,7 @@ def court_homepage(request, pk):
             facet=False,
         )["results"],
         "results_compapp": do_search(
-            request,
+            request.GET.copy(),
             rows=5,
             override_params={
                 "order_by": "dateFiled desc",
