@@ -109,14 +109,14 @@ def paginate_cached_solr_results(request, cd, results, rows, cache_key):
 
 
 def do_search(
-    request, rows=20, search_params=None, facet=True, cache_key=None,
+    request, rows=20, override_params=None, facet=True, cache_key=None,
 ):
     """Do all the difficult solr work.
 
     :param request: The request made by the user
     :param rows: The number of solr results to request
-    :param search_params: A dict with additional search params to be sent to
-    solr.
+    :param override_params: A dict with additional or different GET params to
+    be sent to solr.
     :param facet: Whether to complete faceting in the query
     :param cache_key: A cache key with which to save the results. Note that it
     does not do anything clever with the actual query, so if you use this, your
@@ -132,8 +132,8 @@ def do_search(
 
     # Add additional or overridden GET parameters
     mutable_GET = request.GET.copy()  # Makes it mutable
-    if search_params:
-        mutable_GET.update(search_params)
+    if override_params:
+        mutable_GET.update(override_params)
     search_form = SearchForm(mutable_GET)
 
     if search_form.is_valid():
@@ -327,7 +327,7 @@ def show_results(request):
                 do_search(
                     request,
                     rows=5,
-                    search_params={"order_by": "dateFiled desc"},
+                    override_params={"order_by": "dateFiled desc"},
                     facet=False,
                     cache_key="homepage-data-o",
                 )
@@ -338,7 +338,7 @@ def show_results(request):
                     "results_oa": do_search(
                         request,
                         rows=5,
-                        search_params={
+                        override_params={
                             "order_by": "dateArgued desc",
                             "type": "oa",
                         },
@@ -412,7 +412,7 @@ def advanced(request):
         o_results = do_search(
             request,
             rows=1,
-            search_params={"type": obj_type,},
+            override_params={"type": obj_type,},
             facet=True,
             cache_key="opinion-homepage-results",
         )

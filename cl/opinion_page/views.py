@@ -49,7 +49,7 @@ def court_homepage(request, pk):
         "results_compcl": do_search(
             request,
             rows=5,
-            search_params={
+            override_params={
                 "order_by": "dateFiled desc",
                 "court": "tennworkcompcl",
             },
@@ -58,7 +58,7 @@ def court_homepage(request, pk):
         "results_compapp": do_search(
             request,
             rows=5,
-            search_params={
+            override_params={
                 "order_by": "dateFiled desc",
                 "court": "tennworkcompapp",
             },
