@@ -74,17 +74,17 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        both_list_and_endpoints = options.get("doc-id") is not None and (
-            options.get("start-id") is not None
-            or options.get("end-id") is not None
-            or options.get("filed-after") is not None
+        both_list_and_endpoints = options.get("doc_id") is not None and (
+            options.get("start_id") is not None
+            or options.get("end_id") is not None
+            or options.get("filed_after") is not None
         )
         no_option = not any(
             [
-                options.get("doc-id") is None,
-                options.get("start-id") is None,
-                options.get("end-id") is None,
-                options.get("filed-after") is None,
+                options.get("doc_id") is None,
+                options.get("start_id") is None,
+                options.get("end_id") is None,
+                options.get("filed_after") is None,
                 options.get("all") is False,
             ]
         )
@@ -100,15 +100,15 @@ class Command(VerboseCommand):
 
         # Use query chaining to build the query
         query = Opinion.objects.all()
-        if options.get("doc-id"):
-            query = query.filter(pk__in=options.get("doc-id"))
-        if options.get("end-id"):
-            query = query.filter(pk__lte=options.get("end-id"))
-        if options.get("start-id"):
-            query = query.filter(pk__gte=options.get("start-id"))
-        if options.get("filed-after"):
+        if options.get("doc_id"):
+            query = query.filter(pk__in=options["doc_id"])
+        if options.get("end_id"):
+            query = query.filter(pk__lte=options["end_id"])
+        if options.get("start_id"):
+            query = query.filter(pk__gte=options["start_id"])
+        if options.get("filed_after"):
             query = query.filter(
-                cluster__date_filed__gte=options["filed-after"]
+                cluster__date_filed__gte=options["filed_after"]
             )
         if options.get("all"):
             query = Opinion.objects.all()
@@ -169,7 +169,7 @@ class Command(VerboseCommand):
             self.log_progress(processed_count, opinion_pk)
 
     def add_to_solr(self):
-        if self.index == "all_at_end":
+        if self.index == "all-at-end":
             # fmt: off
             call_command(
                 'cl_update_index',
@@ -178,7 +178,6 @@ class Command(VerboseCommand):
                 '--noinput',
                 '--update',
                 '--everything',
-                '--do-commit',
             )
             # fmt: on
         elif self.index == "False":
