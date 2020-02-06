@@ -3,10 +3,8 @@ from django.views.generic import RedirectView
 
 from cl.simple_pages.sitemap import sitemap_maker
 from cl.simple_pages.views import (
-    about,
     advanced_search,
     alert_help,
-    browser_warning,
     contact,
     contact_thanks,
     contribute,
@@ -15,7 +13,6 @@ from cl.simple_pages.views import (
     donation_help,
     faq,
     feeds,
-    humans,
     latest_terms,
     markdown_help,
     old_terms,
@@ -30,7 +27,6 @@ from cl.simple_pages.views import (
 
 urlpatterns = [
     # Footer stuff
-    url(r"^about/$", about, name="about"),
     url(r"^faq/$", faq, name="faq"),
     url(r"^coverage/$", coverage_graph, name="coverage"),
     url(r"^feeds/$", feeds, name="feeds_info"),
@@ -52,11 +48,8 @@ urlpatterns = [
     ),
     url(r"^terms/v/(\d{1,2})/$", old_terms, name="old_terms"),
     url(r"^terms/$", latest_terms, name="terms"),
-    # Randoms
-    url(r"^bad-browser/$", browser_warning, name="bad_browser",),
-    # Robots & Humans
+    # Robots
     url(r"^robots\.txt$", robots, name="robots"),
-    url(r"^humans\.txt$", humans, name="humans",),
     # Sitemap:
     url(
         r"^sitemap-simple-pages\.xml$",

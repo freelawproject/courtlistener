@@ -53,7 +53,7 @@ class UserTest(LiveServerTestCase):
             # No spaces
             ("/test test", True),
             # A safe redirect
-            (reverse("about"), False),
+            (reverse("faq"), False),
         ]
         for next_param, is_evil in next_params:
             bad_url = "{host}{path}?next={next}".format(

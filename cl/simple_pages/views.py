@@ -333,15 +333,6 @@ def robots(request):
     return response
 
 
-@cache_page(60 * 60 * 12)  # 12 hours
-def humans(request):
-    """Generate the humans.txt file"""
-    response = HttpResponse(content_type="text/plain")
-    t = loader.get_template("humans.txt")
-    response.write(t.render({}))
-    return response
-
-
 def validate_for_bing(request):
     return HttpResponse(
         '<?xml version="1.0"?><users><user>8BA95D8EAA744379D80D9F70847EA156</user></users>'
@@ -362,10 +353,6 @@ def validate_for_google2(request):
 
 def validate_for_wot(request):
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
-
-
-def browser_warning(request):
-    return render(request, "browser_warning.html", {"private": True})
 
 
 def ratelimited(request, exception):
