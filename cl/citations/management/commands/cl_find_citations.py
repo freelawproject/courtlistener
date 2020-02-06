@@ -18,15 +18,15 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--doc_id", type=int, nargs="*", help="ids of citing opinions",
+            "--doc-id", type=int, nargs="*", help="ids of citing opinions",
         )
         parser.add_argument(
-            "--start_id",
+            "--start-id",
             type=int,
             help="start id for a range of documents to update (inclusive)",
         )
         parser.add_argument(
-            "--end_id",
+            "--end-id",
             type=int,
             help="end id for a range of documents to update (inclusive)",
         )
@@ -39,7 +39,7 @@ class Command(VerboseCommand):
             # that the program continues onto the newly edited files,
             # including those files that have new citations to them.
             # ♪♪♪ Smoke in the server, fire in the wires. ♪♪♪
-            "--filed_after",
+            "--filed-after",
             type=valid_date_time,
             help="Start date in ISO-8601 format for a range of documents to "
             "update. Dates will be converted to ",
@@ -53,14 +53,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--index",
             type=str,
-            default="all_at_end",
-            choices=("all_at_end", "concurrently", "False"),
+            default="all-at-end",
+            choices=("all-at-end", "concurrently", "False"),
             help=(
                 "When/if to save changes to the Solr index. Options are "
                 "all_at_end, concurrently or False. Saving 'concurrently' "
                 "is least efficient, since each document is updated once "
                 "for each citation to it, however this setting will show "
-                "changes in the index in realtime. Saving 'all_at_end' can "
+                "changes in the index in realtime. Saving 'all-at-end' can "
                 "be considerably more efficient, but will not show changes "
                 "until the process has finished and the index has been "
                 "completely regenerated from the database. Setting this to "
@@ -74,17 +74,17 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        both_list_and_endpoints = options.get("doc_id") is not None and (
-            options.get("start_id") is not None
-            or options.get("end_id") is not None
-            or options.get("filed_after") is not None
+        both_list_and_endpoints = options.get("doc-id") is not None and (
+            options.get("start-id") is not None
+            or options.get("end-id") is not None
+            or options.get("filed-after") is not None
         )
         no_option = not any(
             [
-                options.get("doc_id") is None,
-                options.get("start_id") is None,
-                options.get("end_id") is None,
-                options.get("filed_after") is None,
+                options.get("doc-id") is None,
+                options.get("start-id") is None,
+                options.get("end-id") is None,
+                options.get("filed-after") is None,
                 options.get("all") is False,
             ]
         )
@@ -100,15 +100,15 @@ class Command(VerboseCommand):
 
         # Use query chaining to build the query
         query = Opinion.objects.all()
-        if options.get("doc_id"):
-            query = query.filter(pk__in=options.get("doc_id"))
-        if options.get("end_id"):
-            query = query.filter(pk__lte=options.get("end_id"))
-        if options.get("start_id"):
-            query = query.filter(pk__gte=options.get("start_id"))
-        if options.get("filed_after"):
+        if options.get("doc-id"):
+            query = query.filter(pk__in=options.get("doc-id"))
+        if options.get("end-id"):
+            query = query.filter(pk__lte=options.get("end-id"))
+        if options.get("start-id"):
+            query = query.filter(pk__gte=options.get("start-id"))
+        if options.get("filed-after"):
             query = query.filter(
-                cluster__date_filed__gte=options["filed_after"]
+                cluster__date_filed__gte=options["filed-after"]
             )
         if options.get("all"):
             query = Opinion.objects.all()
