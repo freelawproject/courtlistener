@@ -326,15 +326,17 @@ def show_results(request):
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
             render_dict.update(
+                do_search(
+                    mutable_GET,
+                    rows=5,
+                    override_params={"order_by": "dateFiled desc"},
+                    facet=False,
+                    cache_key="homepage-data-o",
+                )
+            )
+            # Get the results from the oral arguments as well
+            render_dict.update(
                 {
-                    "results": do_search(
-                        mutable_GET,
-                        rows=5,
-                        override_params={"order_by": "dateFiled desc"},
-                        facet=False,
-                        cache_key="homepage-data-o",
-                    )["results"],
-                    # Get the results from the oral arguments as well
                     "results_oa": do_search(
                         mutable_GET,
                         rows=5,
@@ -344,7 +346,7 @@ def show_results(request):
                         },
                         facet=False,
                         cache_key="homepage-data-oa",
-                    )["results"],
+                    )["results"]
                 }
             )
 
