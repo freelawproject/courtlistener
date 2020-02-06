@@ -115,9 +115,8 @@ class Command(VerboseCommand):
         self.count = query.count()
         self.average_per_s = 0
         self.timings = []
-        count = query.count()
         opinion_pks = query.values_list("pk", flat=True).iterator()
-        self.update_documents(opinion_pks, count)
+        self.update_documents(opinion_pks)
         self.add_to_solr()
 
     def log_progress(self, processed_count, last_pk):
@@ -144,7 +143,7 @@ class Command(VerboseCommand):
         )
         sys.stdout.flush()
 
-    def update_documents(self, opinion_pks, count):
+    def update_documents(self, opinion_pks):
         sys.stdout.write("Graph size is {0:d} nodes.\n".format(self.count))
         sys.stdout.flush()
 
@@ -158,7 +157,7 @@ class Command(VerboseCommand):
         throttle = CeleryThrottle(min_items=500)
         for opinion_pk in opinion_pks:
             processed_count += 1
-            last_item = count == processed_count
+            last_item = self.count == processed_count
             chunk.append(opinion_pk)
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
