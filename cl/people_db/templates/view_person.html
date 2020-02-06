@@ -17,7 +17,7 @@
 {% block footer-scripts %}
 <script type="text/javascript">
     $(document).ready(function(){
-        $(".show-all-appointments").click(function (event) {
+        $(".show-all-appointments").on("click", function (event) {
             var button = $(this);
             button.addClass('hidden');
             button.siblings('ul').children('li').removeClass('hidden');
@@ -133,9 +133,9 @@
                                 <a href="http://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}-{{ person.name_suffix|cut:"." }}">{{ person.fjc_id }}</a>
                             {% else %}
                                 <a href="http://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}">{{ person.fjc_id }}</a>
-                            {% endif %}                  
+                            {% endif %}
                         {% endif %}
-                        {% endfilter %} 
+                        {% endfilter %}
                     {% endif %}
                 </span>
 

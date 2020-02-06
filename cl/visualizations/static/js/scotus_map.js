@@ -1348,28 +1348,28 @@ $(document).ready(function () {
 
 		// unwrap dataSourceSelect for courtlistener
 		// on select JSON in the data and then call drawGraph()
-		$('#chartTypeSelect').change(function () {
+		$('#chartTypeSelect').on("change", function () {
 			settings.type = $('#chartTypeSelect').val();
 			setDosEnable();
 			updateUrl(settings);
 			trigger(settings);
 		});
-		$('#axisTypeSelect').change(function () {
+		$('#axisTypeSelect').on("change", function () {
 			settings.xaxis = $('#axisTypeSelect').val();
 			updateUrl(settings);
 			trigger(settings);
 		});
-		$('#heightTypeSelect').change(function () {
+		$('#heightTypeSelect').on("change", function () {
 			settings.height = $('#heightTypeSelect').val();
 			updateUrl(settings);
 			trigger(settings);
 		});
-		$('#degreesOfSeparationSelect').change(function () {
+		$('#degreesOfSeparationSelect').on("change", function () {
 			settings.dos = $('#degreesOfSeparationSelect').val();
 			updateUrl(settings);
 			trigger(settings);
 		});
-		$('#editMode1, #editMode2').change(function () {
+		$('#editMode1, #editMode2').on("change", function () {
 			settings.mode = $('#editMode1:checked, #editMode2:checked').val();
 			trigger(settings);
 		});

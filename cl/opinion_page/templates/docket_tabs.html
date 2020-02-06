@@ -52,11 +52,11 @@
 
     // If we have classes indicating too many alerts or logged out users,
     // activate their modals.
-    $(".no-more-alerts-modal-trigger").click(function(e){
+    $(".no-more-alerts-modal-trigger").on("click", function(e){
       e.preventDefault();
       $("#modal-no-more-alerts").modal('toggle');
     });
-    $(".logged-out-modal-trigger").click(function(e) {
+    $(".logged-out-modal-trigger").on("click", function(e) {
       e.preventDefault();
       $("#modal-logged-out").modal('toggle');
     });

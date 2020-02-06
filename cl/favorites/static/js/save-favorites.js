@@ -1,9 +1,9 @@
 $(document).ready(function () {
-  $('#closeFavorite').click(function (event) {
+  $('#closeFavorite').on("click", function (event) {
     event.preventDefault();
     $('#modal-save-favorite').modal('hide');
   });
-  $('#modal-logged-out').click(function () {
+  $('#modal-logged-out').on("click", function () {
     $('#modal-logged-out').modal('hide');
   });
   $('#save-favorite-notes-field').NobleCount('#characters-remaining', {
@@ -14,7 +14,7 @@ $(document).ready(function () {
 
 // Ajax functions for favorites form.
 $(function () {
-  $('#saveFavorite').click(function () {
+  $('#saveFavorite').on("click", function () {
     // validate and process form here
     let favorite_id = $('#modal-save-favorite').data('id'),
       cluster_id = $('input#id_cluster_id').val(),
@@ -57,7 +57,7 @@ $(function () {
     return false;
   });
 
-  $('#save-favorite-delete').click(function (event) {
+  $('#save-favorite-delete').on("click", function (event) {
     event.preventDefault();
     // Send a post that deletes the favorite from the DB, and if successful
     // remove the notes from the sidebar; toggle the star icon.
