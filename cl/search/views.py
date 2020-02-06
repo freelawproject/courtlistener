@@ -76,14 +76,14 @@ def get_solr_result_objects(cd, facet):
     return results
 
 
-def paginate_cached_solr_results(request, cd, results, rows, cache_key):
+def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
     # Run the query and set up pagination
     if cache_key is not None:
         paged_results = cache.get(cache_key)
         if paged_results is not None:
             return paged_results
 
-    page = int(request.GET.get("page", 1))
+    page = int(get_params.get("page", 1))
     check_pagination_depth(page)
 
     if cd["type"] == "r":
@@ -109,15 +109,17 @@ def paginate_cached_solr_results(request, cd, results, rows, cache_key):
 
 
 def do_search(
-    request, rows=20, order_by=None, type=None, facet=True, cache_key=None
+    get_params, rows=20, override_params=None, facet=True, cache_key=None,
 ):
     """Do all the difficult solr work.
 
-    :param request: The request made by the user
+    :param get_params: The request.GET parameters sent by the user. Note that
+    this cannot simply be request.GET since that is immutable and
+    override_params needs to be able to change this. Instead generally it's
+    best to send request.GET.copy().
     :param rows: The number of solr results to request
-    :param order_by: An opportunity to override the ordering of the search
-    results
-    :param type: An opportunity to override the type
+    :param override_params: A dict with additional or different GET params to
+    be sent to solr.
     :param facet: Whether to complete faceting in the query
     :param cache_key: A cache key with which to save the results. Note that it
     does not do anything clever with the actual query, so if you use this, your
@@ -129,34 +131,33 @@ def do_search(
     query_citation = None
     error = False
     paged_results = None
-    search_form = SearchForm(request.GET)
     courts = Court.objects.filter(in_use=True)
+
+    # Add additional or overridden GET parameters
+    if override_params:
+        get_params.update(override_params)
+    search_form = SearchForm(get_params)
 
     if search_form.is_valid():
         cd = search_form.cleaned_data
-        # Allows an override by calling methods.
-        if order_by is not None:
-            cd["order_by"] = order_by
-        if type is not None:
-            cd["type"] = type
 
         # Do the query, hitting the cache if desired
         try:
             results = get_solr_result_objects(cd, facet)
             paged_results = paginate_cached_solr_results(
-                request, cd, results, rows, cache_key
+                get_params, cd, results, rows, cache_key
             )
         except (NotImplementedError, RequestException, SolrError) as e:
             error = True
             logger.warning(
-                "Error loading search page with request: %s" % request.GET
+                "Error loading search page with request: %s" % get_params
             )
             logger.warning("Error was: %s" % e)
             if settings.DEBUG is True:
                 traceback.print_exc()
 
         # A couple special variables for particular search types
-        search_form = _clean_form(request, cd, courts)
+        search_form = _clean_form(get_params, cd, courts)
         if cd["type"] == "o":
             query_citation = get_query_citation(cd)
         elif cd["type"] == "r":
@@ -307,7 +308,7 @@ def show_results(request):
         else:
             # Invalid form. Do the search again and show them the alert form
             # with the errors
-            render_dict.update(do_search(request))
+            render_dict.update(do_search(request.GET.copy()))
             render_dict.update({"alert_form": alert_form})
             return render(request, "search.html", render_dict)
 
@@ -319,16 +320,16 @@ def show_results(request):
                 tally_stat("search.homepage_loaded")
 
             # Ensure we get nothing from the future.
-            request.GET = request.GET.copy()  # Makes it mutable
-            request.GET["filed_before"] = date.today()
+            mutable_GET = request.GET.copy()  # Makes it mutable
+            mutable_GET["filed_before"] = date.today()
 
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
             render_dict.update(
                 do_search(
-                    request,
+                    mutable_GET,
                     rows=5,
-                    order_by="dateFiled desc",
+                    override_params={"order_by": "dateFiled desc"},
                     facet=False,
                     cache_key="homepage-data-o",
                 )
@@ -337,10 +338,12 @@ def show_results(request):
             render_dict.update(
                 {
                     "results_oa": do_search(
-                        request,
+                        mutable_GET,
                         rows=5,
-                        order_by="dateArgued desc",
-                        type="oa",
+                        override_params={
+                            "order_by": "dateArgued desc",
+                            "type": "oa",
+                        },
                         facet=False,
                         cache_key="homepage-data-oa",
                     )["results"]
@@ -391,7 +394,7 @@ def show_results(request):
                     user=request.user,
                 )
 
-            render_dict.update(do_search(request))
+            render_dict.update(do_search(request.GET.copy()))
             # Set the value to the query as a convenience
             alert_form.fields["name"].widget.attrs["value"] = render_dict[
                 "search_summary_str"
@@ -409,9 +412,9 @@ def advanced(request):
         # Needed b/c of facet values.
 
         o_results = do_search(
-            request,
+            request.GET.copy(),
             rows=1,
-            type=obj_type,
+            override_params={"type": obj_type,},
             facet=True,
             cache_key="opinion-homepage-results",
         )

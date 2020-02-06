@@ -1,9 +1,11 @@
 import re
 from httplib import ResponseNotReady
+from collections import Counter
 
 from cl.celery import app
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited
+from cl.citations.models import Citation
 
 # This is the distance two reporter abbreviations can be from each other if they
 # are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
@@ -71,14 +73,16 @@ def create_cited_html(opinion, citations):
     if any([opinion.html_columbia, opinion.html_lawbox, opinion.html]):
         new_html = opinion.html_columbia or opinion.html_lawbox or opinion.html
         for citation in citations:
-            new_html = re.sub(
-                citation.as_regex(), citation.as_html(), new_html
-            )
+            if isinstance(citation, Citation):
+                new_html = re.sub(
+                    citation.as_regex(), citation.as_html(), new_html
+                )
     elif opinion.plain_text:
         inner_html = opinion.plain_text
         for citation in citations:
-            repl = u'</pre>%s<pre class="inline">' % citation.as_html()
-            inner_html = re.sub(citation.as_regex(), repl, inner_html)
+            if isinstance(citation, Citation):
+                repl = u'</pre>%s<pre class="inline">' % citation.as_html()
+                inner_html = re.sub(citation.as_regex(), repl, inner_html)
         new_html = u'<pre class="inline">%s</pre>' % inner_html
     return new_html.encode("utf-8")
 
@@ -93,52 +97,33 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
     """
     opinions = Opinion.objects.filter(pk__in=opinion_pks)
     for opinion in opinions:
+        # Returns a list of Citation objects, i.e., something like
+        # [FullCitation, FullCitation, ShortformCitation, FullCitation,
+        #   SupraCitation, SupraCitation, ShortformCitation, FullCitation]
         citations = get_document_citations(opinion)
 
-        # List used so we can do one simple update to the citing opinion.
-        opinions_cited = set()
-        for citation in citations:
-            try:
-                matches = match_citations.match_citation(
-                    citation, citing_doc=opinion
-                )
-            except ResponseNotReady as e:
-                # Threading problem in httplib, which is used in the Solr query.
-                raise self.retry(exc=e, countdown=2)
+        # Match all those different Citation objects to Opinion objects, using
+        # a variety of hueristics.
+        try:
+            citation_matches = match_citations.get_citation_matches(
+                opinion, citations
+            )
+        except ResponseNotReady as e:
+            # Threading problem in httplib, which is used in the Solr query.
+            raise self.retry(exc=e, countdown=2)
 
-            # TODO: Figure out what to do if there's more than one
-            if len(matches) == 1:
-                match_id = matches[0]["id"]
-                try:
-                    matched_opinion = Opinion.objects.get(pk=match_id)
+        # Consolidate duplicate matches, keeping a counter of how often each
+        # match appears (so we know how many times an opinion cites another).
+        # keys = cited opinion
+        # values = number of times that opinion is cited
+        grouped_matches = Counter(citation_matches)
 
-                    # Increase citation count for matched cluster if it hasn't
-                    # already been cited by this opinion.
-                    if matched_opinion not in opinion.opinions_cited.all():
-                        matched_opinion.cluster.citation_count += 1
-                        matched_opinion.cluster.save(index=index)
-
-                    # Add citation match to the citing opinion's list of cases
-                    # it cites. opinions_cited is a set so duplicates aren't an
-                    # issue
-                    opinions_cited.add(matched_opinion.pk)
-
-                    # URL field will be used for generating inline citation
-                    # html
-                    citation.match_url = (
-                        matched_opinion.cluster.get_absolute_url()
-                    )
-                    citation.match_id = matched_opinion.pk
-                except Opinion.DoesNotExist:
-                    # No Opinions returned. Press on.
-                    continue
-                except Opinion.MultipleObjectsReturned:
-                    # Multiple Opinions returned. Press on.
-                    continue
-            else:
-                # No match found for citation
-                # create_stub([citation])
-                pass
+        for matched_opinion in grouped_matches:
+            # Increase citation count for matched cluster if it hasn't
+            # already been cited by this opinion.
+            if matched_opinion not in opinion.opinions_cited.all():
+                matched_opinion.cluster.citation_count += 1
+                matched_opinion.cluster.save(index=index)
 
         # Only update things if we found citations
         if citations:
@@ -151,9 +136,11 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
             OpinionsCited.objects.bulk_create(
                 [
                     OpinionsCited(
-                        citing_opinion_id=opinion.pk, cited_opinion_id=pk
+                        citing_opinion_id=opinion.pk,
+                        cited_opinion_id=matched_opinion.pk,
+                        depth=grouped_matches[matched_opinion],
                     )
-                    for pk in opinions_cited
+                    for matched_opinion in grouped_matches
                 ]
             )
 

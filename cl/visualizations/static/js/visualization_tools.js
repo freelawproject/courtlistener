@@ -2,7 +2,7 @@ $(document).ready(function () {
     ////////////////////
     // Trash, Restore //
     ////////////////////
-    $(".trash-button, .restore-button").click(function (e) {
+    $(".trash-button, .restore-button").on("click", function (e) {
         e.preventDefault();
         var button = $(this),
             id = button.data('id'),
@@ -71,7 +71,7 @@ $(document).ready(function () {
     /////////////////////
     // Share/privatize //
     /////////////////////
-    $('.share-button').click(function(e){
+    $('.share-button').on("click", function(e){
         e.preventDefault();
         var button = $(this),
             id = button.data('id'),

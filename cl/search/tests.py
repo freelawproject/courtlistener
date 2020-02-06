@@ -602,7 +602,7 @@ class GroupedSearchTest(EmptySolrTestCase):
         grouped?
         """
         request = self.factory.get(reverse("show_results"), {"q": "Voutila"})
-        response = do_search(request)
+        response = do_search(request.GET.copy())
         result_count = response["results"].object_list.result.numFound
         num_expected = 1
         self.assertEqual(
