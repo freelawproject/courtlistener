@@ -57,7 +57,7 @@ class Command(VerboseCommand):
             choices=("all-at-end", "concurrently", "False"),
             help=(
                 "When/if to save changes to the Solr index. Options are "
-                "all_at_end, concurrently or False. Saving 'concurrently' "
+                "all-at-end, concurrently or False. Saving 'concurrently' "
                 "is least efficient, since each document is updated once "
                 "for each citation to it, however this setting will show "
                 "changes in the index in realtime. Saving 'all-at-end' can "
