@@ -76,7 +76,7 @@ class Command(VerboseCommand):
             help="Parse citations for all items",
         )
         parser.add_argument(
-            "--doc_id", type=int, nargs="*", help="ids of citing opinions",
+            "--doc-id", type=int, nargs="*", help="ids of citing opinions",
         )
 
     def monkey_patch_citation(self):

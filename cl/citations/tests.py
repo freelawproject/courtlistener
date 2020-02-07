@@ -915,7 +915,7 @@ class CitationCommandTest(IndexedSolrTestCase):
 
     def test_index_by_doc_id(self):
         args = [
-            "--doc_id",
+            "--doc-id",
             "3",
             "--index",
             "concurrently",
@@ -924,7 +924,7 @@ class CitationCommandTest(IndexedSolrTestCase):
 
     def test_index_by_doc_ids(self):
         args = [
-            "--doc_id",
+            "--doc-id",
             "3",
             "2",
             "--index",
@@ -934,7 +934,7 @@ class CitationCommandTest(IndexedSolrTestCase):
 
     def test_index_by_start_only(self):
         args = [
-            "--start_id",
+            "--start-id",
             "0",
             "--index",
             "concurrently",
@@ -943,9 +943,9 @@ class CitationCommandTest(IndexedSolrTestCase):
 
     def test_index_by_start_and_end(self):
         args = [
-            "--start_id",
+            "--start-id",
             "0",
-            "--end_id",
+            "--end-id",
             "5",
             "--index",
             "concurrently",
@@ -954,7 +954,7 @@ class CitationCommandTest(IndexedSolrTestCase):
 
     def test_filed_after(self):
         args = [
-            "--filed_after",
+            "--filed-after",
             "2015-06-09",
             "--index",
             "concurrently",
