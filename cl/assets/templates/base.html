@@ -446,7 +446,7 @@
 {% else %}
   <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.min.js"></script>
 {% endif %}
-<script type="text/javascript" src="{{ STATIC_URL }}js/base.js"></script>
+<script type="text/javascript" src="{{ STATIC_URL }}js/base.js?v=20200206"></script>
 <script type="text/javascript">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
   var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe|default:0}}),
