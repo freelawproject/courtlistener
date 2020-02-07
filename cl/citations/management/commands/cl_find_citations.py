@@ -71,6 +71,11 @@ class Command(VerboseCommand):
                 "'concurrently'."
             ),
         )
+        parser.add_argument(
+            "--queue",
+            default="batch1",
+            help="The celery queue where the tasks should be processed.",
+        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
@@ -116,8 +121,8 @@ class Command(VerboseCommand):
         self.average_per_s = 0
         self.timings = []
         opinion_pks = query.values_list("pk", flat=True).iterator()
-        self.update_documents(opinion_pks)
-        self.add_to_solr()
+        self.update_documents(opinion_pks, options["queue"])
+        self.add_to_solr(options["queue"])
 
     def log_progress(self, processed_count, last_pk):
         if processed_count % 1000 == 1:
@@ -143,7 +148,7 @@ class Command(VerboseCommand):
         )
         sys.stdout.flush()
 
-    def update_documents(self, opinion_pks):
+    def update_documents(self, opinion_pks, queue_name):
         sys.stdout.write("Graph size is {0:d} nodes.\n".format(self.count))
         sys.stdout.flush()
 
@@ -154,21 +159,21 @@ class Command(VerboseCommand):
         chunk = []
         chunk_size = 100
         processed_count = 0
-        throttle = CeleryThrottle(min_items=500)
+        throttle = CeleryThrottle(queue_name=queue_name)
         for opinion_pk in opinion_pks:
             processed_count += 1
             last_item = self.count == processed_count
             chunk.append(opinion_pk)
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
-                find_citations_for_opinion_by_pks.delay(
-                    chunk, index_during_subtask
+                find_citations_for_opinion_by_pks.apply_async(
+                    args=(chunk, index_during_subtask), queue=queue_name,
                 )
                 chunk = []
 
             self.log_progress(processed_count, opinion_pk)
 
-    def add_to_solr(self):
+    def add_to_solr(self, queue_name):
         if self.index == "all-at-end":
             # fmt: off
             call_command(
@@ -178,6 +183,7 @@ class Command(VerboseCommand):
                 '--noinput',
                 '--update',
                 '--everything',
+                '--queue', queue_name,
             )
             # fmt: on
         elif self.index == "False":
