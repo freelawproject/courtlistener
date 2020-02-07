@@ -252,52 +252,52 @@ def process_recap_pdf(self, pk):
             msg = "Too many dockets found when trying to save '%s'" % pq
             mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             return None
-        else:
-            # Got the Docket, attempt to get/create the DocketEntry, and then
-            # create the RECAPDocument
-            try:
-                de = DocketEntry.objects.get(
-                    docket=d, entry_number=pq.document_number
-                )
-            except DocketEntry.DoesNotExist as exc:
-                logger.warning(
-                    "Unable to find docket entry for processing "
-                    "queue '%s'. Retrying if max_retries is not "
-                    "exceeded." % pq
-                )
-                pq.error_message = "Unable to find docket entry for item."
-                if (self.request.retries == self.max_retries) or pq.debug:
-                    pq.status = PROCESSING_STATUS.FAILED
-                    pq.save()
-                    return None
-                else:
-                    pq.status = PROCESSING_STATUS.QUEUED_FOR_RETRY
-                    pq.save()
-                    raise self.retry(exc=exc)
+
+        # Got the Docket, attempt to get/create the DocketEntry, and then
+        # create the RECAPDocument
+        try:
+            de = DocketEntry.objects.get(
+                docket=d, entry_number=pq.document_number
+            )
+        except DocketEntry.DoesNotExist as exc:
+            logger.warning(
+                "Unable to find docket entry for processing "
+                "queue '%s'. Retrying if max_retries is not "
+                "exceeded." % pq
+            )
+            pq.error_message = "Unable to find docket entry for item."
+            if (self.request.retries == self.max_retries) or pq.debug:
+                pq.status = PROCESSING_STATUS.FAILED
+                pq.save()
+                return None
             else:
-                # If we're here, we've got the docket and docket
-                # entry, but were unable to find the document by
-                # pacer_doc_id. This happens when pacer_doc_id is
-                # missing, for example. ∴, try to get the document
-                # from the docket entry.
-                try:
-                    rd = RECAPDocument.objects.get(
-                        docket_entry=de,
-                        document_number=pq.document_number,
-                        attachment_number=pq.attachment_number,
-                        document_type=document_type,
-                    )
-                except (
-                    RECAPDocument.DoesNotExist,
-                    RECAPDocument.MultipleObjectsReturned,
-                ):
-                    # Unable to find it. Make a new item.
-                    rd = RECAPDocument(
-                        docket_entry=de,
-                        pacer_doc_id=pq.pacer_doc_id,
-                        date_upload=now(),
-                        document_type=document_type,
-                    )
+                pq.status = PROCESSING_STATUS.QUEUED_FOR_RETRY
+                pq.save()
+                raise self.retry(exc=exc)
+        else:
+            # If we're here, we've got the docket and docket
+            # entry, but were unable to find the document by
+            # pacer_doc_id. This happens when pacer_doc_id is
+            # missing, for example. ∴, try to get the document
+            # from the docket entry.
+            try:
+                rd = RECAPDocument.objects.get(
+                    docket_entry=de,
+                    document_number=pq.document_number,
+                    attachment_number=pq.attachment_number,
+                    document_type=document_type,
+                )
+            except (
+                RECAPDocument.DoesNotExist,
+                RECAPDocument.MultipleObjectsReturned,
+            ):
+                # Unable to find it. Make a new item.
+                rd = RECAPDocument(
+                    docket_entry=de,
+                    pacer_doc_id=pq.pacer_doc_id,
+                    date_upload=now(),
+                    document_type=document_type,
+                )
 
     rd.document_number = pq.document_number
     rd.attachment_number = pq.attachment_number
