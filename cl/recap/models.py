@@ -183,6 +183,7 @@ class ProcessingQueue(models.Model):
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
             UPLOAD_TYPE.APPELLATE_DOCKET,
+            UPLOAD_TYPE.DOCUMENT_ZIP,
         ]:
             return u"ProcessingQueue %s: %s case #%s (%s)" % (
                 self.pk,
@@ -199,15 +200,10 @@ class ProcessingQueue(models.Model):
                 self.attachment_number or 0,
                 self.get_upload_type_display(),
             )
-        elif self.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
+        else:
             return u"ProcessingQueue: %s (%s)" % (
                 self.pk,
                 self.get_upload_type_display(),
-            )
-        else:
-            raise NotImplementedError(
-                "No __unicode__ method on ProcessingQueue model for upload_"
-                "type of %s" % self.upload_type
             )
 
     class Meta:
