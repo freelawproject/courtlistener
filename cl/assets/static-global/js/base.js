@@ -114,11 +114,11 @@ $(document).ready(function () {
   // Make the enter key work in the search form
   $('.external-input').on('keypress', function (e) {
     if (e.keyCode == 13) {
-      $('#search-form').trigger("submit");
+      $('#search-form').submit();
     }
   });
   $('#search-button-secondary').on("click", function (e) {
-    $('#search-form').trigger("submit");
+    $('#search-form').submit();
   });
 
   $('#advanced-page #court-picker-search-form').on("submit", function (e) {
@@ -167,7 +167,7 @@ $(document).ready(function () {
   ////////////
   $('#save-alert-button').on("click", function (e) {
     e.preventDefault();
-    $('#alert-sidebar form').trigger("submit");
+    $('#alert-sidebar form').submit();
   });
 
   $('#id_rate').on("change", function () {
@@ -195,7 +195,7 @@ $(document).ready(function () {
   // Docket page: Change sort order when the asc/desc buttons are clicked.
   ///////////////////
   $("#sort-buttons :input").on("change", function () {
-    this.closest("form").trigger("submit");
+    this.closest("form").submit();
   });
 
   //////////////////////////
