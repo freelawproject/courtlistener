@@ -14,6 +14,7 @@ from cl.citations.models import (
     Citation,
     FullCitation,
     IdCitation,
+    IbidCitation,
     SupraCitation,
     ShortformCitation,
     NonopinionCitation,
@@ -582,12 +583,18 @@ def get_citations(
                     # Neither a full nor short form citation
                     continue
 
-        # CASE 2: Citation token is an "Ibid." or "Id." reference.
+        # CASE 2: Citation token is an "Id." reference.
         # In this case, the citation is simply to the immediately previous
         # document, but for safety we won't make that resolution until the
         # previous citation has been successfully matched to an opinion.
-        elif citation_token.lower() in {"ibid.", "id.", "id.,"}:
+        elif citation_token.lower() in {"id.", "id.,"}:
             citation = IdCitation(
+                id_token=citation_token, after_tokens=words[i + 1 : i + 3]
+            )
+
+        # CASE 2: Citation token is an "Ibid." reference. Same logic as above.
+        elif citation_token.lower() == "ibid.":
+            citation = IbidCitation(
                 id_token=citation_token, after_tokens=words[i + 1 : i + 4]
             )
 
