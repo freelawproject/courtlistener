@@ -315,7 +315,7 @@ def extract_shortform_citation(words, reporter_index):
     Shortform 2: 515 U.S., at 241
     """
     # Don't check if we are at the beginning of a string
-    if reporter_index == 0:
+    if reporter_index <= 2:
         return None
 
     # Get volume
@@ -327,13 +327,16 @@ def extract_shortform_citation(words, reporter_index):
         return None
 
     # Get page
-    page = parse_page(words[reporter_index + 2])
-    if not page:
-        # There might be a comma in the way, so try one more index
-        page = parse_page(words[reporter_index + 3])
+    try:
+        page = parse_page(words[reporter_index + 2])
         if not page:
-            # No page, therefore not a valid citation
-            return None
+            # There might be a comma in the way, so try one more index
+            page = parse_page(words[reporter_index + 3])
+            if not page:
+                # No page, therefore not a valid citation
+                return None
+    except IndexError:
+        return None
 
     # Get antecedent
     antecedent_guess = words[reporter_index - 2]
@@ -372,7 +375,10 @@ def extract_supra_citation(words, supra_index):
     volume = None
 
     # Get page
-    page = parse_page(words[supra_index + 2])
+    try:
+        page = parse_page(words[supra_index + 2])
+    except IndexError:
+        page = None
 
     # Get antecedent
     antecedent_guess = words[supra_index - 1]
