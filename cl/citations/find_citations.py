@@ -236,7 +236,10 @@ def parse_page(page):
         # Most page numbers will be digits.
         page = int(page)
     else:
-        if isroman(page):
+        if re.match(r"\d{1,4}[-]?\d{1,4}", page):
+            # Check if the page number is really a page range
+            pass
+        elif isroman(page):
             # Some places like Nebraska have Roman numerals, e.g. in
             # '250 Neb. xxiv (1996)'. No processing needed.
             pass

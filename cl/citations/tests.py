@@ -199,6 +199,12 @@ class CiteTest(TestCase):
                                 reporter_found='U. S.', reporter_index=3)]),
             # Test short form citation at end of document (issue #1171)
             ('before asdf, 1 U. S. end', []),
+            # Test short form citation with a page range
+            ('before asdf, 1 U. S., at 20-25',
+             [ShortformCitation(reporter='U.S.', page='20-25', volume=1,
+                                antecedent_guess='asdf,', court='scotus',
+                                canonical_reporter=u'U.S.', lookup_index=0,
+                                reporter_found='U. S.', reporter_index=3)]),
             # Test first kind of supra citation (standard kind)
             ('before asdf, supra, at 2',
              [SupraCitation(antecedent_guess='asdf,', page=2, volume=None)]),
