@@ -239,11 +239,11 @@ def parse_page(page):
         if isroman(page):
             # Some places like Nebraska have Roman numerals, e.g. in
             # '250 Neb. xxiv (1996)'. No processing needed.
-            page = page.encode("utf-8")
+            pass
         elif re.match(r"\d{1,6}[-]?[a-zA-Z]{1,6}", page):
             # Some places, like Connecticut, have pages like "13301-M".
             # Other places, like Illinois have "pages" like "110311-B".
-            page = page.encode("utf-8")
+            pass
         else:
             # Not Roman, and not a weird connecticut page number. Thus a bad
             # value. Abort.
