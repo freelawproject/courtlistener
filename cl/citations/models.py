@@ -335,8 +335,7 @@ class IdCitation(Citation):
     possesses is a record of the tokens after the 'id' token. Those tokens
     enable us to build a regex to match this citation later.
 
-    Example 1: foo bar, id., at 240
-    Example 2: foo bar, ibid.
+    Example: "... foo bar," id., at 240
     """
 
     def __init__(self, id_token=None, after_tokens=None):
@@ -358,28 +357,72 @@ class IdCitation(Citation):
             + r"(\s?)",
         )
 
-    def as_html(self):
+    def prepare_html(self):
         span_class = "citation"
-        if self.match_url:
-            id_token = u'<a href="%s">%s</a>' % (self.match_url, self.id_token)
-            data_attr = u' data-id="%s"' % self.match_id
-        else:
-            id_token = u"%s" % self.id_token
-            span_class += " no-link"
-            data_attr = ""
-        return u'<span class="%s"%s>%s%s</span>' % (
-            span_class,
-            data_attr,
-            id_token,
+        after_tokens = (
             "".join(
                 [  # Backreferences must be dynamically generated based on the number of after tokens
-                    "\\g<" + str(i + 1) + ">" + t
+                    "\\g<"
+                    + str(i + 1)
+                    + ">"
+                    + '<span class="after_token">'
+                    + t
+                    + "</span>"
                     for i, t in enumerate(self.after_tokens)
                 ]
             )
             + "\\g<"
             + str(len(self.after_tokens) + 1)
-            + ">",
+            + ">"
+        )
+        return (span_class, after_tokens)
+
+    def as_html(self):
+        span_class, after_tokens = self.prepare_html()
+        if self.match_url:
+            id_string = u'<a href="%s">%s%s</a>' % (
+                self.match_url,
+                self.id_token,
+                after_tokens,
+            )
+            data_attr = u' data-id="%s"' % self.match_id
+        else:
+            id_string = u"%s%s" % (self.id_token, after_tokens)
+            span_class += " no-link"
+            data_attr = ""
+        return u'<span class="%s"%s>%s</span>' % (
+            span_class,
+            data_attr,
+            id_string,
+        )
+
+
+class IbidCitation(IdCitation):
+    """Convenience class which represents an 'ibid' citation, a special case
+    of an 'id' citation that doesn't have any attached page. Overrides the
+    as_html() method in order to only linkify the 'ibid' token itself, and
+    not any after tokens.
+
+    Example: "... foo bar," ibid.
+    """
+
+    def as_html(self):
+        span_class, after_tokens = self.prepare_html()
+        if self.match_url:
+            ibid_token = u'<a href="%s">%s</a>' % (
+                self.match_url,
+                self.id_token,
+            )
+            data_attr = u' data-id="%s"' % self.match_id
+        else:
+            ibid_token = u"%s" % self.id_token
+            span_class += " no-link"
+            data_attr = ""
+        return u'<span class="%s"%s>%s%s</span>' % (
+            span_class,
+            data_attr,
+            ibid_token,
+            after_tokens,
         )
 
 
