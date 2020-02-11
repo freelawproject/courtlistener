@@ -230,11 +230,11 @@ class ShortformCitation(Citation):
         # Don't include the antecedent guess in the HTML link, since the guess
         # might be horribly wrong.
         inner_html = (
-            u'<span class="volume">%d</span>\\g<2>'
-            + u'<span class="reporter">%s</span>\\g<3>\\g<4>at\\g<5>'
-            + u'<span class="page">%s</span>\\g<6>'
+            u'<span class="volume">%(volume)d</span>\\g<2>'
+            + u'<span class="reporter">%(reporter)s</span>\\g<3>\\g<4>at\\g<5>'
+            + u'<span class="page">%(page)s</span>\\g<6>'
         )
-        inner_html = inner_html % (self.volume, self.reporter, self.page)
+        inner_html = inner_html % self.__dict__
         span_class = "citation"
         if self.match_url:
             inner_html = u'<a href="%s">%s</a>' % (self.match_url, inner_html)
