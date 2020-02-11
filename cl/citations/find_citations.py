@@ -236,14 +236,17 @@ def parse_page(page):
         # Most page numbers will be digits.
         page = int(page)
     else:
-        if isroman(page):
+        if re.match(r"\d{1,4}[-]?\d{1,4}", page):
+            # Check if the page number is really a page range
+            pass
+        elif isroman(page):
             # Some places like Nebraska have Roman numerals, e.g. in
             # '250 Neb. xxiv (1996)'. No processing needed.
-            page = page.encode("utf-8")
+            pass
         elif re.match(r"\d{1,6}[-]?[a-zA-Z]{1,6}", page):
             # Some places, like Connecticut, have pages like "13301-M".
             # Other places, like Illinois have "pages" like "110311-B".
-            page = page.encode("utf-8")
+            pass
         else:
             # Not Roman, and not a weird connecticut page number. Thus a bad
             # value. Abort.
@@ -315,7 +318,7 @@ def extract_shortform_citation(words, reporter_index):
     Shortform 2: 515 U.S., at 241
     """
     # Don't check if we are at the beginning of a string
-    if reporter_index == 0:
+    if reporter_index <= 2:
         return None
 
     # Get volume
@@ -327,13 +330,16 @@ def extract_shortform_citation(words, reporter_index):
         return None
 
     # Get page
-    page = parse_page(words[reporter_index + 2])
-    if not page:
-        # There might be a comma in the way, so try one more index
-        page = parse_page(words[reporter_index + 3])
+    try:
+        page = parse_page(words[reporter_index + 2])
         if not page:
-            # No page, therefore not a valid citation
-            return None
+            # There might be a comma in the way, so try one more index
+            page = parse_page(words[reporter_index + 3])
+            if not page:
+                # No page, therefore not a valid citation
+                return None
+    except IndexError:
+        return None
 
     # Get antecedent
     antecedent_guess = words[reporter_index - 2]
@@ -372,7 +378,10 @@ def extract_supra_citation(words, supra_index):
     volume = None
 
     # Get page
-    page = parse_page(words[supra_index + 2])
+    try:
+        page = parse_page(words[supra_index + 2])
+    except IndexError:
+        page = None
 
     # Get antecedent
     antecedent_guess = words[supra_index - 1]

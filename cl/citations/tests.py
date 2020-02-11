@@ -168,35 +168,43 @@ class CiteTest(TestCase):
                            lookup_index=0, reporter_index=1,
                            reporter_found='IL App (1st)')]),
             # Test first kind of short form citation (meaningless antecedent)
-            ('asdf 1 U. S., at 2',
+            ('before asdf 1 U. S., at 2',
              [ShortformCitation(reporter='U.S.', page=2, volume=1,
                                 antecedent_guess='asdf', court='scotus',
                                 canonical_reporter=u'U.S.', lookup_index=0,
-                                reporter_found='U. S.', reporter_index=2)]),
+                                reporter_found='U. S.', reporter_index=3)]),
             # Test second kind of short form citation (meaningful antecedent)
-            ('asdf, 1 U. S., at 2',
+            ('before asdf, 1 U. S., at 2',
              [ShortformCitation(reporter='U.S.', page=2, volume=1,
                                 antecedent_guess='asdf,', court='scotus',
                                 canonical_reporter=u'U.S.', lookup_index=0,
-                                reporter_found='U. S.', reporter_index=2)]),
+                                reporter_found='U. S.', reporter_index=3)]),
             # Test short form citation with preceding ASCII quotation
-            (u'asdf,” 1 U. S., at 2',
+            (u'before asdf,” 1 U. S., at 2',
              [ShortformCitation(reporter='U.S.', page=2, volume=1,
                                 antecedent_guess=u'asdf,”', court='scotus',
                                 canonical_reporter=u'U.S.', lookup_index=0,
-                                reporter_found='U. S.', reporter_index=2)]),
+                                reporter_found='U. S.', reporter_index=3)]),
             # Test short form citation when case name looks like a reporter
-            ('Johnson, 1 U. S., at 2',
+            ('before Johnson, 1 U. S., at 2',
              [ShortformCitation(reporter='U.S.', page=2, volume=1,
                                 antecedent_guess=u'Johnson,', court='scotus',
                                 canonical_reporter=u'U.S.', lookup_index=0,
-                                reporter_found='U. S.', reporter_index=3)]),
+                                reporter_found='U. S.', reporter_index=4)]),
             # Test short form citation with no comma after reporter
-            ('asdf, 1 U. S. at 2',
+            ('before asdf, 1 U. S. at 2',
              [ShortformCitation(reporter='U.S.', page=2, volume=1,
                                 antecedent_guess='asdf,', court='scotus',
                                 canonical_reporter=u'U.S.', lookup_index=0,
-                                reporter_found='U. S.', reporter_index=2)]),
+                                reporter_found='U. S.', reporter_index=3)]),
+            # Test short form citation at end of document (issue #1171)
+            ('before asdf, 1 U. S. end', []),
+            # Test short form citation with a page range
+            ('before asdf, 1 U. S., at 20-25',
+             [ShortformCitation(reporter='U.S.', page='20-25', volume=1,
+                                antecedent_guess='asdf,', court='scotus',
+                                canonical_reporter=u'U.S.', lookup_index=0,
+                                reporter_found='U. S.', reporter_index=3)]),
             # Test first kind of supra citation (standard kind)
             ('before asdf, supra, at 2',
              [SupraCitation(antecedent_guess='asdf,', page=2, volume=None)]),
@@ -208,6 +216,9 @@ class CiteTest(TestCase):
              [SupraCitation(antecedent_guess='asdf,', page=None, volume=None)]),
             # Test third kind of supra citation (with period)
             ('before asdf, supra. foo bar',
+             [SupraCitation(antecedent_guess='asdf,', page=None, volume=None)]),
+            # Test supra citation at end of document (issue #1171)
+            ('before asdf, supra end',
              [SupraCitation(antecedent_guess='asdf,', page=None, volume=None)]),
             # Test Ibid. citation
             ('foo v. bar 1 U.S. 12. asdf. Ibid. foo bar lorem ipsum.',
