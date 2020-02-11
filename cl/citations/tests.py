@@ -510,23 +510,20 @@ class CiteTest(TestCase):
             # Id. citation ("Id., at 123")
             ('asdf, id., at 123. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation no-link">'
-             'id., <span class="after_token">at</span> <span class="'
-             'after_token">123.</span> </span><pre class="inline">Lorem ipsum'
-             ' dolor sit amet</pre>'),
+             '<span class="id_token">id.,</span> at 123. </span><pre class="'
+             'inline">Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation across line break
             ('asdf." Id., at 315.\n       Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf." </pre><span class="citation no-link">'
-             'Id., <span class="after_token">at</span> <span class="'
-             'after_token">315.</span>\n</span><pre class="inline">       '
-             'Lorem ipsum dolor sit amet</pre>'),
+             '<span class="id_token">Id.,</span> at 315.\n</span><pre class="'
+             'inline">       Lorem ipsum dolor sit amet</pre>'),
 
             # Ibid. citation ("... Ibid.")
             ('asdf, Ibid. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation no-link">'
-             'Ibid. <span class="after_token">Lorem</span> <span class="'
-             'after_token">ipsum</span> <span class="after_token">dolor</span>'
-             ' </span><pre class="inline">sit amet</pre>'),
+             '<span class="ibid_token">Ibid.</span> Lorem ipsum dolor </span>'
+             '<pre class="inline">sit amet</pre>'),
         ]
 
         # fmt: on

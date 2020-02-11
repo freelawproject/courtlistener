@@ -362,12 +362,7 @@ class IdCitation(Citation):
         after_tokens = (
             "".join(
                 [  # Backreferences must be dynamically generated based on the number of after tokens
-                    "\\g<"
-                    + str(i + 1)
-                    + ">"
-                    + '<span class="after_token">'
-                    + t
-                    + "</span>"
+                    "\\g<" + str(i + 1) + ">" + t
                     for i, t in enumerate(self.after_tokens)
                 ]
             )
@@ -380,14 +375,16 @@ class IdCitation(Citation):
     def as_html(self):
         span_class, after_tokens = self.prepare_html()
         if self.match_url:
-            id_string = u'<a href="%s">%s%s</a>' % (
-                self.match_url,
-                self.id_token,
-                after_tokens,
+            id_string = (
+                u'<a href="%s"><span class="id_token">%s</span>%s</a>'
+                % (self.match_url, self.id_token, after_tokens,)
             )
             data_attr = u' data-id="%s"' % self.match_id
         else:
-            id_string = u"%s%s" % (self.id_token, after_tokens)
+            id_string = u'<span class="id_token">%s</span>%s' % (
+                self.id_token,
+                after_tokens,
+            )
             span_class += " no-link"
             data_attr = ""
         return u'<span class="%s"%s>%s</span>' % (
@@ -409,20 +406,18 @@ class IbidCitation(IdCitation):
     def as_html(self):
         span_class, after_tokens = self.prepare_html()
         if self.match_url:
-            ibid_token = u'<a href="%s">%s</a>' % (
-                self.match_url,
-                self.id_token,
+            ibid_token = (
+                u'<a href="%s"><span class="ibid_token">%s</span></a>'
+                % (self.match_url, self.id_token,)
             )
             data_attr = u' data-id="%s"' % self.match_id
         else:
             ibid_token = u"%s" % self.id_token
             span_class += " no-link"
             data_attr = ""
-        return u'<span class="%s"%s>%s%s</span>' % (
-            span_class,
-            data_attr,
-            ibid_token,
-            after_tokens,
+        return (
+            u'<span class="%s"%s><span class="ibid_token">%s</span>%s</span>'
+            % (span_class, data_attr, ibid_token, after_tokens,)
         )
 
 
