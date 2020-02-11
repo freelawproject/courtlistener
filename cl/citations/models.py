@@ -351,39 +351,56 @@ class IdCitation(Citation):
     def as_regex(self):
         # This works by matching only the Id. token that precedes the "after
         # tokens" we collected earlier.
-        return r"%s(\s+)%s" % (
-            re.escape(self.id_token),
-            r"(\s+)".join([re.escape(t) for t in self.after_tokens])
-            + r"(\s?)",
+        # The content matched by the matching groups in this regex will later
+        # be re-injected into the generated HTML using backreferences
+
+        # Start with the id_token
+        template = re.escape(self.id_token)
+
+        # Add a matching group for any whitespace
+        template += r"(\s+)"
+
+        # Add all the "after tokens", with whitespace groups in between
+        template += r"(\s+)".join([re.escape(t) for t in self.after_tokens])
+
+        # Add a final matching group for any whitespace
+        template += r"(\s?)"
+
+        return template
+
+    def generate_after_token_html(self):
+        # First, insert the regex backreferences between each "after token"
+        # The group numbers of each backreference (g<NUMBER>) must be
+        #   dynamically generated because total number of "after tokens" varies
+        # Produces something like this:
+        # "\\g<1>after_token_1\\g<2>after_token_2\\g<3>after_token_3" ...
+        template = u"\\g<%s>%s"
+        after_token_html = "".join(
+            [
+                template % (str(i + 1), t)
+                for i, t in enumerate(self.after_tokens)
+            ]
         )
 
-    def prepare_html(self):
-        span_class = "citation"
-        after_tokens = (
-            "".join(
-                [  # Backreferences must be dynamically generated based on the number of after tokens
-                    "\\g<" + str(i + 1) + ">" + t
-                    for i, t in enumerate(self.after_tokens)
-                ]
-            )
-            + "\\g<"
-            + str(len(self.after_tokens) + 1)
-            + ">"
-        )
-        return (span_class, after_tokens)
+        # Then, append one final backreference to the end of the string
+        after_token_html += "\\g<" + str(len(self.after_tokens) + 1) + ">"
+
+        # Return the full string
+        return after_token_html
 
     def as_html(self):
-        span_class, after_tokens = self.prepare_html()
+        span_class = "citation"
+        after_token_html = self.generate_after_token_html()
         if self.match_url:
             id_string = (
                 u'<a href="%s"><span class="id_token">%s</span>%s</a>'
-                % (self.match_url, self.id_token, after_tokens,)
+                % (self.match_url, self.id_token, after_token_html,)
             )
             data_attr = u' data-id="%s"' % self.match_id
         else:
             id_string = u'<span class="id_token">%s</span>%s' % (
                 self.id_token,
-                after_tokens,
+                after_token_html,
             )
             span_class += " no-link"
             data_attr = ""
@@ -404,7 +421,8 @@ class IbidCitation(IdCitation):
     """
 
     def as_html(self):
-        span_class, after_tokens = self.prepare_html()
+        span_class = "citation"
+        after_token_html = self.generate_after_token_html()
         if self.match_url:
             ibid_token = (
                 u'<a href="%s"><span class="ibid_token">%s</span></a>'
@@ -417,7 +435,7 @@ class IbidCitation(IdCitation):
             data_attr = ""
         return (
             u'<span class="%s"%s><span class="ibid_token">%s</span>%s</span>'
-            % (span_class, data_attr, ibid_token, after_tokens,)
+            % (span_class, data_attr, ibid_token, after_token_html,)
         )
 
 
