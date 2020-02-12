@@ -235,7 +235,7 @@ class CiteTest(TestCase):
                            canonical_reporter=u'U.S.', reporter_index=4,
                            reporter_found='U.S.', court='scotus'),
               IdCitation(id_token='Id.,',
-                         after_tokens=['at', '123.', 'foo'])]),
+                         after_tokens=['at', '123.'])]),
             # Test non-opinion citation
             (u'lorem ipsum see §99 of the U.S. code.',
              [NonopinionCitation(match_token=u'§99')]),
@@ -518,23 +518,23 @@ class CiteTest(TestCase):
              'at\n<span class="page">99</span> </span><pre class="inline">'
              '(quoting foo)</pre>'),
 
-            # First kind of id. citation ("Id., at 123")
+            # Id. citation ("Id., at 123")
             ('asdf, id., at 123. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf, </pre><span class="citation no-link">'
-             'id., at 123. Lorem </span><pre class="inline">ipsum dolor sit '
-             'amet</pre>'),
-
-            # Second kind of id. citation ("Ibid.")
-            ('asdf, Ibid. Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf, </pre><span class="citation no-link">'
-             'Ibid. Lorem ipsum dolor </span><pre class="inline">sit amet'
-             '</pre>'),
+             '<span class="id_token">id.,</span> at 123. </span><pre class="'
+             'inline">Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation across line break
             ('asdf." Id., at 315.\n       Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf." </pre><span class="citation '
-             'no-link">Id., at 315.\n       Lorem </span><pre class="inline">'
-             'ipsum dolor sit amet</pre>')
+             '<pre class="inline">asdf." </pre><span class="citation no-link">'
+             '<span class="id_token">Id.,</span> at 315.\n</span><pre class="'
+             'inline">       Lorem ipsum dolor sit amet</pre>'),
+
+            # Ibid. citation ("... Ibid.")
+            ('asdf, Ibid. Lorem ipsum dolor sit amet',
+             '<pre class="inline">asdf, </pre><span class="citation no-link">'
+             '<span class="ibid_token">Ibid.</span> Lorem ipsum dolor </span>'
+             '<pre class="inline">sit amet</pre>'),
         ]
 
         # fmt: on
