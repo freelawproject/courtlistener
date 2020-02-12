@@ -104,7 +104,7 @@ class Command(VerboseCommand):
         self.si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="rw")
 
         # Use query chaining to build the query
-        query = Opinion.objects.all()
+        query = Opinion.objects.all().order_by("pk")
         if options.get("doc_id"):
             query = query.filter(pk__in=options["doc_id"])
         if options.get("end_id"):
