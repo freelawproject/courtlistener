@@ -381,50 +381,49 @@ def process_recap_zip(self, pk):
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     logger.info("Processing RECAP zip (debug is: %s): %s", pq.debug, pq)
-    archive = ZipFile(pq.filepath_local.path, "r")
+    with ZipFile(pq.filepath_local.path, "r") as archive:
+        # For each document in the zip, create a new PQ
+        new_pqs = []
+        tasks = []
+        for file_name in archive.namelist():
+            file_content = archive.read(file_name)
+            f = SimpleUploadedFile(file_name, file_content)
 
-    # For each document in the zip, create a new PQ
-    new_pqs = []
-    tasks = []
-    for file_name in archive.namelist():
-        file_content = archive.read(file_name)
-        f = SimpleUploadedFile(file_name, file_content)
+            doc_num, att_num = file_name.split(".pdf")[0].split("-")
 
-        doc_num, att_num = file_name.split(".pdf")[0].split("-")
+            if att_num == "main":
+                att_num = None
 
-        if att_num == "main":
-            att_num = None
+            # Create a new PQ and enqueue it for processing
+            new_pq = ProcessingQueue.objects.create(
+                court=pq.court,
+                uploader=pq.uploader,
+                pacer_case_id=pq.pacer_case_id,
+                pacer_doc_id=pq.pacer_doc_id,
+                document_number=doc_num,
+                attachment_number=att_num,
+                filepath_local=f,
+                status=PROCESSING_STATUS.ENQUEUED,
+                upload_type=UPLOAD_TYPE.PDF,
+                debug=pq.debug,
+            )
+            new_pqs.append(new_pq.pk)
+            tasks.append(process_recap_pdf.delay(new_pq.pk))
 
-        # Create a new PQ and enqueue it for processing
-        new_pq = ProcessingQueue.objects.create(
-            court=pq.court,
-            uploader=pq.uploader,
-            pacer_case_id=pq.pacer_case_id,
-            pacer_doc_id=pq.pacer_doc_id,
-            document_number=doc_num,
-            attachment_number=att_num,
-            filepath_local=f,
-            status=PROCESSING_STATUS.ENQUEUED,
-            upload_type=UPLOAD_TYPE.PDF,
-            debug=pq.debug,
+        # At the end, mark the pq as successful and return the PQ
+        mark_pq_status(
+            pq,
+            "Successfully created ProcessingQueue objects: %s"
+            % oxford_join(new_pqs),
+            PROCESSING_STATUS.SUCCESSFUL,
         )
-        new_pqs.append(new_pq.pk)
-        tasks.append(process_recap_pdf.delay(new_pq.pk))
 
-    # At the end, mark the pq as successful and return the PQ
-    mark_pq_status(
-        pq,
-        "Successfully created ProcessingQueue objects: %s"
-        % oxford_join(new_pqs),
-        PROCESSING_STATUS.SUCCESSFUL,
-    )
-
-    # Returning the tasks allows tests to wait() for the PDFs to complete
-    # before checking assertions.
-    return {
-        "new_pqs": new_pqs,
-        "tasks": tasks,
-    }
+        # Returning the tasks allows tests to wait() for the PDFs to complete
+        # before checking assertions.
+        return {
+            "new_pqs": new_pqs,
+            "tasks": tasks,
+        }
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
