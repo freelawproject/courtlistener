@@ -315,7 +315,7 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
             date_filed, is_approximate = validate_dt(data["decision_date"])
 
             logger.info("Adding cluster for: %s", citation.base_citation())
-            cluster = OpinionCluster.objects.create(
+            cluster = OpinionCluster(
                 case_name=case_name,
                 case_name_short=case_name_short,
                 case_name_full=case_name_full,
@@ -336,6 +336,7 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
                 judges=judges,
                 filepath_json_harvard=file_path,
             )
+            cluster.save(index=False)
 
             logger.info("Adding citation for: %s", citation.base_citation())
             Citation.objects.create(
