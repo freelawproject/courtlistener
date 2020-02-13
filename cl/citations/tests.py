@@ -148,6 +148,13 @@ class CiteTest(TestCase):
                            year=2004, canonical_reporter=u'Neb. Ct. App.',
                            lookup_index=0, reporter_index=1,
                            reporter_found='Neb. App.')]),
+            # Test with page range with a weird suffix
+            ('559 N.W.2d 826|N.D.',
+             [FullCitation(volume=559, reporter='N.W.2d', page='826',
+                           canonical_reporter=u'N.W.', lookup_index=0,
+                           reporter_index=1, reporter_found='N.W.2d')]),
+            # Test with malformed/missing page number
+            ('1 U.S. f24601', []),
             # Test with the 'digit-REPORTER-digit' corner-case formatting
             ('2007-NMCERT-008',
              [FullCitation(volume=2007, reporter='NMCERT', page=8,
@@ -201,6 +208,12 @@ class CiteTest(TestCase):
             ('before asdf, 1 U. S. end', []),
             # Test short form citation with a page range
             ('before asdf, 1 U. S., at 20-25',
+             [ShortformCitation(reporter='U.S.', page='20-25', volume=1,
+                                antecedent_guess='asdf,', court='scotus',
+                                canonical_reporter=u'U.S.', lookup_index=0,
+                                reporter_found='U. S.', reporter_index=3)]),
+            # Test short form citation with a page range with weird suffix
+            ('before asdf, 1 U. S., at 20-25\\& n. 4',
              [ShortformCitation(reporter='U.S.', page='20-25', volume=1,
                                 antecedent_guess='asdf,', court='scotus',
                                 canonical_reporter=u'U.S.', lookup_index=0,
