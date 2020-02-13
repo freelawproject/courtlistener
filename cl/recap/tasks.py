@@ -1,11 +1,13 @@
 # coding=utf-8
 import logging
 import os
+from zipfile import ZipFile
 
 import requests
 from celery.canvas import chain
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -26,6 +28,7 @@ from cl.corpus_importer.tasks import (
     get_docket_by_pacer_case_id,
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
+from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.crypto import sha1
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.pacer import map_cl_to_pacer_id
@@ -83,6 +86,8 @@ def process_recap_upload(pq):
         ).apply_async()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         process_recap_appellate_attachment.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.DOCUMENT_ZIP:
+        process_recap_zip.delay(pq.pk)
 
 
 def do_pacer_fetch(fq):
@@ -357,6 +362,69 @@ def process_recap_pdf(self, pk):
     if changed:
         rd.docket_entry.docket.save()
     return rd
+
+
+@app.task(bind=True, max_retries=5, ignore_result=True)
+def process_recap_zip(self, pk):
+    """Process a zip uploaded from a PACER district court
+
+    The general process is to use our existing infrastructure. We open the zip,
+    identify the documents inside, and then associate them with the rest of our
+    collection.
+
+    :param self: A celery task object
+    :param pk: The PK of the ProcessingQueue object to process
+    :return: A list of new PQ's that were created, one per PDF that was
+    enqueued.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
+
+    logger.info("Processing RECAP zip (debug is: %s): %s", pq.debug, pq)
+    archive = ZipFile(pq.filepath_local.path, "r")
+
+    # For each document in the zip, create a new PQ
+    new_pqs = []
+    tasks = []
+    for file_name in archive.namelist():
+        file_content = archive.read(file_name)
+        f = SimpleUploadedFile(file_name, file_content)
+
+        doc_num, att_num = file_name.split(".pdf")[0].split("-")
+
+        if att_num == "main":
+            att_num = None
+
+        # Create a new PQ and enqueue it for processing
+        new_pq = ProcessingQueue.objects.create(
+            court=pq.court,
+            uploader=pq.uploader,
+            pacer_case_id=pq.pacer_case_id,
+            pacer_doc_id=pq.pacer_doc_id,
+            document_number=doc_num,
+            attachment_number=att_num,
+            filepath_local=f,
+            status=PROCESSING_STATUS.ENQUEUED,
+            upload_type=UPLOAD_TYPE.PDF,
+            debug=pq.debug,
+        )
+        new_pqs.append(new_pq.pk)
+        tasks.append(process_recap_pdf.delay(new_pq.pk))
+
+    # At the end, mark the pq as successful and return the PQ
+    mark_pq_status(
+        pq,
+        "Successfully created ProcessingQueue objects: %s"
+        % oxford_join(new_pqs),
+        PROCESSING_STATUS.SUCCESSFUL,
+    )
+
+    # Returning the tasks allows tests to wait() for the PDFs to complete
+    # before checking assertions.
+    return {
+        "new_pqs": new_pqs,
+        "tasks": tasks,
+    }
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
