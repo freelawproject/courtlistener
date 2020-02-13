@@ -382,6 +382,20 @@ def process_recap_zip(self, pk):
 
     logger.info("Processing RECAP zip (debug is: %s): %s", pq.debug, pq)
     with ZipFile(pq.filepath_local.path, "r") as archive:
+        # Security: Check for zip bombs.
+        max_file_size = convert_size_to_bytes("200MB")
+        for zip_info in archive.infolist():
+            if zip_info.file_size < max_file_size:
+                continue
+            mark_pq_status(
+                pq,
+                "Zip too large; possible zip bomb. File in zip named %s "
+                "would be %s bytes expanded."
+                % (zip_info.filename, zip_info.file_size),
+                PROCESSING_STATUS.INVALID_CONTENT,
+            )
+            return {"new_pqs": [], "tasks": []}
+
         # For each document in the zip, create a new PQ
         new_pqs = []
         tasks = []
