@@ -233,27 +233,27 @@ def add_defendant(citation, words):
 
 def parse_page(page):
     page = strip_punct(page)
-    if page.isdigit():
-        # Most page numbers will be digits.
-        page = int(page)
-    else:
-        if re.match(r"\d{1,4}[-]?\d{1,4}", page):
-            # Check if the page number is really a page range
-            pass
-        elif isroman(page):
-            # Some places like Nebraska have Roman numerals, e.g. in
-            # '250 Neb. xxiv (1996)'. No processing needed.
-            pass
-        elif re.match(r"\d{1,6}[-]?[a-zA-Z]{1,6}", page):
-            # Some places, like Connecticut, have pages like "13301-M".
-            # Other places, like Illinois have "pages" like "110311-B".
-            pass
-        else:
-            # Not Roman, and not a weird connecticut page number. Thus a bad
-            # value. Abort.
-            page = None
 
-    return page
+    if page.isdigit():
+        # First, check whether the page is a simple digit. Most will be.
+        return int(page)
+    else:
+        # Otherwise, check whether the "page" is really one of the following:
+        # (ordered in descending order of likelihood)
+        # 1) A numerical page range. E.g., "123-124"
+        # 2) A roman numeral. E.g., "250 Neb. xxiv (1996)"
+        # 3) A special Connecticut or Illinois number. E.g., "13301-M"
+        # 4) A page with a weird suffix. E.g., "559 N.W.2d 826|N.D."
+        match = (
+            re.match(r"\d{1,6}-\d{1,6}", page)  # Page range
+            or isroman(page)  # Roman numeral
+            or re.match(r"\d{1,6}[-]?[a-zA-Z]{1,6}", page)  # CT/IL page
+            or re.match(r"\d{1,6}", page)  # Weird suffix
+        )
+        if match:
+            return match.group(0)
+        else:
+            return None
 
 
 def extract_full_citation(words, reporter_index):
