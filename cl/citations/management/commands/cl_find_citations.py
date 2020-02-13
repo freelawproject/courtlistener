@@ -18,15 +18,15 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--doc_id", type=int, nargs="*", help="ids of citing opinions",
+            "--doc-id", type=int, nargs="*", help="ids of citing opinions",
         )
         parser.add_argument(
-            "--start_id",
+            "--start-id",
             type=int,
             help="start id for a range of documents to update (inclusive)",
         )
         parser.add_argument(
-            "--end_id",
+            "--end-id",
             type=int,
             help="end id for a range of documents to update (inclusive)",
         )
@@ -39,7 +39,7 @@ class Command(VerboseCommand):
             # that the program continues onto the newly edited files,
             # including those files that have new citations to them.
             # ♪♪♪ Smoke in the server, fire in the wires. ♪♪♪
-            "--filed_after",
+            "--filed-after",
             type=valid_date_time,
             help="Start date in ISO-8601 format for a range of documents to "
             "update. Dates will be converted to ",
@@ -53,14 +53,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--index",
             type=str,
-            default="all_at_end",
-            choices=("all_at_end", "concurrently", "False"),
+            default="all-at-end",
+            choices=("all-at-end", "concurrently", "False"),
             help=(
                 "When/if to save changes to the Solr index. Options are "
-                "all_at_end, concurrently or False. Saving 'concurrently' "
+                "all-at-end, concurrently or False. Saving 'concurrently' "
                 "is least efficient, since each document is updated once "
                 "for each citation to it, however this setting will show "
-                "changes in the index in realtime. Saving 'all_at_end' can "
+                "changes in the index in realtime. Saving 'all-at-end' can "
                 "be considerably more efficient, but will not show changes "
                 "until the process has finished and the index has been "
                 "completely regenerated from the database. Setting this to "
@@ -70,6 +70,11 @@ class Command(VerboseCommand):
                 "the opinions, it is thus generally wise to use "
                 "'concurrently'."
             ),
+        )
+        parser.add_argument(
+            "--queue",
+            default="batch1",
+            help="The celery queue where the tasks should be processed.",
         )
 
     def handle(self, *args, **options):
@@ -99,13 +104,13 @@ class Command(VerboseCommand):
         self.si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="rw")
 
         # Use query chaining to build the query
-        query = Opinion.objects.all()
+        query = Opinion.objects.all().order_by("pk")
         if options.get("doc_id"):
-            query = query.filter(pk__in=options.get("doc_id"))
+            query = query.filter(pk__in=options["doc_id"])
         if options.get("end_id"):
-            query = query.filter(pk__lte=options.get("end_id"))
+            query = query.filter(pk__lte=options["end_id"])
         if options.get("start_id"):
-            query = query.filter(pk__gte=options.get("start_id"))
+            query = query.filter(pk__gte=options["start_id"])
         if options.get("filed_after"):
             query = query.filter(
                 cluster__date_filed__gte=options["filed_after"]
@@ -115,10 +120,9 @@ class Command(VerboseCommand):
         self.count = query.count()
         self.average_per_s = 0
         self.timings = []
-        count = query.count()
         opinion_pks = query.values_list("pk", flat=True).iterator()
-        self.update_documents(opinion_pks, count)
-        self.add_to_solr()
+        self.update_documents(opinion_pks, options["queue"])
+        self.add_to_solr(options["queue"])
 
     def log_progress(self, processed_count, last_pk):
         if processed_count % 1000 == 1:
@@ -144,7 +148,7 @@ class Command(VerboseCommand):
         )
         sys.stdout.flush()
 
-    def update_documents(self, opinion_pks, count):
+    def update_documents(self, opinion_pks, queue_name):
         sys.stdout.write("Graph size is {0:d} nodes.\n".format(self.count))
         sys.stdout.flush()
 
@@ -155,22 +159,22 @@ class Command(VerboseCommand):
         chunk = []
         chunk_size = 100
         processed_count = 0
-        throttle = CeleryThrottle(min_items=500)
+        throttle = CeleryThrottle(queue_name=queue_name)
         for opinion_pk in opinion_pks:
             processed_count += 1
-            last_item = count == processed_count
+            last_item = self.count == processed_count
             chunk.append(opinion_pk)
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
-                find_citations_for_opinion_by_pks.delay(
-                    chunk, index_during_subtask
+                find_citations_for_opinion_by_pks.apply_async(
+                    args=(chunk, index_during_subtask), queue=queue_name,
                 )
                 chunk = []
 
             self.log_progress(processed_count, opinion_pk)
 
-    def add_to_solr(self):
-        if self.index == "all_at_end":
+    def add_to_solr(self, queue_name):
+        if self.index == "all-at-end":
             # fmt: off
             call_command(
                 'cl_update_index',
@@ -179,7 +183,7 @@ class Command(VerboseCommand):
                 '--noinput',
                 '--update',
                 '--everything',
-                '--do-commit',
+                '--queue', queue_name,
             )
             # fmt: on
         elif self.index == "False":

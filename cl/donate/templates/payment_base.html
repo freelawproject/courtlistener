@@ -27,7 +27,7 @@
     };
 
     jQuery(function($) {
-      $('#donate-form').submit(function(e) {
+      $('#donate-form').on("submit", function(e) {
         if ($('input[name=payment_provider]:checked', '#donate-form').val() == 'cc'){
           var $form = $(this);
           // Disable the submit button to prevent repeated clicks
@@ -40,7 +40,7 @@
       });
     });
 
-    $("#id_amount_other").click(function () {
+    $("#id_amount_other").on("click", function () {
       // Make the "Other amount" input box select the "Other" radio input.
       $(".radio-list li:last-child input[type=radio]").prop('checked', true);
     });

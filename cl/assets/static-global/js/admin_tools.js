@@ -1,7 +1,7 @@
 $(document).ready(function () {
 
     // Block items
-    $('.block-item').click(function(e){
+    $('.block-item').on("click", function(e){
         e.preventDefault();
         var button = $(this),
             id = button.data('id'),
