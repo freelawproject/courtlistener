@@ -118,13 +118,6 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
         # values = number of times that opinion is cited
         grouped_matches = Counter(citation_matches)
 
-        for matched_opinion in grouped_matches:
-            # Increase citation count for matched cluster if it hasn't
-            # already been cited by this opinion.
-            if matched_opinion not in opinion.opinions_cited.all():
-                matched_opinion.cluster.citation_count += 1
-                matched_opinion.cluster.save(index=index)
-
         # Only update things if we found citations
         if citations:
             opinion.html_with_citations = create_cited_html(opinion, citations)
@@ -143,6 +136,14 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
                     for matched_opinion in grouped_matches
                 ]
             )
+
+            # Recalculate the citation counts for the matched clusters
+            for matched_opinion in grouped_matches:
+                count = OpinionsCited.objects.filter(
+                    cited_opinion__cluster__pk=matched_opinion.cluster.pk,
+                ).count()
+                matched_opinion.cluster.citation_count = count
+                matched_opinion.cluster.save(index=index)
 
         # Update Solr if requested. In some cases we do it at the end for
         # performance reasons.
