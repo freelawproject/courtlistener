@@ -37,14 +37,11 @@ TYPE_CHOICES = (
 )
 
 
-def _clean_form(request, cd, courts):
+def _clean_form(get_params, cd, courts):
     """Returns cleaned up values as a Form object.
     """
-    # Make a copy of request.GET so it is mutable
-    mutable_GET = request.GET.copy()
-
     # Send the user the cleaned up query
-    mutable_GET["q"] = cd["q"]
+    get_params["q"] = cd["q"]
 
     # Clean up the date formats. This is probably no longer needed since we do
     # date cleanup on the client side via our datepickers, but it's probably
@@ -53,26 +50,26 @@ def _clean_form(request, cd, courts):
     for date_field in SearchForm().get_date_field_names():
         for time in ("before", "after"):
             field = "%s_%s" % (date_field, time)
-            if mutable_GET.get(field) and cd.get(field) is not None:
+            if get_params.get(field) and cd.get(field) is not None:
                 # Don't use strftime. It'll fail before 1900
                 before = cd[field]
-                mutable_GET[field] = "%02d/%02d/%s" % (
+                get_params[field] = "%02d/%02d/%s" % (
                     before.month,
                     before.day,
                     before.year,
                 )
 
-    mutable_GET["order_by"] = cd["order_by"]
-    mutable_GET["type"] = cd["type"]
+    get_params["order_by"] = cd["order_by"]
+    get_params["type"] = cd["type"]
 
     for court in courts:
-        mutable_GET["court_%s" % court.pk] = cd["court_%s" % court.pk]
+        get_params["court_%s" % court.pk] = cd["court_%s" % court.pk]
 
     for status in DOCUMENT_STATUSES:
-        mutable_GET["stat_%s" % status[1]] = cd["stat_%s" % status[1]]
+        get_params["stat_%s" % status[1]] = cd["stat_%s" % status[1]]
 
     # Ensure that we have the cleaned_data and other related attributes set.
-    form = SearchForm(mutable_GET)
+    form = SearchForm(get_params)
     form.is_valid()
     return form
 

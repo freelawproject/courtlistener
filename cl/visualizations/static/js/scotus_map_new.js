@@ -151,7 +151,7 @@ $(document).ready(function () {
         .typeahead(optionsNoMin, resultOptions);
 
 
-    $('#starting-cluster-typeahead').bind(
+    $('#starting-cluster-typeahead').on(
         'typeahead:select',
         function (ev, suggestion) {
             updateCache(suggestion, function (suggestion) {
@@ -165,7 +165,7 @@ $(document).ready(function () {
             $('.first-selection')
                 .text(suggestion.caseNameShort || suggestion.caseName);
         });
-    $('.ending-typeahead').bind(
+    $('.ending-typeahead').on(
         'typeahead:select',
         function (ev, suggestion) {
             $('#id_cluster_end').val(suggestion.cluster_id);
@@ -175,7 +175,7 @@ $(document).ready(function () {
     });
 
     // Extra options JS
-    $('#more').click(function (e) {
+    $('#more').on("click", function (e) {
         $('#more').addClass('hidden');
         $('#extra-options').removeClass('hidden');
     });

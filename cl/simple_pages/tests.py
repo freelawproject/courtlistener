@@ -116,7 +116,6 @@ class SimplePagesTest(TestCase):
     def test_simple_pages(self):
         """Do all the simple pages load properly?"""
         reverse_params = [
-            {"viewname": "about"},
             {"viewname": "faq"},
             {"viewname": "coverage"},
             {"viewname": "feeds_info"},
@@ -130,9 +129,7 @@ class SimplePagesTest(TestCase):
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
             {"viewname": "terms"},
-            {"viewname": "bad_browser"},
             {"viewname": "robots"},
-            {"viewname": "humans"},
         ]
         for reverse_param in reverse_params:
             path = reverse(**reverse_param)

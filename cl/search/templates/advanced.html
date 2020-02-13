@@ -37,7 +37,7 @@
   {% include "includes/date_picker.html" %}
   <script type="text/javascript">
     $(document).ready(function () {
-      $('#start-scroll').click(function () {
+      $('#start-scroll').on("click", function () {
         $('html, body').animate({
           scrollTop: $(".learn-more").offset().top
         }, 500);

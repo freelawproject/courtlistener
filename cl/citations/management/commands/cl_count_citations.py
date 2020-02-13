@@ -13,7 +13,7 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--doc_id",
+            "--doc-id",
             type=int,
             nargs="*",
             help="ids to process one by one, if desired",
@@ -21,14 +21,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--index",
             type=str,
-            default="all_at_end",
-            choices=("all_at_end", "concurrently", "False"),
+            default="all-at-end",
+            choices=("all-at-end", "concurrently", "False"),
             help=(
                 "When/if to save changes to the Solr index. Options are "
-                "all_at_end, concurrently or False. Saving 'concurrently' "
+                "all-at-end, concurrently or False. Saving 'concurrently' "
                 "is least efficient, since each document is updated once "
                 "for each citation to it, however this setting will show "
-                "changes in the index in realtime. Saving 'all_at_end' can "
+                "changes in the index in realtime. Saving 'all-at-end' can "
                 "be considerably more efficient, but will not show changes "
                 "until the process has finished and the index has been "
                 "completely regenerated from the database. Setting this to "
@@ -43,7 +43,7 @@ class Command(VerboseCommand):
     @staticmethod
     def do_solr(options):
         """Update Solr if requested, or report if not."""
-        if options["index"] == "all_at_end":
+        if options["index"] == "all-at-end":
             # fmt: off
             call_command(
                 'cl_update_index',
