@@ -44,6 +44,7 @@ from cl.recap.tasks import (
     process_recap_attachment,
     process_recap_docket,
     process_recap_pdf,
+    process_recap_zip,
 )
 from cl.search.models import (
     Docket,
@@ -376,14 +377,14 @@ class RecapPdfTaskTest(TestCase):
             upload_type=UPLOAD_TYPE.PDF,
         )
         self.docket = Docket.objects.create(
-            source=0, court_id="scotus", pacer_case_id="asdf"
+            source=Docket.DEFAULT, court_id="scotus", pacer_case_id="asdf"
         )
         self.de = DocketEntry.objects.create(
             docket=self.docket, entry_number=1
         )
         self.rd = RECAPDocument.objects.create(
             docket_entry=self.de,
-            document_type=1,
+            document_type=RECAPDocument.PACER_DOCUMENT,
             document_number=1,
             pacer_doc_id="asdf",
             sha1=sha1,
@@ -478,6 +479,105 @@ class RecapPdfTaskTest(TestCase):
         # working, the correct status is PROCESSING_STATUS.FAILED.
         self.assertEqual(self.pq.status, PROCESSING_STATUS.QUEUED_FOR_RETRY)
         self.assertIn("Unable to find docket", self.pq.error_message)
+
+
+class RecapZipTaskTest(TestCase):
+    """Do we do good things when people send us zips?"""
+
+    test_dir = os.path.join(
+        settings.INSTALL_ROOT, "cl", "recap", "test_assets"
+    )
+
+    def setUp(self):
+        user = User.objects.get(username="recap")
+        self.filename = "1-20-cv-10189-FDS.zip"
+        self.file_path = os.path.join(self.test_dir, self.filename)
+        with open(self.file_path, "r") as f:
+            self.file_content = f.read()
+        f = SimpleUploadedFile(self.filename, self.file_content)
+        self.pq = ProcessingQueue.objects.create(
+            court_id="scotus",
+            uploader=user,
+            pacer_case_id="asdf",
+            filepath_local=f,
+            upload_type=UPLOAD_TYPE.DOCUMENT_ZIP,
+        )
+        self.docket = Docket.objects.create(
+            source=Docket.DEFAULT, court_id="scotus", pacer_case_id="asdf"
+        )
+        self.de = DocketEntry.objects.create(
+            docket=self.docket, entry_number=12
+        )
+        doc12_sha1 = "130c52020a3d3ce7f0dbd46361b242493abf8b43"
+        self.doc12 = RECAPDocument.objects.create(
+            docket_entry=self.de,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            document_number=12,
+            pacer_doc_id="asdf",
+            sha1=doc12_sha1,
+        )
+        doc12_att1_sha1 = "0ce3a2df4f429f94a8f579eac4d47ba42dd66eac"
+        self.doc12_att1 = RECAPDocument.objects.create(
+            docket_entry=self.de,
+            document_type=RECAPDocument.ATTACHMENT,
+            document_number=12,
+            attachment_number=1,
+            pacer_doc_id="asdf",
+            sha1=doc12_att1_sha1,
+        )
+        self.docs = [self.doc12, self.doc12_att1]
+
+    def tearDown(self):
+        Docket.objects.all().delete()
+        ProcessingQueue.objects.all().delete()
+
+    @mock.patch("cl.recap.tasks.extract_recap_pdf")
+    def test_simple_zip_upload(self, mock):
+        """Do we unpack the zip and process it's contents properly?"""
+        # The original pq should be marked as complete with a good message.
+        results = process_recap_zip(self.pq.pk)
+        self.pq.refresh_from_db()
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertTrue(
+            self.pq.error_message.startswith(
+                "Successfully created ProcessingQueue objects: "
+            ),
+        )
+
+        # A new pq should be created for each document
+        expected_new_pq_count = 2
+        actual_new_pq_count = len(results["new_pqs"])
+        self.assertEqual(
+            expected_new_pq_count,
+            actual_new_pq_count,
+            msg="Should have %s pq items in the DB, two from inside the zip, "
+            "and one for the zip itself. Instead got %s."
+            % (expected_new_pq_count, actual_new_pq_count),
+        )
+
+        # Wait for all the tasks to finish
+        for task in results["tasks"]:
+            task.wait(timeout=5, interval=0.25)
+
+        # Are the PDF PQ's marked as successful?
+        for new_pq in results["new_pqs"]:
+            new_pq = ProcessingQueue.objects.get(pk=new_pq)
+            self.assertEqual(
+                new_pq.status, PROCESSING_STATUS.SUCCESSFUL,
+            )
+
+        # Are the documents marked as available?
+        for doc in self.docs:
+            doc.refresh_from_db()
+            self.assertTrue(
+                doc.is_available,
+                msg="Doc %s was not marked as available. This may mean that "
+                "it was not processed properly by the PDF processor.",
+            )
+
+        # Was the mock called once per PDF in the zip?
+        expected_call_count = len(results["new_pqs"])
+        self.assertEqual(mock.call_count, expected_call_count)
 
 
 class RecapAddAttorneyTest(TestCase):
