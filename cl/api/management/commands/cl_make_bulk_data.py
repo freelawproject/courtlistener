@@ -152,7 +152,7 @@ class Command(VerboseCommand):
         # the citation table to disk as a compressed CSV.
         default_db = settings.DATABASES["default"]
         os.system(
-            """PGPASSWORD="{password}" psql -c "COPY \\"search_opinionscited\\" (citing_opinion_id, cited_opinion_id) to stdout DELIMITER ',' CSV HEADER" --host {host} --dbname {database} --username {username} | gzip > {destination}""".format(
+            """PGPASSWORD="{password}" psql -c "COPY \\"search_opinionscited\\" (citing_opinion_id, cited_opinion_id, depth) to stdout DELIMITER ',' CSV HEADER" --host {host} --dbname {database} --username {username} | gzip > {destination}""".format(
                 password=default_db["PASSWORD"],
                 host=default_db["HOST"],
                 database=default_db["NAME"],
