@@ -76,10 +76,10 @@
         </div>
 
         {# Show cases that cite this case #}
-        {% if citing_clusters.result.numFound > 0 %}
+        {% if children_count > 0 %}
             <div id="cited-by" class="sidebar-section">
                 <h3>
-                    <span>Cited By ({{ citing_clusters.result.numFound }}) <a
+                    <span>Cited By ({{ children_count }}) <a
                         href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})">
                             <i class="gray fa fa-rss"
                                title="Subscribe to a feed of citations to this case."></i>
@@ -88,9 +88,10 @@
                 </h3>
                 <p class="bottom">This case has been cited by these opinions:</p>
                 <ul>
-                    {% for citing_cluster in citing_clusters %}
+                    {% for child in top_children %}
                         <li>
-                            <a href="{{ citing_cluster.absolute_url }}?{{ request.META.QUERY_STRING }}">{{ citing_cluster.caseName|safe|truncatewords:12|v_wrapper }} ({{ citing_cluster.dateFiled|date:"Y" }})</a>
+                            <a href="{{ child.absolute_url }}?{{ request.META.QUERY_STRING }}">{{ child.caseName|safe|truncatewords:12|v_wrapper }} ({{ child.dateFiled|date:"Y" }})</a>
+                            ({{ child.citations_count }} time{{ child.citations_count|pluralize }})
                         </li>
                     {% endfor %}
                 </ul>

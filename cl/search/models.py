@@ -7,13 +7,14 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.urls import reverse, NoReverseMatch
 from django.db import models
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, Sum
 from django.template import loader
 from django.utils.encoding import smart_unicode
 from django.utils.text import slugify
+from django.conf import settings
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib import fields
+from cl.lib import fields, sunburnt
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import (
     make_upload_path,
@@ -2124,7 +2125,8 @@ class OpinionCluster(models.Model):
     @property
     def authorities(self):
         """Returns a queryset that can be used for querying and caching
-        authorities.
+        authorities. Authorities are like children, but the opposite.
+        (authorities == opinion clusters cited by this opinion cluster)
         """
         # All clusters that have sub_opinions cited by the sub_opinions of
         # the current cluster, ordered by citation count, descending.
@@ -2188,6 +2190,50 @@ class OpinionCluster(models.Model):
             key=lambda x: x["this_cluster_citation_count"], reverse=True
         )
         return authorities_with_data
+
+    @property
+    def children(self):
+        """Returns a Solr result for an opinion's "children". Children are like
+        authorities, but the opposite. (children == opinion clusters that cite
+        this opinion cluster.)
+        """
+        # Use Solr for this for speed
+        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+        q = {
+            "q": "cites:({ids})".format(
+                ids=" OR ".join(
+                    [
+                        str(pk)
+                        for pk in (
+                            self.sub_opinions.values_list("pk", flat=True)
+                        )
+                    ]
+                )
+            ),
+            "start": 0,
+            "caller": "view_opinion",
+        }
+        children = conn.raw_query(**q).execute()
+        return children.result.docs
+
+    @property
+    def children_with_data(self):
+        """Returns a list of dictionaries containing useful data on every
+        child, for eventual injection into a view template. Because
+        self.children is already a list of dictionaries (a Solr result), it's
+        easy to calculate and append an extra data field (relating to citation
+        counts) on-the-fly.
+        The returned list is then sorted by that citation count field.
+        """
+        children_with_data = self.children
+        for child in children_with_data:
+            child["citations_count"] = get_citation_depth_for_cluster_pks(
+                citing_cluster_pk=child["id"], cited_cluster_pk=self.pk,
+            )
+        children_with_data.sort(
+            key=lambda x: x["citations_count"], reverse=True
+        )
+        return children_with_data
 
     def top_visualizations(self):
         return self.visualizations.filter(
