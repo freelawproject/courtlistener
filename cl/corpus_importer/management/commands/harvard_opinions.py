@@ -315,7 +315,7 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
             date_filed, is_approximate = validate_dt(data["decision_date"])
 
             logger.info("Adding cluster for: %s", citation.base_citation())
-            cluster = OpinionCluster.objects.create(
+            cluster = OpinionCluster(
                 case_name=case_name,
                 case_name_short=case_name_short,
                 case_name_full=case_name_full,
@@ -336,6 +336,7 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
                 judges=judges,
                 filepath_json_harvard=file_path,
             )
+            cluster.save(index=False)
 
             logger.info("Adding citation for: %s", citation.base_citation())
             Citation.objects.create(
@@ -347,6 +348,7 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
                 ),
                 cluster_id=cluster.id,
             )
+            new_op_pks = []
             for op in soup.find_all("opinion"):
                 # This code cleans author tags for processing.
                 # It is particularly useful for identifiying Per Curiam
@@ -372,7 +374,7 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
                 op_type = map_opinion_type(op.get("type"))
                 opinion_xml = str(op)
                 logger.info("Adding opinion for: %s", citation.base_citation())
-                op = Opinion.objects.create(
+                op = Opinion(
                     cluster_id=cluster.id,
                     type=op_type,
                     author_str=author_str,
@@ -380,8 +382,12 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
                     per_curiam=per_curiam,
                     extracted_by_ocr=True,
                 )
-                if make_searchable:
-                    add_items_to_solr.delay([op.pk], "search.Opinion")
+                # Don't index now; do so later if desired
+                op.save(index=False)
+                new_op_pks.append(op.pk)
+
+        if make_searchable:
+            add_items_to_solr.delay(new_op_pks, "search.Opinion")
 
         logger.info("Finished: %s", citation.base_citation())
 
