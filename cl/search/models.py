@@ -28,6 +28,7 @@ from cl.lib.search_index_utils import (
 )
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
+from cl.citations.utils import get_citation_depth_for_cluster_pks
 
 DOCUMENT_STATUSES = (
     ("Published", "Precedential"),
@@ -2157,6 +2158,36 @@ class OpinionCluster(models.Model):
                     break
             self._has_private_authority = private
         return self._has_private_authority
+
+    @property
+    def authorities_with_data(self):
+        """Returns a list of dictionaries containing useful data on every
+        authority, for eventual injection into a view template. Wrapping each
+        authority in such a dictionary is necessary because we have to
+        calculate and append an extra data field (relating to citation counts)
+        on-the-fly.
+        The returned list is sorted by that citation count field.
+        """
+        authorities_with_data = [
+            {
+                "caption": authority.caption,
+                "docket": authority.docket,
+                "date_filed": authority.date_filed,
+                "absolute_url": authority.get_absolute_url,
+                "sub_opinions": authority.sub_opinions,
+                # Number of other opinions that cite this authority
+                "unique_citation_count": authority.citation_count,
+                # Number of citations from this cluster to this authority
+                "this_cluster_citation_count": get_citation_depth_for_cluster_pks(
+                    citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk,
+                ),
+            }
+            for authority in self.authorities
+        ]
+        authorities_with_data.sort(
+            key=lambda x: x["this_cluster_citation_count"], reverse=True
+        )
+        return authorities_with_data
 
     def top_visualizations(self):
         return self.visualizations.filter(
