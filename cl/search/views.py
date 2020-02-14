@@ -1,5 +1,6 @@
 import logging
 import traceback
+import re
 from datetime import date, datetime, timedelta
 from urllib import quote
 
@@ -34,10 +35,11 @@ from cl.lib.search_utils import (
     regroup_snippets,
 )
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import Court, Opinion
+from cl.search.models import Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
+from cl.citations.utils import get_citation_depth_for_cluster_pks
 
 logger = logging.getLogger(__name__)
 
@@ -173,6 +175,26 @@ def do_search(
     )
     search_summary_str = search_form.as_text(court_count, court_count_human)
 
+    # If the search query contains a single "cites" term (e.g., "cites:(123)"),
+    # calculate and append citation depth information to the result list
+    cited_cluster = None
+    cites_query_matches = re.findall(r"cites:\((\d+)\)", cd["q"])
+    if len(cites_query_matches) == 1:
+        try:
+            cited_cluster = OpinionCluster.objects.get(
+                pk=cites_query_matches[0]
+            )
+        except OpinionCluster.DoesNotExist:
+            pass
+        else:
+            for result in paged_results.object_list:
+                result[
+                    "references_count"
+                ] = get_citation_depth_for_cluster_pks(
+                    citing_cluster_pk=result["id"],
+                    cited_cluster_pk=cited_cluster.pk,
+                )
+
     return {
         "results": paged_results,
         "facet_fields": make_stats_variable(search_form, paged_results),
@@ -183,6 +205,7 @@ def do_search(
         "court_count": court_count,
         "query_citation": query_citation,
         "error": error,
+        "cited_cluster": cited_cluster,
     }
 
 

@@ -32,6 +32,12 @@
     {% endif %}
   </h3>
 
+  {% if cited_cluster %}
+  <div class="bottom">
+      <span class="meta-data-header">{{ result.references_count }} reference{{ result.references_count|pluralize }}</span> to {{ cited_cluster.caption|safe|v_wrapper }}
+  </div>
+  {% endif %}
+
   {% if type == 'r' or type_override == 'r' %}
   <div class="bottom">
     {% if doc0.solr_highlights.docketNumber.0 %}
@@ -337,7 +343,7 @@
       <div class="bottom" class="inline-block">
         <span class="meta-data-value">
           <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})">
-              Cited {{ result.citeCount|intcomma }} time{{ result.citeCount|pluralize }}
+              Cited by {{ result.citeCount|intcomma }} opinion{{ result.citeCount|pluralize }}
           </a>
         </span>
       </div>
