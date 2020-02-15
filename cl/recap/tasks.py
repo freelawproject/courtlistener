@@ -403,9 +403,13 @@ def process_recap_zip(self, pk):
             file_content = archive.read(file_name)
             f = SimpleUploadedFile(file_name, file_content)
 
-            doc_num, att_num = file_name.split(".pdf")[0].split("-")
-
-            if att_num == "main":
+            file_name = file_name.split(".pdf")[0]
+            if "-" in file_name:
+                doc_num, att_num = file_name.split("-")
+                if att_num == "main":
+                    att_num = None
+            else:
+                doc_num = file_name
                 att_num = None
 
             # Create a new PQ and enqueue it for processing
