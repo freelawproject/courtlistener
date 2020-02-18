@@ -10,7 +10,15 @@ from cl.citations.match_citations import match_citation
 from cl.search.forms import SearchForm
 from cl.search.models import Court
 
-boosts = {
+
+SEARCH_TYPES = (
+    ("o", "Opinions"),
+    ("oa", "Oral Arguments"),
+    ("p", "People"),
+    ("r", "RECAP"),
+)
+
+BOOSTS = {
     "qf": {
         "o": {"text": 1, "caseName": 4, "docketNumber": 2,},
         "r": {"text": 1, "caseName": 4, "docketNumber": 3, "description": 2,},
@@ -353,7 +361,7 @@ def add_boosts(main_params, cd):
         main_params["boost"] = "pagerank"
 
     # Apply standard qf parameters
-    qf = boosts["qf"][cd["type"]].copy()
+    qf = BOOSTS["qf"][cd["type"]].copy()
     main_params["qf"] = make_boost_string(qf)
 
     if cd["type"] in ["o", "r", "oa"]:
@@ -375,7 +383,7 @@ def add_boosts(main_params, cd):
 
     # Apply phrase-based boosts
     if cd["type"] in ["o", "r", "oa"]:
-        main_params["pf"] = make_boost_string(boosts["pf"][cd["type"]])
+        main_params["pf"] = make_boost_string(BOOSTS["pf"][cd["type"]])
         main_params["ps"] = 5
 
 
