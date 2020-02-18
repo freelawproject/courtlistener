@@ -6,6 +6,7 @@ from django.forms import DateField, ChoiceField
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.model_helpers import flatten_choices
+from cl.lib.search_utils import SEARCH_TYPES
 from cl.people_db.models import Position, PoliticalAffiliation
 from cl.search.fields import (
     CeilingDateField,
@@ -27,13 +28,6 @@ OPINION_ORDER_BY_CHOICES = (
     ("dob desc,name_reverse asc", "Most Recently Born"),
     ("dob asc,name_reverse asc", "Least Recently Born"),
     ("dod desc,name_reverse asc", "Most Recently Deceased"),
-)
-
-TYPE_CHOICES = (
-    ("o", "Opinions"),
-    ("oa", "Oral Arguments"),
-    ("p", "People"),
-    ("r", "RECAP"),
 )
 
 
@@ -79,7 +73,7 @@ class SearchForm(forms.Form):
     # Blended fields
     #
     type = forms.ChoiceField(
-        choices=TYPE_CHOICES,
+        choices=SEARCH_TYPES,
         required=False,
         initial="o",
         widget=forms.RadioSelect(
