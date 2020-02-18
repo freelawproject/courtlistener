@@ -232,13 +232,24 @@ def merge_form_with_courts(courts, search_form):
     return court_tabs, court_count_human, court_count
 
 
-def make_fq(cd, field, key):
+def make_fq(cd, field, key, make_phrase=False):
     """Does some minimal processing of the query string to get it into a
     proper field query.
 
     This is necessary because despite our putting AND as the default join
     method, in some cases Solr decides OR is a better approach. So, to work
-    around this bug, we do some minimal query parsing ourselves.
+    around this bug, we do some minimal query parsing ourselves:
+
+    1. If the user provided a phrase we pass that through.
+
+    1. Otherwise, we insert AND as a conjunction between all words.
+
+    :param cd: The cleaned data dictionary from the form.
+    :param field: The Solr field to use for the query (e.g. "caseName")
+    :param key: The model form field to use for the query (e.g. "case_name")
+    :param make_phrase: Whether we should wrap the query in quotes to make a
+    phrase search.
+    :returns A field query string like "caseName:Roe"
     """
     q = cd[key]
     q = q.replace(":", " ")
@@ -246,6 +257,10 @@ def make_fq(cd, field, key):
     if q.startswith('"') and q.endswith('"'):
         # User used quotes. Just pass it through.
         return "%s:(%s)" % (field, q)
+
+    if make_phrase:
+        # No need to mess with conjunctions. Just wrap in quotes.
+        return '%s:("%s")' % (field, q)
 
     # Iterate over the query word by word. If the word is a conjunction
     # word, detect that and use the user's request. Else, make sure there's
@@ -537,7 +552,9 @@ def add_filter_queries(main_params, cd):
         if cd["judge"]:
             main_fq.append(make_fq(cd, "judge", "judge"))
         if cd["docket_number"]:
-            main_fq.append(make_fq(cd, "docketNumber", "docket_number"))
+            main_fq.append(
+                make_fq(cd, "docketNumber", "docket_number", make_phrase=True)
+            )
         if cd["citation"]:
             main_fq.append(make_fq_proximity_query(cd, "citation", "citation"))
         if cd["neutral_cite"]:
@@ -556,7 +573,9 @@ def add_filter_queries(main_params, cd):
         if cd["description"]:
             main_fq.append(make_fq(cd, "description", "description"))
         if cd["docket_number"]:
-            main_fq.append(make_fq(cd, "docketNumber", "docket_number"))
+            main_fq.append(
+                make_fq(cd, "docketNumber", "docket_number", make_phrase=True)
+            )
         if cd["nature_of_suit"]:
             main_fq.append(make_fq(cd, "suitNature", "nature_of_suit"))
         if cd["cause"]:
