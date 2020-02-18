@@ -365,7 +365,7 @@ class SearchTest(IndexedSolrTestCase):
     def test_a_docket_number_query(self):
         """Can we query by docket number?"""
         r = self.client.get(
-            reverse("show_results"), {"q": "*", "docket_number": "2",}
+            reverse("show_results"), {"q": "*", "docket_number": "2"}
         )
         self.assertIn("Honda", r.content, "Result not found by docket number!")
 
@@ -554,15 +554,43 @@ class SearchTest(IndexedSolrTestCase):
         """Do queries with leading zeros work equal to ones without?"""
         r = self.client.get(
             reverse("show_results"),
-            {"docket_number": "005", "stat_Errata": "on",},
+            {"docket_number": "005", "stat_Errata": "on"},
         )
         expected = 1
         self.assertEqual(expected, self.get_article_count(r))
         r = self.client.get(
             reverse("show_results"),
-            {"docket_number": "5", "stat_Errata": "on",},
+            {"docket_number": "5", "stat_Errata": "on"},
         )
         self.assertEqual(expected, self.get_article_count(r))
+
+    def test_issue_1193_docket_numbers_as_phrase(self):
+        """Are docket numbers searched as a phrase?"""
+        # Search for the full docket number. Does it work?
+        r = self.client.get(
+            reverse("show_results"),
+            {"docket_number": "docket number 1 005", "stat_Errata": "on"},
+        )
+        expected = 1
+        got = self.get_article_count(r)
+        self.assertEqual(
+            expected,
+            got,
+            "Didn't get the expected result count of '%s' for docket "
+            "phrase search. Got '%s' instead." % (expected, got),
+        )
+
+        # Twist up the docket numbers. Do we get no results?
+        r = self.client.get(
+            reverse("show_results"),
+            {"docket_number": "docket 005 number", "stat_Errata": "on"},
+        )
+        expected = 0
+        self.assertEqual(
+            expected,
+            self.get_article_count(r),
+            "Got results for badly ordered docket number.",
+        )
 
     def test_issue_727_doc_att_numbers(self):
         """Can we send integers to the document number and attachment number
