@@ -11,12 +11,18 @@ from cl.search.forms import SearchForm
 from cl.search.models import Court
 
 
-SEARCH_TYPES = (
-    ("o", "Opinions"),
-    ("oa", "Oral Arguments"),
-    ("p", "People"),
-    ("r", "RECAP"),
-)
+class SEARCH_TYPES:
+    OPINION = "o"
+    RECAP = "r"
+    ORAL_ARGUMENT = "oa"
+    PEOPLE = "p"
+    NAMES = (
+        (OPINION, "Opinions"),
+        (RECAP, "RECAP"),
+        (PEOPLE, "People"),
+        (ORAL_ARGUMENT, "Oral Arguments"),
+    )
+
 
 BOOSTS = {
     "qf": {
