@@ -73,7 +73,7 @@ class SearchForm(forms.Form):
     # Blended fields
     #
     type = forms.ChoiceField(
-        choices=SEARCH_TYPES,
+        choices=SEARCH_TYPES.NAMES,
         required=False,
         initial="o",
         widget=forms.RadioSelect(
