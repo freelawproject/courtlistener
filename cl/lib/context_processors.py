@@ -3,6 +3,8 @@ import random
 from django.conf import settings
 from django.urls import reverse
 
+from cl.search.models import SEARCH_TYPES
+
 
 def inject_settings(request):
     """Use this function to inject specific settings into every page."""
@@ -13,6 +15,7 @@ def inject_settings(request):
         "FUNDRAISING_MODE": settings.FUNDRAISING_MODE,
         "MAX_FREE_DOCKET_ALERTS": settings.MAX_FREE_DOCKET_ALERTS,
         "DOCKET_ALERT_RECAP_BONUS": settings.DOCKET_ALERT_RECAP_BONUS,
+        "SEARCH_TYPES": SEARCH_TYPES,
     }
 
 

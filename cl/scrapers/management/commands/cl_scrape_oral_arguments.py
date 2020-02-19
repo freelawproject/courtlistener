@@ -16,7 +16,7 @@ from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import process_audio_file
 from cl.scrapers.utils import get_extension, get_binary_content
-from cl.search.models import Court, Docket
+from cl.search.models import Court, Docket, SEARCH_TYPES
 
 
 class Command(cl_scrape_opinions.Command):
@@ -94,7 +94,9 @@ class Command(cl_scrape_opinions.Command):
         for candidate in candidate_judges:
             af.panel.add(candidate)
         if not backscrape:
-            RealTimeQueue.objects.create(item_type="oa", item_pk=af.pk)
+            RealTimeQueue.objects.create(
+                item_type=SEARCH_TYPES.ORAL_ARGUMENT, item_pk=af.pk
+            )
 
     def scrape_court(self, site, full_crawl=False):
         download_error = False
