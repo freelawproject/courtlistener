@@ -412,12 +412,17 @@ def process_recap_zip(self, pk):
                 doc_num = file_name
                 att_num = None
 
+            if att_num:
+                # An attachment, ∴ nuke the pacer_doc_id value, since it
+                # corresponds to the main doc only.
+                pacer_doc_id = ""
+
             # Create a new PQ and enqueue it for processing
             new_pq = ProcessingQueue.objects.create(
                 court=pq.court,
                 uploader=pq.uploader,
                 pacer_case_id=pq.pacer_case_id,
-                pacer_doc_id=pq.pacer_doc_id,
+                pacer_doc_id=pacer_doc_id,
                 document_number=doc_num,
                 attachment_number=att_num,
                 filepath_local=f,
