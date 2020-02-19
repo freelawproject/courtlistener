@@ -114,7 +114,7 @@
                             <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
                                 {{ authority.caption|safe|truncatewords:10|v_wrapper }}
                             </a>
-                            ({{ authority.citing_cluster_references }} time{{ authority.citing_cluster_references|pluralize }})
+                            <span class="small gray">({{ authority.citing_cluster_references }} time{{ authority.citing_cluster_references|pluralize }})</span>
                         </li>
                     {% endfor %}
                 </ul>
