@@ -2168,12 +2168,12 @@ class OpinionCluster(models.Model):
         """
         authorities_with_data = list(self.authorities)
         for authority in authorities_with_data:
-            authority.cluster_references = get_citation_depth_between_clusters(
+            authority.citing_cluster_references = get_citation_depth_between_clusters(
                 citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk,
             )
 
         authorities_with_data.sort(
-            key=lambda x: x.cluster_references, reverse=True
+            key=lambda x: x.citing_cluster_references, reverse=True
         )
         return authorities_with_data
 

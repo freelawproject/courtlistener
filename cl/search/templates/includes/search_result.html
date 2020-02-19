@@ -34,7 +34,7 @@
 
   {% if cited_cluster %}
   <div class="bottom">
-      <span class="meta-data-header">{{ result.references_count }} reference{{ result.references_count|pluralize }}</span> to {{ cited_cluster.caption|safe|v_wrapper }}
+      <span class="meta-data-header">{{ result.citing_cluster_references }} reference{{ result.citing_cluster_references|pluralize }}</span> to {{ cited_cluster.caption|safe|v_wrapper }}
   </div>
   {% endif %}
 
