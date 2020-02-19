@@ -21,7 +21,7 @@
 {% block head %}
     {% if not error %}
         {% if get_string %}
-          {% if search_form.type.value != "p" %}
+          {% if search_form.type.value != SEARCH_TYPES.PEOPLE %}
             <link rel="alternate"
                   type="application/rss+xml"
                   title="Atom Feed for These Search Results"
@@ -51,16 +51,16 @@
 {% endblock %}
 
 {% block navbar-o %}
-    {% if search_form.type.value == "o" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.OPINION %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-r %}
-    {% if search_form.type.value == 'r' %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.RECAP %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-oa %}
-    {% if search_form.type.value == "oa" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-p %}
-    {% if search_form.type.value == "p" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.PEOPLE %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 
 

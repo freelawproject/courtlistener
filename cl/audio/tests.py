@@ -1,5 +1,6 @@
 from django.urls import reverse
 
+from cl.search.models import SEARCH_TYPES
 from cl.lib.test_helpers import IndexedSolrTestCase, SitemapTest
 from lxml import etree
 
@@ -41,7 +42,7 @@ class PodcastTest(IndexedSolrTestCase):
         """
         response = self.client.get(
             reverse("search_podcast", args=["search"]),
-            {"q": "court:test", "type": "oa"},
+            {"q": "court:test", "type": SEARCH_TYPES.ORAL_ARGUMENT},
         )
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."

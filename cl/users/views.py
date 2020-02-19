@@ -26,6 +26,7 @@ from django.views.decorators.debug import (
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
+from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
     ProfileForm,
@@ -55,7 +56,7 @@ def view_alerts(request):
     for a in search_alerts:
         # default to 'o' because if there's no 'type' param in the search UI,
         # that's an opinion search.
-        a.type = QueryDict(a.query).get("type", "o")
+        a.type = QueryDict(a.query).get("type", SEARCH_TYPES.OPINION)
     docket_alerts = request.user.docket_alerts.all().order_by("date_created")
     return render(
         request,

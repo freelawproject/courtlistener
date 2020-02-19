@@ -1,37 +1,37 @@
 <div id="type-switcher" class="hidden">
     <label for="id_type_0"
-           class="{% if search_form.type.value == 'o' %}selected{% endif %}">
-        <input {% if search_form.type.value == 'o' %}checked="checked"{% endif %}
+           class="{% if search_form.type.value == SEARCH_TYPES.OPINION %}selected{% endif %}">
+        <input {% if search_form.type.value == SEARCH_TYPES.OPINION %}checked="checked"{% endif %}
             class="external-input hidden"
             id="id_type_0"
             name="type"
-            value="o"
+            value="{{ SEARCH_TYPES.OPINION }}"
             type="radio">Opinions</label>
 
     <label for="id_type_1"
-           class="{% if search_form.type.value == 'oa' %}selected{% endif %}">
-        <input {% if search_form.type.value == 'oa' %}checked="checked"{% endif %}
+           class="{% if search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}selected{% endif %}">
+        <input {% if search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}checked="checked"{% endif %}
             class="external-input hidden"
             id="id_type_1"
             name="type"
-            value="oa"
+            value="{{ SEARCH_TYPES.ORAL_ARGUMENT }}"
             type="radio">Oral Arguments</label>
 
     <label for="id_type_2"
-           class="{% if search_form.type.value == 'p' %}selected{% endif %}">
-        <input {% if search_form.type.value == 'p' %}checked="checked"{% endif %}
+           class="{% if search_form.type.value == SEARCH_TYPES.PEOPLE %}selected{% endif %}">
+        <input {% if search_form.type.value == SEARCH_TYPES.PEOPLE %}checked="checked"{% endif %}
             class="external-input hidden"
             id="id_type_2"
             name="type"
-            value="p"
+            value="{{ SEARCH_TYPES.PEOPLE }}"
             type="radio">Judges</label>
 
     <label for="id_type_3"
-           class="{% if search_form.type.value == 'r' %}selected{% endif %}">
-        <input {% if search_form.type.value == 'r' %}checked="checked"{% endif %}
+           class="{% if search_form.type.value == SEARCH_TYPES.RECAP  %}selected{% endif %}">
+        <input {% if search_form.type.value == SEARCH_TYPES.RECAP  %}checked="checked"{% endif %}
                class="external-input hidden"
                id="id_type_3"
                name="type"
-               value="r"
+               value="{{ SEARCH_TYPES.RECAP }}"
                type="radio">RECAP</label>
 </div>
