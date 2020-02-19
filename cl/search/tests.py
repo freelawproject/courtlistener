@@ -34,6 +34,7 @@ from cl.search.models import (
     DocketEntry,
     Citation,
     sort_cites,
+    SEARCH_TYPES,
 )
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
@@ -458,13 +459,18 @@ class SearchTest(IndexedSolrTestCase):
         self.assertNotIn("an error", r.content)
 
     def test_oa_results_basic(self):
-        r = self.client.get(reverse("show_results"), {"type": "oa"})
+        r = self.client.get(
+            reverse("show_results"), {"type": SEARCH_TYPES.ORAL_ARGUMENT}
+        )
         self.assertIn("Jose", r.content)
 
     def test_oa_results_date_argued_ordering(self):
         r = self.client.get(
             reverse("show_results"),
-            {"type": "oa", "order_by": "dateArgued desc"},
+            {
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "order_by": "dateArgued desc",
+            },
         )
         self.assertTrue(
             r.content.index("SEC") < r.content.index("Jose"),
@@ -473,7 +479,7 @@ class SearchTest(IndexedSolrTestCase):
 
         r = self.client.get(
             reverse("show_results"),
-            {"type": "oa", "order_by": "dateArgued asc"},
+            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "order_by": "dateArgued asc"},
         )
         self.assertTrue(
             r.content.index("Jose") < r.content.index("SEC"),
@@ -482,7 +488,8 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_oa_case_name_filtering(self):
         r = self.client.get(
-            reverse("show_results"), {"type": "oa", "case_name": "jose"}
+            reverse("show_results"),
+            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "case_name": "jose"},
         )
         actual = self.get_article_count(r)
         expected = 1
@@ -495,7 +502,8 @@ class SearchTest(IndexedSolrTestCase):
 
     def test_oa_jurisdiction_filtering(self):
         r = self.client.get(
-            reverse("show_results"), {"type": "oa", "court": "test"}
+            reverse("show_results"),
+            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "court": "test"},
         )
         actual = self.get_article_count(r)
         expected = 2
@@ -509,7 +517,7 @@ class SearchTest(IndexedSolrTestCase):
     def test_oa_date_argued_filtering(self):
         r = self.client.get(
             reverse("show_results"),
-            {"type": "oa", "argued_after": "2014-10-01"},
+            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "argued_after": "2014-10-01"},
         )
         self.assertNotIn(
             "an error",
@@ -520,7 +528,8 @@ class SearchTest(IndexedSolrTestCase):
     def test_oa_search_api(self):
         """Can we get oa results on the search endpoint?"""
         r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}), {"type": "oa"},
+            reverse("search-list", kwargs={"version": "v3"}),
+            {"type": SEARCH_TYPES.ORAL_ARGUMENT},
         )
         self.assertEqual(
             r.status_code,
@@ -569,11 +578,13 @@ class SearchTest(IndexedSolrTestCase):
         fields?
         """
         r = self.client.get(
-            reverse("show_results"), {"type": "r", "document_number": "1",}
+            reverse("show_results"),
+            {"type": SEARCH_TYPES.RECAP, "document_number": "1",},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
         r = self.client.get(
-            reverse("show_results"), {"type": "r", "attachment_number": "1",}
+            reverse("show_results"),
+            {"type": SEARCH_TYPES.RECAP, "attachment_number": "1",},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
 
@@ -622,7 +633,9 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "dod desc,name_reverse asc",
         ]
         for sort_field in sort_fields:
-            r = self.client.get("/", {"type": "p", "ordered_by": sort_field})
+            r = self.client.get(
+                "/", {"type": SEARCH_TYPES.PEOPLE, "ordered_by": sort_field}
+            )
             self.assertNotIn(
                 "an error",
                 r.content.lower(),
@@ -645,85 +658,119 @@ class JudgeSearchTest(IndexedSolrTestCase):
         )
 
     def test_name_field(self):
-        self._test_article_count({"type": "p", "name": "judith"}, 1, "name")
+        self._test_article_count(
+            {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}, 1, "name"
+        )
 
     def test_court_filter(self):
-        self._test_article_count({"type": "p", "court": "ca1"}, 1, "court")
-        self._test_article_count({"type": "p", "court": "scotus"}, 0, "court")
         self._test_article_count(
-            {"type": "p", "court": "scotus ca1"}, 1, "court"
+            {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}, 1, "court"
+        )
+        self._test_article_count(
+            {"type": SEARCH_TYPES.PEOPLE, "court": "scotus"}, 0, "court"
+        )
+        self._test_article_count(
+            {"type": SEARCH_TYPES.PEOPLE, "court": "scotus ca1"}, 1, "court"
         )
 
     def test_dob_filters(self):
         self._test_article_count(
-            {"type": "p", "born_after": "1941", "born_before": "1943"},
+            {
+                "type": SEARCH_TYPES.PEOPLE,
+                "born_after": "1941",
+                "born_before": "1943",
+            },
             1,
             "born_{before|after}",
         )
         # Are reversed dates corrected?
         self._test_article_count(
-            {"type": "p", "born_after": "1943", "born_before": "1941"},
+            {
+                "type": SEARCH_TYPES.PEOPLE,
+                "born_after": "1943",
+                "born_before": "1941",
+            },
             1,
             "born_{before|after}",
         )
         # Just one filter, but Judy is older than this.
         self._test_article_count(
-            {"type": "p", "born_after": "1946"}, 0, "born_{before|after}"
+            {"type": SEARCH_TYPES.PEOPLE, "born_after": "1946"},
+            0,
+            "born_{before|after}",
         )
 
     def test_birth_location(self):
         """Can we filter by city and state?"""
         self._test_article_count(
-            {"type": "p", "dob_city": "brookyln"}, 1, "dob_city"
-        )
-        self._test_article_count(
-            {"type": "p", "dob_city": "brooklyn2"}, 0, "dob_city"
-        )
-        self._test_article_count(
-            {"type": "p", "dob_city": "brookyln", "dob_state": "NY"},
+            {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"},
             1,
             "dob_city",
         )
         self._test_article_count(
-            {"type": "p", "dob_city": "brookyln", "dob_state": "OK"},
+            {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brooklyn2"},
+            0,
+            "dob_city",
+        )
+        self._test_article_count(
+            {
+                "type": SEARCH_TYPES.PEOPLE,
+                "dob_city": "brookyln",
+                "dob_state": "NY",
+            },
+            1,
+            "dob_city",
+        )
+        self._test_article_count(
+            {
+                "type": SEARCH_TYPES.PEOPLE,
+                "dob_city": "brookyln",
+                "dob_state": "OK",
+            },
             0,
             "dob_city",
         )
 
     def test_schools_filter(self):
         self._test_article_count(
-            {"type": "p", "school": "american"}, 1, "school",
+            {"type": SEARCH_TYPES.PEOPLE, "school": "american"}, 1, "school",
         )
         self._test_article_count(
-            {"type": "p", "school": "pitzer"}, 0, "school",
+            {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}, 0, "school",
         )
 
     def test_appointer_filter(self):
         self._test_article_count(
-            {"type": "p", "appointer": "clinton"}, 1, "appointer",
+            {"type": SEARCH_TYPES.PEOPLE, "appointer": "clinton"},
+            1,
+            "appointer",
         )
         self._test_article_count(
-            {"type": "p", "appointer": "obama"}, 0, "appointer",
+            {"type": SEARCH_TYPES.PEOPLE, "appointer": "obama"},
+            0,
+            "appointer",
         )
 
     def test_selection_method_filter(self):
         self._test_article_count(
-            {"type": "p", "selection_method": "e_part"}, 1, "selection_method",
+            {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_part"},
+            1,
+            "selection_method",
         )
         self._test_article_count(
-            {"type": "p", "selection_method": "e_non_part"},
+            {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_non_part"},
             0,
             "selection_method",
         )
 
     def test_political_affiliation_filter(self):
         self._test_article_count(
-            {"type": "p", "political_affiliation": "d"},
+            {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "d"},
             1,
             "political_affiliation",
         )
         self._test_article_count(
-            {"type": "p", "political_affiliation": "r"},
+            {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "r"},
             0,
             "political_affiliation",
         )

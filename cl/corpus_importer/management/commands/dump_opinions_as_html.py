@@ -33,7 +33,7 @@ class Command(VerboseCommand):
         )
 
         for op in ops:
-            content = render_to_string("simple_opinion.html", {"o": op,})
+            content = render_to_string("simple_opinion.html", {"o": op})
             output_dir = os.path.join(
                 options["output_directory"],
                 str(op.cluster.date_filed.year),
