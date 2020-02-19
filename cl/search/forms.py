@@ -12,8 +12,7 @@ from cl.search.fields import (
     FloorDateField,
     RandomChoiceField,
 )
-from cl.search.models import Court
-from cl.search.models import DOCUMENT_STATUSES
+from cl.search.models import Court, SEARCH_TYPES, DOCUMENT_STATUSES
 
 OPINION_ORDER_BY_CHOICES = (
     ("score desc", "Relevance"),
@@ -27,13 +26,6 @@ OPINION_ORDER_BY_CHOICES = (
     ("dob desc,name_reverse asc", "Most Recently Born"),
     ("dob asc,name_reverse asc", "Least Recently Born"),
     ("dod desc,name_reverse asc", "Most Recently Deceased"),
-)
-
-TYPE_CHOICES = (
-    ("o", "Opinions"),
-    ("oa", "Oral Arguments"),
-    ("p", "People"),
-    ("r", "RECAP"),
 )
 
 
@@ -79,16 +71,16 @@ class SearchForm(forms.Form):
     # Blended fields
     #
     type = forms.ChoiceField(
-        choices=TYPE_CHOICES,
+        choices=SEARCH_TYPES.NAMES,
         required=False,
-        initial="o",
+        initial=SEARCH_TYPES.OPINION,
         widget=forms.RadioSelect(
             attrs={"class": "external-input form-control"}
         ),
     )
     type.as_str_types = []
     q = forms.CharField(required=False, label="Query",)
-    q.as_str_types = ["o", "oa", "r", "p"]
+    q.as_str_types = SEARCH_TYPES.ALL_TYPES
     court = forms.CharField(required=False, widget=forms.HiddenInput())
     court.as_str_types = []
     order_by = RandomChoiceField(
@@ -114,7 +106,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    judge.as_str_types = ["oa", "o"]
+    judge.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT]
 
     # Oral arg, opinion, and RECAP
     case_name = forms.CharField(
@@ -128,7 +120,11 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    case_name.as_str_types = ["oa", "o", "r"]
+    case_name.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+    ]
     docket_number = forms.CharField(
         required=False,
         label="Docket Number",
@@ -139,7 +135,11 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    docket_number.as_str_types = ["oa", "o", "r"]
+    docket_number.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+    ]
 
     #
     # RECAP fields
@@ -152,7 +152,7 @@ class SearchForm(forms.Form):
             attrs={"class": "external-input form-control left",}
         ),
     )
-    available_only.as_str_types = ["r"]
+    available_only.as_str_types = [SEARCH_TYPES.RECAP]
     description = forms.CharField(
         required=False,
         label="Document Description",
@@ -163,7 +163,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    description.as_str_types = ["r"]
+    description.as_str_types = [SEARCH_TYPES.RECAP]
     nature_of_suit = forms.CharField(
         required=False,
         label="Nature of Suit",
@@ -174,7 +174,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    nature_of_suit.as_str_types = ["r"]
+    nature_of_suit.as_str_types = [SEARCH_TYPES.RECAP]
     cause = forms.CharField(
         required=False,
         label="Cause",
@@ -185,7 +185,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    cause.as_str_types = ["r"]
+    cause.as_str_types = [SEARCH_TYPES.RECAP]
     assigned_to = forms.CharField(
         required=False,
         label="Assigned To Judge",
@@ -196,7 +196,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    assigned_to.as_str_types = ["r"]
+    assigned_to.as_str_types = [SEARCH_TYPES.RECAP]
     referred_to = forms.CharField(
         required=False,
         label="Referred To Judge",
@@ -207,7 +207,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    referred_to.as_str_types = ["r"]
+    referred_to.as_str_types = [SEARCH_TYPES.RECAP]
     document_number = forms.CharField(
         required=False,
         label="Document #",
@@ -218,7 +218,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    document_number.as_str_types = ["r"]
+    document_number.as_str_types = [SEARCH_TYPES.RECAP]
     attachment_number = forms.CharField(
         required=False,
         label="Attachment #",
@@ -229,7 +229,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    attachment_number.as_str_types = ["r"]
+    attachment_number.as_str_types = [SEARCH_TYPES.RECAP]
     party_name = forms.CharField(
         required=False,
         label="Party Name",
@@ -240,7 +240,7 @@ class SearchForm(forms.Form):
             },
         ),
     )
-    party_name.as_str_types = ["r"]
+    party_name.as_str_types = [SEARCH_TYPES.RECAP]
     atty_name = forms.CharField(
         required=False,
         label="Attorney Name",
@@ -251,7 +251,7 @@ class SearchForm(forms.Form):
             },
         ),
     )
-    atty_name.as_str_types = ["r"]
+    atty_name.as_str_types = [SEARCH_TYPES.RECAP]
 
     #
     # Oral argument fields
@@ -267,7 +267,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    argued_after.as_str_types = ["oa"]
+    argued_after.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
     argued_before = CeilingDateField(
         required=False,
         label="Argued Before",
@@ -279,7 +279,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    argued_before.as_str_types = ["oa"]
+    argued_before.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
 
     #
     # Opinion fields
@@ -295,7 +295,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    filed_after.as_str_types = ["o", "r"]
+    filed_after.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]
     filed_before = CeilingDateField(
         required=False,
         label="Filed Before",
@@ -307,7 +307,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    filed_before.as_str_types = ["o", "r"]
+    filed_before.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]
     citation = forms.CharField(
         required=False,
         label="Citation",
@@ -318,7 +318,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    citation.as_str_types = ["o"]
+    citation.as_str_types = [SEARCH_TYPES.OPINION]
     neutral_cite = forms.CharField(
         required=False,
         label="Neutral Citation",
@@ -329,7 +329,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    neutral_cite.as_str_types = ["o"]
+    neutral_cite.as_str_types = [SEARCH_TYPES.OPINION]
     cited_gt = forms.IntegerField(
         required=False,
         label="Min Cites",
@@ -341,7 +341,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    cited_gt.as_str_types = ["o"]
+    cited_gt.as_str_types = [SEARCH_TYPES.OPINION]
     cited_lt = forms.IntegerField(
         required=False,
         label="Max Cites",
@@ -353,7 +353,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    cited_lt.as_str_types = ["o"]
+    cited_lt.as_str_types = [SEARCH_TYPES.OPINION]
 
     #
     # Judge fields
@@ -368,7 +368,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    name.as_str_types = ["p"]
+    name.as_str_types = [SEARCH_TYPES.PEOPLE]
     born_after = FloorDateField(
         required=False,
         label="Born After",
@@ -380,7 +380,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    born_after.as_str_types = ["p"]
+    born_after.as_str_types = [SEARCH_TYPES.PEOPLE]
     born_before = CeilingDateField(
         required=False,
         label="Born Before",
@@ -392,7 +392,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    born_before.as_str_types = ["p"]
+    born_before.as_str_types = [SEARCH_TYPES.PEOPLE]
     dob_city = forms.CharField(
         required=False,
         label="Birth City",
@@ -403,14 +403,14 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    dob_city.as_str_types = ["p"]
+    dob_city.as_str_types = [SEARCH_TYPES.PEOPLE]
     dob_state = forms.ChoiceField(
         choices=[("", "---------")] + list(STATE_CHOICES),
         required=False,
         label="Birth State",
         widget=forms.Select(attrs={"class": "external-input form-control"}),
     )
-    dob_state.as_str_types = ["p"]
+    dob_state.as_str_types = [SEARCH_TYPES.PEOPLE]
     school = forms.CharField(
         required=False,
         label="School Attended",
@@ -421,7 +421,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    school.as_str_types = ["p"]
+    school.as_str_types = [SEARCH_TYPES.PEOPLE]
     appointer = forms.CharField(
         required=False,
         label="Appointed By",
@@ -432,7 +432,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    appointer.as_str_types = ["p"]
+    appointer.as_str_types = [SEARCH_TYPES.PEOPLE]
     selection_method = forms.ChoiceField(
         choices=[("", "---------")] + list(Position.SELECTION_METHODS),
         required=False,
@@ -440,7 +440,7 @@ class SearchForm(forms.Form):
         initial="None",
         widget=forms.Select(attrs={"class": "external-input form-control"}),
     )
-    selection_method.as_str_types = ["p"]
+    selection_method.as_str_types = [SEARCH_TYPES.PEOPLE]
     political_affiliation = forms.ChoiceField(
         choices=[("", "---------")]
         + list(PoliticalAffiliation.POLITICAL_PARTIES),
@@ -449,7 +449,7 @@ class SearchForm(forms.Form):
         initial="None",
         widget=forms.Select(attrs={"class": "external-input form-control"}),
     )
-    political_affiliation.as_str_types = ["p"]
+    political_affiliation.as_str_types = [SEARCH_TYPES.PEOPLE]
 
     def get_date_field_names(self):
         return {
@@ -549,13 +549,16 @@ class SearchForm(forms.Form):
 
     def clean_order_by(self):
         """Sets the default order_by value if one isn't provided by the user."""
-        if self.cleaned_data["type"] == "o" or not self.cleaned_data["type"]:
+        if (
+            self.cleaned_data["type"] == SEARCH_TYPES.OPINION
+            or not self.cleaned_data["type"]
+        ):
             if not self.cleaned_data["order_by"]:
                 return self.fields["order_by"].initial
-        elif self.cleaned_data["type"] == "oa":
+        elif self.cleaned_data["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
             if not self.cleaned_data["order_by"]:
                 return "dateArgued desc"
-        elif self.cleaned_data["type"] == "p":
+        elif self.cleaned_data["type"] == SEARCH_TYPES.PEOPLE:
             if not self.cleaned_data["order_by"]:
                 return "name_reverse asc"
         return self.cleaned_data["order_by"]

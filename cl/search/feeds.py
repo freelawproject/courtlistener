@@ -10,7 +10,7 @@ from cl.lib.date_time import midnight_pst
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.forms import SearchForm
-from cl.search.models import Court
+from cl.search.models import Court, SEARCH_TYPES
 
 
 def get_item(item):
@@ -43,9 +43,9 @@ class SearchFeed(Feed):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             order_by = "dateFiled"
-            if cd["type"] == "o":
+            if cd["type"] == SEARCH_TYPES.OPINION:
                 solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-            elif cd["type"] == "r":
+            elif cd["type"] == SEARCH_TYPES.RECAP:
                 solr = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
             else:
                 return []
