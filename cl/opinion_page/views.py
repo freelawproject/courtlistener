@@ -354,9 +354,28 @@ def view_opinion(request, pk, _):
         favorite_form = FavoriteForm(instance=fave)
 
     if not is_bot(request):
-        children = cluster.children_with_data
+        # Get the citing results from Solr for speed. Only do this for humans
+        # to save on disk usage.
+        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+        q = {
+            "q": "cites:({ids})".format(
+                ids=" OR ".join(
+                    [
+                        str(pk)
+                        for pk in (
+                            cluster.sub_opinions.values_list("pk", flat=True)
+                        )
+                    ]
+                )
+            ),
+            "rows": 5,
+            "start": 0,
+            "sort": "citeCount desc",
+            "caller": "view_opinion",
+        }
+        citing_clusters = conn.raw_query(**q).execute()
     else:
-        children = None
+        citing_clusters = None
 
     return render(
         request,
@@ -368,8 +387,7 @@ def view_opinion(request, pk, _):
             "favorite_form": favorite_form,
             "get_string": get_string,
             "private": cluster.blocked,
-            "top_children": children[:5],
-            "children_count": len(children),
+            "citing_clusters": citing_clusters,
             "top_authorities": cluster.authorities_with_data[:5],
             "authorities_count": len(cluster.authorities_with_data),
         },
