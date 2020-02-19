@@ -35,7 +35,7 @@ from cl.lib.search_utils import (
     regroup_snippets,
 )
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import Court, Opinion, OpinionCluster
+from cl.search.models import Court, Opinion, OpinionCluster, SEARCH_TYPES
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
@@ -60,16 +60,16 @@ def get_solr_result_objects(cd, facet):
     pagination is run.
     """
     search_type = cd["type"]
-    if search_type == "o":
+    if search_type == SEARCH_TYPES.OPINION:
         si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
         results = si.query().add_extra(**build_main_query(cd, facet=facet))
-    elif search_type == "r":
+    elif search_type == SEARCH_TYPES.RECAP:
         si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
         results = si.query().add_extra(**build_main_query(cd, facet=facet))
-    elif search_type == "oa":
+    elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
         si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
         results = si.query().add_extra(**build_main_query(cd, facet=facet))
-    elif search_type == "p":
+    elif search_type == SEARCH_TYPES.PEOPLE:
         si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
         results = si.query().add_extra(**build_main_query(cd, facet=facet))
     else:
@@ -88,7 +88,7 @@ def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
     page = int(get_params.get("page", 1))
     check_pagination_depth(page)
 
-    if cd["type"] == "r":
+    if cd["type"] == SEARCH_TYPES.RECAP:
         rows = 10
 
     paginator = Paginator(results, rows)
@@ -160,9 +160,10 @@ def do_search(
 
         # A couple special variables for particular search types
         search_form = _clean_form(get_params, cd, courts)
-        if cd["type"] == "o":
+        if cd["type"] in [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]:
             query_citation = get_query_citation(cd)
-        elif cd["type"] == "r":
+
+        if cd["type"] == SEARCH_TYPES.RECAP:
             panels = Court.FEDERAL_BANKRUPTCY_PANEL
             courts = courts.filter(
                 pacer_court_id__isnull=False, end_date__isnull=True
@@ -365,7 +366,7 @@ def show_results(request):
                         rows=5,
                         override_params={
                             "order_by": "dateArgued desc",
-                            "type": "oa",
+                            "type": SEARCH_TYPES.ORAL_ARGUMENT,
                         },
                         facet=False,
                         cache_key="homepage-data-oa",
@@ -431,7 +432,7 @@ def advanced(request):
 
     # I'm not thrilled about how this is repeating URLs in a view.
     if request.path == reverse("advanced_o"):
-        obj_type = "o"
+        obj_type = SEARCH_TYPES.OPINION
         # Needed b/c of facet values.
 
         o_results = do_search(
@@ -447,14 +448,14 @@ def advanced(request):
     else:
         courts = Court.objects.filter(in_use=True)
         if request.path == reverse("advanced_r"):
-            obj_type = "r"
+            obj_type = SEARCH_TYPES.RECAP
             courts = courts.filter(
                 pacer_court_id__isnull=False, end_date__isnull=True,
             ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL,)
         elif request.path == reverse("advanced_oa"):
-            obj_type = "oa"
+            obj_type = SEARCH_TYPES.ORAL_ARGUMENT
         elif request.path == reverse("advanced_p"):
-            obj_type = "p"
+            obj_type = SEARCH_TYPES.PEOPLE
         else:
             raise NotImplementedError("Unknown path: %s" % request.path)
 

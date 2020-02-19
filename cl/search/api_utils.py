@@ -3,6 +3,7 @@ from django.conf import settings
 from cl.lib import search_utils
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
+from cl.search.models import SEARCH_TYPES
 
 
 def get_object_list(request, cd, paginator):
@@ -16,7 +17,7 @@ def get_object_list(request, cd, paginator):
         cd, highlight="text", facet=False, group=False
     )
     main_query["caller"] = "api_search"
-    if cd["type"] == "r":
+    if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
     sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
     return sl
@@ -33,15 +34,15 @@ class SolrList(object):
         self.offset = offset
         self.type = type
         self._item_cache = []
-        if self.type == "o":
+        if self.type == SEARCH_TYPES.OPINION:
             self.conn = ExtraSolrInterface(
                 settings.SOLR_OPINION_URL, mode="r",
             )
-        elif self.type == "oa":
+        elif self.type == SEARCH_TYPES.ORAL_ARGUMENT:
             self.conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r",)
-        elif self.type == "r":
+        elif self.type == SEARCH_TYPES.RECAP:
             self.conn = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r",)
-        elif self.type == "p":
+        elif self.type == SEARCH_TYPES.PEOPLE:
             self.conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r",)
         self._length = length
 

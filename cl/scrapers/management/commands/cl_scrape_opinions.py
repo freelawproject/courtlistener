@@ -20,7 +20,7 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import get_extension, get_binary_content, signal_handler
-from cl.search.models import Citation, Court
+from cl.search.models import Citation, Court, SEARCH_TYPES
 from cl.search.models import Docket
 from cl.search.models import Opinion
 from cl.search.models import OpinionCluster
@@ -192,7 +192,9 @@ class Command(VerboseCommand):
         opinion.cluster = cluster
         opinion.save(index=index)
         if not backscrape:
-            RealTimeQueue.objects.create(item_type="o", item_pk=opinion.pk)
+            RealTimeQueue.objects.create(
+                item_type=SEARCH_TYPES.OPINION, item_pk=opinion.pk
+            )
 
     def scrape_court(self, site, full_crawl=False):
         download_error = False

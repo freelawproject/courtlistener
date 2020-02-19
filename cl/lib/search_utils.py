@@ -8,14 +8,23 @@ from django.http import QueryDict
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
 from cl.search.forms import SearchForm
-from cl.search.models import Court
+from cl.search.models import Court, SEARCH_TYPES
 
-boosts = {
+BOOSTS = {
     "qf": {
-        "o": {"text": 1, "caseName": 4, "docketNumber": 2,},
-        "r": {"text": 1, "caseName": 4, "docketNumber": 3, "description": 2,},
-        "oa": {"text": 1, "caseName": 4, "docketNumber": 2,},
-        "p": {
+        SEARCH_TYPES.OPINION: {"text": 1, "caseName": 4, "docketNumber": 2},
+        SEARCH_TYPES.RECAP: {
+            "text": 1,
+            "caseName": 4,
+            "docketNumber": 3,
+            "description": 2,
+        },
+        SEARCH_TYPES.ORAL_ARGUMENT: {
+            "text": 1,
+            "caseName": 4,
+            "docketNumber": 2,
+        },
+        SEARCH_TYPES.PEOPLE: {
             "text": 1,
             "name": 4,
             # Suppress these fields b/c a match on them returns the wrong
@@ -27,10 +36,10 @@ boosts = {
     },
     # Phrase-based boosts.
     "pf": {
-        "o": {"text": 3, "caseName": 3,},
-        "r": {"text": 3, "caseName": 3, "description": 3,},
-        "oa": {"caseName": 3,},
-        "p": {
+        SEARCH_TYPES.OPINION: {"text": 3, "caseName": 3,},
+        SEARCH_TYPES.RECAP: {"text": 3, "caseName": 3, "description": 3},
+        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3,},
+        SEARCH_TYPES.PEOPLE: {
             # None here. Phrases don't make much sense for people.
         },
     },
@@ -232,13 +241,24 @@ def merge_form_with_courts(courts, search_form):
     return court_tabs, court_count_human, court_count
 
 
-def make_fq(cd, field, key):
+def make_fq(cd, field, key, make_phrase=False):
     """Does some minimal processing of the query string to get it into a
     proper field query.
 
     This is necessary because despite our putting AND as the default join
     method, in some cases Solr decides OR is a better approach. So, to work
-    around this bug, we do some minimal query parsing ourselves.
+    around this bug, we do some minimal query parsing ourselves:
+
+    1. If the user provided a phrase we pass that through.
+
+    1. Otherwise, we insert AND as a conjunction between all words.
+
+    :param cd: The cleaned data dictionary from the form.
+    :param field: The Solr field to use for the query (e.g. "caseName")
+    :param key: The model form field to use for the query (e.g. "case_name")
+    :param make_phrase: Whether we should wrap the query in quotes to make a
+    phrase search.
+    :returns A field query string like "caseName:Roe"
     """
     q = cd[key]
     q = q.replace(":", " ")
@@ -246,6 +266,10 @@ def make_fq(cd, field, key):
     if q.startswith('"') and q.endswith('"'):
         # User used quotes. Just pass it through.
         return "%s:(%s)" % (field, q)
+
+    if make_phrase:
+        # No need to mess with conjunctions. Just wrap in quotes.
+        return '%s:("%s")' % (field, q)
 
     # Iterate over the query word by word. If the word is a conjunction
     # word, detect that and use the user's request. Else, make sure there's
@@ -349,14 +373,20 @@ def make_boost_string(fields):
 
 def add_boosts(main_params, cd):
     """Add any boosts that make sense for the query."""
-    if cd["type"] == "o" and main_params["sort"].startswith("score"):
+    if cd["type"] == SEARCH_TYPES.OPINION and main_params["sort"].startswith(
+        "score"
+    ):
         main_params["boost"] = "pagerank"
 
     # Apply standard qf parameters
-    qf = boosts["qf"][cd["type"]].copy()
+    qf = BOOSTS["qf"][cd["type"]].copy()
     main_params["qf"] = make_boost_string(qf)
 
-    if cd["type"] in ["o", "r", "oa"]:
+    if cd["type"] in [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+    ]:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         vs_query = any(
@@ -374,8 +404,12 @@ def add_boosts(main_params, cd):
             main_params["qf"] = make_boost_string(qf)
 
     # Apply phrase-based boosts
-    if cd["type"] in ["o", "r", "oa"]:
-        main_params["pf"] = make_boost_string(boosts["pf"][cd["type"]])
+    if cd["type"] in [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+    ]:
+        main_params["pf"] = make_boost_string(BOOSTS["pf"][cd["type"]])
         main_params["ps"] = 5
 
 
@@ -386,7 +420,7 @@ def add_faceting(main_params, cd, facet):
         return
 
     facet_params = {}
-    if cd["type"] == "o":
+    if cd["type"] == SEARCH_TYPES.OPINION:
         facet_params = {
             "facet": "true",
             "facet.mincount": 0,
@@ -423,7 +457,7 @@ def add_highlighting(main_params, cd, highlight):
     # here that are not requested as part of highlighting. Facet
     # params are not set here because they do not retrieve results,
     # only counts (they are set to 0 rows).
-    if cd["type"] == "o":
+    if cd["type"] == SEARCH_TYPES.OPINION:
         fl = [
             "absolute_url",
             "citeCount",
@@ -447,7 +481,7 @@ def add_highlighting(main_params, cd, highlight):
             "suitNature",
             "text",
         ]
-    elif cd["type"] == "r":
+    elif cd["type"] == SEARCH_TYPES.RECAP:
         fl = [
             "absolute_url",
             "assigned_to_id",
@@ -478,7 +512,7 @@ def add_highlighting(main_params, cd, highlight):
             "suitNature",
             "text",
         ]
-    elif cd["type"] == "oa":
+    elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         fl = [
             "id",
             "absolute_url",
@@ -497,7 +531,7 @@ def add_highlighting(main_params, cd, highlight):
             "docketNumber",
             "court_citation_string",
         ]
-    elif cd["type"] == "p":
+    elif cd["type"] == SEARCH_TYPES.PEOPLE:
         fl = [
             "id",
             "absolute_url",
@@ -531,13 +565,15 @@ def add_filter_queries(main_params, cd):
     # Changes here are usually mirrored in place_facet_queries, below.
     main_fq = []
 
-    if cd["type"] == "o":
+    if cd["type"] == SEARCH_TYPES.OPINION:
         if cd["case_name"]:
             main_fq.append(make_fq(cd, "caseName", "case_name"))
         if cd["judge"]:
             main_fq.append(make_fq(cd, "judge", "judge"))
         if cd["docket_number"]:
-            main_fq.append(make_fq(cd, "docketNumber", "docket_number"))
+            main_fq.append(
+                make_fq(cd, "docketNumber", "docket_number", make_phrase=True)
+            )
         if cd["citation"]:
             main_fq.append(make_fq_proximity_query(cd, "citation", "citation"))
         if cd["neutral_cite"]:
@@ -550,13 +586,15 @@ def add_filter_queries(main_params, cd):
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
 
-    elif cd["type"] == "r":
+    elif cd["type"] == SEARCH_TYPES.RECAP:
         if cd["case_name"]:
             main_fq.append(make_fq(cd, "caseName", "case_name"))
         if cd["description"]:
             main_fq.append(make_fq(cd, "description", "description"))
         if cd["docket_number"]:
-            main_fq.append(make_fq(cd, "docketNumber", "docket_number"))
+            main_fq.append(
+                make_fq(cd, "docketNumber", "docket_number", make_phrase=True)
+            )
         if cd["nature_of_suit"]:
             main_fq.append(make_fq(cd, "suitNature", "nature_of_suit"))
         if cd["cause"]:
@@ -584,7 +622,7 @@ def add_filter_queries(main_params, cd):
             make_date_query("dateFiled", cd["filed_before"], cd["filed_after"])
         )
 
-    elif cd["type"] == "oa":
+    elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         if cd["case_name"]:
             main_fq.append(make_fq(cd, "caseName", "case_name"))
         if cd["judge"]:
@@ -597,7 +635,7 @@ def add_filter_queries(main_params, cd):
             )
         )
 
-    elif cd["type"] == "p":
+    elif cd["type"] == SEARCH_TYPES.PEOPLE:
         if cd["name"]:
             main_fq.append(make_fq(cd, "name", "name"))
         if cd["dob_city"]:
@@ -623,7 +661,7 @@ def add_filter_queries(main_params, cd):
         )
 
     # Facet filters
-    if cd["type"] == "o":
+    if cd["type"] == SEARCH_TYPES.OPINION:
         selected_stats_string = get_selected_field_string(cd, "stat_")
         if len(selected_stats_string) > 0:
             main_fq.append(
@@ -655,7 +693,7 @@ def map_to_docket_entry_sorting(sort_string):
 
 def add_grouping(main_params, cd, group):
     """Add any grouping parameters."""
-    if cd["type"] == "o":
+    if cd["type"] == SEARCH_TYPES.OPINION:
         # Group clusters. Because this uses faceting, we use the collapse query
         # parser here instead of the usual result grouping. Faceting with
         # grouping has terrible performance.
@@ -665,7 +703,7 @@ def add_grouping(main_params, cd, group):
         else:
             main_params["fq"] = group_fq
 
-    elif cd["type"] == "r" and group is True:
+    elif cd["type"] == SEARCH_TYPES.RECAP and group is True:
         docket_query = re.match("docket_id:\d+", cd["q"])
         if docket_query:
             group_sort = map_to_docket_entry_sorting(main_params["sort"])

@@ -2921,3 +2921,15 @@ class Tag(models.Model):
 #
 #     class Meta:
 #         unique_together = ("upper_court", "lower_court")
+class SEARCH_TYPES:
+    OPINION = "o"
+    RECAP = "r"
+    ORAL_ARGUMENT = "oa"
+    PEOPLE = "p"
+    NAMES = (
+        (OPINION, "Opinions"),
+        (RECAP, "RECAP"),
+        (ORAL_ARGUMENT, "Oral Arguments"),
+        (PEOPLE, "People"),
+    )
+    ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
