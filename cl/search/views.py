@@ -158,9 +158,10 @@ def do_search(
 
         # A couple special variables for particular search types
         search_form = _clean_form(get_params, cd, courts)
-        if cd["type"] == SEARCH_TYPES.OPINION:
+        if cd["type"] in [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]:
             query_citation = get_query_citation(cd)
-        elif cd["type"] == SEARCH_TYPES.RECAP:
+
+        if cd["type"] == SEARCH_TYPES.RECAP:
             panels = Court.FEDERAL_BANKRUPTCY_PANEL
             courts = courts.filter(
                 pacer_court_id__isnull=False, end_date__isnull=True
