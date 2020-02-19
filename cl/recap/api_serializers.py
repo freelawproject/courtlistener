@@ -122,13 +122,6 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     "fields completed."
                 )
 
-        elif attrs["upload_type"] == UPLOAD_TYPE.DOCUMENT_ZIP:
-            if attrs.get("pacer_doc_id"):
-                raise ValidationError(
-                    "Uploaded zip files cannot have the pacer_doc_id field "
-                    "completed."
-                )
-
         if attrs["upload_type"] != UPLOAD_TYPE.PDF:
             # Everything but PDFs require the case ID.
             if not attrs.get("pacer_case_id"):
