@@ -39,7 +39,7 @@ from cl.search.models import Court, Opinion, OpinionCluster, SEARCH_TYPES
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
-from cl.citations.utils import get_citation_depth_for_cluster_pks
+from cl.citations.utils import get_citation_depth_between_clusters
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +191,7 @@ def do_search(
             for result in paged_results.object_list:
                 result[
                     "references_count"
-                ] = get_citation_depth_for_cluster_pks(
+                ] = get_citation_depth_between_clusters(
                     citing_cluster_pk=result["id"],
                     cited_cluster_pk=cited_cluster.pk,
                 )

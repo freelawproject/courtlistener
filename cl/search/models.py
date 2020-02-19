@@ -28,7 +28,7 @@ from cl.lib.search_index_utils import (
 )
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
-from cl.citations.utils import get_citation_depth_for_cluster_pks
+from cl.citations.utils import get_citation_depth_between_clusters
 
 DOCUMENT_STATUSES = (
     ("Published", "Precedential"),
@@ -2178,7 +2178,7 @@ class OpinionCluster(models.Model):
                 # Number of other opinions that cite this authority
                 "unique_citation_count": authority.citation_count,
                 # Number of citations from this cluster to this authority
-                "this_cluster_citation_count": get_citation_depth_for_cluster_pks(
+                "this_cluster_citation_count": get_citation_depth_between_clusters(
                     citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk,
                 ),
             }

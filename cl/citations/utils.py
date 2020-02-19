@@ -24,14 +24,14 @@ def map_reporter_db_cite_type(citation_type):
     return citation_map.get(citation_type)
 
 
-def get_citation_depth_for_cluster_pks(citing_cluster_pk, cited_cluster_pk):
+def get_citation_depth_between_clusters(citing_cluster_pk, cited_cluster_pk):
     """OpinionsCited objects exist as relationships between Opinion objects,
     but we often want access to citation depth information between
     OpinionCluster objects. This helper method assists in doing the necessary
     DB lookup.
 
     :param citing_cluster_pk: The primary key of the citing OpinionCluster
-    :param citing_cluster_pk: The primary key of the cited OpinionCluster
+    :param cited_cluster_pk: The primary key of the cited OpinionCluster
     :return: The sum of all the depth fields of the OpinionsCited objects
         associated with the Opinion objects associated with the given
         OpinionCited objects
