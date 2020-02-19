@@ -2161,31 +2161,19 @@ class OpinionCluster(models.Model):
 
     @property
     def authorities_with_data(self):
-        """Returns a list of dictionaries containing useful data on every
-        authority, for eventual injection into a view template. Wrapping each
-        authority in such a dictionary is necessary because we have to
-        calculate and append an extra data field (relating to citation counts)
-        on-the-fly.
+        """Returns a list of this cluster's authorities with an extra field
+        appended related to citation counts, for eventual injection into a
+        view template.
         The returned list is sorted by that citation count field.
         """
-        authorities_with_data = [
-            {
-                "caption": authority.caption,
-                "docket": authority.docket,
-                "date_filed": authority.date_filed,
-                "absolute_url": authority.get_absolute_url,
-                "sub_opinions": authority.sub_opinions,
-                # Number of other opinions that cite this authority
-                "unique_citation_count": authority.citation_count,
-                # Number of citations from this cluster to this authority
-                "this_cluster_citation_count": get_citation_depth_between_clusters(
-                    citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk,
-                ),
-            }
-            for authority in self.authorities
-        ]
+        authorities_with_data = list(self.authorities)
+        for authority in authorities_with_data:
+            authority.cluster_references = get_citation_depth_between_clusters(
+                citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk,
+            )
+
         authorities_with_data.sort(
-            key=lambda x: x["this_cluster_citation_count"], reverse=True
+            key=lambda x: x.cluster_references, reverse=True
         )
         return authorities_with_data
 

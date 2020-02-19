@@ -111,10 +111,10 @@
                 <ul>
                     {% for authority in top_authorities %}
                         <li>
-                            <a href="{{ authority.absolute_url }}?{{ request.META.QUERY_STRING }}">
+                            <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
                                 {{ authority.caption|safe|truncatewords:10|v_wrapper }}
                             </a>
-                            ({{ authority.this_cluster_citation_count }} time{{ authority.this_cluster_citation_count|pluralize }})
+                            ({{ authority.cluster_references }} time{{ authority.cluster_references|pluralize }})
                         </li>
                     {% endfor %}
                 </ul>

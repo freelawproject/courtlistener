@@ -36,15 +36,15 @@
             <ul>
                 {% for authority in authorities_with_data %}
                     <li>
-                        {{ authority.this_cluster_citation_count }} reference{{ authority.this_cluster_citation_count|pluralize }} to 
-                        <a href="{{ authority.absolute_url }}?{{ request.META.QUERY_STRING }}">
+                        {{ authority.cluster_references }} reference{{ authority.cluster_references|pluralize }} to
+                        <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
                             {{ authority.caption|safe|v_wrapper }}
                         </a>
                         <br/>
                         {{ authority.docket.court }} |
                         {{ authority.date_filed }} |
-                        {% if authority.unique_citation_count > 0 %}
-                            Also cited by <a href="/?q=cites%3A({{ authority.sub_opinions.all|OR_join }})">{{ authority.unique_citation_count|add:"-1" }} other opinion{{ authority.unique_citation_count|add:"-1"|pluralize }}</a>
+                        {% if authority.citation_count > 0 %}
+                            Also cited by <a href="/?q=cites%3A({{ authority.sub_opinions.all|OR_join }})">{{ authority.citation_count|add:"-1" }} other opinion{{ authority.citation_count|add:"-1"|pluralize }}</a>
                         {% else %}
                             Cited by 0 other opinions
                         {% endif %}
