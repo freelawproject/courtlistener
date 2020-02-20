@@ -172,13 +172,15 @@ def do_search(
     courts, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
     )
-    search_summary_str = search_form.as_text(court_count, court_count_human)
+    search_summary_str = search_form.as_text(court_count_human)
+    search_summary_dict = search_form.as_display_dict(court_count_human)
 
     return {
         "results": paged_results,
         "facet_fields": make_stats_variable(search_form, paged_results),
         "search_form": search_form,
         "search_summary_str": search_summary_str,
+        "search_summary_dict": search_summary_dict,
         "courts": courts,
         "court_count_human": court_count_human,
         "court_count": court_count,
