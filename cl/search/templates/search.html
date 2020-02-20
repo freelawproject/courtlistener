@@ -48,6 +48,13 @@
 
 {% block footer-scripts %}
   {% include "includes/date_picker.html" %}
+  {% if alert_form.errors  %}
+    <script type="text/javascript">
+      $(window).on('load',function(){
+        $('#modal-save-alert').modal('show');
+      });
+    </script>
+  {% endif %}
 {% endblock %}
 
 {% block navbar-o %}
@@ -72,9 +79,6 @@
     </div>
     {% include "includes/result_type_chooser.html" %}
     {% include "includes/sidebar_filters.html" %}
-    {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
-        {% include "includes/alert_sidebar_section.html" %}
-    {% endif %}
     {% include "includes/donate_sidebar.html" with referrer="search-donate-now" %}
 </div>
 {% endblock %}
@@ -83,9 +87,58 @@
 {% block content %}
 {% with type=search_form.type.value %}
     <div id="search-results" class="col-lg-7 col-sm-9 search-page">
-        <div class="row">
+      {% include "includes/messages.html" %}
+      {% if type != 'p' %}
+        {% if query_citation or alert_form.errors or request.GET.edit_alert  %}
+          <div class="alert {% if query_citation %}alert-info{% elif alert_form.errors %}alert-danger{% elif request.GET.edit_alert %}alert-info{% endif %}" role="alert">
+            <div class="row">
+              {% if query_citation %}
+                <div class="col-xs-9">
+                  <p><i class="fa fa-info-circle fa-lg"></i> It looks like you're trying to search for <a class="alert-link" href="{{ query_citation.absolute_url }}">{{ query_citation.caseName|safe }}</a>, from {{ query_citation.dateFiled.year }}.</p>
+
+                </div>
+                <div class="col-xs-3 text-right">
+                  <a class="btn btn-primary btn-sm"
+                     href="{{ query_citation.absolute_url }}">Go<span
+                          class="hidden-xs"> to This Case</span></a>
+                </div>
+              {% elif alert_form.errors %}
+                <div class="col-xs-9">
+                  <p class="bottom"><i class="fa fa-exclamation-circle"></i> There was an error creating your alert.</p>
+                </div>
+                <div class="col-xs-3 text-right">
+                  <a class="btn btn-danger btn-sm"
+                     data-toggle="modal"
+                     data-target="#modal-save-alert">Update Alert</a>
+                </div>
+              {% elif request.GET.edit_alert %}
+                <div class="col-sm-6">
+                  <p class="bottom">You are editing your alert,
+                    "<strong>{{ alert_form.name.value }}</strong>".</p>
+                </div>
+                <div class="col-sm-6 text-right">
+                  <a class="btn btn-default btn-sm"
+                     data-toggle="modal"
+                     data-target="#modal-save-alert">
+                    Save Alert
+                  </a>
+                  <a class="btn btn-danger btn-sm"
+                     href="?{{ get_string_sans_alert }}">
+                    Cancel
+                  </a>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+
+      <div class="row">
             <div class="col-sm-12">
-                <form action="/"
+              {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
+                {% include "includes/alert_modal.html" %}
+              {% endif %}
+              <form action="/"
                       method="get"
                       id="search-form"
                       role="form">
@@ -98,6 +151,16 @@
                                    id="id_q"
                                    autocomplete="off"
                                    type="text">
+                            {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
+                              {% if not error and get_string %}
+                                <span class="input-group-addon input-group-addon-blended">
+                                  <i class="fa fa-bell-o fa-lg gray pointer"
+                                   data-toggle="modal"
+                                   data-target="#modal-save-alert"
+                                   title="{% if request.GET.edit_alert %}Edit this alert{% else %}Create new alert{% endif %}"></i>
+                                </span>
+                              {% endif %}
+                            {% endif %}
                             <span class="input-group-btn">
                                 <button type="submit"
                                         class="btn btn-primary"
@@ -112,51 +175,6 @@
                 </form>
             </div>
         </div>
-
-        {% include "includes/messages.html" %}
-        {% if type != 'p' %}
-            {% if alert_form.errors %}
-                <div class="alert alert-danger" role="alert">
-                    <p class="bottom">There was an error creating your alert. Please
-                        <a href="#create-alert-header">see below</a>.
-                    </p>
-                </div>
-            {% endif %}
-            {% if request.GET.edit_alert %}
-                <div class="alert alert-warning" role="alert">
-                    <div class="row">
-                        <div class="col-sm-6">
-                            <p class="bottom">You are editing your alert,
-                            "<strong>{{ alert_form.name.value }}</strong>".</p>
-                        </div>
-                        <div class="col-sm-6 text-right">
-                            <a class="btn btn-success btn-sm"
-                               id="save-alert-button">
-                                Save Alert
-                            </a>
-                            <a class="btn btn-default btn-sm"
-                               href="?{{ get_string_sans_alert }}">
-                                Cancel
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-            {% if query_citation %}
-                <div class="alert alert-info" role="alert">
-                    <div class="row">
-                        <div class="col-xs-9">
-                            <p><i class="fa fa-info-circle fa-lg"></i> It looks like you're trying to search for <a class="alert-link" href="{{ query_citation.absolute_url }}">{{ query_citation.caseName|safe }}</a>, from {{ query_citation.dateFiled.year }}.</p>
-                        </div>
-                        <div class="col-xs-3 text-right">
-                            <a class="btn btn-primary btn-sm"
-                               href="{{ query_citation.absolute_url }}">Go<span
-                                    class="hidden-xs"> to This Case</span></a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-        {% endif %}
 
         {% if results.paginator.count > 0 %}
             <div class="row">
