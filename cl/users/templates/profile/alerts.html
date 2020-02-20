@@ -89,7 +89,7 @@
                      class="btn btn-primary btn-xs">
                     <i class="fa fa-pencil"></i>&nbsp;Edit</a>
                 {% endif %}
-                <a href="/alert/delete/confirm/{{ alert.pk }}"
+                <a href="{% url "delete_alert_confirm" alert.pk %}"
                    class="btn btn-danger btn-xs">
                   <i class="fa fa-trash-o"></i>&nbsp;Delete</a>
               </td>
