@@ -151,12 +151,12 @@ a.button:active {
   margin-top: 4em;
 }
 
-#search-form .input-group-addon-blended {
-  background-color: inherit;
-  border-top: 1px solid;
-  border-bottom: 1px solid;
-  border-left: 0px;
-  border-color: #a6a6a6 transparent;
+.dl-horizontal dt {
+  white-space: normal;
+  width: 100px;
+}
+.dl-horizontal dd {
+  margin-left: 120px;
 }
 
 
@@ -455,10 +455,20 @@ body {
   border-width: 1px 0px 1px 1px;
   margin: 0;
   font-size: 16px;
-  -webkit-transition: all 0.5s ease;
-  -moz-transition: all 0.5s ease;
-  -o-transition: all 0.5s ease;
   transition: all 0.5s ease;
+  /* Adjust to the right and set blur of 1px  */
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.075);
+}
+
+#search-form .input-group-addon-blended {
+  background-color: inherit;
+  border-top: 1px solid;
+  border-bottom: 1px solid;
+  border-left: 0;
+  border-color: #a6a6a6 transparent;
+  /* Adjust to the left and set blur of 1px. This eliminates a tiny line
+     between the input box and this box */
+  box-shadow: inset -1px 1px 1px rgba(0, 0, 0, 0.075);
 }
 
 #advanced {
