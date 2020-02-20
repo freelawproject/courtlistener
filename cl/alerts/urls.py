@@ -12,7 +12,11 @@ from cl.alerts.views import (
 urlpatterns = [
     url(r"^alert/edit/(\d{1,6})/$", edit_alert_redirect),
     url(r"^alert/delete/(\d{1,6})/$", delete_alert),
-    url(r"^alert/delete/confirm/(\d{1,6})/$", delete_alert_confirm),
+    url(
+        r"^alert/delete/confirm/(\d{1,6})/$",
+        delete_alert_confirm,
+        name="delete_alert_confirm",
+    ),
     url(
         r"^alert/disable/([a-zA-Z0-9]{40})/$",
         disable_alert,
