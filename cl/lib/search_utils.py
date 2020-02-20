@@ -7,8 +7,9 @@ from django.http import QueryDict
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
+from cl.citations.utils import get_citation_depth_between_clusters
 from cl.search.forms import SearchForm
-from cl.search.models import Court, SEARCH_TYPES
+from cl.search.models import Court, OpinionCluster, SEARCH_TYPES
 
 BOOSTS = {
     "qf": {
@@ -849,3 +850,33 @@ def build_court_count_query(group=False):
             }
         )
     return params
+
+
+def add_depth_counts(search_data, search_results):
+    """If the search data contains a single "cites" term (e.g., "cites:(123)"),
+    calculate and append the citation depth information between each Solr
+    result and the cited OpinionCluster. We only do this for *single* "cites"
+    terms to avoid the complexity of trying to render multiple depth
+    relationships for all the possible result-citation combinations.
+
+    :param search_data: The cleaned search form data
+    :param search_results: Solr results from paginate_cached_solr_results()
+    :return The OpinionCluster if the lookup was successful
+    """
+    cites_query_matches = re.findall(r"cites:\((\d+)\)", search_data["q"])
+    if len(cites_query_matches) == 1:
+        try:
+            cited_cluster = OpinionCluster.objects.get(
+                pk=cites_query_matches[0]
+            )
+        except OpinionCluster.DoesNotExist:
+            return None
+        else:
+            for result in search_results.object_list:
+                result["citation_depth"] = get_citation_depth_between_clusters(
+                    citing_cluster_pk=result["id"],
+                    cited_cluster_pk=cited_cluster.pk,
+                )
+            return cited_cluster
+    else:
+        return None
