@@ -416,6 +416,8 @@ def process_recap_zip(self, pk):
                 # An attachment, ∴ nuke the pacer_doc_id value, since it
                 # corresponds to the main doc only.
                 pacer_doc_id = ""
+            else:
+                pacer_doc_id = pq.pacer_doc_id
 
             # Create a new PQ and enqueue it for processing
             new_pq = ProcessingQueue.objects.create(
