@@ -165,11 +165,6 @@ $(document).ready(function () {
   ////////////
   // Alerts //
   ////////////
-  $('#save-alert-button').on("click", function (e) {
-    e.preventDefault();
-    $('#alert-sidebar form').submit();
-  });
-
   $('#id_rate').on("change", function () {
     if ($(this).val() === 'rt' && totalDonatedLastYear < priceRtAlerts) {
       $('#donate-for-rt').removeClass('hidden');
