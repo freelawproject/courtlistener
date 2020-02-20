@@ -146,13 +146,17 @@ a.button:active {
 }
 
 #main-query-box {
-  /* margin: 0 auto; */
-  -webkit-transition: all 0.5s ease;
-  -moz-transition: all 0.5s ease;
-  -o-transition: all 0.5s ease;
   transition: all 0.5s ease;
   margin-bottom: 4em;
   margin-top: 4em;
+}
+
+#search-form .input-group-addon-blended {
+  background-color: inherit;
+  border-top: 1px solid;
+  border-bottom: 1px solid;
+  border-left: 0px;
+  border-color: #a6a6a6 transparent;
 }
 
 
