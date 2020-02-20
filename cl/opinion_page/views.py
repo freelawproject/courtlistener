@@ -388,7 +388,8 @@ def view_opinion(request, pk, _):
             "get_string": get_string,
             "private": cluster.blocked,
             "citing_clusters": citing_clusters,
-            "top_authorities": cluster.authorities[:5],
+            "top_authorities": cluster.authorities_with_data[:5],
+            "authorities_count": len(cluster.authorities_with_data),
         },
     )
 
@@ -405,7 +406,7 @@ def view_authorities(request, pk, slug):
             % (trunc(best_case_name(cluster), 100), cluster.citation_string),
             "cluster": cluster,
             "private": cluster.blocked or cluster.has_private_authority,
-            "authorities": cluster.authorities.order_by("case_name"),
+            "authorities_with_data": cluster.authorities_with_data,
         },
     )
 
