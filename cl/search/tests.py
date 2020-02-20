@@ -1230,7 +1230,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         search_box = self.browser.find_element_by_id("id_q")
         self.assertEqual("lissner", search_box.get_attribute("value"))
 
-        # She now sees the form for creating an alert
+        # She now opens the modal for the form for creating an alert
+        alert_bell = self.browser.find_element_by_css_selector(
+            ".input-group-addon-blended i"
+        )
+        alert_bell.click()
+        page_text = self.browser.find_element_by_tag_name("body").text
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
         self.assertIn("How often should we notify you?", page_text)
@@ -1238,6 +1243,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.browser.find_element_by_id("id_rate")
         btn = self.browser.find_element_by_id("alertSave")
         self.assertEqual("Create Alert", btn.text)
+        x_button = self.browser.find_elements_by_css_selector(".close")[0]
+        x_button.click()
 
         # But she decides to wait until another time. Instead she decides she
         # will log out. She notices a Profile link dropdown in the top of the
