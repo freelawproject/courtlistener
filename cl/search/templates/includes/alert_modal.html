@@ -23,6 +23,15 @@
                     class="fa fa-question-circle gray"></i></a>
             </p>
           {% endif %}
+
+          <div class="well well-sm">
+            <dl class="dl-horizontal bottom">
+              {% for label, values in search_summary_dict.items %}
+                <dt>{{ label }}</dt>
+                <dd>{{ values }}</dd>
+              {% endfor %}
+            </dl>
+          </div>
           <form action="" method="post">{% csrf_token %}
             {{ alert_form.query }}
             <div class="form-group">
@@ -87,7 +96,7 @@
                       class="btn btn-primary btn-lg title"
                       name="alertSave"
                       id="alertSave">
-                {% if request.GET.edit_alert %}<i class="fa fa-bell-o"></i> Save Changes{% else %}Create
+                <i class="fa fa-bell-o"></i> {% if request.GET.edit_alert %}Save Changes{% else %}Create
                   Alert{% endif %}
               </button>
             </p>
