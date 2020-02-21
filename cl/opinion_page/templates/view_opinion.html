@@ -114,7 +114,9 @@
                             <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
                                 {{ authority.caption|safe|truncatewords:10|v_wrapper }}
                             </a>
-                            <span class="small gray">({{ authority.citation_depth }} time{{ authority.citation_depth|pluralize }})</span>
+                            {% if authority.citation_depth %}
+                              <span class="small gray">({{ authority.citation_depth }} time{{ authority.citation_depth|pluralize }})</span>
+                            {% endif %}
                         </li>
                     {% endfor %}
                 </ul>
