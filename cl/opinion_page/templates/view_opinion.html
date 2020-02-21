@@ -118,9 +118,9 @@
 
 
         {# Show cases this case cites #}
-        {% if top_authorities %}
+        {% if authorities_count > 0  %}
             <div id="authorities" class="sidebar-section">
-                <h3><span>Authorities ({{ cluster.authority_count }})</span></h3>
+                <h3><span>Authorities ({{ authorities_count }})</span></h3>
                 <p class="bottom">This opinion cites:</p>
                 <ul>
                     {% for authority in top_authorities %}
@@ -128,6 +128,9 @@
                             <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
                                 {{ authority.caption|safe|truncatewords:10|v_wrapper }}
                             </a>
+                            {% if authority.citation_depth %}
+                              <span class="small gray">({{ authority.citation_depth }} time{{ authority.citation_depth|pluralize }})</span>
+                            {% endif %}
                         </li>
                     {% endfor %}
                 </ul>
