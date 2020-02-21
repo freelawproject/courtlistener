@@ -267,7 +267,9 @@ def show_results(request):
     """
     # Create a search string that does not contain the page numbers
     get_string = make_get_string(request)
-    get_string_sans_alert = make_get_string(request, ["page", "edit_alert"])
+    get_string_sans_alert = make_get_string(
+        request, ["page", "edit_alert", "show_alert_modal"]
+    )
     render_dict = {
         "private": True,
         "get_string": get_string,
