@@ -151,14 +151,6 @@ a.button:active {
   margin-top: 4em;
 }
 
-.dl-horizontal dt {
-  white-space: normal;
-  width: 100px;
-}
-.dl-horizontal dd {
-  margin-left: 120px;
-}
-
 
 @media (max-width: 767px) {
   #homepage #main-query-box {
@@ -189,6 +181,9 @@ a.button:active {
   #donate-image {
     text-align: start;
   }
+  .dl-horizontal dd {
+    margin-left: 15px;
+  }
 }
 @media (min-width: 768px) {
   #main-query-box #id_q {
@@ -206,7 +201,13 @@ a.button:active {
   #court-picker-tabs {
     text-align: right;
   }
-
+  .dl-horizontal dt {
+    white-space: normal;
+    width: 100px;
+  }
+  .dl-horizontal dd {
+    margin-left: 120px;
+  }
 }
 @media (min-width: 992px) {
   #main-query-box #id_q {
