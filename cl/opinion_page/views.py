@@ -356,23 +356,16 @@ def view_opinion(request, pk, _):
     if not is_bot(request):
         # Get the citing results from Solr for speed. Only do this for humans
         # to save on disk usage.
-        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+        sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
+        ids_str = " OR ".join([str(pk) for pk in sub_opinion_pks])
         q = {
-            "q": "cites:({ids})".format(
-                ids=" OR ".join(
-                    [
-                        str(pk)
-                        for pk in (
-                            cluster.sub_opinions.values_list("pk", flat=True)
-                        )
-                    ]
-                )
-            ),
+            "q": "cites:(%s)" % ids_str,
             "rows": 5,
             "start": 0,
             "sort": "citeCount desc",
             "caller": "view_opinion",
         }
+        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
         citing_clusters = conn.raw_query(**q).execute()
     else:
         citing_clusters = None
