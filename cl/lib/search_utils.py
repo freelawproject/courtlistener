@@ -466,6 +466,7 @@ def add_highlighting(main_params, cd, highlight):
             "dateFiled",
             "download_url",
             "id",
+            "cluster_id",
             "local_path",
             "sibling_ids",
             "source",
@@ -867,14 +868,14 @@ def add_depth_counts(search_data, search_results):
     if len(cites_query_matches) == 1:
         try:
             cited_cluster = OpinionCluster.objects.get(
-                pk=cites_query_matches[0]
+                sub_opinions__pk=cites_query_matches[0]
             )
         except OpinionCluster.DoesNotExist:
             return None
         else:
             for result in search_results.object_list:
                 result["citation_depth"] = get_citation_depth_between_clusters(
-                    citing_cluster_pk=result["id"],
+                    citing_cluster_pk=result["cluster_id"],
                     cited_cluster_pk=cited_cluster.pk,
                 )
             return cited_cluster
