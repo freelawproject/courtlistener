@@ -32,6 +32,7 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     make_get_string,
     regroup_snippets,
+    add_depth_counts,
 )
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion, SEARCH_TYPES
@@ -174,6 +175,9 @@ def do_search(
     )
     search_summary_str = search_form.as_text(court_count_human)
     search_summary_dict = search_form.as_display_dict(court_count_human)
+    cited_cluster = add_depth_counts(  # Also returns cited cluster if found
+        search_data=cd, search_results=paged_results,
+    )
 
     return {
         "results": paged_results,
@@ -186,6 +190,7 @@ def do_search(
         "court_count": court_count,
         "query_citation": query_citation,
         "error": error,
+        "cited_cluster": cited_cluster,
     }
 
 

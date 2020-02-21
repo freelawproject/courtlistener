@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load humanize %}
+{% load text_filters %}
 
 {% block message %}{% endblock %}
 
@@ -197,6 +198,9 @@
                     <h2 id="result-count" class="bottom">
                         {% if type == 'o' %}
                             {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
+                          {% if cited_cluster %}
+                            <span class="gray alt">cite{{ results.paginator.count|pluralize:"s," }}</span> {{ cited_cluster.caption|safe|v_wrapper }}
+                          {% endif %}
                         {% elif type == 'r' %}
                             {% with matches=results.object_list.groups.docket_id.matches count=results.paginator.count %}
                             {{ count|intcomma }} Case{{ count|pluralize }} <span class="gray">&mdash;</span>
