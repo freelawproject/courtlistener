@@ -173,7 +173,8 @@ def do_search(
     courts, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
     )
-    search_summary_str = search_form.as_text(court_count, court_count_human)
+    search_summary_str = search_form.as_text(court_count_human)
+    search_summary_dict = search_form.as_display_dict(court_count_human)
     cited_cluster = add_depth_counts(  # Also returns cited cluster if found
         search_data=cd, search_results=paged_results,
     )
@@ -183,6 +184,7 @@ def do_search(
         "facet_fields": make_stats_variable(search_form, paged_results),
         "search_form": search_form,
         "search_summary_str": search_summary_str,
+        "search_summary_dict": search_summary_dict,
         "courts": courts,
         "court_count_human": court_count_human,
         "court_count": court_count,
@@ -270,7 +272,9 @@ def show_results(request):
     """
     # Create a search string that does not contain the page numbers
     get_string = make_get_string(request)
-    get_string_sans_alert = make_get_string(request, ["page", "edit_alert"])
+    get_string_sans_alert = make_get_string(
+        request, ["page", "edit_alert", "show_alert_modal"]
+    )
     render_dict = {
         "private": True,
         "get_string": get_string,

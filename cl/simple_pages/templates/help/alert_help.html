@@ -14,8 +14,8 @@
     <h1>Help with Alerts on CourtListener</h1>
     <p>CourtListener was created in 2009 as an alert and awareness tool for people that were interested in keeping up with new cases or topics in the federal circuit courts.
     </p>
-    <p>We currently have two kinds of alerts: Search Alerts and RECAP Alerts for PACER. Read on to learn more or skip ahead to the section that interests you:
-    </p>
+    <p>We currently have three kinds of alerts: Search Alerts, RECAP Alerts for PACER, and Citation Alerts.</p>
+    <p>Read on to learn more or skip ahead to the section that interests you:</p>
     <ul>
       <li>
         <a href="#recap-alerts">RECAP Alerts for PACER</a>
@@ -33,9 +33,9 @@
           <li><a href="#enabling-real-time-alerts">Enabling Real Time Alerts</a></li>
           <li><a href="#editing-or-deleting-an-alert">Editing or Deleting an Alert</a></li>
           <li><a href="#disabling-an-alert">Disabling an Alert</a></li>
-          <li><a href="#citation-alerts">Citation Alerts</a></li>
         </ul>
       </li>
+      <li><a href="#citation-alerts">Citation Alerts</a></li>
       <li><a href="#coming-soon">Coming Soon</a></li>
     </ul>
     <p>We hope that if you find our alerts useful, you will donate to <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP, to support their ongoing maintenance.
@@ -185,10 +185,12 @@
     <p>If there is a jurisdiction that is not currently listed, please <a href="{% url "contact" %}">let us know you are interested in it</a>, and we will do our best to add it to our list.
     </p>
 
-    <h3>Citation Alerts</h3>
-    <p>Citation alerts are a way to keep up with citations to a case of interest so that whenever that case is cited, you get an email. To create a citation alert, start at webpage for the case that interests you, for example, <a href="/opinion/108713/roe-v-wade/"><em>Roe v. Wade</em></a>.
+    <h2>Citation Alerts</h2>
+    <p>Citation alerts are a way to keep up with citations to a case of interest. When you have a citation alert, you will get an email whenever a new case cites that case. Like regular search alerts described above, citation alerts can be configured with custom queries, filters, or jurisdictions.
     </p>
-    <p>On that page, in the sidebar on the left, the cases that cite it are listed, and there is a button to "View All Citing Opinions":
+    <p>To create a citation alert, start at webpage for the case that interests you. In this example, we will use <a href="/opinion/108713/roe-v-wade/"><em>Roe v. Wade</em></a>.
+    </p>
+    <p>On that page, in the sidebar on the left, any cases that cite it are listed, and there is a button to "Get Citation Alerts":
     </p>
     <p>
       <img src="{{ STATIC_PREFIX }}/png/citing-opinions.png"
@@ -198,7 +200,8 @@
            height="253">
     </p>
 
-    <p>Clicking that button will perform a search in CourtListener that <a href="/?q=cites%3A(108713)">shows the opinions that cite <em>Roe v. Wade</em></a>. To create a citation alert, simply save these search results as an alert, as you normally would.
+    <p>Clicking that button will perform a search in CourtListener that <a href="/?q=cites%3A(108713)&show_alert_modal=yes">shows the opinions that cite <em>Roe v. Wade</em></a>, and a dialog will appear where you can easily save the alert.</p>
+    <p>If you prefer to modify the alert, you can close the dialog that popped up, tweak the query and filters you wish to apply, and then save it as you would any regular alert.
     </p>
     <p>For more on citation alerts, <a href="https://free.law/2016/01/30/citation-searching-on-courtlistener/">see our blog post announcing this feature</a>.
     </p>
