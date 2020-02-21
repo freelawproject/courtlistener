@@ -1,5 +1,6 @@
 # coding=utf-8
 import re
+from collections import OrderedDict
 
 from django import forms
 from django.forms import DateField, ChoiceField
@@ -482,12 +483,14 @@ class SearchForm(forms.Form):
                 attrs.update({"checked": "checked"})
             else:
                 initial = False
-            self.fields["stat_" + status[1]] = forms.BooleanField(
+            new_field = forms.BooleanField(
                 label=status[1],
                 required=False,
                 initial=initial,
                 widget=forms.CheckboxInput(attrs=attrs),
             )
+            new_field.as_str_types = [SEARCH_TYPES.OPINION]
+            self.fields["stat_" + status[1]] = new_field
 
     # This is a particularly nasty area of the code due to several factors:
     #  1. Django doesn't have a good method of setting default values for
@@ -630,10 +633,24 @@ class SearchForm(forms.Form):
 
         return cleaned_data
 
-    def as_text(self, court_count, court_count_human):
-        crumbs = []
+    def as_display_dict(self, court_count_human):
+        """Generate a displayable dictionary of the search form
+
+        This can be useful for displaying on the front end, or converting into
+        a useful string. The dictionary looks like:
+
+            {
+              'Case name': 'Foo',
+              'Query': 'bar',
+            }
+
+        :param court_count_human: The number of courts being queried or "All",
+        if all courts are being queried.
+        :returns A dictionary of the data
+        """
+        display_dict = OrderedDict({"Courts": court_count_human})
         search_type = self.data["type"]
-        for field_name, field in self.base_fields.items():
+        for field_name, field in self.fields.items():
             if not hasattr(field, "as_str_types"):
                 continue
             if search_type in field.as_str_types:
@@ -642,9 +659,13 @@ class SearchForm(forms.Form):
                     if isinstance(field, ChoiceField):
                         choices = flatten_choices(self.fields[field_name])
                         value = dict(choices)[value]
-                    crumbs.append("%s: %s" % (field.label, value))
+                    display_dict[field.label] = value
 
-        if court_count_human != "All":
-            pluralize = "s" if court_count > 1 else ""
-            crumbs.append("%s Court%s" % (court_count, pluralize))
+        return display_dict
+
+    def as_text(self, court_count_human):
+        """Create a human-readable string representation of the search form"""
+        crumbs = []
+        for label, value in self.as_display_dict(court_count_human).items():
+            crumbs.append(u"%s: %s" % (label, value))
         return u" › ".join(crumbs)

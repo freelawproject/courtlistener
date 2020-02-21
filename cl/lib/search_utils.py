@@ -52,7 +52,7 @@ def make_get_string(request, nuke_fields=None):
     the pagination parameters.
     """
     if nuke_fields is None:
-        nuke_fields = ["page"]
+        nuke_fields = ["page", "show_alert_modal"]
     get_dict = parse_qs(request.META["QUERY_STRING"])
     for key in nuke_fields:
         try:
