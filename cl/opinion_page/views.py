@@ -1,7 +1,6 @@
 from collections import defaultdict, OrderedDict
 from itertools import groupby
 
-from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.urls import reverse
@@ -26,10 +25,10 @@ from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
-from cl.lib import search_utils, sunburnt
 from cl.lib.bot_detector import is_bot, is_og_bot
 from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
+from cl.lib.search_utils import get_citing_clusters_with_cache, make_get_string
 from cl.lib.string_utils import trunc
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
@@ -165,7 +164,7 @@ def view_docket(request, pk, slug):
             "parties": docket.parties.exists(),  # Needed to show/hide parties tab.
             "docket_entries": docket_entries,
             "form": form,
-            "get_string": search_utils.make_get_string(request),
+            "get_string": make_get_string(request),
         }
     )
     return render(request, "view_docket.html", context)
@@ -338,7 +337,7 @@ def view_opinion(request, pk, _):
         if sub_opinion.local_path or sub_opinion.download_url:
             has_downloads = True
             break
-    get_string = search_utils.make_get_string(request)
+    get_string = make_get_string(request)
 
     try:
         fave = Favorite.objects.get(cluster_id=cluster.pk, user=request.user)
@@ -353,29 +352,7 @@ def view_opinion(request, pk, _):
     else:
         favorite_form = FavoriteForm(instance=fave)
 
-    if not is_bot(request):
-        # Get the citing results from Solr for speed. Only do this for humans
-        # to save on disk usage.
-        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-        q = {
-            "q": "cites:({ids})".format(
-                ids=" OR ".join(
-                    [
-                        str(pk)
-                        for pk in (
-                            cluster.sub_opinions.values_list("pk", flat=True)
-                        )
-                    ]
-                )
-            ),
-            "rows": 5,
-            "start": 0,
-            "sort": "citeCount desc",
-            "caller": "view_opinion",
-        }
-        citing_clusters = conn.raw_query(**q).execute()
-    else:
-        citing_clusters = None
+    citing_clusters = get_citing_clusters_with_cache(cluster, is_bot(request))
 
     return render(
         request,
