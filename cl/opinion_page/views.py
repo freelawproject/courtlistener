@@ -2,6 +2,7 @@ from collections import defaultdict, OrderedDict
 from itertools import groupby
 
 from django.conf import settings
+from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.urls import reverse
@@ -353,6 +354,8 @@ def view_opinion(request, pk, _):
     else:
         favorite_form = FavoriteForm(instance=fave)
 
+    cache_key = "citing:%s" % pk
+    cache = caches["db_cache"]
     if not is_bot(request):
         # Get the citing results from Solr for speed. Only do this for humans
         # to save on disk usage.
@@ -367,8 +370,12 @@ def view_opinion(request, pk, _):
         }
         conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
         citing_clusters = conn.raw_query(**q).execute()
+        a_month = 60 * 60 * 24 * 30
+        cache.set(cache_key, citing_clusters, a_month)
     else:
-        citing_clusters = None
+        # If the cache was set by a real user, bots can access it. But if no
+        # user set the cache, this will just return None.
+        citing_clusters = cache.get(cache_key)
 
     return render(
         request,
