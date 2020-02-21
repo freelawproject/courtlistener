@@ -48,7 +48,7 @@
 
 {% block footer-scripts %}
   {% include "includes/date_picker.html" %}
-  {% if alert_form.errors  %}
+  {% if alert_form.errors or request.GET.show_alert_modal %}
     <script type="text/javascript">
       $(window).on('load',function(){
         $('#modal-save-alert').modal('show');
