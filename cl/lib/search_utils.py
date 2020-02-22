@@ -1,4 +1,6 @@
 import re
+from datetime import timedelta
+from datetime import date
 from urllib import urlencode
 from urlparse import parse_qs
 
@@ -841,6 +843,23 @@ def build_coverage_query(court, q):
     }
     if court.lower() != "all":
         params["fq"] = ["court_exact:%s" % court]
+    return params
+
+
+def build_alert_estimation_query(cd, day_count):
+    """Build the parameters for estimating the frequency an alert is
+    triggered.
+    """
+    params = {
+        "q": cd["q"] or "*",
+        "rows": 0,
+        "caller": "alert_estimator",
+    }
+    cd["filed_after"] = date.today() - timedelta(days=day_count)
+    cd["filed_before"] = None
+    add_filter_queries(params, cd)
+
+    print_params(params)
     return params
 
 
