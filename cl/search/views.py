@@ -24,7 +24,6 @@ from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.redis_utils import make_redis_interface
-from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
     build_main_query,
     get_query_citation,
@@ -33,6 +32,7 @@ from cl.lib.search_utils import (
     make_get_string,
     regroup_snippets,
     add_depth_counts,
+    get_solr_interface,
 )
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion, SEARCH_TYPES
@@ -52,29 +52,6 @@ def check_pagination_depth(page_number):
             page_number,
         )
         raise PermissionDenied
-
-
-def get_solr_result_objects(cd, facet):
-    """Note that this doesn't run the query yet. Not until the
-    pagination is run.
-    """
-    search_type = cd["type"]
-    if search_type == SEARCH_TYPES.OPINION:
-        si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-        results = si.query().add_extra(**build_main_query(cd, facet=facet))
-    elif search_type == SEARCH_TYPES.RECAP:
-        si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
-        results = si.query().add_extra(**build_main_query(cd, facet=facet))
-    elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
-        si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
-        results = si.query().add_extra(**build_main_query(cd, facet=facet))
-    elif search_type == SEARCH_TYPES.PEOPLE:
-        si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
-        results = si.query().add_extra(**build_main_query(cd, facet=facet))
-    else:
-        raise NotImplementedError("Unknown search type: %s" % search_type)
-
-    return results
 
 
 def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
@@ -144,7 +121,17 @@ def do_search(
 
         # Do the query, hitting the cache if desired
         try:
-            results = get_solr_result_objects(cd, facet)
+            si = get_solr_interface(cd)
+        except NotImplementedError:
+            logger.error(
+                "Tried getting solr connection for %s, but it's not "
+                "implemented yet",
+                cd["type"],
+            )
+            raise
+
+        try:
+            results = si.query().add_extra(**build_main_query(cd, facet=facet))
             paged_results = paginate_cached_solr_results(
                 get_params, cd, results, rows, cache_key
             )
