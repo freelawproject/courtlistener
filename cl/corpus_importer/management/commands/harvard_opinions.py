@@ -314,8 +314,10 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
             long_data = parse_extra_fields(soup, long_fields, True)
 
             if len(data["docket_number"]) > 5000:
-                long_data['correction'] = "%s <br> %s" % (
-                data["docket_number"], long_data['correction'])
+                long_data["correction"] = "%s <br> %s" % (
+                    data["docket_number"],
+                    long_data["correction"],
+                )
 
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
