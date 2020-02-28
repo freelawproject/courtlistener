@@ -284,6 +284,8 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
             .replace("Docket Nos.", "")
             .strip()
         )
+        if len(docket_string) > 5000:
+            docket_string = "See below for full docket number"
 
         with transaction.atomic():
             logger.info("Adding docket for: %s", citation.base_citation())
@@ -310,6 +312,10 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
 
             short_data = parse_extra_fields(soup, short_fields, False)
             long_data = parse_extra_fields(soup, long_fields, True)
+
+            if len(data["docket_number"]) > 5000:
+                long_data['correction'] = "%s <br> %s" % (
+                data["docket_number"], long_data['correction'])
 
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
