@@ -449,7 +449,9 @@ class Docket(models.Model):
     )
     docket_number = models.TextField(
         help_text="The docket numbers of a case, can be consolidated and "
-        "quite long",
+                  "quite long. In some instances they are too long to be "
+                  "indexed by postgres and we store the full docket in "
+                  "the correction field on the Opinion Cluster.",
         blank=True,
         null=True,
         db_index=True,
