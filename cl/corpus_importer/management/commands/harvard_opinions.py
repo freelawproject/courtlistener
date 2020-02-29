@@ -316,7 +316,8 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
             except OperationalError as e:
                 if "maximum size" in str(e):
                     docket.docket_number = (
-                        "%s, See Corrections for full Docket Number" % trunc(docket_string, True)
+                        "%s, See Corrections for full Docket Number"
+                        % trunc(docket_string, length=5000, ellipsis=True)
                     )
                     docket.save()
                     long_data["correction"] = "%s <br> %s" % (
