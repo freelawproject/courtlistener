@@ -4,6 +4,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from rest_framework import status
+from rest_framework.status import HTTP_400_BAD_REQUEST
 
 from cl.lib import sunburnt
 from cl.lib.search_utils import (
@@ -160,7 +161,11 @@ def get_result_count(request, version, day_count):
     """
     search_form = SearchForm(request.GET.copy())
     if not search_form.is_valid():
-        return JsonResponse({"error": "Invalid SearchForm"}, safe=True)
+        return JsonResponse(
+            {"error": "Invalid SearchForm"},
+            safe=True,
+            status=HTTP_400_BAD_REQUEST,
+        )
 
     cd = search_form.cleaned_data
     try:
