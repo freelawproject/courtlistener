@@ -88,18 +88,25 @@
               <p class="gray v-offset-above-2">RECAP alerts will only be triggered when there is a new responsive document added to the RECAP Archive. Check out <a href="{% url "coverage" %}#recap-archive">how RECAP content is acquired</a> to learn more.
               </p>
             {% endif %}
-            <p class="text-right v-offset-above-2">
-              {% if request.GET.edit_alert %}
-                <a class="btn btn-danger btn-lg" href="{% url "delete_alert_confirm" request.GET.edit_alert %}"><i class="fa fa-trash-o"></i> Delete Alert</a>
-              {% endif %}
-              <button type="submit"
-                      class="btn btn-primary btn-lg title"
-                      name="alertSave"
-                      id="alertSave">
-                <i class="fa fa-bell-o"></i> {% if request.GET.edit_alert %}Save Changes{% else %}Create
-                  Alert{% endif %}
-              </button>
-            </p>
+            <div class="row v-offset-above-2">
+              <div class="hidden-xs col-sm-4" id="alert-estimate">
+                <p class="v-offset-above-1"><i class="fa fa-spinner fa-pulse gray"></i><span> Loading alert frequency&hellip;</span></p>
+              </div>
+              <div class="col-xs-12 col-sm-8">
+                <p class="text-right">
+                  {% if request.GET.edit_alert %}
+                    <a class="btn btn-danger btn-lg" href="{% url "delete_alert_confirm" request.GET.edit_alert %}"><i class="fa fa-trash-o"></i> Delete Alert</a>
+                  {% endif %}
+                  <button type="submit"
+                          class="btn btn-primary btn-lg title"
+                          name="alertSave"
+                          id="alertSave">
+                    <i class="fa fa-bell-o"></i> {% if request.GET.edit_alert %}Save Changes{% else %}Create
+                    Alert{% endif %}
+                  </button>
+                </p>
+              </div>
+            </div>
           </form>
         {% else %}
           {# Anonymous user #}

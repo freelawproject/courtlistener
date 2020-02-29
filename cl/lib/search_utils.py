@@ -1,4 +1,6 @@
 import re
+from datetime import timedelta
+from datetime import date
 from urllib import urlencode
 from urlparse import parse_qs
 
@@ -9,6 +11,7 @@ from django.http import QueryDict
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
 from cl.citations.utils import get_citation_depth_between_clusters
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib import sunburnt
 from cl.search.forms import SearchForm
 from cl.search.models import Court, OpinionCluster, SEARCH_TYPES
@@ -47,6 +50,23 @@ BOOSTS = {
         },
     },
 }
+
+
+def get_solr_interface(cd):
+    """Get the correct solr interface for the query"""
+    search_type = cd["type"]
+    if search_type == SEARCH_TYPES.OPINION:
+        si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    elif search_type == SEARCH_TYPES.RECAP:
+        si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
+    elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
+        si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
+    elif search_type == SEARCH_TYPES.PEOPLE:
+        si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
+    else:
+        raise NotImplementedError("Unknown search type: %s" % search_type)
+
+    return si
 
 
 def make_get_string(request, nuke_fields=None):
@@ -825,6 +845,23 @@ def build_coverage_query(court, q):
     }
     if court.lower() != "all":
         params["fq"] = ["court_exact:%s" % court]
+    return params
+
+
+def build_alert_estimation_query(cd, day_count):
+    """Build the parameters for estimating the frequency an alert is
+    triggered.
+    """
+    params = {
+        "q": cd["q"] or "*",
+        "rows": 0,
+        "caller": "alert_estimator",
+    }
+    cd["filed_after"] = date.today() - timedelta(days=day_count)
+    cd["filed_before"] = None
+    add_filter_queries(params, cd)
+
+    print_params(params)
     return params
 
 
