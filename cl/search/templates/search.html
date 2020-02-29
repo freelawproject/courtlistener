@@ -52,10 +52,29 @@
   {% if alert_form.errors or request.GET.show_alert_modal %}
     <script type="text/javascript">
       $(window).on('load',function(){
-        $('#modal-save-alert').modal('show');
+        $("#modal-save-alert").modal('show');
       });
     </script>
   {% endif %}
+  <script type="text/javascript">
+    $("#modal-save-alert").on('show.bs.modal', function (e) {
+      let estimate = $(this).find('#alert-estimate');
+      let icon = estimate.find('i');
+      let msg = estimate.find('span');
+      $.ajax({
+        url: "{% url "alert_frequency" version=3 day_count=100 %}" + window.location.search,
+        success: function(data){
+          // Update icon and text
+          icon.removeClass('fa-spinner fa-pulse').addClass('fa-clock-o');
+          msg.text(" " + data.count + " hits in the last 100 days")
+        },
+        error: function(){
+          icon.removeClass("fa spinner fa-pulse").addClass("fa-warning");
+          msg.text(" Unable to get estimate for this alert");
+        }
+      })
+    })
+  </script>
 {% endblock %}
 
 {% block navbar-o %}
