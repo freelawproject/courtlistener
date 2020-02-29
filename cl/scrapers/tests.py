@@ -352,26 +352,25 @@ class AudioFileTaskTest(TestCase):
     ]
 
     def test_process_audio_file(self):
-        audio = Audio.objects.get(pk=1)
-        audio.duration = None
-        audio.save()
+        af = Audio.objects.get(pk=1)
+        af.duration = None
+        af.save()
 
-        audio = Audio.objects.get(pk=1)
+        expected_duration = 15
         self.assertNotEqual(
-            audio.duration,
-            15,
-            msg="we start with a fake duration in the fixture",
+            af.duration,
+            expected_duration,
+            msg="Do we have no duration info at the outset?",
         )
 
         process_audio_file(pk=1)
-        audio = Audio.objects.get(pk=1)
-        correct_duration = 15
-        measured_duration = audio.duration
+        af.refresh_from_db()
+        measured_duration = af.duration
         # Use almost equal because measuring MP3's is wonky.
         self.assertAlmostEqual(
             measured_duration,
-            correct_duration,
+            expected_duration,
             delta=5,
             msg="We should end up with the proper duration of about %s. "
-            "Instead we got %s." % (correct_duration, measured_duration),
+            "Instead we got %s." % (expected_duration, measured_duration),
         )
