@@ -233,9 +233,8 @@ def process_donation_forms(
             logger.critical("Payment failed. Message was: %s", e.message)
             context["message"] = e.message
             response = {"status": "Failed"}
-        else:
-            logger.info("Payment routed with response: %s", response)
 
+        logger.info("Payment routed with response: %s", response)
         if response["status"] == Donation.AWAITING_PAYMENT:
             if request.user.is_anonymous and not context["stub_account"]:
                 # Create a stub account with an unusable password
@@ -257,7 +256,7 @@ def process_donation_forms(
             donation.donor = user
             donation.save()
 
-            if frequency == FREQUENCIES.MONTHLY:
+            if frequency == FREQUENCIES.MONTHLY and customer:
                 add_monthly_donations(cd_donation_form, user, customer)
 
             return HttpResponseRedirect(response["redirect"])
