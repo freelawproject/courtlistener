@@ -87,6 +87,8 @@ def route_and_process_payment(
         response = process_stripe_payment(
             amount, cd_user_form["email"], stripe_args, stripe_redirect_url
         )
+    else:
+        raise PaymentFailureException("Unknown/unhandled payment provider.")
 
     return response, customer
 
