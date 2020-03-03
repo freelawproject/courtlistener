@@ -312,19 +312,19 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
                 ia_needs_upload=False,
             )
             try:
-                docket.save()
+                with transaction.atomic():
+                    docket.save()
             except OperationalError as e:
-                if "maximum size" in str(e):
+                if "exceeds maximum" in str(e):
                     docket.docket_number = (
                         "%s, See Corrections for full Docket Number"
-                        % trunc(docket_string, length=5000, ellipsis=True)
+                        % trunc(docket_string, length=5000, ellipsis="...")
                     )
                     docket.save()
                     long_data["correction"] = "%s <br> %s" % (
                         data["docket_number"],
                         long_data["correction"],
                     )
-
             # Handle partial dates by adding -01v to YYYY-MM dates
             date_filed, is_approximate = validate_dt(data["decision_date"])
 
