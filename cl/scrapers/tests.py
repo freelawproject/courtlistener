@@ -94,6 +94,7 @@ class ExtractionTest(TestCase):
 
     def test_txt_extraction_with_bad_data(self):
         """Can we extract text from nasty files lacking encodings?"""
+
         path = os.path.join(
             settings.MEDIA_ROOT,
             "test",
@@ -123,6 +124,25 @@ class ExtractionTest(TestCase):
         self.assertTrue(
             o.cluster.citations.exists(),
             msg="Expected citation was not created in db",
+        )
+
+
+    def test_juriscraper_object_creation(self):
+        """Can we extract text from tax court pdf and add to db"""
+
+        test_op = Opinion.objects.filter(cluster__docket__court__pk="tax")[0]
+        assert (
+            test_op.cluster.citations.exists() == False
+        ), "Citation already exists"
+
+        extract_doc_content(pk=test_op.pk, do_ocr=False)
+
+        assert (
+            test_op.cluster.citations.exists() == True
+        ), "Citation extraction failed"
+        print(
+            "Successful tax court citation parsing from pdf",
+            test_op.cluster.citation_string,
         )
 
 
@@ -394,24 +414,3 @@ class AudioFileTaskTest(TestCase):
             "Instead we got %s." % (expected_duration, measured_duration),
         )
 
-
-class ScrapeTextExtactionIntegrationTest(TestCase):
-    fixtures = ["tax_court_test.json"]
-
-    def test_juriscraper_object_creation(self):
-        """Can we extract text from tax court pdf and add to db"""
-
-        test_op = Opinion.objects.filter(cluster__docket__court__pk="tax")[0]
-        assert (
-            test_op.cluster.citations.exists() == False
-        ), "Citation already exists"
-
-        extract_doc_content(pk=test_op.pk, do_ocr=False)
-
-        assert (
-            test_op.cluster.citations.exists() == True
-        ), "Citation extraction failed"
-        print (
-            "Successful tax court citation parsing from pdf",
-            test_op.cluster.citation_string,
-        )
