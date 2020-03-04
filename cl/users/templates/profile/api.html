@@ -10,9 +10,41 @@
     <h3 class="caps gray">Bulk Data and REST APIs for Developers</h3>
     <p>The CourtListener API is a powerful, first-of-its-kind tool that programmers can use to access the contents of the CourtListener database. By allowing programmers and researchers to access this data, we hope to fulfill our mission of stimulating legal innovation.
     </p>
-    <h3>Your API Token</h3>
+    <h3 class="v-offset-above-3">Your API Token</h3>
     <p>To get started, you need an API token. Yours is:</p>
     <h4><code>{{ user.auth_token }}</code></h4>
+
+
+    <h3 class="v-offset-above-3">Your Recent Usage</h3>
+    {% with counts=user.profile.recent_api_usage %}
+      {% if not counts %}
+        <p>No usage yet.</p>
+      {% else %}
+        <p>Showing usage counts for past 14 days</p>
+        <table class="table settings-table">
+          <thead>
+          <tr>
+            <th>Date</th>
+            <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for date, count in counts.items %}
+              <tr>
+                <td><p class="bottom text-left">
+                  {% if not forloop.last %}
+                    <code>{{ date }}</code>
+                  {% else %}
+                    <strong>{{ date|capfirst }}</strong>
+                  {% endif %}
+                </p></td>
+                <td><p class="bottom text-left">{{ count }}</p></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    {% endwith %}
     <p class="v-offset-above-3"><a href="{% url "api_index" %}" class="btn btn-primary btn-lg">Read the Documentation</a></p>
   </div>
   <div class="hidden-xs col-sm-1 col-md-3"></div>
