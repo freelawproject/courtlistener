@@ -15,7 +15,7 @@
     <h4><code>{{ user.auth_token }}</code></h4>
 
 
-    <h3 class="v-offset-above-3">Your Recent Usage</h3>
+    <h3 class="v-offset-above-3" id="usage">Your Recent Usage</h3>
     {% with counts=user.profile.recent_api_usage %}
       {% if not counts %}
         <p>No usage yet.</p>

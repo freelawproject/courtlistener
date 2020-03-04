@@ -854,6 +854,7 @@ PACER_TO_CL_IDS = {
         <h4><code>{{ user.auth_token }}</code></h4>
         <p>Do not share your API token. Keep it private like a password.
         </p>
+        <p class="text-right"><a class="btn btn-default" href="{% url "view_api" %}#usage">See Usage</a></p>
       {% else %}
         <p><a href="{% url "sign-in" %}?next={{ request.path }}"
                 class="btn btn-primary btn-lg">Sign In To See Your Token</a>
