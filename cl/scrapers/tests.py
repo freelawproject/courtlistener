@@ -8,7 +8,6 @@ from django.utils.timezone import now
 
 from cl.audio.models import Audio
 from cl.lib.test_helpers import IndexedSolrTestCase
-from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
     cl_report_scrape_status,
@@ -23,8 +22,7 @@ from cl.scrapers.tasks import (
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
-from cl.search.models import Court, Opinion, Citation
-from cl.scrapers.tasks import extract_doc_content
+from cl.search.models import Court, Opinion
 
 
 class IngestionTest(IndexedSolrTestCase):
@@ -400,15 +398,15 @@ class ScrapeTextExtactionIntegrationTest(TestCase):
     def test_juriscraper_object_creation(self):
         """Can we extract text from tax court pdf and add to db"""
 
-        test_op = Opinion.objects.filter(cluster__docket__court__pk="tax")[0]
+        test_op = Opinion.objects.get(pk=76)
         assert (
-            test_op.cluster.citations.exists() == False
+            test_op.cluster.citations.exists() is False
         ), "Citation already exists"
 
         extract_doc_content(pk=test_op.pk, do_ocr=False)
 
         assert (
-            test_op.cluster.citations.exists() == True
+            test_op.cluster.citations.exists() is True
         ), "Citation extraction failed"
         print(
             "Successful tax court citation parsing from pdf",
