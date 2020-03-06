@@ -410,7 +410,7 @@ class ScrapeTextExtactionIntegrationTest(TestCase):
         assert (
             test_op.cluster.citations.exists() == True
         ), "Citation extraction failed"
-        print (
+        print(
             "Successful tax court citation parsing from pdf",
             test_op.cluster.citation_string,
         )
