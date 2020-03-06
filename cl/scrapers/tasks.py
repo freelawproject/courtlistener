@@ -595,3 +595,4 @@ def process_audio_file(pk):
     af.duration = eyed3.load(tmp_path).info.time_secs
     af.processing_complete = True
     af.save()
+
