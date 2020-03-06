@@ -36,24 +36,5 @@
             "has_oral_argument_scraper": true,
             "start_date": "1891-03-03"
         }
-    },
-    {
-        "pk": "tax",
-        "model": "search.court",
-        "fields": {
-            "jurisdiction": "FS",
-            "end_date": null,
-            "citation_string": "T.C.",
-            "short_name": "U.S. Tax Court",
-            "in_use": true,
-            "url": "http://www.ustaxcourt.gov/",
-            "notes": "",
-            "date_modified": "2013-08-14T16:46:30Z",
-            "full_name": "Court of Appeals for the First Circuit",
-            "position": 101.0,
-            "has_opinion_scraper": true,
-            "has_oral_argument_scraper": true,
-            "start_date": "1891-03-03"
-        }
     }
 ]
