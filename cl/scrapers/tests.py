@@ -401,6 +401,7 @@ class ScrapeTextExtactionIntegrationTest(TestCase):
         """Can we extract text from tax court pdf and add to db"""
 
         test_op = Opinion.objects.filter(cluster__docket__court__pk="tax")[0]
+        print test_op.cluster.citation_string, "---"
         assert (
             test_op.cluster.citations.exists() == False
         ), "Citation already exists"
