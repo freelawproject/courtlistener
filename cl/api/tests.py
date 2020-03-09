@@ -172,7 +172,7 @@ class ApiQueryCountTests(TransactionTestCase):
             self.client.get(path)
 
     def test_party_api_query_counts(self):
-        with self.assertNumQueries(7):
+        with self.assertNumQueries(9):
             path = reverse("party-list", kwargs={"version": "v3"})
             self.client.get(path)
 
