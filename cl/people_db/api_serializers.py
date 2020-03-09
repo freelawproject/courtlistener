@@ -15,6 +15,8 @@ from cl.people_db.models import (
     Attorney,
     Role,
     PartyType,
+    CriminalCount,
+    CriminalComplaint,
 )
 from cl.search.api_serializers import CourtSerializer
 
@@ -153,7 +155,22 @@ class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
         fields = "__all__"
 
 
+class CriminalCountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CriminalCount
+        fields = "__all__"
+
+
+class CriminalComplaintSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CriminalComplaint
+        fields = "__all__"
+
+
 class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
+    criminal_counts = CriminalCountSerializer(many=True)
+    criminal_complaints = CriminalComplaintSerializer(many=True)
+
     class Meta:
         model = PartyType
         fields = (
@@ -163,6 +180,8 @@ class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
             "extra_info",
             "highest_offense_level_opening",
             "highest_offense_level_terminated",
+            "criminal_counts",
+            "criminal_complaints",
         )
 
 
