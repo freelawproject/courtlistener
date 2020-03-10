@@ -311,6 +311,8 @@ REST_FRAMEWORK = {
         "leo": "100/hour",
         "miffy": "100/hour",
         "safetynet": "100/hour",
+        # Send multiple emails, but they haven't responded
+        "linkfenzhao": "10/hour",
         # From fokal.ai, using multiple accounts to dodge limitations
         "manu.jose": "10/hour",
         "shishir": "10/hour",
