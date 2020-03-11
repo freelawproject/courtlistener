@@ -110,6 +110,7 @@ class ExtractionTest(TestCase):
 
     def test_juriscraper_object_creation(self):
         """Can we extract text from tax court pdf and add to db?"""
+
         o = Opinion.objects.get(pk=76)
         self.assertFalse(
             o.cluster.citations.exists(),
@@ -389,26 +390,4 @@ class AudioFileTaskTest(TestCase):
             delta=5,
             msg="We should end up with the proper duration of about %s. "
             "Instead we got %s." % (expected_duration, measured_duration),
-        )
-
-
-class ScrapeTextExtactionIntegrationTest(TestCase):
-    fixtures = ["tax_court_test.json"]
-
-    def test_juriscraper_object_creation(self):
-        """Can we extract text from tax court pdf and add to db"""
-
-        test_op = Opinion.objects.get(pk=76)
-        assert (
-            test_op.cluster.citations.exists() is False
-        ), "Citation already exists"
-
-        extract_doc_content(pk=test_op.pk, do_ocr=False)
-
-        assert (
-            test_op.cluster.citations.exists() is True
-        ), "Citation extraction failed"
-        print(
-            "Successful tax court citation parsing from pdf",
-            test_op.cluster.citation_string,
         )
