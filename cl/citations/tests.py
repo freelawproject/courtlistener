@@ -241,6 +241,10 @@ class CiteTest(TestCase):
                            reporter_found='U.S.', court='scotus'),
               IdCitation(id_token='Ibid.',
                          after_tokens=['foo', 'bar', 'lorem'])]),
+            # Test italicized Ibid. citation
+            ('<p>before asdf. <i>Ibid.</i></p> <p>foo bar lorem</p>',
+             [IdCitation(id_token='Ibid.',
+                         after_tokens=['foo', 'bar', 'lorem'])]),
             # Test Id. citation
             ('foo v. bar 1 U.S. 12, 347-348. asdf. Id., at 123. foo bar',
              [FullCitation(plaintiff='foo', defendant=u'bar', volume=1,
@@ -248,6 +252,14 @@ class CiteTest(TestCase):
                            canonical_reporter=u'U.S.', reporter_index=4,
                            reporter_found='U.S.', court='scotus'),
               IdCitation(id_token='Id.,',
+                         after_tokens=['at', '123.'])]),
+            # Test italicized Id. citation
+            ('<p>before asdf. <i>Id.,</i> at 123.</p> <p>foo bar</p>',
+             [IdCitation(id_token='Id.,',
+                         after_tokens=['at', '123.'])]),
+            # Test italicized Id. citation with another HTML tag in the way
+            ('<p>before asdf. <i>Id.,</i> at <b>123.</b></p> <p>foo bar</p>',
+             [IdCitation(id_token='Id.,',
                          after_tokens=['at', '123.'])]),
             # Test non-opinion citation
             (u'lorem ipsum see §99 of the U.S. code.',
@@ -452,8 +464,8 @@ class CiteTest(TestCase):
             )
             print "✓"
 
-    def test_make_html(self):
-        """Can we make basic HTML conversions properly?"""
+    def test_make_html_from_plain_text(self):
+        """Can we convert the plain text of an opinion into HTML?"""
         # fmt: off
 
         full_citation_html = ('<pre class="inline">asdf </pre><span class="'
@@ -533,27 +545,72 @@ class CiteTest(TestCase):
 
             # Id. citation ("Id., at 123")
             ('asdf, id., at 123. Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf, </pre><span class="citation no-link">'
+             '<pre class="inline">asdf,</pre><span class="citation no-link"> '
              '<span class="id_token">id.,</span> at 123. </span><pre class="'
              'inline">Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation across line break
             ('asdf." Id., at 315.\n       Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf." </pre><span class="citation no-link">'
+             '<pre class="inline">asdf."</pre><span class="citation no-link"> '
              '<span class="id_token">Id.,</span> at 315.\n</span><pre class="'
              'inline">       Lorem ipsum dolor sit amet</pre>'),
 
             # Ibid. citation ("... Ibid.")
             ('asdf, Ibid. Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf, </pre><span class="citation no-link">'
+             '<pre class="inline">asdf,</pre><span class="citation no-link"> '
              '<span class="ibid_token">Ibid.</span> Lorem ipsum dolor </span>'
              '<pre class="inline">sit amet</pre>'),
         ]
 
         # fmt: on
         for s, expected_html in test_pairs:
-            print "Testing html conversion for %s..." % s,
+            print "Testing plain text to html conversion for %s..." % s,
             opinion = Opinion(plain_text=s)
+            citations = get_citations(s)
+            created_html = create_cited_html(opinion, citations)
+            self.assertEqual(
+                created_html,
+                expected_html,
+                msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
+            )
+            print "✓"
+
+    def test_make_html_from_html(self):
+        """Can we convert the HTML of an opinion into modified HTML?"""
+        # fmt: off
+
+        test_pairs = [
+            # Id. citation with HTML tags
+            ('<div><p>the improper views of the Legislature.\" 2 <i>id.,</i> '
+             'at 73.</p>\n<p>Nathaniel Gorham of Massachusetts</p></div>',
+             '<div><p>the improper views of the Legislature." 2<span class="'
+             'citation no-link"> <i><span class="id_token">id.,</span></i> at '
+             '73.</span></p>\n<p>Nathaniel Gorham of Massachusetts</p></div>'),
+
+            # Id. citation with an intervening HTML tag
+            ('<div><p>the improper views of the Legislature.\" 2 <i>id.,</i> '
+             'at <b>73, bolded</b>.</p>\n<p>Nathaniel Gorham of Massachusetts'
+             '</p></div>',
+             '<div><p>the improper views of the Legislature." 2<span class="'
+             'citation no-link"> <i><span class="id_token">id.,</span></i> at '
+             '<b>73, </b></span>bolded.</p>\n<p>Nathaniel Gorham of '
+             'Massachusetts</p></div>'),
+
+            # Ibid. citation with HTML tags
+            ('<div><p>possess any peculiar knowledge of the mere policy of '
+             'public measures.\" <i>Ibid.</i></p> <p>Gerry of Massachusetts '
+             'like</p></div>',
+             '<div><p>possess any peculiar knowledge of the mere policy of '
+             'public measures."<span class="citation no-link"> <i><span class='
+             '"ibid_token">Ibid.</span></i></span></p> <p>Gerry of '
+             'Massachusetts like</p></div>'
+            ),
+        ]
+
+        # fmt: on
+        for s, expected_html in test_pairs:
+            print "Testing html to html conversion for %s..." % s,
+            opinion = Opinion(html=s)
             citations = get_citations(s)
             created_html = create_cited_html(opinion, citations)
             self.assertEqual(
