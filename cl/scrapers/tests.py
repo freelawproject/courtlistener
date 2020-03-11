@@ -126,7 +126,7 @@ class ExtractionTest(TestCase):
 
 
     def test_juriscraper_object_creation(self):
-        """Can we extract text from tax court pdf and add to db"""
+        """Can we extract text from tax court pdf and add to db?"""
 
         test_op = Opinion.objects.get(pk=76)
         assert (
