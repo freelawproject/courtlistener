@@ -354,16 +354,27 @@ class IdCitation(Citation):
         # The content matched by the matching groups in this regex will later
         # be re-injected into the generated HTML using backreferences
 
-        # Start with the id_token
-        template = re.escape(self.id_token)
+        # Whitespace regex explanation:
+        #  \s matches any whitespace character
+        #  </?\w+> matches any HTML tag
+        #  The whole thing matches greedily, saved into a single group
+        whitespace_regex = r"((?:\s|</?\w+>)*)"
+
+        # Start with a matching group for any whitespace
+        template = whitespace_regex
+
+        # Add the id_token
+        template += re.escape(self.id_token)
 
         # Add a matching group for any whitespace
-        template += r"(\s+)"
+        template += whitespace_regex
 
         # Add all the "after tokens", with whitespace groups in between
-        template += r"(\s+)".join([re.escape(t) for t in self.after_tokens])
+        template += whitespace_regex.join(
+            [re.escape(t) for t in self.after_tokens]
+        )
 
-        # Add a final matching group for any whitespace
+        # Add a final matching group for any non-HTML whitespace at the end
         template += r"(\s?)"
 
         return template
@@ -377,13 +388,13 @@ class IdCitation(Citation):
         template = u"\\g<%s>%s"
         after_token_html = "".join(
             [
-                template % (str(i + 1), t)
+                template % (str(i + 2), t)
                 for i, t in enumerate(self.after_tokens)
             ]
         )
 
         # Then, append one final backreference to the end of the string
-        after_token_html += "\\g<" + str(len(self.after_tokens) + 1) + ">"
+        after_token_html += "\\g<" + str(len(self.after_tokens) + 2) + ">"
 
         # Return the full string
         return after_token_html
@@ -404,7 +415,7 @@ class IdCitation(Citation):
             )
             span_class += " no-link"
             data_attr = ""
-        return u'<span class="%s"%s>%s</span>' % (
+        return u'<span class="%s"%s>\\g<1>%s</span>' % (
             span_class,
             data_attr,
             id_string,
@@ -434,7 +445,7 @@ class IbidCitation(IdCitation):
             span_class += " no-link"
             data_attr = ""
         return (
-            u'<span class="%s"%s><span class="ibid_token">%s</span>%s</span>'
+            u'<span class="%s"%s>\\g<1><span class="ibid_token">%s</span>%s</span>'
             % (span_class, data_attr, ibid_token, after_token_html,)
         )
 
