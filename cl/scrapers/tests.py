@@ -124,7 +124,6 @@ class ExtractionTest(TestCase):
             msg="Expected citation was not created in db",
         )
 
-
     def test_juriscraper_object_creation(self):
         """Can we extract text from tax court pdf and add to db?"""
 
@@ -411,4 +410,3 @@ class AudioFileTaskTest(TestCase):
             msg="We should end up with the proper duration of about %s. "
             "Instead we got %s." % (expected_duration, measured_duration),
         )
-
