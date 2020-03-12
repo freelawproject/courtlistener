@@ -469,7 +469,7 @@ class IAUploaderTest(TestCase):
         with self.assertNumQueries(11):
             generate_ia_json(1)
 
-        with self.assertNumQueries(5):
+        with self.assertNumQueries(9):
             generate_ia_json(2)
 
         with self.assertNumQueries(5):
