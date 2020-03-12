@@ -3,10 +3,13 @@ import socket
 
 from django.conf import settings
 from django.core.cache import caches
-
+from ratelimit import UNSAFE
 from ratelimit.decorators import ratelimit
 from ratelimit.exceptions import Ratelimited
 
+
+ratelimiter_fast = ratelimit(key="ip", rate="250/h", block=True)
+ratelimiter_auth = ratelimit(key="ip", rate="10/m", method=UNSAFE, block=True)
 
 # See: https://www.bing.com/webmaster/help/how-to-verify-bingbot-3905dc26
 # and: https://support.google.com/webmasters/answer/80553?hl=en
@@ -18,14 +21,11 @@ APPROVED_DOMAINS = [
 ]
 
 
-ratelimiter = ratelimit(key="ip", rate="250/h", block=True)
-
-
 def ratelimit_if_not_whitelisted(view):
     """A wrapper for the ratelimit function that adds a whitelist for approved
     crawlers.
     """
-    ratelimited_view = ratelimiter(view)
+    ratelimited_view = ratelimiter_fast(view)
 
     @functools.wraps(view)
     def wrapper(request, *args, **kwargs):
