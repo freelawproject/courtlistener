@@ -1,3 +1,5 @@
+from lxml import etree
+
 from django.db.models import Sum
 from django.apps import (
     apps,
@@ -41,3 +43,19 @@ def get_citation_depth_between_clusters(citing_cluster_pk, cited_cluster_pk):
         citing_opinion__cluster__pk=citing_cluster_pk,
         cited_opinion__cluster__pk=cited_cluster_pk,
     ).aggregate(depth=Sum("depth"))["depth"]
+
+
+def is_balanced_html(text):
+    """Test whether a given string contains balanced HTML tags
+
+    :param text: The string to be tested
+    :return: Boolean
+    """
+    text = "<div>%s</div>" % text
+
+    # lxml will throw an error while parsing if the string is unbalanced
+    try:
+        etree.fromstring(text)
+        return True
+    except:
+        return False
