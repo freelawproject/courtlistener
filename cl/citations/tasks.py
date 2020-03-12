@@ -1,7 +1,6 @@
 import re
 from httplib import ResponseNotReady
 from collections import Counter
-from lxml.html.clean import Cleaner
 
 from cl.celery import app
 from cl.citations import find_citations, match_citations
