@@ -57,5 +57,5 @@ def is_balanced_html(text):
     try:
         etree.fromstring(text)
         return True
-    except:
+    except etree.XMLSyntaxError:
         return False
