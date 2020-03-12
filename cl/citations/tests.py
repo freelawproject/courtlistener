@@ -588,22 +588,23 @@ class CiteTest(TestCase):
              '73.</span></p>\n<p>Nathaniel Gorham of Massachusetts</p></div>'),
 
             # Id. citation with an intervening HTML tag
+            #  (We expect the HTML to be unchanged, since it's too risky to
+            #   modify with another tag in the way)
             ('<div><p>the improper views of the Legislature.\" 2 <i>id.,</i> '
              'at <b>73, bolded</b>.</p>\n<p>Nathaniel Gorham of Massachusetts'
              '</p></div>',
-             '<div><p>the improper views of the Legislature." 2<span class="'
-             'citation no-link"> <i><span class="id_token">id.,</span></i> at '
-             '<b>73, </b></span>bolded.</p>\n<p>Nathaniel Gorham of '
-             'Massachusetts</p></div>'),
+             '<div><p>the improper views of the Legislature.\" 2 <i>id.,</i> '
+             'at <b>73, bolded</b>.</p>\n<p>Nathaniel Gorham of Massachusetts'
+             '</p></div>'),
 
             # Ibid. citation with HTML tags
             ('<div><p>possess any peculiar knowledge of the mere policy of '
-             'public measures.\" <i>Ibid.</i></p> <p>Gerry of Massachusetts '
+             'public measures.\" <i>Ibid.</i> Gerry of Massachusetts '
              'like</p></div>',
              '<div><p>possess any peculiar knowledge of the mere policy of '
              'public measures."<span class="citation no-link"> <i><span class='
-             '"ibid_token">Ibid.</span></i></span></p> <p>Gerry of '
-             'Massachusetts like</p></div>'
+             '"ibid_token">Ibid.</span></i> Gerry of Massachusetts </span>like'
+             '</p></div>'
             ),
         ]
 
