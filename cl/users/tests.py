@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.test import LiveServerTestCase, Client, TestCase
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
+from rest_framework.status import HTTP_200_OK
 from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -15,6 +16,26 @@ from cl.users.models import UserProfile
 
 class UserTest(LiveServerTestCase):
     fixtures = ["authtest_data.json"]
+
+    def test_simple_auth_urls_GET(self):
+        """Can we at least GET all the basic auth URLs?"""
+        reverse_names = [
+            "sign-in",
+            "password_reset",
+            "password_reset_done",
+            "password_reset_complete",
+            "email_confirmation_request",
+            "email_confirm_success",
+        ]
+        for reverse_name in reverse_names:
+            path = reverse(reverse_name)
+            r = self.client.get(path)
+            self.assertEqual(
+                r.status_code,
+                HTTP_200_OK,
+                msg="Got wrong status code for page at: {path}. "
+                "Status Code: {code}".format(path=path, code=r.status_code),
+            )
 
     def test_creating_a_new_user(self):
         """Can we register a new user in the front end?"""
