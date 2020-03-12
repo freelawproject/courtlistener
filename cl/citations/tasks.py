@@ -6,6 +6,7 @@ from cl.celery import app
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited
 from cl.citations.models import Citation
+from cl.citations.utils import is_balanced_html
 
 # This is the distance two reporter abbreviations can be from each other if they
 # are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
@@ -74,9 +75,16 @@ def create_cited_html(opinion, citations):
         new_html = opinion.html_columbia or opinion.html_lawbox or opinion.html
         for citation in citations:
             if isinstance(citation, Citation):
-                new_html = re.sub(
-                    citation.as_regex(), citation.as_html(), new_html
-                )
+                citation_regex = citation.as_regex()
+                match = re.search(citation_regex, new_html)
+
+                # Only perform the string replacement if we're sure that the
+                # matched HTML is not unbalanced. (If it is, when we inject
+                # our own HTML, the DOM can get messed up.)
+                if match and is_balanced_html(match.group()):
+                    new_html = re.sub(
+                        citation_regex, citation.as_html(), new_html
+                    )
     elif opinion.plain_text:
         inner_html = opinion.plain_text
         for citation in citations:
