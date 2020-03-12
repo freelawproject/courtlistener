@@ -133,9 +133,11 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_created",
         "date_modified",
     )
-    queryset = Party.objects.prefetch_related("party_types", "roles").order_by(
-        "-id"
-    )
+    queryset = Party.objects.prefetch_related(
+        "party_types__criminal_counts",
+        "party_types__criminal_complaints",
+        "roles",
+    ).order_by("-id")
 
 
 class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
