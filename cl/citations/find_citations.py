@@ -601,13 +601,13 @@ def get_citations(
                 id_token=citation_token, after_tokens=words[i + 1 : i + 3]
             )
 
-        # CASE 2: Citation token is an "Ibid." reference. Same logic as above.
+        # CASE 3: Citation token is an "Ibid." reference. Same logic as above.
         elif citation_token.lower() == "ibid.":
             citation = IbidCitation(
                 id_token=citation_token, after_tokens=words[i + 1 : i + 4]
             )
 
-        # CASE 3: Citation token is a "supra" reference.
+        # CASE 4: Citation token is a "supra" reference.
         # In this case, we're not sure yet what the citation's antecedent is.
         # It could be any of the previous citations above. Thus, like an Id.
         # citation, we won't be able to resolve this reference until the
@@ -615,14 +615,14 @@ def get_citations(
         elif strip_punct(citation_token.lower()) == "supra":
             citation = extract_supra_citation(words, i)
 
-        # CASE 4: Citation token is a section marker.
+        # CASE 5: Citation token is a section marker.
         # In this case, it's likely that this is a reference to a non-
         # opinion document. So we record this marker in order to keep
         # an accurate list of the possible antecedents for id citations.
         elif u"§" in citation_token:
             citation = NonopinionCitation(match_token=citation_token)
 
-        # CASE 5: The token is not a citation.
+        # CASE 6: The token is not a citation.
         else:
             continue
 
