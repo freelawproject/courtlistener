@@ -88,6 +88,8 @@ class IngestionTest(IndexedSolrTestCase):
 
 
 class ExtractionTest(TestCase):
+    fixtures = ["tax_court_test.json"]
+
     def test_txt_extraction_with_bad_data(self):
         """Can we extract text from nasty files lacking encodings?"""
         path = os.path.join(
@@ -104,6 +106,20 @@ class ExtractionTest(TestCase):
             u"¶  1.  DOOLEY, J.   Plaintiffs",
             content,
             "Issue extracting/encoding text from file at: %s" % path,
+        )
+
+    def test_juriscraper_object_creation(self):
+        """Can we extract text from tax court pdf and add to db?"""
+        o = Opinion.objects.get(pk=76)
+        self.assertFalse(
+            o.cluster.citations.exists(),
+            msg="Citation should not exist at beginning of test",
+        )
+
+        extract_doc_content(pk=o.pk, do_ocr=False)
+        self.assertTrue(
+            o.cluster.citations.exists(),
+            msg="Expected citation was not created in db",
         )
 
 
