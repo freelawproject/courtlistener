@@ -1,0 +1,54 @@
+[
+    {
+        "pk": "76",
+        "model": "search.opinion",
+        "fields": {
+            "date_created": "2020-02-14T23:24:59.305Z",
+            "date_modified": "2020-02-14T23:24:59.305Z",
+            "download_url": "https://www.ustaxcourt.gov/UstcInOp/OpinionViewer.aspx?ID=12173",
+            "local_path": "test/search/opinion_tax.pdf",
+            "plain_text": "",
+            "cluster_id": "1776",
+            "extracted_by_ocr": true
+        }
+    },
+    {
+        "pk": "1776",
+        "model": "search.opinioncluster",
+        "fields": {
+            "date_created": "2020-02-14T23:24:59.305Z",
+            "date_modified": "2020-02-14T23:24:59.305Z",
+            "docket_id": "123",
+            "date_filed": "2020-02-14"
+        }
+    },
+    {
+        "pk": "123",
+        "model": "search.docket",
+        "fields": {
+            "date_created": "2020-02-14T23:24:59.305Z",
+            "date_modified": "2020-02-14T23:24:59.305Z",
+            "court_id": "tax",
+            "source": 16
+        }
+    },
+    {
+        "pk": "tax",
+        "model": "search.court",
+        "fields": {
+            "end_date": "1809-12-31",
+            "short_name": "Tax Court",
+            "citation_string": "",
+            "in_use": false,
+            "url": "",
+            "notes": "",
+            "jurisdiction": "FS",
+            "has_oral_argument_scraper": false,
+            "full_name": "Tax Court",
+            "position": 212,
+            "date_modified": "2016-06-18T20:01:59.649Z",
+            "has_opinion_scraper": false,
+            "start_date": "1796-01-01"
+        }
+    }
+]

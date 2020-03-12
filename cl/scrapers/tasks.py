@@ -8,6 +8,8 @@ import traceback
 import uuid
 from tempfile import NamedTemporaryFile
 
+from django.apps import apps
+from cl.lib.juriscraper_utils import get_scraper_object_by_name
 import eyed3
 from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
@@ -228,6 +230,31 @@ def get_page_count(path, extension):
     return None
 
 
+def update_document_from_text(opinion):
+    """Extract additional metadata from document text
+
+    Use functions from Juriscraper to pull metadata out of opinion
+    text. Currently only implemented in Tax, but functional in all
+    scrapers via AbstractSite object.
+    :param opinion: Opinion object
+    :return: None
+    """
+    court = opinion.cluster.docket.court.pk
+    site = get_scraper_object_by_name(court)
+    metadata_dict = site.extract_from_text(opinion.plain_text)
+    for model_name, data in metadata_dict.items():
+        ModelClass = apps.get_model("search.%s" % model_name)
+        if model_name == "OpinionCluster":
+            opinion.cluster.__dict__.update(data)
+        elif model_name == "Citation":
+            data["cluster_id"] = opinion.cluster_id
+            ModelClass.objects.get_or_create(**data)
+        else:
+            raise NotImplemented(
+                "Object type of %s not yet supported." % model_name
+            )
+
+
 @app.task
 def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     """
@@ -278,6 +305,8 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     if blocked:
         opinion.cluster.blocked = True
         opinion.cluster.date_blocked = now()
+
+    update_document_from_text(opinion)
 
     if err:
         print(
