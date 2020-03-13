@@ -237,6 +237,11 @@ def parse_page(page):
     if page.isdigit():
         # First, check whether the page is a simple digit. Most will be.
         return int(page)
+    elif page == len(page) * "_":
+        # Next, check whether the page is indicated as missing. This happens
+        # for a lot of new cases before their full citation is assigned.
+        # E.g., "Carpenter v. United States, 585 U.S. ____ (2018)"
+        return page
     else:
         # Otherwise, check whether the "page" is really one of the following:
         # (ordered in descending order of likelihood)

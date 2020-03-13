@@ -71,9 +71,6 @@ def _tokenize(text):
     # add extra space to make things easier
     text = " " + text + " "
 
-    # get rid of all the annoying underscores in text from pdfs
-    text = re.sub(r"__+", "", text)
-
     # reduce excess whitespace
     text = re.sub(" +", " ", text)
     text = text.strip()
