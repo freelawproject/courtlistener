@@ -153,8 +153,14 @@ class CiteTest(TestCase):
              [FullCitation(volume=559, reporter='N.W.2d', page='826',
                            canonical_reporter=u'N.W.', lookup_index=0,
                            reporter_index=1, reporter_found='N.W.2d')]),
-            # Test with malformed/missing page number
+            # Test with malformed page number
             ('1 U.S. f24601', []),
+            # Test with page number that is indicated as missing
+            ('1 U.S. ___',
+             [FullCitation(volume=1, reporter='U.S.', page='___',
+                           canonical_reporter=u'U.S.', lookup_index=0,
+                           court='scotus', reporter_index=1,
+                           reporter_found='U.S.')]),
             # Test with the 'digit-REPORTER-digit' corner-case formatting
             ('2007-NMCERT-008',
              [FullCitation(volume=2007, reporter='NMCERT', page=8,
@@ -487,6 +493,13 @@ class CiteTest(TestCase):
              '"reporter">U.S.</span> <span class="page">456</span></span><pre'
              ' class="inline">, upholding foo bar</pre>'),
 
+            # Full citation missing a page number
+            ('asdf John v. Doe, 123 U.S. __, upholding foo bar',
+             '<pre class="inline">asdf John v. Doe, </pre><span class="'
+             'citation no-link"><span class="volume">123</span> <span class='
+             '"reporter">U.S.</span> <span class="page">__</span></span><pre'
+             ' class="inline">, upholding foo bar</pre>'),
+
             # Basic short form citation
             ('existing text asdf, 515 U.S., at 240. foobar',
              '<pre class="inline">existing text </pre><span class="citation '
@@ -648,6 +661,28 @@ class MatchingTest(IndexedSolrTestCase):
                              canonical_reporter=u'U.S.', lookup_index=0,
                              court='scotus', reporter_index=1,
                              reporter_found='U.S.')
+            ], [
+                Opinion.objects.get(pk=7)
+            ]),
+
+            # Test matching a citation with a missing page. We expect this to
+            # fail since there's not enough information.
+            ([
+                FullCitation(volume=1, reporter='U.S.', page='___',
+                             canonical_reporter=u'U.S.', lookup_index=0,
+                             court='scotus', reporter_index=1,
+                             reporter_found='U.S.')
+
+            ], []),
+
+            # Test matching a citation with a missing page, but with a known
+            # plaintiff and defendant
+            ([
+                FullCitation(plaintiff='Foo', defendant='Bar', volume=1,
+                             reporter='U.S.', page='___', court='scotus',
+                             canonical_reporter=u'U.S.', lookup_index=0,
+                             reporter_index=1, reporter_found='U.S.')
+
             ], [
                 Opinion.objects.get(pk=7)
             ]),
@@ -854,8 +889,10 @@ class MatchingTest(IndexedSolrTestCase):
         for citations, expected_matches in test_pairs:
             print "Testing citation matching for %s..." % citations
 
-            # The citing opinion does not matter for this test
-            citing_opinion = Opinion.objects.get(pk=1)
+            # The citing opinion matters insofar as its text must contain a
+            # reference to the citation string in cases when a "reverse match"
+            # query is necessary for refinement.
+            citing_opinion = Opinion.objects.get(pk=10)
 
             citation_matches = get_citation_matches(citing_opinion, citations)
             self.assertEqual(
@@ -914,8 +951,9 @@ class UpdateTest(IndexedSolrTestCase):
         # to other mocked opinions, mixed about. It's hard to exhaustively
         # test all combinations, but this test case is made to be deliberately
         # complex, in an effort to "trick" the algorithm. Cited opinions:
-        # pk=7: 1 FullCitation, 1 ShortformCitation, 1 SupraCitation (depth=3)
-        # pk=8: 3 FullCitation (one normal, one Id., and one Ibid.),
+        # pk=7: 2 FullCitation (one normal, one missing a page number),
+        #   1 ShortformCitation, 1 SupraCitation (depth=4)
+        # pk=8: 1 FullCitation, 1 IdCtation, 1 IbidCitation,
         #   1 ShortformCitation, 2 SupraCitation (depth=6)
         # pk=9: 1 FullCitation, 1 ShortformCitation (depth=2)
         remove_citations_from_imported_fixtures()
@@ -923,7 +961,7 @@ class UpdateTest(IndexedSolrTestCase):
         find_citations_for_opinion_by_pks.delay([10])
 
         test_pairs = [
-            (Opinion.objects.get(pk=7), 3),
+            (Opinion.objects.get(pk=7), 4),
             (Opinion.objects.get(pk=8), 6),
             (Opinion.objects.get(pk=9), 2),
         ]
