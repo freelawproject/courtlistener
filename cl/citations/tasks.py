@@ -134,8 +134,9 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
 
         # Increase citation count for each matched cluster if it hasn't
         # already been cited by this opinion.
+        all_cited_opinions = opinion.opinions_cited.all()
         for matched_opinion in grouped_matches:
-            if matched_opinion not in opinion.opinions_cited.all():
+            if matched_opinion not in all_cited_opinions:
                 matched_opinion.cluster.citation_count = (
                     F("citation_count") + 1
                 )
