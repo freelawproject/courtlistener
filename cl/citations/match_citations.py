@@ -134,16 +134,25 @@ def match_citation(citation, citing_doc=None):
     if citation.court:
         main_params["fq"].append("court_exact:%s" % citation.court)
 
-    # Take 1: Use a phrase query to search the citation field.
-    main_params["fq"].append('citation:("%s")' % citation.base_citation())
-    results = conn.raw_query(**main_params).execute()
-    if len(results) == 1:
-        return results
-    if len(results) > 1:
+    # Take 1: If the citation is missing its page, the best we can do is try
+    #   a case name query
+    cp = citation.page
+    if isinstance(cp, basestring) and cp == len(cp) * "_":
         if citing_doc is not None and citation.defendant:
-            # Refine using defendant, if there is one
-            results = case_name_query(conn, main_params, citation, citing_doc)
-        return results
+            return case_name_query(conn, main_params, citation, citing_doc)
+
+    # Take 2: However, if the citation *does* have its full page information,
+    #   we can use that information to perform a citation query first
+    else:
+        main_params["fq"].append('citation:("%s")' % citation.base_citation())
+        results = conn.raw_query(**main_params).execute()
+        if len(results) == 1:
+            return results
+        if len(results) > 1:
+            # Refine using the citation's case name, if it at least knows who
+            # the defendant is
+            if citing_doc is not None and citation.defendant:
+                return case_name_query(conn, main_params, citation, citing_doc)
 
     # Give up.
     return []
