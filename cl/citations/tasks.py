@@ -6,7 +6,8 @@ from django.db.models import F
 
 from cl.celery import app
 from cl.citations import find_citations, match_citations
-from cl.search.models import Opinion, OpinionsCited
+from cl.search.models import Opinion, OpinionsCited, OpinionCluster
+from cl.search.tasks import add_items_to_solr
 from cl.citations.models import Citation
 from cl.citations.utils import is_balanced_html
 
@@ -133,16 +134,25 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
         grouped_matches = Counter(citation_matches)
 
         # Increase citation count for each matched cluster if it hasn't
-        # already been cited by this opinion.
-        all_cited_opinions = opinion.opinions_cited.all()
+        # already been cited by this opinion. First, calculate a list
+        # of the ID of every opinion that will need need updating.
+        all_cited_opinions = opinion.opinions_cited.all().values_list(
+            "pk", flat=True
+        )
+        opinion_ids_to_update = set()
         for matched_opinion in grouped_matches:
-            if matched_opinion not in all_cited_opinions:
-                matched_opinion.cluster.citation_count = (
-                    F("citation_count") + 1
-                )
-                matched_opinion.cluster.save(
-                    index=index, update_fields=["citation_count"]
-                )
+            if matched_opinion.pk not in all_cited_opinions:
+                opinion_ids_to_update.add(matched_opinion.pk)
+
+        # Then, increment the citation_count fields for those matched clusters
+        # all at once. Trigger a single Solr update as well, if required.
+        OpinionCluster.objects.filter(
+            sub_opinions__pk__in=opinion_ids_to_update
+        ).update(citation_count=F("citation_count") + 1)
+        if index:
+            add_items_to_solr.delay(
+                opinion_ids_to_update, "search.OpinionCluster",
+            )
 
         # Generate the opinion's new HTML (with inline citation links)
         opinion.html_with_citations = create_cited_html(opinion, citations)
