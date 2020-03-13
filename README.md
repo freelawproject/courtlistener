@@ -67,19 +67,19 @@ The process now is:
 
  - Check MIGRATIONS.md for potentially critical optimizations to database migrations.
  - Celery:
-    - Simple updates to the docker image can be done with (though you usually want to stop it, then get the latest code, then start it as described next):
-        - sudo docker pull freelawproject/task-server
-        - sudo docker service update task-server_celery_prefork_bulk --image freelawproject/task-server:latest
-        - sudo docker service update task-server_celery_prefork --image freelawproject/task-server:latest
-        - sudo docker service update task-server_celery_gevent --image freelawproject/task-server:latest
     - Pull latest docker image
         - sudo docker pull freelawproject/task-server
     - Stop celery:
         - sudo docker service scale task-server_celery_prefork=0
         - sudo docker service scale task-server_celery_prefork_bulk=0
         - sudo docker service scale task-server_celery_gevent=0
+    - Update the image:
+       - sudo docker service update task-server_celery_prefork_bulk --image freelawproject/task-server:latest
+       - sudo docker service update task-server_celery_prefork --image freelawproject/task-server:latest
+       - sudo docker service update task-server_celery_gevent --image freelawproject/task-server:latest
     - Pull latest code (git):
         - cd /opt/tasks && sudo git pull
+    - Restart services later, as below, once rest of system is updated
  - Solr:
     - Pull latest docker image
     - Pull latest code (git)
