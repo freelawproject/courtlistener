@@ -2,6 +2,8 @@ import re
 from httplib import ResponseNotReady
 from collections import Counter
 
+from django.db.models import F
+
 from cl.celery import app
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited
@@ -134,8 +136,12 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
         # already been cited by this opinion.
         for matched_opinion in grouped_matches:
             if matched_opinion not in opinion.opinions_cited.all():
-                matched_opinion.cluster.citation_count += 1
-                matched_opinion.cluster.save(index=index)
+                matched_opinion.cluster.citation_count = (
+                    F("citation_count") + 1
+                )
+                matched_opinion.cluster.save(
+                    index=index, update_fields=["citation_count"]
+                )
 
         # Generate the opinion's new HTML (with inline citation links)
         opinion.html_with_citations = create_cited_html(opinion, citations)
