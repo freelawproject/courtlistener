@@ -133,9 +133,9 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
         # values = number of times that opinion is cited
         grouped_matches = Counter(citation_matches)
 
-        # Increase citation count for each matched cluster if it hasn't
-        # already been cited by this opinion. First, calculate a list
-        # of the ID of every opinion that will need need updating.
+        # Increase the citation count for the cluster of each matched opinion
+        # if that cluster has not already been cited by this opinion. First,
+        # calculate a list of the IDs of every opinion that will need updating.
         all_cited_opinions = opinion.opinions_cited.all().values_list(
             "pk", flat=True
         )
@@ -154,7 +154,7 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
                 opinion_ids_to_update, "search.OpinionCluster",
             )
 
-        # Generate the opinion's new HTML (with inline citation links)
+        # Generate the citing opinion's new HTML (with inline citation links)
         opinion.html_with_citations = create_cited_html(opinion, citations)
 
         # Nuke existing citations
@@ -172,6 +172,10 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
             ]
         )
 
-        # Update Solr if requested. In some cases we do it at the end for
-        # performance reasons.
-        opinion.save(index=index)
+        # Save all the changes to the citing opinion
+        opinion.save()
+
+    # If a Solr update was requested, do a single one at the end with all the
+    # pks of the passed opinions
+    if index:
+        add_items_to_solr.delay(opinion_pks, "search.Opinion")
