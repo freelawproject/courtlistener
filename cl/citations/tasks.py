@@ -2,9 +2,12 @@ import re
 from httplib import ResponseNotReady
 from collections import Counter
 
+from django.db.models import F
+
 from cl.celery import app
 from cl.citations import find_citations, match_citations
-from cl.search.models import Opinion, OpinionsCited
+from cl.search.models import Opinion, OpinionsCited, OpinionCluster
+from cl.search.tasks import add_items_to_solr
 from cl.citations.models import Citation
 from cl.citations.utils import is_balanced_html
 
@@ -110,6 +113,10 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
         #   SupraCitation, SupraCitation, ShortformCitation, FullCitation]
         citations = get_document_citations(opinion)
 
+        # If no citations are found, continue
+        if not citations:
+            continue
+
         # Match all those different Citation objects to Opinion objects, using
         # a variety of hueristics.
         try:
@@ -126,32 +133,54 @@ def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
         # values = number of times that opinion is cited
         grouped_matches = Counter(citation_matches)
 
+        # Increase the citation count for the cluster of each matched opinion
+        # if that cluster has not already been cited by this opinion. First,
+        # calculate a list of the IDs of every opinion whose cluster will need
+        # updating.
+        all_cited_opinions = opinion.opinions_cited.all().values_list(
+            "pk", flat=True
+        )
+        opinion_ids_to_update = set()
         for matched_opinion in grouped_matches:
-            # Increase citation count for matched cluster if it hasn't
-            # already been cited by this opinion.
-            if matched_opinion not in opinion.opinions_cited.all():
-                matched_opinion.cluster.citation_count += 1
-                matched_opinion.cluster.save(index=index)
+            if matched_opinion.pk not in all_cited_opinions:
+                opinion_ids_to_update.add(matched_opinion.pk)
 
-        # Only update things if we found citations
-        if citations:
-            opinion.html_with_citations = create_cited_html(opinion, citations)
-
-            # Nuke existing citations
-            OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
-
-            # Create the new ones.
-            OpinionsCited.objects.bulk_create(
-                [
-                    OpinionsCited(
-                        citing_opinion_id=opinion.pk,
-                        cited_opinion_id=matched_opinion.pk,
-                        depth=grouped_matches[matched_opinion],
-                    )
-                    for matched_opinion in grouped_matches
-                ]
+        # Then, increment the citation_count fields for those matched clusters
+        # all at once. Trigger a single Solr update as well, if required.
+        opinion_clusters_to_update = OpinionCluster.objects.filter(
+            sub_opinions__pk__in=opinion_ids_to_update
+        )
+        opinion_clusters_to_update.update(
+            citation_count=F("citation_count") + 1
+        )
+        if index:
+            add_items_to_solr.delay(
+                opinion_clusters_to_update.values_list("pk", flat=True),
+                "search.OpinionCluster",
             )
 
-        # Update Solr if requested. In some cases we do it at the end for
-        # performance reasons.
-        opinion.save(index=index)
+        # Generate the citing opinion's new HTML (with inline citation links)
+        opinion.html_with_citations = create_cited_html(opinion, citations)
+
+        # Nuke existing citations
+        OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
+
+        # Create the new ones.
+        OpinionsCited.objects.bulk_create(
+            [
+                OpinionsCited(
+                    citing_opinion_id=opinion.pk,
+                    cited_opinion_id=matched_opinion.pk,
+                    depth=grouped_matches[matched_opinion],
+                )
+                for matched_opinion in grouped_matches
+            ]
+        )
+
+        # Save all the changes to the citing opinion
+        opinion.save()
+
+    # If a Solr update was requested, do a single one at the end with all the
+    # pks of the passed opinions
+    if index:
+        add_items_to_solr.delay(opinion_pks, "search.Opinion")
