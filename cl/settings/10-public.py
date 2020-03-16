@@ -325,7 +325,7 @@ REST_FRAMEWORK = {
         "waldo": "10000/hour",
         "hdave4": "15000/hour",  # GSU
         "ellliottt": "15000/hour",
-        "flooie": "20000/hour", #Needed for testing
+        "flooie": "20000/hour",  # Needed for testing
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
