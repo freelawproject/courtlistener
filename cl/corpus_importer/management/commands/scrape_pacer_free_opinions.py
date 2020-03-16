@@ -104,7 +104,9 @@ def get_and_save_free_document_reports(options):
             in_use=True,
             end_date=None,
         )
-        .exclude(pk__in=["casb", "gub", "innb", "miwb", "ohsb", "prb"],)
+        .exclude(
+            pk__in=["casb", "gasd", "gub", "innb", "miwb", "ohsb", "prb"],
+        )
         .values_list("pk", flat=True,)
     )
     pacer_court_ids = [map_cl_to_pacer_id(v) for v in cl_court_ids]
