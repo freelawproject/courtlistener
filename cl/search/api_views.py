@@ -46,6 +46,7 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = DocketSerializer
     filter_class = DocketFilter
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
         "date_argued",
@@ -75,7 +76,7 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = DocketEntrySerializer
     filter_class = DocketEntryFilter
-    ordering_fields = ("date_created", "date_modified", "date_filed")
+    ordering_fields = ("id", "date_created", "date_modified", "date_filed")
 
     queryset = (
         DocketEntry.objects.select_related(
@@ -96,7 +97,7 @@ class RECAPDocumentViewSet(
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = RECAPDocumentSerializer
     filter_class = RECAPDocumentFilter
-    ordering_fields = ("date_created", "date_modified", "date_upload")
+    ordering_fields = ("id", "date_created", "date_modified", "date_upload")
     queryset = (
         RECAPDocument.objects.select_related(
             "docket_entry", "docket_entry__docket",
@@ -110,6 +111,7 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = CourtSerializer
     filter_class = CourtFilter
     ordering_fields = (
+        "id",
         "date_modified",
         "position",
         "start_date",
@@ -124,6 +126,7 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionClusterSerializer
     filter_class = OpinionClusterFilter
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
         "date_filed",

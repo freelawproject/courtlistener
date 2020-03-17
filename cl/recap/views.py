@@ -34,6 +34,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     serializer_class = ProcessingQueueSerializer
     filter_class = ProcessingQueueFilter
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
     )
@@ -49,6 +50,7 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
     filter_class = PacerFetchQueueFilter
     permission_classes = (IsAuthenticatedOrReadOnly,)
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
         "date_completed",
@@ -93,6 +95,7 @@ class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
     serializer_class = FjcIntegratedDatabaseSerializer
     filter_class = FjcIntegratedDatabaseFilter
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
         "date_filed",
