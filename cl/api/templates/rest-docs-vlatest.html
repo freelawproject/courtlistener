@@ -299,6 +299,7 @@
     </p>
     <pre class="pre-scrollable">
 "ordering": [
+    "id",
     "date_created",
     "date_modified",
     "date_nominated",
@@ -316,7 +317,8 @@
     <p>Descending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Positions</code> ordered by the most recently modified, then by the most recently elected:
     </p>
     <pre class="scrollable">curl {% get_full_host %}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected</pre>
-
+    <p>Ordering by fields with duplicate values is non-deterministic. If you wish to order by such a field, you should also provide a tie-breaker in order to consistently order results. For example, ordering by <code>date_filed</code> will not return consistent ordering for items that have the same date, but this can be fixed by ordering by <code>date_filed,id</code>. In that case, if two items have the same <code>date_filed</code> value, the tie will be broken by the <code>id</code> field.
+    </p>
 
     <h3 id="field-selection">Field Selection</h3>
     <p>To save bandwidth and increase serialization performance, fields can be limited by using the <code>fields</code> parameter with a comma-separated list of fields you wish to receive.
