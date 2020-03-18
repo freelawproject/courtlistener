@@ -12,6 +12,7 @@ def inject_settings(request):
         "DEBUG": settings.DEBUG,
         "EIN_SECRET": settings.EIN_SECRET,
         "MIN_DONATION": settings.MIN_DONATION,
+        "MAX_ALERT_RESULTS_PER_DAY": settings.MAX_ALERT_RESULTS_PER_DAY,
         "FUNDRAISING_MODE": settings.FUNDRAISING_MODE,
         "MAX_FREE_DOCKET_ALERTS": settings.MAX_FREE_DOCKET_ALERTS,
         "DOCKET_ALERT_RECAP_BONUS": settings.DOCKET_ALERT_RECAP_BONUS,
