@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load humanize %}
+{% load text_filters %}
 
 {% block message %}{% endblock %}
 
@@ -21,7 +22,7 @@
 {% block head %}
     {% if not error %}
         {% if get_string %}
-          {% if search_form.type.value != "p" %}
+          {% if search_form.type.value != SEARCH_TYPES.PEOPLE %}
             <link rel="alternate"
                   type="application/rss+xml"
                   title="Atom Feed for These Search Results"
@@ -37,21 +38,76 @@
           type="application/rss+xml"
           title="Podcast For All Oral Arguments"
           href="/podcast/court/all/">
+  {% if DEBUG %}
+    <link rel="stylesheet"
+          href="{{ STATIC_URL }}css/bootstrap-datepicker3.css"/>
+  {% else %}
+    <link rel="stylesheet"
+          href="{{ STATIC_URL }}css/bootstrap-datepicker3.min.css"/>
+  {% endif %}
 {% endblock %}
 
-{% block footer-scripts %}{% endblock %}
+{% block footer-scripts %}
+  {% include "includes/date_picker.html" %}
+  {% if alert_form.errors or request.GET.show_alert_modal %}
+    <script type="text/javascript">
+      $(window).on('load',function(){
+        $("#modal-save-alert").modal('show');
+      });
+    </script>
+  {% endif %}
+  <script type="text/javascript">
+    $("#modal-save-alert").on('show.bs.modal', function (e) {
+      const modalBody = $('.modal-body.logged-in');
+      if (modalBody.length === 0){
+        // Not logged in; abort. Don't do alert estimation ajax
+        return
+      }
+      const estimate = $(this).find('#alert-estimate');
+      const icon = estimate.find('i');
+      const msg = estimate.find('span');
+      const numDaysToEstimate = 100;
+      $.ajax({
+        url: "{% url "alert_frequency" version=3 day_count=100 %}" + window.location.search,
+        success: function(data){
+          // Check if this is impractically large. If so, block it
+          const hitsPerDay = Math.floor(data.count / numDaysToEstimate);
+          if (hitsPerDay > {{ MAX_ALERT_RESULTS_PER_DAY }}){
+            // Wipe the screen; show message to the user
+            modalBody.empty();
+            modalBody.append(
+              $('<p/>').text("This query averages about " + hitsPerDay + " results per day. This is more than our system can support and may create a lot of messages in your inbox."),
+              $('<p/>').text("Please narrow your query to have fewer results per day.")
+            );
+            modalBody.removeClass("hidden");
+          } else {
+            // Show the form; Update icon and text
+            modalBody.removeClass("hidden");
+            icon.removeClass('fa-spinner fa-pulse fa-warning').addClass('fa-clock-o');
+            msg.text(" " + data.count + " hits in the last 100 days")
+          }
+        },
+        error: function(){
+          modalBody.removeClass("hidden");
+          icon.removeClass("fa-spinner fa-pulse fa-clock-o").addClass("fa-warning");
+          msg.text(" Unable to get estimate for this alert");
+        }
+      })
+    })
+  </script>
+{% endblock %}
 
 {% block navbar-o %}
-    {% if search_form.type.value == "o" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.OPINION %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-r %}
-    {% if search_form.type.value == 'r' %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.RECAP %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-oa %}
-    {% if search_form.type.value == "oa" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-p %}
-    {% if search_form.type.value == "p" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.PEOPLE %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 
 
@@ -63,9 +119,6 @@
     </div>
     {% include "includes/result_type_chooser.html" %}
     {% include "includes/sidebar_filters.html" %}
-    {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
-        {% include "includes/alert_sidebar_section.html" %}
-    {% endif %}
     {% include "includes/donate_sidebar.html" with referrer="search-donate-now" %}
 </div>
 {% endblock %}
@@ -74,9 +127,58 @@
 {% block content %}
 {% with type=search_form.type.value %}
     <div id="search-results" class="col-lg-7 col-sm-9 search-page">
-        <div class="row">
+      {% include "includes/messages.html" %}
+      {% if type != 'p' %}
+        {% if query_citation or alert_form.errors or request.GET.edit_alert  %}
+          <div class="alert {% if query_citation %}alert-info{% elif alert_form.errors %}alert-danger{% elif request.GET.edit_alert %}alert-info{% endif %}" role="alert">
+            <div class="row">
+              {% if query_citation %}
+                <div class="col-xs-9">
+                  <p><i class="fa fa-info-circle fa-lg"></i> It looks like you're trying to search for <a class="alert-link" href="{{ query_citation.absolute_url }}">{{ query_citation.caseName|safe }}</a>, from {{ query_citation.dateFiled.year }}.</p>
+
+                </div>
+                <div class="col-xs-3 text-right">
+                  <a class="btn btn-primary btn-sm"
+                     href="{{ query_citation.absolute_url }}">Go<span
+                          class="hidden-xs"> to This Case</span></a>
+                </div>
+              {% elif alert_form.errors %}
+                <div class="col-xs-9">
+                  <p class="bottom"><i class="fa fa-exclamation-circle"></i> There was an error creating your alert.</p>
+                </div>
+                <div class="col-xs-3 text-right">
+                  <a class="btn btn-danger btn-sm"
+                     data-toggle="modal"
+                     data-target="#modal-save-alert">Update Alert</a>
+                </div>
+              {% elif request.GET.edit_alert %}
+                <div class="col-sm-6">
+                  <p class="bottom">You are editing your alert,
+                    "<strong>{{ alert_form.name.value }}</strong>".</p>
+                </div>
+                <div class="col-sm-6 text-right">
+                  <a class="btn btn-default btn-sm"
+                     data-toggle="modal"
+                     data-target="#modal-save-alert">
+                    Save Alert
+                  </a>
+                  <a class="btn btn-danger btn-sm"
+                     href="?{{ get_string_sans_alert }}">
+                    Cancel
+                  </a>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+
+      <div class="row">
             <div class="col-sm-12">
-                <form action="/"
+              {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
+                {% include "includes/alert_modal.html" %}
+              {% endif %}
+              <form action="/"
                       method="get"
                       id="search-form"
                       role="form">
@@ -89,6 +191,16 @@
                                    id="id_q"
                                    autocomplete="off"
                                    type="text">
+                            {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
+                              {% if not error and get_string %}
+                                <span class="input-group-addon input-group-addon-blended">
+                                  <i class="fa fa-bell-o fa-lg gray pointer"
+                                   data-toggle="modal"
+                                   data-target="#modal-save-alert"
+                                   title="{% if request.GET.edit_alert %}Edit this alert{% else %}Create new alert{% endif %}"></i>
+                                </span>
+                              {% endif %}
+                            {% endif %}
                             <span class="input-group-btn">
                                 <button type="submit"
                                         class="btn btn-primary"
@@ -103,51 +215,6 @@
                 </form>
             </div>
         </div>
-
-        {% include "includes/messages.html" %}
-        {% if type != 'p' %}
-            {% if alert_form.errors %}
-                <div class="alert alert-danger" role="alert">
-                    <p class="bottom">There was an error creating your alert. Please
-                        <a href="#create-alert-header">see below</a>.
-                    </p>
-                </div>
-            {% endif %}
-            {% if request.GET.edit_alert %}
-                <div class="alert alert-warning" role="alert">
-                    <div class="row">
-                        <div class="col-sm-6">
-                            <p class="bottom">You are editing your alert,
-                            "<strong>{{ alert_form.name.value }}</strong>".</p>
-                        </div>
-                        <div class="col-sm-6 text-right">
-                            <a class="btn btn-success btn-sm"
-                               id="save-alert-button">
-                                Save Alert
-                            </a>
-                            <a class="btn btn-default btn-sm"
-                               href="?{{ get_string_sans_alert }}">
-                                Cancel
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-            {% if query_citation %}
-                <div class="alert alert-info" role="alert">
-                    <div class="row">
-                        <div class="col-xs-9">
-                            <p><i class="fa fa-info-circle fa-lg"></i> It looks like you're trying to search for <a class="alert-link" href="{{ query_citation.absolute_url }}">{{ query_citation.caseName|safe }}</a>, from {{ query_citation.dateFiled.year }}.</p>
-                        </div>
-                        <div class="col-xs-3 text-right">
-                            <a class="btn btn-primary btn-sm"
-                               href="{{ query_citation.absolute_url }}">Go<span
-                                    class="hidden-xs"> to This Case</span></a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-        {% endif %}
 
         {% if results.paginator.count > 0 %}
             <div class="row">
@@ -170,6 +237,9 @@
                     <h2 id="result-count" class="bottom">
                         {% if type == 'o' %}
                             {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
+                          {% if cited_cluster %}
+                            <span class="gray alt">cite{{ results.paginator.count|pluralize:"s," }}</span> {{ cited_cluster.caption|safe|v_wrapper }}
+                          {% endif %}
                         {% elif type == 'r' %}
                             {% with matches=results.object_list.groups.docket_id.matches count=results.paginator.count %}
                             {{ count|intcomma }} Case{{ count|pluralize }} <span class="gray">&mdash;</span>

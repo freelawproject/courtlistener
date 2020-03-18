@@ -3,8 +3,12 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
 from cl.lib.storage import IncrementingFileSystemStorage, UUIDFileSystemStorage
-from cl.lib.model_helpers import make_json_path, make_pdf_path, \
-    make_pdf_thumb_path, make_lasc_json_path
+from cl.lib.model_helpers import (
+    make_json_path,
+    make_pdf_path,
+    make_pdf_thumb_path,
+    make_lasc_json_path,
+)
 
 
 class THUMBNAIL_STATUSES(object):
@@ -14,12 +18,13 @@ class THUMBNAIL_STATUSES(object):
     NAMES = (
         (NEEDED, "Thumbnail needed"),
         (COMPLETE, "Thumbnail completed successfully"),
-        (FAILED, 'Unable to generate thumbnail'),
+        (FAILED, "Unable to generate thumbnail"),
     )
 
 
 class AbstractPDF(models.Model):
     """An abstract model to hold PDF-related information"""
+
     OCR_COMPLETE = 1
     OCR_UNNECESSARY = 2
     OCR_FAILED = 3
@@ -36,9 +41,7 @@ class AbstractPDF(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.",
-        auto_now=True,
-        db_index=True,
+        help_text="Timestamp of last update.", auto_now=True, db_index=True,
     )
     sha1 = models.CharField(
         help_text="The ID used for a document in RECAP",
@@ -64,9 +67,7 @@ class AbstractPDF(models.Model):
         blank=True,
     )
     filepath_ia = models.CharField(
-        help_text="The URL of the file in IA",
-        max_length=1000,
-        blank=True,
+        help_text="The URL of the file in IA", max_length=1000, blank=True,
     )
     ia_upload_failure_count = models.SmallIntegerField(
         help_text="Number of times the upload to the Internet Archive failed.",
@@ -87,7 +88,7 @@ class AbstractPDF(models.Model):
     )
     plain_text = models.TextField(
         help_text="Plain text of the document after extraction using "
-                  "pdftotext, wpd2txt, etc.",
+        "pdftotext, wpd2txt, etc.",
         blank=True,
     )
     ocr_status = models.SmallIntegerField(
@@ -121,8 +122,8 @@ class AbstractFile(models.Model):
 
     @property
     def file_contents(self):
-        with open(self.filepath.path, 'r') as f:
-            return f.read().decode('utf-8')
+        with open(self.filepath.path, "r") as f:
+            return f.read().decode("utf-8")
 
     def print_file_contents(self):
         print(self.file_contents)
@@ -138,4 +139,3 @@ class AbstractJSON(AbstractFile):
 
     class Meta:
         abstract = True
-

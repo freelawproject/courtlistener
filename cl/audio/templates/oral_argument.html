@@ -20,25 +20,25 @@
 {% endblock %}
 
 {% block footer-scripts %}
-    <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
-    <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/save-favorites.js"></script>
-    <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/jquery.jplayer.min.js"></script>
-    <script type="text/javascript">
-        $(document).ready(function () {
-            $("#jquery_jplayer_1").jPlayer({
-                ready: function (event) {
-                    $(this).jPlayer("setMedia", {
-                        title: "{{ af|best_case_name }}",
-                        mp3: "/{{ af.local_path_mp3 }}"
-                    });
-                },
-                swfPath: "{{ STATIC_URL }}swf/Jplayer.swf"
-            });
-        });
-    </script>
+  <script defer type="text/javascript"
+          src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+  <script defer type="text/javascript"
+          src="{{ STATIC_URL }}js/save-favorites.js"></script>
+  <script defer type="text/javascript"
+          src="{{ STATIC_URL }}js/jquery.jplayer.min.js"></script>
+  <script type="text/javascript">
+    $(document).ready(function () {
+      $("#jquery_jplayer_1").jPlayer({
+        ready: function (event) {
+          $(this).jPlayer("setMedia", {
+            title: "{{ af|best_case_name }}",
+            mp3: "/{{ af.local_path_mp3 }}"
+          });
+        },
+        swfPath: "{{ STATIC_URL }}swf/Jplayer.swf"
+      });
+    });
+  </script>
 {% endblock %}
 
 {% block sidebar %}

@@ -23,16 +23,25 @@ def get_audio_binary():
 
     :returns path to the winning binary
     """
-    path_to_binary = find_executable('avconv')
+    path_to_binary = find_executable("avconv")
     if path_to_binary is None:
-        path_to_binary = find_executable('ffmpeg')
+        path_to_binary = find_executable("ffmpeg")
         if path_to_binary is None:
-            raise Exception("Unable to find avconv or ffmpeg for doing "
-                            "audio conversions.")
+            raise Exception(
+                "Unable to find avconv or ffmpeg for doing "
+                "audio conversions."
+            )
     return path_to_binary
 
 
 def make_af_filename(court_id, docket_number, date_argued, extension):
     """Make a filename for the audio file for uploading to IA"""
-    return '.'.join(['gov', 'uscourts', court_id, slugify(docket_number),
-                     date_argued.isoformat(), extension])
+    parts = [
+        "gov",
+        "uscourts",
+        court_id,
+        slugify(docket_number),
+        date_argued.isoformat(),
+        extension,
+    ]
+    return ".".join(parts)

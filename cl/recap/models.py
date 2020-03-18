@@ -18,26 +18,28 @@ class UPLOAD_TYPE:
     IA_XML_FILE = 7
     CASE_REPORT_PAGE = 8
     CLAIMS_REGISTER = 9
+    DOCUMENT_ZIP = 10
 
     NAMES = (
-        (DOCKET, 'HTML Docket'),
-        (ATTACHMENT_PAGE, 'HTML attachment page'),
-        (PDF, 'PDF'),
-        (DOCKET_HISTORY_REPORT, 'Docket history report'),
-        (APPELLATE_DOCKET, 'Appellate HTML docket'),
-        (APPELLATE_ATTACHMENT_PAGE, 'Appellate HTML attachment page'),
-        (IA_XML_FILE, 'Internet Archive XML docket'),
-        (CASE_REPORT_PAGE, 'Case report (iquery.pl) page'),
-        (CLAIMS_REGISTER, 'Claims register page'),
+        (DOCKET, "HTML Docket"),
+        (ATTACHMENT_PAGE, "HTML attachment page"),
+        (PDF, "PDF"),
+        (DOCKET_HISTORY_REPORT, "Docket history report"),
+        (APPELLATE_DOCKET, "Appellate HTML docket"),
+        (APPELLATE_ATTACHMENT_PAGE, "Appellate HTML attachment page"),
+        (IA_XML_FILE, "Internet Archive XML docket"),
+        (CASE_REPORT_PAGE, "Case report (iquery.pl) page"),
+        (CLAIMS_REGISTER, "Claims register page"),
+        (DOCUMENT_ZIP, "Zip archive of RECAP Documents"),
     )
 
 
 def make_recap_processing_queue_path(instance, filename):
-    return make_path('recap_processing_queue', filename)
+    return make_path("recap_processing_queue", filename)
 
 
 def make_recap_data_path(instance, filename):
-    return make_path('recap-data', filename)
+    return make_path("recap-data", filename)
 
 
 class PacerHtmlFiles(AbstractFile):
@@ -48,6 +50,7 @@ class PacerHtmlFiles(AbstractFile):
     essential as we do more and more data work where we're purchasing content.
     If we don't keep an original copy, a bug could be devastating.
     """
+
     filepath = models.FileField(
         help_text="The path of the original data from PACER.",
         upload_to=make_recap_data_path,
@@ -68,12 +71,12 @@ class PROCESSING_STATUS:
     QUEUED_FOR_RETRY = 5
     INVALID_CONTENT = 6
     NAMES = (
-        (ENQUEUED, 'Awaiting processing in queue.'),
-        (SUCCESSFUL, 'Item processed successfully.'),
-        (FAILED, 'Item encountered an error while processing.'),
-        (IN_PROGRESS, 'Item is currently being processed.'),
-        (QUEUED_FOR_RETRY, 'Item failed processing, but will be retried.'),
-        (INVALID_CONTENT, 'Item failed validity tests.'),
+        (ENQUEUED, "Awaiting processing in queue."),
+        (SUCCESSFUL, "Item processed successfully."),
+        (FAILED, "Item encountered an error while processing."),
+        (IN_PROGRESS, "Item is currently being processed."),
+        (QUEUED_FOR_RETRY, "Item failed processing, but will be retried."),
+        (INVALID_CONTENT, "Item failed validity tests."),
     )
 
 
@@ -91,13 +94,13 @@ class ProcessingQueue(models.Model):
     court = models.ForeignKey(
         Court,
         help_text="The court where the upload was from",
-        related_name='recap_processing_queue',
+        related_name="recap_processing_queue",
         on_delete=models.CASCADE,
     )
     uploader = models.ForeignKey(
         User,
         help_text="The user that uploaded the item to RECAP.",
-        related_name='recap_processing_queue',
+        related_name="recap_processing_queue",
         on_delete=models.CASCADE,
     )
     pacer_case_id = models.CharField(
@@ -119,7 +122,7 @@ class ProcessingQueue(models.Model):
     )
     attachment_number = models.SmallIntegerField(
         help_text="If the file is an attachment, the number is the attachment "
-                  "number on the docket.",
+        "number on the docket.",
         blank=True,
         null=True,
     )
@@ -131,8 +134,10 @@ class ProcessingQueue(models.Model):
     )
     status = models.SmallIntegerField(
         help_text="The current status of this upload. Possible values "
-                  "are: %s" % ', '.join(['(%s): %s' % (t[0], t[1]) for t in
-                                         PROCESSING_STATUS.NAMES]),
+        "are: %s"
+        % ", ".join(
+            ["(%s): %s" % (t[0], t[1]) for t in PROCESSING_STATUS.NAMES]
+        ),
         default=PROCESSING_STATUS.ENQUEUED,
         choices=PROCESSING_STATUS.NAMES,
         db_index=True,
@@ -147,7 +152,7 @@ class ProcessingQueue(models.Model):
     )
     debug = models.BooleanField(
         help_text="Are you debugging? Debugging uploads will be validated, "
-                  "but not saved to the database.",
+        "but not saved to the database.",
         default=False,
     )
 
@@ -161,30 +166,33 @@ class ProcessingQueue(models.Model):
     docket_entry = models.ForeignKey(
         DocketEntry,
         help_text="The docket entry that was created or updated by this "
-                  "request, if applicable. Only applies to PDFs uploads.",
+        "request, if applicable. Only applies to PDFs uploads.",
         null=True,
         on_delete=models.CASCADE,
     )
     recap_document = models.ForeignKey(
         RECAPDocument,
         help_text="The document that was created or updated by this request, "
-                  "if applicable. Only applies to PDFs uploads.",
+        "if applicable. Only applies to PDFs uploads.",
         null=True,
         on_delete=models.CASCADE,
     )
 
     def __unicode__(self):
         if self.upload_type in [
-                UPLOAD_TYPE.DOCKET, UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
-                UPLOAD_TYPE.APPELLATE_DOCKET]:
-            return u'ProcessingQueue %s: %s case #%s (%s)' % (
+            UPLOAD_TYPE.DOCKET,
+            UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
+            UPLOAD_TYPE.APPELLATE_DOCKET,
+            UPLOAD_TYPE.DOCUMENT_ZIP,
+        ]:
+            return u"ProcessingQueue %s: %s case #%s (%s)" % (
                 self.pk,
                 self.court_id,
                 self.pacer_case_id,
                 self.get_upload_type_display(),
             )
         elif self.upload_type == UPLOAD_TYPE.PDF:
-            return u'ProcessingQueue: %s: %s.%s.%s.%s (%s)' % (
+            return u"ProcessingQueue: %s: %s.%s.%s.%s (%s)" % (
                 self.pk,
                 self.court_id,
                 self.pacer_case_id or None,
@@ -192,26 +200,21 @@ class ProcessingQueue(models.Model):
                 self.attachment_number or 0,
                 self.get_upload_type_display(),
             )
-        elif self.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
-            return u'ProcessingQueue: %s (%s)' % (
+        else:
+            return u"ProcessingQueue: %s (%s)" % (
                 self.pk,
                 self.get_upload_type_display(),
-            )
-        else:
-            raise NotImplementedError(
-                "No __unicode__ method on ProcessingQueue model for upload_"
-                "type of %s" % self.upload_type
             )
 
     class Meta:
         permissions = (
-            ("has_recap_upload_access", 'Can upload documents to RECAP.'),
+            ("has_recap_upload_access", "Can upload documents to RECAP."),
         )
 
     @property
     def file_contents(self):
-        with open(self.filepath_local.path, 'r') as f:
-            return f.read().decode('utf-8')
+        with open(self.filepath_local.path, "r") as f:
+            return f.read().decode("utf-8")
 
     def print_file_contents(self):
         print(self.file_contents)
@@ -222,8 +225,8 @@ class REQUEST_TYPE:
     PDF = 2
 
     NAMES = (
-        (DOCKET, 'HTML Docket'),
-        (PDF, 'PDF'),
+        (DOCKET, "HTML Docket"),
+        (PDF, "PDF"),
     )
 
 
@@ -249,13 +252,15 @@ class PacerFetchQueue(models.Model):
     user = models.ForeignKey(
         User,
         help_text="The user that made the request.",
-        related_name='pacer_fetch_queue_items',
+        related_name="pacer_fetch_queue_items",
         on_delete=models.CASCADE,
     )
     status = models.SmallIntegerField(
         help_text="The current status of this request. Possible values "
-                  "are: %s" % ', '.join(['(%s): %s' % (t[0], t[1]) for t in
-                                         PROCESSING_STATUS.NAMES]),
+        "are: %s"
+        % ", ".join(
+            ["(%s): %s" % (t[0], t[1]) for t in PROCESSING_STATUS.NAMES]
+        ),
         default=PROCESSING_STATUS.ENQUEUED,
         choices=PROCESSING_STATUS.NAMES,
         db_index=True,
@@ -266,7 +271,7 @@ class PacerFetchQueue(models.Model):
     )
     message = models.TextField(
         help_text="Any messages that may help a user during or after "
-                  "processing.",
+        "processing.",
         blank=True,
     )
 
@@ -276,7 +281,7 @@ class PacerFetchQueue(models.Model):
     court = models.ForeignKey(
         Court,
         help_text="The court where the request will be made",
-        related_name='pacer_fetch_queue_items',
+        related_name="pacer_fetch_queue_items",
         on_delete=models.CASCADE,
         null=True,
     )
@@ -287,48 +292,48 @@ class PacerFetchQueue(models.Model):
     docket = models.ForeignKey(
         Docket,
         help_text="The ID of an existing docket object in the CourtListener "
-                  "database that should be updated.",
-        related_name='pacer_fetch_queue_items',
+        "database that should be updated.",
+        related_name="pacer_fetch_queue_items",
         on_delete=models.CASCADE,
         null=True,
     )
     pacer_case_id = models.CharField(
         help_text="The case ID provided by PACER for the case to update (must "
-                  "be used in combination with the court field).",
+        "be used in combination with the court field).",
         max_length=100,
         db_index=True,
         blank=True,
     )
     docket_number = models.CharField(
         help_text="The docket number of a case to update (must be used in "
-                  "combination with the court field).",
+        "combination with the court field).",
         max_length=50,
         blank=True,
     )
     de_date_start = models.DateField(
         help_text="Only fetch docket entries (de) newer than this date. "
-                  "Default is 1 Jan. 1960. Timezone appears to be that of the "
-                  "court.",
+        "Default is 1 Jan. 1960. Timezone appears to be that of the "
+        "court.",
         null=True,
         blank=True,
     )
     de_date_end = models.DateField(
         help_text="Only fetch docket entries (de) older than or equal to this "
-                  "date. Timezone appears to be that of the court.",
+        "date. Timezone appears to be that of the court.",
         null=True,
         blank=True,
     )
     de_number_start = models.IntegerField(
         help_text="Only fetch docket entries (de) >= than this value. "
-                  "Warning: Using this parameter will not return numberless "
-                  "entries.",
+        "Warning: Using this parameter will not return numberless "
+        "entries.",
         null=True,
         blank=True,
     )
     de_number_end = models.IntegerField(
         help_text="Only fetch docket entries (de) <= this value. "
-                  "Warning: Using this parameter will not return numberless "
-                  "entries.",
+        "Warning: Using this parameter will not return numberless "
+        "entries.",
         null=True,
         blank=True,
     )
@@ -342,7 +347,7 @@ class PacerFetchQueue(models.Model):
     )
     show_list_of_member_cases = models.BooleanField(
         help_text="Should we pull the list of member cases? This can add "
-                  "considerable expense to each docket.",
+        "considerable expense to each docket.",
         default=False,
     )
 
@@ -352,8 +357,8 @@ class PacerFetchQueue(models.Model):
     recap_document = models.ForeignKey(
         RECAPDocument,
         help_text="The ID of the RECAP Document in the CourtListener databae "
-                  "that you wish to fetch or update.",
-        related_name='pacer_fetch_queue_items',
+        "that you wish to fetch or update.",
+        related_name="pacer_fetch_queue_items",
         on_delete=models.CASCADE,
         null=True,
     )
@@ -367,6 +372,7 @@ class FjcIntegratedDatabase(models.Model):
     Most fields are simply copied across as chars, though some are normalized
     if possible.
     """
+
     ORIG = 1
     REMOVED = 2
     REMANDED = 3
@@ -382,26 +388,44 @@ class FjcIntegratedDatabase(models.Model):
     MULTI_DIST_ORIG = 13
     ORIGINS = (
         (ORIG, "Original Proceeding"),
-        (REMOVED, "Removed  (began in the state court, removed to the "
-                  "district court)"),
-        (REMANDED, "Remanded for further action (removal from court of "
-                   "appeals)"),
-        (REINSTATED, "Reinstated/reopened (previously opened and closed, "
-                     "reopened for additional action)"),
-        (TRANSFERRED, "Transferred from another district(pursuant to 28 USC "
-                      "1404)"),
-        (MULTI_DIST, "Multi district litigation (cases transferred to this "
-                     "district by an order entered by Judicial Panel on Multi "
-                     "District Litigation pursuant to 28 USC 1407)"),
-        (APPEAL_FROM_MAG, "Appeal to a district judge of a magistrate judge's "
-                          "decision"),
+        (
+            REMOVED,
+            "Removed  (began in the state court, removed to the "
+            "district court)",
+        ),
+        (
+            REMANDED,
+            "Remanded for further action (removal from court of appeals)",
+        ),
+        (
+            REINSTATED,
+            "Reinstated/reopened (previously opened and closed, "
+            "reopened for additional action)",
+        ),
+        (
+            TRANSFERRED,
+            "Transferred from another district(pursuant to 28 USC 1404)",
+        ),
+        (
+            MULTI_DIST,
+            "Multi district litigation (cases transferred to this "
+            "district by an order entered by Judicial Panel on Multi "
+            "District Litigation pursuant to 28 USC 1407)",
+        ),
+        (
+            APPEAL_FROM_MAG,
+            "Appeal to a district judge of a magistrate judge's decision",
+        ),
         (SECOND_REOPEN, "Second reopen"),
         (THIRD_REOPEN, "Third reopen"),
         (FOURTH_REOPEN, "Fourth reopen"),
         (FIFTH_REOPEN, "Fifth reopen"),
         (SIXTH_REOPEN, "Sixth reopen"),
-        (MULTI_DIST_ORIG, "Multi district litigation originating in the "
-                          "district (valid beginning July 1, 2016)"),
+        (
+            MULTI_DIST_ORIG,
+            "Multi district litigation originating in the "
+            "district (valid beginning July 1, 2016)",
+        ),
     )
     GOV_PLAIN = 1
     GOV_DEF = 2
@@ -445,26 +469,38 @@ class FjcIntegratedDatabase(models.Model):
     OTHER_PROCEDURAL_PROGRESS = 10
     REQUEST_FOR_DE_NOVO = 13
     PROCEDURAL_PROGRESSES = (
-        ('Before issue joined', (
-            (NO_COURT_ACTION_PRE_ISSUE_JOINED, "No court action (before issue "
-                                               "joined)"),
-            (ORDER_ENTERED, "Order entered"),
-            (HEARING_HELD, "Hearing held"),
-            (ORDER_DECIDED, "Order decided"),
-        )),
-        ('After issue joined', (
-            (NO_COURT_ACTION_POST_ISSUE_JOINED, "No court action (after issue "
-                                                "joined)"),
-            (JUDGMENT_ON_MOTION, "Judgment on motion"),
-            (PRETRIAL_CONFERENCE_HELD, "Pretrial conference held"),
-            (DURING_COURT_TRIAL, "During court trial"),
-            (DURING_JURY_TRIAL, "During jury trial"),
-            (AFTER_COURT_TRIAL, "After court trial"),
-            (AFTER_JURY_TRIAL, "After jury trial"),
-            (OTHER_PROCEDURAL_PROGRESS, "Other"),
-            (REQUEST_FOR_DE_NOVO, "Request for trial de novo after "
-                                  "arbitration"),
-        ))
+        (
+            "Before issue joined",
+            (
+                (
+                    NO_COURT_ACTION_PRE_ISSUE_JOINED,
+                    "No court action (before issue joined)",
+                ),
+                (ORDER_ENTERED, "Order entered"),
+                (HEARING_HELD, "Hearing held"),
+                (ORDER_DECIDED, "Order decided"),
+            ),
+        ),
+        (
+            "After issue joined",
+            (
+                (
+                    NO_COURT_ACTION_POST_ISSUE_JOINED,
+                    "No court action (after issue joined)",
+                ),
+                (JUDGMENT_ON_MOTION, "Judgment on motion"),
+                (PRETRIAL_CONFERENCE_HELD, "Pretrial conference held"),
+                (DURING_COURT_TRIAL, "During court trial"),
+                (DURING_JURY_TRIAL, "During jury trial"),
+                (AFTER_COURT_TRIAL, "After court trial"),
+                (AFTER_JURY_TRIAL, "After jury trial"),
+                (OTHER_PROCEDURAL_PROGRESS, "Other"),
+                (
+                    REQUEST_FOR_DE_NOVO,
+                    "Request for trial de novo after arbitration",
+                ),
+            ),
+        ),
     )
     TRANSFER_TO_DISTRICT = 0
     REMANDED_TO_STATE = 1
@@ -488,33 +524,42 @@ class FjcIntegratedDatabase(models.Model):
     APPEAL_AFFIRMED = 19
     APPEAL_DENIED = 20
     DISPOSITIONS = (
-        ('Cases transferred or remanded', (
-            (TRANSFER_TO_DISTRICT, "Transfer to another district"),
-            (REMANDED_TO_STATE, "Remanded to state court"),
-            (TRANSFER_TO_MULTI, "Multi-district litigation transfer"),
-            (REMANDED_TO_AGENCY, "Remanded to U.S. agency"),
-        )),
-        ('Dismissals', (
-            (WANT_OF_PROSECUTION, "Want of prosecution"),
-            (LACK_OF_JURISDICTION, "Lack of jurisdiction"),
-            (VOLUNTARILY_DISMISSED, "Voluntarily dismissed"),
-            (SETTLED, "Settled"),
-            (OTHER_DISMISSAL, "Other"),
-        )),
-        ('Judgment on', (
-            (DEFAULT, "Default"),
-            (CONSENT, "Consent"),
-            (MOTION_BEFORE_TRIAL, "Motion before trial"),
-            (JURY_VERDICT, "Jury verdict"),
-            (DIRECTED_VERDICT, "Directed verdict"),
-            (COURT_TRIAL, "Court trial"),
-            (AWARD_OF_ARBITRATOR, "Award of arbitrator"),
-            (STAYED_PENDING_BANKR, "Stayed pending bankruptcy"),
-            (OTHER_DISPOSITION, "Other"),
-            (STATISTICAL_CLOSING, "Statistical closing"),
-            (APPEAL_AFFIRMED, "Appeal affirmed (magistrate judge)"),
-            (APPEAL_DENIED, "Appeal denied (magistrate judge"),
-        )),
+        (
+            "Cases transferred or remanded",
+            (
+                (TRANSFER_TO_DISTRICT, "Transfer to another district"),
+                (REMANDED_TO_STATE, "Remanded to state court"),
+                (TRANSFER_TO_MULTI, "Multi-district litigation transfer"),
+                (REMANDED_TO_AGENCY, "Remanded to U.S. agency"),
+            ),
+        ),
+        (
+            "Dismissals",
+            (
+                (WANT_OF_PROSECUTION, "Want of prosecution"),
+                (LACK_OF_JURISDICTION, "Lack of jurisdiction"),
+                (VOLUNTARILY_DISMISSED, "Voluntarily dismissed"),
+                (SETTLED, "Settled"),
+                (OTHER_DISMISSAL, "Other"),
+            ),
+        ),
+        (
+            "Judgment on",
+            (
+                (DEFAULT, "Default"),
+                (CONSENT, "Consent"),
+                (MOTION_BEFORE_TRIAL, "Motion before trial"),
+                (JURY_VERDICT, "Jury verdict"),
+                (DIRECTED_VERDICT, "Directed verdict"),
+                (COURT_TRIAL, "Court trial"),
+                (AWARD_OF_ARBITRATOR, "Award of arbitrator"),
+                (STAYED_PENDING_BANKR, "Stayed pending bankruptcy"),
+                (OTHER_DISPOSITION, "Other"),
+                (STATISTICAL_CLOSING, "Statistical closing"),
+                (APPEAL_AFFIRMED, "Appeal affirmed (magistrate judge)"),
+                (APPEAL_DENIED, "Appeal denied (magistrate judge"),
+            ),
+        ),
     )
     NO_MONEY = 0
     MONEY_ONLY = 1
@@ -554,7 +599,7 @@ class FjcIntegratedDatabase(models.Model):
     )
     dataset_source = models.SmallIntegerField(
         help_text="IDB has several source datafiles. This field helps keep "
-                  "track of where a row came from originally.",
+        "track of where a row came from originally.",
         choices=DATASET_SOURCES,
     )
     date_created = models.DateTimeField(
@@ -569,15 +614,15 @@ class FjcIntegratedDatabase(models.Model):
     )
     circuit = models.ForeignKey(
         Court,
-        help_text='Circuit in which the case was filed.',
-        related_name='+',
+        help_text="Circuit in which the case was filed.",
+        related_name="+",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     district = models.ForeignKey(
         Court,
-        help_text='District court in which the case was filed.',
+        help_text="District court in which the case was filed.",
         related_name="idb_cases",
         on_delete=models.CASCADE,
         db_index=True,
@@ -586,23 +631,23 @@ class FjcIntegratedDatabase(models.Model):
     )
     office = models.CharField(
         help_text="The code that designates the office within the district "
-                  "where the case is filed. Must conform with format "
-                  "established in Volume XI, Guide to Judiciary Policies and "
-                  "Procedures, Appendix A. See: https://free.law/idb-facts/",
+        "where the case is filed. Must conform with format "
+        "established in Volume XI, Guide to Judiciary Policies and "
+        "Procedures, Appendix A. See: https://free.law/idb-facts/",
         max_length=3,
         blank=True,
     )
     docket_number = models.CharField(
         # use a char field here because we need preceding zeros.
-        help_text='The number assigned by the Clerks\' office; consists of 2 '
-                  'digit Docket Year (usually calendar year in which the case '
-                  'was filed) and 5 digit sequence number.',
+        help_text="The number assigned by the Clerks' office; consists of 2 "
+        "digit Docket Year (usually calendar year in which the case "
+        "was filed) and 5 digit sequence number.",
         blank=True,
         max_length=7,
     )
     origin = models.SmallIntegerField(
         help_text="A single digit code describing the manner in which the "
-                  "case was filed in the district.",
+        "case was filed in the district.",
         choices=ORIGINS,
         blank=True,
         null=True,
@@ -615,15 +660,15 @@ class FjcIntegratedDatabase(models.Model):
     )
     jurisdiction = models.SmallIntegerField(
         help_text="The code which provides the basis for the U.S. district "
-                  "court jurisdiction in the case. This code is used in "
-                  "conjunction with appropriate nature of suit code.",
+        "court jurisdiction in the case. This code is used in "
+        "conjunction with appropriate nature of suit code.",
         choices=JURISDICTIONS,
         blank=True,
         null=True,
     )
     nature_of_suit = models.IntegerField(
         help_text="A three digit statistical code representing the nature of "
-                  "suit of the action filed.",
+        "suit of the action filed.",
         choices=NOS_CODES,
         blank=True,
         null=True,
@@ -631,9 +676,7 @@ class FjcIntegratedDatabase(models.Model):
     # Via email from FJC, title and section fields are alternative for "cause"
     # field.
     title = models.TextField(
-        help_text="No description provided by FJC.",
-        blank=True,
-        db_index=True,
+        help_text="No description provided by FJC.", blank=True, db_index=True,
     )
     section = models.CharField(
         help_text="No description provided by FJC.",
@@ -649,35 +692,35 @@ class FjcIntegratedDatabase(models.Model):
     )
     diversity_of_residence = models.SmallIntegerField(
         help_text="Involves diversity of citizenship for the plaintiff and "
-                  "defendant. First position is the citizenship of the "
-                  "plaintiff, second position is the citizenship of the "
-                  "defendant. Only used when jurisdiction is 4",
+        "defendant. First position is the citizenship of the "
+        "plaintiff, second position is the citizenship of the "
+        "defendant. Only used when jurisdiction is 4",
         blank=True,
-        null=True
+        null=True,
     )
     class_action = models.NullBooleanField(
         help_text="Involves an allegation by the plaintiff that the complaint "
-                  "meets the prerequisites of a \"Class Action\" as provided "
-                  "in Rule 23 - F.R.CV.P. ",
+        'meets the prerequisites of a "Class Action" as provided '
+        "in Rule 23 - F.R.CV.P. ",
     )
     monetary_demand = models.IntegerField(
         help_text="The monetary amount sought by plaintiff (in thousands). "
-                  "Amounts less than $500 appear as 1, and amounts over $10k "
-                  "appear as 9999. See notes in codebook.",
+        "Amounts less than $500 appear as 1, and amounts over $10k "
+        "appear as 9999. See notes in codebook.",
         null=True,
         blank=True,
     )
     county_of_residence = models.IntegerField(
         help_text="The code for the county of residence of the first listed "
-                  "plaintiff (see notes in codebook). Appears to use FIPS "
-                  "code.",
+        "plaintiff (see notes in codebook). Appears to use FIPS "
+        "code.",
         null=True,
         blank=True,
     )
     arbitration_at_filing = models.CharField(
         help_text="This field is used only by the courts  participating in "
-                  "the Formal Arbitration Program.  It is not used for any "
-                  "other purpose.",
+        "the Formal Arbitration Program.  It is not used for any "
+        "other purpose.",
         max_length=1,
         choices=ARBITRATION_CHOICES,
         blank=True,
@@ -694,19 +737,19 @@ class FjcIntegratedDatabase(models.Model):
     )
     plaintiff = models.TextField(
         help_text="First listed plaintiff. This field appears to be cut off "
-                  "at 30 characters",
+        "at 30 characters",
         db_index=True,
         blank=True,
     )
     defendant = models.TextField(
         help_text="First listed defendant. This field appears to be cut off "
-                  "at 30 characters.",
+        "at 30 characters.",
         db_index=True,
         blank=True,
     )
     date_transfer = models.DateField(
         help_text="The date when the papers were received in the receiving "
-                  "district for a transferred  case.",
+        "district for a transferred  case.",
         blank=True,
         null=True,
     )
@@ -725,20 +768,20 @@ class FjcIntegratedDatabase(models.Model):
     )
     date_terminated = models.DateField(
         help_text="The date the district court received the final judgment or "
-                  "the order disposing of the case.",
+        "the order disposing of the case.",
         null=True,
         blank=True,
     )
     termination_class_action_status = models.SmallIntegerField(
         help_text="A code that indicates a case involving allegations of "
-                  "class action.",
+        "class action.",
         choices=CLASS_ACTION_STATUSES,
         null=True,
         blank=True,
     )
     procedural_progress = models.SmallIntegerField(
         help_text="The point to which the case had progressed when it was "
-                  "disposed of. See notes in codebook.",
+        "disposed of. See notes in codebook.",
         choices=PROCEDURAL_PROGRESSES,
         null=True,
         blank=True,
@@ -757,7 +800,7 @@ class FjcIntegratedDatabase(models.Model):
     )
     amount_received = models.IntegerField(
         help_text="Dollar amount received (in thousands) when appropriate. "
-                  "Field not used uniformally; see codebook.",
+        "Field not used uniformally; see codebook.",
         null=True,
         blank=True,
     )
@@ -769,15 +812,15 @@ class FjcIntegratedDatabase(models.Model):
     )
     pro_se = models.SmallIntegerField(
         help_text="Which parties filed pro se? (See codebook for more "
-                  "details.)",
+        "details.)",
         choices=PRO_SE_CHOICES,
         null=True,
         blank=True,
     )
     year_of_tape = models.IntegerField(
         help_text="Statistical year label on data files obtained from the "
-                  "Administrative Office of the United States Courts.  2099 "
-                  "on pending case records.",
+        "Administrative Office of the United States Courts.  2099 "
+        "on pending case records.",
         blank=True,
         null=True,
     )
@@ -785,24 +828,22 @@ class FjcIntegratedDatabase(models.Model):
     # Criminal fields
     nature_of_offense = models.CharField(
         help_text="The four digit D2 offense code associated with the filing "
-                  "title/secion 1. These codes were created in FY2005 to "
-                  "replace the AO offense codes.",
+        "title/secion 1. These codes were created in FY2005 to "
+        "replace the AO offense codes.",
         max_length=4,
         choices=NOO_CODES,
         blank=True,
     )
     version = models.IntegerField(
         help_text="This field was created in FY 2012. It increments with each "
-                  "update received to a defendant record.",
+        "update received to a defendant record.",
         null=True,
         blank=True,
     )
 
     def __unicode__(self):
-        return u'%s: %s v. %s' % (self.pk, self.plaintiff, self.defendant)
+        return u"%s: %s v. %s" % (self.pk, self.plaintiff, self.defendant)
 
     class Meta:
-        verbose_name_plural = 'FJC Integrated Database Entries'
-        index_together = (
-            ('district', 'docket_number'),
-        )
+        verbose_name_plural = "FJC Integrated Database Entries"
+        index_together = (("district", "docket_number"),)

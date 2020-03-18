@@ -9,20 +9,22 @@ from cl.custom_filters.templatetags.extras import granular_date
 
 
 class Command(VerboseCommand):
-    help = ('Run through the judges and see which have pictures in the '
-            'judge-pics project.')
+    help = (
+        "Run through the judges and see which have pictures in the "
+        "judge-pics project."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--debug',
-            action='store_true',
+            "--debug",
+            action="store_true",
             default=False,
-            help="Don't change the data."
+            help="Don't change the data.",
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        self.debug = options['debug']
+        self.debug = options["debug"]
         self.options = options
 
         # Run the requested method.
@@ -30,16 +32,13 @@ class Command(VerboseCommand):
 
     @staticmethod
     def make_slugs(person):
-        slug_name = slugify("%s %s" % (person.name_last,
-                                       person.name_first)) + ".jpeg"
+        slug_name = (
+            slugify("%s %s" % (person.name_last, person.name_first)) + ".jpeg"
+        )
 
         slug_name_dob = "{slug}-{date}.jpeg".format(
-            slug=slug_name.rsplit('.')[0],
-            date=granular_date(
-                person,
-                'date_dob',
-                iso=True,
-            ).lower()
+            slug=slug_name.rsplit(".")[0],
+            date=granular_date(person, "date_dob", iso=True,).lower(),
         )
         return slug_name, slug_name_dob
 
@@ -51,7 +50,7 @@ class Command(VerboseCommand):
         the risk of duplicate issues.
         """
         # Create a dict of judge paths, mapping paths to empty lists.
-        judge_paths = os.listdir(os.path.join(judge_root, 'orig'))
+        judge_paths = os.listdir(os.path.join(judge_root, "orig"))
         judge_map = {}
         for path in judge_paths:
             judge_map[path] = []
@@ -86,12 +85,16 @@ class Command(VerboseCommand):
             if len(people) > 1:
                 logger.warn("Found more than one match for %s:" % path)
                 for person in people:
-                    logger.warn("Found: %s - %s" % (person, granular_date(
-                        person,
-                        'date_dob',
-                        iso=True,
-                    )))
+                    logger.warn(
+                        "Found: %s - %s"
+                        % (
+                            person,
+                            granular_date(person, "date_dob", iso=True,),
+                        )
+                    )
                 multi += 1
 
-        logger.info("\n\n%s Matches\n%s Missed\n%s Multiple results" %
-                    (found, missed, multi))
+        logger.info(
+            "\n\n%s Matches\n%s Missed\n%s Multiple results"
+            % (found, missed, multi)
+        )

@@ -16,18 +16,24 @@ def clone_attorney(orig_atty_id, atty, docket):
     atty.save()
     logger.info("Created new attorney: %s" % atty)
 
-    roles_for_docket = Role.objects.filter(attorney_id=orig_atty_id,
-                                           docket=docket)
-    logger.info("Got %s roles for this attorney on docket %s. Remapping "
-                "them all." % (roles_for_docket.count(), docket))
+    roles_for_docket = Role.objects.filter(
+        attorney_id=orig_atty_id, docket=docket
+    )
+    logger.info(
+        "Got %s roles for this attorney on docket %s. Remapping "
+        "them all." % (roles_for_docket.count(), docket)
+    )
     roles_for_docket.update(attorney=atty)
 
     # The attorney is now in place for the docket and party. Remap
     # their organizational information too.
-    atty_orgs_for_docket = AttyOrgAss.objects.filter(docket=docket,
-                                                     attorney_id=orig_atty_id)
-    logger.info("Got %s organization associations on this docket for this "
-                "attorney." % atty_orgs_for_docket.count())
+    atty_orgs_for_docket = AttyOrgAss.objects.filter(
+        docket=docket, attorney_id=orig_atty_id
+    )
+    logger.info(
+        "Got %s organization associations on this docket for this "
+        "attorney." % atty_orgs_for_docket.count()
+    )
     atty_orgs_for_docket.update(attorney=atty)
 
 
@@ -36,7 +42,7 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--count',
+            "--count",
             type=int,
             default=0,
             help="The number of attorneys to do. Default is to do all of them.",
@@ -46,25 +52,33 @@ class Command(VerboseCommand):
         super(Command, self).handle(*args, **options)
 
         # Get attorneys that have roles on more than one docket
-        roles = Role.objects.values('attorney_id').annotate(
-            Count('id')).order_by().filter(id__count__gt=1)
-        logger.info("Got %s attorneys that are on more than one docket." %
-                    roles.count())
+        roles = (
+            Role.objects.values("attorney_id")
+            .annotate(Count("id"))
+            .order_by()
+            .filter(id__count__gt=1)
+        )
+        logger.info(
+            "Got %s attorneys that are on more than one docket."
+            % roles.count()
+        )
 
         # That returns a list of dictionaries like:
         # {'attorney_id': 1, 'id__count': 2}
         for i, role in enumerate(roles):
-            if i >= options['count'] > 0:
+            if i >= options["count"] > 0:
                 break
-            orig_atty_id = role['attorney_id']
+            orig_atty_id = role["attorney_id"]
             atty = Attorney.objects.get(pk=orig_atty_id)
-            dockets = Docket.objects.filter(
-                role__attorney=atty,
-            ).order_by(
-                'date_created',
-            ).distinct()
-            logger.info("Got %s dockets for attorney %s. Cloning them all." %
-                        (dockets.count(), atty))
+            dockets = (
+                Docket.objects.filter(role__attorney=atty,)
+                .order_by("date_created",)
+                .distinct()
+            )
+            logger.info(
+                "Got %s dockets for attorney %s. Cloning them all."
+                % (dockets.count(), atty)
+            )
 
             for docket in dockets[1:]:
                 clone_attorney(orig_atty_id, atty, docket)

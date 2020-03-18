@@ -9,7 +9,7 @@ def honeypot_equals(val):
         Default verifier used if HONEYPOT_VERIFIER is not specified.
         Ensures val == HONEYPOT_VALUE or HONEYPOT_VALUE() if it's a callable.
     """
-    expected = getattr(settings, 'HONEYPOT_VALUE', '')
+    expected = getattr(settings, "HONEYPOT_VALUE", "")
     if callable(expected):
         expected = expected()
     return val == expected
@@ -22,12 +22,16 @@ def verify_honeypot_value(request, field_name):
         Ensures that the field exists and passes verification according to
         HONEYPOT_VERIFIER.
     """
-    verifier = getattr(settings, 'HONEYPOT_VERIFIER', honeypot_equals)
-    if request.method == 'POST':
+    verifier = getattr(settings, "HONEYPOT_VERIFIER", honeypot_equals)
+    if request.method == "POST":
         field = field_name or settings.HONEYPOT_FIELD_NAME
         if field not in request.POST or not verifier(request.POST[field]):
-            return render(request, 'honeypot_error.html', {'fieldname': field},
-                          status=400)
+            return render(
+                request,
+                "honeypot_error.html",
+                {"fieldname": field},
+                status=400,
+            )
 
 
 def check_honeypot(func=None, field_name=None):
@@ -48,10 +52,13 @@ def check_honeypot(func=None, field_name=None):
                 return response
             else:
                 return func(request, *args, **kwargs)
+
         return wraps(func)(inner)
 
     if func is None:
+
         def decorator(func):
             return decorated(func)
+
         return decorator
     return decorated(func)

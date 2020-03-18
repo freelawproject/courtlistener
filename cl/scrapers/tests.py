@@ -10,11 +10,15 @@ from cl.audio.models import Audio
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
-    cl_report_scrape_status, cl_scrape_opinions, cl_scrape_oral_arguments
+    cl_report_scrape_status,
+    cl_scrape_opinions,
+    cl_scrape_oral_arguments,
 )
 from cl.scrapers.models import UrlHash, ErrorLog
 from cl.scrapers.tasks import (
-    extract_from_txt, extract_doc_content, process_audio_file
+    extract_from_txt,
+    extract_doc_content,
+    process_audio_file,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
@@ -22,7 +26,7 @@ from cl.search.models import Court, Opinion
 
 
 class IngestionTest(IndexedSolrTestCase):
-    fixtures = ['test_court.json']
+    fixtures = ["test_court.json"]
 
     def test_ingest_opinions(self):
         """Can we successfully ingest opinions at a high level?"""
@@ -33,8 +37,10 @@ class IngestionTest(IndexedSolrTestCase):
 
         opinions = Opinion.objects.all()
         count = opinions.count()
-        self.assertTrue(opinions.count() == 6, 'Should have 6 test opinions, '
-                                               'not %s' % count)
+        self.assertTrue(
+            opinions.count() == 6,
+            "Should have 6 test opinions, not %s" % count,
+        )
 
     def test_ingest_oral_arguments(self):
         """Can we successfully ingest oral arguments at a high level?"""
@@ -42,8 +48,7 @@ class IngestionTest(IndexedSolrTestCase):
         site.method = "LOCAL"
         parsed_site = site.parse()
         cl_scrape_oral_arguments.Command().scrape_court(
-            parsed_site,
-            full_crawl=True
+            parsed_site, full_crawl=True
         )
 
         # There should now be two items in the database.
@@ -64,58 +69,86 @@ class IngestionTest(IndexedSolrTestCase):
         """Do all of the supported mimetypes get extracted to text
         successfully, including OCR?"""
         test_strings = [
-            'supreme',
-            'intelligence',
-            'indiana',
-            'reagan',
-            'indiana',
-            'fidelity'
+            "supreme",
+            "intelligence",
+            "indiana",
+            "reagan",
+            "indiana",
+            "fidelity",
         ]
         opinions = Opinion.objects.all()
         for op, test_string in zip(opinions, test_strings):
             ext = get_extension(op.local_path.file.read())
             extract_doc_content(op.pk, do_ocr=True)
             op.refresh_from_db()
-            if ext in ['.html', '.wpd']:
+            if ext in [".html", ".wpd"]:
                 self.assertIn(test_string, op.html.lower())
             else:
                 self.assertIn(test_string, op.plain_text.lower())
 
 
 class ExtractionTest(TestCase):
+    fixtures = ["tax_court_test.json"]
+
     def test_txt_extraction_with_bad_data(self):
         """Can we extract text from nasty files lacking encodings?"""
-        path = os.path.join(settings.MEDIA_ROOT, 'test', 'search',
-                            'txt_file_with_no_encoding.txt')
+        path = os.path.join(
+            settings.MEDIA_ROOT,
+            "test",
+            "search",
+            "txt_file_with_no_encoding.txt",
+        )
         content, err = extract_from_txt(path)
-        self.assertFalse(err, "Error reported while extracting text from %s" %
-                         path)
-        self.assertIn(u'¶  1.  DOOLEY, J.   Plaintiffs', content,
-                      "Issue extracting/encoding text from file at: %s" % path)
+        self.assertFalse(
+            err, "Error reported while extracting text from %s" % path
+        )
+        self.assertIn(
+            u"¶  1.  DOOLEY, J.   Plaintiffs",
+            content,
+            "Issue extracting/encoding text from file at: %s" % path,
+        )
+
+    def test_juriscraper_object_creation(self):
+        """Can we extract text from tax court pdf and add to db?"""
+        o = Opinion.objects.get(pk=76)
+        self.assertFalse(
+            o.cluster.citations.exists(),
+            msg="Citation should not exist at beginning of test",
+        )
+
+        extract_doc_content(pk=o.pk, do_ocr=False)
+        self.assertTrue(
+            o.cluster.citations.exists(),
+            msg="Expected citation was not created in db",
+        )
 
 
 class ReportScrapeStatusTest(TestCase):
-    fixtures = ['test_court.json', 'judge_judy.json',
-                'test_objects_search.json']
+    fixtures = [
+        "test_court.json",
+        "judge_judy.json",
+        "test_objects_search.json",
+    ]
 
     def setUp(self):
         super(ReportScrapeStatusTest, self).setUp()
-        self.court = Court.objects.get(pk='test')
+        self.court = Court.objects.get(pk="test")
         # Make some errors that we can tally
-        ErrorLog(log_level='WARNING',
-                 court=self.court,
-                 message="test_msg").save()
-        ErrorLog(log_level='CRITICAL',
-                 court=self.court,
-                 message="test_msg").save()
+        ErrorLog(
+            log_level="WARNING", court=self.court, message="test_msg"
+        ).save()
+        ErrorLog(
+            log_level="CRITICAL", court=self.court, message="test_msg"
+        ).save()
 
     def test_tallying_errors(self):
         errors = cl_report_scrape_status.tally_errors()
         self.assertEqual(
-            errors['test'],
+            errors["test"],
             [1, 1],
-            msg="Did not get expected error counts. Instead got: %s" %
-                errors['test'])
+            msg="Did not get expected error counts. Instead got: %s"
+            % errors["test"],
+        )
 
     @staticmethod
     def test_simple_report_generation():
@@ -129,30 +162,31 @@ class ReportScrapeStatusTest(TestCase):
 
 
 class DupcheckerTest(TestCase):
-    fixtures = ['test_court.json']
+    fixtures = ["test_court.json"]
 
     def setUp(self):
-        self.court = Court.objects.get(pk='test')
-        self.dup_checkers = [DupChecker(self.court, full_crawl=True),
-                             DupChecker(self.court, full_crawl=False)]
+        self.court = Court.objects.get(pk="test")
+        self.dup_checkers = [
+            DupChecker(self.court, full_crawl=True),
+            DupChecker(self.court, full_crawl=False),
+        ]
 
     def test_abort_when_new_court_website(self):
         """Tests what happens when a new website is discovered."""
         site = test_opinion_scraper.Site()
-        site.hash = 'this is a dummy hash code string'
+        site.hash = "this is a dummy hash code string"
 
         for dup_checker in self.dup_checkers:
             abort = dup_checker.abort_by_url_hash(site.url, site.hash)
             if dup_checker.full_crawl:
                 self.assertFalse(
-                    abort,
-                    "DupChecker says to abort during a full crawl."
+                    abort, "DupChecker says to abort during a full crawl."
                 )
             else:
                 self.assertFalse(
                     abort,
                     "DupChecker says to abort on a court that's never been "
-                    "crawled before."
+                    "crawled before.",
                 )
 
             # The checking function creates url2Hashes, that we must delete as
@@ -163,20 +197,19 @@ class DupcheckerTest(TestCase):
         """Similar to the above, but we create a UrlHash object before
         checking if it exists."""
         site = test_opinion_scraper.Site()
-        site.hash = 'this is a dummy hash code string'
+        site.hash = "this is a dummy hash code string"
         for dup_checker in self.dup_checkers:
             UrlHash(id=site.url, sha1=site.hash).save()
             abort = dup_checker.abort_by_url_hash(site.url, site.hash)
             if dup_checker.full_crawl:
                 self.assertFalse(
-                    abort,
-                    "DupChecker says to abort during a full crawl."
+                    abort, "DupChecker says to abort during a full crawl."
                 )
             else:
                 self.assertTrue(
                     abort,
                     "DupChecker says not to abort on a court that's been "
-                    "crawled before with the same hash"
+                    "crawled before with the same hash",
                 )
 
             dup_checker.url_hash.delete()
@@ -186,59 +219,61 @@ class DupcheckerTest(TestCase):
         hash before checking if it exists.
         """
         site = test_opinion_scraper.Site()
-        site.hash = 'this is a dummy hash code string'
+        site.hash = "this is a dummy hash code string"
         for dup_checker in self.dup_checkers:
             UrlHash(pk=site.url, sha1=site.hash).save()
             abort = dup_checker.abort_by_url_hash(
-                site.url,
-                "this is a *different* hash!")
+                site.url, "this is a *different* hash!"
+            )
             if dup_checker.full_crawl:
                 self.assertFalse(
-                    abort,
-                    "DupChecker says to abort during a full crawl."
+                    abort, "DupChecker says to abort during a full crawl."
                 )
             else:
                 self.assertFalse(
                     abort,
                     "DupChecker says to abort on a court where the hash has "
-                    "changed."
+                    "changed.",
                 )
 
             dup_checker.url_hash.delete()
 
     def test_press_on_with_an_empty_database(self):
         site = test_opinion_scraper.Site()
-        site.hash = 'this is a dummy hash code string'
+        site.hash = "this is a dummy hash code string"
         for dup_checker in self.dup_checkers:
             onwards = dup_checker.press_on(
                 Opinion,
                 now(),
                 now() - timedelta(days=1),
-                lookup_value='content',
-                lookup_by='sha1'
+                lookup_value="content",
+                lookup_by="sha1",
             )
             if dup_checker.full_crawl:
                 self.assertTrue(
                     onwards,
                     "DupChecker says to abort during a full crawl. This should "
-                    "never happen."
+                    "never happen.",
                 )
             elif dup_checker.full_crawl is False:
                 count = Opinion.objects.all().count()
                 self.assertTrue(
                     onwards,
                     "DupChecker says to abort on dups when the database has %s "
-                    "Documents." % count
+                    "Documents." % count,
                 )
 
 
 class DupcheckerWithFixturesTest(TestCase):
-    fixtures = ['test_court.json', 'judge_judy.json',
-                'test_objects_search.json']
+    fixtures = [
+        "test_court.json",
+        "judge_judy.json",
+        "test_objects_search.json",
+    ]
 
     def setUp(self):
         super(DupcheckerWithFixturesTest, self).setUp()
-        self.court = Court.objects.get(pk='test')
+        self.court = Court.objects.get(pk="test")
 
         # Set the dup_threshold to zero for these tests
         self.dup_checkers = [
@@ -247,7 +282,7 @@ class DupcheckerWithFixturesTest(TestCase):
         ]
 
         # Set up the hash value using one in the fixture.
-        self.content_hash = 'asdfasdfasdfasdfasdfasddf'
+        self.content_hash = "asdfasdfasdfasdfasdfasddf"
 
     def test_press_on_with_a_dup_found(self):
         for dup_checker in self.dup_checkers:
@@ -256,30 +291,34 @@ class DupcheckerWithFixturesTest(TestCase):
                 now(),
                 now(),
                 lookup_value=self.content_hash,
-                lookup_by='sha1'
+                lookup_by="sha1",
             )
             if dup_checker.full_crawl:
                 self.assertFalse(
                     onwards,
-                    'DupChecker returned True during a full crawl, but there '
-                    'should be duplicates in the database.'
+                    "DupChecker returned True during a full crawl, but there "
+                    "should be duplicates in the database.",
                 )
                 self.assertFalse(
                     dup_checker.emulate_break,
-                    'DupChecker said to emulate a break during a full crawl. '
-                    'Nothing should stop a full crawl!'
+                    "DupChecker said to emulate a break during a full crawl. "
+                    "Nothing should stop a full crawl!",
                 )
 
             elif dup_checker.full_crawl is False:
                 self.assertFalse(
                     onwards,
                     "DupChecker returned %s but there should be a duplicate in "
-                    "the database. dup_count is %s, and dup_threshold is %s" %
-                    (onwards, dup_checker.dup_count, dup_checker.dup_threshold)
+                    "the database. dup_count is %s, and dup_threshold is %s"
+                    % (
+                        onwards,
+                        dup_checker.dup_count,
+                        dup_checker.dup_threshold,
+                    ),
                 )
                 self.assertTrue(
                     dup_checker.emulate_break,
-                    "We should have hit a break but didn't."
+                    "We should have hit a break but didn't.",
                 )
 
     def test_press_on_with_dup_found_and_older_date(self):
@@ -290,55 +329,64 @@ class DupcheckerWithFixturesTest(TestCase):
                 now(),
                 now() - timedelta(days=1),
                 lookup_value=self.content_hash,
-                lookup_by='sha1'
+                lookup_by="sha1",
             )
             if dup_checker.full_crawl:
                 self.assertFalse(
                     onwards,
-                    'DupChecker returned True during a full crawl, but there '
-                    'should be duplicates in the database.'
+                    "DupChecker returned True during a full crawl, but there "
+                    "should be duplicates in the database.",
                 )
                 self.assertFalse(
                     dup_checker.emulate_break,
-                    'DupChecker said to emulate a break during a full crawl. '
-                    'Nothing should stop a full crawl!'
+                    "DupChecker said to emulate a break during a full crawl. "
+                    "Nothing should stop a full crawl!",
                 )
             else:
                 self.assertFalse(
                     onwards,
                     "DupChecker returned %s but there should be a duplicate in "
-                    "the database. dup_count is %s, and dup_threshold is %s" %
-                    (onwards, dup_checker.dup_count, dup_checker.dup_threshold)
+                    "the database. dup_count is %s, and dup_threshold is %s"
+                    % (
+                        onwards,
+                        dup_checker.dup_count,
+                        dup_checker.dup_threshold,
+                    ),
                 )
                 self.assertTrue(
                     dup_checker.emulate_break,
-                    "We should have hit a break but didn't."
+                    "We should have hit a break but didn't.",
                 )
 
 
 class AudioFileTaskTest(TestCase):
 
-    fixtures = ['judge_judy.json', 'test_objects_search.json',
-                'test_objects_audio.json']
+    fixtures = [
+        "judge_judy.json",
+        "test_objects_search.json",
+        "test_objects_audio.json",
+    ]
 
     def test_process_audio_file(self):
-        audio = Audio.objects.get(pk=1)
-        audio.duration = None
-        audio.save()
+        af = Audio.objects.get(pk=1)
+        af.duration = None
+        af.save()
 
-        audio = Audio.objects.get(pk=1)
-        self.assertNotEqual(audio.duration, 15,
-                            msg='we start with a fake duration in the fixture')
+        expected_duration = 15
+        self.assertNotEqual(
+            af.duration,
+            expected_duration,
+            msg="Do we have no duration info at the outset?",
+        )
 
         process_audio_file(pk=1)
-        audio = Audio.objects.get(pk=1)
-        correct_duration = 15
-        measured_duration = audio.duration
+        af.refresh_from_db()
+        measured_duration = af.duration
         # Use almost equal because measuring MP3's is wonky.
         self.assertAlmostEqual(
             measured_duration,
-            correct_duration,
+            expected_duration,
             delta=5,
-            msg='We should end up with the proper duration of about %s. '
-                'Instead we got %s.' % (correct_duration, measured_duration)
+            msg="We should end up with the proper duration of about %s. "
+            "Instead we got %s." % (expected_duration, measured_duration),
         )

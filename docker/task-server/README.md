@@ -189,3 +189,13 @@ Dockerfile, you'll see that we run celery with a user ID of 33. This is the
 ID of the www-data user on the server. (It also corresponds to the www-data 
 user in the container, but I'm not sure I want to count on that.) We need to 
 use this user to access and create the files on the server.
+
+
+## Pushing a new version
+
+1. Update version.txt
+
+1. Change into the root directory, and then do:
+
+        make push --file docker/task-server/Makefile
+        

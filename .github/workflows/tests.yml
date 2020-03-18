@@ -1,19 +1,20 @@
 name: docker build and test
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out solr
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2-beta
         with:
           repository: freelawproject/courtlistener-solr-server
-          ref: origin/master
+          ref: master
+          path: courtlistener-solr-server
       - name: Set up solr permissions
         run: |
-          cd ../courtlistener-solr-server
+          cd courtlistener-solr-server
           sudo chown -R :1024 data
           sudo chown -R :1024 solr
           sudo find data -type d -exec chmod g+s {} \;
@@ -23,19 +24,21 @@ jobs:
           sudo find data -type f -exec chmod 664 {} \;
           sudo find solr -type f -exec chmod 664 {} \;
       - name: Check out CourtListener
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2-beta
+        with:
+          path: courtlistener
       - name: Create the private settings file
-        working-directory: cl/settings
+        working-directory: courtlistener/cl/settings
         run: cp 05-private.example 05-private.py
       - name: Create docker network
         run: docker network create -d bridge --attachable cl_net_overlay
       - name: Start docker compose
-        working-directory: docker/courtlistener
+        working-directory: courtlistener/docker/courtlistener
         run: docker-compose up -d
       - name: List docker statuses
         run: docker ps -a
       - name: Show the logs
-        working-directory: docker/courtlistener
+        working-directory: courtlistener/docker/courtlistener
         run: docker-compose logs
       - name: Run the tests!
         run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django python /opt/courtlistener/manage.py test cl

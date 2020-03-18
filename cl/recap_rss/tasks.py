@@ -14,8 +14,11 @@ from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery import app
 from cl.lib.crypto import sha256
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.recap.mergers import add_docket_entries, find_docket_object, \
-    update_docket_metadata
+from cl.recap.mergers import (
+    add_docket_entries,
+    find_docket_object,
+    update_docket_metadata,
+)
 from cl.recap_rss.models import RssFeedStatus, RssItemCache
 
 logger = logging.getLogger(__name__)
@@ -29,7 +32,7 @@ def get_last_build_date(s):
     we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
     """
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
-    date_re = r'<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>'
+    date_re = r"<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>"
     m = re.search(date_re, s)
     if m is None:
         return None
@@ -92,15 +95,18 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     try:
         rss_feed.query()
     except requests.RequestException as exc:
-        logger.warning("Network error trying to get RSS feed at %s" %
-                       rss_feed.url)
+        logger.warning(
+            "Network error trying to get RSS feed at %s" % rss_feed.url
+        )
         abort_or_retry(self, feed_status, exc)
         return
     else:
         if not rss_feed.response.content:
             try:
-                raise Exception("Empty RSS document returned by PACER: %s" %
-                                feed_status.court_id)
+                raise Exception(
+                    "Empty RSS document returned by PACER: %s"
+                    % feed_status.court_id
+                )
             except Exception as exc:
                 logger.warning(str(exc))
                 abort_or_retry(self, feed_status, exc)
@@ -109,8 +115,10 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     current_build_date = get_last_build_date(rss_feed.response.content)
     if not current_build_date:
         try:
-            raise Exception("No last build date in RSS document returned by "
-                            "PACER: %s" % feed_status.court_id)
+            raise Exception(
+                "No last build date in RSS document returned by "
+                "PACER: %s" % feed_status.court_id
+            )
         except Exception as exc:
             logger.warning(str(exc))
             abort_or_retry(self, feed_status, exc)
@@ -120,21 +128,27 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     if not feed_status.is_sweep:
         # Get the last time this feed was pulled successfully
         if date_last_built == current_build_date:
-            logger.info("%s: Feed has not changed since %s. Aborting." % (
-                feed_status.court_id, date_last_built))
+            logger.info(
+                "%s: Feed has not changed since %s. Aborting."
+                % (feed_status.court_id, date_last_built)
+            )
             # Abort. Nothing has changed here.
             self.request.chain = None
             mark_status(feed_status, RssFeedStatus.UNCHANGED)
             return
 
-    logger.info("%s: Feed changed or doing a sweep. Moving on to the merge." %
-                feed_status.court_id)
+    logger.info(
+        "%s: Feed changed or doing a sweep. Moving on to the merge."
+        % feed_status.court_id
+    )
     feed_status.date_last_build = current_build_date
     feed_status.save()
 
     rss_feed.parse()
-    logger.info("%s: Got %s results to merge." % (feed_status.court_id,
-                                                  len(rss_feed.data)))
+    logger.info(
+        "%s: Got %s results to merge."
+        % (feed_status.court_id, len(rss_feed.data))
+    )
 
     return rss_feed.data
 
@@ -197,19 +211,23 @@ def merge_rss_feed_contents(feed_data, court_pk, feed_status_pk):
                 # in another thread/process and we had a race condition.
                 continue
             d, docket_count = find_docket_object(
-                court_pk, docket['pacer_case_id'], docket['docket_number'])
+                court_pk, docket["pacer_case_id"], docket["docket_number"]
+            )
             if docket_count > 1:
-                logger.info("Found %s dockets during lookup. Choosing "
-                            "oldest." % docket_count)
-                d = d.earliest('date_created')
+                logger.info(
+                    "Found %s dockets during lookup. Choosing "
+                    "oldest." % docket_count
+                )
+                d = d.earliest("date_created")
 
             d.add_recap_source()
             update_docket_metadata(d, docket)
             if not d.pacer_case_id:
-                d.pacer_case_id = docket['pacer_case_id']
+                d.pacer_case_id = docket["pacer_case_id"]
             d.save()
             rds_created, content_updated = add_docket_entries(
-                d, docket['docket_entries'])
+                d, docket["docket_entries"]
+            )
 
         if content_updated and docket_count > 0:
             newly_enqueued = enqueue_docket_alert(d.pk)
@@ -218,10 +236,14 @@ def merge_rss_feed_contents(feed_data, court_pk, feed_status_pk):
 
         all_rds_created.extend([rd.pk for rd in rds_created])
 
-    logger.info("%s: Sending %s new RECAP documents to Solr for indexing and "
-                "sending %s dockets for alerts.", feed_status.court_id,
-                len(all_rds_created), len(d_pks_to_alert))
-    return {'d_pks_to_alert': d_pks_to_alert, 'rds_for_solr': all_rds_created}
+    logger.info(
+        "%s: Sending %s new RECAP documents to Solr for indexing and "
+        "sending %s dockets for alerts.",
+        feed_status.court_id,
+        len(all_rds_created),
+        len(d_pks_to_alert),
+    )
+    return {"d_pks_to_alert": d_pks_to_alert, "rds_for_solr": all_rds_created}
 
 
 @app.task

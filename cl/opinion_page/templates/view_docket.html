@@ -11,6 +11,16 @@
   Initiative and Free Law Project, a non-profit dedicated to creating high
   quality open legal information.{% endblock %}
 
+{% block head %}
+  {% if DEBUG %}
+    <link rel="stylesheet"
+          href="{{ STATIC_URL }}css/bootstrap-datepicker3.css"/>
+  {% else %}
+    <link rel="stylesheet"
+          href="{{ STATIC_URL }}css/bootstrap-datepicker3.min.css"/>
+  {% endif %}
+{% endblock %}
+
 {% block nav-de %}active{% endblock %}
 
 {% block tab-content %}

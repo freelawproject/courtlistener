@@ -6,7 +6,7 @@ BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 def get_bucket_name(court, pacer_case_id):
     bucketlist = ["gov", "uscourts", court, unicode(pacer_case_id)]
     if settings.DEBUG is True:
-        bucketlist.insert(0, 'dev')
+        bucketlist.insert(0, "dev")
     return ".".join(bucketlist)
 
 
@@ -14,7 +14,7 @@ def get_docketxml_url(court, pacer_case_id):
     return "%s/%s/%s" % (
         BASE_DOWNLOAD_URL,
         get_bucket_name(court, pacer_case_id),
-        get_docket_filename(court, pacer_case_id, 'xml'),
+        get_docket_filename(court, pacer_case_id, "xml"),
     )
 
 
@@ -27,19 +27,15 @@ def get_docketxml_url_from_path(path):
         https://www.archive.org/download/gov.uscourts.wyd.16083/gov.uscourts.wyd.16083.docket.xml
         https://www.archive.org/download/gov/gov.uscourts.akd.23118.docket.xml
     """
-    filename = path.rsplit('/', 1)[-1]
-    bucket = '.'.join(filename.split('.')[0:4])
-    return "%s/%s/%s" % (
-        BASE_DOWNLOAD_URL,
-        bucket,
-        filename,
-    )
+    filename = path.rsplit("/", 1)[-1]
+    bucket = ".".join(filename.split(".")[0:4])
+    return "%s/%s/%s" % (BASE_DOWNLOAD_URL, bucket, filename,)
 
 
 def get_ia_document_url_from_path(path, document_number, attachment_number):
     """Make an IA URL based on the download path of an item."""
-    filename = path.rsplit('/', 1)[-1]
-    bucket = '.'.join(filename.split('.')[0:4])
+    filename = path.rsplit("/", 1)[-1]
+    bucket = ".".join(filename.split(".")[0:4])
     return "{url}/{bucket}/{bucket}.{doc_num}.{att_num}.pdf".format(
         url=BASE_DOWNLOAD_URL,
         bucket=bucket,
@@ -50,12 +46,10 @@ def get_ia_document_url_from_path(path, document_number, attachment_number):
 
 def get_local_document_url_from_path(path, document_number, attachment_number):
     """Make a path to a local copy of a PDF."""
-    filename = path.rsplit('/', 1)[-1]
-    bucket = '.'.join(filename.split('.')[0:4])
+    filename = path.rsplit("/", 1)[-1]
+    bucket = ".".join(filename.split(".")[0:4])
     return "{bucket}.{doc_num}.{att_num}.pdf".format(
-        bucket=bucket,
-        doc_num=document_number,
-        att_num=attachment_number,
+        bucket=bucket, doc_num=document_number, att_num=attachment_number,
     )
 
 
@@ -68,15 +62,31 @@ def get_pdf_url(court, pacer_case_id, filename):
 
 
 def get_docket_filename(court, pacer_case_id, ext):
-    return ".".join(["gov", "uscourts", unicode(court), unicode(pacer_case_id),
-                     "docket.%s" % ext])
+    return ".".join(
+        [
+            "gov",
+            "uscourts",
+            unicode(court),
+            unicode(pacer_case_id),
+            "docket.%s" % ext,
+        ]
+    )
 
 
-def get_document_filename(court, pacer_case_id, document_number,
-                          attachment_number):
-    return ".".join(["gov", "uscourts", unicode(court), unicode(pacer_case_id),
-                     unicode(document_number), unicode(attachment_number or 0),
-                     "pdf"])
+def get_document_filename(
+    court, pacer_case_id, document_number, attachment_number
+):
+    return ".".join(
+        [
+            "gov",
+            "uscourts",
+            unicode(court),
+            unicode(pacer_case_id),
+            unicode(document_number),
+            unicode(attachment_number or 0),
+            "pdf",
+        ]
+    )
 
 
 def needs_ocr(content):
@@ -97,7 +107,7 @@ def needs_ocr(content):
     """
     for line in content.splitlines():
         line = line.strip()
-        if line.startswith('Case'):
+        if line.startswith("Case"):
             continue
         elif line:
             # We found a line with good content. No OCR needed.

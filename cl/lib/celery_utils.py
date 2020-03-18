@@ -7,7 +7,7 @@ from django.utils.timezone import now
 
 from cl.lib.redis_utils import make_redis_interface
 
-PRIORITY_SEP = '\x06\x16'
+PRIORITY_SEP = "\x06\x16"
 DEFAULT_PRIORITY_STEPS = [0, 3, 6, 9]
 
 
@@ -34,28 +34,32 @@ def make_queue_name_for_pri(queue, pri):
     :return: A name for the queue-priority pair.
     """
     if pri not in DEFAULT_PRIORITY_STEPS:
-        raise ValueError('Priority not in priority steps')
-    return '{0}{1}{2}'.format(*((queue, PRIORITY_SEP, pri) if pri else
-                                (queue, '', '')))
+        raise ValueError("Priority not in priority steps")
+    return "{0}{1}{2}".format(
+        *((queue, PRIORITY_SEP, pri) if pri else (queue, "", ""))
+    )
 
 
-def get_queue_length(queue_name='celery'):
+def get_queue_length(queue_name="celery"):
     """Get the number of tasks in a celery queue.
 
     :param queue_name: The name of the queue you want to inspect.
     :return: the number of items in the queue.
     """
-    priority_names = [make_queue_name_for_pri(queue_name, pri) for pri in
-                      DEFAULT_PRIORITY_STEPS]
-    r = make_redis_interface('CELERY')
+    priority_names = [
+        make_queue_name_for_pri(queue_name, pri)
+        for pri in DEFAULT_PRIORITY_STEPS
+    ]
+    r = make_redis_interface("CELERY")
     return sum([r.llen(x) for x in priority_names])
 
 
 class CeleryThrottle(object):
     """A class for throttling celery."""
 
-    def __init__(self, min_items=100, min_wait=0, max_wait=1,
-                 queue_name='celery'):
+    def __init__(
+        self, min_items=100, min_wait=0, max_wait=1, queue_name="celery"
+    ):
         """Create a throttle to prevent celery run aways.
 
         :param min_items: The minimum number of items that should be enqueued.

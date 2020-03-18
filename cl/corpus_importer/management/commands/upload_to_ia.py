@@ -15,8 +15,8 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import make_redis_interface
 from cl.search.models import RECAPDocument, Docket
 
-PACER_USERNAME = os.environ.get('PACER_USERNAME', settings.PACER_USERNAME)
-PACER_PASSWORD = os.environ.get('PACER_PASSWORD', settings.PACER_PASSWORD)
+PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
+PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
 def upload_non_free_pdfs_to_internet_archive(options):
@@ -25,17 +25,17 @@ def upload_non_free_pdfs_to_internet_archive(options):
 
 def upload_pdfs_to_internet_archive(options, do_non_free=False):
     """Upload items to the Internet Archive."""
-    q = options['queue']
-    rds = RECAPDocument.objects.filter(
-        Q(ia_upload_failure_count__lt=3) | Q(ia_upload_failure_count=None),
-        is_available=True,
-        filepath_ia='',
-    ).exclude(
-        filepath_local='',
-    ).values_list(
-        'pk',
-        flat=True,
-    ).order_by()
+    q = options["queue"]
+    rds = (
+        RECAPDocument.objects.filter(
+            Q(ia_upload_failure_count__lt=3) | Q(ia_upload_failure_count=None),
+            is_available=True,
+            filepath_ia="",
+        )
+        .exclude(filepath_local="",)
+        .values_list("pk", flat=True,)
+        .order_by()
+    )
     if do_non_free:
         rds = rds.filter(Q(is_free_on_pacer=False) | Q(is_free_on_pacer=None))
     else:
@@ -53,13 +53,16 @@ def upload_pdfs_to_internet_archive(options, do_non_free=False):
 
 def upload_oral_arguments_to_internet_archive(options):
     """Upload oral arguments to the Internet Archive"""
-    q = options['queue']
-    af_pks = Audio.objects.filter(Q(ia_upload_failure_count__lt=3) |
-                               Q(ia_upload_failure_count=None),
-                               filepath_ia='')\
-        .exclude(local_path_mp3='')\
-        .values_list('pk', flat=True)\
+    q = options["queue"]
+    af_pks = (
+        Audio.objects.filter(
+            Q(ia_upload_failure_count__lt=3) | Q(ia_upload_failure_count=None),
+            filepath_ia="",
+        )
+        .exclude(local_path_mp3="")
+        .values_list("pk", flat=True)
         .order_by()
+    )
     count = len(af_pks)
     logger.info("Sending %s oral argument files to Internet Archive", count)
     throttle = CeleryThrottle(queue_name=q)
@@ -72,17 +75,22 @@ def upload_oral_arguments_to_internet_archive(options):
 
 def upload_recap_data(options):
     """Upload RECAP data to Internet Archive."""
-    q = options['queue']
-    database = options['database']
-    r = make_redis_interface('CACHE')
-    redis_key = 'recap-docket-last-id'
+    q = options["queue"]
+    database = options["database"]
+    r = make_redis_interface("CACHE")
+    redis_key = "recap-docket-last-id"
     last_pk = r.getset(redis_key, 0)
-    ds = Docket.objects.filter(
-        Q(ia_upload_failure_count__lte=3) | Q(ia_upload_failure_count=None),
-        ia_needs_upload=True,
-        source__in=Docket.RECAP_SOURCES,
-        pk__gt=last_pk,
-    ).order_by('pk').only('pk')
+    ds = (
+        Docket.objects.filter(
+            Q(ia_upload_failure_count__lte=3)
+            | Q(ia_upload_failure_count=None),
+            ia_needs_upload=True,
+            source__in=Docket.RECAP_SOURCES,
+            pk__gt=last_pk,
+        )
+        .order_by("pk")
+        .only("pk")
+    )
 
     chunk_size = 100  # Small to save memory
     i = 0
@@ -96,8 +104,8 @@ def upload_recap_data(options):
         # This ensures that if the quarter changes while this runs, we get the
         # new value.
         params = {
-            'pk__gt': last_pk,
-            'ia_date_first_change__lt': get_start_of_quarter(),
+            "pk__gt": last_pk,
+            "ia_date_first_change__lt": get_start_of_quarter(),
         }
         for d in ds.filter(**params)[:chunk_size]:
             throttle.maybe_wait()
@@ -109,8 +117,9 @@ def upload_recap_data(options):
                 elapsed_minutes = float((t2 - t1).seconds) / 60
                 try:
                     rate = i / float(elapsed_minutes)
-                    logger.info("Uploaded %s dockets to IA so far (%.01f/m)",
-                                i, rate)
+                    logger.info(
+                        "Uploaded %s dockets to IA so far (%.01f/m)", i, rate
+                    )
                 except ZeroDivisionError:
                     # First lap through can be completed in less than 1s.
                     pass
@@ -156,42 +165,40 @@ class Command(VerboseCommand):
     def valid_actions(self, s):
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
-                "Unable to parse action. Valid actions are: %s" % (
-                    ', '.join(self.VALID_ACTIONS.keys())
-                )
+                "Unable to parse action. Valid actions are: %s"
+                % (", ".join(self.VALID_ACTIONS.keys()))
             )
 
         return self.VALID_ACTIONS[s]
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--action',
+            "--action",
             type=self.valid_actions,
             required=True,
-            help="The action you wish to take. Valid choices are: %s" % (
-                ', '.join(self.VALID_ACTIONS.keys())
-            )
+            help="The action you wish to take. Valid choices are: %s"
+            % (", ".join(self.VALID_ACTIONS.keys())),
         )
         parser.add_argument(
-            '--queue',
-            default='batch1',
+            "--queue",
+            default="batch1",
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(
-            '--database',
-            default='default',
+            "--database",
+            default="default",
             help="The database name to use when querying (currently only "
-                 "supported by the upload-recap-data-to-ia task).",
+            "supported by the upload-recap-data-to-ia task).",
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        options['action'](options)
+        options["action"](options)
 
     VALID_ACTIONS = {
-        'do-routine-uploads': do_routine_uploads,
-        'upload-pdfs-to-ia': upload_pdfs_to_internet_archive,
-        'upload-non-free-pdfs-to-ia': upload_non_free_pdfs_to_internet_archive,
-        'upload-oral-arguments-to-ia': upload_oral_arguments_to_internet_archive,
-        'upload-recap-data-to-ia': upload_recap_data,
+        "do-routine-uploads": do_routine_uploads,
+        "upload-pdfs-to-ia": upload_pdfs_to_internet_archive,
+        "upload-non-free-pdfs-to-ia": upload_non_free_pdfs_to_internet_archive,
+        "upload-oral-arguments-to-ia": upload_oral_arguments_to_internet_archive,
+        "upload-recap-data-to-ia": upload_recap_data,
     }

@@ -1,14 +1,22 @@
-import os
+import logging
 
 from django.conf import settings
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from rest_framework import status
+from rest_framework.status import HTTP_400_BAD_REQUEST
 
-from cl.lib import magic, sunburnt
-from cl.lib.search_utils import build_coverage_query, build_court_count_query
+from cl.lib import sunburnt
+from cl.lib.search_utils import (
+    build_coverage_query,
+    build_court_count_query,
+    get_solr_interface,
+    build_alert_estimation_query,
+)
+from cl.search.forms import SearchForm
 from cl.search.models import Court
-from cl.stats.utils import tally_stat
+
+logger = logging.getLogger(__name__)
 
 
 def annotate_courts_with_counts(courts, court_count_tuples):
@@ -35,9 +43,9 @@ def annotate_courts_with_counts(courts, court_count_tuples):
 
 def make_court_variable():
     courts = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
     response = conn.raw_query(**build_court_count_query()).execute()
-    court_count_tuples = response.facet_counts.facet_fields['court_exact']
+    court_count_tuples = response.facet_counts.facet_fields["court_exact"]
     courts = annotate_courts_with_counts(courts, court_count_tuples)
     return courts
 
@@ -45,10 +53,9 @@ def make_court_variable():
 def court_index(request):
     """Shows the information we have available for the courts."""
     courts = make_court_variable()
-    return render(request, 'jurisdictions.html', {
-        'courts': courts,
-        'private': False
-    })
+    return render(
+        request, "jurisdictions.html", {"courts": courts, "private": False}
+    )
 
 
 def rest_docs(request, version):
@@ -56,39 +63,36 @@ def rest_docs(request, version):
     courts = make_court_variable()
     court_count = len(courts)
     if version is None:
-        version = 'vlatest'
-    return render(request, 'rest-docs-%s.html' % version, {
-        'court_count': court_count,
-        'courts': courts,
-        'private': False
-    })
+        version = "vlatest"
+    return render(
+        request,
+        "rest-docs-%s.html" % version,
+        {"court_count": court_count, "courts": courts, "private": False},
+    )
 
 
 def api_index(request):
     court_count = Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
     ).count()
-    return render(request, 'docs.html', {
-        'court_count': court_count,
-        'private': False
-    })
+    return render(
+        request, "docs.html", {"court_count": court_count, "private": False}
+    )
 
 
 def replication_docs(request):
-    return render(request, 'replication.html', {
-        'private': False,
-    })
+    return render(request, "replication.html", {"private": False,})
 
 
 def bulk_data_index(request):
     """Shows an index page for the dumps."""
     courts = make_court_variable()
     court_count = len(courts)
-    return render(request, 'bulk-data.html', {
-        'court_count': court_count,
-        'courts': courts,
-        'private': False
-    })
+    return render(
+        request,
+        "bulk-data.html",
+        {"court_count": court_count, "courts": courts, "private": False},
+    )
 
 
 def strip_zero_years(data):
@@ -112,7 +116,7 @@ def strip_zero_years(data):
             end = i
             break
 
-    return data[start:end+1]
+    return data[start : end + 1]
 
 
 def coverage_data(request, version, court):
@@ -121,12 +125,12 @@ def coverage_data(request, version, court):
     Responds to either AJAX or regular requests.
     """
 
-    if court != 'all':
+    if court != "all":
         court_str = get_object_or_404(Court, pk=court).pk
     else:
-        court_str = 'all'
-    q = request.GET.get('q')
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        court_str = "all"
+    q = request.GET.get("q")
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
     response = conn.raw_query(**build_coverage_query(court_str, q)).execute()
     counts = response.facet_counts.facet_ranges[0][1][0][1]
     counts = strip_zero_years(counts)
@@ -138,10 +142,49 @@ def coverage_data(request, version, court):
         annual_counts[date_string[:4]] = count
         total_docs += count
 
-    return JsonResponse({
-        'annual_counts': annual_counts,
-        'total': total_docs,
-    }, safe=True)
+    return JsonResponse(
+        {"annual_counts": annual_counts, "total": total_docs}, safe=True
+    )
+
+
+def get_result_count(request, version, day_count):
+    """Get the count of results for the past `day_count` number of days
+
+    GET parameters will be a complete search string
+
+    :param request: The Django request object
+    :param version: The API version number (ignored for now, but there for
+    later)
+    :param day_count: The number of days to average across. More is slower.
+    :return: A JSON object with the number of hits during the last day_range
+    period.
+    """
+    search_form = SearchForm(request.GET.copy())
+    if not search_form.is_valid():
+        return JsonResponse(
+            {"error": "Invalid SearchForm"},
+            safe=True,
+            status=HTTP_400_BAD_REQUEST,
+        )
+
+    cd = search_form.cleaned_data
+    try:
+        si = get_solr_interface(cd)
+    except NotImplementedError:
+        logger.error(
+            "Tried getting solr connection for %s, but it's not "
+            "implemented yet",
+            cd["type"],
+        )
+        raise
+
+    response = (
+        si.query()
+        .add_extra(**build_alert_estimation_query(cd, int(day_count)))
+        .execute()
+    )
+
+    return JsonResponse({"count": response.result.numFound}, safe=True)
 
 
 def deprecated_api(request, v):
@@ -149,10 +192,10 @@ def deprecated_api(request, v):
         {
             "meta": {
                 "status": "This endpoint is deprecated. Please upgrade to the "
-                          "newest version of the API.",
+                "newest version of the API.",
             },
-            "objects": []
+            "objects": [],
         },
         safe=False,
-        status=status.HTTP_410_GONE
+        status=status.HTTP_410_GONE,
     )

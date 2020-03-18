@@ -8,6 +8,7 @@ class UrlHash(models.Model):
     to the Court table, except that courts often have more than one URL they
     parse.
     """
+
     id = models.CharField(
         "the ID of the item that is hashed",
         max_length=5000,
@@ -15,9 +16,7 @@ class UrlHash(models.Model):
         primary_key=True,
     )
     sha1 = models.CharField(
-        "a SHA1 corresponding to the item",
-        max_length=40,
-        editable=False,
+        "a SHA1 corresponding to the item", max_length=40, editable=False,
     )
 
     def __unicode__(self):
@@ -31,31 +30,29 @@ class ErrorLog(models.Model):
     """A class to hold scraper errors. Items are added by the scraper and
     removed by the scraper's status monitor.
     """
+
     court = models.ForeignKey(
         Court,
-        verbose_name='the court where the error occurred',
+        verbose_name="the court where the error occurred",
         on_delete=models.CASCADE,
     )
     log_time = models.DateTimeField(
-        'the exact date and time of the error',
-        auto_now_add=True,
+        "the exact date and time of the error", auto_now_add=True,
     )
     log_level = models.CharField(
-        'the loglevel of the error encountered',
-        max_length=15,
-        editable=False
+        "the loglevel of the error encountered", max_length=15, editable=False
     )
     message = models.TextField(
-        'the message produced in the log',
-        blank=True,
-        editable=False
+        "the message produced in the log", blank=True, editable=False
     )
 
     def __unicode__(self):
-        return u"%s - %s@%s %s" % (self.log_time,
-                                   self.log_level,
-                                   self.court.pk,
-                                   self.message)
+        return u"%s - %s@%s %s" % (
+            self.log_time,
+            self.log_level,
+            self.court.pk,
+            self.message,
+        )
 
 
 class PACERFreeDocumentLog(models.Model):
@@ -83,41 +80,25 @@ class PACERFreeDocumentLog(models.Model):
         db_index=True,
     )
     date_queried = models.DateField(
-        help_text="The date that was queried.",
-        db_index=True,
+        help_text="The date that was queried.", db_index=True,
     )
     status = models.SmallIntegerField(
-        help_text="The status of the scrape.",
-        choices=SCRAPE_STATUSES,
+        help_text="The status of the scrape.", choices=SCRAPE_STATUSES,
     )
 
 
 class PACERFreeDocumentRow(models.Model):
     """Rows from the Free Opinion report table converted to rows in the DB."""
-    court_id = models.CharField(
-        max_length=15,
-    )
-    pacer_case_id = models.CharField(
-        max_length=100,
-    )
-    docket_number = models.CharField(
-        max_length=5000,
-    )
+
+    court_id = models.CharField(max_length=15,)
+    pacer_case_id = models.CharField(max_length=100,)
+    docket_number = models.CharField(max_length=5000,)
     case_name = models.TextField()
     date_filed = models.DateField()
-    pacer_doc_id = models.CharField(
-        max_length=32,
-    )
-    pacer_seq_no = models.IntegerField(
-        null=True,
-        blank=True,
-    )
-    document_number = models.CharField(
-        max_length=32,
-    )
+    pacer_doc_id = models.CharField(max_length=32,)
+    pacer_seq_no = models.IntegerField(null=True, blank=True,)
+    document_number = models.CharField(max_length=32,)
     description = models.TextField()
     nature_of_suit = models.TextField()
-    cause = models.CharField(
-        max_length=2000,
-    )
+    cause = models.CharField(max_length=2000,)
     error_msg = models.TextField()

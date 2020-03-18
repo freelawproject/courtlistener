@@ -17,6 +17,7 @@
 *.exe binary
 *.bz2 binary
 *.gz binary
+*.zip binary
 
 # Fonts
 *.eot binary
@@ -30,7 +31,3 @@
 *.pdf binary
 *.xls binary
 *.wpd binary
-
-# Other
-*.traineddata binary
-

@@ -3,72 +3,75 @@ from django.template import Context
 from django.test import TestCase, RequestFactory
 
 from cl.custom_filters.templatetags.extras import get_full_host, granular_date
-from cl.custom_filters.templatetags.text_filters import naturalduration, \
-    oxford_join
-from cl.people_db.models import GRANULARITY_DAY, GRANULARITY_MONTH, \
-    GRANULARITY_YEAR
+from cl.custom_filters.templatetags.text_filters import (
+    naturalduration,
+    oxford_join,
+)
+from cl.people_db.models import (
+    GRANULARITY_DAY,
+    GRANULARITY_MONTH,
+    GRANULARITY_YEAR,
+)
 
 
 class TestTextFilters(TestCase):
-
     def test_oxford_zero_items(self):
-        self.assertEqual(oxford_join([]), '')
+        self.assertEqual(oxford_join([]), "")
 
     def test_oxford_one_item(self):
-        self.assertEqual(oxford_join(['a']), 'a')
+        self.assertEqual(oxford_join(["a"]), "a")
 
     def test_oxford_two_items(self):
-        self.assertEqual(oxford_join(['a', 'b']), 'a and b')
+        self.assertEqual(oxford_join(["a", "b"]), "a and b")
 
     def test_oxford_three_items(self):
-        self.assertEqual(oxford_join(['a', 'b', 'c']), 'a, b, and c')
+        self.assertEqual(oxford_join(["a", "b", "c"]), "a, b, and c")
 
     def test_oxford_separator(self):
-        self.assertEqual(oxford_join(['a', 'b', 'c'], separator=';'),
-                         'a; b; and c')
+        self.assertEqual(
+            oxford_join(["a", "b", "c"], separator=";"), "a; b; and c"
+        )
 
     def test_oxford_conjunction(self):
-        self.assertEqual(oxford_join(['a', 'b', 'c'], conjunction='or'),
-                         'a, b, or c')
+        self.assertEqual(
+            oxford_join(["a", "b", "c"], conjunction="or"), "a, b, or c"
+        )
 
 
 class TestNaturalDuration(TestCase):
-
     def test_conversion_to_strings(self):
         """Can we get the str output right?"""
         test_cases = (
-            ('01', '1'),
-            ('61', '1:01'),
-            ('3601', '1:00:01'),
-            ('86401', '1:00:00:01'),
-            ('90061', '1:01:01:01'),
+            ("01", "1"),
+            ("61", "1:01"),
+            ("3601", "1:00:01"),
+            ("86401", "1:00:00:01"),
+            ("90061", "1:01:01:01"),
         )
         for test, result in test_cases:
             self.assertEqual(
-                naturalduration(test),
-                result,
+                naturalduration(test), result,
             )
 
     def test_input_as_int_or_str(self):
         """Can we take input as either an int or a str?"""
         test_cases = (
-            ('62', '1:02'),
-            (62, '1:02'),
+            ("62", "1:02"),
+            (62, "1:02"),
         )
         for test, result in test_cases:
             self.assertEqual(
-                naturalduration(test),
-                result,
+                naturalduration(test), result,
             )
 
     def test_conversion_to_dict(self):
         """Can we get the numbers right when it's a dict?"""
         test_cases = (
-            ('01', {'d': 0, 'h': 0, 'm': 0, 's': 1}),
-            ('61', {'d': 0, 'h': 0, 'm': 1, 's': 1}),
-            ('3601', {'d': 0, 'h': 1, 'm': 0, 's': 1}),
-            ('86401', {'d': 1, 'h': 0, 'm': 0, 's': 1}),
-            ('90061', {'d': 1, 'h': 1, 'm': 1, 's': 1}),
+            ("01", {"d": 0, "h": 0, "m": 0, "s": 1}),
+            ("61", {"d": 0, "h": 0, "m": 1, "s": 1}),
+            ("3601", {"d": 0, "h": 1, "m": 0, "s": 1}),
+            ("86401", {"d": 1, "h": 0, "m": 0, "s": 1}),
+            ("90061", {"d": 1, "h": 1, "m": 1, "s": 1}),
         )
         for test, expected_result in test_cases:
             actual_result = naturalduration(test, as_dict=True)
@@ -76,15 +79,15 @@ class TestNaturalDuration(TestCase):
                 actual_result,
                 expected_result,
                 msg="Could not convert %s to dict.\n"
-                    "  Got:      %s\n"
-                    "  Expected: %s" % (test, actual_result, expected_result)
+                "  Got:      %s\n"
+                "  Expected: %s" % (test, actual_result, expected_result),
             )
 
     def test_weird_values(self):
         test_cases = (
-            (None, '0'),   # None
-            (0, '0'),      # Zero
-            (22.2, '22'),  # Float
+            (None, "0"),  # None
+            (0, "0"),  # Zero
+            (22.2, "22"),  # Float
         )
         for test, expected_result in test_cases:
             actual_result = naturalduration(test)
@@ -92,8 +95,8 @@ class TestNaturalDuration(TestCase):
                 actual_result,
                 expected_result,
                 msg="Error with weird value: %s.\n"
-                    "  Got:      %s\n"
-                    "  Expected: %s" % (test, actual_result, expected_result)
+                "  Got:      %s\n"
+                "  Expected: %s" % (test, actual_result, expected_result),
             )
 
 
@@ -107,15 +110,14 @@ class TestExtras(TestCase):
 
     def test_get_full_host(self):
         """Does get_full_host return the right values"""
-        c = Context({'request': self.factory.request()})
+        c = Context({"request": self.factory.request()})
         self.assertEqual(
-            get_full_host(c),
-            'http://testserver',
+            get_full_host(c), "http://testserver",
         )
 
         self.assertEqual(
-            get_full_host(c, username='billy', password='crystal'),
-            'http://billy:crystal@testserver',
+            get_full_host(c, username="billy", password="crystal"),
+            "http://billy:crystal@testserver",
         )
 
     def test_granular_dates(self):
@@ -131,14 +133,16 @@ class TestExtras(TestCase):
         d = datetime.date(year=1982, month=6, day=9)
         obj = DummyObject()
         for q, a in q_a:
-            setattr(obj, 'date_start', d)
-            setattr(obj, 'date_granularity_start', q[0])
-            result = granular_date(obj, 'date_start', *q)
+            setattr(obj, "date_start", d)
+            setattr(obj, "date_granularity_start", q[0])
+            result = granular_date(obj, "date_start", *q)
             self.assertEqual(
                 result,
                 a,
-                msg=("Incorrect granular date conversion. Got: %s instead of "
-                     "%s" % (result, a))
+                msg=(
+                    "Incorrect granular date conversion. Got: %s instead of "
+                    "%s" % (result, a)
+                ),
             )
 
     def test_old_granular_dates(self):
@@ -149,22 +153,19 @@ class TestExtras(TestCase):
         obj.date_granularity_start = GRANULARITY_DAY
 
         try:
-            granular_date(obj, 'date_start')
+            granular_date(obj, "date_start")
         except ValueError:
             self.fail("Granular date failed while parsing date prior to 1900.")
 
     def test_granularity_missing_date(self):
         """Does granularity code work with missing data?"""
         obj = DummyObject()
-        d = ''
+        d = ""
         obj.date_start = d
         obj.date_granularity_start = GRANULARITY_DAY
 
         # Missing date value
-        self.assertEqual(
-            granular_date(obj, 'date_start'),
-            "Unknown"
-        )
+        self.assertEqual(granular_date(obj, "date_start"), "Unknown")
 
     def test_granularity_dict_or_obj(self):
         """Can you pass a dict or an object and will both work?
@@ -173,13 +174,10 @@ class TestExtras(TestCase):
         others are objects.
         """
         obj = {}
-        d = ''
-        obj['date_start'] = d
-        obj['date_granularity_start'] = GRANULARITY_DAY
+        d = ""
+        obj["date_start"] = d
+        obj["date_granularity_start"] = GRANULARITY_DAY
 
         self.assertEqual(
-            granular_date(obj, 'date_start'),
-            "Unknown",
+            granular_date(obj, "date_start"), "Unknown",
         )
-
-
