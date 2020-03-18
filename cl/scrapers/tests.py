@@ -124,22 +124,21 @@ class ExtractionTest(TestCase):
             msg="Expected citation was not created in db",
         )
 
-    def test_juriscraper_object_creation(self):
-        """Can we extract text from tax court pdf and add to db?"""
+    def test_juriscraper_docket_number_extraction(self):
+        """Can we extract docket number from tax court pdf and add to db?"""
 
-        test_op = Opinion.objects.get(pk=76)
-        assert (
-            test_op.cluster.citations.exists() is False
-        ), "Citation already exists"
-
-        extract_doc_content(pk=test_op.pk, do_ocr=False)
-
-        assert (
-            test_op.cluster.citations.exists() is True
-        ), "Citation extraction failed"
-        print(
-            "Successful tax court citation parsing from pdf",
-            test_op.cluster.citation_string,
+        o = Opinion.objects.get(pk=76)
+        self.assertEqual(
+            None,
+            o.cluster.docket.docket_number,
+            msg="Docket number should be none.",
+        )
+        extract_doc_content(pk=76, do_ocr=False)
+        o = Opinion.objects.get(pk=76)
+        self.assertEqual(
+            "19031-13, 27735-13, 11905-14",
+            o.cluster.docket.docket_number,
+            msg="Docket number extracted properly",
         )
 
 
