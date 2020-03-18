@@ -16,8 +16,8 @@
           {% endif %}
         </h3>
       </div>
-      <div class="modal-body">
-        {% if user.is_authenticated %}
+      {% if user.is_authenticated %}
+        <div class="modal-body logged-in hidden">
           {% if not request.GET.edit_alert %}
             <p>Get regular notifications about this query by creating an alert. <a href="{% url "alert_help" %}">Learn more&nbsp;<i
                     class="fa fa-question-circle gray"></i></a>
@@ -108,12 +108,14 @@
               </div>
             </div>
           </form>
-        {% else %}
-          {# Anonymous user #}
+        </div>
+      {% else %}
+        {# Anonymous user #}
+        <div class="modal-body logged-out">
           <p>To get alerts for this search, <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">sign in</a> or <a href="{% url "register" %}?next={{ request.path }}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">register</a> as a new user.
           </p>
-        {% endif %}
-      </div><!-- end .modal-body -->
+        </div>
+      {% endif %}
     </div><!-- end .modal-content -->
   </div><!-- end .modal-dialog -->
 </div>
