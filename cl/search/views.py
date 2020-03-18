@@ -37,9 +37,15 @@ from cl.lib.search_utils import (
     get_solr_interface,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
-from cl.lib.search_utils import build_main_query, get_query_citation, \
-    make_stats_variable, merge_form_with_courts, make_get_string, \
-    regroup_snippets, get_mlt_query
+from cl.lib.search_utils import (
+    build_main_query,
+    get_query_citation,
+    make_stats_variable,
+    merge_form_with_courts,
+    make_get_string,
+    regroup_snippets,
+    get_mlt_query,
+)
 from cl.search.constants import RELATED_PATTERN
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion, SEARCH_TYPES
@@ -138,21 +144,24 @@ def do_search(
             raise
 
         try:
-            # TODO
             # Is this a `related:<pks>` prefix query?
-            # related_prefix_match = re.search(RELATED_PATTERN, cd['q'])
-            # if related_prefix_match:
-            #     results = get_mlt_query(
-            #         si,
-            #         cd,
-            #         facet,
-            #         # Seed IDs
-            #         related_prefix_match.group('pks').split(','),
-            #         # Original query
-            #         cd['q'].replace(related_prefix_match.group('pfx'), '')
-            #     )
-            ############
-            results = si.query().add_extra(**build_main_query(cd, facet=facet))
+            related_prefix_match = RELATED_PATTERN.search(cd["q"])
+            if related_prefix_match:
+                results = get_mlt_query(
+                    si,
+                    cd,
+                    facet,
+                    # Seed IDs
+                    related_prefix_match.group("pks").split(","),
+                    # Original query
+                    cd["q"].replace(related_prefix_match.group("pfx"), ""),
+                )
+            else:
+                # Regular search queries
+                results = si.query().add_extra(
+                    **build_main_query(cd, facet=facet)
+                )
+
             paged_results = paginate_cached_solr_results(
                 get_params, cd, results, rows, cache_key
             )

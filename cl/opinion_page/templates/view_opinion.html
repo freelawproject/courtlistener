@@ -26,8 +26,8 @@
 {% endblock %}
 
 {% block matomo-scripts %}
-  {% if related_items %}
-  _paq.push(['trackEvent', 'viewRelated', 'viewRelated_{{ related_algorithm }}_seed_{{ cluster.pk }}', '{{ related_item_ids|join:"," }}']);
+  {% if related_clusters %}
+  _paq.push(['trackEvent', 'viewRelated', 'viewRelated_{{ related_algorithm }}_seed_{{ cluster.pk }}', '{{ related_cluster_ids|join:"," }}']);
   {% endif %}
 {% endblock %}
 
@@ -150,7 +150,7 @@
         {% endif %}
 
         {# Related opinions #}
-        {% if related_items %}
+        {% if related_clusters %}
             <div id="recommendations" class="sidebar-section">
                 <h3><span>Related Opinions</span></h3>
 
@@ -160,7 +160,7 @@
 
                 {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
                 {% with event_category='clickRelated' event_action='clickRelated_'|add:related_algorithm|add:'_seed'|add:pk_str %}
-                {% with opinions=related_items full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
+                {% with opinions=related_clusters full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
 
                   {% include 'includes/opinions_sidebar.html' %}
 

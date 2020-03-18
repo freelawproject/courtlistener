@@ -618,9 +618,7 @@ class SearchTest(IndexedSolrTestCase):
         self.assertEqual(r.status_code, HTTP_200_OK)
 
 
-@override_settings(
-    RELATED_USE_CACHE=False,
-)
+@override_settings(RELATED_USE_CACHE=False,)
 class RelatedSearchTest(IndexedSolrTestCase):
     def setUp(self):
         # Add additional user fixtures
@@ -647,11 +645,13 @@ class RelatedSearchTest(IndexedSolrTestCase):
         r = self.client.get(reverse("show_results"), params)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-        self.assertEqual(expected_article_count, SearchTest.get_article_count(r))
+        self.assertEqual(
+            expected_article_count, SearchTest.get_article_count(r)
+        )
         self.assertTrue(
             r.content.index("/opinion/%i/" % expected_first_pk)
             < r.content.index("/opinion/%i/" % expected_second_pk),
-            msg="'Howard v. Honda' should come AFTER 'case name cluster 3'."
+            msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
 
     def test_more_like_this_opinion_detail(self):
@@ -661,17 +661,23 @@ class RelatedSearchTest(IndexedSolrTestCase):
         expected_second_pk = 3  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
-        self.assertTrue(self.client.login(username='admin', password='password'))
+        self.assertTrue(
+            self.client.login(username="admin", password="password")
+        )
 
-        r = self.client.get('/opinion/%i/asdf/' % seed_pk)
+        r = self.client.get("/opinion/%i/asdf/" % seed_pk)
         self.assertEqual(r.status_code, 200)
 
         # Test for click tracking order
         self.assertTrue(
-            r.content.index("'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk))
-            <
-            r.content.index("'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_second_pk)),
-            msg="Related opinions are in wrong order."
+            r.content.index(
+                "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
+            )
+            < r.content.index(
+                "'clickRelated_mlt_seed%i', %i,"
+                % (seed_pk, expected_second_pk)
+            ),
+            msg="Related opinions are in wrong order.",
         )
         self.client.logout()
 

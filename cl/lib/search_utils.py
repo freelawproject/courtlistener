@@ -5,13 +5,19 @@ from urllib import urlencode
 from urlparse import parse_qs
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.cache import caches
 from django.http import QueryDict
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
-from cl.search.constants import SOLR_OPINION_HL_FIELDS, SOLR_RECAP_HL_FIELDS, SOLR_AUDIO_HL_FIELDS, \
-    SOLR_PEOPLE_HL_FIELDS
+from cl.lib.bot_detector import is_bot
+from cl.search.constants import (
+    SOLR_OPINION_HL_FIELDS,
+    SOLR_RECAP_HL_FIELDS,
+    SOLR_ORAL_ARGUMENT_HL_FIELDS,
+    SOLR_PEOPLE_HL_FIELDS,
+)
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib import sunburnt
@@ -496,18 +502,7 @@ def add_highlighting(main_params, cd, highlight):
             "source",
             "status",
         ]
-        hlfl = [
-            "caseName",
-            "citation",
-            "court_citation_string",
-            "docketNumber",
-            "judge",
-            "lexisCite",
-            "neutralCite",
-            "suitNature",
-            "text",
-        ]
-        # TODO hlfl = SOLR_OPINION_HL_FIELDS
+        hlfl = SOLR_OPINION_HL_FIELDS
     elif cd["type"] == SEARCH_TYPES.RECAP:
         fl = [
             "absolute_url",
@@ -527,19 +522,7 @@ def add_highlighting(main_params, cd, highlight):
             "party",
             "referred_to_id",
         ]
-        hlfl = [
-            "assignedTo",
-            "caseName",
-            "cause",
-            "court_citation_string",
-            "docketNumber",
-            "juryDemand",
-            "referredTo",
-            "short_description",
-            "suitNature",
-            "text",
-        ]
-        # TODO hlfl = SOLR_RECAP_HL_FIELDS
+        hlfl = SOLR_RECAP_HL_FIELDS
     elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         fl = [
             "id",
@@ -552,14 +535,7 @@ def add_highlighting(main_params, cd, highlight):
             "dateArgued",
             "duration",
         ]
-        hlfl = [
-            "text",
-            "caseName",
-            "judge",
-            "docketNumber",
-            "court_citation_string",
-        ]
-        # TODO hlfl = SOLR_ORAL_ARGUMENT_HL_FIELDS
+        hlfl = SOLR_ORAL_ARGUMENT_HL_FIELDS
     elif cd["type"] == SEARCH_TYPES.PEOPLE:
         fl = [
             "id",
@@ -577,8 +553,7 @@ def add_highlighting(main_params, cd, highlight):
             "selection_method",
             "court",
         ]
-        hlfl = ["name", "dob_city", "dob_state", "name_reverse"]
-        # TODO hlfl = SOLR_PEOPLE_HL_FIELDS
+        hlfl = SOLR_PEOPLE_HL_FIELDS
     main_params.update(
         {"fl": ",".join(fl), "hl.fl": ",".join(hlfl),}
     )
@@ -966,6 +941,107 @@ def get_citing_clusters_with_cache(cluster, is_bot):
     return citing_clusters
 
 
+def is_related_beta_user(request):
+    """Check whether current user is allowed for related opinions beta test
+
+    Beta test:
+    - feature is only available for specific user groups
+    - for better performance, we try to avoid DB queries and, thus, check
+    - first if user is logged in and no admin/staff.
+    """
+    if request.user.is_authenticated and (
+        request.user.is_superuser
+        or request.user.is_staff
+        or (
+            hasattr(settings, "RELATED_USER_GROUPS")
+            and request.user.groups.filter(
+                name__in=settings.RELATED_USER_GROUPS
+            ).exists()
+        )
+    ):
+        return True
+    else:
+        return False
+
+
+def get_related_clusters_with_cache(cluster, request):
+    """Use Solr to get related opinions with Solr-MoreLikeThis query
+
+    :param cluster: The cluster we're targeting
+    :param request: Request object for checking if user is permitted
+    :return: Tuple[List, List] Related clusters and sub-opinion IDs
+    """
+    if is_bot(request) or not is_related_beta_user(request):
+        # If it is a bot or is not beta tester, return empty results
+        return [], []
+
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+
+    # Opinions that belong to the targeted cluster
+    sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
+
+    # Use cache if enabled
+    mlt_cache_key = "mlt-cluster:%s" % cluster.pk
+    related_clusters = (
+        caches["db_cache"].get(mlt_cache_key)
+        if settings.RELATED_USE_CACHE
+        else None
+    )
+
+    if related_clusters is None:
+        # Cache is empty
+
+        # Turn list of opinion IDs into list of Q objects
+        sub_opinion_queries = [conn.Q(id=sub_id) for sub_id in sub_opinion_ids]
+
+        # Take one Q object from the list
+        sub_opinion_query = sub_opinion_queries.pop()
+
+        # OR the Q object with the ones remaining in the list
+        for item in sub_opinion_queries:
+            sub_opinion_query |= item
+
+        mlt_query = (
+            conn.query(sub_opinion_query)
+            .mlt("text", count=settings.RELATED_COUNT)
+            .field_limit(fields=["id", "caseName", "absolute_url"])
+        )
+        mlt_res = mlt_query.execute()
+
+        if mlt_res.more_like_this is not None:
+            # Only a single sub opinion
+            related_clusters = mlt_res.more_like_this.docs
+        elif mlt_res.more_like_these is not None:
+            # Multiple sub opinions
+
+            # Get result list for each sub opinion
+            sub_docs = [
+                sub_res.docs
+                for sub_id, sub_res in mlt_res.more_like_these.items()
+            ]
+
+            # Merge sub results by interleaving
+            # - exclude items that are sub opinions
+            related_clusters = [
+                item
+                for pair in zip(*sub_docs)
+                for item in pair
+                if item["id"] not in sub_opinion_ids
+            ]
+
+            # Limit number of results
+            related_clusters = related_clusters[: settings.RELATED_COUNT]
+        else:
+            # No MLT results are available (this should not happen)
+            related_clusters = []
+
+        cache.set(
+            mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
+        )
+
+    return related_clusters, sub_opinion_ids
+
+
 def get_mlt_query(si, cd, facet, seed_pks, filter_query):
     """
     By default Solr MoreLikeThis queries do not support highlighting. Thus, we use a special search interface
@@ -987,23 +1063,22 @@ def get_mlt_query(si, cd, facet, seed_pks, filter_query):
     q = build_main_query(cd, facet=facet)
     cleaned_fq = filter_query.strip()
 
-    q.update({
-        "caller": "mlt_query",
-        "q": "id:(" + (" OR ".join(seed_pks)) + ")",
-        "mlt": "true",  # Python boolean does not work here
-        "mlt.fl": "text",
-
-        # Retrieve fields as highlight replacement
-        "fl": q["fl"] + "," + (",".join(hl_fields)),
-
-        # Original query as filter query
-        "fq": q["fq"] + [cleaned_fq],
-
-        # unset fields not used for MLT
-        "boost": "",
-        "pf": "",
-        "ps": "",
-        "qf": "",
-    })
+    q.update(
+        {
+            "caller": "mlt_query",
+            "q": "id:(" + (" OR ".join(seed_pks)) + ")",
+            "mlt": "true",  # Python boolean does not work here
+            "mlt.fl": "text",
+            # Retrieve fields as highlight replacement
+            "fl": q["fl"] + "," + (",".join(hl_fields)),
+            # Original query as filter query
+            "fq": q["fq"] + [cleaned_fq],
+            # unset fields not used for MLT
+            "boost": "",
+            "pf": "",
+            "ps": "",
+            "qf": "",
+        }
+    )
 
     return si.mlt_query(hl_fields).add_extra(**q)
