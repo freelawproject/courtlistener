@@ -244,11 +244,10 @@ def update_document_from_text(opinion):
     metadata_dict = site.extract_from_text(opinion.plain_text)
     for model_name, data in metadata_dict.items():
         ModelClass = apps.get_model("search.%s" % model_name)
-        if model_name == "OpinionCluster":
-            opinion.cluster.__dict__.update(data)
-        elif model_name == "Docket":
+        if model_name == "Docket":
             opinion.cluster.docket.__dict__.update(data)
-            opinion.cluster.docket.save()
+        elif model_name == "OpinionCluster":
+            opinion.cluster.__dict__.update(data)
         elif model_name == "Citation":
             data["cluster_id"] = opinion.cluster_id
             ModelClass.objects.get_or_create(**data)
@@ -320,15 +319,15 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     # Save item, and index Solr if needed.
     # noinspection PyBroadException
     try:
+        opinion.cluster.docket.save()
+        opinion.cluster.save(index=False)
         if not citation_jitter:
             # No waiting around. Save to the database now, but don't bother
             # with the index yet because citations are being done imminently.
-            opinion.cluster.save(index=False)
             opinion.save(index=False)
         else:
             # Save to the index now, citations come later, commit comes
             # according to schedule
-            opinion.cluster.save(index=False)
             opinion.save(index=True)
     except Exception:
         print(
