@@ -248,6 +248,7 @@ def update_document_from_text(opinion):
             opinion.cluster.__dict__.update(data)
         elif model_name == "Docket":
             opinion.cluster.docket.__dict__.update(data)
+            opinion.cluster.docket.save()
         elif model_name == "Citation":
             data["cluster_id"] = opinion.cluster_id
             ModelClass.objects.get_or_create(**data)
