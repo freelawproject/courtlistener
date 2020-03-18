@@ -92,6 +92,7 @@ class ExtractionTest(TestCase):
 
     def test_txt_extraction_with_bad_data(self):
         """Can we extract text from nasty files lacking encodings?"""
+
         path = os.path.join(
             settings.MEDIA_ROOT,
             "test",
@@ -110,6 +111,7 @@ class ExtractionTest(TestCase):
 
     def test_juriscraper_object_creation(self):
         """Can we extract text from tax court pdf and add to db?"""
+
         o = Opinion.objects.get(pk=76)
         self.assertFalse(
             o.cluster.citations.exists(),
@@ -120,6 +122,21 @@ class ExtractionTest(TestCase):
         self.assertTrue(
             o.cluster.citations.exists(),
             msg="Expected citation was not created in db",
+        )
+
+    def test_juriscraper_docket_number_extraction(self):
+        """Can we extract docket number from tax court pdf and add to db?"""
+
+        o = Opinion.objects.get(pk=76)
+        self.assertEqual(
+            None,
+            o.cluster.docket.docket_number,
+            msg="Docket number should be none.",
+        )
+        extract_doc_content(pk=76, do_ocr=False)
+        o.cluster.docket.refresh_from_db()
+        self.assertEqual(
+            "19031-13, 27735-13, 11905-14", o.cluster.docket.docket_number,
         )
 
 
