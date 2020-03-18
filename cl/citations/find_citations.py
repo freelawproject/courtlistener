@@ -5,6 +5,7 @@ import sys
 
 from django.utils.timezone import now
 from juriscraper.lib.html_utils import get_visible_text
+from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 
 from cl.citations import reporter_tokenizer
@@ -101,17 +102,25 @@ def is_scotus_reporter(citation):
         return False
 
 
-def is_neutral_tc_reporter(reporter):
-    """Test whether the reporter is a neutral Tax Court reporter.
+def parse_tax_court_cite(words, reporter_index):
+    """If citation is a U.S. Tax Court citation extract volume and page
 
-    These take the format of T.C. Memo YEAR-SERIAL
-
-    :param reporter: A string of the reporter, e.g. "F.2d" or "T.C. Memo"
-    :return True if a T.C. neutral citation, else False
+    Use tax juriscraper object citation parsing.
+    :param words: array of words
+    :param reporter_index: index of reporter in array
+    :return: Volume and Page tuple
     """
-    if re.match(r"T\. ?C\. (Summary|Memo)", reporter):
-        return True
-    return False
+    site = get_scraper_object_by_name("tax")
+    metadata_dict = site.extract_from_text(" ".join(words))
+    c = metadata_dict["Citation"]
+    if len(c.keys) > 1:
+        volume, page = c["volume"], c["page"]
+    else:
+        # Allow for T.C. Searching in typical formatting because we
+        # display it XX T.C. Memo. YY etc.
+        volume = strip_punct(words[reporter_index - 1])
+        page = strip_punct(words[reporter_index + 1])
+    return volume, page
 
 
 def get_court_by_paren(paren_string, citation):
@@ -271,14 +280,8 @@ def extract_full_citation(words, reporter_index):
     reporter = words[reporter_index]
 
     # Handle tax citations
-    is_tax_citation = is_neutral_tc_reporter(reporter)
-    if is_tax_citation:
-        volume, page = (
-            words[reporter_index + 1]
-            .encode("utf-8")
-            .replace("–", "-")
-            .split("-")
-        )
+    if "T.C." in reporter:
+        volume, page = parse_tax_court_cite(words, reporter_index)
 
     # Handle "normal" citations, e.g., XX F.2d YY
     else:
