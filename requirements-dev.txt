@@ -1,5 +1,3 @@
-datadiff
-django-debug-toolbar
 django-extensions
 pylint
 pytest~=4.4.0

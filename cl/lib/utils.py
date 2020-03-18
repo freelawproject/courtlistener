@@ -25,8 +25,8 @@ def deepgetattr(obj, name, default=_UNSPECIFIED):
         AttributeError: if obj has no 'name' attribute.
     """
     try:
-        if '.' in name:
-            attr, subname = name.split('.', 1)
+        if "." in name:
+            attr, subname = name.split(".", 1)
             return deepgetattr(getattr(obj, attr), subname, default)
         else:
             return getattr(obj, name)
@@ -51,8 +51,10 @@ def mkdir_p(path):
             if os.path.isdir(path):
                 pass
             else:
-                raise OSError("Cannot create directory. Location already "
-                              "exists, but is not a directory: %s" % path)
+                raise OSError(
+                    "Cannot create directory. Location already "
+                    "exists, but is not a directory: %s" % path
+                )
         else:
             raise
 
@@ -60,7 +62,7 @@ def mkdir_p(path):
 def chunks(l, n):
     """Yield successive n-sized chunks from l."""
     for i in range(0, len(l), n):
-        yield l[i:i + n]
+        yield l[i : i + n]
 
 
 def previous_and_next(some_iterable):

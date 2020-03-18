@@ -11,21 +11,21 @@ from cl.people_db.import_judges.courtid_levels import courtid2statelevel
 from cl.people_db.models import Person
 
 leveldict = {
-    'H': 'J',  # State Supreme Court
-    'M': 'K',  # State Appellate Court
-    'L': 'D',  # Lower Court
+    "H": "J",  # State Supreme Court
+    "M": "K",  # State Appellate Court
+    "L": "D",  # Lower Court
 }
 
 url_template = (
-    'http://api.followthemoney.org/?'
-    'f-core=1&'
-    'c-exi=1&'
-    'gro=c-t-id&'
-    'mode=json&'
-    'APIKey={key}&'
-    's={state}&'
-    'c-r-ot={level}&'
-    'y={year}'
+    "http://api.followthemoney.org/?"
+    "f-core=1&"
+    "c-exi=1&"
+    "gro=c-t-id&"
+    "mode=json&"
+    "APIKey={key}&"
+    "s={state}&"
+    "c-r-ot={level}&"
+    "y={year}"
 )
 
 
@@ -33,12 +33,14 @@ def make_dict_of_ftm_eids(use_pickle=True):
     """Build up a dictionary mapping jurisdiction IDs to candidates in those
     locations
     """
-    pickle_location = '/tmp/eid_lists.pkl'
+    pickle_location = "/tmp/eid_lists.pkl"
     if use_pickle:
         if os.path.isfile(pickle_location):
-            with open(pickle_location, 'r') as f:
-                logger.info("Loading pickled candidate list. Read the command "
-                            "documentation if this is not desired.")
+            with open(pickle_location, "r") as f:
+                logger.info(
+                    "Loading pickled candidate list. Read the command "
+                    "documentation if this is not desired."
+                )
                 return pickle.load(f)
         else:
             logger.info("Unable to find pickle file.")
@@ -46,7 +48,7 @@ def make_dict_of_ftm_eids(use_pickle=True):
     candidate_eid_lists = defaultdict(list)
 
     for courtid, (state, level) in courtid2statelevel.items():
-        if level != 'H':
+        if level != "H":
             # We only want high courts.
             continue
         for year in range(1989, 2017):
@@ -59,29 +61,30 @@ def make_dict_of_ftm_eids(use_pickle=True):
             logger.info("Getting url at: %s" % url)
             data = requests.get(url).json()
 
-            if data['records'] == ['No Records']:
-                logger.info('  No records found in court %s and year %s.' % (
-                    courtid,
-                    year,
-                ))
+            if data["records"] == ["No Records"]:
+                logger.info(
+                    "  No records found in court %s and year %s."
+                    % (courtid, year,)
+                )
                 continue
-            logger.info('  Found %s records in court %s and year %s' % (
-                len(data['records']),
-                courtid,
-                year,
-            ))
+            logger.info(
+                "  Found %s records in court %s and year %s"
+                % (len(data["records"]), courtid, year,)
+            )
 
-            for item in data['records']:
+            for item in data["records"]:
                 # add an eid, name, year tuple to this court's list
-                candidate_eid_lists[courtid].append({
-                    'eid': item['Candidate_Entity']['id'],
-                    'name': item['Candidate_Entity']['Candidate_Entity'],
-                    'total': float(item['Total_$']['Total_$']),
-                    'year': year,
-                })
+                candidate_eid_lists[courtid].append(
+                    {
+                        "eid": item["Candidate_Entity"]["id"],
+                        "name": item["Candidate_Entity"]["Candidate_Entity"],
+                        "total": float(item["Total_$"]["Total_$"]),
+                        "year": year,
+                    }
+                )
 
     if use_pickle:
-        with open(pickle_location, 'w') as f:
+        with open(pickle_location, "w") as f:
             logger.info("Creating pickle file at: %s" % pickle_location)
             pickle.dump(candidate_eid_lists, f)
     return candidate_eid_lists
@@ -94,7 +97,7 @@ def clear_old_values(do_it, debug):
     if not do_it or debug:
         return
     logger.info("Clearing out all old values in FTM fields.")
-    Person.objects.all().update(ftm_eid='', ftm_total_received=None)
+    Person.objects.all().update(ftm_eid="", ftm_total_received=None)
 
 
 def print_stats(match_stats, candidate_eid_lists):
@@ -108,13 +111,15 @@ def print_stats(match_stats, candidate_eid_lists):
     ftm_judge_count = 0
     for v in candidate_eid_lists.values():
         ftm_judge_count += len(v)
-        logger.info("There were %s judges in FTM that we matched "
-                    "against." % ftm_judge_count)
+        logger.info(
+            "There were %s judges in FTM that we matched "
+            "against." % ftm_judge_count
+        )
 
 
 def update_judges_by_solr(candidate_id_map, debug):
     """Update judges by looking up each entity from FTM in Solr."""
-    conn = SolrInterface(settings.SOLR_PEOPLE_URL, mode='r')
+    conn = SolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
     match_stats = defaultdict(int)
     # These IDs are ones that cannot be updated due to being identified as
     # problematic in FTM's data.
@@ -122,20 +127,29 @@ def update_judges_by_solr(candidate_id_map, debug):
     for court_id, candidate_list in candidate_id_map.items():
         for candidate in candidate_list:
             # Look up the candidate in Solr.
-            logger.info("Doing: %s" % candidate['name'])
-            name = (' AND '.join([word for word in candidate['name'].split() if
-                                 len(word) > 1])).replace(',', '')
-            results = conn.raw_query(**{
-                'caller': 'ftm_update_judges_by_solr',
-                'fq': [
-                    'name:(%s)' % name,
-                    'court_exact:%s' % court_id,
-                    # This filters out Sr/Jr problems by insisting on recent
-                    # positions. 1980 is arbitrary, based on testing.
-                    'date_start:[1980-12-31T23:59:59Z TO *]',
-                ],
-                'q': "*",
-            }).execute()
+            logger.info("Doing: %s" % candidate["name"])
+            name = (
+                " AND ".join(
+                    [
+                        word
+                        for word in candidate["name"].split()
+                        if len(word) > 1
+                    ]
+                )
+            ).replace(",", "")
+            results = conn.raw_query(
+                **{
+                    "caller": "ftm_update_judges_by_solr",
+                    "fq": [
+                        "name:(%s)" % name,
+                        "court_exact:%s" % court_id,
+                        # This filters out Sr/Jr problems by insisting on recent
+                        # positions. 1980 is arbitrary, based on testing.
+                        "date_start:[1980-12-31T23:59:59Z TO *]",
+                    ],
+                    "q": "*",
+                }
+            ).execute()
 
             if len(results) == 0:
                 match_stats[len(results)] += 1
@@ -143,33 +157,37 @@ def update_judges_by_solr(candidate_id_map, debug):
 
             elif len(results) == 1:
                 match_stats[len(results)] += 1
-                logger.info("Found one match: %s" % results[0]['name'])
+                logger.info("Found one match: %s" % results[0]["name"])
 
                 # Get the person from the DB and update them.
-                pk = results[0]['id']
+                pk = results[0]["id"]
                 if pk in blacklisted_ids:
                     continue
                 p = Person.objects.get(pk=pk)
                 if p.ftm_eid:
-                    if p.ftm_eid != candidate['eid']:
-                        logger.info("  Found values in ftm database fields. "
-                                    "This indicates a duplicate in FTM.")
+                    if p.ftm_eid != candidate["eid"]:
+                        logger.info(
+                            "  Found values in ftm database fields. "
+                            "This indicates a duplicate in FTM."
+                        )
 
-                        blacklisted_ids[p.pk].add(candidate['eid'])
+                        blacklisted_ids[p.pk].add(candidate["eid"])
                         blacklisted_ids[p.pk].add(p.ftm_eid)
                         p.ftm_eid = ""
                         p.ftm_total_received = None
                     else:
-                        logger.info("Found values with matching EID. Adding "
-                                    "amounts, since this indicates multiple "
-                                    "jurisdictions that the judge was in.")
-                        p.ftm_total_received += candidate['total']
+                        logger.info(
+                            "Found values with matching EID. Adding "
+                            "amounts, since this indicates multiple "
+                            "jurisdictions that the judge was in."
+                        )
+                        p.ftm_total_received += candidate["total"]
                     if not debug:
                         p.save()
                 else:
                     # No major problems. Proceed.
-                    p.ftm_eid = candidate['eid']
-                    p.ftm_total_received = candidate['total']
+                    p.ftm_eid = candidate["eid"]
+                    p.ftm_total_received = candidate["total"]
                     if not debug:
                         p.save()
 
@@ -182,31 +200,33 @@ def update_judges_by_solr(candidate_id_map, debug):
 
 
 class Command(VerboseCommand):
-    help = ("Use the Follow the Money API to lookup judges by name and "
-            "jurisdiction. Once looked up, save the ID to the DB.")
+    help = (
+        "Use the Follow the Money API to lookup judges by name and "
+        "jurisdiction. Once looked up, save the ID to the DB."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--debug',
-            action='store_true',
+            "--debug",
+            action="store_true",
             default=False,
             help="Don't change the data.",
         )
         parser.add_argument(
-            '--dont-use-pickle',
-            action='store_false',
+            "--dont-use-pickle",
+            action="store_false",
             default=True,
             help="Don't use a pickle file if one exists.",
         )
         parser.add_argument(
-            '--clear-old-values',
-            action='store_true',
+            "--clear-old-values",
+            action="store_true",
             default=False,
-            help='Clear out the old values before beginning.',
+            help="Clear out the old values before beginning.",
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        candidate_id_map = make_dict_of_ftm_eids(options['dont_use_pickle'])
-        clear_old_values(options['clear_old_values'], options['debug'])
-        update_judges_by_solr(candidate_id_map, debug=options['debug'])
+        candidate_id_map = make_dict_of_ftm_eids(options["dont_use_pickle"])
+        clear_old_values(options["clear_old_values"], options["debug"])
+        update_judges_by_solr(candidate_id_map, debug=options["debug"])

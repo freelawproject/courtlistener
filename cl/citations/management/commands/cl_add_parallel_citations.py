@@ -7,11 +7,15 @@ from django.conf import settings
 from django.core.management import call_command, CommandError
 from django.db import IntegrityError
 
-from cl.citations.find_citations import Citation
-from cl.citations.match_citations import get_years_from_reporter, \
-    build_date_range
-from cl.citations.tasks import get_document_citations, \
-    identify_parallel_citations
+from cl.citations.models import Citation
+from cl.citations.match_citations import (
+    get_years_from_reporter,
+    build_date_range,
+)
+from cl.citations.tasks import (
+    get_document_citations,
+    identify_parallel_citations,
+)
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.db_tools import queryset_generator
 from cl.lib.sunburnt import sunburnt
@@ -40,40 +44,39 @@ def make_edge_list(group):
 
 
 class Command(VerboseCommand):
-    help = ('Parse the entire corpus, identifying parallel citations. Add them '
-            'to the database if sufficiently accurate and requested by the '
-            'user.')
+    help = (
+        "Parse the entire corpus, identifying parallel citations. Add them "
+        "to the database if sufficiently accurate and requested by the "
+        "user."
+    )
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
         super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
         self.g = nx.Graph()
-        self.conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        self.conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
         self.update_count = 0
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--update_database',
-            action='store_true',
+            "--update_database",
+            action="store_true",
             default=False,
-            help='Save changes to the database',
+            help="Save changes to the database",
         )
         parser.add_argument(
-            '--update_solr',
-            action='store_true',
+            "--update_solr",
+            action="store_true",
             default=False,
-            help='Update Solr after updating the database',
+            help="Update Solr after updating the database",
         )
         parser.add_argument(
-            '--all',
-            action='store_true',
+            "--all",
+            action="store_true",
             default=False,
-            help='Parse citations for all items',
+            help="Parse citations for all items",
         )
         parser.add_argument(
-            '--doc_id',
-            type=int,
-            nargs='*',
-            help='ids of citing opinions',
+            "--doc-id", type=int, nargs="*", help="ids of citing opinions",
         )
 
     def monkey_patch_citation(self):
@@ -83,23 +86,23 @@ class Command(VerboseCommand):
     def match_on_citation(self, citation):
         """Attempt to identify the item referred to by the citation."""
         main_params = {
-            'fq': [
-                'status:Precedential',
+            "fq": [
+                "status:Precedential",
                 'citation:("%s"~5)' % citation.base_citation(),
             ],
-            'caller': 'citation.add_parallel_citations',
+            "caller": "citation.add_parallel_citations",
         }
 
         if citation.year:
             start_year = end_year = citation.year
         else:
             start_year, end_year = get_years_from_reporter(citation)
-        main_params['fq'].append(
-            'dateFiled:%s' % build_date_range(start_year, end_year)
+        main_params["fq"].append(
+            "dateFiled:%s" % build_date_range(start_year, end_year)
         )
 
         if citation.court:
-            main_params['fq'].append('court_exact:%s' % citation.court)
+            main_params["fq"].append("court_exact:%s" % citation.court)
 
         # Query Solr
         return self.conn.raw_query(**main_params).execute()
@@ -130,7 +133,7 @@ class Command(VerboseCommand):
         for node in sub_graph.nodes():
             has_good_edge = False
             for a, b, data in sub_graph.edges([node], data=True):
-                if data['weight'] > EDGE_RELEVANCE_THRESHOLD:
+                if data["weight"] > EDGE_RELEVANCE_THRESHOLD:
                     has_good_edge = True
                     break
             if not has_good_edge:
@@ -154,21 +157,25 @@ class Command(VerboseCommand):
             return
 
         # Remove any node-results pairs with more than than one result.
-        result_sets = filter(
-            lambda (n, r): len(r) > 1,
-            result_sets,
-        )
+        result_sets = filter(lambda (n, r): len(r) > 1, result_sets,)
 
         # For result_sets with more than 0 results, do all the citations have
         # the same ID?
-        if len(set([results[0]['cluster_id'] for node, results in
-                    result_sets if len(results) > 0])) > 1:
+        unique_results = set(
+            [
+                results[0]["cluster_id"]
+                for node, results in result_sets
+                if len(results) > 0
+            ]
+        )
+        if len(unique_results) > 1:
             logger.info("  Got multiple IDs for the citations. Pass.\n")
             return
 
         # Are the number of unique reporters equal to the number of results?
-        if len(set([node.reporter for node, results in
-                    result_sets])) != len(result_sets):
+        if len(set([node.reporter for node, results in result_sets])) != len(
+            result_sets
+        ):
             logger.info("  Got duplicated reporter in citations. Pass.\n")
             return
 
@@ -176,7 +183,7 @@ class Command(VerboseCommand):
         oc = None
         for node, results in result_sets:
             if len(results) > 0:
-                oc = OpinionCluster.objects.get(pk=results[0]['cluster_id'])
+                oc = OpinionCluster.objects.get(pk=results[0]["cluster_id"])
                 break
 
         if oc is not None:
@@ -189,15 +196,19 @@ class Command(VerboseCommand):
                 c = node.to_model()
                 c.cluster = oc
                 self.update_count += 1
-                if not options['update_database']:
+                if not options["update_database"]:
                     continue
 
                 try:
                     c.save()
                 except IntegrityError:
-                    logger.info("Unable to save '%s' to cluster '%s' due to "
-                                "an IntegrityError. Probably the cluster "
-                                "already has this citation", c, oc)
+                    logger.info(
+                        "Unable to save '%s' to cluster '%s' due to "
+                        "an IntegrityError. Probably the cluster "
+                        "already has this citation",
+                        c,
+                        oc,
+                    )
 
     def add_groups_to_network(self, citation_groups):
         """Add the citation groups from an opinion to the global network
@@ -206,7 +217,7 @@ class Command(VerboseCommand):
         for group in citation_groups:
             edge_list = make_edge_list(group)
             for edge in edge_list:
-                if any(e for e in edge if e.reporter_found in ['Id.', 'Cr.']):
+                if any(e for e in edge if e.reporter_found in ["Id.", "Cr."]):
                     # Alas, Idaho can be abbreviated as Id. This creates lots of
                     # problems, so if made a match on "Id." we simple move on.
                     # Ditto for Cr. (short for Cranch)
@@ -214,14 +225,15 @@ class Command(VerboseCommand):
 
                 if self.g.has_edge(*edge):
                     # Increment the weight of the edge.
-                    self.g[edge[0]][edge[1]]['weight'] += 1
+                    self.g[edge[0]][edge[1]]["weight"] += 1
                 else:
                     self.g.add_edge(*edge, weight=1)
 
     @staticmethod
     def do_solr(options):
         """Update Solr if requested, or report if not."""
-        if options['update_solr']:
+        if options["update_solr"]:
+            # fmt: off
             call_command(
                 'cl_update_index',
                 '--type', 'search.Opinion',
@@ -231,9 +243,12 @@ class Command(VerboseCommand):
                 '--everything',
                 '--do-commit',
             )
+            # fmt: on
         else:
-            logger.info("\nSolr index not updated. You may want to do so "
-                        "manually.\n")
+            logger.info(
+                "\nSolr index not updated. You may want to do so "
+                "manually.\n"
+            )
 
     def handle(self, *args, **options):
         """Identify parallel citations and save them as requested.
@@ -253,11 +268,12 @@ class Command(VerboseCommand):
         citations that are sufficiently likely to be good.
         """
         super(Command, self).handle(*args, **options)
-        no_option = (not any([options.get('doc_id'), options.get('all')]))
+        no_option = not any([options.get("doc_id"), options.get("all")])
         if no_option:
-            raise CommandError("Please specify if you want all items or a "
-                               "specific item.")
-        if not options['update_database']:
+            raise CommandError(
+                "Please specify if you want all items or a specific item."
+            )
+        if not options["update_database"]:
             logger.info(
                 "--update_database is not set. No changes will be made to the "
                 "database."
@@ -266,11 +282,13 @@ class Command(VerboseCommand):
         # Update Citation object to consider similar objects equal.
         self.monkey_patch_citation()
 
-        logger.info("## Entering phase one: Building a network object of "
-                    "all citations.\n")
+        logger.info(
+            "## Entering phase one: Building a network object of "
+            "all citations.\n"
+        )
         q = Opinion.objects.all()
-        if options.get('doc_id'):
-            q = q.filter(pk__in=options['doc_id'])
+        if options.get("doc_id"):
+            q = q.filter(pk__in=options["doc_id"])
         count = q.count()
         opinions = queryset_generator(q, chunksize=10000)
 
@@ -280,14 +298,17 @@ class Command(VerboseCommand):
             subtasks.append(
                 # This will call the second function with the results from the
                 # first.
-                get_document_citations.s(o) | identify_parallel_citations.s()
+                get_document_citations.s(o)
+                | identify_parallel_citations.s()
             )
-            last_item = (count == completed + 1)
+            last_item = count == completed + 1
             if (completed % 50 == 0) or last_item:
                 job = group(subtasks)
                 result = job.apply_async().join()
-                [self.add_groups_to_network(citation_groups) for
-                 citation_groups in result]
+                [
+                    self.add_groups_to_network(citation_groups)
+                    for citation_groups in result
+                ]
                 subtasks = []
 
             completed += 1
@@ -295,16 +316,16 @@ class Command(VerboseCommand):
                 # Only do this once in a while.
                 node_count = len(self.g.nodes())
                 edge_count = len(self.g.edges())
-            sys.stdout.write("\r  Completed %s of %s. (%s nodes, %s edges)" % (
-                completed,
-                count,
-                node_count,
-                edge_count,
-            ))
+            sys.stdout.write(
+                "\r  Completed %s of %s. (%s nodes, %s edges)"
+                % (completed, count, node_count, edge_count,)
+            )
             sys.stdout.flush()
 
-        logger.info("\n\n## Entering phase two: Saving the best edges to "
-                    "the database.\n\n")
+        logger.info(
+            "\n\n## Entering phase two: Saving the best edges to "
+            "the database.\n\n"
+        )
         for sub_graph in nx.connected_component_subgraphs(self.g):
             self.handle_subgraph(sub_graph, options)
 

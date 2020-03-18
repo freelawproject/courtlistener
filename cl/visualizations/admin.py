@@ -5,12 +5,10 @@ from django.contrib import admin
 @admin.register(JSONVersion)
 class JSONVersionAdmin(admin.ModelAdmin):
     readonly_fields = (
-        'date_created',
-        'date_modified',
+        "date_created",
+        "date_modified",
     )
-    raw_id_fields = (
-        'map',
-    )
+    raw_id_fields = ("map",)
 
 
 class JSONVersionInline(admin.StackedInline):
@@ -21,25 +19,21 @@ class JSONVersionInline(admin.StackedInline):
 @admin.register(Referer)
 class RefererAdmin(admin.ModelAdmin):
     readonly_fields = (
-        'date_created',
-        'date_modified',
+        "date_created",
+        "date_modified",
     )
-    raw_id_fields = (
-        'map',
-    )
-    list_filter = (
-        'display',
-    )
+    raw_id_fields = ("map",)
+    list_filter = ("display",)
     list_display = (
-        '__unicode__',
-        'display',
-        'date_created',
-        'date_modified',
+        "__unicode__",
+        "display",
+        "date_created",
+        "date_modified",
     )
     search_fields = (
-        'id',
-        'url',
-        'page_title',
+        "id",
+        "url",
+        "page_title",
     )
 
 
@@ -55,29 +49,29 @@ class SCOTUSMapAdmin(admin.ModelAdmin):
         RefererInline,
     )
     raw_id_fields = (
-        'clusters',
-        'cluster_start',
-        'cluster_end',
+        "clusters",
+        "cluster_start",
+        "cluster_end",
     )
     readonly_fields = (
-        'date_created',
-        'date_modified',
-        'generation_time',
+        "date_created",
+        "date_modified",
+        "generation_time",
     )
     list_display = (
-        '__unicode__',
-        'user_id',
-        'date_created',
-        'date_modified',
-        'view_count',
-        'published',
-        'deleted',
+        "__unicode__",
+        "user_id",
+        "date_created",
+        "date_modified",
+        "view_count",
+        "published",
+        "deleted",
     )
     list_filter = (
-        'published',
-        'deleted',
+        "published",
+        "deleted",
     )
     search_fields = (
-        'id',
-        'title',
+        "id",
+        "title",
     )

@@ -97,6 +97,15 @@ So that should be it! You should now be able to access the following URLs:
 [cl-solr]: https://github.com/freelawproject/courtlistener-solr-server
 
 
+## Logs
+
+You can see most of the logs via docker when you start it. CourtListener also keeps a log in the `cl-django` image that you can tail with:
+
+    docker exec -it cl-django tail -f /var/log/courtlistener/django.log
+    
+The one nice thing about that log is that it contains SQL queries, which can be important for performance tuning. Otherwise the docker logs will be all you need.
+
+
 ## How Settings Work in CourtListener
 
 The files in the `cl/settings` directory contain all of the settings for CourtListener. They are read in alphabetical order, with each subsequent file potentially overriding the previous one.
@@ -284,18 +293,6 @@ Screenshots will be saved into the `cl-django` container. To grab them, [you can
 
 We use Github Actions to run the full test suite and the `black` code formatter on every push. If the tests fail or your code is not formatted properly according to `black`, your code probably won't get merged. (See above for more details about Black.)
 
-
-#### Updating the testing container
-
-If you add new dependencies, remember to update the testing container with the following steps.
-
-1. Have `docker` and `make` CLI tools installed.
-2. Have a Docker Hub account that's a member of the [freelawproject organization][hub-flp].
-3. `docker login` with your credentials for the Hub account above.
-4. Set the version in `version.txt` to whatever makes sense according to
-   semantic versioning. Most of the time incrementing the patch version is enough.
-5. `make push --file .circleci/Makefile` 
-6. Use new Docker image in CircleCI tests by updating the [tag in config.yml][circleci-test-container-tag].
 
 
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux

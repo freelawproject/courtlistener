@@ -2,7 +2,7 @@ import os
 import sys
 from django.utils.timezone import now
 
-execfile('/etc/courtlistener')
+execfile("/etc/courtlistener")
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -25,13 +25,13 @@ def cleaner(simulate=False, verbose=False):
         text = doc.plain_text
         clean_lines = []
         any_mods = []
-        for line in text.split('\n'):
+        for line in text.split("\n"):
             clean_line, modified = anonymize(line)
             if modified:
                 print "Fixing text in document: %s" % doc.pk
                 print "Line reads: %s" % line
-                fix = raw_input("Fix the line? [Y/n]: ") or 'y'
-                if fix.lower() == 'y':
+                fix = raw_input("Fix the line? [Y/n]: ") or "y"
+                if fix.lower() == "y":
                     clean_lines.append(clean_line)
                     any_mods.append(modified)
                 else:
@@ -40,7 +40,7 @@ def cleaner(simulate=False, verbose=False):
                 clean_lines.append(line)
 
         if not simulate and any(any_mods):
-            doc.plain_text = '\n'.join(clean_lines)
+            doc.plain_text = "\n".join(clean_lines)
             doc.blocked = True
             doc.date_blocked = now()
             doc.save()
@@ -49,11 +49,22 @@ def cleaner(simulate=False, verbose=False):
 def main():
     usage = "usage: %prog [--verbose] [---simulate]"
     parser = OptionParser(usage)
-    parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
-        default=False, help="Display log during execution")
-    parser.add_option('-s', '--simulate', action="store_true",
-        dest='simulate', default=False, help=("Simulate the corrections without "
-        "actually making them."))
+    parser.add_option(
+        "-v",
+        "--verbose",
+        action="store_true",
+        dest="verbose",
+        default=False,
+        help="Display log during execution",
+    )
+    parser.add_option(
+        "-s",
+        "--simulate",
+        action="store_true",
+        dest="simulate",
+        default=False,
+        help=("Simulate the corrections without actually making them."),
+    )
     (options, args) = parser.parse_args()
 
     verbose = options.verbose
@@ -67,5 +78,5 @@ def main():
     return cleaner(simulate, verbose)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

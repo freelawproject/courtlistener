@@ -5,6 +5,8 @@
 
 {% block sidebar %}{% endblock %}
 
+{% block navbar-o %}active{% endblock %}
+
 {% block head %}
     <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
 {% endblock %}
@@ -101,7 +103,7 @@
             <h3>Latest Opinions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
             <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
             </p>
-            {% include "includes/search_result.html" with results=results type_override="o" simple=True %}
+            {% include "includes/search_result.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
             <p class="right">
                 <a href="/?order_by=dateFiled+desc"
                    class="btn btn-primary btn-lg v-offset-above-2">See Recent Opinions</a>
@@ -115,7 +117,7 @@
             <p>We download oral arguments from many jurisdictions on an
                 ongoing basis. Here are the most recent ones.
             </p>
-            {% include "includes/search_result.html" with results=results_oa type_override="oa" simple=True %}
+            {% include "includes/search_result.html" with results=results_oa type_override=SEARCH_TYPES.ORAL_ARGUMENT simple=True %}
             <p class="right">
                 <a href="/?order_by=dateArgued+desc&type=oa"
                    class="btn btn-primary btn-lg v-offset-above-2">See Recent Oral Arguments</a>

@@ -15,7 +15,7 @@ class CharNullField(models.CharField):
         Gets value right out of the db and changes it if its ``None``.
         """
         if value is None:
-            return ''
+            return ""
         else:
             return value
 
@@ -28,7 +28,7 @@ class CharNullField(models.CharField):
             return value
         if value is None:
             # If db has NULL, convert it to ''.
-            return ''
+            return ""
 
         # Otherwise, just return the value.
         return value
@@ -37,7 +37,7 @@ class CharNullField(models.CharField):
         """
         Catches value right before sending to db.
         """
-        if value == '':
+        if value == "":
             # If Django tries to save an empty string, send the db None (NULL).
             return None
         else:

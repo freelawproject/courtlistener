@@ -10,13 +10,13 @@ from cl.lib.date_time import midnight_pst
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.forms import SearchForm
-from cl.search.models import Court
+from cl.search.models import Court, SEARCH_TYPES
 
 
 def get_item(item):
     """Normalize grouped and non-grouped results to return the item itself."""
-    if 'doclist' in item:
-        return item['doclist']['docs'][0]
+    if "doclist" in item:
+        return item["doclist"]["docs"][0]
     else:
         return item
 
@@ -25,12 +25,13 @@ class SearchFeed(Feed):
     """This feed returns the results of a search feed. It lacks a second
     argument in the method b/c it gets its search query from a GET request.
     """
+
     feed_type = Atom1Feed
     title = "CourtListener.com Custom Search Feed"
     link = "https://www.courtlistener.com/"
     author_name = "Free Law Project"
     author_email = "feeds@courtlistener.com"
-    description_template = 'feeds/solr_desc_template.html'
+    description_template = "feeds/solr_desc_template.html"
     feed_copyright = "Created for the public domain by Free Law Project"
 
     def get_object(self, request, get_string):
@@ -41,50 +42,54 @@ class SearchFeed(Feed):
         search_form = SearchForm(obj.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            order_by = 'dateFiled'
-            if cd['type'] == 'o':
-                solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
-            elif cd['type'] == 'r':
-                solr = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode='r')
+            order_by = "dateFiled"
+            if cd["type"] == SEARCH_TYPES.OPINION:
+                solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
+            elif cd["type"] == SEARCH_TYPES.RECAP:
+                solr = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
             else:
                 return []
-            main_params = search_utils.build_main_query(cd, highlight=False,
-                                                        facet=False)
-            main_params.update({
-                'sort': '%s desc' % order_by,
-                'rows': '20',
-                'start': '0',
-                'caller': 'SearchFeed',
-            })
+            main_params = search_utils.build_main_query(
+                cd, highlight=False, facet=False
+            )
+            main_params.update(
+                {
+                    "sort": "%s desc" % order_by,
+                    "rows": "20",
+                    "start": "0",
+                    "caller": "SearchFeed",
+                }
+            )
             # Eliminate items that lack the ordering field.
-            main_params['fq'].append('%s:[* TO *]' % order_by)
+            main_params["fq"].append("%s:[* TO *]" % order_by)
             return solr.query().add_extra(**main_params).execute()
         else:
             return []
 
     def item_link(self, item):
-        return get_item(item)['absolute_url']
+        return get_item(item)["absolute_url"]
 
     def item_author_name(self, item):
-        return get_item(item)['court']
+        return get_item(item)["court"]
 
     def item_pubdate(self, item):
-        return midnight_pst(get_item(item)['dateFiled'])
+        return midnight_pst(get_item(item)["dateFiled"])
 
     def item_title(self, item):
-        return get_item(item)['caseName']
+        return get_item(item)["caseName"]
 
 
 class JurisdictionFeed(Feed):
     """When working on this feed, note that it is overridden in a number of
     places, so changes here may have unintended consequences.
     """
+
     feed_type = Atom1Feed
-    link = 'https://www.courtlistener.com/'
+    link = "https://www.courtlistener.com/"
     author_name = "Free Law Project"
     author_email = "feeds@courtlistener.com"
     feed_copyright = "Created for the public domain by Free Law Project"
-    description_template = 'feeds/solr_desc_template.html'
+    description_template = "feeds/solr_desc_template.html"
 
     def title(self, obj):
         return "CourtListener.com: All opinions for the " + obj.full_name
@@ -94,37 +99,37 @@ class JurisdictionFeed(Feed):
 
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
-        solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
         params = {
-            'q': '*',
-            'fq': 'court_exact:%s' % obj.pk,
-            'sort': 'dateFiled desc',
-            'rows': '20',
-            'start': '0',
-            'caller': 'JurisdictionFeed',
+            "q": "*",
+            "fq": "court_exact:%s" % obj.pk,
+            "sort": "dateFiled desc",
+            "rows": "20",
+            "start": "0",
+            "caller": "JurisdictionFeed",
         }
         return solr.query().add_extra(**params).execute()
 
     def item_link(self, item):
-        return get_item(item)['absolute_url']
+        return get_item(item)["absolute_url"]
 
     def item_author_name(self, item):
-        return get_item(item)['court']
+        return get_item(item)["court"]
 
     def item_pubdate(self, item):
-        return midnight_pst(get_item(item)['dateFiled'])
+        return midnight_pst(get_item(item)["dateFiled"])
 
     def item_title(self, item):
-        return get_item(item)['caseName']
+        return get_item(item)["caseName"]
 
     def item_categories(self, item):
-        return [get_item(item)['status']]
+        return [get_item(item)["status"]]
 
     def item_enclosure_url(self, item):
         try:
-            path = get_item(item)['local_path']
-            if not path.startswith('/'):
-                return '/%s' % (path,)
+            path = get_item(item)["local_path"]
+            if not path.startswith("/"):
+                return "/%s" % (path,)
             return path
         except:
             return None
@@ -133,7 +138,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                get_item(item)['local_path'].encode('utf-8')
+                get_item(item)["local_path"].encode("utf-8"),
             )
             return os.path.getsize(file_loc)
         except:
@@ -143,7 +148,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                get_item(item)['local_path'].encode('utf-8')
+                get_item(item)["local_path"].encode("utf-8"),
             )
             return lookup_mime_type(file_loc)
         except:
@@ -158,12 +163,12 @@ class AllJurisdictionsFeed(JurisdictionFeed):
 
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
-        solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
         params = {
-            'q': '*',
-            'sort': 'dateFiled desc',
-            'rows': '20',
-            'start': '0',
-            'caller': 'AllJurisdictionsFeed',
+            "q": "*",
+            "sort": "dateFiled desc",
+            "rows": "20",
+            "start": "0",
+            "caller": "AllJurisdictionsFeed",
         }
         return solr.query().add_extra(**params).execute()

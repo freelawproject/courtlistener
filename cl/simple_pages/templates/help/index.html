@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Getting Help – CourtListener.com{% endblock %}
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+{% block sidebar %}{% endblock %}
+
+
+{% block content %}
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+  <div class="col-xs-12 col-sm-8 col-md-6">
+    <h1>Getting Help on CourtListener</h1>
+    <p class="lead">The following help articles are currently available:</p>
+    <ol>
+      <li><p><a href="{% url "advanced_search" %}">Help with advanced search parameters</a></p></li>
+      <li><p><a href="{% url "alert_help" %}">Help with alerts</a></p></li>
+      <li><p><a href="{% url "feeds_info" %}">Learn about RSS feeds</a></p></li>
+      <li><p><a href="{% url "podcasts" %}">Learn about our Podcasts</a></p></li>
+      <li><p><a href="{% url "markdown_help" %}">Help formatting with Markdown</a></p></li>
+      <li><p><a href="{% url "donation_help" %}">Help with your donations</a></p></li>
+      <li><p><a href="{% url "delete_help" %}">Help deleting your account</a></p></li>
+    </ol>
+
+    <h2 class="v-offset-above-3">Removing Content</h2>
+    <p>We will not remove content from our systems absent a valid court order, but we will usually remove content from public search engines like Google, upon request.
+    </p>
+    <p><a href="{% url "terms" %}#removal" class="btn btn-default">Read our removal policy to learn more</a></p>
+
+    <h2 class="v-offset-above-3">More Help?</h2>
+    <p>If you're unable to find what you're looking for above you have a few more options:</p>
+    <p>
+      <a href="{% url "faq" %}" class="btn btn-default btn-lg col-xs-4 col-xs-push-1"><span class="hidden-xs">Try our </span>FAQs</a>
+      <a href="{% url "contact" %}" class="btn btn-primary btn-lg col-xs-4 col-xs-push-2">Contact Us</a>
+    </p>
+  </div>
+{% endblock %}

@@ -7,8 +7,11 @@ from django.template import loader
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path
-from cl.lib.search_index_utils import InvalidDocumentError, null_map, \
-    normalize_search_dicts
+from cl.lib.search_index_utils import (
+    InvalidDocumentError,
+    null_map,
+    normalize_search_dicts,
+)
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person
@@ -19,13 +22,14 @@ class Audio(models.Model):
     """A class representing oral arguments and their associated metadata
 
     """
+
     STT_NEEDED = 0
     STT_COMPLETE = 1
     STT_FAILED = 2
     STT_STATUSES = (
-        (STT_NEEDED, 'Speech to Text Needed'),
-        (STT_COMPLETE, 'Speech to Text Complete'),
-        (STT_FAILED, 'Speech to Text Failed'),
+        (STT_NEEDED, "Speech to Text Needed"),
+        (STT_COMPLETE, "Speech to Text Complete"),
+        (STT_FAILED, "Speech to Text Failed"),
     )
     docket = models.ForeignKey(
         Docket,
@@ -36,24 +40,22 @@ class Audio(models.Model):
         null=True,
     )
     source = models.CharField(
-        help_text="the source of the audio file, one of: %s" %
-                  ', '.join(['%s (%s)' % (t[0], t[1]) for t in SOURCES]),
+        help_text="the source of the audio file, one of: %s"
+        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES]),
         max_length=10,
         choices=SOURCES,
         blank=True,
     )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
-                  "'Marsh'",
+        "'Marsh'",
         blank=True,
     )
     case_name = models.TextField(
-        help_text="The full name of the case",
-        blank=True,
+        help_text="The full name of the case", blank=True,
     )
     case_name_full = models.TextField(
-        help_text="The full name of the case",
-        blank=True
+        help_text="The full name of the case", blank=True
     )
     panel = models.ManyToManyField(
         Person,
@@ -63,8 +65,8 @@ class Audio(models.Model):
     )
     judges = models.TextField(
         help_text="The judges that heard the oral arguments as a simple text "
-                  "string. This field is used when normalized judges cannot "
-                  "be placed into the panel field.",
+        "string. This field is used when normalized judges cannot "
+        "be placed into the panel field.",
         blank=True,
         null=True,
     )
@@ -75,19 +77,19 @@ class Audio(models.Model):
     )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified. A value in year"
-                  " 1750 indicates the value is unknown",
+        " 1750 indicates the value is unknown",
         auto_now=True,
         db_index=True,
     )
     sha1 = models.CharField(
         help_text="unique ID for the document, as generated via SHA1 of the "
-                  "binary file or text data",
+        "binary file or text data",
         max_length=40,
         db_index=True,
     )
     download_url = models.URLField(
         help_text="The URL on the court website where the document was "
-                  "originally scraped",
+        "originally scraped",
         max_length=500,
         db_index=True,
         null=True,
@@ -95,7 +97,7 @@ class Audio(models.Model):
     )
     local_path_mp3 = models.FileField(
         help_text="The location, relative to MEDIA_ROOT, on the CourtListener "
-                  "server, where encoded file is stored",
+        "server, where encoded file is stored",
         upload_to=make_upload_path,
         storage=IncrementingFileSystemStorage(),
         blank=True,
@@ -103,15 +105,13 @@ class Audio(models.Model):
     )
     local_path_original_file = models.FileField(
         help_text="The location, relative to MEDIA_ROOT, on the CourtListener "
-                  "server, where the original file is stored",
+        "server, where the original file is stored",
         upload_to=make_upload_path,
         storage=IncrementingFileSystemStorage(),
         db_index=True,
     )
     filepath_ia = models.CharField(
-        help_text="The URL of the file in IA",
-        max_length=1000,
-        blank=True,
+        help_text="The URL of the file in IA", max_length=1000, blank=True,
     )
     ia_upload_failure_count = models.SmallIntegerField(
         help_text="Number of times the upload to the Internet Archive failed.",
@@ -119,23 +119,21 @@ class Audio(models.Model):
         blank=True,
     )
     duration = models.SmallIntegerField(
-        help_text="the length of the item, in seconds",
-        null=True,
+        help_text="the length of the item, in seconds", null=True,
     )
     processing_complete = models.BooleanField(
-        help_text="Is audio for this item done processing?",
-        default=False,
+        help_text="Is audio for this item done processing?", default=False,
     )
     date_blocked = models.DateField(
         help_text="The date that this opinion was blocked from indexing by "
-                  "search engines",
+        "search engines",
         blank=True,
         null=True,
         db_index=True,
     )
     blocked = models.BooleanField(
         help_text="Should this item be blocked from indexing by "
-                  "search engines?",
+        "search engines?",
         db_index=True,
         default=False,
     )
@@ -157,25 +155,25 @@ class Audio(models.Model):
         # Find the alternative with the highest confidence for every utterance
         # in the results.
         best_utterances = []
-        for utterance in j['response']['results']:
+        for utterance in j["response"]["results"]:
             best_confidence = 0
-            for alt in utterance['alternatives']:
-                current_confidence = alt.get('confidence', 0)
+            for alt in utterance["alternatives"]:
+                current_confidence = alt.get("confidence", 0)
                 if current_confidence > best_confidence:
-                    best_transcript = alt['transcript']
+                    best_transcript = alt["transcript"]
                     best_confidence = current_confidence
             best_utterances.append(best_transcript)
-        return ' '.join(best_utterances)
+        return " ".join(best_utterances)
 
     class Meta:
         ordering = ["-date_created"]
-        verbose_name_plural = 'Audio Files'
+        verbose_name_plural = "Audio Files"
 
     def __unicode__(self):
-        return u'%s: %s' % (self.pk, self.case_name)
+        return u"%s: %s" % (self.pk, self.case_name)
 
     def get_absolute_url(self):
-        return reverse('view_audio_file', args=[self.pk, self.docket.slug])
+        return reverse("view_audio_file", args=[self.pk, self.docket.slug])
 
     def save(self, index=True, force_commit=False, *args, **kwargs):
         """
@@ -189,7 +187,8 @@ class Audio(models.Model):
         super(Audio, self).save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr
-            add_items_to_solr([self.pk], 'audio.Audio', force_commit)
+
+            add_items_to_solr([self.pk], "audio.Audio", force_commit)
 
     def delete(self, *args, **kwargs):
         """
@@ -198,56 +197,63 @@ class Audio(models.Model):
         id_cache = self.pk
         super(Audio, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        delete_items.delay([id_cache], 'audio.Audio')
+
+        delete_items.delay([id_cache], "audio.Audio")
 
     def as_search_dict(self):
         """Create a dict that can be ingested by Solr"""
         # IDs
         out = {
-            'id': self.pk,
-            'docket_id': self.docket_id,
-            'court_id': self.docket.court_id,
+            "id": self.pk,
+            "docket_id": self.docket_id,
+            "court_id": self.docket.court_id,
         }
 
         # Docket
-        docket = {'docketNumber': self.docket.docket_number}
+        docket = {"docketNumber": self.docket.docket_number}
         if self.docket.date_argued is not None:
-            docket['dateArgued'] = midnight_pst(self.docket.date_argued)
+            docket["dateArgued"] = midnight_pst(self.docket.date_argued)
         if self.docket.date_reargued is not None:
-            docket['dateReargued'] = midnight_pst(self.docket.date_reargued)
+            docket["dateReargued"] = midnight_pst(self.docket.date_reargued)
         if self.docket.date_reargument_denied is not None:
-            docket['dateReargumentDenied'] = midnight_pst(
-                self.docket.date_reargument_denied)
+            docket["dateReargumentDenied"] = midnight_pst(
+                self.docket.date_reargument_denied
+            )
         out.update(docket)
 
         # Court
-        out.update({
-            'court': self.docket.court.full_name,
-            'court_citation_string': self.docket.court.citation_string,
-            'court_exact': self.docket.court_id,  # For faceting
-        })
+        out.update(
+            {
+                "court": self.docket.court.full_name,
+                "court_citation_string": self.docket.court.citation_string,
+                "court_exact": self.docket.court_id,  # For faceting
+            }
+        )
 
         # Audio File
-        out.update({
-            'caseName': best_case_name(self),
-            'panel_ids': [judge.pk for judge in self.panel.all()],
-            'judge': self.judges,
-            'file_size_mp3': deepgetattr(self, 'local_path_mp3.size', None),
-            'duration': self.duration,
-            'source': self.source,
-            'download_url': self.download_url,
-            'local_path': unicode(getattr(self, 'local_path_mp3', None))
-        })
+        out.update(
+            {
+                "caseName": best_case_name(self),
+                "panel_ids": [judge.pk for judge in self.panel.all()],
+                "judge": self.judges,
+                "file_size_mp3": deepgetattr(
+                    self, "local_path_mp3.size", None
+                ),
+                "duration": self.duration,
+                "source": self.source,
+                "download_url": self.download_url,
+                "local_path": unicode(getattr(self, "local_path_mp3", None)),
+            }
+        )
         try:
-            out['absolute_url'] = self.get_absolute_url()
+            out["absolute_url"] = self.get_absolute_url()
         except NoReverseMatch:
             raise InvalidDocumentError(
                 "Unable to save to index due to missing absolute_url: %s"
                 % self.pk
             )
 
-        text_template = loader.get_template('indexes/audio_text.txt')
-        out['text'] = text_template.render({'item': self}).translate(null_map)
+        text_template = loader.get_template("indexes/audio_text.txt")
+        out["text"] = text_template.render({"item": self}).translate(null_map)
 
         return normalize_search_dicts(out)
-

@@ -1,7 +1,7 @@
 import os
 import sys
 
-execfile('/etc/courtlistener')
+execfile("/etc/courtlistener")
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -26,11 +26,22 @@ def fixer(simulate=False, verbose=False):
 def main():
     usage = "usage: %prog [--verbose] [---simulate]"
     parser = OptionParser(usage)
-    parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
-        default=False, help="Display log during execution")
-    parser.add_option('-s', '--simulate', action="store_true",
-        dest='simulate', default=False, help=("Simulate the corrections "
-                                              "without actually making them."))
+    parser.add_option(
+        "-v",
+        "--verbose",
+        action="store_true",
+        dest="verbose",
+        default=False,
+        help="Display log during execution",
+    )
+    parser.add_option(
+        "-s",
+        "--simulate",
+        action="store_true",
+        dest="simulate",
+        default=False,
+        help=("Simulate the corrections without actually making them."),
+    )
     (options, args) = parser.parse_args()
 
     verbose = options.verbose
@@ -43,5 +54,6 @@ def main():
 
     return fixer(simulate, verbose)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

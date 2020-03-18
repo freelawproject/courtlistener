@@ -9,14 +9,14 @@ from cl.donate.models import Donation, PROVIDERS, FREQUENCIES
 from cl.users.models import UserProfile
 
 AMOUNTS = (
-    ('5000', '$5,000'),
-    ('1000', '$1,000'),
-    ('500', '$500'),
-    ('250', '$250'),
-    ('100', '$100'),
-    ('50', '$50'),
-    ('25', '$25'),
-    ('other', 'Other: $'),
+    ("5000", "$5,000"),
+    ("1000", "$1,000"),
+    ("500", "$500"),
+    ("250", "$250"),
+    ("100", "$100"),
+    ("50", "$50"),
+    ("25", "$25"),
+    ("other", "Other: $"),
 )
 
 
@@ -29,55 +29,54 @@ class DecimalOrOtherChoiceField(forms.ChoiceField):
         (as required by amount) or as the word 'other', which is fixed in the
         clean() method for the DonationForm class.
         """
-        if value == 'other':
+        if value == "other":
             return value
         else:
             return super(DecimalOrOtherChoiceField, self).to_python(value)
 
     def validate(self, value):
-        if value == 'other':
+        if value == "other":
             return value
         else:
             return super(DecimalOrOtherChoiceField, self).validate(value)
 
 
 class ProfileForm(ModelForm):
-    wants_newsletter = forms.BooleanField(
-        required=False,
-    )
+    wants_newsletter = forms.BooleanField(required=False,)
     STATE_CHOICES = list(STATE_CHOICES)
-    STATE_CHOICES.insert(0, ('', '---------'))
+    STATE_CHOICES.insert(0, ("", "---------"))
     state = USStateField(
         widget=forms.Select(
-            choices=STATE_CHOICES,
-            attrs={'class': 'form-control'}
+            choices=STATE_CHOICES, attrs={"class": "form-control"}
         )
     )
     zip_code = USZipCodeField(
-        widget=forms.TextInput(attrs={'class': 'form-control'})
+        widget=forms.TextInput(attrs={"class": "form-control"})
     )
 
     class Meta:
         model = UserProfile
         fields = (
-            'address1',
-            'address2',
-            'city',
-            'state',
-            'zip_code',
-            'wants_newsletter',
+            "address1",
+            "address2",
+            "city",
+            "state",
+            "zip_code",
+            "wants_newsletter",
         )
         widgets = {
-            'address1': forms.TextInput(attrs={'class': 'form-control'}),
-            'address2': forms.TextInput(attrs={'class': 'form-control'}),
-            'city': forms.TextInput(attrs={'class': 'form-control'}),
-            'zip_code': forms.TextInput(attrs={'class': 'form-control'})
+            "address1": forms.TextInput(attrs={"class": "form-control"}),
+            "address2": forms.TextInput(attrs={"class": "form-control"}),
+            "city": forms.TextInput(attrs={"class": "form-control"}),
+            "zip_code": forms.TextInput(attrs={"class": "form-control"}),
         }
 
     def __init__(self, *args, **kwargs):
         super(ProfileForm, self).__init__(*args, **kwargs)
-        self.fields['wants_newsletter'].label = "Send me the monthly Free Law Project newsletter"
-        for key in ['address1', 'city', 'state', 'zip_code']:
+        self.fields[
+            "wants_newsletter"
+        ].label = "Send me the monthly Free Law Project newsletter"
+        for key in ["address1", "city", "state", "zip_code"]:
             self.fields[key].required = True
 
 
@@ -85,13 +84,13 @@ class UserForm(ModelForm):
     class Meta:
         model = User
         fields = (
-            'first_name',
-            'last_name',
-            'email',
+            "first_name",
+            "last_name",
+            "email",
         )
         widgets = {
-            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control'})
+            "first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -103,29 +102,24 @@ class UserForm(ModelForm):
 
 class DonationForm(ModelForm):
     reference = forms.CharField(
-        widget=forms.TextInput(attrs={
-            'class': 'form-control'
-        }),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
         required=False,
     )
     frequency = forms.ChoiceField(
         widget=forms.RadioSelect,
         choices=FREQUENCIES.NAMES,
         required=False,
-        initial='once',
+        initial="once",
     )
     amount = DecimalOrOtherChoiceField(
-        widget=forms.RadioSelect,
-        choices=AMOUNTS,
-        initial='50',
+        widget=forms.RadioSelect, choices=AMOUNTS, initial="50",
     )
-    placeholder = 'Amount (min $%s)' % settings.MIN_DONATION['docket_alerts']
+    placeholder = "Amount (min $%s)" % settings.MIN_DONATION["docket_alerts"]
     amount_other = forms.DecimalField(
         required=False,
-        widget=forms.TextInput(attrs={
-            'placeholder': placeholder,
-            'class': 'form-control'
-        }),
+        widget=forms.TextInput(
+            attrs={"placeholder": placeholder, "class": "form-control"}
+        ),
     )
     payment_provider = forms.ChoiceField(
         widget=forms.RadioSelect,
@@ -136,16 +130,16 @@ class DonationForm(ModelForm):
     class Meta:
         model = Donation
         fields = (
-            'amount_other',
-            'amount',
-            'frequency',
-            'payment_provider',
-            'send_annual_reminder',
-            'referrer',
-            'reference',
+            "amount_other",
+            "amount",
+            "frequency",
+            "payment_provider",
+            "send_annual_reminder",
+            "referrer",
+            "reference",
         )
         widgets = {
-            'referrer': forms.HiddenInput(),
+            "referrer": forms.HiddenInput(),
         }
 
     def clean(self):
@@ -153,6 +147,6 @@ class DonationForm(ModelForm):
         Handles validation fixes that need to be performed across fields.
         """
         # 1. Set the amount field to amount_other field's value
-        if self.cleaned_data.get('amount') == 'other':
-            self.cleaned_data['amount'] = self.cleaned_data.get('amount_other')
+        if self.cleaned_data.get("amount") == "other":
+            self.cleaned_data["amount"] = self.cleaned_data.get("amount_other")
         return self.cleaned_data

@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% load humanize %}
 
+{% block head %}
+  {% if DEBUG %}
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/bootstrap-datepicker3.css"/>
+  {% else %}
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/bootstrap-datepicker3.min.css"/>
+  {% endif %}
+{% endblock %}
+
 {% block title %}
     {% if search_form.type.value == 'o' %}
         Advanced Legal Opinion Search – CourtListener.com
@@ -26,30 +34,31 @@
 {% endblock %}
 
 {% block footer-scripts %}
-    <script type="text/javascript">
-        $(document).ready(function () {
-            $('#start-scroll').click(function () {
-                $('html, body').animate({
-                    scrollTop: $(".learn-more").offset().top
-                }, 500);
-            });
-        });
-    </script>
+  {% include "includes/date_picker.html" %}
+  <script type="text/javascript">
+    $(document).ready(function () {
+      $('#start-scroll').on("click", function () {
+        $('html, body').animate({
+          scrollTop: $(".learn-more").offset().top
+        }, 500);
+      });
+    });
+  </script>
 {% endblock %}
 
 {% block sidebar %}{% endblock %}
 
 {% block navbar-o %}
-    {% if search_form.type.value == "o" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.OPINION %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-r %}
-    {% if search_form.type.value == "r" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.RECAP %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-oa %}
-    {% if search_form.type.value == "oa" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-p %}
-    {% if search_form.type.value == "p" %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.PEOPLE %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 
 

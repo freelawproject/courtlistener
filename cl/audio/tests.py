@@ -1,5 +1,6 @@
 from django.urls import reverse
 
+from cl.search.models import SEARCH_TYPES
 from cl.lib.test_helpers import IndexedSolrTestCase, SitemapTest
 from lxml import etree
 
@@ -7,18 +8,22 @@ from lxml import etree
 class PodcastTest(IndexedSolrTestCase):
     def test_do_jurisdiction_podcasts_have_good_content(self):
         """Can we simply load a jurisdiction podcast page?"""
-        response = self.client.get(reverse('jurisdiction_podcast',
-                                           kwargs={'court': 'test'}))
-        self.assertEqual(200, response.status_code,
-                         msg="Did not get 200 OK status code for podcasts.")
+        response = self.client.get(
+            reverse("jurisdiction_podcast", kwargs={"court": "test"})
+        )
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get 200 OK status code for podcasts.",
+        )
         xml_tree = etree.fromstring(response.content)
         node_tests = (
-            ('//channel/title', 1),
-            ('//channel/link', 1),
-            ('//channel/description', 1),
-            ('//channel/item', 2),
-            ('//channel/item/title', 2),
-            ('//channel/item/enclosure/@url', 2),
+            ("//channel/title", 1),
+            ("//channel/link", 1),
+            ("//channel/description", 1),
+            ("//channel/item", 2),
+            ("//channel/item/title", 2),
+            ("//channel/item/enclosure/@url", 2),
         )
         for test, count in node_tests:
             node_count = len(xml_tree.xpath(test))
@@ -26,7 +31,7 @@ class PodcastTest(IndexedSolrTestCase):
                 node_count,
                 count,
                 msg="Did not find %s node(s) with XPath query: %s. "
-                    "Instead found: %s" % (count, test, node_count)
+                "Instead found: %s" % (count, test, node_count),
             )
 
     def test_do_search_podcasts_have_content(self):
@@ -36,23 +41,23 @@ class PodcastTest(IndexedSolrTestCase):
         simple test is all that's needed here.
         """
         response = self.client.get(
-            reverse('search_podcast', args=['search']),
-            {'q': 'court:test', 'type': 'oa'},
+            reverse("search_podcast", args=["search"]),
+            {"q": "court:test", "type": SEARCH_TYPES.ORAL_ARGUMENT},
         )
-        self.assertEqual(200, response.status_code,
-                         msg="Did not get a 200 OK status code.")
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
         xml_tree = etree.fromstring(response.content)
-        node_count = len(xml_tree.xpath('//channel/item'))
+        node_count = len(xml_tree.xpath("//channel/item"))
 
         expected_item_count = 2
         self.assertEqual(
             node_count,
             expected_item_count,
             msg="Did not get {expected} node(s) during search podcast "
-                "generation. Instead found: {actual}".format(
-                    expected=expected_item_count,
-                    actual=node_count,
-                )
+            "generation. Instead found: {actual}".format(
+                expected=expected_item_count, actual=node_count,
+            ),
         )
 
 
@@ -62,8 +67,10 @@ class AudioSitemapTest(SitemapTest):
         # We expect 2X the number of items in the fixture b/c there are nodes
         # for the mp3 file and for the page on CourtListener.
         self.expected_item_count = 4
-        self.sitemap_url = '%s?court=%s' % (reverse('oral_argument_sitemap'),
-                                            'test')
+        self.sitemap_url = "%s?court=%s" % (
+            reverse("oral_argument_sitemap"),
+            "test",
+        )
 
     def test_does_the_sitemap_have_content(self):
         super(AudioSitemapTest, self).does_the_sitemap_have_content()

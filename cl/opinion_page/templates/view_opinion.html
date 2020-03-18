@@ -82,37 +82,51 @@
         </div>
 
         {# Show cases that cite this case #}
-        {% if citing_clusters.result.numFound > 0 %}
-            <div id="cited-by" class="sidebar-section">
-                <h3>
-                    <span>Cited By ({{ citing_clusters.result.numFound }}) <a
-                        href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})">
-                            <i class="gray fa fa-rss"
-                               title="Subscribe to a feed of citations to this case."></i>
-                        </a>
-                    </span>
-                </h3>
-                <p class="bottom">This case has been cited by these opinions:</p>
-                <ul>
-                    {% for citing_cluster in citing_clusters %}
-                        <li>
-                            <a href="{{ citing_cluster.absolute_url }}?{{ request.META.QUERY_STRING }}">{{ citing_cluster.caseName|safe|truncatewords:12|v_wrapper }} ({{ citing_cluster.dateFiled|date:"Y" }})</a>
-                        </li>
-                    {% endfor %}
-                </ul>
-                <h4>
-                    <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
-                       class="btn btn-default">
-                        View All Citing Opinions
-                    </a>
-                </h4>
-            </div>
-        {% endif %}
+        <div id="cited-by" class="sidebar-section">
+          <h3>
+            <span>Cited By ({{ citing_clusters.result.numFound }}) <a
+              href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})">
+                <i class="gray fa fa-rss"
+                   title="Subscribe to a feed of citations to this case."></i>
+              </a>
+            </span>
+          </h3>
+          {% if citing_clusters.result.numFound > 0 %}
+            <p class="bottom">This case has been cited by these opinions:</p>
+            <ul>
+              {% for citing_cluster in citing_clusters %}
+                <li>
+                  <a href="{{ citing_cluster.absolute_url }}?{{ request.META.QUERY_STRING }}">{{ citing_cluster.caseName|safe|truncatewords:12|v_wrapper }} ({{ citing_cluster.dateFiled|date:"Y" }})</a>
+                </li>
+              {% endfor %}
+            </ul>
+            <p>
+              <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+                 class="btn btn-default">
+                  View Citing Opinions
+              </a>
+            </p>
+          {% else %}
+            <p>This case has not yet been cited in our system.</p>
+          {% endif %}
+          <div class="btn-group">
+            <a class="btn btn-primary"
+               href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"><i class="fa fa-bell-o"></i> Get Citation Alerts</a>
+            <a class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              <span class="caret"></span>
+              <span class="sr-only">Toggle Dropdown</span>
+            </a>
+            <ul class="dropdown-menu">
+              <li><a href="{% url "alert_help" %}#citation-alerts">Learn More</a></li>
+            </ul>
+          </div>
+        </div>
+
 
         {# Show cases this case cites #}
-        {% if top_authorities %}
+        {% if authorities_count > 0  %}
             <div id="authorities" class="sidebar-section">
-                <h3><span>Authorities ({{ cluster.authority_count }})</span></h3>
+                <h3><span>Authorities ({{ authorities_count }})</span></h3>
                 <p class="bottom">This opinion cites:</p>
                 <ul>
                     {% for authority in top_authorities %}
@@ -120,6 +134,9 @@
                             <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
                                 {{ authority.caption|safe|truncatewords:10|v_wrapper }}
                             </a>
+                            {% if authority.citation_depth %}
+                              <span class="small gray">({{ authority.citation_depth }}&nbsp;time{{ authority.citation_depth|pluralize }})</span>
+                            {% endif %}
                         </li>
                     {% endfor %}
                 </ul>
@@ -384,11 +401,11 @@
                             <div class="col-sm-12 alert-warning alert v-offset-above-2">
                                 <p class="bottom">The text of this document was
                                     obtained by analyzing a scanned document
-                                    provided by the court. As a result it may have
-                                    typos, and you may prefer <a
-                                            href="{{ sub_opinion.download_url }}"
-                                            class="visitable">reading the
-                                        original</a>.
+                                    provided by the court and may have typos.
+                                  {% if sub_opinion.download_url %}
+                                    You may prefer <a href="{{ sub_opinion.download_url }}"
+                                                      class="visitable">reading the original</a>.
+                                  {% endif %}
                                 </p>
                             </div>
                             <div class="clearfix"></div>
@@ -409,6 +426,8 @@
                                     {{ sub_opinion.html_columbia|safe }}
                                 {% elif sub_opinion.html_lawbox %}
                                     {{ sub_opinion.html_lawbox|safe }}
+                                {% elif sub_opinion.xml_harvard %}
+                                    {{ sub_opinion.xml_harvard|safe }}
                                 {% elif sub_opinion.html %}
                                     {{sub_opinion.html|safe}}
                                 {% else %}

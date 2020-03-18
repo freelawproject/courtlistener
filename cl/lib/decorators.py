@@ -31,8 +31,8 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
     :param logger: logger to use. If None, print
     :type logger: logging.Logger instance
     """
-    def deco_retry(f):
 
+    def deco_retry(f):
         @wraps(f)
         def f_retry(*args, **kwargs):
             mtries, mdelay = tries, delay
@@ -81,6 +81,7 @@ def track_in_matomo(func, timeout=0.5, check_bots=True):
     exclusively on Matomo's bot detection.
     :returns the result of the wrapped function
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         t1 = time.time()
@@ -96,7 +97,7 @@ def track_in_matomo(func, timeout=0.5, check_bots=True):
             return result
 
         url = request.build_absolute_uri()
-        referer = request.META.get('HTTP_REFERER', '')
+        referer = request.META.get("HTTP_REFERER", "")
         url_domain = tldextract.extract(url)
         ref_domain = tldextract.extract(referer)
         if url_domain == ref_domain:
@@ -110,20 +111,22 @@ def track_in_matomo(func, timeout=0.5, check_bots=True):
                 settings.MATOMO_URL,
                 timeout=timeout,
                 params={
-                    'idsite': settings.MATOMO_SITE_ID,
-                    'rec': 1,  # Required but unexplained in docs.
-                    'url': url,
-                    'download': url,
-                    'apiv': 1,
-                    'urlref': referer,
-                    'ua': request.META.get('HTTP_USER_AGENT', ''),
-                    'gt_ms': int((t2 - t1) * 1000),  # Milliseconds
-                    'send_image': 0,
+                    "idsite": settings.MATOMO_SITE_ID,
+                    "rec": 1,  # Required but unexplained in docs.
+                    "url": url,
+                    "download": url,
+                    "apiv": 1,
+                    "urlref": referer,
+                    "ua": request.META.get("HTTP_USER_AGENT", ""),
+                    "gt_ms": int((t2 - t1) * 1000),  # Milliseconds
+                    "send_image": 0,
                 },
             )
         except RequestException:
-            logger.info("Matomo tracking request had an error (likely "
-                        "timeout?) out for URL: %s" % url)
+            logger.info(
+                "Matomo tracking request had an error (likely "
+                "timeout?) out for URL: %s" % url
+            )
         return result
 
     return wrapper

@@ -11,7 +11,7 @@
 import os
 import sys
 
-execfile('/etc/courtlistener')
+execfile("/etc/courtlistener")
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -34,30 +34,30 @@ def cleaner(simulate=False, verbose=False):
      - Match a regex for the funky date pattern
 
     """
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="rw")
     q = {
-        'q': 'argued',
-        'fl': 'id,text,source',
-        'fq': [
-            'dateFiled:[2002-01-01T00:00:00Z TO 2031-12-31T00:00:00Z]',
+        "q": "argued",
+        "fl": "id,text,source",
+        "fq": [
+            "dateFiled:[2002-01-01T00:00:00Z TO 2031-12-31T00:00:00Z]",
             'status_exact:("Precedential")',
         ],
-        'sort': 'dateFiled asc',
-        'caller': 'cleanup_script',
+        "sort": "dateFiled asc",
+        "caller": "cleanup_script",
     }
     results = conn.raw_query(**q)
     for r in results:
         if verbose:
-            print "Running tests on item %s" % r['id']
+            print "Running tests on item %s" % r["id"]
         # We iterate over the search results. For each one, we run tests on it to see if it needs a fix.
         # If so, we get the record from the database and update it. If not, re continue.
-        if r['source'] != 'L':
+        if r["source"] != "L":
             # Only affects pure Lawbox cases. Merged cases did not have their date updated.
             if verbose:
-                print "  - Source is %s. Punting." % r['source']
+                print "  - Source is %s. Punting." % r["source"]
             continue
 
-        re_match = re.search('Argued.{1,12}\d{1,2}-\d{1,2}, \d{4}', r['text'])
+        re_match = re.search("Argued.{1,12}\d{1,2}-\d{1,2}, \d{4}", r["text"])
         if not re_match:
             # Lacks the affronting line. Onwards.
             if verbose:
@@ -67,7 +67,7 @@ def cleaner(simulate=False, verbose=False):
         if verbose:
             print "  - All tests pass. This item may be modified. (Simulate is: %s)" % simulate
 
-        doc = Document.objects.get(pk=r['id'])
+        doc = Document.objects.get(pk=r["id"])
         clean_html_tree = html.fromstring(doc.html_lawbox)
 
         new_date = get_date_filed(clean_html_tree, citations=[]).date()
@@ -97,20 +97,20 @@ def main():
     usage = "usage: %prog [--verbose] [---simulate]"
     parser = OptionParser(usage)
     parser.add_option(
-        '-v',
-        '--verbose',
+        "-v",
+        "--verbose",
         action="store_true",
-        dest='verbose',
+        dest="verbose",
         default=False,
-        help="Display log during execution"
+        help="Display log during execution",
     )
     parser.add_option(
-        '-s',
-        '--simulate',
+        "-s",
+        "--simulate",
         action="store_true",
-        dest='simulate',
+        dest="simulate",
         default=False,
-        help="Simulate the corrections without actually making them."
+        help="Simulate the corrections without actually making them.",
     )
     (options, args) = parser.parse_args()
 
@@ -125,7 +125,5 @@ def main():
     return cleaner(simulate, verbose)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-

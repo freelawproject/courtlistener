@@ -1,15 +1,6 @@
 ---
 
 # Run this whenever you want the latest code pulled and loaded.
-- hosts: celery
-  tasks:
-  - name: stop celeryd
-    become: yes
-    become_user: root
-    service:
-        name=celeryd
-        state=stopped
-
 - hosts: all
   tasks:
   - include_vars: defaults.yml
@@ -29,6 +20,15 @@
       extra_args='--upgrade --no-cache-dir'
     tags:
      - dependencies
+  - name: update flp python dependencies
+    become: yes
+    become_user: root
+    pip:
+      virtualenv={{ virtualenv_root }}
+      requirements={{ install_root }}/requirements-flp.txt
+      extra_args='--upgrade --no-cache-dir'
+    tags:
+      - dependencies
   - name: update seals
     become: yes
     become_user: "{{ web_user }}"
@@ -51,7 +51,7 @@
       path={{ install_root }}/apache/django.wsgi
       state=touch
 
-- hosts: db, dev
+- hosts: db
   tasks:
   - include_vars: defaults.yml
   - name: migrate database
@@ -59,12 +59,3 @@
       app_path={{ install_root }}
       command=migrate
       virtualenv={{ virtualenv_root }}
-
-- hosts: celery
-  tasks:
-  - name: start celeryd
-    become: yes
-    become_user: root
-    service:
-        name=celeryd
-        state=started

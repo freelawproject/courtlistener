@@ -1,7 +1,7 @@
 import os
 import sys
 
-execfile('/etc/courtlistener')
+execfile("/etc/courtlistener")
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -22,12 +22,14 @@ def cleaner(simulate=False, verbose=False):
     be live in the search system.
     """
     queryset = Document.search.query('@casename "unpublished disposition"')
-    docs = queryset.set_options(mode="SPH_MATCH_EXTENDED2").order_by('-date_filed')
+    docs = queryset.set_options(mode="SPH_MATCH_EXTENDED2").order_by(
+        "-date_filed"
+    )
     if verbose:
         print "%s results found." % (docs.count())
 
     # Must slice here, or else only get top 20 results
-    for doc in docs[0:docs.count()]:
+    for doc in docs[0 : docs.count()]:
         if doc.citation.caseNameFull.lower() == "unpublished disposition":
             # Only do each case once, since the index isn't updated until
             # later, and I may run this script many times.
@@ -46,11 +48,22 @@ def cleaner(simulate=False, verbose=False):
 def main():
     usage = "usage: %prog [--verbose] [---simulate]"
     parser = OptionParser(usage)
-    parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
-        default=False, help="Display log during execution")
-    parser.add_option('-s', '--simulate', action="store_true",
-        dest='simulate', default=False, help="Simulate the corrections without " + \
-        "actually making them.")
+    parser.add_option(
+        "-v",
+        "--verbose",
+        action="store_true",
+        dest="verbose",
+        default=False,
+        help="Display log during execution",
+    )
+    parser.add_option(
+        "-s",
+        "--simulate",
+        action="store_true",
+        dest="simulate",
+        default=False,
+        help="Simulate the corrections without " + "actually making them.",
+    )
     (options, args) = parser.parse_args()
 
     verbose = options.verbose
@@ -64,5 +77,5 @@ def main():
     return cleaner(simulate, verbose)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
