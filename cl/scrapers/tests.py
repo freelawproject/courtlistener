@@ -134,11 +134,10 @@ class ExtractionTest(TestCase):
             msg="Docket number should be none.",
         )
         extract_doc_content(pk=76, do_ocr=False)
-        o = Opinion.objects.get(pk=76)
+        o.cluster.docket.refresh_from_db()
         self.assertEqual(
             "19031-13, 27735-13, 11905-14",
             o.cluster.docket.docket_number,
-            msg="Docket number extracted properly",
         )
 
 
