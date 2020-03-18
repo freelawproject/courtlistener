@@ -278,6 +278,7 @@ MIN_DONATION = {
 }
 MAX_FREE_DOCKET_ALERTS = 5
 DOCKET_ALERT_RECAP_BONUS = 10
+MAX_ALERT_RESULTS_PER_DAY = 30
 # If people pay via XERO invoices, this is the ID we see in our stripe
 # callbacks
 XERO_APPLICATION_ID = "ca_1pvP3rYcArUkd3InUnImFI9llOiSIq6k"
