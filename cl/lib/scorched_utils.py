@@ -7,6 +7,7 @@ class ExtraSolrInterface(SolrInterface):
     """Extends the SolrInterface class so that it uses the ExtraSolrSearch
     class.
     """
+
     hl_fields = None
 
     def __init__(self, *args, **kwargs):
@@ -129,20 +130,24 @@ class MoreLikeThisHighlightsSolrSearch(ExtraSolrSearch):
             ret = self.interface.mlt_search(**self.options())
         except TypeError:
             # Catch exception when seed is not available
-            raise SolrError('Seed documents for MoreLikeThis query do not exist')
+            raise SolrError(
+                "Seed documents for MoreLikeThis query do not exist"
+            )
 
         # Add solr_highlighting to MLT results
         for doc in ret:
             # Initialize empty highlights dict
-            doc['solr_highlights'] = {}
+            doc["solr_highlights"] = {}
 
             # Copy each highlight field
             for field_name in self.interface.hl_fields:
                 if field_name in doc:
-                    if field_name == 'text':  # max text length
-                        doc[field_name] = doc[field_name][:self.text_max_length]
+                    if field_name == "text":  # max text length
+                        doc[field_name] = doc[field_name][
+                            : self.text_max_length
+                        ]
 
-                    doc['solr_highlights'][field_name] = [doc[field_name]]
+                    doc["solr_highlights"][field_name] = [doc[field_name]]
 
         if constructor:
             ret = self.constructor(ret, constructor)
