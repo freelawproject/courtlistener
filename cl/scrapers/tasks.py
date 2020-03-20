@@ -252,7 +252,7 @@ def update_document_from_text(opinion):
             data["cluster_id"] = opinion.cluster_id
             ModelClass.objects.get_or_create(**data)
         else:
-            raise NotImplemented(
+            raise NotImplementedError(
                 "Object type of %s not yet supported." % model_name
             )
 
