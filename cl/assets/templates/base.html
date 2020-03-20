@@ -463,7 +463,7 @@
     _paq.push(['trackPageView']);
     _paq.push(['enableLinkTracking']);
     (function () {
-      var u = "{{ MATOMO_BASE_URL }}";
+      var u = "{{ MATOMO_FRONTEND_BASE_URL }}";
       _paq.push(['setTrackerUrl', u + 'matomo.php']);
       _paq.push(['setSiteId', '{{ MATOMO_SITE_ID }}']);
       {% block matomo-scripts %}{% endblock %}
@@ -476,7 +476,7 @@
       s.parentNode.insertBefore(g, s);
     })();
   </script>
-  <noscript><p><img src="//matomo.courtlistener.com/piwik.php?idsite=1&rec=1"
+  <noscript><p><img src="{{MATOMO_FRONTEND_BASE_URL }}/piwik.php?idsite={{ MATOMO_SITE_ID }}&rec=1"
                     style="border:0;" alt=""/></p></noscript>
   <!-- End Matomo Code -->
 {% endif %}
