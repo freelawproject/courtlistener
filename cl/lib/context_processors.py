@@ -18,7 +18,7 @@ def inject_settings(request):
         "DOCKET_ALERT_RECAP_BONUS": settings.DOCKET_ALERT_RECAP_BONUS,
         "SEARCH_TYPES": SEARCH_TYPES,
         "MATOMO_URL": settings.MATOMO_URL,
-        "MATOMO_BASE_URL": settings.MATOMO_BASE_URL,
+        "MATOMO_FRONTEND_BASE_URL": settings.MATOMO_FRONTEND_BASE_URL,
         "MATOMO_SITE_ID": settings.MATOMO_SITE_ID,
     }
 
