@@ -30,6 +30,8 @@ from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
 from cl.citations.utils import get_citation_depth_between_clusters
 
+from simple_history.models import HistoricalRecords
+
 DOCUMENT_STATUSES = (
     ("Published", "Precedential"),
     ("Unpublished", "Non-Precedential"),
@@ -588,6 +590,8 @@ class Docket(models.Model):
         default=False,
     )
 
+    history = HistoricalRecords(excluded_fields=['view_count'])
+
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
         index_together = (
@@ -619,6 +623,15 @@ class Docket(models.Model):
                     )
 
         super(Docket, self).save(*args, **kwargs)
+
+    #Not working but would resolve the view count issue
+    def save_without_historical_record(self, *args, **kwargs):
+        self.skip_history_when_saving = True
+        try:
+            ret = self.save(*args, **kwargs)
+        finally:
+            del self.skip_history_when_saving
+        return ret
 
     def get_absolute_url(self):
         return reverse("view_docket", args=[self.pk, self.slug])

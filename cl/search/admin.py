@@ -1,4 +1,5 @@
 from django.contrib import admin
+from simple_history.admin import SimpleHistoryAdmin
 
 from cl.search.models import (
     BankruptcyInformation,
@@ -177,7 +178,6 @@ class OriginatingCourtInformationAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(Docket)
 class DocketAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ["case_name"]}
     inlines = (
@@ -210,3 +210,8 @@ class OpinionsCitedAdmin(admin.ModelAdmin):
         from cl.search.tasks import add_items_to_solr
 
         add_items_to_solr.delay([obj.citing_opinion_id], "search.Opinion")
+
+
+
+admin.site.register(Docket, SimpleHistoryAdmin)
+# admin.site.register(Choice, SimpleHistoryAdmin)

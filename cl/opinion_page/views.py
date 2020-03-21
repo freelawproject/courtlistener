@@ -130,7 +130,7 @@ def view_docket(request, pk, slug):
         with suppress_autotime(docket, ["date_modified"]):
             cached_count = docket.view_count
             docket.view_count = F("view_count") + 1
-            docket.save()
+            docket.save_without_historical_record()
             docket.view_count = cached_count + 1
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")

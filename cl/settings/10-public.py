@@ -60,6 +60,7 @@ MIDDLEWARE = [
     "ratelimit.middleware.RatelimitMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.MaintenanceModeMiddleware",
+    'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
 ROOT_URLCONF = "cl.urls"
@@ -83,6 +84,7 @@ INSTALLED_APPS = [
     "rest_framework_swagger",
     "django_filters",
     "storages",
+    'simple_history',
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",
