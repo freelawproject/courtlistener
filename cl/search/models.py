@@ -1615,6 +1615,11 @@ class Court(models.Model):
     STATE_TRIAL = "ST"
     STATE_SPECIAL = "SS"
     STATE_ATTORNEY_GENERAL = "SAG"
+    TRIBAL_SUPREME = "TS"
+    TRIBAL_APPELLATE = "TA"
+    TRIBAL_TRIAL = "TT"
+    TRIBAL_SPECIAL = "TS"
+    TRIBAL_GAMING = "TG"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
     TESTING_COURT = "T"
@@ -1631,6 +1636,12 @@ class Court(models.Model):
         (STATE_ATTORNEY_GENERAL, "State Attorney General"),
         (COMMITTEE, "Committee"),
         (INTERNATIONAL, "International"),
+        (TRIBAL_SUPREME, "State Supreme"),
+        (TRIBAL_APPELLATE, "State Appellate"),
+        (TRIBAL_TRIAL, "State Trial"),
+        (TRIBAL_SPECIAL, "State Special"),
+        (TRIBAL_GAMING, "State Attorney General"),
+
         (TESTING_COURT, "Testing"),
     )
     FEDERAL_JURISDICTIONS = [
@@ -1650,6 +1661,13 @@ class Court(models.Model):
     BANKRUPTCY_JURISDICTIONS = [
         FEDERAL_BANKRUPTCY,
         FEDERAL_BANKRUPTCY_PANEL,
+    ]
+    TRIBAL_JURISDICTIONS = [
+        TRIBAL_SUPREME,
+        TRIBAL_APPELLATE,
+        TRIBAL_TRIAL,
+        TRIBAL_SPECIAL,
+        TRIBAL_GAMING,
     ]
     id = models.CharField(
         help_text="a unique ID for each court as used in URLs",
