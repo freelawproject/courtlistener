@@ -101,15 +101,16 @@ def get_query_citation(cd):
     """
     if not cd.get("q"):
         return None
-    citations = get_citations(cd["q"], html=False)
+    citations = get_citations(
+        cd["q"], html=False, do_post_citation=False, do_defendant=False
+    )
 
     matches = None
     if len(citations) == 1:
         # If it's not exactly one match, user doesn't get special help.
         matches = match_citation(citations[0])
-        if len(matches) >= 1:
-            # Just return the first result if there is more than one. This
-            # should be rare, and they're ordered by relevance.
+        if len(matches) == 1:
+            # If more than one match, don't show the tip
             return matches.result.docs[0]
 
     return matches
