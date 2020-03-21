@@ -624,11 +624,11 @@ class Docket(models.Model):
 
         super(Docket, self).save(*args, **kwargs)
 
-    #Not working but would resolve the view count issue
+    #Method saves data without history being invoked.  Used for view count
     def save_without_historical_record(self, *args, **kwargs):
         self.skip_history_when_saving = True
         try:
-            ret = self.save(*args, **kwargs)
+            ret = super(Docket, self).save(*args, **kwargs)
         finally:
             del self.skip_history_when_saving
         return ret
