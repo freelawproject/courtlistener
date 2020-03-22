@@ -123,14 +123,15 @@ def core_docket_data(request, pk):
     )
 
 
-@ratelimit_if_not_whitelisted
+# @ratelimit_if_not_whitelisted
 def view_docket(request, pk, slug):
     docket, context = core_docket_data(request, pk)
     if not is_bot(request):
         with suppress_autotime(docket, ["date_modified"]):
             cached_count = docket.view_count
             docket.view_count = F("view_count") + 1
-            docket.save_without_historical_record()
+            # docket.save_without_historical_record()
+            docket.save()
             docket.view_count = cached_count + 1
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")

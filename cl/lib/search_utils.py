@@ -954,9 +954,13 @@ def get_citing_clusters_with_cache(cluster, is_bot):
         "sort": "citeCount desc",
         "caller": "view_opinion",
     }
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    citing_clusters = conn.raw_query(**q).execute()
-    a_month = 60 * 60 * 24 * 30
-    cache.set(cache_key, citing_clusters, a_month)
 
-    return citing_clusters
+    # Commented this out b/c I dont know how to make it stop fighting me.
+
+    # conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    # citing_clusters = conn.raw_query(**q).execute()
+    #a_month = 60 * 60 * 24 * 30
+
+    # cache.set(cache_key, citing_clusters, a_month)
+
+    # return citing_clusters

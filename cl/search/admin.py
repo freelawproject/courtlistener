@@ -17,7 +17,6 @@ from cl.search.models import (
 )
 
 
-@admin.register(Opinion)
 class OpinionAdmin(admin.ModelAdmin):
     raw_id_fields = (
         "cluster",
@@ -48,7 +47,6 @@ class OpinionAdmin(admin.ModelAdmin):
         delete_items.delay([obj.pk], "search.Opinion")
 
 
-@admin.register(Citation)
 class CitationAdmin(admin.ModelAdmin):
     raw_id_fields = ("cluster",)
     list_display = (
@@ -68,7 +66,6 @@ class CitationInline(admin.TabularInline):
     extra = 1
 
 
-@admin.register(OpinionCluster)
 class OpinionClusterAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ["case_name"]}
     inlines = (CitationInline,)
@@ -94,7 +91,6 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         add_items_to_solr.delay([obj.pk], "search.OpinionCluster")
 
 
-@admin.register(Court)
 class CourtAdmin(admin.ModelAdmin):
     list_display = ("full_name", "short_name", "position", "in_use", "pk")
     list_filter = (
@@ -214,4 +210,7 @@ class OpinionsCitedAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Docket, SimpleHistoryAdmin)
-# admin.site.register(Choice, SimpleHistoryAdmin)
+admin.site.register(OpinionCluster, SimpleHistoryAdmin)
+admin.site.register(Opinion, SimpleHistoryAdmin)
+admin.site.register(Court, SimpleHistoryAdmin)
+admin.site.register(Citation, SimpleHistoryAdmin)

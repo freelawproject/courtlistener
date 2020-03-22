@@ -1763,6 +1763,8 @@ class Court(models.Model):
         blank=True,
     )
 
+    history = HistoricalRecords()
+
     def __unicode__(self):
         return u"{name}".format(name=self.full_name)
 
@@ -2084,6 +2086,8 @@ class OpinionCluster(models.Model):
         db_index=True,
     )
 
+    history = HistoricalRecords()
+
     objects = ClusterCitationQuerySet.as_manager()
 
     @property
@@ -2392,6 +2396,7 @@ class Citation(models.Model):
     type = models.SmallIntegerField(
         help_text="The type of citation that this is.", choices=CITATION_TYPES,
     )
+    history = HistoricalRecords()
 
     def __unicode__(self):
         # Note this representation is used in the front end.
@@ -2613,6 +2618,7 @@ class Opinion(models.Model):
         default=False,
         db_index=True,
     )
+    history = HistoricalRecords()
 
     @property
     def siblings(self):
