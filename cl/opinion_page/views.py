@@ -87,7 +87,7 @@ def core_docket_data(request, pk):
                 trunc(best_case_name(docket), 100, ellipsis="..."),
                 docket.docket_number,
             ]
-            if s.strip()
+            if s and s.strip()
         ]
     )
 
