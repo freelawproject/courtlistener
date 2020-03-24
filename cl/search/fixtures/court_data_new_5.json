@@ -506,7 +506,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 351.75,
             "start_date": null
         },
         "model": "search.court",
@@ -867,7 +867,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 359.17,
             "start_date": "1959-01-01"
         },
         "model": "search.court",
@@ -886,7 +886,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 359.15,
             "start_date": "1959-01-01"
         },
         "model": "search.court",
@@ -905,7 +905,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 359.13,
             "start_date": "1959-01-01"
         },
         "model": "search.court",
@@ -924,7 +924,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 359.18,
             "start_date": null
         },
         "model": "search.court",
@@ -943,7 +943,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 359.27,
             "start_date": null
         },
         "model": "search.court",
@@ -962,7 +962,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 359.28,
             "start_date": null
         },
         "model": "search.court",
@@ -981,7 +981,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 359.291,
             "start_date": null
         },
         "model": "search.court",
@@ -1000,7 +1000,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 359.292,
             "start_date": null
         },
         "model": "search.court",
@@ -1019,30 +1019,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 359.8,
             "start_date": null
         },
         "model": "search.court",
         "pk": "ilclaimsct"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "SS",
-            "full_name": "Indiana Tax Court",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.116731",
-            "url": "http://www.in.gov/judiciary/tax/",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1986-07-01"
-        },
-        "model": "search.court",
-        "pk": "indtax"
     },
     {
         "fields": {
@@ -1057,7 +1038,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 362.8,
             "start_date": null
         },
         "model": "search.court",
@@ -1076,7 +1057,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 362.55,
             "start_date": null
         },
         "model": "search.court",
@@ -1095,7 +1076,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 362.57,
             "start_date": null
         },
         "model": "search.court",
@@ -1114,7 +1095,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 362.66,
             "start_date": null
         },
         "model": "search.court",
@@ -1133,7 +1114,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 364.2,
             "start_date": null
         },
         "model": "search.court",
@@ -1152,7 +1133,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 365.5,
             "start_date": null
         },
         "model": "search.court",
@@ -1171,30 +1152,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 365.31,
             "start_date": null
         },
         "model": "search.court",
         "pk": "minndistct"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "FD",
-            "full_name": "United States District Court for the District of Mississippi",
-            "has_opinion_scraper": false,
-            "end_date": "1838-06-18",
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.117532",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1818-04-03"
-        },
-        "model": "search.court",
-        "pk": "msd"
     },
     {
         "fields": {
@@ -1209,7 +1171,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.13,
             "start_date": null
         },
         "model": "search.court",
@@ -1228,30 +1190,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.16,
             "start_date": null
         },
         "model": "search.court",
         "pk": "mtjdct"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "SS",
-            "full_name": "Montana Tax Appeal Board",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.117725",
-            "url": "http://mtab.mt.gov/",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": null
-        },
-        "model": "search.court",
-        "pk": "monttax"
     },
     {
         "fields": {
@@ -1266,7 +1209,7 @@
             "url": "http://www.courts.state.nh.us/supreme/",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.54,
             "start_date": null
         },
         "model": "search.court",
@@ -1285,7 +1228,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.85,
             "start_date": null
         },
         "model": "search.court",
@@ -1304,7 +1247,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.83,
             "start_date": null
         },
         "model": "search.court",
@@ -1323,7 +1266,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.84,
             "start_date": null
         },
         "model": "search.court",
@@ -1342,7 +1285,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.86,
             "start_date": null
         },
         "model": "search.court",
@@ -1361,30 +1304,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 367.255,
             "start_date": null
         },
         "model": "search.court",
         "pk": "paoytermct"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "SS",
-            "full_name": "New Jersey Tax Court",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.118173",
-            "url": "http://www.judiciary.state.nj.us/taxcourt/\\u200e",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1979-01-01"
-        },
-        "model": "search.court",
-        "pk": "njtax"
     },
     {
         "fields": {
@@ -1399,7 +1323,7 @@
             "url": ".",
             "notes": "It was state wide criminal court until 1846 then only Manhattan",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.96761,
             "start_date": "1683-10-17"
         },
         "model": "search.court",
@@ -1418,7 +1342,7 @@
             "url": ".",
             "notes": "See https://history.nycourts.gov/case/court-sessions",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.96762,
             "start_date": "1684-01-01"
         },
         "model": "search.court",
@@ -1437,7 +1361,7 @@
             "url": "http://www.nycourts.gov/courts/townandvillage/",
             "notes": "Added city courts in 1846, district courts in 1937, Village Justice Courts from 1790s",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.96763,
             "start_date": "1790-01-01"
         },
         "model": "search.court",
@@ -1456,7 +1380,7 @@
             "url": ".",
             "notes": "Abolished by Constitutional Amendment and transfered to the NY Court of Appeals",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.961,
             "start_date": "1777-01-01"
         },
         "model": "search.court",
@@ -1475,7 +1399,7 @@
             "url": ".",
             "notes": "Still exists see: https://en.wikipedia.org/wiki/New_York_Court_for_the_Trial_of_Impeachments",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9681,
             "start_date": "1777-01-01"
         },
         "model": "search.court",
@@ -1494,7 +1418,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9671,
             "start_date": "1683-01-01"
         },
         "model": "search.court",
@@ -1513,7 +1437,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9653,
             "start_date": "1828-01-01"
         },
         "model": "search.court",
@@ -1532,7 +1456,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9682,
             "start_date": "1775-01-01"
         },
         "model": "search.court",
@@ -1551,7 +1475,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9666,
             "start_date": "1778-01-01"
         },
         "model": "search.court",
@@ -1570,7 +1494,7 @@
             "url": ".",
             "notes": "https://www.dos.ny.gov/lg//handbook/html/the_judicial_system.html",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9654,
             "start_date": "1786-01-01"
         },
         "model": "search.court",
@@ -1589,7 +1513,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9683,
             "start_date": "1807-01-01"
         },
         "model": "search.court",
@@ -1608,7 +1532,7 @@
             "url": "http://www.nycourts.gov/courts/cts-outside-nyc-COUNTY.shtml",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9655,
             "start_date": null
         },
         "model": "search.court",
@@ -1627,7 +1551,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9684,
             "start_date": "1788-01-01"
         },
         "model": "search.court",
@@ -1646,7 +1570,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9685,
             "start_date": null
         },
         "model": "search.court",
@@ -1665,7 +1589,7 @@
             "url": "http://www.nycourts.gov/courts/cts-outside-nyc-DISTRICT.shtml",
             "notes": "Added city courts in 1846, district courts in 1937, Village Justice Courts from 1790s",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9656,
             "start_date": "1937-01-01"
         },
         "model": "search.court",
@@ -1684,87 +1608,11 @@
             "url": "http://www.nycourts.gov/courts/cts-outside-nyc-CITY.shtml",
             "notes": "Added city courts in 1846",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9657,
             "start_date": "1846-01-01"
         },
         "model": "search.court",
         "pk": "nycityct"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "New York Family Court",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.119026",
-            "url": "http://www.nycourts.gov/courts/cts-outside-nyc-FAMILY.shtml",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1902-09-15"
-        },
-        "model": "search.court",
-        "pk": "nyfamcourt"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "New York Surrogate's Court",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.119061",
-            "url": "http://www.nycourts.gov/courts/cts-outside-nyc-SURROGATES.shtml",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1787-01-01"
-        },
-        "model": "search.court",
-        "pk": "nysurgct"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "Civil Court of the City of New York",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.119095",
-            "url": ".",
-            "notes": "https://www.dos.ny.gov/lg//handbook/html/the_judicial_system.html",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1962-09-01"
-        },
-        "model": "search.court",
-        "pk": "civctnyc"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "The Criminal Court of the City of New York",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.119128",
-            "url": ".",
-            "notes": "This was partially created by the Court of Special Sessions but special sessions for the rest of the state was abolished and this one was kept effectively making a new court",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1732-01-01"
-        },
-        "model": "search.court",
-        "pk": "nyccrimct"
     },
     {
         "fields": {
@@ -1779,7 +1627,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9658,
             "start_date": "1817-01-01"
         },
         "model": "search.court",
@@ -1798,7 +1646,7 @@
             "url": ".",
             "notes": "Appears to be the civil side of the Court of General Sessions",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9659,
             "start_date": "1686-01-01"
         },
         "model": "search.court",
@@ -1817,7 +1665,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9667,
             "start_date": "1998-01-01"
         },
         "model": "search.court",
@@ -1836,30 +1684,11 @@
             "url": ".",
             "notes": "See: ",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.9668,
             "start_date": null
         },
         "model": "search.court",
         "pk": "nyarbct"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "North Carolina Superior Court",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.119523",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": null
-        },
-        "model": "search.court",
-        "pk": "nysuperct"
     },
     {
         "fields": {
@@ -1874,11 +1703,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 351.9,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "dakotaupct"
+        "pk": "dakotasup"
     },
     {
         "fields": {
@@ -2064,7 +1893,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.89,
             "start_date": null
         },
         "model": "search.court",
@@ -2083,7 +1912,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.891,
             "start_date": null
         },
         "model": "search.court",
@@ -2140,30 +1969,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.94,
             "start_date": null
         },
         "model": "search.court",
         "pk": "okd"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "Oregon Tax Court",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.120462",
-            "url": "http://courts.oregon.gov/Tax/Pages/index.aspx",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1962-01-01"
-        },
-        "model": "search.court",
-        "pk": "ortax"
     },
     {
         "fields": {
@@ -2178,7 +1988,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 367.13,
             "start_date": "1962-01-01"
         },
         "model": "search.court",
@@ -2197,7 +2007,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 367.256,
             "start_date": null
         },
         "model": "search.court",
@@ -2216,7 +2026,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 367.257,
             "start_date": null
         },
         "model": "search.court",
@@ -2235,7 +2045,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 392.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2254,7 +2064,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 392,
             "start_date": null
         },
         "model": "search.court",
@@ -2273,7 +2083,7 @@
             "url": "http://www.judicial.state.sc.us/appeals/",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 367.44,
             "start_date": null
         },
         "model": "search.court",
@@ -2292,7 +2102,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 369.7,
             "start_date": null
         },
         "model": "search.court",
@@ -2311,7 +2121,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 369.9,
             "start_date": null
         },
         "model": "search.court",
@@ -2330,30 +2140,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 369.8,
             "start_date": null
         },
         "model": "search.court",
         "pk": "vachanct"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "Washington Court of Appeals",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.121432",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1969-05-12"
-        },
-        "model": "search.court",
-        "pk": "wactapp"
     },
     {
         "fields": {
@@ -2368,7 +2159,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 387.55,
             "start_date": null
         },
         "model": "search.court",
@@ -2387,7 +2178,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 387.5,
             "start_date": null
         },
         "model": "search.court",
@@ -2397,7 +2188,7 @@
         "fields": {
             "short_name": null,
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Hopi Trial Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2406,7 +2197,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 640,
             "start_date": null
         },
         "model": "search.court",
@@ -2425,7 +2216,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 640.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2444,7 +2235,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 610.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2463,7 +2254,7 @@
             "url": "https://www.cherokeecourts.org/Supreme-Court",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 612,
             "start_date": null
         },
         "model": "search.court",
@@ -2482,7 +2273,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 614,
             "start_date": null
         },
         "model": "search.court",
@@ -2501,7 +2292,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 616,
             "start_date": null
         },
         "model": "search.court",
@@ -2520,7 +2311,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 618.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2539,7 +2330,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 620.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2558,7 +2349,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 622.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2577,7 +2368,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 624,
             "start_date": null
         },
         "model": "search.court",
@@ -2596,11 +2387,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 626,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "eastcherkokee"
+        "pk": "echerkokee"
     },
     {
         "fields": {
@@ -2615,11 +2406,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 626.2,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "echerkct"
+        "pk": "echerkokeect"
     },
     {
         "fields": {
@@ -2634,7 +2425,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 630,
             "start_date": null
         },
         "model": "search.court",
@@ -2653,7 +2444,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 630.4,
             "start_date": null
         },
         "model": "search.court",
@@ -2672,7 +2463,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 630.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2691,7 +2482,7 @@
             "url": "https://fptc.org",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 632.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2710,7 +2501,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 634,
             "start_date": null
         },
         "model": "search.court",
@@ -2729,7 +2520,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 634.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2748,7 +2539,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 636,
             "start_date": null
         },
         "model": "search.court",
@@ -2767,7 +2558,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 638,
             "start_date": null
         },
         "model": "search.court",
@@ -2786,7 +2577,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 638.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2805,7 +2596,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 642,
             "start_date": null
         },
         "model": "search.court",
@@ -2824,7 +2615,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 644,
             "start_date": null
         },
         "model": "search.court",
@@ -2843,7 +2634,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 657,
             "start_date": null
         },
         "model": "search.court",
@@ -2862,7 +2653,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 646,
             "start_date": null
         },
         "model": "search.court",
@@ -2881,7 +2672,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 665,
             "start_date": null
         },
         "model": "search.court",
@@ -2900,7 +2691,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 665.2,
             "start_date": null
         },
         "model": "search.court",
@@ -2919,7 +2710,7 @@
             "url": "https://millelacsband.com/services/tribal-court",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 657,
             "start_date": null
         },
         "model": "search.court",
@@ -2938,7 +2729,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 648.6,
             "start_date": null
         },
         "model": "search.court",
@@ -2957,7 +2748,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 648.7,
             "start_date": null
         },
         "model": "search.court",
@@ -2976,7 +2767,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 648.4,
             "start_date": null
         },
         "model": "search.court",
@@ -2995,7 +2786,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 648,
             "start_date": null
         },
         "model": "search.court",
@@ -3014,7 +2805,7 @@
             "url": "http://www.creeksupremecourt.com/index.php/case-law",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 651,
             "start_date": null
         },
         "model": "search.court",
@@ -3033,7 +2824,7 @@
             "url": "http://www.navajocourts.org/indexsuct.htm",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 653.4,
             "start_date": null
         },
         "model": "search.court",
@@ -3052,7 +2843,7 @@
             "url": "http://www.navajocourts.org/indexsuct.htm",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 653.2,
             "start_date": null
         },
         "model": "search.court",
@@ -3071,7 +2862,7 @@
             "url": "http://www.navajocourts.org/indexsuct.htm",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 653,
             "start_date": null
         },
         "model": "search.court",
@@ -3090,11 +2881,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 655,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "npalinsctapp"
+        "pk": "nplainsctapp"
     },
     {
         "fields": {
@@ -3109,7 +2900,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 661,
             "start_date": null
         },
         "model": "search.court",
@@ -3128,7 +2919,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 661.2,
             "start_date": null
         },
         "model": "search.court",
@@ -3147,7 +2938,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 663,
             "start_date": null
         },
         "model": "search.court",
@@ -3166,7 +2957,7 @@
             "url": "http://www.puyallup-tribe.com/court/",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 667,
             "start_date": null
         },
         "model": "search.court",
@@ -3185,7 +2976,7 @@
             "url": "http://www.puyallup-tribe.com/court/",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 667.2,
             "start_date": null
         },
         "model": "search.court",
@@ -3204,7 +2995,7 @@
             "url": "https://www.srmt-nsn.gov/tribal_court",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 671.2,
             "start_date": null
         },
         "model": "search.court",
@@ -3223,7 +3014,7 @@
             "url": "http://www.csktribes.org/judicial/appellate-court",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 669,
             "start_date": null
         },
         "model": "search.court",
@@ -3242,7 +3033,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 673,
             "start_date": null
         },
         "model": "search.court",
@@ -3261,7 +3052,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 673.2,
             "start_date": null
         },
         "model": "search.court",
@@ -3280,7 +3071,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 677,
             "start_date": null
         },
         "model": "search.court",
@@ -3318,7 +3109,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 359.19,
             "start_date": "1903-01-01"
         },
         "model": "search.court",
@@ -3337,7 +3128,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 366.88,
             "start_date": "1675-01-01"
         },
         "model": "search.court",
@@ -3356,7 +3147,7 @@
             "url": "https://www.courts.wa.gov/appellate_trial_courts/?fa=atc.crtPage&crtType=Super",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 385.2,
             "start_date": null
         },
         "model": "search.court",
@@ -3375,7 +3166,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 393.8,
             "start_date": null
         },
         "model": "search.court",
@@ -3394,7 +3185,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 393.7,
             "start_date": null
         },
         "model": "search.court",
@@ -3413,7 +3204,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 393.5,
             "start_date": null
         },
         "model": "search.court",
@@ -3432,7 +3223,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 393,
             "start_date": null
         },
         "model": "search.court",
@@ -3451,7 +3242,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 502,
             "start_date": null
         },
         "model": "search.court",
@@ -3470,239 +3261,11 @@
             "url": ".",
             "notes": "Convened only once, U.S. v. Tiede in 1979 see: https://en.wikipedia.org/wiki/United_States_Court_for_Berlin",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 117,
             "start_date": "1955-04-28"
         },
         "model": "search.court",
-        "pk": "usberlinct"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "Temporary Emergency Court of Appeals",
-            "has_opinion_scraper": false,
-            "end_date": "1993-03-29",
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124010",
-            "url": ".",
-            "notes": "Transfered to United States Court of Appeals for the Federal Circuit See: https://en.wikipedia.org/wiki/Temporary_Emergency_Court_of_Appeals",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1971-12-01"
-        },
-        "model": "search.court",
-        "pk": "tempemergctapp"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": " Emergency Court of Appeals",
-            "has_opinion_scraper": false,
-            "end_date": "1962-04-18",
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124038",
-            "url": ".",
-            "notes": "See: https://www.fjc.gov/history/courts/emergency-court-appeals-1942-1962",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1942-01-01"
-        },
-        "model": "search.court",
-        "pk": "emergctapp"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": " United States Judicial Panel on Multidistrict Litigation",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124069",
-            "url": ".",
-            "notes": "See: https://en.wikipedia.org/wiki/Judicial_Panel_on_Multidistrict_Litigation",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1968-01-01"
-        },
-        "model": "search.court",
-        "pk": "usmultidist"
-    },
-    {
-        "fields": {
-            "short_name": "U.S. Foreign Intel. Surveil. Ct.",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "United States Foreign Intelligence Surveillance Court",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124091",
-            "url": ".",
-            "notes": "See: https://en.wikipedia.org/wiki/United_States_Foreign_Intelligence_Surveillance_Court",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1968-01-01"
-        },
-        "model": "search.court",
-        "pk": "fisa"
-    },
-    {
-        "fields": {
-            "short_name": "U.S. Ct. of Fed. Claims",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "United States Court of Federal Claims",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124114",
-            "url": ".",
-            "notes": "See: ",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1855-02-24"
-        },
-        "model": "search.court",
-        "pk": "usfedclaims"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "United States Bankruptcy Appellate Panel Of The First Circuit",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124140",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1984-04-01"
-        },
-        "model": "search.court",
-        "pk": "usbap1"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "United States Bankruptcy Appellate Panel Of The Sixth Circuit",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124174",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1984-04-01"
-        },
-        "model": "search.court",
-        "pk": "usbap6"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "United States Bankruptcy Appellate Panel Of The Eighth Circuit",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124207",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1984-04-01"
-        },
-        "model": "search.court",
-        "pk": "usbap8"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "United States Bankruptcy Appellate Panel Of The Ninth Circuit",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124240",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1984-04-01"
-        },
-        "model": "search.court",
-        "pk": "usbap9"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "United States Bankruptcy Appellate Panel Of The Tenth Circuit",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124274",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1984-04-01"
-        },
-        "model": "search.court",
-        "pk": "usbap10"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "United States Court of Veteran Appeals",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124308",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1988-11-18"
-        },
-        "model": "search.court",
-        "pk": "usvetapp"
-    },
-    {
-        "fields": {
-            "short_name": "U.S. Mil. Comm'n Rev. Ct.",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "United States Court Of Military Commission Review",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124341",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": null
-        },
-        "model": "search.court",
-        "pk": "usmilcommn"
+        "pk": "berlin"
     },
     {
         "fields": {
@@ -3717,11 +3280,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.9999,
             "start_date": "1950-01-01"
         },
         "model": "search.court",
-        "pk": "uscoma"
+        "pk": "cma"
     },
     {
         "fields": {
@@ -3736,11 +3299,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.9962,
             "start_date": "1968-01-01"
         },
         "model": "search.court",
-        "pk": "usnmcmilrev"
+        "pk": "nmcmr"
     },
     {
         "fields": {
@@ -3755,30 +3318,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.996,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "usnmccoca"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "U S Court Of Appeals For The Armed Forces",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124473",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": null
-        },
-        "model": "search.court",
-        "pk": "armedforcesapp"
+        "pk": "nmcca"
     },
     {
         "fields": {
@@ -3793,11 +3337,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.998,
             "start_date": "1968-01-01"
         },
         "model": "search.court",
-        "pk": "cgcomilrev"
+        "pk": "cgmr"
     },
     {
         "fields": {
@@ -3812,11 +3356,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.9981,
             "start_date": "1950-01-01"
         },
         "model": "search.court",
-        "pk": "uscgbdrev"
+        "pk": "cgbr"
     },
     {
         "fields": {
@@ -3831,11 +3375,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.9961,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "usnbdrev"
+        "pk": "nbr"
     },
     {
         "fields": {
@@ -3850,30 +3394,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.997,
             "start_date": "1968-01-01"
         },
         "model": "search.court",
-        "pk": "usarmymilrev"
-    },
-    {
-        "fields": {
-            "short_name": "A. Ct. Crim. App.",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "U S Army Court Of Criminal Appeals",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124640",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": null
-        },
-        "model": "search.court",
-        "pk": "armycoca"
+        "pk": "amrev"
     },
     {
         "fields": {
@@ -3888,7 +3413,7 @@
             "url": ".",
             "notes": "https://en.wikipedia.org/wiki/Coast_Guard_Court_of_Criminal_Appeals",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.9982,
             "start_date": "1968-01-01"
         },
         "model": "search.court",
@@ -3907,7 +3432,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.9971,
             "start_date": "1950-01-01"
         },
         "model": "search.court",
@@ -3926,7 +3451,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.9991,
             "start_date": "1968-01-01"
         },
         "model": "search.court",
@@ -3945,7 +3470,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.999,
             "start_date": null
         },
         "model": "search.court",
@@ -3964,30 +3489,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 114.9992,
             "start_date": "1950-01-01"
         },
         "model": "search.court",
         "pk": "usafbrdrev"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "United States Judicial Conference Committee To Review Circuit Council Conduct And Disability Orders",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.124836",
-            "url": ".",
-            "notes": "",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": null
-        },
-        "model": "search.court",
-        "pk": "usjconfdisord"
     },
     {
         "fields": {
@@ -4002,11 +3508,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.5,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun1"
+        "pk": "jc1"
     },
     {
         "fields": {
@@ -4021,11 +3527,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.51,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun2"
+        "pk": "jc2"
     },
     {
         "fields": {
@@ -4040,11 +3546,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.52,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun3"
+        "pk": "jc3"
     },
     {
         "fields": {
@@ -4059,11 +3565,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.53,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun4"
+        "pk": "jc4"
     },
     {
         "fields": {
@@ -4078,11 +3584,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.54,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun5"
+        "pk": "jc5"
     },
     {
         "fields": {
@@ -4097,11 +3603,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.55,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun6"
+        "pk": "jc6"
     },
     {
         "fields": {
@@ -4116,11 +3622,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.56,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun7"
+        "pk": "jc7"
     },
     {
         "fields": {
@@ -4135,11 +3641,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.57,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun8"
+        "pk": "jc8"
     },
     {
         "fields": {
@@ -4154,11 +3660,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.58,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun9"
+        "pk": "jc9"
     },
     {
         "fields": {
@@ -4173,11 +3679,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.59,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun10"
+        "pk": "jc10"
     },
     {
         "fields": {
@@ -4192,11 +3698,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 450.6,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "judcoun11"
+        "pk": "jc11"
     },
     {
         "fields": {
@@ -4211,7 +3717,7 @@
             "url": "https://www.energy.gov/oha/decision-summaries",
             "notes": "The Office of Hearings and Appeals (OHA) is the quasi-judicial arm of the Department of Energy that conducts hearings and issues initial Departmental decisions with respect to any adjudicative proceedings",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 453,
             "start_date": null
         },
         "model": "search.court",
@@ -4230,7 +3736,7 @@
             "url": "https://oha.ed.gov/oha-judges-decisions/",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 453.1,
             "start_date": null
         },
         "model": "search.court",
@@ -4249,11 +3755,11 @@
             "url": ".",
             "notes": "See: https://en.wikipedia.org/wiki/United_States_Maritime_Commission",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 454,
             "start_date": "1936-06-29"
         },
         "model": "search.court",
-        "pk": "usmaritcommn"
+        "pk": "maritimecomm"
     },
     {
         "fields": {
@@ -4268,30 +3774,11 @@
             "url": "https://www.justice.gov/eoir/board-of-immigration-appeals",
             "notes": "See: https://en.wikipedia.org/wiki/Board_of_Immigration_Appeals",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 455,
             "start_date": "1940-01-01"
         },
         "model": "search.court",
-        "pk": "justicboia"
-    },
-    {
-        "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
-            "full_name": "Special Court Regional Rail Reorganization Act Of 1973",
-            "has_opinion_scraper": false,
-            "end_date": null,
-            "citation_string": "",
-            "date_modified": "2020-03-20 10:58:34.125431",
-            "url": ".",
-            "notes": "See: ",
-            "has_oral_argument_scraper": false,
-            "position": null,
-            "start_date": "1973-01-01"
-        },
-        "model": "search.court",
-        "pk": "specrailroadct"
+        "pk": "dojbia"
     },
     {
         "fields": {
@@ -4306,11 +3793,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 200.91,
             "start_date": "1873-01-01"
         },
         "model": "search.court",
-        "pk": "circtala"
+        "pk": "cirala"
     },
     {
         "fields": {
@@ -4325,7 +3812,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 201.1,
             "start_date": "1839-01-01"
         },
         "model": "search.court",
@@ -4344,7 +3831,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 201.51,
             "start_date": "1837-01-01"
         },
         "model": "search.court",
@@ -4363,7 +3850,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 202.1,
             "start_date": "1837-01-01"
         },
         "model": "search.court",
@@ -4382,7 +3869,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 203.91,
             "start_date": "1837-01-01"
         },
         "model": "search.court",
@@ -4401,7 +3888,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 204.1,
             "start_date": "1851-01-01"
         },
         "model": "search.court",
@@ -4420,7 +3907,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 204.21,
             "start_date": "1851-01-01"
         },
         "model": "search.court",
@@ -4439,7 +3926,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 203.9,
             "start_date": "1819-01-01"
         },
         "model": "search.court",
@@ -4458,7 +3945,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 205.11,
             "start_date": "1863-01-01"
         },
         "model": "search.court",
@@ -4477,7 +3964,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 205.21,
             "start_date": "1863-01-01"
         },
         "model": "search.court",
@@ -4496,7 +3983,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 248.61,
             "start_date": "1789-01-01"
         },
         "model": "search.court",
@@ -4515,7 +4002,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 206.1,
             "start_date": "1876-01-01"
         },
         "model": "search.court",
@@ -4534,7 +4021,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 200.6,
             "start_date": "1801-01-01"
         },
         "model": "search.court",
@@ -4553,7 +4040,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 207.1,
             "start_date": "1789-01-01"
         },
         "model": "search.court",
@@ -4572,7 +4059,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.31,
             "start_date": "1889-01-01"
         },
         "model": "search.court",
@@ -4591,7 +4078,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 249.51,
             "start_date": "1889-01-01"
         },
         "model": "search.court",
@@ -4610,7 +4097,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 208.491,
             "start_date": null
         },
         "model": "search.court",
@@ -4629,7 +4116,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 208.511,
             "start_date": "1862-01-01"
         },
         "model": "search.court",
@@ -4648,7 +4135,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 208.521,
             "start_date": "1862-01-01"
         },
         "model": "search.court",
@@ -4667,7 +4154,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 208.591,
             "start_date": "1789-01-01"
         },
         "model": "search.court",
@@ -4686,7 +4173,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 208.611,
             "start_date": "1848-01-01"
         },
         "model": "search.court",
@@ -4705,7 +4192,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 208.621,
             "start_date": "1848-01-01"
         },
         "model": "search.court",
@@ -4724,7 +4211,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 243.1,
             "start_date": "1789-01-01"
         },
         "model": "search.court",
@@ -4743,7 +4230,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 209.1,
             "start_date": "1890-01-01"
         },
         "model": "search.court",
@@ -4762,7 +4249,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 210.11,
             "start_date": "1837-01-01"
         },
         "model": "search.court",
@@ -4781,7 +4268,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 210.51,
             "start_date": "1905-01-01"
         },
         "model": "search.court",
@@ -4800,7 +4287,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 210.05,
             "start_date": "1855-01-01"
         },
         "model": "search.court",
@@ -4819,7 +4306,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 210.11,
             "start_date": "1855-01-01"
         },
         "model": "search.court",
@@ -4838,7 +4325,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 214.1,
             "start_date": "1837-01-01"
         },
         "model": "search.court",
@@ -4857,7 +4344,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 215.1,
             "start_date": "1882-01-01"
         },
         "model": "search.court",
@@ -4876,7 +4363,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 212.1,
             "start_date": "1882-01-01"
         },
         "model": "search.court",
@@ -4895,7 +4382,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 214.51,
             "start_date": "1862-01-01"
         },
         "model": "search.court",
@@ -4914,7 +4401,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 248.51,
             "start_date": "1790-01-01"
         },
         "model": "search.court",
@@ -4933,7 +4420,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 243.51,
             "start_date": "1789-01-01"
         },
         "model": "search.court",
@@ -4952,7 +4439,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 228.1,
             "start_date": "1862-01-01"
         },
         "model": "search.court",
@@ -4971,7 +4458,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 229.1,
             "start_date": "1901-01-01"
         },
         "model": "search.court",
@@ -4990,7 +4477,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 228.51,
             "start_date": "1807-01-01"
         },
         "model": "search.court",
@@ -5009,7 +4496,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 230.1,
             "start_date": "1901-01-01"
         },
         "model": "search.court",
@@ -5028,7 +4515,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 231.05,
             "start_date": "1837-01-01"
         },
         "model": "search.court",
@@ -5047,7 +4534,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 230.51,
             "start_date": "1845-01-01"
         },
         "model": "search.court",
@@ -5066,7 +4553,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 231.21,
             "start_date": "1837-01-01"
         },
         "model": "search.court",
@@ -5085,7 +4572,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 239.1,
             "start_date": "1820-01-01"
         },
         "model": "search.court",
@@ -5104,7 +4591,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 240.1,
             "start_date": "1789-01-01"
         },
         "model": "search.court",
@@ -5123,7 +4610,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 240.51,
             "start_date": "1789-01-01"
         },
         "model": "search.court",
@@ -5142,7 +4629,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 240.61,
             "start_date": "1863-01-01"
         },
         "model": "search.court",
@@ -5161,7 +4648,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 240.71,
             "start_date": "1863-01-01"
         },
         "model": "search.court",
@@ -5180,7 +4667,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 240.551,
             "start_date": null
         },
         "model": "search.court",
@@ -5199,7 +4686,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 241.01,
             "start_date": "1862-01-01"
         },
         "model": "search.court",
@@ -5218,7 +4705,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 241.121,
             "start_date": "1838-01-01"
         },
         "model": "search.court",
@@ -5237,7 +4724,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 241.151,
             "start_date": "1838-01-01"
         },
         "model": "search.court",
@@ -5256,7 +4743,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 240.61,
             "start_date": "1857-01-01"
         },
         "model": "search.court",
@@ -5275,7 +4762,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 241.5,
             "start_date": "1837-01-01"
         },
         "model": "search.court",
@@ -5294,7 +4781,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 242.11,
             "start_date": "1857-01-01"
         },
         "model": "search.court",
@@ -5313,7 +4800,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 242.191,
             "start_date": "1889-01-01"
         },
         "model": "search.court",
@@ -5332,7 +4819,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.11,
             "start_date": "1872-01-01"
         },
         "model": "search.court",
@@ -5351,7 +4838,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.251,
             "start_date": "1801-01-01"
         },
         "model": "search.court",
@@ -5370,7 +4857,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.252,
             "start_date": "1794-01-01"
         },
         "model": "search.court",
@@ -5389,7 +4876,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.253,
             "start_date": "1794-01-01"
         },
         "model": "search.court",
@@ -5408,7 +4895,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.254,
             "start_date": "1794-01-01"
         },
         "model": "search.court",
@@ -5427,7 +4914,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.255,
             "start_date": "1801-01-01"
         },
         "model": "search.court",
@@ -5446,7 +4933,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.256,
             "start_date": "1801-01-01"
         },
         "model": "search.court",
@@ -5465,7 +4952,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.21,
             "start_date": "1872-01-01"
         },
         "model": "search.court",
@@ -5484,7 +4971,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 242.21,
             "start_date": "1867-01-01"
         },
         "model": "search.court",
@@ -5503,7 +4990,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 242.51,
             "start_date": "1865-01-01"
         },
         "model": "search.court",
@@ -5522,7 +5009,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.81,
             "start_date": "1855-01-01"
         },
         "model": "search.court",
@@ -5541,7 +5028,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.911,
             "start_date": "1855-01-01"
         },
         "model": "search.court",
@@ -5560,7 +5047,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.921,
             "start_date": "1801-01-01"
         },
         "model": "search.court",
@@ -5579,7 +5066,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.951,
             "start_date": "1906-01-01"
         },
         "model": "search.court",
@@ -5598,7 +5085,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 246.1,
             "start_date": "1906-01-01"
         },
         "model": "search.court",
@@ -5617,7 +5104,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 247.1,
             "start_date": "1863-01-01"
         },
         "model": "search.court",
@@ -5636,7 +5123,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 247.91,
             "start_date": "1818-01-01"
         },
         "model": "search.court",
@@ -5655,7 +5142,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 247.951,
             "start_date": "1901-01-01"
         },
         "model": "search.court",
@@ -5674,7 +5161,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 248.05,
             "start_date": "1789-01-01"
         },
         "model": "search.court",
@@ -5693,7 +5180,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 248.11,
             "start_date": "1818-01-01"
         },
         "model": "search.court",
@@ -5712,7 +5199,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 249.61,
             "start_date": "1808-01-01"
         },
         "model": "search.court",
@@ -5731,7 +5218,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 249.71,
             "start_date": "1839-01-01"
         },
         "model": "search.court",
@@ -5750,7 +5237,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 249.81,
             "start_date": "1808-01-01"
         },
         "model": "search.court",
@@ -5769,7 +5256,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 249.951,
             "start_date": "1845-12-29"
         },
         "model": "search.court",
@@ -5788,7 +5275,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 249.61,
             "start_date": "1862-01-01"
         },
         "model": "search.court",
@@ -5807,7 +5294,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 250.2,
             "start_date": "1879-01-01"
         },
         "model": "search.court",
@@ -5826,7 +5313,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 250.6,
             "start_date": "1902-01-01"
         },
         "model": "search.court",
@@ -5845,7 +5332,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 251.01,
             "start_date": "1862-01-01"
         },
         "model": "search.court",
@@ -5864,7 +5351,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 251.2,
             "start_date": "1894-01-01"
         },
         "model": "search.court",
@@ -5883,7 +5370,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 278.1,
             "start_date": "1789-01-01"
         },
         "model": "search.court",
@@ -5902,7 +5389,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 279.1,
             "start_date": "1819-01-01"
         },
         "model": "search.court",
@@ -5921,7 +5408,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 280.1,
             "start_date": "1819-01-01"
         },
         "model": "search.court",
@@ -5940,7 +5427,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 294.1,
             "start_date": "1901-01-01"
         },
         "model": "search.court",
@@ -5959,7 +5446,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 295.1,
             "start_date": "1901-01-01"
         },
         "model": "search.court",
@@ -5978,7 +5465,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 293.1,
             "start_date": "1864-01-01"
         },
         "model": "search.court",
@@ -5997,7 +5484,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 252.1,
             "start_date": "1791-01-01"
         },
         "model": "search.court",
@@ -6016,7 +5503,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 297.1,
             "start_date": "1905-01-01"
         },
         "model": "search.court",
@@ -6035,7 +5522,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 288.1,
             "start_date": "1889-01-01"
         },
         "model": "search.court",
@@ -6054,7 +5541,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 290.1,
             "start_date": "1905-01-01"
         },
         "model": "search.court",
@@ -6073,7 +5560,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 297.1,
             "start_date": "1870-01-01"
         },
         "model": "search.court",
@@ -6092,7 +5579,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 298.1,
             "start_date": "1870-01-01"
         },
         "model": "search.court",
@@ -6111,7 +5598,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 296.1,
             "start_date": "1862-01-01"
         },
         "model": "search.court",
@@ -6130,7 +5617,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 299.01,
             "start_date": "1890-01-01"
         },
         "model": "search.court",
@@ -6149,7 +5636,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 244.71,
             "start_date": "1801-01-01"
         },
         "model": "search.court",
@@ -6168,7 +5655,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 244.81,
             "start_date": "1865-01-01"
         },
         "model": "search.court",
@@ -6187,7 +5674,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 244.91,
             "start_date": "1814-01-01"
         },
         "model": "search.court",
@@ -6206,7 +5693,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.01,
             "start_date": "1814-01-01"
         },
         "model": "search.court",
@@ -6225,7 +5712,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 245.06,
             "start_date": "1900-01-01"
         },
         "model": "search.court",
@@ -6244,7 +5731,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 454,
             "start_date": null
         },
         "model": "search.court",
@@ -6263,11 +5750,11 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 118,
             "start_date": "1889-01-01"
         },
         "model": "search.court",
-        "pk": "indterrctapp"
+        "pk": "cait"
     },
     {
         "fields": {
@@ -6282,10 +5769,10 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": null,
+            "position": 350.7,
             "start_date": null
         },
         "model": "search.court",
-        "pk": "caljudct"
+        "pk": "caljp"
     }
 ]
