@@ -1620,6 +1620,12 @@ class Court(models.Model):
     TRIBAL_TRIAL = "TT"
     TRIBAL_SPECIAL = "TS"
     TRIBAL_GAMING = "TG"
+    MILITARY_APPELLATE = "MA"
+    MILITARY_TRIAL = "MT"
+    MILITARY_SPECIAL = "MS"
+    CITY_APPELLATE = "CA"
+    CITY_TRIAL = "CT"
+    CITY_SPECIAL = "CS"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
     TESTING_COURT = "T"
@@ -1636,11 +1642,17 @@ class Court(models.Model):
         (STATE_ATTORNEY_GENERAL, "State Attorney General"),
         (COMMITTEE, "Committee"),
         (INTERNATIONAL, "International"),
-        (TRIBAL_SUPREME, "State Supreme"),
-        (TRIBAL_APPELLATE, "State Appellate"),
-        (TRIBAL_TRIAL, "State Trial"),
-        (TRIBAL_SPECIAL, "State Special"),
-        (TRIBAL_GAMING, "State Attorney General"),
+        (TRIBAL_SUPREME, "Tribal Supreme"),
+        (TRIBAL_APPELLATE, "Tribal Appellate"),
+        (TRIBAL_TRIAL, "Triabl Trial"),
+        (TRIBAL_SPECIAL, "Tribal Special"),
+        (TRIBAL_GAMING, "Tribal Gaming"),
+        (MILITARY_APPELLATE, "Military Appellate"),
+        (MILITARY_TRIAL, "Military Trial"),
+        (MILITARY_SPECIAL, "Military Special"),
+        (CITY_APPELLATE, "City Special"),
+        (CITY_TRIAL, "City Appellate"),
+        (CITY_SPECIAL, "City Special"),
 
         (TESTING_COURT, "Testing"),
     )
@@ -1669,6 +1681,17 @@ class Court(models.Model):
         TRIBAL_SPECIAL,
         TRIBAL_GAMING,
     ]
+    MILITARY_JURISDICTIONS = [
+        MILITARY_APPELLATE,
+        MILITARY_TRIAL,
+        MILITARY_SPECIAL,
+    ]
+    CITY_JURISDICTIONS = [
+        CITY_APPELLATE,
+        CITY_TRIAL,
+        CITY_SPECIAL,
+    ]
+
     id = models.CharField(
         help_text="a unique ID for each court as used in URLs",
         max_length=15,  # Changes here will require updates in urls.py
