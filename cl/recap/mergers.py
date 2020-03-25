@@ -1013,7 +1013,7 @@ def add_claim_history_entry(new_history, claim):
 
 
 @transaction.atomic
-def add_claims_to_docket(d, new_claims, tag_names):
+def add_claims_to_docket(d, new_claims, tag_names=None):
     """Add claims data to the docket.
 
     :param d: A docket object to associate claims with.
