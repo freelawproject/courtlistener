@@ -82,9 +82,12 @@ The process now is:
     - Restart services later, as below, once rest of system is updated
  - Solr:
     - Pull latest docker image
+        - sudo docker pull freelawproject/solr:latest
     - Pull latest code (git)
+        - cd /opt/solr && sudo git pull
     - Restart solr:
         - sudo docker restart solr
+        - NOTE: If you get an error like "network not found" just...wait a few minutes. After three minutes last time, this self resolved. From what I can tell, this is due to the previous image lingering for a minute or two and the network being unavailable until the other image is properly shut down.
  - Web:
     - Run ansible scripts (they still work)
  - Database:
