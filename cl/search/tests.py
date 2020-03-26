@@ -35,6 +35,7 @@ from cl.search.models import (
     Citation,
     sort_cites,
     SEARCH_TYPES,
+    DOCUMENT_STATUSES,
 )
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
@@ -615,6 +616,70 @@ class SearchTest(IndexedSolrTestCase):
             {"type": SEARCH_TYPES.RECAP, "attachment_number": "1",},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
+
+
+@override_settings(RELATED_USE_CACHE=False,)
+class RelatedSearchTest(IndexedSolrTestCase):
+    def setUp(self):
+        # Add additional user fixtures
+        self.fixtures.append("authtest_data.json")
+
+        super(RelatedSearchTest, self).setUp()
+
+    def test_more_like_this_opinion(self):
+        """Does the MoreLikeThis query return the correct number and order of
+        articles."""
+        seed_pk = 1
+        expected_article_count = 3
+        expected_first_pk = 2  # Howard v. Honda
+        expected_second_pk = 3  # case name cluster 3
+
+        params = {
+            "type": "o",
+            "q": "related:%i" % seed_pk,
+        }
+
+        # disable all status filters (otherwise results do not match detail page)
+        params.update({"stat_" + v: "on" for s, v in DOCUMENT_STATUSES})
+
+        r = self.client.get(reverse("show_results"), params)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+        self.assertEqual(
+            expected_article_count, SearchTest.get_article_count(r)
+        )
+        self.assertTrue(
+            r.content.index("/opinion/%i/" % expected_first_pk)
+            < r.content.index("/opinion/%i/" % expected_second_pk),
+            msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
+        )
+
+    def test_more_like_this_opinion_detail(self):
+        """MoreLikeThis query on opinion detail page (cache must be disabled)"""
+        seed_pk = 1
+        expected_first_pk = 2  # Howard v. Honda
+        expected_second_pk = 3  # case name cluster 3
+
+        # Login as staff user (related items are by default disabled for guests)
+        self.assertTrue(
+            self.client.login(username="admin", password="password")
+        )
+
+        r = self.client.get("/opinion/%i/asdf/" % seed_pk)
+        self.assertEqual(r.status_code, 200)
+
+        # Test for click tracking order
+        self.assertTrue(
+            r.content.index(
+                "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
+            )
+            < r.content.index(
+                "'clickRelated_mlt_seed%i', %i,"
+                % (seed_pk, expected_second_pk)
+            ),
+            msg="Related opinions are in wrong order.",
+        )
+        self.client.logout()
 
 
 class GroupedSearchTest(EmptySolrTestCase):

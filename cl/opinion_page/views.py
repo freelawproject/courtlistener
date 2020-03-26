@@ -1,14 +1,18 @@
 from collections import defaultdict, OrderedDict
 from itertools import groupby
+from urllib import urlencode
 
+from django.conf import settings
+from django.core.cache import cache
+from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.urls import reverse
 from django.db.models import F, Prefetch
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponse, HttpResponseNotAllowed, Http404
 from django.shortcuts import get_object_or_404, render
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -25,16 +29,27 @@ from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
+from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot, is_og_bot
 from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
-from cl.lib.search_utils import get_citing_clusters_with_cache, make_get_string
+from cl.lib.search_utils import (
+    get_citing_clusters_with_cache,
+    make_get_string,
+    get_related_clusters_with_cache,
+)
 from cl.lib.string_utils import trunc
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import Citation, Docket, OpinionCluster, RECAPDocument
+from cl.search.models import (
+    Citation,
+    Docket,
+    OpinionCluster,
+    RECAPDocument,
+    DOCUMENT_STATUSES,
+)
 from cl.search.views import do_search
 
 
@@ -354,6 +369,10 @@ def view_opinion(request, pk, _):
 
     citing_clusters = get_citing_clusters_with_cache(cluster, is_bot(request))
 
+    related_clusters, sub_opinion_ids = get_related_clusters_with_cache(
+        cluster, request
+    )
+
     return render(
         request,
         "view_opinion.html",
@@ -367,6 +386,12 @@ def view_opinion(request, pk, _):
             "citing_clusters": citing_clusters,
             "top_authorities": cluster.authorities_with_data[:5],
             "authorities_count": len(cluster.authorities_with_data),
+            "sub_opinion_ids": sub_opinion_ids,
+            "related_algorithm": "mlt",
+            "related_clusters": related_clusters,
+            "related_cluster_ids": [item["id"] for item in related_clusters],
+            "related_search_params": "&"
+            + urlencode({"stat_" + v: "on" for s, v in DOCUMENT_STATUSES}),
         },
     )
 
