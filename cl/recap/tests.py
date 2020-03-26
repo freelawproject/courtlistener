@@ -59,6 +59,8 @@ from cl.search.models import (
 class RecapUploadsTest(TestCase):
     """Test the rest endpoint, but exclude the processing tasks."""
 
+    fixtures = ["canb_court.json"]
+
     def setUp(self):
         self.client = APIClient()
         self.user = User.objects.get(username="recap")
@@ -114,12 +116,16 @@ class RecapUploadsTest(TestCase):
         r = self.client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_uploading_a_claims_regsitry_page(self, mock):
+    def test_uploading_a_claims_registry_page(self, mock):
         """Can we upload claims registry data?"""
         self.data.update(
-            {"upload_type": UPLOAD_TYPE.CLAIMS_REGISTER, "document_number": ""}
+            {
+                "upload_type": UPLOAD_TYPE.CLAIMS_REGISTER,
+                "document_number": "",
+                "pacer_doc_id": "",
+                "court": "canb",
+            }
         )
-        del self.data["pacer_case_id"]
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         mock.assert_called()
