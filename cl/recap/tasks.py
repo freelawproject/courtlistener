@@ -740,9 +740,6 @@ def process_recap_claims_register(self, pk):
     # Merge the contents into CL
     d.add_recap_source()
     update_docket_metadata(d, data)
-    add_bankruptcy_data_to_docket(d, data)
-    add_claims_to_docket(d, data["claims"])
-    logger.info("Created/updated claims data for %s", pq)
 
     try:
         d.save()
@@ -761,6 +758,10 @@ def process_recap_claims_register(self, pk):
             )
             raise self.retry(exc=exc)
 
+    add_bankruptcy_data_to_docket(d, data)
+    add_claims_to_docket(d, data["claims"])
+    logger.info("Created/updated claims data for %s", pq)
+
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(
         content_object=d, upload_type=UPLOAD_TYPE.CLAIMS_REGISTER
@@ -772,7 +773,7 @@ def process_recap_claims_register(self, pk):
     )
 
     mark_pq_successful(pq, d_id=d.pk)
-    return None
+    return {"docket_pk": d.pk}
 
 
 @app.task(
