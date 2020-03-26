@@ -45,6 +45,7 @@ from cl.recap.tasks import (
     process_recap_docket,
     process_recap_pdf,
     process_recap_zip,
+    process_recap_claims_register,
 )
 from cl.search.models import (
     Docket,
@@ -57,6 +58,8 @@ from cl.search.models import (
 @mock.patch("cl.recap.views.process_recap_upload")
 class RecapUploadsTest(TestCase):
     """Test the rest endpoint, but exclude the processing tasks."""
+
+    fixtures = ["canb_court.json"]
 
     def setUp(self):
         self.client = APIClient()
@@ -112,6 +115,20 @@ class RecapUploadsTest(TestCase):
         )
         r = self.client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_uploading_a_claims_registry_page(self, mock):
+        """Can we upload claims registry data?"""
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.CLAIMS_REGISTER,
+                "document_number": "",
+                "pacer_doc_id": "",
+                "court": "canb",
+            }
+        )
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        mock.assert_called()
 
     def test_uploading_an_attachment_page(self, mock):
         """Can we upload an attachment page and have it be saved correctly?"""
@@ -1155,6 +1172,58 @@ class RecapDocketTaskTest(TestCase):
         process_recap_docket(self.pq.pk)
         pq.refresh_from_db()
         self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+
+class ClaimsRegistryTaskTest(TestCase):
+    """Can we handle claims registry uploads?"""
+
+    fixtures = ["canb_court.json"]
+
+    def setUp(self):
+        self.user = User.objects.get(username="recap")
+        self.filename = "claims_registry_njb.html"
+        path = os.path.join(
+            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        )
+        with open(path, "r") as f:
+            f = SimpleUploadedFile(self.filename, f.read())
+        self.pq = ProcessingQueue.objects.create(
+            court_id="canb",
+            uploader=self.user,
+            pacer_case_id="asdf",
+            filepath_local=f,
+            upload_type=UPLOAD_TYPE.CLAIMS_REGISTER,
+        )
+
+    def tearDown(self):
+        self.pq.filepath_local.delete()
+        self.pq.delete()
+        Docket.objects.all().delete()
+
+    def test_parsing_docket_does_not_exist(self):
+        """Can we parse the claims registry when the docket doesn't exist?"""
+        returned_data = process_recap_claims_register(self.pq.pk)
+        d = Docket.objects.get(pk=returned_data["docket_pk"])
+        self.assertEqual(d.source, Docket.RECAP)
+        self.assertTrue(d.case_name)
+        expected_claims_count = 7
+        self.assertEqual(d.claims.count(), expected_claims_count)
+
+    def test_parsing_bad_data(self):
+        """Can we handle it when there's no data to parse?"""
+        filename = "claims_registry_empty.html"
+        path = os.path.join(
+            settings.INSTALL_ROOT, "cl", "recap", "test_assets", filename
+        )
+        with open(path, "r") as f:
+            f = SimpleUploadedFile(filename, f.read())
+        self.pq.filepath_local = f
+        self.pq.save()
+
+        returned_data = process_recap_claims_register(self.pq.pk)
+        self.assertIsNone(returned_data)
+        self.pq.refresh_from_db()
+        self.assertTrue(self.pq.status, PROCESSING_STATUS.INVALID_CONTENT)
 
 
 class RecapDocketAppellateTaskTest(TestCase):

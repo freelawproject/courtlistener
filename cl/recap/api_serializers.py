@@ -73,6 +73,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         if attrs["upload_type"] in [
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.APPELLATE_DOCKET,
+            UPLOAD_TYPE.CLAIMS_REGISTER,
         ]:
             # Dockets shouldn't have these fields completed.
             numbers_not_blank = any(
@@ -85,7 +86,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             if numbers_not_blank:
                 raise ValidationError(
                     "PACER document ID, document number and attachment number "
-                    "must be blank for docket uploads."
+                    "must be blank for docket or claims register uploads."
                 )
 
         if attrs["upload_type"] in [
@@ -109,6 +110,17 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     % attrs["court"]
                 )
 
+        if attrs["upload_type"] == UPLOAD_TYPE.CLAIMS_REGISTER:
+            # Only allowed on bankruptcy courts
+            district_court_ids = Court.objects.filter(
+                jurisdiction=Court.FEDERAL_BANKRUPTCY
+            ).values_list("pk", flat=True)
+            if attrs["court"].pk not in district_court_ids:
+                raise ValidationError(
+                    "%s is not a bankruptcy court ID. Only bankruptcy cases "
+                    "should have claims registry pages." % attrs["court"]
+                )
+
         if attrs["upload_type"] == UPLOAD_TYPE.APPELLATE_DOCKET:
             # Appellate court dockets. Is the court valid?
             appellate_court_ids = Court.objects.filter(
@@ -123,7 +135,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     "upload_type for district dockets?" % attrs["court"]
                 )
 
-        elif attrs["upload_type"] == UPLOAD_TYPE.PDF:
+        if attrs["upload_type"] == UPLOAD_TYPE.PDF:
             # PDFs require pacer_doc_id and document_number values.
             if not all(
                 [attrs.get("pacer_doc_id"), attrs.get("document_number")]
