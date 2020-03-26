@@ -1,5 +1,4 @@
 import logging
-import re
 import traceback
 from datetime import date, datetime, timedelta
 from urllib import quote
@@ -10,7 +9,6 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.urls import reverse
 from django.db.models import Sum, Count
 from django.shortcuts import HttpResponseRedirect, render, get_object_or_404
 from django.urls import reverse
@@ -33,18 +31,9 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     make_get_string,
     regroup_snippets,
+    get_mlt_query,
     add_depth_counts,
     get_solr_interface,
-)
-from cl.lib.scorched_utils import ExtraSolrInterface
-from cl.lib.search_utils import (
-    build_main_query,
-    get_query_citation,
-    make_stats_variable,
-    merge_form_with_courts,
-    make_get_string,
-    regroup_snippets,
-    get_mlt_query,
 )
 from cl.search.constants import RELATED_PATTERN
 from cl.search.forms import SearchForm, _clean_form
@@ -149,7 +138,7 @@ def do_search(
             if related_prefix_match:
                 results = get_mlt_query(
                     si,
-                    cd,
+                    cd.copy(),
                     facet,
                     # Seed IDs
                     related_prefix_match.group("pks").split(","),
