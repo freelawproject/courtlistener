@@ -16,6 +16,7 @@ from juriscraper.pacer import (
     AttachmentPage,
     DocketHistoryReport,
     DocketReport,
+    ClaimsRegister,
 )
 from requests import HTTPError
 
@@ -41,6 +42,8 @@ from cl.recap.mergers import (
     update_docket_metadata,
     process_orphan_documents,
     find_docket_object,
+    add_bankruptcy_data_to_docket,
+    add_claims_to_docket,
 )
 from cl.recap.models import (
     PacerHtmlFiles,
@@ -86,6 +89,8 @@ def process_recap_upload(pq):
         ).apply_async()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         process_recap_appellate_attachment.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.CLAIMS_REGISTER:
+        process_recap_claims_register.delay(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCUMENT_ZIP:
         process_recap_zip.delay(pq.pk)
 
@@ -690,6 +695,90 @@ def process_recap_attachment(self, pk, tag_names=None):
 @app.task(
     bind=True, max_retries=3, interval_start=5 * 60, interval_step=5 * 60
 )
+def process_recap_claims_register(self, pk):
+    """Merge bankruptcy claims registry HTML into RECAP
+
+    :param pk: The primary key of the processing queue item you want to work on
+    :type pk: int
+    :return: None
+    :rtype: None
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    if pq.debug:
+        # Proper debugging not supported on this endpoint. Just abort.
+        mark_pq_successful(pq)
+        self.request.chain = None
+        return None
+
+    mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
+    logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
+
+    with open(pq.filepath_local.path) as f:
+        text = f.read().decode("utf-8")
+    report = ClaimsRegister(map_cl_to_pacer_id(pq.court_id))
+    report._parse_text(text)
+    data = report.data
+    logger.info("Parsing completed for item %s" % pq)
+
+    if not data:
+        # Bad HTML
+        msg = "Not a valid claims registry page or other parsing failure"
+        mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        self.request.chain = None
+        return None
+
+    # Merge the contents of the docket into CL.
+    d, docket_count = find_docket_object(
+        pq.court_id, pq.pacer_case_id, data["docket_number"]
+    )
+    if docket_count > 1:
+        logger.info(
+            "Found %s dockets during lookup. Choosing oldest." % docket_count
+        )
+        d = d.earliest("date_created")
+
+    # Merge the contents into CL
+    d.add_recap_source()
+    update_docket_metadata(d, data)
+
+    try:
+        d.save()
+    except IntegrityError as exc:
+        logger.warning(
+            "Race condition experienced while attempting docket save."
+        )
+        error_message = "Unable to save docket due to IntegrityError."
+        if self.request.retries == self.max_retries:
+            mark_pq_status(pq, error_message, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        else:
+            mark_pq_status(
+                pq, error_message, PROCESSING_STATUS.QUEUED_FOR_RETRY
+            )
+            raise self.retry(exc=exc)
+
+    add_bankruptcy_data_to_docket(d, data)
+    add_claims_to_docket(d, data["claims"])
+    logger.info("Created/updated claims data for %s", pq)
+
+    # Add the HTML to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles(
+        content_object=d, upload_type=UPLOAD_TYPE.CLAIMS_REGISTER
+    )
+    pacer_file.filepath.save(
+        # We only care about the ext w/UUIDFileSystemStorage
+        "claims_registry.html",
+        ContentFile(text),
+    )
+
+    mark_pq_successful(pq, d_id=d.pk)
+    return {"docket_pk": d.pk}
+
+
+@app.task(
+    bind=True, max_retries=3, interval_start=5 * 60, interval_step=5 * 60
+)
 def process_recap_docket_history_report(self, pk):
     """Process the docket history report.
 
@@ -701,9 +790,9 @@ def process_recap_docket_history_report(self, pk):
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
-    report = DocketHistoryReport(map_cl_to_pacer_id(pq.court_id))
     with open(pq.filepath_local.path) as f:
         text = f.read().decode("utf-8")
+    report = DocketHistoryReport(map_cl_to_pacer_id(pq.court_id))
     report._parse_text(text)
     data = report.data
     logger.info("Parsing completed for item %s" % pq)
