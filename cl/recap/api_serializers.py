@@ -64,7 +64,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         ]:
             # Regardless of upload type, we don't want values to be set to
             # "undefined"
-            if attrs[attr_name] == "undefined":
+            if attrs.get(attr_name) == "undefined":
                 raise ValidationError(
                     "'%s' field cannot have the literal value 'undefined'."
                     % attr_name
