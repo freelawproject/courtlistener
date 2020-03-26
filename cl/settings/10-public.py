@@ -404,9 +404,10 @@ MARKDOWN_DEUX_STYLES = {
 ##########
 # MATOMO #
 ##########
-MATOMO_URL = "http://192.168.0.243/piwik.php"
-MATOMO_SITE_ID = "1"
 
+MATOMO_URL = "http://192.168.0.243/piwik.php"
+MATOMO_FRONTEND_BASE_URL = "//matomo.courtlistener.com/"
+MATOMO_SITE_ID = "1"
 
 ########
 # SCDB #
@@ -515,6 +516,15 @@ if DEVELOPMENT:
         "level": "DEBUG",
         "propagate": False,
     }
+
+###################
+# Related content #
+###################
+
+RELATED_COUNT = 5
+RELATED_USE_CACHE = True
+RELATED_CACHE_TIMEOUT = 60 * 60 * 24 * 7
+RELATED_USER_GROUPS = ["recommendation_system_tester"]
 
 
 #######

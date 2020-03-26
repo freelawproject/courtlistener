@@ -9,9 +9,9 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.urls import reverse
 from django.db.models import Sum, Count
 from django.shortcuts import HttpResponseRedirect, render, get_object_or_404
+from django.urls import reverse
 from django.utils.timezone import utc, make_aware
 from django.views.decorators.cache import never_cache
 from requests import RequestException
@@ -31,9 +31,11 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     make_get_string,
     regroup_snippets,
+    get_mlt_query,
     add_depth_counts,
     get_solr_interface,
 )
+from cl.search.constants import RELATED_PATTERN
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import Court, Opinion, SEARCH_TYPES
 from cl.stats.models import Stat
@@ -131,7 +133,24 @@ def do_search(
             raise
 
         try:
-            results = si.query().add_extra(**build_main_query(cd, facet=facet))
+            # Is this a `related:<pks>` prefix query?
+            related_prefix_match = RELATED_PATTERN.search(cd["q"])
+            if related_prefix_match:
+                results = get_mlt_query(
+                    si,
+                    cd.copy(),
+                    facet,
+                    # Seed IDs
+                    related_prefix_match.group("pks").split(","),
+                    # Original query
+                    cd["q"].replace(related_prefix_match.group("pfx"), ""),
+                )
+            else:
+                # Regular search queries
+                results = si.query().add_extra(
+                    **build_main_query(cd, facet=facet)
+                )
+
             paged_results = paginate_cached_solr_results(
                 get_params, cd, results, rows, cache_key
             )
