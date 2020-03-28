@@ -14,8 +14,8 @@ class FREQUENCIES(object):
     ONCE = "once"
     MONTHLY = "monthly"
     NAMES = (
-        (ONCE, "Once"),
         (MONTHLY, "Monthly"),
+        (ONCE, "Once"),
     )
 
 
