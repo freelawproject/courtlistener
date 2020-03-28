@@ -10,7 +10,7 @@
             src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
     <script type="text/javascript">
         $(document).ready(function(){
-            $(".edit-favorite-trigger").click(function (event) {
+            $(".edit-favorite-trigger").on("click", function (event) {
                 event.preventDefault();
                 var pk = $(this).data("id");
                 var ds = $("#data-store-" + pk);

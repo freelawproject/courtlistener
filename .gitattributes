@@ -17,6 +17,7 @@
 *.exe binary
 *.bz2 binary
 *.gz binary
+*.zip binary
 
 # Fonts
 *.eot binary

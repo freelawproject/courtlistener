@@ -1,0 +1,21 @@
+[
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Faked CANB Court",
+      "citation_string": "",
+      "in_use": false,
+      "url": "",
+      "notes": "",
+      "jurisdiction": "FB",
+      "has_oral_argument_scraper": false,
+      "full_name": "Faked CANB Court",
+      "position": 22,
+      "date_modified": "2016-06-18T20:01:59.649Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "canb"
+  }
+]

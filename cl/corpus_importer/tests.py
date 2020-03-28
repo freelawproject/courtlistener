@@ -469,7 +469,7 @@ class IAUploaderTest(TestCase):
         with self.assertNumQueries(11):
             generate_ia_json(1)
 
-        with self.assertNumQueries(5):
+        with self.assertNumQueries(9):
             generate_ia_json(2)
 
         with self.assertNumQueries(5):
@@ -553,11 +553,13 @@ class HarvardTests(TestCase):
 
     @mock.patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "tax_court_duplicate*"))],
+        side_effect=[iglob(os.path.join(test_dir, "bta_*.json"))],
     )
-    def test_duplicate_cite_same_case(self, mock):
-        """Will a duplicate case be skipped?"""
-        self.assertSuccessfulParse(1)
+    def test_real_bta_failure(self, mock):
+        """Will we add a case with the same citation but a different case
+        name?
+        """
+        self.assertSuccessfulParse(2)
 
     @mock.patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",

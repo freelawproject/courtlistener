@@ -88,8 +88,11 @@ class IngestionTest(IndexedSolrTestCase):
 
 
 class ExtractionTest(TestCase):
+    fixtures = ["tax_court_test.json"]
+
     def test_txt_extraction_with_bad_data(self):
         """Can we extract text from nasty files lacking encodings?"""
+
         path = os.path.join(
             settings.MEDIA_ROOT,
             "test",
@@ -104,6 +107,36 @@ class ExtractionTest(TestCase):
             u"¶  1.  DOOLEY, J.   Plaintiffs",
             content,
             "Issue extracting/encoding text from file at: %s" % path,
+        )
+
+    def test_juriscraper_object_creation(self):
+        """Can we extract text from tax court pdf and add to db?"""
+
+        o = Opinion.objects.get(pk=76)
+        self.assertFalse(
+            o.cluster.citations.exists(),
+            msg="Citation should not exist at beginning of test",
+        )
+
+        extract_doc_content(pk=o.pk, do_ocr=False)
+        self.assertTrue(
+            o.cluster.citations.exists(),
+            msg="Expected citation was not created in db",
+        )
+
+    def test_juriscraper_docket_number_extraction(self):
+        """Can we extract docket number from tax court pdf and add to db?"""
+
+        o = Opinion.objects.get(pk=76)
+        self.assertEqual(
+            None,
+            o.cluster.docket.docket_number,
+            msg="Docket number should be none.",
+        )
+        extract_doc_content(pk=76, do_ocr=False)
+        o.cluster.docket.refresh_from_db()
+        self.assertEqual(
+            "19031-13, 27735-13, 11905-14", o.cluster.docket.docket_number,
         )
 
 
@@ -352,26 +385,25 @@ class AudioFileTaskTest(TestCase):
     ]
 
     def test_process_audio_file(self):
-        audio = Audio.objects.get(pk=1)
-        audio.duration = None
-        audio.save()
+        af = Audio.objects.get(pk=1)
+        af.duration = None
+        af.save()
 
-        audio = Audio.objects.get(pk=1)
+        expected_duration = 15
         self.assertNotEqual(
-            audio.duration,
-            15,
-            msg="we start with a fake duration in the fixture",
+            af.duration,
+            expected_duration,
+            msg="Do we have no duration info at the outset?",
         )
 
         process_audio_file(pk=1)
-        audio = Audio.objects.get(pk=1)
-        correct_duration = 15
-        measured_duration = audio.duration
+        af.refresh_from_db()
+        measured_duration = af.duration
         # Use almost equal because measuring MP3's is wonky.
         self.assertAlmostEqual(
             measured_duration,
-            correct_duration,
+            expected_duration,
             delta=5,
             msg="We should end up with the proper duration of about %s. "
-            "Instead we got %s." % (correct_duration, measured_duration),
+            "Instead we got %s." % (expected_duration, measured_duration),
         )

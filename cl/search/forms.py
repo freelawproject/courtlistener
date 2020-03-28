@@ -1,5 +1,6 @@
 # coding=utf-8
 import re
+from collections import OrderedDict
 
 from django import forms
 from django.forms import DateField, ChoiceField
@@ -12,8 +13,7 @@ from cl.search.fields import (
     FloorDateField,
     RandomChoiceField,
 )
-from cl.search.models import Court
-from cl.search.models import DOCUMENT_STATUSES
+from cl.search.models import Court, SEARCH_TYPES, DOCUMENT_STATUSES
 
 OPINION_ORDER_BY_CHOICES = (
     ("score desc", "Relevance"),
@@ -29,22 +29,12 @@ OPINION_ORDER_BY_CHOICES = (
     ("dod desc,name_reverse asc", "Most Recently Deceased"),
 )
 
-TYPE_CHOICES = (
-    ("o", "Opinions"),
-    ("oa", "Oral Arguments"),
-    ("p", "People"),
-    ("r", "RECAP"),
-)
 
-
-def _clean_form(request, cd, courts):
+def _clean_form(get_params, cd, courts):
     """Returns cleaned up values as a Form object.
     """
-    # Make a copy of request.GET so it is mutable
-    mutable_GET = request.GET.copy()
-
     # Send the user the cleaned up query
-    mutable_GET["q"] = cd["q"]
+    get_params["q"] = cd["q"]
 
     # Clean up the date formats. This is probably no longer needed since we do
     # date cleanup on the client side via our datepickers, but it's probably
@@ -53,26 +43,26 @@ def _clean_form(request, cd, courts):
     for date_field in SearchForm().get_date_field_names():
         for time in ("before", "after"):
             field = "%s_%s" % (date_field, time)
-            if mutable_GET.get(field) and cd.get(field) is not None:
+            if get_params.get(field) and cd.get(field) is not None:
                 # Don't use strftime. It'll fail before 1900
                 before = cd[field]
-                mutable_GET[field] = "%02d/%02d/%s" % (
+                get_params[field] = "%02d/%02d/%s" % (
                     before.month,
                     before.day,
                     before.year,
                 )
 
-    mutable_GET["order_by"] = cd["order_by"]
-    mutable_GET["type"] = cd["type"]
+    get_params["order_by"] = cd["order_by"]
+    get_params["type"] = cd["type"]
 
     for court in courts:
-        mutable_GET["court_%s" % court.pk] = cd["court_%s" % court.pk]
+        get_params["court_%s" % court.pk] = cd["court_%s" % court.pk]
 
     for status in DOCUMENT_STATUSES:
-        mutable_GET["stat_%s" % status[1]] = cd["stat_%s" % status[1]]
+        get_params["stat_%s" % status[1]] = cd["stat_%s" % status[1]]
 
     # Ensure that we have the cleaned_data and other related attributes set.
-    form = SearchForm(mutable_GET)
+    form = SearchForm(get_params)
     form.is_valid()
     return form
 
@@ -82,16 +72,16 @@ class SearchForm(forms.Form):
     # Blended fields
     #
     type = forms.ChoiceField(
-        choices=TYPE_CHOICES,
+        choices=SEARCH_TYPES.NAMES,
         required=False,
-        initial="o",
+        initial=SEARCH_TYPES.OPINION,
         widget=forms.RadioSelect(
             attrs={"class": "external-input form-control"}
         ),
     )
     type.as_str_types = []
     q = forms.CharField(required=False, label="Query",)
-    q.as_str_types = ["o", "oa", "r", "p"]
+    q.as_str_types = SEARCH_TYPES.ALL_TYPES
     court = forms.CharField(required=False, widget=forms.HiddenInput())
     court.as_str_types = []
     order_by = RandomChoiceField(
@@ -117,7 +107,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    judge.as_str_types = ["oa", "o"]
+    judge.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT]
 
     # Oral arg, opinion, and RECAP
     case_name = forms.CharField(
@@ -131,7 +121,11 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    case_name.as_str_types = ["oa", "o", "r"]
+    case_name.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+    ]
     docket_number = forms.CharField(
         required=False,
         label="Docket Number",
@@ -142,7 +136,11 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    docket_number.as_str_types = ["oa", "o", "r"]
+    docket_number.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+    ]
 
     #
     # RECAP fields
@@ -155,7 +153,7 @@ class SearchForm(forms.Form):
             attrs={"class": "external-input form-control left",}
         ),
     )
-    available_only.as_str_types = ["r"]
+    available_only.as_str_types = [SEARCH_TYPES.RECAP]
     description = forms.CharField(
         required=False,
         label="Document Description",
@@ -166,7 +164,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    description.as_str_types = ["r"]
+    description.as_str_types = [SEARCH_TYPES.RECAP]
     nature_of_suit = forms.CharField(
         required=False,
         label="Nature of Suit",
@@ -177,7 +175,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    nature_of_suit.as_str_types = ["r"]
+    nature_of_suit.as_str_types = [SEARCH_TYPES.RECAP]
     cause = forms.CharField(
         required=False,
         label="Cause",
@@ -188,7 +186,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    cause.as_str_types = ["r"]
+    cause.as_str_types = [SEARCH_TYPES.RECAP]
     assigned_to = forms.CharField(
         required=False,
         label="Assigned To Judge",
@@ -199,7 +197,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    assigned_to.as_str_types = ["r"]
+    assigned_to.as_str_types = [SEARCH_TYPES.RECAP]
     referred_to = forms.CharField(
         required=False,
         label="Referred To Judge",
@@ -210,7 +208,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    referred_to.as_str_types = ["r"]
+    referred_to.as_str_types = [SEARCH_TYPES.RECAP]
     document_number = forms.CharField(
         required=False,
         label="Document #",
@@ -221,7 +219,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    document_number.as_str_types = ["r"]
+    document_number.as_str_types = [SEARCH_TYPES.RECAP]
     attachment_number = forms.CharField(
         required=False,
         label="Attachment #",
@@ -232,7 +230,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    attachment_number.as_str_types = ["r"]
+    attachment_number.as_str_types = [SEARCH_TYPES.RECAP]
     party_name = forms.CharField(
         required=False,
         label="Party Name",
@@ -243,7 +241,7 @@ class SearchForm(forms.Form):
             },
         ),
     )
-    party_name.as_str_types = ["r"]
+    party_name.as_str_types = [SEARCH_TYPES.RECAP]
     atty_name = forms.CharField(
         required=False,
         label="Attorney Name",
@@ -254,7 +252,7 @@ class SearchForm(forms.Form):
             },
         ),
     )
-    atty_name.as_str_types = ["r"]
+    atty_name.as_str_types = [SEARCH_TYPES.RECAP]
 
     #
     # Oral argument fields
@@ -270,7 +268,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    argued_after.as_str_types = ["oa"]
+    argued_after.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
     argued_before = CeilingDateField(
         required=False,
         label="Argued Before",
@@ -282,7 +280,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    argued_before.as_str_types = ["oa"]
+    argued_before.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
 
     #
     # Opinion fields
@@ -298,7 +296,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    filed_after.as_str_types = ["o", "r"]
+    filed_after.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]
     filed_before = CeilingDateField(
         required=False,
         label="Filed Before",
@@ -310,7 +308,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    filed_before.as_str_types = ["o", "r"]
+    filed_before.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]
     citation = forms.CharField(
         required=False,
         label="Citation",
@@ -321,7 +319,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    citation.as_str_types = ["o"]
+    citation.as_str_types = [SEARCH_TYPES.OPINION]
     neutral_cite = forms.CharField(
         required=False,
         label="Neutral Citation",
@@ -332,7 +330,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    neutral_cite.as_str_types = ["o"]
+    neutral_cite.as_str_types = [SEARCH_TYPES.OPINION]
     cited_gt = forms.IntegerField(
         required=False,
         label="Min Cites",
@@ -344,7 +342,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    cited_gt.as_str_types = ["o"]
+    cited_gt.as_str_types = [SEARCH_TYPES.OPINION]
     cited_lt = forms.IntegerField(
         required=False,
         label="Max Cites",
@@ -356,7 +354,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    cited_lt.as_str_types = ["o"]
+    cited_lt.as_str_types = [SEARCH_TYPES.OPINION]
 
     #
     # Judge fields
@@ -371,7 +369,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    name.as_str_types = ["p"]
+    name.as_str_types = [SEARCH_TYPES.PEOPLE]
     born_after = FloorDateField(
         required=False,
         label="Born After",
@@ -383,7 +381,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    born_after.as_str_types = ["p"]
+    born_after.as_str_types = [SEARCH_TYPES.PEOPLE]
     born_before = CeilingDateField(
         required=False,
         label="Born Before",
@@ -395,7 +393,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    born_before.as_str_types = ["p"]
+    born_before.as_str_types = [SEARCH_TYPES.PEOPLE]
     dob_city = forms.CharField(
         required=False,
         label="Birth City",
@@ -406,14 +404,14 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    dob_city.as_str_types = ["p"]
+    dob_city.as_str_types = [SEARCH_TYPES.PEOPLE]
     dob_state = forms.ChoiceField(
         choices=[("", "---------")] + list(STATE_CHOICES),
         required=False,
         label="Birth State",
         widget=forms.Select(attrs={"class": "external-input form-control"}),
     )
-    dob_state.as_str_types = ["p"]
+    dob_state.as_str_types = [SEARCH_TYPES.PEOPLE]
     school = forms.CharField(
         required=False,
         label="School Attended",
@@ -424,7 +422,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    school.as_str_types = ["p"]
+    school.as_str_types = [SEARCH_TYPES.PEOPLE]
     appointer = forms.CharField(
         required=False,
         label="Appointed By",
@@ -435,7 +433,7 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    appointer.as_str_types = ["p"]
+    appointer.as_str_types = [SEARCH_TYPES.PEOPLE]
     selection_method = forms.ChoiceField(
         choices=[("", "---------")] + list(Position.SELECTION_METHODS),
         required=False,
@@ -443,7 +441,7 @@ class SearchForm(forms.Form):
         initial="None",
         widget=forms.Select(attrs={"class": "external-input form-control"}),
     )
-    selection_method.as_str_types = ["p"]
+    selection_method.as_str_types = [SEARCH_TYPES.PEOPLE]
     political_affiliation = forms.ChoiceField(
         choices=[("", "---------")]
         + list(PoliticalAffiliation.POLITICAL_PARTIES),
@@ -452,7 +450,7 @@ class SearchForm(forms.Form):
         initial="None",
         widget=forms.Select(attrs={"class": "external-input form-control"}),
     )
-    political_affiliation.as_str_types = ["p"]
+    political_affiliation.as_str_types = [SEARCH_TYPES.PEOPLE]
 
     def get_date_field_names(self):
         return {
@@ -485,12 +483,14 @@ class SearchForm(forms.Form):
                 attrs.update({"checked": "checked"})
             else:
                 initial = False
-            self.fields["stat_" + status[1]] = forms.BooleanField(
+            new_field = forms.BooleanField(
                 label=status[1],
                 required=False,
                 initial=initial,
                 widget=forms.CheckboxInput(attrs=attrs),
             )
+            new_field.as_str_types = [SEARCH_TYPES.OPINION]
+            self.fields["stat_" + status[1]] = new_field
 
     # This is a particularly nasty area of the code due to several factors:
     #  1. Django doesn't have a good method of setting default values for
@@ -552,13 +552,16 @@ class SearchForm(forms.Form):
 
     def clean_order_by(self):
         """Sets the default order_by value if one isn't provided by the user."""
-        if self.cleaned_data["type"] == "o" or not self.cleaned_data["type"]:
+        if (
+            self.cleaned_data["type"] == SEARCH_TYPES.OPINION
+            or not self.cleaned_data["type"]
+        ):
             if not self.cleaned_data["order_by"]:
                 return self.fields["order_by"].initial
-        elif self.cleaned_data["type"] == "oa":
+        elif self.cleaned_data["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
             if not self.cleaned_data["order_by"]:
                 return "dateArgued desc"
-        elif self.cleaned_data["type"] == "p":
+        elif self.cleaned_data["type"] == SEARCH_TYPES.PEOPLE:
             if not self.cleaned_data["order_by"]:
                 return "name_reverse asc"
         return self.cleaned_data["order_by"]
@@ -630,10 +633,24 @@ class SearchForm(forms.Form):
 
         return cleaned_data
 
-    def as_text(self, court_count, court_count_human):
-        crumbs = []
+    def as_display_dict(self, court_count_human):
+        """Generate a displayable dictionary of the search form
+
+        This can be useful for displaying on the front end, or converting into
+        a useful string. The dictionary looks like:
+
+            {
+              'Case name': 'Foo',
+              'Query': 'bar',
+            }
+
+        :param court_count_human: The number of courts being queried or "All",
+        if all courts are being queried.
+        :returns A dictionary of the data
+        """
+        display_dict = OrderedDict({"Courts": court_count_human})
         search_type = self.data["type"]
-        for field_name, field in self.base_fields.items():
+        for field_name, field in self.fields.items():
             if not hasattr(field, "as_str_types"):
                 continue
             if search_type in field.as_str_types:
@@ -642,9 +659,13 @@ class SearchForm(forms.Form):
                     if isinstance(field, ChoiceField):
                         choices = flatten_choices(self.fields[field_name])
                         value = dict(choices)[value]
-                    crumbs.append("%s: %s" % (field.label, value))
+                    display_dict[field.label] = value
 
-        if court_count_human != "All":
-            pluralize = "s" if court_count > 1 else ""
-            crumbs.append("%s Court%s" % (court_count, pluralize))
+        return display_dict
+
+    def as_text(self, court_count_human):
+        """Create a human-readable string representation of the search form"""
+        crumbs = []
+        for label, value in self.as_display_dict(court_count_human).items():
+            crumbs.append(u"%s: %s" % (label, value))
         return u" › ".join(crumbs)

@@ -3,11 +3,13 @@ from django.conf.urls import url
 from django.contrib.auth import views as auth_views
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
+from cl.lib.ratelimiter import ratelimiter_auth
 from cl.users import views
 from cl.users.forms import (
     CustomPasswordResetForm,
     CustomSetPasswordForm,
 )
+
 
 urlpatterns = [
     # Sign in/out and password pages
@@ -31,7 +33,7 @@ urlpatterns = [
     ),
     url(
         r"^reset-password/$",
-        auth_views.password_reset,
+        ratelimiter_auth(auth_views.password_reset),
         {
             "template_name": "register/password_reset_form.html",
             "email_template_name": "register/password_reset_email.html",
@@ -100,7 +102,7 @@ urlpatterns = [
     url(
         r"^profile/take-out/done/$", views.take_out_done, name="take_out_done"
     ),
-    url(r"^register/$", views.register, name="register"),
+    url(r"^register/$", ratelimiter_auth(views.register), name="register",),
     url(
         r"^register/success/$",
         views.register_success,
@@ -114,7 +116,7 @@ urlpatterns = [
     ),
     url(
         r"^email-confirmation/request/$",
-        views.request_email_confirmation,
+        ratelimiter_auth(views.request_email_confirmation),
         name="email_confirmation_request",
     ),
     url(

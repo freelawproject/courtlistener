@@ -103,7 +103,7 @@
 
         <h2 id="citation-data">Citation Bulk Data File</h2>
         <p>
-            A new file that is available in the latest updates to our bulk data system is a CSV that contains all of the citation relationships between opinions in our database. This file has millions lines, one per citation between opinions.
+            This is a CSV file that contains all of the citation relationships between opinions in our database. This file has millions of lines, one per citation between opinions.
         </p>
         <p>
             This file can be obtained in a similar manner to the core data
@@ -114,7 +114,7 @@
                 <a href="/api/bulk-data/citations/all.csv.gz">{% get_full_host %}/api/bulk-data/citations/all.csv.gz</a>
             </code>
         </blockquote>
-        <p>The format of the file is two columns. The first column is the <code>opinion</code> that cites the second. Note that these are Opinion IDs, not OpinionCluster IDs, though in many cases these are equivalent. This was simplified when v3 of the API was released.
+        <p>The format of the file is three columns. The first column is the <code>ID</code> of the citing opinion; the second column is the <code>ID</code> of the cited opinion; and the third column is the <code>depth</code> of the citation (i.e., the number of those citing-cited dyads). Note that the <code>ID</code> fields are Opinion IDs, not OpinionCluster IDs, though in many cases these are equivalent. This was simplified when v3 of the API was released.
         </p>
 
 

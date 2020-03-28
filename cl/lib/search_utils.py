@@ -1,21 +1,44 @@
 import re
+from datetime import timedelta
+from datetime import date
 from urllib import urlencode
 from urlparse import parse_qs
 
 from django.conf import settings
+from django.core.cache import cache
+from django.core.cache import caches
 from django.http import QueryDict
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
+from cl.lib.bot_detector import is_bot
+from cl.search.constants import (
+    SOLR_OPINION_HL_FIELDS,
+    SOLR_RECAP_HL_FIELDS,
+    SOLR_ORAL_ARGUMENT_HL_FIELDS,
+    SOLR_PEOPLE_HL_FIELDS,
+)
+from cl.citations.utils import get_citation_depth_between_clusters
+from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib import sunburnt
 from cl.search.forms import SearchForm
-from cl.search.models import Court
+from cl.search.models import Court, OpinionCluster, SEARCH_TYPES
 
-boosts = {
+BOOSTS = {
     "qf": {
-        "o": {"text": 1, "caseName": 4, "docketNumber": 2,},
-        "r": {"text": 1, "caseName": 4, "docketNumber": 3, "description": 2,},
-        "oa": {"text": 1, "caseName": 4, "docketNumber": 2,},
-        "p": {
+        SEARCH_TYPES.OPINION: {"text": 1, "caseName": 4, "docketNumber": 2},
+        SEARCH_TYPES.RECAP: {
+            "text": 1,
+            "caseName": 4,
+            "docketNumber": 3,
+            "description": 2,
+        },
+        SEARCH_TYPES.ORAL_ARGUMENT: {
+            "text": 1,
+            "caseName": 4,
+            "docketNumber": 2,
+        },
+        SEARCH_TYPES.PEOPLE: {
             "text": 1,
             "name": 4,
             # Suppress these fields b/c a match on them returns the wrong
@@ -27,14 +50,31 @@ boosts = {
     },
     # Phrase-based boosts.
     "pf": {
-        "o": {"text": 3, "caseName": 3,},
-        "r": {"text": 3, "caseName": 3, "description": 3,},
-        "oa": {"caseName": 3,},
-        "p": {
+        SEARCH_TYPES.OPINION: {"text": 3, "caseName": 3,},
+        SEARCH_TYPES.RECAP: {"text": 3, "caseName": 3, "description": 3},
+        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3,},
+        SEARCH_TYPES.PEOPLE: {
             # None here. Phrases don't make much sense for people.
         },
     },
 }
+
+
+def get_solr_interface(cd):
+    """Get the correct solr interface for the query"""
+    search_type = cd["type"]
+    if search_type == SEARCH_TYPES.OPINION:
+        si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    elif search_type == SEARCH_TYPES.RECAP:
+        si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
+    elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
+        si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
+    elif search_type == SEARCH_TYPES.PEOPLE:
+        si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
+    else:
+        raise NotImplementedError("Unknown search type: %s" % search_type)
+
+    return si
 
 
 def make_get_string(request, nuke_fields=None):
@@ -42,7 +82,7 @@ def make_get_string(request, nuke_fields=None):
     the pagination parameters.
     """
     if nuke_fields is None:
-        nuke_fields = ["page"]
+        nuke_fields = ["page", "show_alert_modal"]
     get_dict = parse_qs(request.META["QUERY_STRING"])
     for key in nuke_fields:
         try:
@@ -61,15 +101,16 @@ def get_query_citation(cd):
     """
     if not cd.get("q"):
         return None
-    citations = get_citations(cd["q"], html=False)
+    citations = get_citations(
+        cd["q"], html=False, do_post_citation=False, do_defendant=False
+    )
 
     matches = None
     if len(citations) == 1:
         # If it's not exactly one match, user doesn't get special help.
         matches = match_citation(citations[0])
-        if len(matches) >= 1:
-            # Just return the first result if there is more than one. This
-            # should be rare, and they're ordered by relevance.
+        if len(matches) == 1:
+            # If more than one match, don't show the tip
             return matches.result.docs[0]
 
     return matches
@@ -232,13 +273,24 @@ def merge_form_with_courts(courts, search_form):
     return court_tabs, court_count_human, court_count
 
 
-def make_fq(cd, field, key):
+def make_fq(cd, field, key, make_phrase=False):
     """Does some minimal processing of the query string to get it into a
     proper field query.
 
     This is necessary because despite our putting AND as the default join
     method, in some cases Solr decides OR is a better approach. So, to work
-    around this bug, we do some minimal query parsing ourselves.
+    around this bug, we do some minimal query parsing ourselves:
+
+    1. If the user provided a phrase we pass that through.
+
+    1. Otherwise, we insert AND as a conjunction between all words.
+
+    :param cd: The cleaned data dictionary from the form.
+    :param field: The Solr field to use for the query (e.g. "caseName")
+    :param key: The model form field to use for the query (e.g. "case_name")
+    :param make_phrase: Whether we should wrap the query in quotes to make a
+    phrase search.
+    :returns A field query string like "caseName:Roe"
     """
     q = cd[key]
     q = q.replace(":", " ")
@@ -246,6 +298,10 @@ def make_fq(cd, field, key):
     if q.startswith('"') and q.endswith('"'):
         # User used quotes. Just pass it through.
         return "%s:(%s)" % (field, q)
+
+    if make_phrase:
+        # No need to mess with conjunctions. Just wrap in quotes.
+        return '%s:("%s")' % (field, q)
 
     # Iterate over the query word by word. If the word is a conjunction
     # word, detect that and use the user's request. Else, make sure there's
@@ -349,14 +405,20 @@ def make_boost_string(fields):
 
 def add_boosts(main_params, cd):
     """Add any boosts that make sense for the query."""
-    if cd["type"] == "o" and main_params["sort"].startswith("score"):
+    if cd["type"] == SEARCH_TYPES.OPINION and main_params["sort"].startswith(
+        "score"
+    ):
         main_params["boost"] = "pagerank"
 
     # Apply standard qf parameters
-    qf = boosts["qf"][cd["type"]].copy()
+    qf = BOOSTS["qf"][cd["type"]].copy()
     main_params["qf"] = make_boost_string(qf)
 
-    if cd["type"] in ["o", "r", "oa"]:
+    if cd["type"] in [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+    ]:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         vs_query = any(
@@ -374,8 +436,12 @@ def add_boosts(main_params, cd):
             main_params["qf"] = make_boost_string(qf)
 
     # Apply phrase-based boosts
-    if cd["type"] in ["o", "r", "oa"]:
-        main_params["pf"] = make_boost_string(boosts["pf"][cd["type"]])
+    if cd["type"] in [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+    ]:
+        main_params["pf"] = make_boost_string(BOOSTS["pf"][cd["type"]])
         main_params["ps"] = 5
 
 
@@ -386,7 +452,7 @@ def add_faceting(main_params, cd, facet):
         return
 
     facet_params = {}
-    if cd["type"] == "o":
+    if cd["type"] == SEARCH_TYPES.OPINION:
         facet_params = {
             "facet": "true",
             "facet.mincount": 0,
@@ -423,7 +489,7 @@ def add_highlighting(main_params, cd, highlight):
     # here that are not requested as part of highlighting. Facet
     # params are not set here because they do not retrieve results,
     # only counts (they are set to 0 rows).
-    if cd["type"] == "o":
+    if cd["type"] == SEARCH_TYPES.OPINION:
         fl = [
             "absolute_url",
             "citeCount",
@@ -431,23 +497,14 @@ def add_highlighting(main_params, cd, highlight):
             "dateFiled",
             "download_url",
             "id",
+            "cluster_id",
             "local_path",
             "sibling_ids",
             "source",
             "status",
         ]
-        hlfl = [
-            "caseName",
-            "citation",
-            "court_citation_string",
-            "docketNumber",
-            "judge",
-            "lexisCite",
-            "neutralCite",
-            "suitNature",
-            "text",
-        ]
-    elif cd["type"] == "r":
+        hlfl = SOLR_OPINION_HL_FIELDS
+    elif cd["type"] == SEARCH_TYPES.RECAP:
         fl = [
             "absolute_url",
             "assigned_to_id",
@@ -466,19 +523,8 @@ def add_highlighting(main_params, cd, highlight):
             "party",
             "referred_to_id",
         ]
-        hlfl = [
-            "assignedTo",
-            "caseName",
-            "cause",
-            "court_citation_string",
-            "docketNumber",
-            "juryDemand",
-            "referredTo",
-            "short_description",
-            "suitNature",
-            "text",
-        ]
-    elif cd["type"] == "oa":
+        hlfl = SOLR_RECAP_HL_FIELDS
+    elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         fl = [
             "id",
             "absolute_url",
@@ -490,14 +536,8 @@ def add_highlighting(main_params, cd, highlight):
             "dateArgued",
             "duration",
         ]
-        hlfl = [
-            "text",
-            "caseName",
-            "judge",
-            "docketNumber",
-            "court_citation_string",
-        ]
-    elif cd["type"] == "p":
+        hlfl = SOLR_ORAL_ARGUMENT_HL_FIELDS
+    elif cd["type"] == SEARCH_TYPES.PEOPLE:
         fl = [
             "id",
             "absolute_url",
@@ -514,8 +554,7 @@ def add_highlighting(main_params, cd, highlight):
             "selection_method",
             "court",
         ]
-        hlfl = ["name", "dob_city", "dob_state", "name_reverse"]
-
+        hlfl = SOLR_PEOPLE_HL_FIELDS
     main_params.update(
         {"fl": ",".join(fl), "hl.fl": ",".join(hlfl),}
     )
@@ -531,13 +570,15 @@ def add_filter_queries(main_params, cd):
     # Changes here are usually mirrored in place_facet_queries, below.
     main_fq = []
 
-    if cd["type"] == "o":
+    if cd["type"] == SEARCH_TYPES.OPINION:
         if cd["case_name"]:
             main_fq.append(make_fq(cd, "caseName", "case_name"))
         if cd["judge"]:
             main_fq.append(make_fq(cd, "judge", "judge"))
         if cd["docket_number"]:
-            main_fq.append(make_fq(cd, "docketNumber", "docket_number"))
+            main_fq.append(
+                make_fq(cd, "docketNumber", "docket_number", make_phrase=True)
+            )
         if cd["citation"]:
             main_fq.append(make_fq_proximity_query(cd, "citation", "citation"))
         if cd["neutral_cite"]:
@@ -550,13 +591,15 @@ def add_filter_queries(main_params, cd):
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
 
-    elif cd["type"] == "r":
+    elif cd["type"] == SEARCH_TYPES.RECAP:
         if cd["case_name"]:
             main_fq.append(make_fq(cd, "caseName", "case_name"))
         if cd["description"]:
             main_fq.append(make_fq(cd, "description", "description"))
         if cd["docket_number"]:
-            main_fq.append(make_fq(cd, "docketNumber", "docket_number"))
+            main_fq.append(
+                make_fq(cd, "docketNumber", "docket_number", make_phrase=True)
+            )
         if cd["nature_of_suit"]:
             main_fq.append(make_fq(cd, "suitNature", "nature_of_suit"))
         if cd["cause"]:
@@ -584,7 +627,7 @@ def add_filter_queries(main_params, cd):
             make_date_query("dateFiled", cd["filed_before"], cd["filed_after"])
         )
 
-    elif cd["type"] == "oa":
+    elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         if cd["case_name"]:
             main_fq.append(make_fq(cd, "caseName", "case_name"))
         if cd["judge"]:
@@ -597,7 +640,7 @@ def add_filter_queries(main_params, cd):
             )
         )
 
-    elif cd["type"] == "p":
+    elif cd["type"] == SEARCH_TYPES.PEOPLE:
         if cd["name"]:
             main_fq.append(make_fq(cd, "name", "name"))
         if cd["dob_city"]:
@@ -623,7 +666,7 @@ def add_filter_queries(main_params, cd):
         )
 
     # Facet filters
-    if cd["type"] == "o":
+    if cd["type"] == SEARCH_TYPES.OPINION:
         selected_stats_string = get_selected_field_string(cd, "stat_")
         if len(selected_stats_string) > 0:
             main_fq.append(
@@ -655,7 +698,7 @@ def map_to_docket_entry_sorting(sort_string):
 
 def add_grouping(main_params, cd, group):
     """Add any grouping parameters."""
-    if cd["type"] == "o":
+    if cd["type"] == SEARCH_TYPES.OPINION:
         # Group clusters. Because this uses faceting, we use the collapse query
         # parser here instead of the usual result grouping. Faceting with
         # grouping has terrible performance.
@@ -665,7 +708,7 @@ def add_grouping(main_params, cd, group):
         else:
             main_params["fq"] = group_fq
 
-    elif cd["type"] == "r" and group is True:
+    elif cd["type"] == SEARCH_TYPES.RECAP and group is True:
         docket_query = re.match("docket_id:\d+", cd["q"])
         if docket_query:
             group_sort = map_to_docket_entry_sorting(main_params["sort"])
@@ -786,6 +829,23 @@ def build_coverage_query(court, q):
     return params
 
 
+def build_alert_estimation_query(cd, day_count):
+    """Build the parameters for estimating the frequency an alert is
+    triggered.
+    """
+    params = {
+        "q": cd["q"] or "*",
+        "rows": 0,
+        "caller": "alert_estimator",
+    }
+    cd["filed_after"] = date.today() - timedelta(days=day_count)
+    cd["filed_before"] = None
+    add_filter_queries(params, cd)
+
+    print_params(params)
+    return params
+
+
 def build_court_count_query(group=False):
     """Build a query that returns the count of cases for all courts
 
@@ -811,3 +871,215 @@ def build_court_count_query(group=False):
             }
         )
     return params
+
+
+def add_depth_counts(search_data, search_results):
+    """If the search data contains a single "cites" term (e.g., "cites:(123)"),
+    calculate and append the citation depth information between each Solr
+    result and the cited OpinionCluster. We only do this for *single* "cites"
+    terms to avoid the complexity of trying to render multiple depth
+    relationships for all the possible result-citation combinations.
+
+    :param search_data: The cleaned search form data
+    :param search_results: Solr results from paginate_cached_solr_results()
+    :return The OpinionCluster if the lookup was successful
+    """
+    cites_query_matches = re.findall(r"cites:\((\d+)\)", search_data["q"])
+    if len(cites_query_matches) == 1:
+        try:
+            cited_cluster = OpinionCluster.objects.get(
+                sub_opinions__pk=cites_query_matches[0]
+            )
+        except OpinionCluster.DoesNotExist:
+            return None
+        else:
+            for result in search_results.object_list:
+                result["citation_depth"] = get_citation_depth_between_clusters(
+                    citing_cluster_pk=result["cluster_id"],
+                    cited_cluster_pk=cited_cluster.pk,
+                )
+            return cited_cluster
+    else:
+        return None
+
+
+def get_citing_clusters_with_cache(cluster, is_bot):
+    """Use Solr to get clusters citing the one we're looking at
+
+    If it's not a bot, cache the results for a long time. If it is a bot, load
+    those results if they exist. Otherwise, return None.
+
+    :param cluster: The cluster we're targeting
+    :type cluster: OpinionCluster
+    :param is_bot: Whether the page running this was loaded by a bot
+    :type is_bot: bool
+    :return: A search result of the top five citing clusters or None
+    :rtype: SolrSearch or None
+    """
+    cache_key = "citing:%s" % cluster.pk
+    cache = caches["db_cache"]
+    if is_bot:
+        # If the cache was set by a real user, bots can access it. But if no
+        # user set the cache, this will just return None.
+        return cache.get(cache_key)
+
+    # Get the citing results from Solr for speed. Only do this for humans
+    # to save on disk usage.
+    sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
+    ids_str = " OR ".join([str(pk) for pk in sub_opinion_pks])
+    q = {
+        "q": "cites:(%s)" % ids_str,
+        "rows": 5,
+        "start": 0,
+        "sort": "citeCount desc",
+        "caller": "view_opinion",
+    }
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    citing_clusters = conn.raw_query(**q).execute()
+    a_month = 60 * 60 * 24 * 30
+    cache.set(cache_key, citing_clusters, a_month)
+
+    return citing_clusters
+
+
+def is_related_beta_user(request):
+    """Check whether current user is allowed for related opinions beta test
+
+    Beta test:
+    - feature is only available for specific user groups
+    - for better performance, we try to avoid DB queries and, thus, check
+    - first if user is logged in and no admin/staff.
+    """
+    if request.user.is_authenticated and (
+        request.user.is_superuser
+        or request.user.is_staff
+        or (
+            hasattr(settings, "RELATED_USER_GROUPS")
+            and request.user.groups.filter(
+                name__in=settings.RELATED_USER_GROUPS
+            ).exists()
+        )
+    ):
+        return True
+    else:
+        return False
+
+
+def get_related_clusters_with_cache(cluster, request):
+    """Use Solr to get related opinions with Solr-MoreLikeThis query
+
+    :param cluster: The cluster we're targeting
+    :param request: Request object for checking if user is permitted
+    :return: Tuple[List, List] Related clusters and sub-opinion IDs
+    """
+    if is_bot(request) or not is_related_beta_user(request):
+        # If it is a bot or is not beta tester, return empty results
+        return [], []
+
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+
+    # Opinions that belong to the targeted cluster
+    sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
+
+    # Use cache if enabled
+    mlt_cache_key = "mlt-cluster:%s" % cluster.pk
+    related_clusters = (
+        caches["db_cache"].get(mlt_cache_key)
+        if settings.RELATED_USE_CACHE
+        else None
+    )
+
+    if related_clusters is None:
+        # Cache is empty
+
+        # Turn list of opinion IDs into list of Q objects
+        sub_opinion_queries = [conn.Q(id=sub_id) for sub_id in sub_opinion_ids]
+
+        # Take one Q object from the list
+        sub_opinion_query = sub_opinion_queries.pop()
+
+        # OR the Q object with the ones remaining in the list
+        for item in sub_opinion_queries:
+            sub_opinion_query |= item
+
+        mlt_query = (
+            conn.query(sub_opinion_query)
+            .mlt("text", count=settings.RELATED_COUNT)
+            .field_limit(fields=["id", "caseName", "absolute_url"])
+        )
+        mlt_res = mlt_query.execute()
+
+        if mlt_res.more_like_this is not None:
+            # Only a single sub opinion
+            related_clusters = mlt_res.more_like_this.docs
+        elif mlt_res.more_like_these is not None:
+            # Multiple sub opinions
+
+            # Get result list for each sub opinion
+            sub_docs = [
+                sub_res.docs
+                for sub_id, sub_res in mlt_res.more_like_these.items()
+            ]
+
+            # Merge sub results by interleaving
+            # - exclude items that are sub opinions
+            related_clusters = [
+                item
+                for pair in zip(*sub_docs)
+                for item in pair
+                if item["id"] not in sub_opinion_ids
+            ]
+
+            # Limit number of results
+            related_clusters = related_clusters[: settings.RELATED_COUNT]
+        else:
+            # No MLT results are available (this should not happen)
+            related_clusters = []
+
+        cache.set(
+            mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
+        )
+
+    return related_clusters, sub_opinion_ids
+
+
+def get_mlt_query(si, cd, facet, seed_pks, filter_query):
+    """
+    By default Solr MoreLikeThis queries do not support highlighting. Thus, we use a special search interface
+    and build the Solr query manually.
+
+    :param si: SolrInterface
+    :param cd: Cleaned search form data
+    :param facet: Set to True to enable facets
+    :param seed_pks: List of IDs of the documents for that related documents should be returned
+    :param filter_query:
+    :return: Executed SolrSearch
+    """
+    hl_fields = SOLR_OPINION_HL_FIELDS
+
+    # Reset query for query builder
+    cd["q"] = ""
+
+    # Build main query as always
+    q = build_main_query(cd, facet=facet)
+    cleaned_fq = filter_query.strip()
+
+    q.update(
+        {
+            "caller": "mlt_query",
+            "q": "id:(" + (" OR ".join(seed_pks)) + ")",
+            "mlt": "true",  # Python boolean does not work here
+            "mlt.fl": "text",
+            # Retrieve fields as highlight replacement
+            "fl": q["fl"] + "," + (",".join(hl_fields)),
+            # Original query as filter query
+            "fq": q["fq"] + [cleaned_fq],
+            # unset fields not used for MLT
+            "boost": "",
+            "pf": "",
+            "ps": "",
+            "qf": "",
+        }
+    )
+
+    return si.mlt_query(hl_fields).add_extra(**q)

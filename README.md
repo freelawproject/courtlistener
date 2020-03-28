@@ -67,24 +67,27 @@ The process now is:
 
  - Check MIGRATIONS.md for potentially critical optimizations to database migrations.
  - Celery:
-    - Simple updates to the docker image can be done with (though you usually want to stop it, then get the latest code, then start it as described next):
-        - sudo docker pull freelawproject/task-server
-        - sudo docker service update task-server_celery_prefork_bulk --image freelawproject/task-server:latest
-        - sudo docker service update task-server_celery_prefork --image freelawproject/task-server:latest
-        - sudo docker service update task-server_celery_gevent --image freelawproject/task-server:latest
     - Pull latest docker image
         - sudo docker pull freelawproject/task-server
     - Stop celery:
         - sudo docker service scale task-server_celery_prefork=0
         - sudo docker service scale task-server_celery_prefork_bulk=0
         - sudo docker service scale task-server_celery_gevent=0
+    - Update the image:
+       - sudo docker service update task-server_celery_prefork_bulk --image freelawproject/task-server:latest
+       - sudo docker service update task-server_celery_prefork --image freelawproject/task-server:latest
+       - sudo docker service update task-server_celery_gevent --image freelawproject/task-server:latest
     - Pull latest code (git):
         - cd /opt/tasks && sudo git pull
+    - Restart services later, as below, once rest of system is updated
  - Solr:
     - Pull latest docker image
+        - sudo docker pull freelawproject/solr:latest
     - Pull latest code (git)
+        - cd /opt/solr && sudo git pull
     - Restart solr:
         - sudo docker restart solr
+        - NOTE: If you get an error like "network not found" just...wait a few minutes. After three minutes last time, this self resolved. From what I can tell, this is due to the previous image lingering for a minute or two and the network being unavailable until the other image is properly shut down.
  - Web:
     - Run ansible scripts (they still work)
  - Database:
@@ -122,6 +125,23 @@ To contract Free Law Project, see here:
 
 https://free.law/contact/
 
+
+                       ````
+                .:+oo++//++osso+/. -+++////+++.
+             -+ys/-`         ./yy+  `./mmmm/``
+           -sys:               `oo     ymmy
+          +yyo`                 `+`    ymmy
+         +yyy`                         ymms
+        -yyy+                          ymms
+        +yyy:                          ymms
+        +sss:                          ymms
+        /sss+                          ydds
+        `ssss.                         sdds
+         -syyo`                  ``    sdds
+          .oyys-                `s/    ydds            `+`
+            :shhs:`           `/ys`    yddh`          .hs
+              .:oyys+:-....-/oyys.  `./ddddy/:--.---:odd.
+                  `.-::///::-.`    -///////////////////-
 
 
 [issues]: https://github.com/freelawproject/courtlistener/issues

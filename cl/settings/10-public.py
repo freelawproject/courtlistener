@@ -278,6 +278,7 @@ MIN_DONATION = {
 }
 MAX_FREE_DOCKET_ALERTS = 5
 DOCKET_ALERT_RECAP_BONUS = 10
+MAX_ALERT_RESULTS_PER_DAY = 30
 # If people pay via XERO invoices, this is the ID we see in our stripe
 # callbacks
 XERO_APPLICATION_ID = "ca_1pvP3rYcArUkd3InUnImFI9llOiSIq6k"
@@ -311,6 +312,8 @@ REST_FRAMEWORK = {
         "leo": "100/hour",
         "miffy": "100/hour",
         "safetynet": "100/hour",
+        # Send multiple emails, but they haven't responded
+        "linkfenzhao": "10/hour",
         # From fokal.ai, using multiple accounts to dodge limitations
         "manu.jose": "10/hour",
         "shishir": "10/hour",
@@ -323,6 +326,7 @@ REST_FRAMEWORK = {
         "waldo": "10000/hour",
         "hdave4": "15000/hour",  # GSU
         "ellliottt": "15000/hour",
+        "flooie": "20000/hour",  # Needed for testing
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -400,9 +404,10 @@ MARKDOWN_DEUX_STYLES = {
 ##########
 # MATOMO #
 ##########
-MATOMO_URL = "http://192.168.0.243/piwik.php"
-MATOMO_SITE_ID = "1"
 
+MATOMO_URL = "http://192.168.0.243/piwik.php"
+MATOMO_FRONTEND_BASE_URL = "//matomo.courtlistener.com/"
+MATOMO_SITE_ID = "1"
 
 ########
 # SCDB #
@@ -511,6 +516,15 @@ if DEVELOPMENT:
         "level": "DEBUG",
         "propagate": False,
     }
+
+###################
+# Related content #
+###################
+
+RELATED_COUNT = 5
+RELATED_USE_CACHE = True
+RELATED_CACHE_TIMEOUT = 60 * 60 * 24 * 7
+RELATED_USER_GROUPS = ["recommendation_system_tester"]
 
 
 #######
