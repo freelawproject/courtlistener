@@ -28,6 +28,7 @@ from cl.lib.search_index_utils import (
 )
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
+from cl.citations.utils import get_citation_depth_between_clusters
 
 DOCUMENT_STATUSES = (
     ("Published", "Precedential"),
@@ -448,7 +449,9 @@ class Docket(models.Model):
     )
     docket_number = models.TextField(
         help_text="The docket numbers of a case, can be consolidated and "
-        "quite long",
+        "quite long. In some instances they are too long to be "
+        "indexed by postgres and we store the full docket in "
+        "the correction field on the Opinion Cluster.",
         blank=True,
         null=True,
         db_index=True,
@@ -2158,6 +2161,24 @@ class OpinionCluster(models.Model):
             self._has_private_authority = private
         return self._has_private_authority
 
+    @property
+    def authorities_with_data(self):
+        """Returns a list of this cluster's authorities with an extra field
+        appended related to citation counts, for eventual injection into a
+        view template.
+        The returned list is sorted by that citation count field.
+        """
+        authorities_with_data = list(self.authorities)
+        for authority in authorities_with_data:
+            authority.citation_depth = get_citation_depth_between_clusters(
+                citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk,
+            )
+
+        authorities_with_data.sort(
+            key=lambda x: x.citation_depth, reverse=True
+        )
+        return authorities_with_data
+
     def top_visualizations(self):
         return self.visualizations.filter(
             published=True, deleted=False
@@ -2844,3 +2865,15 @@ class Tag(models.Model):
 #
 #     class Meta:
 #         unique_together = ("upper_court", "lower_court")
+class SEARCH_TYPES:
+    OPINION = "o"
+    RECAP = "r"
+    ORAL_ARGUMENT = "oa"
+    PEOPLE = "p"
+    NAMES = (
+        (OPINION, "Opinions"),
+        (RECAP, "RECAP"),
+        (ORAL_ARGUMENT, "Oral Arguments"),
+        (PEOPLE, "People"),
+    )
+    ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]

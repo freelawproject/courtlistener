@@ -15,6 +15,7 @@ from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import regroup_snippets
+from cl.search.models import SEARCH_TYPES
 from cl.search.forms import SearchForm
 from cl.stats.utils import tally_stat
 
@@ -79,9 +80,15 @@ class Command(VerboseCommand):
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
         self.connections = {
-            "o": ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r"),
-            "oa": ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r"),
-            "r": ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r"),
+            SEARCH_TYPES.OPINION: ExtraSolrInterface(
+                settings.SOLR_OPINION_URL, mode="r"
+            ),
+            SEARCH_TYPES.ORAL_ARGUMENT: ExtraSolrInterface(
+                settings.SOLR_AUDIO_URL, mode="r"
+            ),
+            SEARCH_TYPES.RECAP: ExtraSolrInterface(
+                settings.SOLR_RECAP_URL, mode="r"
+            ),
         }
         self.options = {}
         self.valid_ids = {}
@@ -120,10 +127,10 @@ class Command(VerboseCommand):
         qd["order_by"] = "score desc"
         cut_off_date = get_cut_off_date(rate)
         # Default to 'o', if not available, according to the front end.
-        query_type = qd.get("type", "o")
-        if query_type in ["o", "r"]:
+        query_type = qd.get("type", SEARCH_TYPES.OPINION)
+        if query_type in [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]:
             qd["filed_after"] = cut_off_date
-        elif query_type == "oa":
+        elif query_type == SEARCH_TYPES.ORAL_ARGUMENT:
             qd["argued_after"] = cut_off_date
         logger.info("Data sent to SearchForm is: %s\n" % qd)
         search_form = SearchForm(qd)
@@ -207,7 +214,9 @@ class Command(VerboseCommand):
                 # paired with a list of document dicts, of the form:
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
                 if len(results) > 0:
-                    hits.append([alert, qd.get("type", "o"), results])
+                    hits.append(
+                        [alert, qd.get("type", SEARCH_TYPES.OPINION), results]
+                    )
                     alert.query_run = qd.urlencode()
                     alert.date_last_hit = now()
                     alert.save()
@@ -254,7 +263,7 @@ class Command(VerboseCommand):
             }
         """
         valid_ids = {}
-        for item_type in RealTimeQueue.ALL_ITEM_TYPES:
+        for item_type in SEARCH_TYPES.ALL_TYPES:
             ids = RealTimeQueue.objects.filter(item_type=item_type)
             if ids:
                 main_params = {

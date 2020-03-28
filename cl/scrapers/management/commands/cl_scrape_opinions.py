@@ -20,7 +20,7 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import get_extension, get_binary_content, signal_handler
-from cl.search.models import Citation, Court
+from cl.search.models import Citation, Court, SEARCH_TYPES
 from cl.search.models import Docket
 from cl.search.models import Opinion
 from cl.search.models import OpinionCluster
@@ -192,7 +192,9 @@ class Command(VerboseCommand):
         opinion.cluster = cluster
         opinion.save(index=index)
         if not backscrape:
-            RealTimeQueue.objects.create(item_type="o", item_pk=opinion.pk)
+            RealTimeQueue.objects.create(
+                item_type=SEARCH_TYPES.OPINION, item_pk=opinion.pk
+            )
 
     def scrape_court(self, site, full_crawl=False):
         download_error = False
@@ -202,102 +204,97 @@ class Command(VerboseCommand):
         court = Court.objects.get(pk=court_str)
 
         dup_checker = DupChecker(court, full_crawl=full_crawl)
-        abort = dup_checker.abort_by_url_hash(site.url, site.hash)
-        if not abort:
-            if site.cookies:
-                logger.info("Using cookies: %s" % site.cookies)
-            for i, item in enumerate(site):
-                msg, r = get_binary_content(
-                    item["download_urls"],
-                    site.cookies,
-                    site._get_adapter_instance(),
-                    method=site.method,
+        if dup_checker.abort_by_url_hash(site.url, site.hash):
+            return
+
+        if site.cookies:
+            logger.info("Using cookies: %s" % site.cookies)
+        for i, item in enumerate(site):
+            msg, r = get_binary_content(
+                item["download_urls"],
+                site.cookies,
+                site._get_adapter_instance(),
+                method=site.method,
+            )
+            if msg:
+                logger.warn(msg)
+                ErrorLog(log_level="WARNING", court=court, message=msg).save()
+                continue
+
+            content = site.cleanup_content(r.content)
+
+            current_date = item["case_dates"]
+            try:
+                next_date = site[i + 1]["case_dates"]
+            except IndexError:
+                next_date = None
+
+            # request.content is sometimes a str, sometimes unicode, so
+            # force it all to be bytes, pleasing hashlib.
+            sha1_hash = sha1(force_bytes(content))
+            if (
+                court_str == "nev"
+                and item["precedential_statuses"] == "Unpublished"
+            ):
+                # Nevada's non-precedential cases have different SHA1 sums
+                # every time.
+                lookup_params = {
+                    "lookup_value": item["download_urls"],
+                    "lookup_by": "download_url",
+                }
+            else:
+                lookup_params = {
+                    "lookup_value": sha1_hash,
+                    "lookup_by": "sha1",
+                }
+
+            proceed = dup_checker.press_on(
+                Opinion, current_date, next_date, **lookup_params
+            )
+            if dup_checker.emulate_break:
+                break
+            if not proceed:
+                continue
+
+            # Not a duplicate, carry on
+            logger.info(
+                "Adding new document found at: %s"
+                % item["download_urls"].encode("utf-8")
+            )
+            dup_checker.reset()
+
+            docket, opinion, cluster, citations, error = self.make_objects(
+                item, court, sha1_hash, content
+            )
+
+            if error:
+                download_error = True
+                continue
+
+            self.save_everything(
+                items={
+                    "docket": docket,
+                    "opinion": opinion,
+                    "cluster": cluster,
+                    "citations": citations,
+                },
+                index=False,
+            )
+            extract_doc_content.delay(
+                opinion.pk, do_ocr=True, citation_jitter=True,
+            )
+
+            logger.info(
+                "Successfully added doc {pk}: {name}".format(
+                    pk=opinion.pk, name=item["case_names"].encode("utf-8"),
                 )
-                if msg:
-                    logger.warn(msg)
-                    ErrorLog(
-                        log_level="WARNING", court=court, message=msg
-                    ).save()
-                    continue
+            )
 
-                content = site.cleanup_content(r.content)
-
-                current_date = item["case_dates"]
-                try:
-                    next_date = site[i + 1]["case_dates"]
-                except IndexError:
-                    next_date = None
-
-                # request.content is sometimes a str, sometimes unicode, so
-                # force it all to be bytes, pleasing hashlib.
-                sha1_hash = sha1(force_bytes(content))
-                if (
-                    court_str == "nev"
-                    and item["precedential_statuses"] == "Unpublished"
-                ):
-                    # Nevada's non-precedential cases have different SHA1
-                    # sums every time.
-                    lookup_params = {
-                        "lookup_value": item["download_urls"],
-                        "lookup_by": "download_url",
-                    }
-                else:
-                    lookup_params = {
-                        "lookup_value": sha1_hash,
-                        "lookup_by": "sha1",
-                    }
-
-                onwards = dup_checker.press_on(
-                    Opinion, current_date, next_date, **lookup_params
-                )
-                if dup_checker.emulate_break:
-                    break
-
-                if onwards:
-                    # Not a duplicate, carry on
-                    logger.info(
-                        "Adding new document found at: %s"
-                        % item["download_urls"].encode("utf-8")
-                    )
-                    dup_checker.reset()
-
-                    (
-                        docket,
-                        opinion,
-                        cluster,
-                        citations,
-                        error,
-                    ) = self.make_objects(item, court, sha1_hash, content)
-
-                    if error:
-                        download_error = True
-                        continue
-
-                    self.save_everything(
-                        items={
-                            "docket": docket,
-                            "opinion": opinion,
-                            "cluster": cluster,
-                            "citations": citations,
-                        },
-                        index=False,
-                    )
-                    extract_doc_content.delay(
-                        opinion.pk, do_ocr=True, citation_jitter=True,
-                    )
-
-                    logger.info(
-                        "Successfully added doc {pk}: {name}".format(
-                            pk=opinion.pk,
-                            name=item["case_names"].encode("utf-8"),
-                        )
-                    )
-
-            # Update the hash if everything finishes properly.
-            logger.info("%s: Successfully crawled opinions." % site.court_id)
-            if not download_error and not full_crawl:
-                # Only update the hash if no errors occurred.
-                dup_checker.update_site_hash(site.hash)
+        # Update the hash if everything finishes properly.
+        logger.info("%s: Successfully crawled opinions." % site.court_id)
+        if not download_error and not full_crawl:
+            # Only update the hash if no errors occurred.
+            dup_checker.update_site_hash(site.hash)
 
     def parse_and_scrape_site(self, mod, full_crawl):
         site = mod.Site().parse()

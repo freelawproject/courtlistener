@@ -56,9 +56,24 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         extra_kwargs = {"filepath_local": {"write_only": True}}
 
     def validate(self, attrs):
+        for attr_name in [
+            "pacer_doc_id",
+            "pacer_case_id",
+            "document_number",
+            "attachment_number",
+        ]:
+            # Regardless of upload type, we don't want values to be set to
+            # "undefined"
+            if attrs.get(attr_name) == "undefined":
+                raise ValidationError(
+                    "'%s' field cannot have the literal value 'undefined'."
+                    % attr_name
+                )
+
         if attrs["upload_type"] in [
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.APPELLATE_DOCKET,
+            UPLOAD_TYPE.CLAIMS_REGISTER,
         ]:
             # Dockets shouldn't have these fields completed.
             numbers_not_blank = any(
@@ -70,9 +85,8 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             )
             if numbers_not_blank:
                 raise ValidationError(
-                    "PACER document ID, document number and "
-                    "attachment number must be blank for "
-                    "docket uploads."
+                    "PACER document ID, document number and attachment number "
+                    "must be blank for docket or claims register uploads."
                 )
 
         if attrs["upload_type"] in [
@@ -91,9 +105,20 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             ).values_list("pk", flat=True)
             if attrs["court"].pk not in district_court_ids:
                 raise ValidationError(
-                    "%s is not a district or bankruptcy "
-                    "court ID. Did you mean to use the "
-                    "upload_type for appellate dockets?" % attrs["court"]
+                    "%s is not a district or bankruptcy court ID. Did you "
+                    "mean to use the upload_type for appellate dockets?"
+                    % attrs["court"]
+                )
+
+        if attrs["upload_type"] == UPLOAD_TYPE.CLAIMS_REGISTER:
+            # Only allowed on bankruptcy courts
+            district_court_ids = Court.objects.filter(
+                jurisdiction=Court.FEDERAL_BANKRUPTCY
+            ).values_list("pk", flat=True)
+            if attrs["court"].pk not in district_court_ids:
+                raise ValidationError(
+                    "%s is not a bankruptcy court ID. Only bankruptcy cases "
+                    "should have claims registry pages." % attrs["court"]
                 )
 
         if attrs["upload_type"] == UPLOAD_TYPE.APPELLATE_DOCKET:
@@ -106,28 +131,26 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             ).values_list("pk", flat=True)
             if attrs["court"].pk not in appellate_court_ids:
                 raise ValidationError(
-                    "%s is not an appellate court ID. Did "
-                    "you mean to use the upload_type for "
-                    "district dockets?" % attrs["court"]
+                    "%s is not an appellate court ID. Did you mean to use the "
+                    "upload_type for district dockets?" % attrs["court"]
                 )
 
-        elif attrs["upload_type"] == UPLOAD_TYPE.PDF:
+        if attrs["upload_type"] == UPLOAD_TYPE.PDF:
             # PDFs require pacer_doc_id and document_number values.
             if not all(
                 [attrs.get("pacer_doc_id"), attrs.get("document_number")]
             ):
                 raise ValidationError(
-                    "Uploaded PDFs must have the "
-                    "pacer_doc_id and document_number "
-                    "fields completed."
+                    "Uploaded PDFs must have the pacer_doc_id and "
+                    "document_number fields completed."
                 )
 
         if attrs["upload_type"] != UPLOAD_TYPE.PDF:
             # Everything but PDFs require the case ID.
             if not attrs.get("pacer_case_id"):
                 raise ValidationError(
-                    "PACER case ID is required for for all "
-                    "non-document uploads."
+                    "PACER case ID is required for for all non-document "
+                    "uploads."
                 )
 
         return attrs

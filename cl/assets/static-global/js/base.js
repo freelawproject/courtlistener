@@ -1,5 +1,5 @@
 /*eslint-env browser */
-/*global $, hopscotch */
+/*global $ */
 
 function recapIsInstalled(event) {
   // Check the event that's returned by the extension and return whether it
@@ -91,7 +91,7 @@ $(document).ready(function () {
   }
 
   // Statuses
-  $('#show-all-statuses').click(function (event) {
+  $('#show-all-statuses').on("click", function (event) {
     event.preventDefault();
     $('.status-item').removeClass('hidden');
     $('#show-all-statuses').addClass('hidden');
@@ -102,26 +102,26 @@ $(document).ready(function () {
   ///////////////////////
   $('#search-form, ' +
     '#sidebar-search-form, ' +
-    '.search-page #court-picker-search-form').submit(function (e) {
+    '.search-page #court-picker-search-form').on("submit", function (e) {
     e.preventDefault();
     submitSearchForm();
   });
 
-  $('.search-page #id_order_by').change(function () {
+  $('.search-page #id_order_by').on("change", function () {
     submitSearchForm();
   });
 
   // Make the enter key work in the search form
-  $('.external-input').bind('keypress', function (e) {
+  $('.external-input').on('keypress', function (e) {
     if (e.keyCode == 13) {
       $('#search-form').submit();
     }
   });
-  $('#search-button-secondary').click(function (e) {
+  $('#search-button-secondary').on("click", function (e) {
     $('#search-form').submit();
   });
 
-  $('#advanced-page #court-picker-search-form').submit(function (e) {
+  $('#advanced-page #court-picker-search-form').on("submit", function (e) {
     e.preventDefault();
 
     // Indicate the count of selected jurisdictions when switching to
@@ -145,19 +145,19 @@ $(document).ready(function () {
     matches.find('input').prop('checked', true);
   }
 
-  $('#court-filter').keyup(courtFilter).change(courtFilter);
+  $('#court-filter').on("keyup", courtFilter).on("change", courtFilter);
 
   // Check/clear the tab/everything
-  $('#check-all').click(function () {
+  $('#check-all').on("click", function () {
     $('#modal-court-picker .tab-pane input').prop('checked', true);
   });
-  $('#clear-all').click(function () {
+  $('#clear-all').on("click", function () {
     $('#modal-court-picker .tab-pane input').prop('checked', false);
   });
-  $('#check-current').click(function () {
+  $('#check-current').on("click", function () {
     $('#modal-court-picker .tab-pane.active input').prop('checked', true);
   });
-  $('#clear-current').click(function () {
+  $('#clear-current').on("click", function () {
     $('#modal-court-picker .tab-pane.active input').prop('checked', false);
   });
 
@@ -165,12 +165,7 @@ $(document).ready(function () {
   ////////////
   // Alerts //
   ////////////
-  $('#save-alert-button').click(function (e) {
-    e.preventDefault();
-    $('#alert-sidebar form').submit();
-  });
-
-  $('#id_rate').change(function () {
+  $('#id_rate').on("change", function () {
     if ($(this).val() === 'rt' && totalDonatedLastYear < priceRtAlerts) {
       $('#donate-for-rt').removeClass('hidden');
       $('#alertSave').prop("disabled", true);
@@ -184,7 +179,7 @@ $(document).ready(function () {
   ///////////////
   // Show More //
   ///////////////
-  $(".read-more").click(function (e) {
+  $(".read-more").on("click", function (e) {
     e.preventDefault();
     var t = $(this);
     t.parent().find('.more').removeClass('hidden');
@@ -194,14 +189,14 @@ $(document).ready(function () {
   ///////////////////
   // Docket page: Change sort order when the asc/desc buttons are clicked.
   ///////////////////
-  $("#sort-buttons :input").change(function () {
+  $("#sort-buttons :input").on("change", function () {
     this.closest("form").submit();
   });
 
   //////////////////////////
   // Popup Cookie Handling//
   //////////////////////////
-  $('.alert-dismissible button').click(function () {
+  $('.alert-dismissible button').on("click", function () {
     let that = $(this);
     let duration = parseInt(that.data('duration'), 10);
     let cookie_name = that.data('cookie-name');
@@ -211,177 +206,6 @@ $(document).ready(function () {
     document.cookie = cookie_name + "=" + 'true' + expires + "; path=/";
     that.closest('.alert-dismissible').addClass('hidden');
   });
-
-  //////////
-  // Tour //
-  //////////
-  var tour = {
-    id: 'feature-tour',
-    showPrevButton: true,
-    steps: [
-      {//0
-        target: '#search-container',
-        placement: 'bottom',
-        xOffset: 'center',
-        arrowOffset: 'center',
-        title: 'Welcome to the Tour!',
-        content: 'Broad queries can be a great way to start a ' +
-        'research task. Our search box can understand ' +
-        'everything you might expect&hellip; terms, concepts, ' +
-        'citations, you name it.'
-      },
-      {//1
-        target: '#navbar-o',
-        placement: 'bottom',
-        arrowOffset: 'left',
-        multipage: true,
-        nextOnTargetClick: true,
-        title: 'More Power Please!',
-        content: 'If you are the kind of person that wants more ' +
-        'power, you can do advanced searches of opinions, oral ' +
-        'arguments or judges by clicking these buttons.' +
-        'Click on \"Opinions\" to see the advanced search page.',
-        onNext: function () {
-          window.location = '/opinion/'
-        }
-      },
-      {//2
-        target: '#id_order_by',
-        placement: 'top',
-        zindex: 10,
-        arrowOffset: 'center',
-        multipage: true,
-        title: 'Sophisticated Search',
-        content: 'On the Advanced Search page, you can make ' +
-        'sophisticated searches against a variety of fields. ' +
-        'Press \"Next\" and we\'ll make a query for you.',
-
-        showPrevButton: false,
-        onNext: function () {
-          window.location = '/?q=roe+v.+wade&order_by=score+desc&stat_Precedential=on&court=scotus';
-        }
-      },
-      {//3
-        // This step will be skipped if on a dev machine with no
-        // results. Be not alarmed!
-        target: document.querySelector('.search-page article'),
-        placement: 'top',
-        arrowOffset: 'center',
-        zindex: 10,
-        title: 'Detailed Results',
-        content: 'Here you can see the results for the query "Roe ' +
-        'v. Wade" sorted by relevance and filtered to only one ' +
-        'jurisdiction, the Supreme Court.',
-        showPrevButton: false
-      },
-      {//4
-        target: '#create-alert-header',
-        placement: 'top',
-        arrowOffset: 'center',
-        title: 'Make Alerts',
-        content: '<p>Once you have placed a query, you can create ' +
-        'an alert. If there are ever any new results for your ' +
-        'query, CourtListener will send you an email to keep ' +
-        'you up to date.</p> <p>Hit next to check out <em>Roe ' +
-        'v. Wade</em>.</p>',
-        multipage: true,
-        onNext: function () {
-          window.location = '/opinion/108713/roe-v-wade/';
-        }
-      },
-      {//5
-        target: '#cited-by',
-        placement: 'bottom',
-        arrowOffset: 'center',
-        showPrevButton: false,
-        title: 'The Power of Citation',
-        content: 'Roe v. Wade has been cited hundreds of times since ' +
-        'it was issued in 1973. Looking at these citations can ' +
-        'be a good way to see related cases.'
-      },
-      {//6
-        target: '#authorities',
-        placement: 'top',
-        arrowOffset: 'center',
-        title: 'Authorities',
-        content: 'The Authorities section lists all of the ' +
-        'opinions that Roe v. Wade references. These can be ' +
-        'thought of as the principles upon which it rests.',
-        multipage: true,
-        onNext: function () {
-          window.location = '/visualizations/scotus-mapper/'
-        }
-      },
-      {//7
-        target: '#new-button a',
-        zindex: 2,
-        placement: 'bottom',
-        arrowOffset: 'center',
-        xOffset: 'center',
-        showPrevButton: false,
-        title: 'Supreme Court Network Visualizations',
-        content: '<p>Networks like these show how a line of precedent ' +
-        'evolves. You can make your own network to study an area that ' +
-        'interests you or look at ones other people have shared.</p>' +
-        '<p>For now let\'s skip creating our own and check out what ' +
-        'the final product looks like.</p>',
-        multipage: true,
-        onNext: function () {
-          window.location = '/visualizations/scotus-mapper/232/roberts-to-crawford/'
-        }
-      },
-      {//8
-        target: "#chart",
-        placement: "top",
-        arrowOffset: 'center',
-        showPrevButton: false,
-        xOffset: 'center',
-        yOffset: 150,
-        title: 'Network Visualizations',
-        content: 'Network visualizations have a lot of information. ' +
-        'To understand them, consider that the most recent case is on ' +
-        'the right and all previous cases are to the left. The ' +
-        'further to the left you go, the more heavily cited the cases ' +
-        'become.'
-      },
-      {//9
-        target: "form",
-        placement: "top",
-        arrowOffset: "center",
-        xOffset: 'center',
-        title: "Different Views",
-        content: '<p>Networks can be adjusted to show several ' +
-        'different perspectives or Degrees of Separation (DoS). Read ' +
-        'the tips in the question marks for more details. There is ' +
-        'also more information in the tabs below or you can create ' +
-        'your own network to share with others via the button on ' +
-        'the right.</p>' +
-        '<p>That\'s everything for now. Let us know if ' +
-        'you have any questions!</p>',
-        onNext: function () {
-          hopscotch.endTour();
-        }
-      }
-    ]
-  };
-
-  $('.tour-link').click(function (event) {
-    event.preventDefault();
-    var loc = location.pathname + location.search;
-    if (loc !== '/') {
-      sessionStorage.setItem('hopscotch.tour.state', 'feature-tour:0');
-      window.location = '/';
-    } else {
-      hopscotch.startTour(tour, 0);
-    }
-  });
-  // Start it automatically for certain steps, if they were directed from
-  // another page.
-  var autoStartIDs = ['feature-tour:0', 'feature-tour:2', 'feature-tour:3',
-    'feature-tour:5', 'feature-tour:7', 'feature-tour:8'];
-  if ($.inArray(hopscotch.getState(), autoStartIDs) !== -1) {
-    hopscotch.startTour(tour);
-  }
 
   ///////////////////////
   // Utility Functions //

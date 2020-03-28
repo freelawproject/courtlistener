@@ -20,6 +20,7 @@ https://github.com/ankane/strong_migrations
 https://leopard.in.ua/2016/09/20/safe-and-unsafe-operations-postgresql
 
 
+
 # Known Problems
 
 ## Migrations that do literally nothing
@@ -53,6 +54,7 @@ be used in a transaction block.
 [concur-blog]: https://realpython.com/create-django-index-without-downtime/
 [ex]: https://github.com/freelawproject/courtlistener/pull/1132
 
+
 ## Making data changes in same transaction as schema changes
 
 You cannot make data changes in the same transaction as schema changes. Doing 
@@ -64,4 +66,41 @@ This post has some more information about this: https://stackoverflow.com/a/1283
 
 
 
+# Notes on schema changes
 
+## Adding a column
+
+If you add a column to the publisher that doesn't already exist on the 
+subscriber you'll get a message at the subscriber that says something like:
+
+    ERROR:  logical replication target relation "public.t" is missing some replicated columns
+    
+Or:
+
+```
+2018-12-09 05:59:45 UTC::@:[13373]:LOG: logical replication apply worker for subscription "replicasubscription" has started
+2018-12-09 05:59:45 UTC::@:[13373]:ERROR: null value in column "recap_sequence_number" violates not-null constraint
+2018-12-09 05:59:45 UTC::@:[13373]:DETAIL: Failing row contains (48064261, 2018-12-07 04:48:40.388377+00, 2018-12-07 04:48:40.388402+00, null, 576, , 4571214, null, null).
+2018-12-09 05:59:45 UTC::@:[6342]:LOG: worker process: logical replication worker for subscription 18390 (PID 13373) exited with exit code 1
+```
+
+(See https://github.com/freelawproject/courtlistener/issues/919)
+    
+Both of these messages sort of make sense. In each you're trying to move data 
+(or a null value) to the subscriber and the subscriber doesn't know what to do
+with it. The fix, of course, is to have that column set up at the subscriber 
+first, as hinted in the documentation:
+
+> In many cases, intermittent errors can be avoided by applying additive schema 
+> changes to the subscriber first. 
+
+
+## Removing a column
+
+If you remove a column at the subscriber first, you will receive tuples with 
+fields you don't know how to handle. If you remove it at the publisher 
+first, you'll have columns on the subscriber that don't know how to be 
+populated. The general rule is to drop a column at the publisher first, then 
+at the subscriber, once things have flushed. See:
+
+https://github.com/freelawproject/courtlistener/issues/1164

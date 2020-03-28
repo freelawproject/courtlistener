@@ -7,7 +7,7 @@ from django.conf import settings
 from django.core.management import call_command, CommandError
 from django.db import IntegrityError
 
-from cl.citations.find_citations import Citation
+from cl.citations.models import Citation
 from cl.citations.match_citations import (
     get_years_from_reporter,
     build_date_range,
@@ -76,7 +76,7 @@ class Command(VerboseCommand):
             help="Parse citations for all items",
         )
         parser.add_argument(
-            "--doc_id", type=int, nargs="*", help="ids of citing opinions",
+            "--doc-id", type=int, nargs="*", help="ids of citing opinions",
         )
 
     def monkey_patch_citation(self):

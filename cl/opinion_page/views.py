@@ -1,15 +1,18 @@
 from collections import defaultdict, OrderedDict
 from itertools import groupby
+from urllib import urlencode
 
 from django.conf import settings
+from django.core.cache import cache
+from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.urls import reverse
 from django.db.models import F, Prefetch
 from django.http import HttpResponseRedirect
-from django.http.response import HttpResponse, HttpResponseNotAllowed
+from django.http.response import HttpResponse, HttpResponseNotAllowed, Http404
 from django.shortcuts import get_object_or_404, render
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -26,16 +29,58 @@ from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
-from cl.lib import search_utils, sunburnt
+from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot, is_og_bot
 from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
+from cl.lib.search_utils import (
+    get_citing_clusters_with_cache,
+    make_get_string,
+    get_related_clusters_with_cache,
+)
 from cl.lib.string_utils import trunc
 from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import Citation, Docket, OpinionCluster, RECAPDocument
+from cl.search.models import (
+    Citation,
+    Docket,
+    OpinionCluster,
+    RECAPDocument,
+    DOCUMENT_STATUSES,
+)
+from cl.search.views import do_search
+
+
+def court_homepage(request, pk):
+    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
+        raise Http404("Court pages only implemented for Tennessee so far.")
+
+    render_dict = {
+        # Load the render_dict with good results that can be shown in the
+        # "Latest Cases" sections
+        "results_compcl": do_search(
+            request.GET.copy(),
+            rows=5,
+            override_params={
+                "order_by": "dateFiled desc",
+                "court": "tennworkcompcl",
+            },
+            facet=False,
+        )["results"],
+        "results_compapp": do_search(
+            request.GET.copy(),
+            rows=5,
+            override_params={
+                "order_by": "dateFiled desc",
+                "court": "tennworkcompapp",
+            },
+            facet=False,
+        )["results"],
+        "private": False,
+    }
+    return render(request, "court.html", render_dict)
 
 
 def redirect_docket_recap(request, court, pacer_case_id):
@@ -134,7 +179,7 @@ def view_docket(request, pk, slug):
             "parties": docket.parties.exists(),  # Needed to show/hide parties tab.
             "docket_entries": docket_entries,
             "form": form,
-            "get_string": search_utils.make_get_string(request),
+            "get_string": make_get_string(request),
         }
     )
     return render(request, "view_docket.html", context)
@@ -307,7 +352,7 @@ def view_opinion(request, pk, _):
         if sub_opinion.local_path or sub_opinion.download_url:
             has_downloads = True
             break
-    get_string = search_utils.make_get_string(request)
+    get_string = make_get_string(request)
 
     try:
         fave = Favorite.objects.get(cluster_id=cluster.pk, user=request.user)
@@ -322,29 +367,11 @@ def view_opinion(request, pk, _):
     else:
         favorite_form = FavoriteForm(instance=fave)
 
-    if not is_bot(request):
-        # Get the citing results from Solr for speed. Only do this for humans
-        # to save on disk usage.
-        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-        q = {
-            "q": "cites:({ids})".format(
-                ids=" OR ".join(
-                    [
-                        str(pk)
-                        for pk in (
-                            cluster.sub_opinions.values_list("pk", flat=True)
-                        )
-                    ]
-                )
-            ),
-            "rows": 5,
-            "start": 0,
-            "sort": "citeCount desc",
-            "caller": "view_opinion",
-        }
-        citing_clusters = conn.raw_query(**q).execute()
-    else:
-        citing_clusters = None
+    citing_clusters = get_citing_clusters_with_cache(cluster, is_bot(request))
+
+    related_clusters, sub_opinion_ids = get_related_clusters_with_cache(
+        cluster, request
+    )
 
     return render(
         request,
@@ -357,7 +384,14 @@ def view_opinion(request, pk, _):
             "get_string": get_string,
             "private": cluster.blocked,
             "citing_clusters": citing_clusters,
-            "top_authorities": cluster.authorities[:5],
+            "top_authorities": cluster.authorities_with_data[:5],
+            "authorities_count": len(cluster.authorities_with_data),
+            "sub_opinion_ids": sub_opinion_ids,
+            "related_algorithm": "mlt",
+            "related_clusters": related_clusters,
+            "related_cluster_ids": [item["id"] for item in related_clusters],
+            "related_search_params": "&"
+            + urlencode({"stat_" + v: "on" for s, v in DOCUMENT_STATUSES}),
         },
     )
 
@@ -374,7 +408,7 @@ def view_authorities(request, pk, slug):
             % (trunc(best_case_name(cluster), 100), cluster.citation_string),
             "cluster": cluster,
             "private": cluster.blocked or cluster.has_private_authority,
-            "authorities": cluster.authorities.order_by("case_name"),
+            "authorities_with_data": cluster.authorities_with_data,
         },
     )
 

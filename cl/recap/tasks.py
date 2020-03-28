@@ -1,11 +1,13 @@
 # coding=utf-8
 import logging
 import os
+from zipfile import ZipFile
 
 import requests
 from celery.canvas import chain
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -14,6 +16,7 @@ from juriscraper.pacer import (
     AttachmentPage,
     DocketHistoryReport,
     DocketReport,
+    ClaimsRegister,
 )
 from requests import HTTPError
 
@@ -26,6 +29,7 @@ from cl.corpus_importer.tasks import (
     get_docket_by_pacer_case_id,
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
+from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.crypto import sha1
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.pacer import map_cl_to_pacer_id
@@ -38,6 +42,8 @@ from cl.recap.mergers import (
     update_docket_metadata,
     process_orphan_documents,
     find_docket_object,
+    add_bankruptcy_data_to_docket,
+    add_claims_to_docket,
 )
 from cl.recap.models import (
     PacerHtmlFiles,
@@ -83,6 +89,10 @@ def process_recap_upload(pq):
         ).apply_async()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         process_recap_appellate_attachment.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.CLAIMS_REGISTER:
+        process_recap_claims_register.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.DOCUMENT_ZIP:
+        process_recap_zip.delay(pq.pk)
 
 
 def do_pacer_fetch(fq):
@@ -252,52 +262,52 @@ def process_recap_pdf(self, pk):
             msg = "Too many dockets found when trying to save '%s'" % pq
             mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             return None
-        else:
-            # Got the Docket, attempt to get/create the DocketEntry, and then
-            # create the RECAPDocument
-            try:
-                de = DocketEntry.objects.get(
-                    docket=d, entry_number=pq.document_number
-                )
-            except DocketEntry.DoesNotExist as exc:
-                logger.warning(
-                    "Unable to find docket entry for processing "
-                    "queue '%s'. Retrying if max_retries is not "
-                    "exceeded." % pq
-                )
-                pq.error_message = "Unable to find docket entry for item."
-                if (self.request.retries == self.max_retries) or pq.debug:
-                    pq.status = PROCESSING_STATUS.FAILED
-                    pq.save()
-                    return None
-                else:
-                    pq.status = PROCESSING_STATUS.QUEUED_FOR_RETRY
-                    pq.save()
-                    raise self.retry(exc=exc)
+
+        # Got the Docket, attempt to get/create the DocketEntry, and then
+        # create the RECAPDocument
+        try:
+            de = DocketEntry.objects.get(
+                docket=d, entry_number=pq.document_number
+            )
+        except DocketEntry.DoesNotExist as exc:
+            logger.warning(
+                "Unable to find docket entry for processing "
+                "queue '%s'. Retrying if max_retries is not "
+                "exceeded." % pq
+            )
+            pq.error_message = "Unable to find docket entry for item."
+            if (self.request.retries == self.max_retries) or pq.debug:
+                pq.status = PROCESSING_STATUS.FAILED
+                pq.save()
+                return None
             else:
-                # If we're here, we've got the docket and docket
-                # entry, but were unable to find the document by
-                # pacer_doc_id. This happens when pacer_doc_id is
-                # missing, for example. ∴, try to get the document
-                # from the docket entry.
-                try:
-                    rd = RECAPDocument.objects.get(
-                        docket_entry=de,
-                        document_number=pq.document_number,
-                        attachment_number=pq.attachment_number,
-                        document_type=document_type,
-                    )
-                except (
-                    RECAPDocument.DoesNotExist,
-                    RECAPDocument.MultipleObjectsReturned,
-                ):
-                    # Unable to find it. Make a new item.
-                    rd = RECAPDocument(
-                        docket_entry=de,
-                        pacer_doc_id=pq.pacer_doc_id,
-                        date_upload=now(),
-                        document_type=document_type,
-                    )
+                pq.status = PROCESSING_STATUS.QUEUED_FOR_RETRY
+                pq.save()
+                raise self.retry(exc=exc)
+        else:
+            # If we're here, we've got the docket and docket
+            # entry, but were unable to find the document by
+            # pacer_doc_id. This happens when pacer_doc_id is
+            # missing, for example. ∴, try to get the document
+            # from the docket entry.
+            try:
+                rd = RECAPDocument.objects.get(
+                    docket_entry=de,
+                    document_number=pq.document_number,
+                    attachment_number=pq.attachment_number,
+                    document_type=document_type,
+                )
+            except (
+                RECAPDocument.DoesNotExist,
+                RECAPDocument.MultipleObjectsReturned,
+            ):
+                # Unable to find it. Make a new item.
+                rd = RECAPDocument(
+                    docket_entry=de,
+                    pacer_doc_id=pq.pacer_doc_id,
+                    date_upload=now(),
+                    document_type=document_type,
+                )
 
     rd.document_number = pq.document_number
     rd.attachment_number = pq.attachment_number
@@ -357,6 +367,93 @@ def process_recap_pdf(self, pk):
     if changed:
         rd.docket_entry.docket.save()
     return rd
+
+
+@app.task(bind=True, max_retries=5, ignore_result=True)
+def process_recap_zip(self, pk):
+    """Process a zip uploaded from a PACER district court
+
+    The general process is to use our existing infrastructure. We open the zip,
+    identify the documents inside, and then associate them with the rest of our
+    collection.
+
+    :param self: A celery task object
+    :param pk: The PK of the ProcessingQueue object to process
+    :return: A list of new PQ's that were created, one per PDF that was
+    enqueued.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
+
+    logger.info("Processing RECAP zip (debug is: %s): %s", pq.debug, pq)
+    with ZipFile(pq.filepath_local.path, "r") as archive:
+        # Security: Check for zip bombs.
+        max_file_size = convert_size_to_bytes("200MB")
+        for zip_info in archive.infolist():
+            if zip_info.file_size < max_file_size:
+                continue
+            mark_pq_status(
+                pq,
+                "Zip too large; possible zip bomb. File in zip named %s "
+                "would be %s bytes expanded."
+                % (zip_info.filename, zip_info.file_size),
+                PROCESSING_STATUS.INVALID_CONTENT,
+            )
+            return {"new_pqs": [], "tasks": []}
+
+        # For each document in the zip, create a new PQ
+        new_pqs = []
+        tasks = []
+        for file_name in archive.namelist():
+            file_content = archive.read(file_name)
+            f = SimpleUploadedFile(file_name, file_content)
+
+            file_name = file_name.split(".pdf")[0]
+            if "-" in file_name:
+                doc_num, att_num = file_name.split("-")
+                if att_num == "main":
+                    att_num = None
+            else:
+                doc_num = file_name
+                att_num = None
+
+            if att_num:
+                # An attachment, ∴ nuke the pacer_doc_id value, since it
+                # corresponds to the main doc only.
+                pacer_doc_id = ""
+            else:
+                pacer_doc_id = pq.pacer_doc_id
+
+            # Create a new PQ and enqueue it for processing
+            new_pq = ProcessingQueue.objects.create(
+                court=pq.court,
+                uploader=pq.uploader,
+                pacer_case_id=pq.pacer_case_id,
+                pacer_doc_id=pacer_doc_id,
+                document_number=doc_num,
+                attachment_number=att_num,
+                filepath_local=f,
+                status=PROCESSING_STATUS.ENQUEUED,
+                upload_type=UPLOAD_TYPE.PDF,
+                debug=pq.debug,
+            )
+            new_pqs.append(new_pq.pk)
+            tasks.append(process_recap_pdf.delay(new_pq.pk))
+
+        # At the end, mark the pq as successful and return the PQ
+        mark_pq_status(
+            pq,
+            "Successfully created ProcessingQueue objects: %s"
+            % oxford_join(new_pqs),
+            PROCESSING_STATUS.SUCCESSFUL,
+        )
+
+        # Returning the tasks allows tests to wait() for the PDFs to complete
+        # before checking assertions.
+        return {
+            "new_pqs": new_pqs,
+            "tasks": tasks,
+        }
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
@@ -598,6 +695,90 @@ def process_recap_attachment(self, pk, tag_names=None):
 @app.task(
     bind=True, max_retries=3, interval_start=5 * 60, interval_step=5 * 60
 )
+def process_recap_claims_register(self, pk):
+    """Merge bankruptcy claims registry HTML into RECAP
+
+    :param pk: The primary key of the processing queue item you want to work on
+    :type pk: int
+    :return: None
+    :rtype: None
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    if pq.debug:
+        # Proper debugging not supported on this endpoint. Just abort.
+        mark_pq_successful(pq)
+        self.request.chain = None
+        return None
+
+    mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
+    logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
+
+    with open(pq.filepath_local.path) as f:
+        text = f.read().decode("utf-8")
+    report = ClaimsRegister(map_cl_to_pacer_id(pq.court_id))
+    report._parse_text(text)
+    data = report.data
+    logger.info("Parsing completed for item %s" % pq)
+
+    if not data:
+        # Bad HTML
+        msg = "Not a valid claims registry page or other parsing failure"
+        mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        self.request.chain = None
+        return None
+
+    # Merge the contents of the docket into CL.
+    d, docket_count = find_docket_object(
+        pq.court_id, pq.pacer_case_id, data["docket_number"]
+    )
+    if docket_count > 1:
+        logger.info(
+            "Found %s dockets during lookup. Choosing oldest." % docket_count
+        )
+        d = d.earliest("date_created")
+
+    # Merge the contents into CL
+    d.add_recap_source()
+    update_docket_metadata(d, data)
+
+    try:
+        d.save()
+    except IntegrityError as exc:
+        logger.warning(
+            "Race condition experienced while attempting docket save."
+        )
+        error_message = "Unable to save docket due to IntegrityError."
+        if self.request.retries == self.max_retries:
+            mark_pq_status(pq, error_message, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        else:
+            mark_pq_status(
+                pq, error_message, PROCESSING_STATUS.QUEUED_FOR_RETRY
+            )
+            raise self.retry(exc=exc)
+
+    add_bankruptcy_data_to_docket(d, data)
+    add_claims_to_docket(d, data["claims"])
+    logger.info("Created/updated claims data for %s", pq)
+
+    # Add the HTML to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles(
+        content_object=d, upload_type=UPLOAD_TYPE.CLAIMS_REGISTER
+    )
+    pacer_file.filepath.save(
+        # We only care about the ext w/UUIDFileSystemStorage
+        "claims_registry.html",
+        ContentFile(text),
+    )
+
+    mark_pq_successful(pq, d_id=d.pk)
+    return {"docket_pk": d.pk}
+
+
+@app.task(
+    bind=True, max_retries=3, interval_start=5 * 60, interval_step=5 * 60
+)
 def process_recap_docket_history_report(self, pk):
     """Process the docket history report.
 
@@ -609,9 +790,9 @@ def process_recap_docket_history_report(self, pk):
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
-    report = DocketHistoryReport(map_cl_to_pacer_id(pq.court_id))
     with open(pq.filepath_local.path) as f:
         text = f.read().decode("utf-8")
+    report = DocketHistoryReport(map_cl_to_pacer_id(pq.court_id))
     report._parse_text(text)
     data = report.data
     logger.info("Parsing completed for item %s" % pq)
