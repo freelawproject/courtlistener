@@ -1,14 +1,22 @@
-import os
+import logging
 
 from django.conf import settings
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from rest_framework import status
+from rest_framework.status import HTTP_400_BAD_REQUEST
 
-from cl.lib import magic, sunburnt
-from cl.lib.search_utils import build_coverage_query, build_court_count_query
+from cl.lib import sunburnt
+from cl.lib.search_utils import (
+    build_coverage_query,
+    build_court_count_query,
+    get_solr_interface,
+    build_alert_estimation_query,
+)
+from cl.search.forms import SearchForm
 from cl.search.models import Court
-from cl.stats.utils import tally_stat
+
+logger = logging.getLogger(__name__)
 
 
 def annotate_courts_with_counts(courts, court_count_tuples):
@@ -135,8 +143,48 @@ def coverage_data(request, version, court):
         total_docs += count
 
     return JsonResponse(
-        {"annual_counts": annual_counts, "total": total_docs,}, safe=True
+        {"annual_counts": annual_counts, "total": total_docs}, safe=True
     )
+
+
+def get_result_count(request, version, day_count):
+    """Get the count of results for the past `day_count` number of days
+
+    GET parameters will be a complete search string
+
+    :param request: The Django request object
+    :param version: The API version number (ignored for now, but there for
+    later)
+    :param day_count: The number of days to average across. More is slower.
+    :return: A JSON object with the number of hits during the last day_range
+    period.
+    """
+    search_form = SearchForm(request.GET.copy())
+    if not search_form.is_valid():
+        return JsonResponse(
+            {"error": "Invalid SearchForm"},
+            safe=True,
+            status=HTTP_400_BAD_REQUEST,
+        )
+
+    cd = search_form.cleaned_data
+    try:
+        si = get_solr_interface(cd)
+    except NotImplementedError:
+        logger.error(
+            "Tried getting solr connection for %s, but it's not "
+            "implemented yet",
+            cd["type"],
+        )
+        raise
+
+    response = (
+        si.query()
+        .add_extra(**build_alert_estimation_query(cd, int(day_count)))
+        .execute()
+    )
+
+    return JsonResponse({"count": response.result.numFound}, safe=True)
 
 
 def deprecated_api(request, v):

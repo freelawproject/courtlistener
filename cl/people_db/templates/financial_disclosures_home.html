@@ -24,7 +24,9 @@
           var judges = $('.judge-name:contains(' + this.value + ')');
           matches.hide();
         };
-        $('#id_disclosures_filter').keyup(judge_filter).change(judge_filter);
+        $('#id_disclosures_filter')
+                .on("keyup", judge_filter)
+                .on("change", judge_filter);
     </script>
 {% endblock %}
 

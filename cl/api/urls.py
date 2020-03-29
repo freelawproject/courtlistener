@@ -2,7 +2,6 @@ from django.conf.urls import url, include
 from rest_framework.routers import DefaultRouter
 from rest_framework.schemas import get_schema_view
 from rest_framework_swagger.renderers import OpenAPIRenderer, SwaggerUIRenderer
-
 from cl.api import views
 from cl.audio import api_views as audio_views
 from cl.people_db import api_views as people_views
@@ -99,6 +98,11 @@ urlpatterns = [
         r"^api/rest/v(?P<version>[123])/coverage/(?P<court>.+)/$",
         views.coverage_data,
         name="coverage_data",
+    ),
+    url(
+        r"^api/rest/v(?P<version>[123])/alert-frequency/(?P<day_count>\d+)/$",
+        views.get_result_count,
+        name="alert_frequency",
     ),
     # Deprecation Dates:
     # v1: 2016-04-01

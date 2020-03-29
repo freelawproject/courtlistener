@@ -24,7 +24,7 @@
     let bitcoin_info = $("#bitcoin-info");
 
     // Monthly/one-time handling
-    $("#id_frequency_1").parent("label").click(function () {
+    $("#id_frequency_1").parent("label").on("click", function () {
       // Credit card
       $("#annual-reminder").hide();
       $("#how-donate label[for=id_payment_provider_0], " +
@@ -40,7 +40,7 @@
       cc_info.show();
       bitcoin_info.hide();
     });
-    $("#id_frequency_0").parent("label").click(function () {
+    $("#id_frequency_0").parent("label").on("click", function () {
       $("#annual-reminder").show("fast");
       $("#how-donate label[for=id_payment_provider_0], " +
         "#how-donate label[for=id_payment_provider_2], " +
@@ -58,28 +58,28 @@
     check_info.hide();
     bitcoin_info.hide();
 
-    $("#id_payment_provider_0").parent("label").click(function () {
+    $("#id_payment_provider_0").parent("label").on("click", function () {
       // PayPal
       donor_info.show("fast");
       check_info.hide();
       cc_info.hide();
       bitcoin_info.hide();
     });
-    $("#id_payment_provider_1").parent("label").click(function () {
+    $("#id_payment_provider_1").parent("label").on("click", function () {
       // Credit Card
       donor_info.show("fast");
       check_info.hide();
       cc_info.show();
       bitcoin_info.hide();
     });
-    $("#id_payment_provider_2").parent("label").click(function () {
+    $("#id_payment_provider_2").parent("label").on("click", function () {
       // Check
       donor_info.hide();
       check_info.show("fast");
       cc_info.hide();
       bitcoin_info.hide();
     });
-    $("#id_payment_provider_3").parent("label").click(function () {
+    $("#id_payment_provider_3").parent("label").on("click", function () {
       // Bitcoin
       donor_info.hide();
       check_info.hide();

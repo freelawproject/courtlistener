@@ -172,7 +172,7 @@ class ApiQueryCountTests(TransactionTestCase):
             self.client.get(path)
 
     def test_party_api_query_counts(self):
-        with self.assertNumQueries(7):
+        with self.assertNumQueries(9):
             path = reverse("party-list", kwargs={"version": "v3"})
             self.client.get(path)
 
@@ -946,6 +946,7 @@ class BulkDataTest(TestCase):
 
     def test_database_has_objects_for_bulk_export(self):
         self.assertTrue(Opinion.objects.count() > 0, "Opinions exist")
+        self.assertTrue(OpinionsCited.objects.count() > 0, "Citations exist")
         self.assertTrue(Audio.objects.count() > 0, "Audio exist")
         self.assertTrue(Docket.objects.count() > 0, "Docket exist")
         self.assertTrue(Court.objects.count() > 0, "Court exist")

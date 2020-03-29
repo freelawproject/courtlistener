@@ -8,6 +8,8 @@ import traceback
 import uuid
 from tempfile import NamedTemporaryFile
 
+from django.apps import apps
+from cl.lib.juriscraper_utils import get_scraper_object_by_name
 import eyed3
 from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
@@ -228,6 +230,33 @@ def get_page_count(path, extension):
     return None
 
 
+def update_document_from_text(opinion):
+    """Extract additional metadata from document text
+
+    Use functions from Juriscraper to pull metadata out of opinion
+    text. Currently only implemented in Tax, but functional in all
+    scrapers via AbstractSite object.
+    :param opinion: Opinion object
+    :return: None
+    """
+    court = opinion.cluster.docket.court.pk
+    site = get_scraper_object_by_name(court)
+    metadata_dict = site.extract_from_text(opinion.plain_text)
+    for model_name, data in metadata_dict.items():
+        ModelClass = apps.get_model("search.%s" % model_name)
+        if model_name == "Docket":
+            opinion.cluster.docket.__dict__.update(data)
+        elif model_name == "OpinionCluster":
+            opinion.cluster.__dict__.update(data)
+        elif model_name == "Citation":
+            data["cluster_id"] = opinion.cluster_id
+            ModelClass.objects.get_or_create(**data)
+        else:
+            raise NotImplementedError(
+                "Object type of %s not yet supported." % model_name
+            )
+
+
 @app.task
 def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     """
@@ -279,6 +308,8 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
         opinion.cluster.blocked = True
         opinion.cluster.date_blocked = now()
 
+    update_document_from_text(opinion)
+
     if err:
         print(
             "****Error extracting text from %s: %s****" % (extension, opinion)
@@ -288,15 +319,15 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     # Save item, and index Solr if needed.
     # noinspection PyBroadException
     try:
+        opinion.cluster.docket.save()
+        opinion.cluster.save(index=False)
         if not citation_jitter:
             # No waiting around. Save to the database now, but don't bother
             # with the index yet because citations are being done imminently.
-            opinion.cluster.save(index=False)
             opinion.save(index=False)
         else:
             # Save to the index now, citations come later, commit comes
             # according to schedule
-            opinion.cluster.save(index=False)
             opinion.save(index=True)
     except Exception:
         print(

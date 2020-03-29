@@ -11,6 +11,7 @@ from django.http import HttpRequest
 from django.test import TestCase
 from django.test.utils import override_settings
 from lxml.html import fromstring
+from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
 
 from cl.audio.models import Audio
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
@@ -52,13 +53,13 @@ class ContactTest(TestCase):
             self.client.login(username="pandora", password="password")
         )
         response = self.client.post(reverse("contact"), self.test_msg)
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
     def test_contact_logged_out(self):
         """Can we use the contact form to send a message when logged out?"""
         response = self.client.post(reverse("contact"), self.test_msg)
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
     def test_contact_unicode(self):
@@ -71,7 +72,7 @@ class ContactTest(TestCase):
             "thoughts with comparatively few words. — John Wesley Powell"
         )
         response = self.client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
     def test_spam_message_is_rejected(self):
@@ -84,13 +85,13 @@ class ContactTest(TestCase):
         msg = self.test_msg.copy()
         msg["phone_number"] = "909-576-4123"
         response = self.client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 0)
 
         # Number in middle of subject is OK!
         msg["phone_number"] = "asdf 909 asdf"
         response = self.client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
 
@@ -116,7 +117,6 @@ class SimplePagesTest(TestCase):
     def test_simple_pages(self):
         """Do all the simple pages load properly?"""
         reverse_params = [
-            {"viewname": "about"},
             {"viewname": "faq"},
             {"viewname": "coverage"},
             {"viewname": "feeds_info"},
@@ -130,9 +130,7 @@ class SimplePagesTest(TestCase):
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
             {"viewname": "terms"},
-            {"viewname": "bad_browser"},
             {"viewname": "robots"},
-            {"viewname": "humans"},
         ]
         for reverse_param in reverse_params:
             path = reverse(**reverse_param)
@@ -140,7 +138,7 @@ class SimplePagesTest(TestCase):
             r = self.client.get(path)
             self.assertEqual(
                 r.status_code,
-                200,
+                HTTP_200_OK,
                 msg="Got wrong status code for page at: {path}\n  args: "
                 "{args}\n  kwargs: {kwargs}\n  Status Code: {code}".format(
                     path=path,
@@ -208,14 +206,14 @@ class StaticFilesTest(TestCase):
         request = HttpRequest()
         file_path = self.audio.local_path_mp3
         response = serve_static_file(request, file_path=self.good_mp3_path)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(response["Content-Type"], "audio/mpeg")
         self.assertIn("inline;", response["Content-Disposition"])
 
     def test_serve_static_file_serves_txt(self):
         request = HttpRequest()
         response = serve_static_file(request, file_path=self.good_txt_path)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(response["Content-Type"], "text/plain")
         self.assertIn("inline;", response["Content-Disposition"])
         self.assertIn("FOR THE DISTRICT OF COLUMBIA CIRCUIT", response.content)
@@ -223,6 +221,6 @@ class StaticFilesTest(TestCase):
     def test_serve_static_file_serves_pdf(self):
         request = HttpRequest()
         response = serve_static_file(request, file_path=self.good_pdf_path)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertIn("inline;", response["Content-Disposition"])

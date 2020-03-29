@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -6,6 +6,8 @@ from django.db import models
 from django.db.models import Sum
 from django.utils.timezone import now
 from localflavor.us import models as local_models
+
+from cl.api.utils import invert_user_logs
 
 donation_exclusion_codes = [
     1,  # Unknown error
@@ -107,6 +109,19 @@ class UserProfile(models.Model):
         :return bool: True if so, False if not.
         """
         return bool(self.user.monthly_donations.filter(enabled=True).count())
+
+    @property
+    def recent_api_usage(self):
+        """Get stats about API usage for the user for the past 14 days
+
+        :return: A dict of date-count pairs indicating the amount of times the
+        user has hit the API per day.
+        :rtype: collections.OrderedDict
+        """
+        start = datetime.today() - timedelta(days=14)
+        end = datetime.today()
+        data = invert_user_logs(start, end, add_usernames=False)
+        return data[self.user.pk]
 
     def __unicode__(self):
         return u"{name}".format(name=self.user.username)

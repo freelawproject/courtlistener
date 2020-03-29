@@ -27,7 +27,7 @@ services:
             POSTGRES_PASSWORD: "postgres"
             POSTGRES_DB: "courtlistener"
         volumes:
-            - /var/run/postgresql:/var/run/postgresql
+            - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
         networks:
             - cl_net_overlay
 
@@ -52,9 +52,9 @@ services:
             - cl-postgresql
             - cl-redis
         volumes:
-            - ../../cl:/opt/celery/cl:ro
-            - /var/run/postgresql:/var/run/postgresql
-            - ../../cl/assets/media:/opt/celery/cl/assets/media
+            - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
+            - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
+            - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
         networks:
             - cl_net_overlay
 
@@ -70,8 +70,8 @@ services:
         ports:
             - "8000:8000"
         volumes:
-            - ../../../courtlistener:/opt/courtlistener
-            - /var/run/postgresql:/var/run/postgresql
+            - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+            - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
         networks:
             - cl_net_overlay
 
@@ -82,6 +82,6 @@ services:
             - 4444:4444  # Selenium
             - 5900:5900  # VNC server
         volumes:
-            - /dev/shm:/dev/shm
+            - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
         networks:
             - cl_net_overlay
