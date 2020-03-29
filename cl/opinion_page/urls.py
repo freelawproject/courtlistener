@@ -4,6 +4,7 @@ from cl.opinion_page.sitemap import opinion_sitemap_maker, recap_sitemap_maker
 from cl.opinion_page.views import (
     block_item,
     cluster_visualizations,
+    court_homepage,
     view_opinion,
     citation_redirector,
     redirect_docket_recap,
@@ -15,6 +16,9 @@ from cl.opinion_page.views import (
 )
 
 urlpatterns = [
+    # Court pages
+    url(r"^court/(?P<pk>[^/]*)/$", court_homepage, name="court_homepage"),
+    # Opinion pages
     url(
         r"^opinion/(?P<pk>\d*)/(?P<slug>[^/]*)/authorities/$",
         view_authorities,

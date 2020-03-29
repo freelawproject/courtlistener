@@ -351,7 +351,7 @@ with Virginia Historic Tax Credit Fund""",
                 "2003 T.C. Summary Opinion 150",
             ),
             (
-                """
+                u"""
                    MICHAEL KEITH SHENK, PETITIONER v. COMMISSIONER
                                                     OF INTERNAL REVENUE, RESPONDENT
 

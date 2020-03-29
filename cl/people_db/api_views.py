@@ -44,6 +44,7 @@ class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = PersonSerializer
     filter_class = PersonFilter
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
         "date_dob",
@@ -56,6 +57,7 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = PositionSerializer
     filter_class = PositionFilter
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
         "date_nominated",
@@ -75,21 +77,21 @@ class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = RetentionEvent.objects.all().order_by("-id")
     serializer_class = RetentionEventSerializer
     filter_class = RetentionEventFilter
-    ordering_fields = ("date_created", "date_modified", "date_retention")
+    ordering_fields = ("id", "date_created", "date_modified", "date_retention")
 
 
 class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Education.objects.all().order_by("-id")
     serializer_class = EducationSerializer
     filter_class = EducationFilter
-    ordering_fields = ("date_created", "date_modified")
+    ordering_fields = ("id", "date_created", "date_modified")
 
 
 class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = School.objects.all().order_by("-id")
     serializer_class = SchoolSerializer
     filter_class = SchoolFilter
-    ordering_fields = ("date_created", "date_modified")
+    ordering_fields = ("id", "date_created", "date_modified")
 
 
 class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -97,6 +99,7 @@ class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = PoliticalAffiliationSerializer
     filter_class = PoliticalAffiliationFilter
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
         "date_start",
@@ -109,6 +112,7 @@ class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = SourceSerializer
     filter_class = SourceFilter
     ordering_fields = (
+        "id",
         "date_modified",
         "date_accessed",
     )
@@ -119,6 +123,7 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = ABARatingSerializer
     filter_class = ABARatingFilter
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
         "year_rated",
@@ -130,12 +135,15 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = PartySerializer
     filter_class = PartyFilter
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
     )
-    queryset = Party.objects.prefetch_related("party_types", "roles").order_by(
-        "-id"
-    )
+    queryset = Party.objects.prefetch_related(
+        "party_types__criminal_counts",
+        "party_types__criminal_complaints",
+        "roles",
+    ).order_by("-id")
 
 
 class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -143,6 +151,7 @@ class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = AttorneySerializer
     filter_class = AttorneyFilter
     ordering_fields = (
+        "id",
         "date_created",
         "date_modified",
     )

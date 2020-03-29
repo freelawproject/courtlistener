@@ -438,7 +438,7 @@ class BulkJsonHistory(object):
         self.save_to_disk()
 
 
-def invert_user_logs(start, end):
+def invert_user_logs(start, end, add_usernames=True):
     """Invert the user logs for a period of time
 
     The user logs have the date in the key and the user as part of the set:
@@ -461,21 +461,20 @@ def invert_user_logs(start, end):
             }
         }
     :param start: The beginning date (inclusive) you want the results for. A
-    string to be interpreted by dateparser
-    :param end: The end date (inclusive) you want the results for. A string to
-    be interpreted by dateparser.
+    :type start: datetime.datetime
+    :param end: The end date (inclusive) you want the results for.
+    :type end: datetime.datetime
+    :param add_usernames: Stats are stored with the user ID. If this is True,
+    add an alias in the returned dictionary that contains the username as well.
+    :type add_usernames: bool
     :return The inverted dictionary
+    :rtype: dict
     """
     r = make_redis_interface("STATS")
     pipe = r.pipeline()
 
     dates = [
-        d.date().isoformat()
-        for d in rrule(
-            DAILY,
-            dtstart=parser.parse(start, fuzzy=False),
-            until=parser.parse(end, fuzzy=False),
-        )
+        d.date().isoformat() for d in rrule(DAILY, dtstart=start, until=end,)
     ]
     for d in dates:
         pipe.zrange("api:v3.user.d:%s.counts" % d, 0, -1, withscores=True)
@@ -502,13 +501,14 @@ def invert_user_logs(start, end):
         out[k] = OrderedDict(sorted(v.items(), key=lambda t: t[0]))
 
     # Add usernames as alternate keys for every value possible.
-    for k, v in out.items():
-        try:
-            user = User.objects.get(pk=k)
-        except (User.DoesNotExist, ValueError):
-            pass
-        else:
-            out[user.username] = v
+    if add_usernames:
+        for k, v in out.items():
+            try:
+                user = User.objects.get(pk=k)
+            except (User.DoesNotExist, ValueError):
+                pass
+            else:
+                out[user.username] = v
 
     return out
 

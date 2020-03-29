@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils.crypto import get_random_string
 
-from cl.search.models import Docket
+from cl.search.models import Docket, SEARCH_TYPES
 
 
 class Alert(models.Model):
@@ -121,13 +121,6 @@ class RealTimeQueue(models.Model):
     Hindsight is 20/20, but we're here now.
     """
 
-    OPINION = "o"
-    ORAL_ARGUMENT = "oa"
-    ITEM_TYPES = (
-        (OPINION, "Opinion"),
-        (ORAL_ARGUMENT, "Oral Argument"),
-    )
-    ALL_ITEM_TYPES = [OPINION, ORAL_ARGUMENT]
     date_modified = models.DateTimeField(
         help_text="the last moment when the item was modified",
         auto_now=True,
@@ -135,9 +128,9 @@ class RealTimeQueue(models.Model):
     )
     item_type = models.CharField(
         help_text="the type of item this is, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in ITEM_TYPES]),
+        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SEARCH_TYPES.NAMES]),
         max_length=3,
-        choices=ITEM_TYPES,
+        choices=SEARCH_TYPES.NAMES,
         db_index=True,
     )
     item_pk = models.IntegerField(help_text="the pk of the item",)

@@ -279,6 +279,7 @@ MIN_DONATION = {
 }
 MAX_FREE_DOCKET_ALERTS = 5
 DOCKET_ALERT_RECAP_BONUS = 10
+MAX_ALERT_RESULTS_PER_DAY = 30
 # If people pay via XERO invoices, this is the ID we see in our stripe
 # callbacks
 XERO_APPLICATION_ID = 'ca_1pvP3rYcArUkd3InUnImFI9llOiSIq6k'
@@ -312,17 +313,28 @@ REST_FRAMEWORK = {
         # Throttling down.
         # Doing a background check service, we told them we didn't want to work
         # with them.
+<<<<<<< HEAD
         'elios': '10/hour',
         'shreyngd': '100/hour',
         'leo': '100/hour',
         'miffy': '100/hour',
         'safetynet': '100/hour',
+=======
+        "elios": "10/hour",
+        "shreyngd": "100/hour",
+        "leo": "100/hour",
+        "miffy": "100/hour",
+        "safetynet": "100/hour",
+        # Send multiple emails, but they haven't responded
+        "linkfenzhao": "10/hour",
+>>>>>>> 19fe1b7235042a4f87a4595873a2a636ca9e3455
         # From fokal.ai, using multiple accounts to dodge limitations
         'manu.jose': '10/hour',
         'shishir': '10/hour',
         'shishir.kumar': '10/hour',
 
         # Throttling up.
+<<<<<<< HEAD
         'YFIN': '430000/day',
         'mlissner': '1000000/hour',  # Needed for benchmarking (not greed)
         'gpilapil': '10000/hour',
@@ -330,6 +342,16 @@ REST_FRAMEWORK = {
         'waldo': '10000/hour',
         'hdave4': '15000/hour',  # GSU
         'ellliottt': '15000/hour',
+=======
+        "YFIN": "430000/day",
+        "mlissner": "1000000/hour",  # Needed for benchmarking (not greed)
+        "gpilapil": "10000/hour",
+        "peidelman": "20000/hour",
+        "waldo": "10000/hour",
+        "hdave4": "15000/hour",  # GSU
+        "ellliottt": "15000/hour",
+        "flooie": "20000/hour",  # Needed for testing
+>>>>>>> 19fe1b7235042a4f87a4595873a2a636ca9e3455
     },
 
     # Auth
@@ -406,9 +428,15 @@ MARKDOWN_DEUX_STYLES = {
 ##########
 # MATOMO #
 ##########
+<<<<<<< HEAD
 MATOMO_URL = 'http://192.168.0.243/piwik.php'
 MATOMO_SITE_ID = '1'
+=======
 
+MATOMO_URL = "http://192.168.0.243/piwik.php"
+MATOMO_FRONTEND_BASE_URL = "//matomo.courtlistener.com/"
+MATOMO_SITE_ID = "1"
+>>>>>>> 19fe1b7235042a4f87a4595873a2a636ca9e3455
 
 ########
 # SCDB #
@@ -528,6 +556,15 @@ if DEVELOPMENT:
         'level': 'DEBUG',
         'propagate': False,
     }
+
+###################
+# Related content #
+###################
+
+RELATED_COUNT = 5
+RELATED_USE_CACHE = True
+RELATED_CACHE_TIMEOUT = 60 * 60 * 24 * 7
+RELATED_USER_GROUPS = ["recommendation_system_tester"]
 
 
 #######
