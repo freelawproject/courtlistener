@@ -8,8 +8,8 @@ from django.contrib.auth.forms import (
 )
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
-from django.urls import reverse
 from django.forms import ModelForm
+from django.urls import reverse
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
@@ -47,6 +47,7 @@ class ProfileForm(ModelForm):
             "state",
             "zip_code",
             "wants_newsletter",
+            "is_tester",
             "barmembership",
             "plaintext_preferred",
         )
