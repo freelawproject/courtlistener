@@ -80,6 +80,10 @@ class UserProfile(models.Model):
     notes = models.TextField(
         help_text="Any notes about the user.", blank=True,
     )
+    is_tester = models.BooleanField(
+        help_text="The user tests new features before they are finished",
+        default=False,
+    )
 
     @property
     def total_donated_last_year(self):
