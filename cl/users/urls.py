@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.conf.urls import url
 from django.contrib.auth import views as auth_views
+from django.views.generic import RedirectView
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from cl.lib.ratelimiter import ratelimiter_auth
@@ -72,6 +73,7 @@ urlpatterns = [
     ),
     # Profile pages
     url(r"^profile/settings/$", views.view_settings, name="view_settings"),
+    url(r"^profile/$", RedirectView.as_view(pattern_name="view_settings")),
     url(
         r"^profile/favorites/$", views.view_favorites, name="profile_favorites"
     ),
