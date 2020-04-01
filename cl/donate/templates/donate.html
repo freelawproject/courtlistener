@@ -58,6 +58,9 @@
     check_info.hide();
     bitcoin_info.hide();
 
+    // Disable other forms of payment, monthly donation is the default and only accepts CC
+    $("#id_frequency_0").parent("label").click();
+
 
     $("#id_payment_provider_0").parent("label").on("click", function () {
       // PayPal
