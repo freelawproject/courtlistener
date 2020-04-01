@@ -24,7 +24,7 @@
     let bitcoin_info = $("#bitcoin-info");
 
     // Monthly/one-time handling
-    $("#id_frequency_1").parent("label").on("click", function () {
+    $("#id_frequency_0").parent("label").on("click", function () {
       // Credit card
       $("#annual-reminder").hide();
       $("#how-donate label[for=id_payment_provider_0], " +
@@ -40,7 +40,7 @@
       cc_info.show();
       bitcoin_info.hide();
     });
-    $("#id_frequency_0").parent("label").on("click", function () {
+    $("#id_frequency_1").parent("label").on("click", function () {
       $("#annual-reminder").show("fast");
       $("#how-donate label[for=id_payment_provider_0], " +
         "#how-donate label[for=id_payment_provider_2], " +
@@ -57,6 +57,10 @@
     // Hide check and bitcoin info by default
     check_info.hide();
     bitcoin_info.hide();
+
+    // Disable other forms of payment, monthly donation is the default and only accepts CC
+    $("#id_frequency_0").parent("label").click();
+
 
     $("#id_payment_provider_0").parent("label").on("click", function () {
       // PayPal
