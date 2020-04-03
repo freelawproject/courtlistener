@@ -995,9 +995,8 @@ def add_claim_history_entry(new_history, claim):
         db_history.pacer_dm_id = (
             new_history.get("pacer_dm_id") or db_history.pacer_dm_id
         )
-        db_history.pacer_seq_no = (
-            new_history.get("pacer_seq_no") or db_history.pacer_seq_no
-        )
+        db_history.pacer_seq_no = new_history.get("pacer_seq_no")
+
     else:
         db_history, _ = ClaimHistory.objects.get_or_create(
             claim_document_type=ClaimHistory.CLAIM_ENTRY,
