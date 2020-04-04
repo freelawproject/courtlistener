@@ -7,9 +7,10 @@ from rest_framework.exceptions import ValidationError
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import (
     FjcIntegratedDatabase,
-    ProcessingQueue,
-    UPLOAD_TYPE,
     PacerFetchQueue,
+    ProcessingQueue,
+    REQUEST_TYPE,
+    UPLOAD_TYPE,
 )
 from cl.search.models import Court, RECAPDocument, Docket
 
@@ -222,8 +223,19 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 "generally."
             )
 
+        # Attachment page and PDF validation
+        if attrs["request_type"] in [
+            REQUEST_TYPE.PDF,
+            REQUEST_TYPE.ATTACHMENT_PAGE,
+        ]:
+            if not attrs.get("recap_document"):
+                raise ValidationError(
+                    "recap_document is a required field for attachment page "
+                    "and PDF fetches."
+                )
+
         # PDF validations
-        if attrs.get("recap_document"):
+        if attrs["request_type"] == REQUEST_TYPE.PDF:
             rd = attrs["recap_document"]
             if rd.is_available:
                 raise ValidationError(
