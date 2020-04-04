@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load extras %}
 
-{% block title %}REST API, v3.8 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v3.9 &ndash; CourtListener.com{% endblock %}
 {% block description %}
   REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.
 {% endblock %}
@@ -17,7 +17,7 @@
 
 {% block content %}
   <div class="col-sm-7">
-    <h1 id="about">REST API &ndash; v3.8</h1>
+    <h1 id="about">REST API &ndash; v3.9</h1>
     <h2 id="api-overview">Getting Started &amp; Overview</h2>
 
     <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
@@ -754,9 +754,9 @@ PACER_TO_CL_IDS = {
     <h4 id="pacer-fetch">{% url "pacerfetchqueue-list" version="v3" %}</h4>
     <p>If you've identified an item in PACER that we do not have, you can use this API to ask us to download it and add it to the RECAP Archive.
     </p>
-    <p>This API can currently either download dockets or PDFs. Dockets are more complicated than PDFs because there are a handful of options available when purchasing dockets on PACER.
+    <p>This API can currently download dockets, PDFs, or attachment pages. Dockets are more complicated than PDFs or attachment pages because there are a handful of options available when purchasing dockets on PACER. Accordingly, we explain the simpler PDFs and attachment pages first.
     </p>
-    <p>To purchase a PDF:</p>
+    <p><strong>To purchase a PDF:</strong></p>
     <ol>
       <li>Set <code>request_type</code> to <code>2</code>, which indicates PDFs.</li>
       <li>Identify the PDF you wish to add to our system. To identify the PDF use the <code>recap_document</code> field to provide the RECAP Document ID of the item you wish to download.</li>
@@ -774,7 +774,10 @@ PACER_TO_CL_IDS = {
     <p>A known issue we currently have is that if we do not have the <code>pacer_doc_id</code> for a particular <code>recap_document</code>, we will not be able to download it.
     </p>
 
-    <p>Fetching dockets is done similarly:</p>
+    <p><strong>Attachment pages</strong> are the pages that you see in PACER after you click to download a document, if that document has attachments. These pages are free in PACER. Fetching attachment pages is done same as PDFs, above, but with <code>request_type</code> set to <code>3</code>.
+    </p>
+
+    <p><strong>Fetching dockets</strong> is done similarly:</p>
     <ol>
       <li>Provide the <code>request_type</code> of <code>1</code> for dockets.</li>
       <li>Indicate the docket you want by either a CourtListener <code>docket</code> ID, a <code>pacer_case_id</code>-<code>court</code> pair or a <code>docket_number</code>-<code>court</code> pair.</li>
