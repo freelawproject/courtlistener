@@ -27,6 +27,8 @@ from cl.corpus_importer.tasks import (
     update_rd_metadata,
     get_pacer_case_id_and_title,
     get_docket_by_pacer_case_id,
+    get_attachment_page_by_rd,
+    make_attachment_pq_object,
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import oxford_join
@@ -159,6 +161,16 @@ def do_pacer_fetch(fq):
                 extract_recap_pdf.si(rd_pk),
                 add_items_to_solr.si([rd_pk], "search.RECAPDocument"),
             )
+    elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
+        rd_pk = fq.recap_document_id
+        cookies = get_pacer_cookie_from_cache(fq.user_id)
+        if fq.recap_document_id:
+            c = chain(
+                get_attachment_page_by_rd.s(rd_pk, cookies),
+                make_attachment_pq_object.s(rd_pk, fq.user_id),
+                process_recap_attachment.s(),
+            )
+
     if c is not None:
         c |= mark_fq_successful.si(fq.pk)
         c.apply_async()

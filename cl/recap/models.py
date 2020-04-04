@@ -223,10 +223,12 @@ class ProcessingQueue(models.Model):
 class REQUEST_TYPE:
     DOCKET = 1
     PDF = 2
+    ATTACHMENT_PAGE = 3
 
     NAMES = (
         (DOCKET, "HTML Docket"),
         (PDF, "PDF"),
+        (ATTACHMENT_PAGE, "Attachment Page"),
     )
 
 
@@ -281,6 +283,15 @@ class PacerFetchQueue(models.Model):
     court = models.ForeignKey(
         Court,
         help_text="The court where the request will be made",
+        related_name="pacer_fetch_queue_items",
+        on_delete=models.CASCADE,
+        null=True,
+    )
+    # PDF and attachment pages use this
+    recap_document = models.ForeignKey(
+        RECAPDocument,
+        help_text="The ID of the RECAP Document or attachment page in the "
+        "CourtListener databae that you wish to fetch or update.",
         related_name="pacer_fetch_queue_items",
         on_delete=models.CASCADE,
         null=True,
@@ -349,18 +360,6 @@ class PacerFetchQueue(models.Model):
         help_text="Should we pull the list of member cases? This can add "
         "considerable expense to each docket.",
         default=False,
-    )
-
-    #
-    # PDF request parameters
-    #
-    recap_document = models.ForeignKey(
-        RECAPDocument,
-        help_text="The ID of the RECAP Document in the CourtListener databae "
-        "that you wish to fetch or update.",
-        related_name="pacer_fetch_queue_items",
-        on_delete=models.CASCADE,
-        null=True,
     )
 
 
