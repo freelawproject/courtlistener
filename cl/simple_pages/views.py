@@ -81,7 +81,7 @@ def alert_help(request):
     no_feeds = Court.objects.filter(
         jurisdiction__in=[Court.FEDERAL_BANKRUPTCY, Court.FEDERAL_DISTRICT,],
         pacer_has_rss_feed=False,
-        date_terminated=None,
+        end_date=None,
     )
     cache_key = "alert-help-stats"
     data = cache.get(cache_key)
