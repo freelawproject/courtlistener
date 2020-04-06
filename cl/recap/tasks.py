@@ -152,15 +152,17 @@ def do_pacer_fetch(fq):
                 )
             c = chain(get_docket_by_pacer_case_id.si(**kwargs))
         c |= add_or_update_recap_docket.s()
+        c |= mark_fq_successful.si(fq.pk)
+        c.apply_async()
     elif fq.request_type == REQUEST_TYPE.PDF:
         # Request by recap_document_id
         rd_pk = fq.recap_document_id
-        if fq.recap_document_id:
-            c = chain(
-                fetch_pacer_doc_by_rd.si(rd_pk, fq.pk, fq.user_id),
-                extract_recap_pdf.si(rd_pk),
-                add_items_to_solr.si([rd_pk], "search.RECAPDocument"),
-            )
+        chain(
+            fetch_pacer_doc_by_rd.si(rd_pk, fq.pk, fq.user_id),
+            extract_recap_pdf.si(rd_pk),
+            add_items_to_solr.si([rd_pk], "search.RECAPDocument"),
+            mark_fq_successful.si(fq.pk),
+        ).apply_async()
     elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
         rd_pk = fq.recap_document_id
         if not fq.recap_document.pacer_doc_id:
@@ -173,21 +175,12 @@ def do_pacer_fetch(fq):
             return
 
         cookies = get_pacer_cookie_from_cache(fq.user_id)
-        if fq.recap_document_id:
-            c = chain(
-                get_attachment_page_by_rd.s(rd_pk, cookies),
-                make_attachment_pq_object.s(rd_pk, fq.user_id),
-                process_recap_attachment.s(),
-            )
-
-    if c is not None:
-        c |= mark_fq_successful.si(fq.pk)
-        c.apply_async()
-    else:
-        # Somehow failed to make a chain. Log an error.
-        fq.status = PROCESSING_STATUS.INVALID_CONTENT
-        fq.message = "Invalid submission, unable to make chain for processing."
-        fq.save()
+        chain(
+            get_attachment_page_by_rd.s(rd_pk, cookies),
+            make_attachment_pq_object.s(rd_pk, fq.user_id),
+            process_recap_attachment.s(),
+            mark_fq_status.s(fq.pk),
+        ).apply_async()
 
 
 def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
@@ -212,6 +205,7 @@ def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
     pq.docket_entry_id = de_id
     pq.recap_document_id = rd_id
     pq.save()
+    return pq.status, pq.msg
 
 
 def mark_pq_status(pq, msg, status):
@@ -226,6 +220,7 @@ def mark_pq_status(pq, msg, status):
     pq.error_message = msg
     pq.status = status
     pq.save()
+    return pq.status, pq.msg
 
 
 @app.task(
@@ -582,7 +577,8 @@ def process_recap_attachment(self, pk, tag_names=None):
     :param pk: The primary key of the processing queue item you want to work on
     :param tag_names: A list of tag names to add to all items created or
     modified in this function.
-    :return: None
+    :return: Tuple indicating the status of the processing and a related
+    message
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
@@ -598,9 +594,8 @@ def process_recap_attachment(self, pk, tag_names=None):
     if att_data == {}:
         # Bad attachment page.
         msg = "Not a valid attachment page upload."
-        mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
         self.request.chain = None
-        return None
+        return mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
 
     if pq.pacer_case_id in ["undefined", "null"]:
         # Bad data from the client. Fix it with parsed data.
@@ -623,13 +618,11 @@ def process_recap_attachment(self, pk, tag_names=None):
             "Too many documents found when attempting to associate "
             "attachment data"
         )
-        mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-        return None
+        return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
     except RECAPDocument.DoesNotExist as exc:
         msg = "Could not find docket to associate with attachment metadata"
         if (self.request.retries == self.max_retries) or pq.debug:
-            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-            return None
+            return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         else:
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
@@ -704,13 +697,13 @@ def process_recap_attachment(self, pk, tag_names=None):
                 # Do *not* do this async — that can cause race conditions.
                 add_items_to_solr([rd.pk], "search.RECAPDocument")
 
-    mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
     process_orphan_documents(
         rds_created, pq.court_id, main_rd.docket_entry.docket.date_filed
     )
     changed = mark_ia_upload_needed(de.docket)
     if changed:
         de.docket.save()
+    return mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
 
 
 @app.task(
@@ -1155,4 +1148,24 @@ def mark_fq_successful(fq_pk):
     fq.status = PROCESSING_STATUS.SUCCESSFUL
     fq.date_completed = now()
     fq.message = "Successfully completed fetch and save."
+    fq.save()
+
+
+@app.task
+def mark_fq_status(data, fq_pk):
+    """Update the PacerFetchQueue item with the status and message provided
+
+    :param data: A tuple returned from a previous task. The tuple contains
+    the PROCESSING_STATUS value and a message.
+    :type data: Tuple
+    :param fq_pk: The PK of the PacerFetchQueue item to update
+    :type fq_pk: int
+    :return: None
+    :rtype: None
+    """
+    status, msg = data[0:]
+    fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    fq.status = status
+    fq.date_completed = now()
+    fq.message = msg
     fq.save()
