@@ -205,7 +205,7 @@ def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
     pq.docket_entry_id = de_id
     pq.recap_document_id = rd_id
     pq.save()
-    return pq.status, pq.msg
+    return pq.status, pq.error_message
 
 
 def mark_pq_status(pq, msg, status):
@@ -220,7 +220,7 @@ def mark_pq_status(pq, msg, status):
     pq.error_message = msg
     pq.status = status
     pq.save()
-    return pq.status, pq.msg
+    return pq.status, pq.error_message
 
 
 @app.task(
