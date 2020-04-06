@@ -70,6 +70,7 @@ class PROCESSING_STATUS:
     IN_PROGRESS = 4
     QUEUED_FOR_RETRY = 5
     INVALID_CONTENT = 6
+    NEEDS_INFO = 7
     NAMES = (
         (ENQUEUED, "Awaiting processing in queue."),
         (SUCCESSFUL, "Item processed successfully."),
@@ -77,6 +78,7 @@ class PROCESSING_STATUS:
         (IN_PROGRESS, "Item is currently being processed."),
         (QUEUED_FOR_RETRY, "Item failed processing, but will be retried."),
         (INVALID_CONTENT, "Item failed validity tests."),
+        (NEEDS_INFO, "There was insufficient metadata to complete the task."),
     )
 
 
