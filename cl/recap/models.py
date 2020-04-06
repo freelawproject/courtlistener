@@ -364,6 +364,12 @@ class PacerFetchQueue(models.Model):
         default=False,
     )
 
+    def __unicode__(self):
+        return u"PacerFetchQueue: %s (%s)" % (
+            self.pk,
+            self.get_request_type_display(),
+        )
+
 
 class FjcIntegratedDatabase(models.Model):
     """The Integrated Database of PACER data as described here:
