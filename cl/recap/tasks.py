@@ -163,6 +163,15 @@ def do_pacer_fetch(fq):
             )
     elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
         rd_pk = fq.recap_document_id
+        if not fq.recap_document.pacer_doc_id:
+            fq.status = PROCESSING_STATUS.FAILED
+            fq.message = (
+                "Unable to get attachment page: Unknown pacer_doc_id for "
+                "RECAP Document object %s" % rd_pk
+            )
+            fq.save()
+            return
+
         cookies = get_pacer_cookie_from_cache(fq.user_id)
         if fq.recap_document_id:
             c = chain(
