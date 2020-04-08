@@ -84,6 +84,7 @@ from cl.recap.mergers import (
     process_orphan_documents,
     add_claims_to_docket,
     add_bankruptcy_data_to_docket,
+    add_tags_to_objs,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
@@ -884,12 +885,7 @@ def do_case_query_by_pacer_case_id(
     update_docket_metadata(d, docket_data)
     d.save()
 
-    tags = []
-    if tag_names is not None:
-        for tag_name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name=tag_name)
-            tag.tag_object(d)
-            tags.append(tag)
+    add_tags_to_objs(tag_names, [d])
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(
@@ -1057,12 +1053,7 @@ def get_docket_by_pacer_case_id(
     d.add_recap_source()
     update_docket_metadata(d, docket_data)
     d.save()
-    tags = []
-    if tag_names is not None:
-        for tag_name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name=tag_name)
-            tag.tag_object(d)
-            tags.append(tag)
+    tags = add_tags_to_objs(tag_names, [d])
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(
@@ -1152,12 +1143,7 @@ def get_appellate_docket_by_docket_number(
         og_info.save()
         d.originating_court_information = og_info
     d.save()
-    tags = []
-    if tag_names is not None:
-        for tag_name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name=tag_name)
-            tag.tag_object(d)
-            tags.append(tag)
+    tags = add_tags_to_objs(tag_names, [d])
 
     # Save the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(

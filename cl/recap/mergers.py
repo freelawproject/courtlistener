@@ -1071,17 +1071,32 @@ def add_claims_to_docket(d, new_claims, tag_names=None):
         )
         db_claim.remarks = new_claim.get("remarks") or db_claim.remarks
         db_claim.save()
-
-        # Add tags to claim
-        tags = []
-        if tag_names is not None:
-            for tag_name in tag_names:
-                tag, _ = Tag.objects.get_or_create(name=tag_name)
-                tag.tag_object(db_claim)
-                tags.append(tag)
-
+        add_tags_to_objs(tag_names, [db_claim])
         for new_history in new_claim["history"]:
             add_claim_history_entry(new_history, db_claim)
+
+
+def add_tags_to_objs(tag_names, objs):
+    """Add tags by name to objects
+
+    :param tag_names: A list of tag name strings
+    :type tag_names: list
+    :param objs: A list of objects in need of tags
+    :type objs: list
+    :return: [] if no tag names, else a list of the tags created/found
+    """
+    if tag_names is None:
+        return []
+
+    tags = []
+    for tag_name in tag_names:
+        tag, _ = Tag.objects.get_or_create(name=tag_name)
+        tags.append(tag)
+
+    for tag in tags:
+        for obj in objs:
+            tag.tag_object(obj)
+    return tags
 
 
 def process_orphan_documents(rds_created, court_id, docket_date):
