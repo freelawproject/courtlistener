@@ -166,23 +166,7 @@ def do_pacer_fetch(fq):
             mark_fq_successful.si(fq.pk),
         ).apply_async()
     elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
-        rd_pk = fq.recap_document_id
-        if not fq.recap_document.pacer_doc_id:
-            fq.status = PROCESSING_STATUS.NEEDS_INFO
-            fq.message = (
-                "Unable to get attachment page: Unknown pacer_doc_id for "
-                "RECAP Document object %s" % rd_pk
-            )
-            fq.save()
-            return
-
-        cookies = get_pacer_cookie_from_cache(fq.user_id)
-        chain(
-            get_attachment_page_by_rd.s(rd_pk, cookies),
-            make_attachment_pq_object.s(rd_pk, fq.user_id),
-            process_recap_attachment.s(),
-            mark_fq_status.s(fq.pk),
-        ).apply_async()
+        fetch_attachment_page.apply_async(args=(fq.pk,))
 
 
 def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
@@ -1061,6 +1045,85 @@ def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk):
         return
 
     return rd.pk
+
+
+@app.task(
+    bind=True,
+    max_retries=3,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
+@transaction.atomic
+def fetch_attachment_page(self, fq_pk):
+    """Fetch a PACER attachment page by rd_pk
+
+    This is very similar to process_recap_attachment, except that it manages
+    status as it proceeds and it gets the cookie info from redis.
+
+    :param fq_pk: The PK of the RECAP Fetch Queue to update.
+    :return: None
+    """
+    fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    fq.status = PROCESSING_STATUS.IN_PROGRESS
+    fq.save()
+
+    rd = fq.recap_document
+    if not rd.pacer_doc_id:
+        msg = (
+            "Unable to get attachment page: Unknown pacer_doc_id for "
+            "RECAP Document object %s" % rd.pk
+        )
+        mark_fq_status(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
+        return
+
+    cookies = get_pacer_cookie_from_cache(fq.user_id)
+    if not cookies:
+        msg = "Unable to find cached cookies. Aborting request."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        return
+
+    try:
+        r = get_attachment_page_by_rd(rd.pk, cookies)
+    except (requests.RequestException, HTTPError):
+        msg = "Failed to get attachment page from network."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        return
+
+    text = r.response.text
+    att_data = get_data_from_att_report(text, rd.docket_entry.docket.court_id,)
+
+    if att_data == {}:
+        msg = "Not a valid attachment page upload"
+        mark_fq_status(fq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        return
+
+    try:
+        merge_attachment_page_data(
+            rd.docket_entry.docket.court,
+            rd.docket_entry.docket.pacer_case_id,
+            att_data["pacer_doc_id"],
+            att_data["document_number"],
+            text,
+            att_data["attachments"],
+        )
+    except RECAPDocument.MultipleObjectsReturned:
+        msg = (
+            "Too many documents found when attempting to associate "
+            "attachment data"
+        )
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        return
+    except RECAPDocument.DoesNotExist as exc:
+        msg = "Could not find docket to associate with attachment metadata"
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            return
+        else:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+    msg = "Successfully completed fetch and save."
+    mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
 
 
 @app.task
