@@ -46,6 +46,7 @@ from cl.recap.mergers import (
     find_docket_object,
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
+    add_tags_to_objs,
 )
 from cl.recap.models import (
     PacerHtmlFiles,
