@@ -379,9 +379,7 @@ def process_recap_pdf(self, pk):
         de_id=rd.docket_entry_id,
         rd_id=rd.pk,
     )
-    changed = mark_ia_upload_needed(rd.docket_entry.docket)
-    if changed:
-        rd.docket_entry.docket.save()
+    mark_ia_upload_needed(rd.docket_entry.docket, save_docket=True)
     return rd
 
 
