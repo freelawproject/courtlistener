@@ -28,7 +28,6 @@ from cl.corpus_importer.tasks import (
     get_pacer_case_id_and_title,
     get_docket_by_pacer_case_id,
     get_attachment_page_by_rd,
-    make_attachment_pq_object,
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import oxford_join
@@ -47,6 +46,8 @@ from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
     add_tags_to_objs,
+    merge_attachment_page_data,
+    get_data_from_att_report,
 )
 from cl.recap.models import (
     PacerHtmlFiles,
@@ -583,11 +584,9 @@ def process_recap_attachment(self, pk, tag_names=None):
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
-    att_page = AttachmentPage(map_cl_to_pacer_id(pq.court_id))
     with open(pq.filepath_local.path) as f:
         text = f.read().decode("utf-8")
-    att_page._parse_text(text)
-    att_data = att_page.data
+    att_data = get_data_from_att_report(text, pq.court_id)
     logger.info("Parsing completed for item %s" % pq)
 
     if att_data == {}:
@@ -601,18 +600,17 @@ def process_recap_attachment(self, pk, tag_names=None):
         pq.pacer_case_id = att_data.get("pacer_case_id")
         pq.save()
 
-    # Merge the contents of the data into CL.
     try:
-        params = {
-            "pacer_doc_id": att_data["pacer_doc_id"],
-            "docket_entry__docket__court": pq.court,
-        }
-        if pq.pacer_case_id:
-            params["docket_entry__docket__pacer_case_id"] = pq.pacer_case_id
-        main_rd = RECAPDocument.objects.get(**params)
+        rds_affected, de = merge_attachment_page_data(
+            pq.court,
+            pq.pacer_case_id,
+            att_data["pacer_doc_id"],
+            att_data["document_number"],
+            text,
+            att_data["attachments"],
+            pq.debug,
+        )
     except RECAPDocument.MultipleObjectsReturned:
-        # Unclear how to proceed and we don't want to associate this data with
-        # the wrong case. We must punt.
         msg = (
             "Too many documents found when attempting to associate "
             "attachment data"
@@ -626,82 +624,7 @@ def process_recap_attachment(self, pk, tag_names=None):
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
-    # We got the right item. Update/create all the attachments for
-    # the docket entry.
-    de = main_rd.docket_entry
-    if att_data["document_number"] is None:
-        # Bankruptcy attachment page. Use the document number from the Main doc
-        att_data["document_number"] = main_rd.document_number
-
-    rds_created = []
-    if not pq.debug:
-        # Save the old HTML to the docket entry.
-        pacer_file = PacerHtmlFiles(
-            content_object=de, upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE
-        )
-        pacer_file.filepath.save(
-            "attachment_page.html",  # Irrelevant b/c UUIDFileSystemStorage
-            ContentFile(text),
-        )
-
-        # Create/update the attachment items.
-        tags = []
-        if tag_names:
-            for tag_name in tag_names:
-                tag, _ = Tag.objects.get_or_create(name=tag_name)
-                tags.append(tag)
-        for attachment in att_data["attachments"]:
-            if all(
-                [
-                    attachment["attachment_number"],
-                    # Missing on sealed items.
-                    attachment.get("pacer_doc_id", False),
-                    # Missing on some restricted docs (see Juriscraper)
-                    attachment["page_count"] is not None,
-                    attachment["description"],
-                ]
-            ):
-                rd, created = RECAPDocument.objects.update_or_create(
-                    docket_entry=de,
-                    document_number=att_data["document_number"],
-                    attachment_number=attachment["attachment_number"],
-                    document_type=RECAPDocument.ATTACHMENT,
-                )
-                if created:
-                    rds_created.append(rd)
-                needs_save = False
-                for field in ["description", "pacer_doc_id"]:
-                    if attachment[field]:
-                        setattr(rd, field, attachment[field])
-                        needs_save = True
-
-                # Only set page_count and file_size if they're blank, in case
-                # we got the real value by measuring.
-                if rd.page_count is None:
-                    rd.page_count = attachment["page_count"]
-                if rd.file_size is None and attachment["file_size_str"]:
-                    try:
-                        rd.file_size = convert_size_to_bytes(
-                            attachment["file_size_str"]
-                        )
-                    except ValueError:
-                        pass
-
-                if needs_save:
-                    rd.save()
-                if tags:
-                    for tag in tags:
-                        tag.tag_object(rd)
-
-                # Do *not* do this async — that can cause race conditions.
-                add_items_to_solr([rd.pk], "search.RECAPDocument")
-
-    process_orphan_documents(
-        rds_created, pq.court_id, main_rd.docket_entry.docket.date_filed
-    )
-    changed = mark_ia_upload_needed(de.docket)
-    if changed:
-        de.docket.save()
+    add_tags_to_objs(tag_names, rds_affected)
     return mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
 
 
@@ -1084,7 +1007,6 @@ def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk, user_pk):
 
     :param rd_pk: The PK of the RECAP Document to get.
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
-    :param user_pk: The PK of the User that made the request.
     :return: The RECAPDocument PK
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
