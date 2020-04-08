@@ -372,7 +372,7 @@ def process_free_opinion_result(self, row_pk, cnt):
                 self.request.chain = None
                 return
             d.blocked, d.date_blocked = get_blocked_status(d)
-            mark_ia_upload_needed(d)
+            mark_ia_upload_needed(d, save_docket=False)
             d.save()
 
             de, de_created = DocketEntry.objects.update_or_create(
@@ -1444,10 +1444,7 @@ def update_rd_metadata(
     rd.save()
 
     # Make sure we mark the docket as needing upload
-    changed = mark_ia_upload_needed(rd.docket_entry.docket)
-    if changed:
-        rd.docket_entry.docket.save()
-
+    mark_ia_upload_needed(rd.docket_entry.docket, save_docket=True)
     return True, "Saved item successfully"
 
 
