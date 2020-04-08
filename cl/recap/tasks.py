@@ -1072,21 +1072,17 @@ def mark_fq_successful(fq_pk):
     fq.save()
 
 
-@app.task
-def mark_fq_status(data, fq_pk):
+def mark_fq_status(fq, msg, status):
     """Update the PacerFetchQueue item with the status and message provided
 
-    :param data: A tuple returned from a previous task. The tuple contains
-    the PROCESSING_STATUS value and a message.
-    :type data: Tuple
-    :param fq_pk: The PK of the PacerFetchQueue item to update
-    :type fq_pk: int
+    :param fq: The PacerFetchQueue item to update
+    :param msg: The message to associate
+    :param status: The status code to associate. If SUCCESSFUL, date_completed
+    is set as well.
     :return: None
-    :rtype: None
     """
-    status, msg = data[0:]
-    fq = PacerFetchQueue.objects.get(pk=fq_pk)
-    fq.status = status
-    fq.date_completed = now()
     fq.message = msg
+    fq.status = status
+    if status == PROCESSING_STATUS.SUCCESSFUL:
+        fq.date_completed = now()
     fq.save()
