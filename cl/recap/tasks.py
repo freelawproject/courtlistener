@@ -160,7 +160,7 @@ def do_pacer_fetch(fq):
         # Request by recap_document_id
         rd_pk = fq.recap_document_id
         chain(
-            fetch_pacer_doc_by_rd.si(rd_pk, fq.pk, fq.user_id),
+            fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
             extract_recap_pdf.si(rd_pk),
             add_items_to_solr.si([rd_pk], "search.RECAPDocument"),
             mark_fq_successful.si(fq.pk),
@@ -999,7 +999,7 @@ def update_docket_from_hidden_api(data):
     ignore_result=True,
 )
 @transaction.atomic
-def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk, user_pk):
+def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk):
     """Fetch a PACER PDF by rd_pk
 
     This is very similar to get_pacer_doc_by_rd, except that it manages
@@ -1021,7 +1021,7 @@ def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk, user_pk):
         self.request.chain = None
         return
 
-    cookies = get_pacer_cookie_from_cache(user_pk)
+    cookies = get_pacer_cookie_from_cache(fq.user_id)
     if not cookies:
         fq.status = PROCESSING_STATUS.FAILED
         fq.message = "Unable to find cached cookies. Aborting request."
