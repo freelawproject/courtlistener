@@ -37,7 +37,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.constants import RELATED_PATTERN
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import Court, Opinion, SEARCH_TYPES
+from cl.search.models import Court, Opinion, SEARCH_TYPES, OpinionCluster
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
@@ -112,6 +112,7 @@ def do_search(
     error = False
     paged_results = None
     courts = Court.objects.filter(in_use=True)
+    related_cluster_pks = None
 
     # Add additional or overridden GET parameters
     if override_params:
@@ -136,12 +137,15 @@ def do_search(
             # Is this a `related:<pks>` prefix query?
             related_prefix_match = RELATED_PATTERN.search(cd["q"])
             if related_prefix_match:
+                # Seed IDs
+                related_cluster_pks = related_prefix_match.group("pks").split(
+                    ","
+                )
                 results = get_mlt_query(
                     si,
                     cd.copy(),
                     facet,
-                    # Seed IDs
-                    related_prefix_match.group("pks").split(","),
+                    related_cluster_pks,
                     # Original query
                     cd["q"].replace(related_prefix_match.group("pfx"), ""),
                 )
@@ -184,6 +188,11 @@ def do_search(
     cited_cluster = add_depth_counts(  # Also returns cited cluster if found
         search_data=cd, search_results=paged_results,
     )
+    related_cluster = (
+        OpinionCluster.objects.get(sub_opinions__pk__in=related_cluster_pks)
+        if related_cluster_pks
+        else None
+    )
 
     return {
         "results": paged_results,
@@ -197,6 +206,7 @@ def do_search(
         "query_citation": query_citation,
         "error": error,
         "cited_cluster": cited_cluster,
+        "related_cluster": related_cluster,
     }
 
 
