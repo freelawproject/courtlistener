@@ -1623,9 +1623,6 @@ class Court(models.Model):
     MILITARY_APPELLATE = "MA"
     MILITARY_TRIAL = "MT"
     MILITARY_SPECIAL = "MS"
-    CITY_APPELLATE = "CA"
-    CITY_TRIAL = "CT"
-    CITY_SPECIAL = "CS"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
     TESTING_COURT = "T"
@@ -1650,9 +1647,6 @@ class Court(models.Model):
         (MILITARY_APPELLATE, "Military Appellate"),
         (MILITARY_TRIAL, "Military Trial"),
         (MILITARY_SPECIAL, "Military Special"),
-        (CITY_APPELLATE, "City Special"),
-        (CITY_TRIAL, "City Appellate"),
-        (CITY_SPECIAL, "City Special"),
 
         (TESTING_COURT, "Testing"),
     )
@@ -1685,11 +1679,6 @@ class Court(models.Model):
         MILITARY_APPELLATE,
         MILITARY_TRIAL,
         MILITARY_SPECIAL,
-    ]
-    CITY_JURISDICTIONS = [
-        CITY_APPELLATE,
-        CITY_TRIAL,
-        CITY_SPECIAL,
     ]
 
     id = models.CharField(
