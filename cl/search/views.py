@@ -353,6 +353,9 @@ def show_results(request):
             # Get a bunch of stats.
             stats = get_homepage_stats()
             render_dict.update(stats)
+            # Add all courts - for parsing during django templating
+            # This will be eventually adjusted down to in use courts
+            render_dict.update({"all_courts": Court.objects.filter()})
 
             return render(request, "homepage.html", render_dict)
         else:
