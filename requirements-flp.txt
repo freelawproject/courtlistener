@@ -3,3 +3,4 @@
 # really changes frequently is juriscraper.
 juriscraper==1.26.28
 reporters-db
+courts-db
