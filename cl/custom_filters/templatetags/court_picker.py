@@ -103,9 +103,6 @@ def split(value, key):
 def clean_crt(courtstring):
     if "Bankruptcy" in courtstring:
         return courtstring.replace("United States Bankruptcy Court, ", "USBC ")
-    for k, v in us_state_abbrev.items():
-        if k in str(courtstring):
-            return k
     courtstring = courtstring.replace("U.S. Circuit Court for the District of", "C.C.")
     courtstring = courtstring.replace("Court of Appeals for the ", "")
     return courtstring
