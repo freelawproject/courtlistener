@@ -1,0 +1,334 @@
+
+{% load court_picker %}
+
+
+<div class="row no-gutters row-eq-height" style="">
+
+{# Sidebar tab content #}
+
+  <div class="col-sm-2  tab">
+     <li class="tablinks active"><a href="#home" aria-controls="home" role="tab" data-toggle="tab">Shortcuts</a></li>
+      {% with 'Federal,District,State,Bankruptcy,Military,Tribal,Special'|split:"," as details %}
+        {% for g in details %}
+              <li class="tablinks">
+                  <a href="#{{ g.lower }}" aria-controls="{{ g }} Tab" role="tab" data-toggle="tab">{{ g }}
+                    <span data-name="{{ g.lower }}" data-value="0" style="display: inline" class="badge">0</span>
+                  <button data-value="0" data-shortcut="{{ g.lower }}" type="button" class="close" aria-label="Close">
+                    <i class="fa fa-square-o" data-tab="{{ g.lower }}"></i>
+                  </button>
+                </a>
+              </li>
+          {% endfor %}
+      {% endwith %}
+  </div>
+
+
+{# Our tab content #}
+
+  <div class="col-xs-10 tab-content">
+
+{#  HOME PAGE #}
+
+      <div role="tabpanel" class="tab-pane active" id="home">
+        <div class="row border-between">
+          <div class="col-sm-4" style="padding-top: 15px; padding-bottom:15px;">
+          <ul class="list-group" style="margin-bottom:0;"><label class="checkbox-inline shortcut">
+            Federal Appellate
+                  <div id="specialallnone" style="float:right; font-size:12px; line-height:1.4;">
+                    <a data-check="federal">All</a>
+                    <span style="text-decoration: none!important; font-weight: normal; vertical-align: middle;">|</span>
+                    <a data-uncheck="federal">None</a>
+                  </div>
+            </label>
+          </ul>
+
+            <div class="form-group" style="margin-left:10px;">
+              {% with f=all_courts|parse_courts:"federal" %}
+                {% for k in f %}
+                  <div class="form" style="margin-left: 1px;">
+                      <label>
+                        <input data-checkbox="federal"
+                               data-check="{{ k.1.0.full_name|clean_fed }}"
+                               type="checkbox"
+                               value=""> {{ k.1.0.full_name|clean_fed }}</label>
+                    </div>
+                {% endfor %}
+            {% endwith %}
+
+            <hr>
+
+      {% with 'District,Bankruptcy,Military,Tribal,Special'|split:"," as details %}
+        {% for g in details %}
+          <ul class="list-group" style="margin-bottom:0;"><label class="checkbox-inline shortcut">
+            {{ g }}
+                  <div style="float:right; font-size:12px; line-height:1.4; padding-right:10px;">
+                    <a data-shortcut="{{ g.lower }}">All</a>
+                    <span style="text-decoration: none!important; font-weight: normal; vertical-align: middle;">|</span>
+                    <a data-unshortcut="{{ g.lower }}">None</a>
+                    </div>
+            </label>
+          </ul>
+          {% endfor %}
+      {% endwith %}
+
+            </div>
+
+          </div>
+            <div class="col-sm-8" style="padding-top: 15px; padding-bottom:15px;">
+              <ul class="list-group" style="margin-bottom:0;">
+              <label class="checkbox-inline shortcut"> States & Territories
+                <div style="float:right; font-size:12px; line-height:1.4; padding-right:10px;">
+                  <a data-check="state">All</a>
+                    <span style="text-decoration: none!important; font-weight: normal; vertical-align: middle;">|</span>
+                  <a data-uncheck="state">None</a>
+                </div>
+              </label>
+            </ul>
+
+                {% with sd=all_courts|parse_courts:"state" %}
+                  {% for col in sd|split_columns:3 %}
+                      <div class="col-sm-4">
+                            {% for c in col %}
+                            <div class="form" style="margin-left: 10px;">
+                              <label class="checkbox-inline">
+                                <input data-checkbox="state"
+                                       data-check="state_{{ c.lower }}"
+                                       type="checkbox" value=""> {{ c }}</label>
+                            </div>
+                          {% endfor %}
+                      </div>
+                  {% endfor %}
+              {% endwith %}
+              </div>
+            </div>
+          </div>
+
+
+{#  FEDERAL COURT  #}
+
+      <div role="tabpanel" class="tab-pane" id="federal" data-panel="federal" data-badge="federal" >
+        {% with f=all_courts|parse_courts:"federal" %}
+          {% for col in f|split_columns:3 %}
+            <div class="col-sm-4" style="padding-top: 15px; padding-bottom:15px;">
+              {% for k in col %}
+                <div class="form" style="padding-left:5px;">
+
+                  <ul class="list-group" style="margin-bottom:0;"><label class="checkbox-inline shortcut">
+                    {% if k.1.0.full_name|clean_fed == "U.S. Supreme Court " %}
+                                U.S. Supreme Court
+                              {% else %}
+                              {{ k.1.0.full_name|clean_fed }}
+                              {% endif %}
+                          <div style="float:right; font-size:12px; line-height:1.4;">
+                            <a data-check="{{ k.1.0.full_name|clean_fed }}">All</a>
+                            <span style="text-decoration: none!important; font-weight: normal; vertical-align: middle;">|</span>
+                            <a data-uncheck="{{ k.1.0.full_name|clean_fed }}">None</a>
+                            </div>
+                    </label>
+                  </ul>
+                </div>
+
+                {% for item in k.1 %}
+                  <div class="form" style="margin-left: 20px;">
+                      <label class="checkbox-inline"
+                             style="margin-left:10px;"
+                      ><input data-checkbox="{{ k.1.0.full_name|clean_fed }}" type="checkbox" value="">{{ item.full_name |  x_clean }} {% if item.end_date %} ({{ item.end_date|date:"Y" }}) {% endif %}</label>
+                  </div>
+                {% endfor %}
+              {% endfor %}
+              </div>
+        {% endfor %}
+      {% endwith %}
+      </div>
+
+{# FEDERAL DISTRICT #}
+
+      <div role="tabpanel" class="tab-pane" data-badge="district" data-panel="district" id="district">
+        {% with sd=all_courts|parse_courts:"district" %}
+          {% for col in sd|split_columns:4 %}
+              <div class="col-sm-3" style="padding-top: 15px; padding-bottom:15px;">
+                {% for c in col %}
+
+                    <ul class="list-group" style="margin-bottom:0;"><label class="checkbox-inline shortcut">
+                      {{ c }}
+                            <div style="float:right; font-size:12px; line-height:1.4; padding-right:10px;">
+                              <a data-check="district_{{ c.lower }}">All</a>
+                              <span style="text-decoration: none!important; font-weight: normal; vertical-align: middle;">|</span>
+                              <a data-uncheck="district_{{ c.lower }}">None</a>
+                              </div>
+                      </label>
+                    </ul>
+
+                  {% for item in sd|get_item:c reversed%}
+                    <div class="form" style="margin-left: 20px;">
+                        <label class="checkbox-inline"
+                               style="margin-left:10px;"
+                        ><input data-checkbox="district_{{ c.lower }}" type="checkbox" value="">{{ item.full_name }}</label>
+                      </div>
+                  {% endfor %}
+
+                {% endfor %}
+              </div>
+          {% endfor %}
+      {% endwith %}
+      </div>
+
+
+{#  STATE COURTS #}
+
+      <div role="tabpanel" class="tab-pane" data-badge="state" data-panel="state" id="state">
+        {% with sd=all_courts|parse_courts:"state" %}
+          {% for col in sd|split_columns:4 %}
+              <div class="col-sm-3" style="padding-top: 15px;">
+
+                {% for c in col %}
+                      <ul class="list-group" style="margin-bottom:0;"><label class="checkbox-inline shortcut">
+                        {{ c }}
+                            <div style="float:right; font-size:12px; line-height:1.4; padding-right:10px;">
+                              <a data-check="state_{{ c.lower }}">All</a>
+                              <span style="text-decoration: none!important; font-weight: normal; vertical-align: middle;">|</span>
+                              <a data-uncheck="state_{{ c.lower }}">None</a>
+                              </div>
+                      </label>
+                    </ul>
+
+                        {% for item in  sd|get_item:c %}
+                          <div class="form" style="margin-left: 20px;">
+                              <label class="checkbox-inline"
+                                     style="margin-left:10px;">
+                                <input data-checkbox="state_{{ c.lower }}" type="checkbox" value="">{{ item.full_name }}
+                              </label>
+                            </div>
+                        {% endfor %}
+                {% endfor %}
+              </div>
+          {% endfor %}
+      {% endwith %}
+      </div>
+
+{#  BANKRUPTCY COURTS #}
+
+      <div role="tabpanel" class="tab-pane" data-badge="bankruptcy" data-panel="bankruptcy" id="bankruptcy">
+        {% with sd=all_courts|parse_courts:"bankruptcy" %}
+          {% for col in sd|split_columns:4 %}
+              <div class="col-sm-3" style="padding-top: 15px;">
+                {% for c in col %}
+                          <ul class="list-group" style="margin-bottom:0;"><label class="checkbox-inline shortcut">
+                                {{ c }}
+                                <div style="float:right; font-size:12px; line-height:1.4; padding-right:10px;">
+                                  <a data-check="{{ c }}">All</a>
+                                  <span style="text-decoration: none!important; font-weight: normal; vertical-align: middle;">|</span>
+                                  <a data-uncheck="{{ c }}">None</a>
+                                  </div>
+                          </label>
+                        </ul>
+
+                        {% for item in sd|get_item:c %}
+                          <div class="form" style="margin-left: 20px;">
+                              <label class="checkbox-inline"
+                                     style="margin-left:10px;"
+                              ><input data-global-check="bankruptcy" data-to-check="{{ c }}" type="checkbox" value="">{{ item.full_name }}</label>
+                            </div>
+                        {% endfor %}
+                {% endfor %}
+              </div>
+          {% endfor %}
+      {% endwith %}
+      </div>
+
+{#  MILITARY COURTS #}
+
+      <div role="tabpanel" class="tab-pane" data-badge="military" data-panel="military" id="military">
+          {% with xd=all_courts|parse_courts:"military" %}
+            {% for col in xd|split_columns:1 %}
+              <div class="col-sm-4" style="padding-top: 15px; padding-bottom: 15px;">
+
+                    <ul class="list-group" style="margin-bottom:0;"><label class="checkbox-inline shortcut">
+                      Military
+                            <div style="float:right; font-size:12px; line-height:1.4;">
+                              <a data-check="military">All</a>
+                              <span style="text-decoration: none!important; font-weight: normal; vertical-align: middle;">|</span>
+                              <a data-uncheck="military">None</a>
+                              </div>
+                      </label>
+                    </ul>
+
+                {% for c in col %}
+                    <div class="form" style="margin-left: 20px;">
+                        <label class="checkbox-inline"
+                               style="margin-left:10px;"
+                        ><input data-global-check="military" data-to-check="military" type="checkbox" value="">{{ c }}</label>
+                      </div>
+                  {% endfor %}
+              </div>
+            {% endfor %}
+          {% endwith %}
+      </div>
+
+{#  TRIBAL COURTS #}
+
+      <div role="tabpanel" class="tab-pane" data-badge="tribal" data-panel="tribal" id="tribal">
+                {% with xd=all_courts|parse_courts:"tribal" %}
+
+                  <div class="col-sm-12" style="padding-top: 15px;">
+                      <ul class="list-group" style="margin-bottom:0;"><label class="checkbox-inline shortcut">
+                        Tribal
+                              <div style="float:right; font-size:12px; line-height:1.4;">
+                                <a data-check="tribal">All</a>
+                                <span style="text-decoration: none!important; font-weight: normal; vertical-align: middle;">|</span>
+                                <a data-uncheck="tribal">None</a>
+                                </div>
+                        </label>
+                      </ul>
+                    </div>
+
+                  {% for col in xd|split_columns:2 %}
+
+                    <div class="col-sm-6" style="padding-bottom: 15px;">
+
+                      {% for c in col %}
+                          <div class="form" style="margin-left: 20px;">
+                              <label class="checkbox-inline"
+                                     style="margin-left:10px;"
+                              ><input data-global-check="tribal" data-to-check="tribal" type="checkbox" value="">{{ c }}</label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                  {% endfor %}
+                {% endwith %}
+      </div>
+
+{#  SPECIAL COURTS #}
+
+      <div role="tabpanel" class="tab-pane" data-badge="special" data-panel="special" id="special">
+                {% with xd=all_courts|parse_courts:"special" %}
+
+                    <div class="col-sm-12" style="padding-top: 15px;">
+                      <ul class="list-group" style="margin-bottom:0;"><label class="checkbox-inline shortcut">
+                        Special
+                              <div style="float:right; font-size:12px; line-height:1.4;">
+                                <a data-check="special">All</a>
+                                <span style="text-decoration: none!important; font-weight: normal; vertical-align: middle;">|</span>
+                                <a data-uncheck="special" data-to-check="special">None</a>
+                                </div>
+                        </label>
+                      </ul>
+                    </div>
+
+                  {% for col in xd|split_columns:2 %}
+                    <div class="col-sm-6" style="padding-bottom: 15px;">
+
+                      {% for c in col %}
+                          <div class="form" style="margin-left: 20px;">
+                              <label class="checkbox-inline"
+                                     style="margin-left:10px;"
+                              ><input data-all-check="special" data-to-check="special" type="checkbox" value="">{{ c.full_name }} ({{ c.end_date }})</label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                  {% endfor %}
+                {% endwith %}
+      </div>
+  </div>
+
+</div>

@@ -37,6 +37,8 @@
 
 
 {% block content %}
+     <link rel="stylesheet" href="{{ STATIC_URL }}css/court-picker.css"/>
+
     <div id="homepage" class="col-xs-12">
 
     <div id="above-main-query">
@@ -44,6 +46,10 @@
         <p class="text-center large gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free&nbsp;Law&nbsp;Project.</p>
     </div>
 
+    {% if not user.is_staff %}
+      {% include "courts.html" %}
+
+    {% else %}
     <div class="row" id="main-query-box">
         <form action="/" method="get" id="search-form" class="form-inline"
               role="form">
@@ -67,6 +73,9 @@
             </div>
         </form>
     </div>
+  {% endif %}
+
+
 
     <div id="advanced-search" class="row">
         <p class="text-center large alt gray top bottom">&ndash; or &ndash;</p>
@@ -253,4 +262,6 @@
         </div>
     </div>
     </div>
+
 {% endblock %}
+

@@ -1,0 +1,46 @@
+
+
+<div class="col-xs-12" id="court-picker" >
+  <form action="/" method="get" id="search-form" class="">
+        <div class="row">
+                    <div class="form-group">
+                        <div class="input-group">
+                          <input class="form-control input-lg"
+                           value="{{ search_form.q.value|default:'' }}"
+                           name="q"
+                           id="id_q"
+                           autocomplete="off"
+                           type="text">
+                            <div class="input-group-addon stay-open" style="padding:0; border:none; background:none">
+                                <button class="btn btn-default btn-lg dropdown-toggle"
+                                        type="button"
+                                        style="border-bottom-left-radius:0;
+                                            border-radius:0;
+                                            border-top-left-radius:0">
+                                  Courts  <span class="caret"></span>
+
+                                </button>
+                                <ul class="dropdown-menu court-dropdown keep-open" style="
+                                width:100%;
+                                margin:0 !important;
+                                padding:0;
+                                background:whitesmoke;">
+
+                                  {% include 'court-picker-dropdown.html' %}
+
+                                </ul>
+                            </div>
+                          <span class="input-group-btn">
+                            <button type="submit"
+                                class="btn btn-primary btn-lg"
+                                name="search"
+                                id="search-button"><i class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </span>
+                </div>
+          </div>
+    </div>
+  </form>
+</div>
+
+
