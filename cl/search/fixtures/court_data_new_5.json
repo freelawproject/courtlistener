@@ -1,7 +1,7 @@
 [
     {
         "fields": {
-            "short_name": null,
+            "short_name": "Alabama Circuit Courts",
             "in_use": false,
             "jurisdiction": "ST",
             "full_name": "Alabama Circuit Courts",
@@ -20,7 +20,7 @@
     },
     {
         "fields": {
-            "short_name": null,
+            "short_name": "Alabama District Courts",
             "in_use": false,
             "jurisdiction": "ST",
             "full_name": "Alabama District Courts",
@@ -39,7 +39,7 @@
     },
     {
         "fields": {
-            "short_name": null,
+            "short_name": "Alabama Municipal Courts",
             "in_use": false,
             "jurisdiction": "ST",
             "full_name": "Alabama Municipal Courts",
@@ -58,7 +58,7 @@
     },
     {
         "fields": {
-            "short_name": null,
+            "short_name": "Alabama Probate Courts",
             "in_use": false,
             "jurisdiction": "ST",
             "full_name": "Alabama Probate Courts",
@@ -77,7 +77,7 @@
     },
     {
         "fields": {
-            "short_name": null,
+            "short_name": "Alabama Juvenile Courts",
             "in_use": false,
             "jurisdiction": "ST",
             "full_name": "Alabama Juvenile Courts",
@@ -96,7 +96,7 @@
     },
     {
         "fields": {
-            "short_name": null,
+            "short_name": "Alabama Small Claims Courts",
             "in_use": false,
             "jurisdiction": "ST",
             "full_name": "Alabama Small Claims Courts",
@@ -115,7 +115,7 @@
     },
     {
         "fields": {
-            "short_name": null,
+            "short_name": "Alabama Court of the Judiciary",
             "in_use": false,
             "jurisdiction": "SS",
             "full_name": "Alabama Court of the Judiciary",
@@ -134,7 +134,7 @@
     },
     {
         "fields": {
-            "short_name": null,
+            "short_name": "Alaska District Court",
             "in_use": false,
             "jurisdiction": "ST",
             "full_name": "Alaska District Court",
@@ -153,8 +153,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Alaska Superior Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Alaska Superior Court",
             "has_opinion_scraper": false,
@@ -172,8 +172,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Arizona Superior Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Arizona Superior Court",
             "has_opinion_scraper": false,
@@ -191,8 +191,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Arizona Justice Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Arizona Justice Court",
             "has_opinion_scraper": false,
@@ -210,8 +210,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Arizona Tax Court",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Arizona Tax Court",
             "has_opinion_scraper": false,
@@ -229,8 +229,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "United States District Court for the District of Arkansas",
+			"in_use": false,
             "jurisdiction": "FD",
             "full_name": "United States District Court for the District of Arkansas",
             "has_opinion_scraper": false,
@@ -248,8 +248,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Arkansas Circuit Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Arkansas Circuit Courts",
             "has_opinion_scraper": false,
@@ -267,8 +267,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Arkansas District Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Arkansas District Courts",
             "has_opinion_scraper": false,
@@ -286,8 +286,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Arkansas City Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Arkansas City Courts",
             "has_opinion_scraper": false,
@@ -305,8 +305,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Opinion Of The Ohio Attorney General",
+			"in_use": false,
             "jurisdiction": "SAG",
             "full_name": "Opinion Of The Ohio Attorney General",
             "has_opinion_scraper": false,
@@ -324,8 +324,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Ohio State Racing Commission",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Ohio State Racing Commission",
             "has_opinion_scraper": false,
@@ -343,8 +343,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Ohio Civil Rights Commission",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Ohio Civil Rights Commission",
             "has_opinion_scraper": false,
@@ -362,8 +362,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "California Superior Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "California Superior Court",
             "has_opinion_scraper": false,
@@ -381,8 +381,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Colorado County Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Colorado County Court",
             "has_opinion_scraper": false,
@@ -400,8 +400,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Colorado Municipal Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Colorado Municipal Court",
             "has_opinion_scraper": false,
@@ -419,8 +419,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Denver Probate Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Denver Probate Court",
             "has_opinion_scraper": false,
@@ -438,8 +438,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Denver Juvenile Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Denver Juvenile Court",
             "has_opinion_scraper": false,
@@ -457,8 +457,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Colorado District Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Colorado District Court",
             "has_opinion_scraper": false,
@@ -476,8 +476,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Colorado Water Court",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Colorado Water Court",
             "has_opinion_scraper": false,
@@ -495,8 +495,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Connecticut Probate Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Connecticut Probate Court",
             "has_opinion_scraper": false,
@@ -514,8 +514,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Circuit Courts Of Connecticut",
+			      "in_use": false,
             "jurisdiction": "ST",
             "full_name": "Circuit Courts Of Connecticut",
             "has_opinion_scraper": false,
@@ -533,8 +533,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Court Of Common Pleas Of Connecticut",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Court Of Common Pleas Of Connecticut",
             "has_opinion_scraper": false,
@@ -552,8 +552,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Delaware Justice of the Peace Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Delaware Justice of the Peace Courts",
             "has_opinion_scraper": false,
@@ -561,7 +561,7 @@
             "citation_string": "",
             "date_modified": "2020-03-20 10:58:34.115530",
             "url": ".",
-            "notes": null,
+            "notes": "",
             "has_oral_argument_scraper": false,
             "position": 355.564,
             "start_date": "1792-01-01"
@@ -571,7 +571,7 @@
     },
     {
         "fields": {
-            "short_name": "",
+            "short_name": "Court Of General Sessions Of The Peace And Jail Delivery Of Delaware",
             "in_use": false,
             "jurisdiction": "ST",
             "full_name": "Court Of General Sessions Of The Peace And Jail Delivery Of Delaware",
@@ -580,7 +580,7 @@
             "citation_string": "",
             "date_modified": "2020-03-20 10:58:34.115565",
             "url": ".",
-            "notes": null,
+            "notes": "",
             "has_oral_argument_scraper": false,
             "position": 355.561,
             "start_date": null
@@ -590,8 +590,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Delaware Alderman's Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Delaware Alderman's Courts",
             "has_opinion_scraper": false,
@@ -599,7 +599,7 @@
             "citation_string": "",
             "date_modified": "2020-03-20 10:58:34.115602",
             "url": ".",
-            "notes": null,
+            "notes": "",
             "has_oral_argument_scraper": false,
             "position": 355.562,
             "start_date": null
@@ -609,8 +609,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Orphans Court Of Delaware",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Orphans Court Of Delaware",
             "has_opinion_scraper": false,
@@ -628,8 +628,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Florida Circuit Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Florida Circuit Court",
             "has_opinion_scraper": false,
@@ -647,8 +647,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Florida County Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Florida County Court",
             "has_opinion_scraper": false,
@@ -666,8 +666,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Georgia Superior Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Georgia Superior Courts",
             "has_opinion_scraper": false,
@@ -685,8 +685,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Georgia Probate Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Georgia Probate Courts",
             "has_opinion_scraper": false,
@@ -704,8 +704,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Georgia State Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Georgia State Courts",
             "has_opinion_scraper": false,
@@ -723,8 +723,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Georgia Magistrate Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Georgia Magistrate Courts",
             "has_opinion_scraper": false,
@@ -742,8 +742,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Georgia Municipal Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Georgia Municipal Courts",
             "has_opinion_scraper": false,
@@ -761,8 +761,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Georgia Juvenile Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Georgia Juvenile Courts",
             "has_opinion_scraper": false,
@@ -780,8 +780,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Georgia Business Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Georgia Business Court",
             "has_opinion_scraper": false,
@@ -799,8 +799,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "North Carolina Business Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "North Carolina Business Court",
             "has_opinion_scraper": false,
@@ -818,8 +818,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Supreme Court Of The Commonwealth Of The Northern Mariana Islands",
+			"in_use": false,
             "jurisdiction": "S",
             "full_name": "Supreme Court Of The Commonwealth Of The Northern Mariana Islands",
             "has_opinion_scraper": false,
@@ -829,7 +829,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": 392,
+            "position": 395,
             "start_date": null
         },
         "model": "search.court",
@@ -837,8 +837,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Supreme Court of Guam",
+			"in_use": false,
             "jurisdiction": "S",
             "full_name": "Supreme Court of Guam",
             "has_opinion_scraper": false,
@@ -856,8 +856,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Hawaii Family Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Hawaii Family Courts",
             "has_opinion_scraper": false,
@@ -875,8 +875,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Hawaii District Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Hawaii District Courts",
             "has_opinion_scraper": false,
@@ -894,8 +894,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Hawaii Circuit Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Hawaii Circuit Courts",
             "has_opinion_scraper": false,
@@ -913,8 +913,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Hawaii State Tax Appeal Court",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Hawaii State Tax Appeal Court",
             "has_opinion_scraper": false,
@@ -932,8 +932,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Idaho District Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Idaho District Courts",
             "has_opinion_scraper": false,
@@ -951,8 +951,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Idaho Magistrate Division",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Idaho Magistrate Division",
             "has_opinion_scraper": false,
@@ -970,8 +970,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Idaho Drug Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Idaho Drug Court",
             "has_opinion_scraper": false,
@@ -989,8 +989,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Idaho Mental Health Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Idaho Mental Health Court",
             "has_opinion_scraper": false,
@@ -1008,8 +1008,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Court Of Claims Of Illinois",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Court Of Claims Of Illinois",
             "has_opinion_scraper": false,
@@ -1027,8 +1027,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Maryland Tax Court",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Maryland Tax Court",
             "has_opinion_scraper": false,
@@ -1046,8 +1046,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Superior Court Of The State Of Louisiana",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Superior Court Of The State Of Louisiana",
             "has_opinion_scraper": false,
@@ -1057,7 +1057,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": 362.55,
+            "position": 362.54,
             "start_date": null
         },
         "model": "search.court",
@@ -1065,8 +1065,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Superior Court Of Maine",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Superior Court Of Maine",
             "has_opinion_scraper": false,
@@ -1084,8 +1084,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Circuit Court Of Maryland",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Circuit Court Of Maryland",
             "has_opinion_scraper": false,
@@ -1103,8 +1103,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Massachusetts Land Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Massachusetts Land Court",
             "has_opinion_scraper": false,
@@ -1122,8 +1122,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Minnesota Tax Court",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Minnesota Tax Court",
             "has_opinion_scraper": false,
@@ -1141,8 +1141,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Minnesota District Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Minnesota District Courts",
             "has_opinion_scraper": false,
@@ -1160,8 +1160,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Water Court Of The State Of Montana",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Water Court Of The State Of Montana",
             "has_opinion_scraper": false,
@@ -1179,8 +1179,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Judicial District Court Of Montana",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Judicial District Court Of Montana",
             "has_opinion_scraper": false,
@@ -1198,8 +1198,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Superior Court of New Hampshire",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Superior Court of New Hampshire",
             "has_opinion_scraper": false,
@@ -1217,8 +1217,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Orphans Court Of New Jersey",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Orphans Court Of New Jersey",
             "has_opinion_scraper": false,
@@ -1236,8 +1236,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Municipal Courts of New Jersey",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Municipal Courts of New Jersey",
             "has_opinion_scraper": false,
@@ -1255,8 +1255,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Court Of Common Pleas Of New Jersey",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Court Of Common Pleas Of New Jersey",
             "has_opinion_scraper": false,
@@ -1274,8 +1274,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Court Of Oyer And Terminer Of New Jersey",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Court Of Oyer And Terminer Of New Jersey",
             "has_opinion_scraper": false,
@@ -1293,8 +1293,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Court Of Oyer And Terminer of Pennsylvania",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Court Of Oyer And Terminer of Pennsylvania",
             "has_opinion_scraper": false,
@@ -1312,8 +1312,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "The Court of General Sessions",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "The Court of General Sessions",
             "has_opinion_scraper": false,
@@ -1331,8 +1331,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Court of Sessions",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Court of Sessions",
             "has_opinion_scraper": false,
@@ -1350,8 +1350,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Town and Village Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Town and Village Courts",
             "has_opinion_scraper": false,
@@ -1369,8 +1369,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Court for the Correction of Errors",
+			"in_use": false,
             "jurisdiction": "S",
             "full_name": "Court for the Correction of Errors",
             "has_opinion_scraper": false,
@@ -1388,8 +1388,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Court for the Trial of Impeachments",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Court for the Trial of Impeachments",
             "has_opinion_scraper": false,
@@ -1407,8 +1407,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "New York Court of Chancery",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "New York Court of Chancery",
             "has_opinion_scraper": false,
@@ -1426,8 +1426,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "The Superior Court of the City of New York and Buffalo",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "The Superior Court of the City of New York and Buffalo",
             "has_opinion_scraper": false,
@@ -1445,8 +1445,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "The New York Court of Admiralty",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "The New York Court of Admiralty",
             "has_opinion_scraper": false,
@@ -1464,8 +1464,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "The New York Probate Court",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "The New York Probate Court",
             "has_opinion_scraper": false,
@@ -1483,8 +1483,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "The New York Circuit Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "The New York Circuit Courts",
             "has_opinion_scraper": false,
@@ -1502,8 +1502,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "The Marine Court of the City of New York, 1807-1883",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "The Marine Court of the City of New York, 1807-1883",
             "has_opinion_scraper": false,
@@ -1521,8 +1521,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "New York County Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "New York County Courts",
             "has_opinion_scraper": false,
@@ -1540,8 +1540,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Court Of Oyer And Terminer New York",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "Court Of Oyer And Terminer New York",
             "has_opinion_scraper": false,
@@ -1559,8 +1559,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "Court On The Judiciary Of New York",
+			"in_use": false,
             "jurisdiction": "SS",
             "full_name": "Court On The Judiciary Of New York",
             "has_opinion_scraper": false,
@@ -1578,8 +1578,8 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
+            "short_name": "New York District Courts",
+			"in_use": false,
             "jurisdiction": "ST",
             "full_name": "New York District Courts",
             "has_opinion_scraper": false,
@@ -1597,9 +1597,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "City and Municipal Courts of New York",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "City and Municipal Courts of New York",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1616,9 +1616,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "New York State Court of Claims",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "New York State Court of Claims",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1635,9 +1635,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "New York Court of Common Pleas",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "New York Court of Common Pleas",
             "has_opinion_scraper": false,
             "end_date": "1895-12-31",
@@ -1654,9 +1654,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "New York Problem Solving Courts",
+			"in_use": false,
+            "jurisdiction": "SS",
             "full_name": "New York Problem Solving Courts",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1673,9 +1673,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Court Of Arbitration Of The Chamber Of Commerce Of New York",
+			"in_use": false,
+            "jurisdiction": "SS",
             "full_name": "Court Of Arbitration Of The Chamber Of Commerce Of New York",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1692,9 +1692,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Supreme Court of Dakota",
+			"in_use": false,
+            "jurisdiction": "S",
             "full_name": "Supreme Court of Dakota",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1711,9 +1711,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Ohio County Courts",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Ohio County Courts",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1730,9 +1730,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Ohio Superior Court",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Ohio Superior Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1749,9 +1749,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Ohio Magistrate Court",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Ohio Magistrate Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1768,9 +1768,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Ohio Circuit Courts",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Ohio Circuit Courts",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1787,9 +1787,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Ohio District Courts",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Ohio District Courts",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1806,9 +1806,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Court Of Common Pleas Of Ohio",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Court Of Common Pleas Of Ohio",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1825,9 +1825,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Juvenile Court of Ohio",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Juvenile Court of Ohio",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1844,9 +1844,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Municipal Courts of Ohio",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Municipal Courts of Ohio",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1863,9 +1863,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Ohio Public Utilities Commission",
+			"in_use": false,
+            "jurisdiction": "SS",
             "full_name": "Ohio Public Utilities Commission",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1882,9 +1882,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "New Jersey Public Utilities Commission",
+			"in_use": false,
+            "jurisdiction": "SS",
             "full_name": "New Jersey Public Utilities Commission",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1901,9 +1901,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "New Jersey Department Of Labor Workmen S Compensation Bureau",
+			"in_use": false,
+            "jurisdiction": "SS",
             "full_name": "New Jersey Department Of Labor Workmen S Compensation Bureau",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1920,9 +1920,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Board Of Commissioners On The Unauthorized Practice Of Law State Of Ohio",
+			"in_use": false,
+            "jurisdiction": "SS",
             "full_name": "Board Of Commissioners On The Unauthorized Practice Of Law State Of Ohio",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1939,9 +1939,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Board Of Tax Appeals Of Ohio Department Of Taxation",
+			"in_use": false,
+            "jurisdiction": "SS",
             "full_name": "Board Of Tax Appeals Of Ohio Department Of Taxation",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1958,9 +1958,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "United States District Court for the District of Oklahoma",
+			"in_use": false,
+            "jurisdiction": "FD",
             "full_name": "United States District Court for the District of Oklahoma",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1977,9 +1977,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Circuit Courts Of Oregon",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Circuit Courts Of Oregon",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -1996,9 +1996,9 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Common Pleas Court Of Pennsylvania",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Common Pleas Court Of Pennsylvania",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2015,9 +2015,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Pennsylvania Circuit Courts",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Pennsylvania Circuit Courts",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2034,9 +2034,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Tribunal De Apelaciones De Puerto Rico/Court of Appeals of Puerto Rico",
+			"in_use": false,
+            "jurisdiction": "SA",
             "full_name": "Tribunal De Apelaciones De Puerto Rico/Court of Appeals of Puerto Rico",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2053,9 +2053,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Supreme Court of Puerto Rico",
+			"in_use": false,
+            "jurisdiction": "S",
             "full_name": "Supreme Court of Puerto Rico",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2072,9 +2072,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Common Pleas Court Of South Carolina",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Common Pleas Court Of South Carolina",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2091,9 +2091,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Virginia Circuit Courts",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Virginia Circuit Courts",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2110,9 +2110,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Virginia Corporation Court",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Virginia Corporation Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2129,9 +2129,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Virginia Chancery Court",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Virginia Chancery Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2148,9 +2148,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Wisconsin Municipal Court",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Wisconsin Municipal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2167,9 +2167,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Wisconsin Circuit Court",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Wisconsin Circuit Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2186,8 +2186,8 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
+            "short_name": "Hopi Trial Court",
+			"in_use": false,
             "jurisdiction": "TT",
             "full_name": "Hopi Trial Court",
             "has_opinion_scraper": false,
@@ -2205,9 +2205,9 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Hopi Appellate Court",
+			"in_use": false,
+            "jurisdiction": "TA",
             "full_name": "Hopi Appellate Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2226,7 +2226,7 @@
         "fields": {
             "short_name": "Chehalis Tribal Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Chehalis Tribal Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2245,7 +2245,7 @@
         "fields": {
             "short_name": "Cherokee Nation Sup. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Cherokee Nation Supreme Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2264,7 +2264,7 @@
         "fields": {
             "short_name": "Chitimacha Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Chitimacha Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2283,7 +2283,7 @@
         "fields": {
             "short_name": "Colville Confederated Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Colville Confederated Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2302,7 +2302,7 @@
         "fields": {
             "short_name": "Confederated Tribes of the Coos, Lower Umpqua & Siuslaw Indians Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Confederated Tribes of the Coos, Lower Umpqua & Siuslaw Indians Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2321,7 +2321,7 @@
         "fields": {
             "short_name": "Coquille Indian Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Coquille Indian Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2340,7 +2340,7 @@
         "fields": {
             "short_name": "Coushatta Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Coushatta Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2359,7 +2359,7 @@
         "fields": {
             "short_name": "Crow App. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Crow Nation Appellate Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2378,7 +2378,7 @@
         "fields": {
             "short_name": "Eastern Band of Cherokee Sup. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Eastern Band of Cherokee Indians Supreme Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2397,7 +2397,7 @@
         "fields": {
             "short_name": "E. Band of Cherokee Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Eastern Band of Cherokee Indians Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2416,7 +2416,7 @@
         "fields": {
             "short_name": "Fort McDowell Sup. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Fort McDowell Supreme Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2435,7 +2435,7 @@
         "fields": {
             "short_name": "Fort McDowell Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Fort McDowell Yavapai Nation Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2454,7 +2454,7 @@
         "fields": {
             "short_name": "Fort McDowell Tribal Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Fort McDowell Yavapai Nation Tribal Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2473,7 +2473,7 @@
         "fields": {
             "short_name": "Fort Peck App. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Fort Peck Appellate Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2492,7 +2492,7 @@
         "fields": {
             "short_name": "Grand Ronde Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Grand Ronde Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2511,7 +2511,7 @@
         "fields": {
             "short_name": "Grand Ronde Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Grand Ronde Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2530,7 +2530,7 @@
         "fields": {
             "short_name": "Grand Traverse Band of Ottawa & Chippewa Indians Tribal App. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Grand Traverse Band of Ottawa & Chippewa Indians Tribal Appellate Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2549,7 +2549,7 @@
         "fields": {
             "short_name": "Ho-Chunk Nation Sup. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Ho-Chunk Nation Supreme Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2568,7 +2568,7 @@
         "fields": {
             "short_name": "Ho-Chunk Nation Trial Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Ho-Chunk Nation Trial Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2587,7 +2587,7 @@
         "fields": {
             "short_name": "Hualapai Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Hualapai Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2606,7 +2606,7 @@
         "fields": {
             "short_name": "Little River Band of Ottawa Indians Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Little River Band of Ottawa Indians Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2625,7 +2625,7 @@
         "fields": {
             "short_name": "Little Traverse Bay Bands of Odawa Indians Tribal App. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Little Traverse Bay Bands of Odawa Indians Tribal Appellate Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2644,7 +2644,7 @@
         "fields": {
             "short_name": "Makah Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Makah Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2663,7 +2663,7 @@
         "fields": {
             "short_name": "Mashantucket Pequot Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Mashantucket Pequot Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2682,7 +2682,7 @@
         "fields": {
             "short_name": "Mashantucket Pequot Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Mashantucket Pequot Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2701,7 +2701,7 @@
         "fields": {
             "short_name": "Mille Lacs Band of Ojibwe Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Mille Lacs Band of Ojibwe Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2710,7 +2710,7 @@
             "url": "https://millelacsband.com/services/tribal-court",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": 657,
+            "position": 658,
             "start_date": null
         },
         "model": "search.court",
@@ -2720,7 +2720,7 @@
         "fields": {
             "short_name": "Mohegan Gaming Disputes Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TG",
             "full_name": "Mohegan Gaming Disputes Ct. of App.",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2739,7 +2739,7 @@
         "fields": {
             "short_name": "Mohegan Gaming Disputes Trial Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TG",
             "full_name": "Mohegan Gaming Disputes Trial Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2758,7 +2758,7 @@
         "fields": {
             "short_name": "Mohegan Trial Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Mohegan Trial Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2777,7 +2777,7 @@
         "fields": {
             "short_name": "Mohegan Tribal Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Mohegan Tribal Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2796,7 +2796,7 @@
         "fields": {
             "short_name": "Muscogee (Creek) Nation Sup. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Muscogee (Creek) Nation Supreme Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2815,7 +2815,7 @@
         "fields": {
             "short_name": "Dist. Ct. of the Navajo Nation",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Navajo Nation District Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2834,7 +2834,7 @@
         "fields": {
             "short_name": "Navajo Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Navajo Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2853,7 +2853,7 @@
         "fields": {
             "short_name": "Navajo Nation Sup. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TS",
             "full_name": "Navajo Nation Supreme Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2872,7 +2872,7 @@
         "fields": {
             "short_name": "Northern Plains Intertribal Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Northern Plains Intertribal Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2891,7 +2891,7 @@
         "fields": {
             "short_name": "Oneida App. Comm'n, App. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Oneida Appellate Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2908,9 +2908,9 @@
     },
     {
         "fields": {
-            "short_name": "Oneida App. Comm'n, Trial Ct.",
+            "short_name": "Oneida Trial Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Oneida Trial Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2929,7 +2929,7 @@
         "fields": {
             "short_name": "Passamaquoddy App. Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Passamaquoddy Appellate Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2948,7 +2948,7 @@
         "fields": {
             "short_name": "Puyallup Tribal Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Puyallup Tribal Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2967,7 +2967,7 @@
         "fields": {
             "short_name": "Puyallup Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Puyallup Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -2986,7 +2986,7 @@
         "fields": {
             "short_name": "Saint Regis Mohawk Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Saint Regis Mohawk Tribal Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3005,7 +3005,7 @@
         "fields": {
             "short_name": "Confederated Salish & Kootenai Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Confederated Salish & Kootenai Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3024,7 +3024,7 @@
         "fields": {
             "short_name": "Tulalip Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Tulalip Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3043,7 +3043,7 @@
         "fields": {
             "short_name": "Tunica-Biloxi Tribal Ct.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TT",
             "full_name": "Tunica-Biloxi Tribal Ct.",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3062,7 +3062,7 @@
         "fields": {
             "short_name": "Turtle Mountain Tribal Ct. of App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "TA",
             "full_name": "Turtle Mountain Tribal Court of Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3079,16 +3079,16 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Court of Oyer and Terminer",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Court of Oyer and Terminer",
             "has_opinion_scraper": false,
             "end_date": null,
             "citation_string": "",
             "date_modified": "2020-03-20 10:58:34.123469",
             "url": "http://courts.delaware.gov/Superior/",
-            "notes": null,
+            "notes": "",
             "has_oral_argument_scraper": false,
             "position": 355.52,
             "start_date": "1719-01-01"
@@ -3098,9 +3098,9 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Land Court of the State of Hawai\\u02bbi",
+			"in_use": false,
+            "jurisdiction": "SS",
             "full_name": "Land Court of the State of Hawai\\u02bbi",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3117,9 +3117,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Courts of General Quarter Sessions of the Peace",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Courts of General Quarter Sessions of the Peace",
             "has_opinion_scraper": false,
             "end_date": "1947-12-31",
@@ -3136,9 +3136,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Washingon Superior Court",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Washingon Superior Court",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3155,9 +3155,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Municipal Court Of The Virgin Islands",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Municipal Court Of The Virgin Islands",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3174,9 +3174,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Police Court Of The Virgin Islands",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Police Court Of The Virgin Islands",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3193,9 +3193,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Superior Court Of The Virgin Islands",
+			"in_use": false,
+            "jurisdiction": "ST",
             "full_name": "Superior Court Of The Virgin Islands",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3212,9 +3212,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Supreme Court Of The Virgin Islands",
+			"in_use": false,
+            "jurisdiction": "S",
             "full_name": "Supreme Court Of The Virgin Islands",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3231,9 +3231,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Supreme Court Of The Phillippine Islands",
+			"in_use": false,
+            "jurisdiction": "I",
             "full_name": "Supreme Court Of The Phillippine Islands",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3250,9 +3250,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": " United States Court of Berlin",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": " United States Court of Berlin",
             "has_opinion_scraper": false,
             "end_date": "1990-09-12",
@@ -3269,9 +3269,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "United States Court Of Military Appeals",
+			"in_use": false,
+            "jurisdiction": "MA",
             "full_name": "United States Court Of Military Appeals",
             "has_opinion_scraper": false,
             "end_date": "1994-12-31",
@@ -3290,7 +3290,7 @@
         "fields": {
             "short_name": "N-M. Ct. Mil. Rev.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "MA",
             "full_name": "U.S. Navy-Marine Corps Court Of Military Review",
             "has_opinion_scraper": false,
             "end_date": "1994-12-31",
@@ -3309,7 +3309,7 @@
         "fields": {
             "short_name": "N-M. Ct. Crim. App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "MA",
             "full_name": "U S Navy Marine Corps Court Of Criminal Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3328,7 +3328,7 @@
         "fields": {
             "short_name": "C.G. Ct. Mil. Rev.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "MA",
             "full_name": "U S Coast Guard Court Of Military Review",
             "has_opinion_scraper": false,
             "end_date": "1994-12-31",
@@ -3347,7 +3347,7 @@
         "fields": {
             "short_name": "C.G. Bd. Rev.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "MA",
             "full_name": "U.S. Coast Guard Board Of Review",
             "has_opinion_scraper": false,
             "end_date": "1968-12-31",
@@ -3364,9 +3364,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "U.S. Navy Board Of Review",
+			"in_use": false,
+            "jurisdiction": "MA",
             "full_name": "U.S. Navy Board Of Review",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3385,7 +3385,7 @@
         "fields": {
             "short_name": "A. Ct. Mil. Rev.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "MA",
             "full_name": "U.S. Army Court Of Military Review",
             "has_opinion_scraper": false,
             "end_date": "1994-12-31",
@@ -3404,7 +3404,7 @@
         "fields": {
             "short_name": "C.G. Ct. Crim. App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "MA",
             "full_name": "U S Coast Guard Court Of Criminal Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3423,7 +3423,7 @@
         "fields": {
             "short_name": "A. Bd. Rev.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "MA",
             "full_name": "U.S. Army Board Of Review",
             "has_opinion_scraper": false,
             "end_date": "1968-12-31",
@@ -3442,7 +3442,7 @@
         "fields": {
             "short_name": "A.F. Ct. Mil. Rev.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "MA",
             "full_name": "U S Air Force Court Of Military Review",
             "has_opinion_scraper": false,
             "end_date": "1994-12-31",
@@ -3461,7 +3461,7 @@
         "fields": {
             "short_name": "A.F. Ct. Crim. App.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "MA",
             "full_name": "U S Air Force Court Of Criminal Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3480,7 +3480,7 @@
         "fields": {
             "short_name": "A.F. Bd. Rev.",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "MA",
             "full_name": "U.S. Air Force Board Of Review",
             "has_opinion_scraper": false,
             "end_date": "1968-12-31",
@@ -3497,9 +3497,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The First Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The First Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3516,9 +3516,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The Second Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The Second Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3535,9 +3535,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The Third Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The Third Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3554,9 +3554,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The Fourth Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The Fourth Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3573,9 +3573,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The Fifth Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The Fifth Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3592,9 +3592,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The Sixth Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The Sixth Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3611,9 +3611,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The Seventh Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The Seventh Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3630,9 +3630,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The Eighth Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The Eighth Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3649,9 +3649,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The Ninth Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The Ninth Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3668,9 +3668,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The Tenth Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The Tenth Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3687,9 +3687,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Judicial Council Of The Eleventh Circuit",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Judicial Council Of The Eleventh Circuit",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3706,9 +3706,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Office of Hearings and Appeals (OHA)",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Office of Hearings and Appeals (OHA)",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3725,9 +3725,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Office of Hearings and Appeals (OHA)",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Office of Hearings and Appeals (OHA)",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3744,9 +3744,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "United States Maritime Commission",
+			"in_use": false,
+            "jurisdiction": "MS",
             "full_name": "United States Maritime Commission",
             "has_opinion_scraper": false,
             "end_date": "1950-05-24",
@@ -3763,9 +3763,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "United States Department Of Justice Board Of Immigration Appeals",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "United States Department Of Justice Board Of Immigration Appeals",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -3784,7 +3784,7 @@
         "fields": {
             "short_name": "Ala. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Ala.",
             "has_opinion_scraper": false,
             "end_date": "1874-12-31",
@@ -3803,7 +3803,7 @@
         "fields": {
             "short_name": "Mid. Ala. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Mid. Ala.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -3822,7 +3822,7 @@
         "fields": {
             "short_name": "N. Ala. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of N. Ala.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -3841,7 +3841,7 @@
         "fields": {
             "short_name": "S. Ala. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of S. Ala.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -3860,7 +3860,7 @@
         "fields": {
             "short_name": "Ark. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Ark.",
             "has_opinion_scraper": false,
             "end_date": "1851-12-31",
@@ -3879,7 +3879,7 @@
         "fields": {
             "short_name": "E. Ark. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Ark.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -3898,7 +3898,7 @@
         "fields": {
             "short_name": "W. Ark. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Ark.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -3917,7 +3917,7 @@
         "fields": {
             "short_name": "Terr. of Ark. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Terr. of Ark.",
             "has_opinion_scraper": false,
             "end_date": "1836-12-31",
@@ -3936,7 +3936,7 @@
         "fields": {
             "short_name": "N. Cal. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of N. Cal.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -3955,7 +3955,7 @@
         "fields": {
             "short_name": "S. Cal. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of S. Cal.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -3974,7 +3974,7 @@
         "fields": {
             "short_name": "South Carolina. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of South Carolina.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -3993,7 +3993,7 @@
         "fields": {
             "short_name": "Colorado. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Colorado.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4012,7 +4012,7 @@
         "fields": {
             "short_name": "Dist. of Columbia Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Dist. of Columbia",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4031,7 +4031,7 @@
         "fields": {
             "short_name": "Connecticut. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Connecticut.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4050,7 +4050,7 @@
         "fields": {
             "short_name": "North Dakota. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of North Dakota.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4069,7 +4069,7 @@
         "fields": {
             "short_name": "South Dakota. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of South Dakota.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4088,7 +4088,7 @@
         "fields": {
             "short_name": "Fla. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Florida",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -4107,7 +4107,7 @@
         "fields": {
             "short_name": "N. Fla. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of N. Fla.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4126,7 +4126,7 @@
         "fields": {
             "short_name": "S. Fla. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of S. Fla.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4145,7 +4145,7 @@
         "fields": {
             "short_name": "Ga. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Ga.",
             "has_opinion_scraper": false,
             "end_date": "1848-12-31",
@@ -4164,7 +4164,7 @@
         "fields": {
             "short_name": "N. Ga. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of N. Ga.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4183,7 +4183,7 @@
         "fields": {
             "short_name": "S. Ga. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of S. Ga.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4202,7 +4202,7 @@
         "fields": {
             "short_name": "New Hampshire. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of New Hampshire.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4221,7 +4221,7 @@
         "fields": {
             "short_name": "Idaho. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Idaho.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4240,7 +4240,7 @@
         "fields": {
             "short_name": "Ill. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Ill.",
             "has_opinion_scraper": false,
             "end_date": "1855-12-31",
@@ -4249,7 +4249,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": 210.11,
+            "position": 210.61,
             "start_date": "1837-01-01"
         },
         "model": "search.court",
@@ -4259,7 +4259,7 @@
         "fields": {
             "short_name": "E. Ill. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Ill.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4278,7 +4278,7 @@
         "fields": {
             "short_name": "N. Ill. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of N. Ill.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4297,7 +4297,7 @@
         "fields": {
             "short_name": "S. Ill. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of S. Ill.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4316,7 +4316,7 @@
         "fields": {
             "short_name": "Indiana. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Indiana.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4335,7 +4335,7 @@
         "fields": {
             "short_name": "N. Iowa Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of N. Iowa",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4354,7 +4354,7 @@
         "fields": {
             "short_name": "S. Iowa Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of S. Iowa",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4373,7 +4373,7 @@
         "fields": {
             "short_name": "Iowa. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Iowa.",
             "has_opinion_scraper": false,
             "end_date": "1882-12-31",
@@ -4392,7 +4392,7 @@
         "fields": {
             "short_name": "Rhode Island. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Rhode Island.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4411,7 +4411,7 @@
         "fields": {
             "short_name": "New Jersey. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of New Jersey.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4430,7 +4430,7 @@
         "fields": {
             "short_name": "Kansas. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Kansas.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4449,7 +4449,7 @@
         "fields": {
             "short_name": "E. Ky. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Ky.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4468,7 +4468,7 @@
         "fields": {
             "short_name": "Ky. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Ky.",
             "has_opinion_scraper": false,
             "end_date": "1901-12-31",
@@ -4487,7 +4487,7 @@
         "fields": {
             "short_name": "W. Ky. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Ky.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4506,7 +4506,7 @@
         "fields": {
             "short_name": "E. La. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. La.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4525,7 +4525,7 @@
         "fields": {
             "short_name": "La. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Louisiana",
             "has_opinion_scraper": false,
             "end_date": "1849-12-31",
@@ -4544,7 +4544,7 @@
         "fields": {
             "short_name": "W. La. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Louisiana",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4563,7 +4563,7 @@
         "fields": {
             "short_name": "Maine. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Maine",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4582,7 +4582,7 @@
         "fields": {
             "short_name": "Maryland. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Maryland.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4601,7 +4601,7 @@
         "fields": {
             "short_name": "Massachusetts. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Massachusetts.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4620,7 +4620,7 @@
         "fields": {
             "short_name": "E. Mich. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Mich.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4639,7 +4639,7 @@
         "fields": {
             "short_name": "W. Mich. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Michigan.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4658,7 +4658,7 @@
         "fields": {
             "short_name": "Mich. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Michigan.",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -4677,7 +4677,7 @@
         "fields": {
             "short_name": "Minnesota. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Minnesota.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4696,7 +4696,7 @@
         "fields": {
             "short_name": "N. Miss. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of N. Mississippi",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4715,7 +4715,7 @@
         "fields": {
             "short_name": "S. Miss. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of S. Mississippi",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4734,7 +4734,7 @@
         "fields": {
             "short_name": "E. Mo. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Missouri",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4743,7 +4743,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": 240.61,
+            "position": 242.01,
             "start_date": "1857-01-01"
         },
         "model": "search.court",
@@ -4753,7 +4753,7 @@
         "fields": {
             "short_name": "Mo. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Missouri",
             "has_opinion_scraper": false,
             "end_date": "1872-12-31",
@@ -4772,7 +4772,7 @@
         "fields": {
             "short_name": "W. Mo. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Mo.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4791,7 +4791,7 @@
         "fields": {
             "short_name": "Montana. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Montana.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4810,7 +4810,7 @@
         "fields": {
             "short_name": "E. N.C. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. N.C.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4827,9 +4827,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "U.S. Circuit Court District of Cape Fear (North Carolina)",
+			"in_use": false,
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court District of Cape Fear (North Carolina)",
             "has_opinion_scraper": false,
             "end_date": "1872-12-31",
@@ -4846,9 +4846,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "U.S. Circuit Court District of Edenton (North Carolina)",
+			"in_use": false,
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court District of Edenton (North Carolina)",
             "has_opinion_scraper": false,
             "end_date": "1797-12-31",
@@ -4865,9 +4865,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "U.S. Circuit Court District of New Bern (North Carolina)",
+			"in_use": false,
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court District of New Bern (North Carolina)",
             "has_opinion_scraper": false,
             "end_date": "1797-12-31",
@@ -4884,9 +4884,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "U.S. Circuit Court District of Wilmington (North Carolina)",
+			"in_use": false,
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court District of Wilmington (North Carolina)",
             "has_opinion_scraper": false,
             "end_date": "1797-12-31",
@@ -4903,9 +4903,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "U.S. Circuit Court District of Albemarle (North Carolina)",
+			"in_use": false,
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court District of Albemarle (North Carolina)",
             "has_opinion_scraper": false,
             "end_date": "1872-12-31",
@@ -4922,9 +4922,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "U.S. Circuit Court District of Pamptico (North Carolina)",
+			"in_use": false,
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court District of Pamptico (North Carolina)",
             "has_opinion_scraper": false,
             "end_date": "1872-12-31",
@@ -4943,7 +4943,7 @@
         "fields": {
             "short_name": "W. N.C. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. N.C.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4962,7 +4962,7 @@
         "fields": {
             "short_name": "Nebraska. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Nebraska.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -4981,7 +4981,7 @@
         "fields": {
             "short_name": "Nevada. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Nevada.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5000,7 +5000,7 @@
         "fields": {
             "short_name": "N. Ohio Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of N. Ohio",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5019,7 +5019,7 @@
         "fields": {
             "short_name": "S. Ohio Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of S. Ohio",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5038,7 +5038,7 @@
         "fields": {
             "short_name": "Ohio. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Ohio.",
             "has_opinion_scraper": false,
             "end_date": "1855-12-31",
@@ -5057,7 +5057,7 @@
         "fields": {
             "short_name": "E. Okla. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Okla.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5076,7 +5076,7 @@
         "fields": {
             "short_name": "W. Okla. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Okla.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5095,7 +5095,7 @@
         "fields": {
             "short_name": "Oregon. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Oregon.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5114,7 +5114,7 @@
         "fields": {
             "short_name": "E. Pa. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Pa.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5133,7 +5133,7 @@
         "fields": {
             "short_name": "Mid. Pa. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Mid. Pennsylvania",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5152,7 +5152,7 @@
         "fields": {
             "short_name": "Pa. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Pennsylvania",
             "has_opinion_scraper": false,
             "end_date": "1818-12-31",
@@ -5171,7 +5171,7 @@
         "fields": {
             "short_name": "W. Pa. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Pa.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5190,7 +5190,7 @@
         "fields": {
             "short_name": "E. Tenn. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Tennessee",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5209,7 +5209,7 @@
         "fields": {
             "short_name": "Mid. Tenn. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Mid. Tenn.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5228,7 +5228,7 @@
         "fields": {
             "short_name": "W. Tenn. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Tennessee",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5247,7 +5247,7 @@
         "fields": {
             "short_name": "Tex. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Texas",
             "has_opinion_scraper": false,
             "end_date": "1857-02-21",
@@ -5266,7 +5266,7 @@
         "fields": {
             "short_name": "E. Tex. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Texas",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5275,7 +5275,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": 249.61,
+            "position": 250.01,
             "start_date": "1862-01-01"
         },
         "model": "search.court",
@@ -5285,7 +5285,7 @@
         "fields": {
             "short_name": "N. Tex. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of N. Texas",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5304,7 +5304,7 @@
         "fields": {
             "short_name": "S. Tex. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of S. Texas",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5323,7 +5323,7 @@
         "fields": {
             "short_name": "W. Tex. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Tex.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5342,7 +5342,7 @@
         "fields": {
             "short_name": "Utah. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Utah.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5361,7 +5361,7 @@
         "fields": {
             "short_name": "Va. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Virginia",
             "has_opinion_scraper": false,
             "end_date": "1819-12-31",
@@ -5380,7 +5380,7 @@
         "fields": {
             "short_name": "E. Va. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Va.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5399,7 +5399,7 @@
         "fields": {
             "short_name": "W. Va. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Western Virginia",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5418,7 +5418,7 @@
         "fields": {
             "short_name": "N. West Va. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of N. West Virginia",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5437,7 +5437,7 @@
         "fields": {
             "short_name": "S. West Va. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of S. West Virginia",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5456,7 +5456,7 @@
         "fields": {
             "short_name": "West Va. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of West Va.",
             "has_opinion_scraper": false,
             "end_date": "1901-12-31",
@@ -5475,7 +5475,7 @@
         "fields": {
             "short_name": "Vermont. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Vermont.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5494,7 +5494,7 @@
         "fields": {
             "short_name": "E. Wash. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Washington",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5503,7 +5503,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": 297.1,
+            "position": 289.1,
             "start_date": "1905-01-01"
         },
         "model": "search.court",
@@ -5513,7 +5513,7 @@
         "fields": {
             "short_name": "Wash. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Wash.",
             "has_opinion_scraper": false,
             "end_date": "1905-12-31",
@@ -5532,7 +5532,7 @@
         "fields": {
             "short_name": "W. Wash. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Wash.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5551,7 +5551,7 @@
         "fields": {
             "short_name": "E. Wis. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of E. Wisconsin",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5570,7 +5570,7 @@
         "fields": {
             "short_name": "W. Wis. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of W. Wis.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5589,7 +5589,7 @@
         "fields": {
             "short_name": "Wis. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Wisconsin",
             "has_opinion_scraper": false,
             "end_date": "1870-12-31",
@@ -5608,7 +5608,7 @@
         "fields": {
             "short_name": "Wyoming. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Wyoming.",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5627,7 +5627,7 @@
         "fields": {
             "short_name": "Albany New York. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Albany New York",
             "has_opinion_scraper": false,
             "end_date": "1802-12-31",
@@ -5646,7 +5646,7 @@
         "fields": {
             "short_name": "Eastern New York. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Eastern New York",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5665,7 +5665,7 @@
         "fields": {
             "short_name": "Northern New York. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Northern New York",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5684,7 +5684,7 @@
         "fields": {
             "short_name": "Southern New York. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Southern New York",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5703,7 +5703,7 @@
         "fields": {
             "short_name": "Western New York. Cir. Ct",
             "in_use": false,
-            "jurisdiction": "",
+            "jurisdiction": "F",
             "full_name": "U.S. Circuit Court for the District of Western New York",
             "has_opinion_scraper": false,
             "end_date": "1911-12-31",
@@ -5720,9 +5720,9 @@
     },
     {
         "fields": {
-            "short_name": null,
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Decisions of the Federal Communications Commission",
+			"in_use": false,
+            "jurisdiction": "C",
             "full_name": "Decisions of the Federal Communications Commission",
             "has_opinion_scraper": false,
             "end_date": null,
@@ -5731,7 +5731,7 @@
             "url": ".",
             "notes": "",
             "has_oral_argument_scraper": false,
-            "position": 454,
+            "position": 456,
             "start_date": null
         },
         "model": "search.court",
@@ -5739,9 +5739,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "Court Of Appeals Of Indian Territory",
+			"in_use": false,
+            "jurisdiction": "FS",
             "full_name": "Court Of Appeals Of Indian Territory",
             "has_opinion_scraper": false,
             "end_date": "1907-12-31",
@@ -5758,9 +5758,9 @@
     },
     {
         "fields": {
-            "short_name": "",
-            "in_use": false,
-            "jurisdiction": "",
+            "short_name": "State Of California Commission On Judicial Performance",
+			"in_use": false,
+            "jurisdiction": "SS",
             "full_name": "State Of California Commission On Judicial Performance",
             "has_opinion_scraper": false,
             "end_date": null,
