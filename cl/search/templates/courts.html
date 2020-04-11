@@ -10,23 +10,18 @@
                            name="q"
                            id="id_q"
                            autocomplete="off"
+                           placeholder="Search here"
                            type="text">
-                            <div class="input-group-addon stay-open" style="padding:0; border:none; background:none">
-                                <button class="btn btn-default btn-lg dropdown-toggle"
-                                        type="button"
-                                        style="border-bottom-left-radius:0;
-                                            border-radius:0;
-                                            border-top-left-radius:0">
-                                  Courts  <span class="caret"></span>
 
-                                </button>
+                            <div class="input-group-addon stay-open" style="padding:0; border:none; background:none">
+                            <input id="court-search" class="input-lg" placeholder="Find Court" style="border-radius:0px; border:solid; border-width:1px; outline-width: 0;" type="text"/>
                                 <ul class="dropdown-menu court-dropdown keep-open" style="
                                 width:100%;
                                 margin:0 !important;
                                 padding:0;
                                 background:whitesmoke;">
 
-                                  {% include 'court-picker-dropdown.html' %}
+                                    {% include 'court-picker-dropdown.html' %}
 
                                 </ul>
                             </div>

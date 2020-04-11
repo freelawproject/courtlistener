@@ -2,13 +2,71 @@
 
  document.addEventListener('DOMContentLoaded', function() {
 
-    $(".dropdown-toggle").on('click', function(e){
-            $(this).parent().toggleClass('open');
-     })
+   $.expr[":"].contains = $.expr.createPseudo(function(arg) {
+    return function( elem ) {
+        return $(elem).text().toUpperCase().indexOf(arg.toUpperCase()) >= 0;
+    };
+  });
+
+   $(document).on("mousedown", function(e) {
+    clicked = e.target
+  })
+
+  $("input").on("blur", function() {
+    if ($(clicked).parents(".dropdown-menu").length == 0){
+        $(this).parent().removeClass('open');
+    } else {
+      $("#court-search").focus()
+    }
+  })
+
+   $('#court-search').on('focusin', function () {
+        $(this).parent().addClass('open');
+    });
+
+    $("#court-search").focusout(function(e){
+
+    })
+
+
+  var typingTimer;
+  var doneTypingInterval = 100;
+  var $input = $('#court-search');
+
+  $input.on('keyup', function () {
+  clearTimeout(typingTimer);
+    typingTimer = setTimeout(doneTyping, doneTypingInterval);
+  });
+
+  $input.on('keydown', function () {
+    clearTimeout(typingTimer);
+  });
+
+  function doneTyping () {
+
+    var i = $('#court-search').val()
+
+    if (i.length > 2) {
+      // var results = $("label:contains('" + i + "') input")
+      var results = $("label:contains('" + i + "') input")
+      $(results).prop("checked", true).trigger("change")
+      console.log(results )
+    }
+    if (i.length > 2) {
+      var results = $("label:not(:contains('" + i + "')) input:checked")
+      $(results).prop("checked", false).trigger("change")
+    }
+    if (i.length < 3){
+        var results = $("label input:checked")
+        $(results).prop("checked", false).trigger("change")
+    }
+
+  }
+
 
 
     // {# Change tabs #}
-    $(".tablinks").on("click", function () {
+    $(".tablinks").click(function () {
         $(".active").toggleClass("active")
     })
 
