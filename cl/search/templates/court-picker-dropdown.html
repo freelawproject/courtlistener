@@ -5,7 +5,6 @@
 <div class="row no-gutters row-eq-height" style="">
 
 {# Sidebar tab content #}
-
   <div class="col-sm-2  tab">
      <li class="tablinks active"><a href="#home" aria-controls="home" role="tab" data-toggle="tab">Shortcuts</a></li>
       {% with 'Federal,District,State,Bankruptcy,Military,Tribal,Special'|split:"," as details %}
@@ -132,7 +131,7 @@
                   <div class="form" style="margin-left: 20px;">
                       <label class="checkbox-inline"
                              style="margin-left:10px;"
-                      ><input data-checkbox="{{ k.1.0.full_name|clean_fed }}" type="checkbox" value="">{{ item.full_name |  x_clean }} {% if item.end_date %} ({{ item.end_date|date:"Y" }}) {% endif %}</label>
+                      ><input data-checkbox="{{ k.1.0.full_name|clean_fed }}" type="checkbox" value="{{ item.id }}">{{ item.full_name |  x_clean }} {% if item.end_date %} ({{ item.end_date|date:"Y" }}) {% endif %}</label>
                   </div>
                 {% endfor %}
               {% endfor %}
@@ -163,7 +162,7 @@
                     <div class="form" style="margin-left: 20px;">
                         <label class="checkbox-inline"
                                style="margin-left:10px;"
-                        ><input data-checkbox="district_{{ c.lower }}" type="checkbox" value="">{{ item.full_name }}</label>
+                        ><input data-checkbox="district_{{ c.lower }}" type="checkbox" value="{{ item.id }}">{{ item.full_name }}</label>
                       </div>
                   {% endfor %}
 
@@ -192,11 +191,11 @@
                       </label>
                     </ul>
 
-                        {% for item in  sd|get_item:c %}
+                        {% for item in sd|get_item:c %}
                           <div class="form" style="margin-left: 20px;">
                               <label class="checkbox-inline"
                                      style="margin-left:10px;">
-                                <input data-checkbox="state_{{ c.lower }}" type="checkbox" value="">{{ item.full_name }}
+                                <input data-checkbox="state_{{ c.lower }}" type="checkbox" value="{{ item.id }}">{{ item.full_name }}
                               </label>
                             </div>
                         {% endfor %}
@@ -227,7 +226,7 @@
                           <div class="form" style="margin-left: 20px;">
                               <label class="checkbox-inline"
                                      style="margin-left:10px;"
-                              ><input data-global-check="bankruptcy" data-to-check="{{ c }}" type="checkbox" value="">{{ item.full_name }}</label>
+                              ><input data-global-check="bankruptcy" data-to-check="{{ c }}" type="checkbox" value="{{ item.id }}">{{ item.full_name }}</label>
                             </div>
                         {% endfor %}
                 {% endfor %}
@@ -253,11 +252,11 @@
                       </label>
                     </ul>
 
-                {% for c in col %}
+                {% for item in col %}
                     <div class="form" style="margin-left: 20px;">
                         <label class="checkbox-inline"
                                style="margin-left:10px;"
-                        ><input data-global-check="military" data-to-check="military" type="checkbox" value="">{{ c }}</label>
+                        ><input data-global-check="military" data-to-check="military" type="checkbox" value="{{ item.id }}">{{ item }}</label>
                       </div>
                   {% endfor %}
               </div>
@@ -285,12 +284,11 @@
                   {% for col in xd|split_columns:2 %}
 
                     <div class="col-sm-6" style="padding-bottom: 15px;">
-
-                      {% for c in col %}
+                      {% for item in col %}
                           <div class="form" style="margin-left: 20px;">
                               <label class="checkbox-inline"
                                      style="margin-left:10px;"
-                              ><input data-global-check="tribal" data-to-check="tribal" type="checkbox" value="">{{ c }}</label>
+                              ><input data-global-check="tribal" data-to-check="tribal" type="checkbox" value="{{ item.id }}">{{ item }}</label>
                             </div>
                         {% endfor %}
                     </div>
@@ -317,12 +315,11 @@
 
                   {% for col in xd|split_columns:2 %}
                     <div class="col-sm-6" style="padding-bottom: 15px;">
-
-                      {% for c in col %}
+                      {% for item in col %}
                           <div class="form" style="margin-left: 20px;">
                               <label class="checkbox-inline"
                                      style="margin-left:10px;"
-                              ><input data-all-check="special" data-to-check="special" type="checkbox" value="">{{ c.full_name }} ({{ c.end_date }})</label>
+                              ><input data-all-check="special" data-to-check="special" type="checkbox" value="{{ item.id }}">{{ item.full_name }} ({{ item.end_date }})</label>
                             </div>
                         {% endfor %}
                     </div>
