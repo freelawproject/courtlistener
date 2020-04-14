@@ -105,7 +105,7 @@ def do_pacer_fetch(fq):
     :param fq: The PacerFetchQueue item to process
     :return: None
     """
-    c = None
+    result = None
     if fq.request_type == REQUEST_TYPE.DOCKET:
         # Request by docket_id
         court_id = fq.court_id or getattr(fq.docket, "court_id", None)
@@ -155,18 +155,19 @@ def do_pacer_fetch(fq):
             c = chain(get_docket_by_pacer_case_id.si(**kwargs))
         c |= add_or_update_recap_docket.s()
         c |= mark_fq_successful.si(fq.pk)
-        c.apply_async()
+        result = c.apply_async()
     elif fq.request_type == REQUEST_TYPE.PDF:
         # Request by recap_document_id
         rd_pk = fq.recap_document_id
-        chain(
+        result = chain(
             fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
             extract_recap_pdf.si(rd_pk),
             add_items_to_solr.si([rd_pk], "search.RECAPDocument"),
             mark_fq_successful.si(fq.pk),
         ).apply_async()
     elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
-        fetch_attachment_page.apply_async(args=(fq.pk,))
+        result = fetch_attachment_page.apply_async(args=(fq.pk,))
+    return result
 
 
 def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
